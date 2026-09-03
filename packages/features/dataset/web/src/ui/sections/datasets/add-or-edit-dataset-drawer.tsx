@@ -38,11 +38,23 @@ export interface AddDatasetDrawerProps {
   };
   open?: boolean;
   onClose?: () => void;
-  onSuccess: (dataset: {
-    datasetId: string;
-    name: string;
-    columnTypes: DatasetColumns;
-  }) => void;
+  /**
+   * What the caller does with the dataset that was just written.
+   *
+   * OPTIONAL, BECAUSE THE DRAWER IS ALSO A REGISTERED ADDRESS. Every in-product
+   * caller — the workbench, the upload confirm step, "Add to Dataset" — mounts
+   * this drawer itself and hands one in. `?drawer.open=addOrEditDataset` has no
+   * caller at all: `CurrentDrawer` spreads the parsed address, and a URL cannot
+   * carry a function. A required callback made that open a crash on the FIRST
+   * successful save, after the dataset had already been written.
+   *
+   * The drawers doc settles what the ending should be instead: a sub-flow
+   * "NAVIGATES to it and returns", and the return leg is `onClose`, which
+   * already falls back to the navigator's `closeDrawer`. So a bare-URL open
+   * creates the dataset and closes, and only a caller that asked to be told is
+   * told.
+   */
+  onSuccess?: (dataset: { datasetId: string; name: string; columnTypes: DatasetColumns }) => void;
   /**
    * When true, skip saving to DB and just call onSuccess with the form data.
    * Useful for editing inline/in-memory datasets that shouldn't be persisted yet.
@@ -202,7 +214,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       },
       {
         onSuccess: (data) => {
-          props.onSuccess({
+          props.onSuccess?.({
             datasetId: data.id,
             name: data.name,
             columnTypes: data.columnTypes as DatasetColumns,
@@ -250,7 +262,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const onSubmit = (data: DatasetRecordForm) => {
     // For localOnly mode, skip DB save and just call onSuccess
     if (props.localOnly) {
-      props.onSuccess({
+      props.onSuccess?.({
         datasetId: props.datasetToSave?.datasetId ?? "",
         name: data.name,
         columnTypes: data.columnTypes,

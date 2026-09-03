@@ -122,6 +122,15 @@ export type GatewayPlan = {
  * the frontend feature constructs once and a test double is an obvious object
  * literal.
  */
+/**
+ * The drawers this family serves, by the name the address uses.
+ *
+ * Named rather than left as a string so a screen cannot address an overlay the
+ * composing application does not register — a miss renders null with no error,
+ * no toast and no log line.
+ */
+export type GatewayDrawer = "routingPolicy";
+
 export abstract class GatewayHostPort {
   /** The organization and project this page is about. */
   abstract scope(): GatewayScope;
@@ -161,6 +170,30 @@ export abstract class GatewayHostPort {
   ): void;
 
   abstract navigate(to: string): void;
+
+  /**
+   * Puts a REGISTERED DRAWER's address in the URL.
+   *
+   * The routing-policy editor used to be an overlay of the policies screen's
+   * own, keyed on `?policy=`, because the drawer registry is application
+   * composition a feature-web package may not reach. It still may not reach it,
+   * and it does not have to: the registry is addressed by a QUERY STRING, which
+   * the host already writes. So a screen names the drawer and the host spells
+   * the address, which is what makes `?drawer.open=` the single way any overlay
+   * in the product opens (`dev/docs/best_practices/drawers.md`) — and puts the
+   * policies table's own rows on exactly the link a virtual key's detail page
+   * already hands out for the policy it routes through.
+   *
+   * `params` are the DRAWER'S OWN parameter names, unprefixed — the `drawer.`
+   * vocabulary belongs to the host, which writes `?drawer.open=<drawer>` plus
+   * one `drawer.<name>` per parameter and clears every stale `drawer.*` key,
+   * exactly as `openDrawer` does. The shape the agents, api-key and
+   * model-provider families already state.
+   */
+  abstract openDrawer(request: {
+    drawer: GatewayDrawer;
+    params?: Readonly<Record<string, string | undefined>>;
+  }): void;
 
   abstract succeeded(notice: GatewaySuccessNotice): void;
 

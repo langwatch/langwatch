@@ -9,10 +9,12 @@
  * whoever is on call with them.
  *
  * So each overlay keeps its own query key, the surface that opens it also
- * renders it, and the registry entry is deleted. This is the answer the gateway
- * family reached for its routing-policy editor (`?policy=<id>`) and the
- * automations family for both of its drawers, and it is the third time it has
- * been the right one.
+ * renders it, and the registry entry is deleted. The gateway and automations
+ * families reached the same answer for a while and then went back: the registry
+ * is composition, but its ADDRESS is a query string a host can write, so a
+ * screen can name a registered drawer without reaching the registry. These stay
+ * local because nothing outside Ops links to them — no email, no REST field, no
+ * other screen — so there is no second caller for one address to serve.
  *
  * `setQuery` REPLACES the whole query string, so `open` spreads what is already
  * there: an overlay opened over a filtered table must not clear the filter.

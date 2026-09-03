@@ -1,24 +1,22 @@
 /**
  * @vitest-environment jsdom
  *
- * The two editors this screen owns, and the addresses that open them.
+ * The two overlays this screen opens, and the names it opens them by.
  *
- * `platform/app` opened both through the application's drawer registry, which
- * writes a drawer NAME into the query string and mounts the component from a
- * registry the whole application shares. That registry is composition a
- * feature-web package may not reach, so the screen keeps the addresses itself
- * and renders the editors inline — the answer the gateway family's
- * routing-policy editor gave.
+ * IT USED TO OWN TWO QUERY KEYS AND RENDER BOTH EDITORS INLINE — `?automation=`
+ * and `?viewAutomation=` — because the drawer registry is composition a
+ * feature-web package may not reach. The conclusion did not follow: the
+ * registry is addressed by a QUERY STRING and the host already writes those, so
+ * the screen names the drawer and the host spells `?drawer.open=`. That is what
+ * puts a row click on the same address every alert email, the REST
+ * `platformUrl`, the trace explorer's Automate button and Langy's relay links
+ * already mint, instead of on a second one only this page understood.
  *
- * What that makes worth pinning is the CONTRACT of those addresses, because
- * nothing else states it: `?automation=` opens the editor, `?viewAutomation=`
- * opens the panel, opening one drops the other, and closing either leaves an
- * address that no longer reopens anything. A renamed key would silently stop a
- * shared link from working, and no type would notice.
- *
- * The editors themselves are faked. What is under test is which address mounts
- * which one, and driving a thousand lines of Chakra to learn that would test the
- * drawer instead.
+ * SO WHAT IS PINNED HERE MOVED WITH IT. The address vocabulary is the composing
+ * application's and its own suite pins it; what this file states is the half
+ * that is the screen's: which overlay each affordance asks for, with which
+ * automation, and that the screen no longer mounts either editor itself — a
+ * screen that kept rendering one would put a second copy under the registry's.
  */
 
 import { cleanup, screen } from "@testing-library/react";
@@ -68,32 +66,19 @@ vi.mock("../../../behavior/automation-api", () => {
   return { api, automationApi: api };
 });
 
+/**
+ * Both editors, as anything the screen mounted would print.
+ *
+ * They are stubbed rather than left real so that "the screen does not render
+ * either one" is an assertion about the screen and not about whether a thousand
+ * lines of Chakra happened to throw.
+ */
 vi.mock("../../../features/authoring/ui/sections/automation-drawer", () => ({
-  AutomationDrawer: ({ automationId, onClose }: { automationId?: string; onClose: () => void }) => (
-    <div>
-      <span>editing {automationId ?? "a new automation"}</span>
-      <button type="button" onClick={onClose}>
-        close the editor
-      </button>
-    </div>
-  ),
+  AutomationDrawer: () => <div>the editor</div>,
 }));
 
 vi.mock("../../../features/authoring/ui/sections/view-automation-drawer", () => ({
-  ViewAutomationDrawer: ({
-    automationId,
-    onEdit,
-  }: {
-    automationId: string;
-    onEdit: (id: string) => void;
-  }) => (
-    <div>
-      <span>viewing {automationId}</span>
-      <button type="button" onClick={() => onEdit(automationId)}>
-        edit from the panel
-      </button>
-    </div>
-  ),
+  ViewAutomationDrawer: () => <div>the panel</div>,
 }));
 
 import AutomationsPage from "../automations.screen";
@@ -127,66 +112,66 @@ afterEach(() => {
   triggers.rows = [];
 });
 
-describe("given an address that names an automation to edit", () => {
-  describe("when the screen opens on it", () => {
-    it("renders the editor for that automation", () => {
-      openScreen({ automation: "tr_1" });
-
-      expect(screen.getByText("editing tr_1")).toBeDefined();
-      expect(screen.queryByText(/^viewing/)).toBeNull();
-    });
-
-    it("treats the reserved value as a fresh create", () => {
-      openScreen({ automation: "new" });
-
-      expect(screen.getByText("editing a new automation")).toBeDefined();
-    });
-  });
-});
-
-describe("given an address that names an automation to view", () => {
-  describe("when the screen opens on it", () => {
-    it("renders the panel for that automation", () => {
-      openScreen({ viewAutomation: "tr_1" });
-
-      expect(screen.getByText("viewing tr_1")).toBeDefined();
-      expect(screen.queryByText(/^editing/)).toBeNull();
-    });
-  });
-});
-
 describe("given the automations list", () => {
   describe("when a row is clicked", () => {
-    it("puts the automation in the address, so the same link reopens it", async () => {
+    /** @scenario "The automations list opens its viewer at the registered address" */
+    it("asks for the viewer on that automation, by the name the registry answers to", async () => {
       triggers.rows = [TRACE_AUTOMATION];
       const host = openScreen();
 
       await userEvent.click(screen.getByText("Error digest"));
 
-      expect(host.recording.queries.at(-1)?.next).toEqual({ viewAutomation: "tr_1" });
-      expect(screen.getByText("viewing tr_1")).toBeDefined();
+      expect(host.recording.drawerOpens.at(-1)).toEqual({
+        drawer: "viewAutomation",
+        params: { automationId: "tr_1" },
+      });
+    });
+
+    it("does not render the panel itself, so the registry's is the only one", async () => {
+      triggers.rows = [TRACE_AUTOMATION];
+      openScreen();
+
+      await userEvent.click(screen.getByText("Error digest"));
+
+      expect(screen.queryByText("the panel")).toBeNull();
     });
   });
 
-  describe("when the panel hands over to the editor", () => {
-    it("swaps the address rather than carrying both editors at once", async () => {
-      const host = openScreen({ viewAutomation: "tr_1" });
+  describe("when a row's Edit action is chosen", () => {
+    /** @scenario "The automations list opens its editor at the registered address" */
+    it("asks for the editor on that automation", async () => {
+      triggers.rows = [TRACE_AUTOMATION];
+      const host = openScreen();
 
-      await userEvent.click(screen.getByText("edit from the panel"));
+      await userEvent.click(screen.getByLabelText("Actions for Error digest"));
+      await userEvent.click(await screen.findByText("Edit"));
 
-      expect(host.recording.queries.at(-1)?.next).toEqual({ automation: "tr_1" });
-      expect(screen.getByText("editing tr_1")).toBeDefined();
-      expect(screen.queryByText(/^viewing/)).toBeNull();
+      expect(host.recording.drawerOpens.at(-1)).toEqual({
+        drawer: "automation",
+        params: { automationId: "tr_1" },
+      });
     });
   });
 
-  describe("when the editor is closed", () => {
-    it("leaves an address that no longer reopens it", async () => {
-      openScreen({ automation: "tr_1" });
+  describe("when a new automation is started", () => {
+    /** @scenario "Creating an automation opens the editor with no automation named" */
+    it("asks for the editor carrying the prefills and no automation id", async () => {
+      const host = openScreen();
 
-      await userEvent.click(screen.getByText("close the editor"));
+      await userEvent.click(screen.getByText("New automation"));
 
-      expect(screen.queryByText(/^editing/)).toBeNull();
+      expect(host.recording.drawerOpens.at(-1)).toEqual({ drawer: "automation", params: {} });
+    });
+  });
+});
+
+describe("given an address that already names one of the two overlays", () => {
+  describe("when the screen renders under it", () => {
+    it("renders neither editor, because the registry mounts whichever one it names", () => {
+      openScreen({ "drawer.open": "automation", "drawer.automationId": "tr_1" });
+
+      expect(screen.queryByText("the editor")).toBeNull();
+      expect(screen.queryByText("the panel")).toBeNull();
     });
   });
 });

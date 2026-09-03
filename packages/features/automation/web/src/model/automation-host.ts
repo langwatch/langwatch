@@ -91,6 +91,16 @@ export type AutomationFailureNotice = {
  * the frontend feature constructs once and a test double is an obvious object
  * literal.
  */
+/**
+ * The drawers this family serves, by the name the address uses.
+ *
+ * Named rather than left as a string so a screen cannot address an overlay the
+ * composing application does not register — which is the failure this family
+ * spent a release inside: `CurrentDrawer` misses, renders null, and there is no
+ * error, no toast and no log line.
+ */
+export type AutomationDrawer = "automation" | "viewAutomation";
+
 export abstract class AutomationHostPort {
   /** The organization, team and project this page is about. */
   abstract scope(): AutomationScope;
@@ -126,6 +136,30 @@ export abstract class AutomationHostPort {
   ): void;
 
   abstract navigate(to: string): void;
+
+  /**
+   * Puts a REGISTERED DRAWER's address in the URL.
+   *
+   * The two editors used to be an overlay of this screen's own, keyed on
+   * `?automation=` and `?viewAutomation=`, because the drawer registry is
+   * application composition a feature-web package may not reach. It still may
+   * not reach it — but it does not have to: the registry is addressed by a
+   * QUERY STRING, and a query string is something the host already writes. So
+   * the screen names the drawer and the host spells the address, which is what
+   * makes `?drawer.open=` the single way any overlay in the product opens
+   * (`dev/docs/best_practices/drawers.md`).
+   *
+   * `params` are the DRAWER'S OWN parameter names, unprefixed — the `drawer.`
+   * vocabulary belongs to the host, which writes `?drawer.open=<drawer>` plus
+   * one `drawer.<name>` per parameter and clears every stale `drawer.*` key,
+   * exactly as `openDrawer` does. The shape the agents, api-key and
+   * model-provider families already state; they call it `openPlatformDrawer`,
+   * a name from when the registry was `platform/app`'s.
+   */
+  abstract openDrawer(request: {
+    drawer: AutomationDrawer;
+    params?: Readonly<Record<string, string | undefined>>;
+  }): void;
 
   /**
    * The application's own address, for the links a rendered preview prints.

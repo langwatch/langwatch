@@ -43,12 +43,11 @@ import { useRoutingPolicyMutations } from "../../behavior/use-routing-policy-mut
  * With no `policyId` this is the create flow; `seedScopeType` and
  * `seedScopeId` pre-select where the new policy applies.
  *
- * IT NO LONGER CLOSES ITSELF. In `platform/app` this component was registered
- * in the application's drawer registry and reached for `closeDrawer`, which
- * clears that registry's whole navigation stack. The registry is application
- * composition a feature-web package may not import, and it is not this drawer's
- * business anyway: the screen that opened it owns the address it opened from,
- * so closing is a callback it passes in.
+ * IT DOES NOT CLOSE ITSELF, which is the drawers doc's rule rather than a
+ * consequence of where it lives: a target that reaches for `closeDrawer` clears
+ * the navigator's whole stack and drops whoever opened it. So closing arrives
+ * as a callback, and the composing application's registry adapter supplies the
+ * navigator's own.
  */
 export function RoutingPolicyDrawer({
   policyId,

@@ -44,12 +44,23 @@
  *   header branch — a drawer is addressed by the query string and renders
  *   through a portal, so it opens over a legacy page too.
  *
- * WHAT IS STILL OPEN is per drawer rather than structural: a drawer opens as
- * soon as its component lives in its family's package with that package's
- * transport and host port behind it. The ones that do are registered; the ones
- * whose component is still a `platform/app` module, or whose closure drives
- * `@langwatch/workflow-web`'s studio drawer navigator instead of this one, are
- * recorded drawer by drawer in the family manifests.
+ * NOTHING IS STILL OPEN, and the two things this used to defer to are gone:
+ * there is no `platform/app` module left to be waiting on, and the family
+ * manifests it pointed at describe a tree that no longer exists. Every name any
+ * screen, command-bar entry, host adapter or outbound email addresses resolves
+ * in `installed-ui-drawers.ts`. Four names do not, and each is a decision
+ * rather than a gap:
+ *
+ * - `traceV2Details` (and `traceDetails`, which `routeTraceDrawerForV2`
+ *   rewrites into it) is MOUNTED rather than registered — `UiTraceDrawerMount`,
+ *   below `CurrentDrawer` in `ui-app-chrome` — because its URL-to-store sync has
+ *   to outlive the `?drawer.open=` parameter. See that module's own comment.
+ * - `dashboardName` and `seriesFilters` (`@langwatch/analytics-web`) and
+ *   `opsGroupDetail` (`@langwatch/ops-web`) are local overlays on their screens'
+ *   own query keys, kept because nothing outside those screens links to them.
+ *   The gateway and automations families took the same shape for a while and
+ *   went back, once a second caller — a virtual key's link, an alert email —
+ *   made one address serve two pages.
  */
 
 import { chromePageLoaders } from "./ui/sections/chrome-routes";

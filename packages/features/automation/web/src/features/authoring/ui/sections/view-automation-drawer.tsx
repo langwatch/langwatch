@@ -29,11 +29,14 @@ import { formatTimeAgo } from "../../../../model/relative-time";
 interface ViewAutomationDrawerProps {
   automationId: string;
   /**
-   * Closes the panel. The screen owns this drawer's address
-   * (`?viewAutomation=<id>`), so closing is the screen dropping its own key.
+   * Closes the panel.
+   *
+   * Taken as a prop for the drawers doc's reason: a target that calls
+   * `closeDrawer` itself clears the caller's stack too. The registry adapter
+   * supplies the navigator's own close.
    */
   onClose: () => void;
-  /** Hands over to the editor, which the screen addresses as `?automation=`. */
+  /** Hands over to the editor, which the registry answers to as `automation`. */
   onEdit: (automationId: string) => void;
 }
 

@@ -61,7 +61,7 @@ export function UploadCSVDrawer({
 }: {
   isOpen?: boolean;
   onClose?: () => void;
-  onSuccess: AddDatasetDrawerProps["onSuccess"];
+  onSuccess: NonNullable<AddDatasetDrawerProps["onSuccess"]>;
   onCreateFromScratch?: () => void;
   /**
    * When true (default), a successful upload streams the raw file directly to
@@ -322,7 +322,7 @@ export function DatasetUploadProcessing({
 export function InlineUploadCSVForm({
   onSuccess,
 }: {
-  onSuccess: AddDatasetDrawerProps["onSuccess"];
+  onSuccess: NonNullable<AddDatasetDrawerProps["onSuccess"]>;
 }) {
   const addDatasetDrawer = useDisclosure();
   const [uploadedDataset, setUploadedDataset] = useState<InMemoryDataset | undefined>(

@@ -28,31 +28,34 @@ export const simulationsApiBinding: UiFeatureApiBinding = uiFeatureApi({
  * addresses this family writes. `agentTypeSelector` is `@langwatch/agent-web`'s
  * and is registered there.
  *
- * THE LAST SIX ARE THE AGENT EDITORS. Each is wrapped in this family's host
- * before it is registered, because `CurrentDrawer` is mounted above the outlet
- * and a drawer opened from a workflow or the command palette renders outside
- * whatever provider the page below it brought. See
+ * EVERY ONE OF THEM IS WRAPPED IN THIS FAMILY'S HOST before it is registered,
+ * because `CurrentDrawer` is mounted above the outlet and a drawer opened from
+ * a workflow or the command palette renders outside whatever provider the page
+ * below it brought. The five above the agent editors were registered straight
+ * off the package for a while, and `agentWorkflowEditor` and `suiteEditor` both
+ * THREW on mount for want of the provider — swallowed by the drawer host's
+ * error boundary, so it read as the same silent non-opening. See
  * `ui/sections/simulations-drawers.tsx` for the whole argument.
  */
 export const simulationsDrawers: UiDrawerRegistry = {
   scenarioRunDetail: lazyDrawer({
-    factory: () => import("@langwatch/scenario-web/drawers"),
+    factory: () => import("./ui/sections/simulations-drawers"),
     key: "ScenarioRunDetailDrawer",
   }),
   scenarioEditor: lazyDrawer({
-    factory: () => import("@langwatch/scenario-web/drawers"),
-    key: "ScenarioFormDrawerFromUrl",
+    factory: () => import("./ui/sections/simulations-drawers"),
+    key: "ScenarioEditorDrawer",
   }),
   suiteEditor: lazyDrawer({
-    factory: () => import("@langwatch/scenario-web/drawers"),
-    key: "SuiteFormDrawer",
+    factory: () => import("./ui/sections/simulations-drawers"),
+    key: "SuiteEditorDrawer",
   }),
   scenarioVersionHistory: lazyDrawer({
-    factory: () => import("@langwatch/scenario-web/drawers"),
+    factory: () => import("./ui/sections/simulations-drawers"),
     key: "ScenarioVersionHistoryDrawer",
   }),
   agentWorkflowEditor: lazyDrawer({
-    factory: () => import("@langwatch/scenario-web/drawers"),
+    factory: () => import("./ui/sections/simulations-drawers"),
     key: "AgentWorkflowEditorDrawer",
   }),
   agentCodeEditor: lazyDrawer({

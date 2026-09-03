@@ -74,6 +74,11 @@ vi.mock("@langwatch/scenario-web/drawers", () =>
     "AgentListDrawer",
     "AgentWorkflowTargetEditorDrawer",
     "AgentTestingPlanEditorDrawer",
+    "ScenarioRunDetailDrawer",
+    "ScenarioFormDrawerFromUrl",
+    "SuiteFormDrawer",
+    "AgentWorkflowEditorDrawer",
+    "ScenarioVersionHistoryDrawer",
   ]),
 );
 
@@ -110,7 +115,9 @@ vi.mock("@langwatch/organization-web/drawers", () =>
 
 vi.mock("@langwatch/gateway-web/drawers", () => stub.drawers(["RoutingPolicyDrawer"]));
 
-vi.mock("@langwatch/automation-web/drawers", () => stub.drawers(["AutomationDrawer"]));
+vi.mock("@langwatch/automation-web/drawers", () =>
+  stub.drawers(["AutomationDrawer", "ViewAutomationDrawer"]),
+);
 
 vi.mock("@langwatch/ops-web/drawers", async () => {
   const { createElement } = await import("react");
@@ -227,6 +234,42 @@ const OPENINGS: ReadonlyArray<{
     carries: ["suite_1"],
   },
   {
+    what: "the run board opening one simulation run",
+    drawer: "scenarioRunDetail",
+    address: "?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_1",
+    component: "ScenarioRunDetailDrawer",
+    carries: ["run_1"],
+  },
+  {
+    what: "the Scenario Library editing a test case",
+    drawer: "scenarioEditor",
+    address: "?drawer.open=scenarioEditor&drawer.scenarioId=scenario_1",
+    component: "ScenarioFormDrawerFromUrl",
+    carries: ["scenario_1"],
+  },
+  {
+    what: "the suites table editing a suite",
+    drawer: "suiteEditor",
+    address: "?drawer.open=suiteEditor&drawer.suiteId=suite_1",
+    component: "SuiteFormDrawer",
+    carries: ["suite_1"],
+  },
+  {
+    what: "the scenario editor opening a workflow agent",
+    drawer: "agentWorkflowEditor",
+    address: "?drawer.open=agentWorkflowEditor&drawer.agentId=agent_1",
+    component: "AgentWorkflowEditorDrawer",
+    carries: ["agent_1"],
+  },
+  {
+    what: "the scenario editor reading a case's version history",
+    drawer: "scenarioVersionHistory",
+    address:
+      "?drawer.open=scenarioVersionHistory&drawer.scenarioId=scenario_1&drawer.markVersion=3",
+    component: "ScenarioVersionHistoryDrawer",
+    carries: ["scenario_1"],
+  },
+  {
     what: "the evaluator category selector handing over to a workflow evaluator",
     drawer: "workflowSelectorForEvaluator",
     address: "?drawer.open=workflowSelectorForEvaluator",
@@ -263,6 +306,13 @@ const OPENINGS: ReadonlyArray<{
     address: "?drawer.open=routingPolicy&drawer.policyId=policy_1",
     component: "RoutingPolicyDrawer",
     carries: ["policy_1"],
+  },
+  {
+    what: "the automations list opening a row's read-only panel",
+    drawer: "viewAutomation",
+    address: "?drawer.open=viewAutomation&drawer.automationId=trigger_1",
+    component: "ViewAutomationDrawer",
+    carries: ["trigger_1"],
   },
 ];
 
@@ -353,18 +403,52 @@ describe("given a drawer the framework may not let close itself", () => {
    * be shut.
    */
   const CLOSED_BY_THE_ADAPTER = [
-    { drawer: "automation", component: "AutomationDrawer" },
-    { drawer: "routingPolicy", component: "RoutingPolicyDrawer" },
-    { drawer: "foundry", component: "FoundryDrawer" },
+    { drawer: "automation", component: "AutomationDrawer", address: "?drawer.open=automation" },
+    {
+      drawer: "routingPolicy",
+      component: "RoutingPolicyDrawer",
+      address: "?drawer.open=routingPolicy",
+    },
+    { drawer: "foundry", component: "FoundryDrawer", address: "?drawer.open=foundry" },
+    // The viewer needs an automation to view — with none, the adapter renders
+    // nothing rather than asking the server for an empty id.
+    {
+      drawer: "viewAutomation",
+      component: "ViewAutomationDrawer",
+      address: "?drawer.open=viewAutomation&drawer.automationId=trigger_1",
+    },
   ] as const;
 
-  for (const { drawer, component } of CLOSED_BY_THE_ADAPTER) {
+  for (const { drawer, component, address } of CLOSED_BY_THE_ADAPTER) {
     describe(`when the address opens ${drawer}`, () => {
       it("is given the close to call", async () => {
-        const props = await openAddress(`?drawer.open=${drawer}`, component);
+        const props = await openAddress(address, component);
 
         expect(JSON.parse(props).onClose).toBe("[callback]");
       });
     });
   }
+});
+
+/**
+ * The one drawer that leads to another drawer.
+ *
+ * "Edit" on the read-only panel is a drawer NAVIGATING to a drawer, which the
+ * drawers doc says goes through `openDrawer` rather than through a second
+ * mount. The panel cannot make that call itself — it is a package component and
+ * the registry is composition — so the adapter hands it the hand-over, and a
+ * missing one is a dead button rather than an error.
+ */
+describe("given the automation viewer's hand-over to the editor", () => {
+  describe("when the address opens viewAutomation", () => {
+    /** @scenario "The automation viewer hands over to the editor at its registered address" */
+    it("is given the edit to call", async () => {
+      const props = await openAddress(
+        "?drawer.open=viewAutomation&drawer.automationId=trigger_1",
+        "ViewAutomationDrawer",
+      );
+
+      expect(JSON.parse(props).onEdit).toBe("[callback]");
+    });
+  });
 });

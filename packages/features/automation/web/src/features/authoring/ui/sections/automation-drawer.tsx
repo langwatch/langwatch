@@ -188,10 +188,12 @@ export function AutomationDrawer({
   /**
    * Closes the editor.
    *
-   * `platform/app` called the drawer registry's `closeDrawer`, which cleared
-   * the whole navigation stack. The screen owns this drawer's address now
-   * (`?automation=<id>`), so closing is the screen dropping its own query key —
-   * the same shape the gateway family's routing-policy editor took.
+   * Taken as a prop rather than called on the navigator, which is the drawers
+   * doc's rule: a target that calls `closeDrawer` itself clears the whole
+   * navigation stack and drops the caller with it. Every way in now goes
+   * through the registry — the screen's own rows, the alert emails, the trace
+   * explorer's Automate button — so what arrives here is the composing
+   * application's `closeDrawer`, supplied once by its registry adapter.
    */
   onClose: () => void;
 }) {

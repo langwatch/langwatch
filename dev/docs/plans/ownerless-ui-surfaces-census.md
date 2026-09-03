@@ -33,7 +33,7 @@ than by comment:
 | --- | --- | --- |
 | Page keys in `ui-route-table.ts` | 134 / 134 | 0 |
 | Settings-menu hrefs | 33 / 33 | 0 |
-| Registered drawer names | 17 | **22** |
+| Registered drawer names | 39 (was 17) | **0** (was 22) — closed 2026-09-03, `2c6c3a9815` |
 
 ### The two clean bills of health
 
@@ -54,17 +54,25 @@ match a `path:` in the route table, and each of those has a loader. The claim th
 platform"); most of its components were deleted in `cc91631cd8` ("Second reachability
 census: delete 230 unreachable platform files").
 
-`apps/ui/src/features/installed-ui-drawers.ts` registers **17**. Everything else that any
-screen, command-bar entry, host adapter or **outbound email** still addresses by name opens
-nothing: `CurrentDrawer` looks the name up in `installedUiDrawers`, misses, and renders
-null. There is no error, no toast and no log line — the reader clicks and the page does not
-move.
+`apps/ui/src/features/installed-ui-drawers.ts` registered **17** when this census was
+taken. Everything else that any screen, command-bar entry, host adapter or **outbound
+email** addressed by name opened nothing: `CurrentDrawer` looks the name up in
+`installedUiDrawers`, misses, and renders null. There is no error, no toast and no log line
+— the reader clicks and the page does not move.
 
-Registered today: `addOrEditDataset`, `agentTypeSelector`, `agentWorkflowEditor`,
-`annotationScoreEditor`, `codeEvaluatorEditor`, `evaluatorCategorySelector`,
-`evaluatorEditor`, `evaluatorHistory`, `evaluatorList`, `promptEditor`, `promptList`,
-`scenarioEditor`, `scenarioRunDetail`, `scenarioVersionHistory`, `selectDataset`,
-`suiteEditor`, `uploadCSV`.
+**CLOSED (2026-09-03).** `2c6c3a9815` ("Every drawer the product addresses opens again")
+and the two lanes around it took the registry to **39**, and a follow-up collapsed the two
+screens that were still opening their own overlays. Every name the product writes now
+resolves, `traceV2Details` excepted — it is MOUNTED rather than registered
+(`UiTraceDrawerMount`), because its URL-to-store sync has to outlive `?drawer.open=`. The
+three remaining unregistered names (`dashboardName`, `seriesFilters`, `opsGroupDetail`) are
+deliberate local overlays; see the retired list below.
+
+Registered when the census was taken: `addOrEditDataset`, `agentTypeSelector`,
+`agentWorkflowEditor`, `annotationScoreEditor`, `codeEvaluatorEditor`,
+`evaluatorCategorySelector`, `evaluatorEditor`, `evaluatorHistory`, `evaluatorList`,
+`promptEditor`, `promptList`, `scenarioEditor`, `scenarioRunDetail`,
+`scenarioVersionHistory`, `selectDataset`, `suiteEditor`, `uploadCSV`.
 
 ---
 
@@ -123,7 +131,7 @@ vacuous; retire it explicitly.
 | 35 | `apps/ui/src/features/agent/ui/sections/agent-drawers.tsx:18` | "THE THREE EDITORS IT LEADS TO ARE NOT INSTALLED YET. `agentCodeEditor`, `agentHttpEditor` and `workflowSelector` are still `platform/app` modules … a pick writes the next address and nothing opens" | `agentCodeEditor`, `agentHttpEditor`, `workflowSelector` | All three components exist: `packages/features/agent/web/src/features/http/ui/sections/agent-http-editor-drawer.tsx` (already exported from `screens/agent-management`), and `packages/features/scenario/web/src/ui/sections/agents/{agent-code-editor-drawer,workflow-selector-drawer,drawer-from-url}.tsx` (not exported). Picking an agent type still opens nothing. | Add the three to `agentDrawers`, exporting the two scenario ones through `@langwatch/scenario-web/drawers` first | 4 files |
 | 36 | `apps/ui/tests/agent-host.adapter.unit.test.ts:7` | "The code, HTTP and workflow editors are still `platform/app`'s registered drawers" | Same three | Same | Same change; then this docblock states what the adapter writes and what receives it | 1 file |
 | 37 | `packages/features/agent/web/src/screens/agent-management/__tests__/agent-management.screen.test.tsx:10` | "an editor still registered in `platform/app` is an address the host writes" | Same three | Same. The test asserts the address is written, which is still correct — it just no longer lands anywhere | Keep the assertion, correct the premise | 1 file |
-| 38 | `apps/ui/src/features/chrome/index.ts:50` | "the ones whose component is still a `platform/app` module … are recorded drawer by drawer in the family manifests" | The residual unregistered set | Accurate in shape, wrong in cause: the components are in web packages or gone, not in `platform/app`. The manifests it defers to describe a tree that no longer exists | Replace the deferral with the concrete list below | 1 file |
+| 38 | `apps/ui/src/features/chrome/index.ts:50` | "the ones whose component is still a `platform/app` module … are recorded drawer by drawer in the family manifests" | The residual unregistered set | **ANSWERED** (2026-09-03). The deferral is replaced by the concrete list: `traceV2Details` is mounted rather than registered, and `dashboardName`, `seriesFilters` and `opsGroupDetail` are deliberate local overlays. Nothing waits on a `platform/app` module, and the manifests it deferred to describe a deleted tree | Replace the deferral with the concrete list below | 1 file |
 
 ### Group (c) — died with the platform, nothing replaces it (9)
 
@@ -132,7 +140,7 @@ unreachable platform files"), except the drawer registry itself, deleted in `72e
 
 | # | File:line | Claim (abridged) | Surface | State today | Old path | Recommendation | Size |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 39 | `apps/ui/tests/prompt-host.adapter.unit.test.ts:8` | "`traceV2Details` is still `platform/app`'s registered drawer, opened by most of the product" | **The trace drawer, everywhere except `/:project/traces`** | `traceV2Details` is not in `installedUiDrawers`, and nothing in `apps/ui` mounts `GlobalTraceV2DrawerMount`. `routeTraceDrawerForV2` rewrites every `traceDetails` open into `traceV2Details`, so *all* "View trace" affordances funnel into a name that opens nothing. Only `/:project/traces` works, because `traces-page.tsx:248` mounts its own `<TraceDrawerMount>` | `platform/app/src/components/drawerRegistry.ts` (`traceV2Details`) | Mount `GlobalTraceV2DrawerMount` (already in `@langwatch/trace-web`) in `ui-app-chrome` beside `CurrentDrawer`, or register `traceV2Details` in `installedUiDrawers`; export it from `@langwatch/trace-web` first | 2–3 files |
+| 39 | `apps/ui/tests/prompt-host.adapter.unit.test.ts:8` | "`traceV2Details` is still `platform/app`'s registered drawer, opened by most of the product" | **The trace drawer, everywhere except `/:project/traces`** | **ANSWERED** (2026-09-03, `2c6c3a9815`). `ui-app-chrome` mounts `UiTraceDrawerMount` beside `CurrentDrawer`, so every "View trace" affordance opens again; `/:project/traces` still mounts its own copy and the chrome's stands down there. `traceV2Details` is deliberately NOT registered — its URL-to-store sync has to outlive the `?drawer.open=` parameter, which a registry entry cannot do. The claim in `prompt-host.adapter.unit.test.ts:8` was corrected in the same commit | `platform/app/src/components/drawerRegistry.ts` (`traceV2Details`) | Done: the mount, not the registration | 2–3 files |
 | 40 | `apps/ui/tests/model-provider-host.adapter.unit.test.ts:9` | "The provider editor, the default-model override and the model-cost editor are all still `platform/app`'s registered drawers" | `editModelProvider`, `defaultModelOverride`, `llmModelCost` | None registered; **no component for any of the three exists anywhere in `packages/**`** | `platform/app/src/components/EditModelProviderDrawer.tsx`, `.../settings/DefaultModelOverrideDrawer.tsx`, `.../settings/LLMModelCostDrawer.tsx` | Rebuild all three in `@langwatch/model-provider-web` and register them | ~8–12 files |
 | 41 | `packages/features/model-provider/web/src/screens/model-provider/model-providers.screen.tsx:15` | "the one place a key is typed is the editor drawer, which is still `platform/app`'s and which this screen only ADDRESSES" | `editModelProvider` | **A customer cannot add or edit a model-provider credential.** The screen writes the address (line 212) and reads `query["drawer.open"] === "editModelProvider"` (line 101) to decide whether an editor is open; nothing ever opens | `platform/app/src/components/EditModelProviderDrawer.tsx` | Rebuild the credential form in `@langwatch/model-provider-web` and register `editModelProvider` | ~5 files |
 | 42 | `packages/features/model-provider/web/src/behavior/use-model-provider-connection-test.ts:4` | "The sibling `useModelProviderApiKeyValidation` — still `platform/app`'s" | The typed-credential validation hook | Gone with the form above; no replacement | `platform/app/src/hooks/` (with the editor drawer) | Rebuild alongside the editor | 1 file |
@@ -153,8 +161,8 @@ several of these before any of the commented ones.**
 
 | Drawer name | Who opens it | Component today | Group |
 | --- | --- | --- | --- |
-| `traceV2Details` / `traceDetails` | Evaluator Try-it-out, prompt studio chat, simulations, langy links, command bar, evaluation results | `@langwatch/trace-web` (`GlobalTraceV2DrawerMount`, unexported/unmounted) | c |
-| `addDatasetRecord` | Trace explorer bulk-action bar, trace overflow menu, annotation my-queue | **none anywhere** | c |
+| `traceV2Details` / `traceDetails` | Evaluator Try-it-out, prompt studio chat, simulations, langy links, command bar, evaluation results | `@langwatch/trace-web` — **mounted** (2026-09-03, `2c6c3a9815`) as `UiTraceDrawerMount` beside `CurrentDrawer`; not registered, because its URL-to-store sync must outlive `?drawer.open=` | c |
+| `addDatasetRecord` | Trace explorer bulk-action bar, trace overflow menu, annotation my-queue | `@langwatch/trace-web/drawers` — rebuilt and **registered** (2026-09-03, `2c6c3a9815`) | c |
 | `editModelProvider` | Model Providers screen, evaluator type selector | `@langwatch/model-provider-web/drawers` — **registered** (2026-09-03) | c |
 | `defaultModelOverride` | Default Models table | `@langwatch/model-provider-web/drawers` — **registered** (2026-09-03) | c |
 | `llmModelCost` | Model Costs screen | `@langwatch/model-provider-web/drawers` — **registered** (2026-09-03) | c |
@@ -162,21 +170,21 @@ several of these before any of the commented ones.**
 | `editProject` | Teams screen | `@langwatch/organization-web/drawers/project` — **registered** (2026-09-03) | c |
 | `targetTypeSelector` | Evaluations v3 table, Run Evaluation button | `@langwatch/experiment-web/drawers` — **registered** (2026-09-03) | c |
 | `comparisonLeaderboard` | Batch evaluation results | `@langwatch/experiment-web/drawers` — **registered** (2026-09-03) | c |
-| `automation` | **Alert emails** (`automation/contract/src/templating/template-context.ts:271`), trace explorer Automate button, command bar, langy links | `@langwatch/automation-web` has the drawer, but the screen reads `?automation=<id>` / `?viewAutomation=<id>`, not `?drawer.open=automation` | b |
-| `routingPolicy` | Gateway virtual-key screen (`gateway-virtual-key.screen.tsx:487`, an `href`) | `@langwatch/gateway-web` has the drawer, but the screen reads `?policy=<id>` | b |
+| `automation` | **Alert emails** (`automation/contract/src/templating/template-context.ts:271`), trace explorer Automate button, command bar, langy links | `@langwatch/automation-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`); the screen's own `?automation=` / `?viewAutomation=` overlays were collapsed onto the registry after it, so `viewAutomation` is registered too | b |
+| `routingPolicy` | Gateway virtual-key screen (`gateway-virtual-key.screen.tsx:487`, an `href`) | `@langwatch/gateway-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`); the policies screen's own `?policy=` overlay was collapsed onto the registry after it | b |
 | `agentViewer` | Command-bar entity search, command entity registry | **retired** (2026-09-03) — never a drawer; both call sites now address the real per-kind agent editor | c |
-| `agentCodeEditor` | Agent type selector, scenario agent list, experiments target editor, langy relay links | `@langwatch/scenario-web` (unexported) | b |
-| `agentHttpEditor` | Agent type selector, scenario agent list, experiments target editor | `@langwatch/agent-web/screens/agent-management` (**exported**) | b |
-| `workflowSelector` | Agent type selector | `@langwatch/scenario-web` (unexported) | b |
-| `agentList` | Studio agent-picker flow, evaluations v3 table | `@langwatch/scenario-web` (unexported) | b |
-| `agentWorkflowTargetEditor` | Experiments target editor | `@langwatch/scenario-web` (unexported) | b |
-| `workflowSelectorForEvaluator` | Evaluator category selector | `@langwatch/evaluator-web` (unexported) | b |
-| `onlineEvaluation` | Online Evaluations screen, langy capability registry, **monitor alert emails** (`monitor/server/src/transport/api-rest/monitor.api.ts:142`) | `@langwatch/evaluator-web` (unexported) | b |
-| `guardrails` | Online Evaluations screen | `@langwatch/evaluator-web` (unexported) | b |
-| `agentTestingPlanEditor` | agent-testing surfaces | `@langwatch/scenario-web` (unexported) | b |
-| `inviteMember` | Members screen, command bar | `@langwatch/organization-web` (unexported) | b |
-| `createTeam` | Teams screen | `@langwatch/organization-web` (unexported) | b |
-| `foundry` | Command bar | `@langwatch/ops-web` (exported from root) | b |
+| `agentCodeEditor` | Agent type selector, scenario agent list, experiments target editor, langy relay links | `@langwatch/scenario-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `agentHttpEditor` | Agent type selector, scenario agent list, experiments target editor | `@langwatch/scenario-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `workflowSelector` | Agent type selector | `@langwatch/scenario-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `agentList` | Studio agent-picker flow, evaluations v3 table | `@langwatch/scenario-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `agentWorkflowTargetEditor` | Experiments target editor | `@langwatch/scenario-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `workflowSelectorForEvaluator` | Evaluator category selector | `@langwatch/evaluator-web/editor-drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `onlineEvaluation` | Online Evaluations screen, langy capability registry, **monitor alert emails** (`monitor/server/src/transport/api-rest/monitor.api.ts:142`) | `@langwatch/evaluator-web/editor-drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `guardrails` | Online Evaluations screen | `@langwatch/evaluator-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `agentTestingPlanEditor` | agent-testing surfaces | `@langwatch/scenario-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `inviteMember` | Members screen, command bar | `@langwatch/organization-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `createTeam` | Teams screen | `@langwatch/organization-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
+| `foundry` | Command bar | `@langwatch/ops-web/drawers` — **registered** (2026-09-03, `2c6c3a9815`) | b |
 
 Retired deliberately — these are **not** gaps. Each family converted its drawer to a
 local overlay keyed on its own query parameter, and recorded why: `dashboardName` and
@@ -184,16 +192,24 @@ local overlay keyed on its own query parameter, and recorded why: `dashboardName
 `dataPrivacyRule` (`@langwatch/data-privacy-web`), `addAnnotationQueue`
 (`@langwatch/trace-web`, mounted by `add-to-annotation-queue-dialog.tsx`), and
 `addOrEditAnnotationScore` (renamed to the registered `annotationScoreEditor`). Old
-`?drawer.open=` links to these no longer reopen them.
+`?drawer.open=` links to these no longer reopen them. The gateway and automations families
+took the same shape and went back (2026-09-03): the registry is composition a feature-web
+package may not reach, but its ADDRESS is a query string a host already writes, so a screen
+can name a registered drawer without reaching the registry. What decided it was a SECOND
+caller — a virtual key's link, an alert email — for the same editor. The five above have
+none.
 
 ## Two outbound-email links that now go nowhere
 
-Worth separating because they leave the product and cannot be fixed after the fact:
+**BOTH ANSWERED** (2026-09-03, `2c6c3a9815`), on the receiving side and without touching a
+template — which is the only side that could still be fixed. Worth keeping because they
+leave the product and cannot be corrected after the fact:
 
 - `packages/features/automation/contract/src/templating/template-context.ts:271` mints
   `…/automations?drawer.open=automation&drawer.automationId=<id>&drawer.source=email-link`
-  for every alert email. `automations.screen.tsx` reads `?automation=<id>`. The link lands
-  on the automations list with nothing open.
+  for every alert email. `automations.screen.tsx` read `?automation=<id>`, so the link
+  landed on the automations list with nothing open. `automation` is registered, and the
+  screen writes the same address as the email now.
 - `packages/features/monitor/server/src/transport/api-rest/monitor.api.ts:142` mints
-  `…/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=<id>`, and
-  `onlineEvaluation` is unregistered.
+  `…/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=<id>`.
+  `onlineEvaluation` is registered.

@@ -1,12 +1,20 @@
 /**
  * @vitest-environment jsdom
  *
- * The routing policy editor is still URL-routed (see
- * dev/docs/best_practices/drawers.md), but the address is now the screen's own
- * query string rather than the application drawer registry's: the page writes
- * `?policy=<id>` and renders the editor for whatever that names, so a pasted
- * link reopens the same policy. What is asserted here is that behaviour — the
- * address the page writes, and the editor a page opened at that address builds.
+ * The routing policy editor is URL-routed (see
+ * dev/docs/best_practices/drawers.md), and the address is the drawer registry's
+ * again: the page names `routingPolicy` and its host writes
+ * `?drawer.open=routingPolicy&drawer.policyId=<id>`, which is exactly the link
+ * a virtual key's detail page already hands out for the policy that key routes
+ * through. It kept a `?policy=<id>` key of its own for a while, on the reading
+ * that a feature-web package may not reach the registry — true of the registry,
+ * false of its ADDRESS, which is a query string the host already writes.
+ *
+ * SO THIS FILE SPLIT ALONG THAT SEAM. What the page does is name a drawer and
+ * hand over the policy, which is asserted off the host's recording; what the
+ * editor rebuilds from a policy id is asserted by rendering the editor with the
+ * props the registry's adapter builds from the address. The address vocabulary
+ * itself belongs to the composing application and its own suite pins it.
  *
  * Spec: specs/ai-gateway/governance/admin-routing-policies.feature
  *       (Rule: The routing policy editor opens from its own address)
@@ -162,7 +170,10 @@ describe("given the routing policies page", () => {
       );
       await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
 
-      expect(host.recording.queries.at(-1)?.next).toEqual({ policy: "rp-1" });
+      expect(host.recording.drawerOpens.at(-1)).toEqual({
+        drawer: "routingPolicy",
+        params: { policyId: "rp-1" },
+      });
     });
   });
 
@@ -173,11 +184,14 @@ describe("given the routing policies page", () => {
 
       await user.click(screen.getAllByRole("button", { name: /New policy/ })[0]!);
 
-      expect(host.recording.queries.at(-1)?.next).toEqual({
-        policy: "new",
-        scopeType: "ORGANIZATION",
-        scopeId: "org-1",
-        isDefault: "false",
+      expect(host.recording.drawerOpens.at(-1)).toEqual({
+        drawer: "routingPolicy",
+        // No policy id: a create is the same drawer with nothing to load.
+        params: {
+          seedScopeType: "ORGANIZATION",
+          seedScopeId: "org-1",
+          seedIsDefault: "false",
+        },
       });
     });
   });
@@ -187,9 +201,17 @@ describe("given a shared link that carries a policy", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(cleanup);
 
+  /**
+   * The editor, built from the one thing the address carries.
+   *
+   * `renderEditor` mounts it with the props the registry's adapter reads off
+   * `?drawer.open=routingPolicy&drawer.policyId=rp-1` — the page itself no
+   * longer renders it, so mounting the page here would prove nothing about
+   * what a pasted link rebuilds.
+   */
   /** @scenario "Editing a policy from the list opens the editor for that policy" */
   it("rebuilds the editor for that policy from the address alone", async () => {
-    renderPage({ policy: "rp-1" });
+    renderEditor();
 
     expect(await screen.findByText("Edit routing policy")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Developer default")).toBeInTheDocument();

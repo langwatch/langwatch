@@ -14,11 +14,14 @@
  * mounted out of the same package as `automation.*` and both screens' hooks run
  * on one Provider.
  *
- * IT SERVES ONE DRAWER AS WELL AS ITS PAGES, and that one leaves the product:
- * every alert email carries `?drawer.open=automation&drawer.automationId=<id>`
- * as its "Edit automation" link, and so do the trace explorer's Automate
- * button, the command palette and Langy's relay links. The name was never
- * registered, so all of them landed on the automations list with nothing open.
+ * IT SERVES TWO DRAWERS AS WELL AS ITS PAGES, and one of them leaves the
+ * product: every alert email carries
+ * `?drawer.open=automation&drawer.automationId=<id>` as its "Edit automation"
+ * link, and so do the REST `platformUrl`, the trace explorer's Automate button,
+ * the command palette and Langy's relay links. The name was never registered,
+ * so all of them landed on the automations list with nothing open. `viewAutomation`
+ * joins it because the screen's own rows write both addresses now, and the
+ * viewer hands over to the editor.
  */
 
 import { automationApi } from "@langwatch/automation-web/screens/automations";
@@ -37,6 +40,10 @@ export const automationsDrawers: UiDrawerRegistry = {
   automation: lazyDrawer({
     factory: () => import("./ui/sections/automations-drawers"),
     key: "AutomationDrawer",
+  }),
+  viewAutomation: lazyDrawer({
+    factory: () => import("./ui/sections/automations-drawers"),
+    key: "ViewAutomationDrawer",
   }),
 };
 

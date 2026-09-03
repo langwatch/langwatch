@@ -14,28 +14,29 @@ import { useRoutingPolicyMutations } from "../../features/routing-policies/behav
 import type { ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
 import { Link } from "../../ui/elements/gateway-link";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
-import { RoutingPolicyDrawer } from "../../features/routing-policies/ui/sections/routing-policy-drawer";
-import { useGatewayRouter } from "../../behavior/gateway-router";
+import { useGatewayHost } from "../../model/gateway-host";
 import { useOrganizationTeamProject } from "../../behavior/gateway-session";
 import { api } from "../../behavior/gateway-api";
 import { docsUrl } from "../../model/docs-url";
 
 /**
- * The routing policy editor still opens from its own address.
+ * The routing policy editor opens at the name the registry answers to.
  *
- * `platform/app` opened it through the application's drawer registry, which
- * writes the drawer's name and its scalar props into the query string. That
- * registry is application composition a feature-web package may not reach, and
- * the platform copy of the registered component dies with the page it was
- * registered for. What the spec asks for is the behaviour, not the registry:
- * "the address carries the policy, so the same link reopens it"
- * (specs/ai-gateway/governance/admin-routing-policies.feature). So the screen
- * keeps the policy in the query string itself — `?policy=<id>` to edit,
- * `?policy=new` plus the seed to create — reads it back through the host, and
- * renders the editor inline.
+ * IT USED TO KEEP A KEY OF ITS OWN, `?policy=<id>` to edit and `?policy=new`
+ * plus the seed to create, and render the editor inline. The reason was real —
+ * the drawer registry is application composition a feature-web package may not
+ * reach — and the conclusion did not follow: the registry is addressed by a
+ * QUERY STRING, which the host already writes. So the screen names the drawer
+ * and the host spells `?drawer.open=routingPolicy`, which is what the spec
+ * asked for all along ("the address carries the policy, so the same link
+ * reopens it", specs/ai-gateway/governance/admin-routing-policies.feature) and
+ * what a virtual key's detail page already links to for the policy that key
+ * routes through. One editor, one address, whichever page the reader came from.
+ *
+ * A create is the same drawer with no `policyId` rather than the sentinel the
+ * screen's own key needed; the seed rides along as the drawer's own parameters.
  */
-export const ROUTING_POLICY_QUERY_KEY = "policy";
-const NEW_ROUTING_POLICY = "new";
+const ROUTING_POLICY_DRAWER = "routingPolicy" as const;
 
 /**
  * Exported unwrapped so tests can render the page itself rather than the
@@ -44,14 +45,8 @@ const NEW_ROUTING_POLICY = "new";
 export function RoutingPoliciesPage() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject();
   const organizationId = organization?.id ?? "";
-  const router = useGatewayRouter();
+  const host = useGatewayHost();
   const canManage = hasAnyPermission("routingPolicies:manage");
-
-  const openPolicy = router.query[ROUTING_POLICY_QUERY_KEY];
-  const seedScopeType = router.query.scopeType;
-  const seedScopeId = router.query.scopeId;
-  const seedIsDefault = router.query.isDefault;
-  const closeEditor = () => router.replace("?");
 
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId },
@@ -68,14 +63,14 @@ export function RoutingPoliciesPage() {
   const hasAnyDefault = policies.some((policy) => policy.isDefault);
 
   const openNew = (level: RoutingPolicyScopeLevel, isDefault = false) =>
-    router.push(
-      `?${new URLSearchParams({
-        [ROUTING_POLICY_QUERY_KEY]: NEW_ROUTING_POLICY,
-        scopeType: level.toUpperCase(),
-        scopeId: level === "organization" ? organizationId : "",
-        isDefault: isDefault ? "true" : "false",
-      }).toString()}`,
-    );
+    host.openDrawer({
+      drawer: ROUTING_POLICY_DRAWER,
+      params: {
+        seedScopeType: level.toUpperCase(),
+        seedScopeId: level === "organization" ? organizationId : "",
+        seedIsDefault: isDefault ? "true" : "false",
+      },
+    });
 
   return (
     <AiGatewayLayout pageTitle="Routing Policies · AI Gateway · LangWatch">
@@ -103,9 +98,10 @@ export function RoutingPoliciesPage() {
           resolveScopeNames={resolveScopeNames}
           onNew={(level) => openNew(level)}
           onEdit={(policy) =>
-            router.push(
-              `?${new URLSearchParams({ [ROUTING_POLICY_QUERY_KEY]: policy.id }).toString()}`,
-            )
+            host.openDrawer({
+              drawer: ROUTING_POLICY_DRAWER,
+              params: { policyId: policy.id },
+            })
           }
           onSetDefault={(policy) => setDefault.mutate({ organizationId, id: policy.id })}
           onDelete={setPolicyToDelete}
@@ -133,15 +129,9 @@ export function RoutingPoliciesPage() {
         }}
       />
 
-      {openPolicy ? (
-        <RoutingPolicyDrawer
-          {...(openPolicy === NEW_ROUTING_POLICY ? {} : { policyId: openPolicy })}
-          {...(seedScopeType ? { seedScopeType } : {})}
-          {...(seedScopeId ? { seedScopeId } : {})}
-          {...(seedIsDefault ? { seedIsDefault } : {})}
-          onClose={closeEditor}
-        />
-      ) : null}
+      {/* The editor is not rendered here. `CurrentDrawer` mounts it in the
+          host it needs, over whatever page the reader is on — which is the
+          same mount a virtual key's "routes through" link lands on. */}
     </AiGatewayLayout>
   );
 }

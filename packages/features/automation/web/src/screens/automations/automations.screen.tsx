@@ -14,11 +14,7 @@ import { Calendar, Edit2, Eye, Filter, MoreVertical, Trash, TrendingUp, Zap } fr
 import { FilterDisplay } from "../../ui/elements/filter-display";
 import { ClampedText } from "../../ui/elements/clamped-text";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  AUTOMATION_SECTIONS,
-  AutomationsLayout,
-  type AutomationSection,
-} from "../../ui/sections/automations-layout";
+import { AutomationsLayout, type AutomationSection } from "../../ui/sections/automations-layout";
 import { Link } from "../../ui/elements/automation-link";
 import { Menu } from "@langwatch/design-system/menu";
 import { Switch } from "@langwatch/design-system/switch";
@@ -41,34 +37,39 @@ import {
 } from "../../features/overview/ui/elements/automation-table-cells";
 import { RUNAWAY_PAUSE_REASON, type TriggerAction } from "@langwatch/automation-contract";
 import { CLIENT_PROVIDERS } from "../../features/authoring/ui/sections/client-providers";
-import { AutomationDrawer } from "../../features/authoring/ui/sections/automation-drawer";
-import { ViewAutomationDrawer } from "../../features/authoring/ui/sections/view-automation-drawer";
 import type { Monitor } from "@langwatch/monitor-contract";
+import { useAutomationHost } from "../../model/automation-host";
 import { useOrganizationTeamProject } from "../../behavior/automation-session";
 import { useAutomationToaster } from "../../behavior/automation-feedback";
-import { useAutomationRouter } from "../../behavior/automation-router";
 import { api, type RouterOutputs } from "../../behavior/automation-api";
 import { formatTimeAgo } from "../../model/relative-time";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
 /**
- * The two editors this screen owns, addressed by its own query string.
+ * The two editors this screen opens, by the name the registry answers to.
  *
- * `platform/app` opened them through the application's drawer registry, which
- * writes a drawer NAME and its scalar props into the query string, and mounts
- * the component from a registry the whole application shares. That registry is
- * composition a feature-web package may not reach. What the addresses were ever
- * for is reopening the same editor from the same link, so the screen keeps them
- * itself and renders the editors inline — the answer the gateway family's
- * routing-policy editor gave, repeated by the me family's pull-request detail.
+ * IT USED TO OWN TWO QUERY KEYS OF ITS OWN, `?automation=` and
+ * `?viewAutomation=`, and render the editors inline. The reason was real — the
+ * drawer registry is application composition a feature-web package may not
+ * reach — and the conclusion was wrong: the registry is addressed by a QUERY
+ * STRING, which the host already writes. So the screen names the drawer and the
+ * host spells `?drawer.open=`, and there is one mechanism for every overlay in
+ * the product rather than one per screen (`dev/docs/best_practices/drawers.md`).
  *
- * `?automation=new` is a fresh create; any other value is the automation being
- * edited. The create prefills ride alongside it under their own keys.
+ * What this settles is not tidiness. Every alert email, the REST `platformUrl`,
+ * the trace explorer's Automate button and Langy's relay links already write
+ * `?drawer.open=automation`; the screen's own rows wrote something else, so the
+ * SAME editor had two addresses and only one of them survived being pasted to
+ * a colleague on a different page.
+ *
+ * A create is the same drawer with no id — the registry carries no
+ * `drawer.automationId` — rather than the sentinel `?automation=new` the
+ * screen's own key needed. The prefills ride along as the drawer's own
+ * parameters.
  */
-const EDIT_QUERY_KEY = "automation";
-const VIEW_QUERY_KEY = "viewAutomation";
-const NEW_AUTOMATION = "new";
+const EDIT_DRAWER = "automation" as const;
+const VIEW_DRAWER = "viewAutomation" as const;
 
 /** The prefills a create can be opened with, as the query carries them. */
 type AutomationCreatePrefill = {
@@ -110,37 +111,25 @@ const sectionDetails: Record<AutomationSection, { title: string; description: st
 export function AutomationsPage({ section = "overview" }: { section?: AutomationSection } = {}) {
   const { project } = useOrganizationTeamProject();
   const toaster = useAutomationToaster();
-  const router = useAutomationRouter();
+  const host = useAutomationHost();
   const details = sectionDetails[section];
   const basePath = project ? `/${project.slug}/automations` : "/auth/signin";
 
-  const editing = router.query[EDIT_QUERY_KEY];
-  const viewing = router.query[VIEW_QUERY_KEY];
-
   /**
-   * Writes one of the two editor keys, dropping the other.
+   * Opens one of the two editors at its registered address.
    *
-   * `setQuery` replaces the whole query string, so switching from the viewer to
-   * the editor is one write rather than a clear followed by a set — and closing
-   * either one is an empty write, which is what takes the editor out of the
-   * address so the link stops reopening it.
+   * The host clears every stale `drawer.*` key on the way, so switching from
+   * the viewer to the editor is one write rather than a clear followed by a
+   * set, and neither editor can open carrying the other's parameters. Closing
+   * is the drawer's own: the registry adapter hands it `closeDrawer`, which is
+   * what takes the name out of the address so the link stops reopening it.
    */
   const openEdit = (automationId: string) =>
-    router.push(`?${new URLSearchParams({ [EDIT_QUERY_KEY]: automationId }).toString()}`);
+    host.openDrawer({ drawer: EDIT_DRAWER, params: { automationId } });
   const openView = (automationId: string) =>
-    router.push(`?${new URLSearchParams({ [VIEW_QUERY_KEY]: automationId }).toString()}`);
+    host.openDrawer({ drawer: VIEW_DRAWER, params: { automationId } });
   const openCreate = (prefill: AutomationCreatePrefill) =>
-    router.push(
-      `?${new URLSearchParams({
-        [EDIT_QUERY_KEY]: NEW_AUTOMATION,
-        ...Object.fromEntries(
-          Object.entries(prefill).filter(
-            (entry): entry is [string, string] => typeof entry[1] === "string",
-          ),
-        ),
-      }).toString()}`,
-    );
-  const closeEditor = () => router.push("?");
+    host.openDrawer({ drawer: EDIT_DRAWER, params: prefill });
 
   const triggers = api.automation.getTriggers.useQuery(
     {
@@ -889,25 +878,9 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
         </VStack>
       </Box>
 
-      {/* Both editors are rendered by the screen that addresses them, so the
-          link that carries `?automation=` reopens exactly what it named. */}
-      {editing !== void 0 ? (
-        <AutomationDrawer
-          {...(editing !== NEW_AUTOMATION ? { automationId: editing } : {})}
-          {...(router.query.initialSource ? { initialSource: router.query.initialSource } : {})}
-          {...(router.query.initialName ? { initialName: router.query.initialName } : {})}
-          {...(router.query.initialAction ? { initialAction: router.query.initialAction } : {})}
-          {...(router.query.initialFilters ? { initialFilters: router.query.initialFilters } : {})}
-          {...(router.query.initialFilterQuery
-            ? { initialFilterQuery: router.query.initialFilterQuery }
-            : {})}
-          {...(router.query.source ? { source: router.query.source } : {})}
-          onClose={closeEditor}
-        />
-      ) : null}
-      {viewing !== void 0 ? (
-        <ViewAutomationDrawer automationId={viewing} onClose={closeEditor} onEdit={openEdit} />
-      ) : null}
+      {/* Neither editor is rendered here. `CurrentDrawer` mounts whichever one
+          the address names, in the host it needs, over whatever page the reader
+          is on — which is the same mount an alert email's link lands on. */}
     </AutomationsLayout>
   );
 }

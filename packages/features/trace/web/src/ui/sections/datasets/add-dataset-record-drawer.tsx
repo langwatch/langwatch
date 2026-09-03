@@ -64,7 +64,16 @@ export type DatasetEditorComponent = ComponentType<{
   };
   open?: boolean;
   onClose?: () => void;
-  onSuccess: (dataset: { datasetId: string; name: string; columnTypes: DatasetColumns }) => void;
+  /**
+   * OPTIONAL, MATCHING THE EDITOR'S OWN PROP. The editor is a registered drawer
+   * as well as a component, and an address cannot carry a function, so it
+   * declares `onSuccess` optional and calls it only when one arrived. Requiring
+   * it here would make the real editor unassignable to this slot: `ComponentType`
+   * admits a class component, whose props are invariant, so a required callback
+   * on this side rejects an optional one on that side. This caller always passes
+   * one.
+   */
+  onSuccess?: (dataset: { datasetId: string; name: string; columnTypes: DatasetColumns }) => void;
 }>;
 
 export interface AddDatasetRecordDrawerProps {

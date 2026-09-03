@@ -15,6 +15,7 @@
  */
 
 import type {
+  AutomationDrawer,
   AutomationFailureNotice,
   AutomationOrganization,
   AutomationProject,
@@ -24,6 +25,9 @@ import type {
   AutomationTeam,
 } from "@langwatch/automation-web/screens/automations";
 import { AutomationHostPort } from "@langwatch/automation-web/screens/automations";
+
+/** The key `openDrawer` writes the drawer's name under. */
+export const DRAWER_OPEN_PARAM = "drawer.open";
 
 export type AutomationHostReadings = {
   scope: AutomationScope;
@@ -108,6 +112,27 @@ export class UiAutomationHost extends AutomationHostPort {
 
   navigate(to: string): void {
     this.actions.navigate(to);
+  }
+
+  openDrawer({
+    drawer,
+    params = {},
+  }: {
+    drawer: AutomationDrawer;
+    params?: Readonly<Record<string, string | undefined>>;
+  }): void {
+    // Every other `drawer.*` key is dropped, exactly as `openDrawer` does:
+    // leaving a previous drawer's parameters behind is what makes the editor
+    // open on the automation the reader was only looking at.
+    const next: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(this.readings.route.query)) {
+      if (!key.startsWith("drawer.")) next[key] = value;
+    }
+    next[DRAWER_OPEN_PARAM] = drawer;
+    for (const [name, value] of Object.entries(params)) {
+      if (value !== void 0) next[`drawer.${name}`] = value;
+    }
+    this.actions.setQuery(next);
   }
 
   succeeded(notice: AutomationSuccessNotice): void {

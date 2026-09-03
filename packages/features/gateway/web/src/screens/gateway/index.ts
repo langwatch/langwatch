@@ -51,6 +51,7 @@ export {
   type GatewayPlan,
   type GatewayProject,
   type GatewayRouteReading,
+  type GatewayDrawer,
   type GatewayScope,
   type GatewaySuccessNotice,
   type GatewayTeam,

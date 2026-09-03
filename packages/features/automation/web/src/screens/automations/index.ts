@@ -36,6 +36,7 @@ export { automationApi } from "../../behavior/automation-api";
 export {
   AutomationHostPort,
   AutomationHostProvider,
+  type AutomationDrawer,
   type AutomationFailureNotice,
   type AutomationOrganization,
   type AutomationProject,

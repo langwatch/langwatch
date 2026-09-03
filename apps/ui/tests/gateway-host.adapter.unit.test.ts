@@ -6,11 +6,17 @@
  * is worth pinning is the three decisions it makes rather than forwards: which
  * organization this page is about, and which project and team the address is
  * standing in — all three resolved out of the graph already in hand rather than
- * asked for again.
+ * asked for again — and the ADDRESS IT SPELLS for a registered drawer, which is
+ * the half `@langwatch/gateway-web` deliberately does not state: its screens
+ * name a drawer and record the request, and this is where that becomes
+ * `?drawer.open=`.
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { UiGatewayHost } from "../src/features/gateway/behavior/gateway-host.adapter";
+import {
+  DRAWER_OPEN_PARAM,
+  UiGatewayHost,
+} from "../src/features/gateway/behavior/gateway-host.adapter";
 
 const CHECKOUT = {
   id: "project_1",
@@ -31,10 +37,12 @@ const OTHER = { id: "org_other", name: "Other", slug: "other", teams: [] };
 function host({
   organizationId = "org_acme",
   projectId = null,
+  query = {},
   actions = {},
 }: {
   organizationId?: string | null;
   projectId?: string | null;
+  query?: Readonly<Record<string, string | undefined>>;
   actions?: Partial<Parameters<typeof UiGatewayHost.create>[1]>;
 } = {}) {
   return UiGatewayHost.create(
@@ -48,7 +56,7 @@ function host({
         appBaseUrl: "https://app.langwatch.ai",
         gatewayBaseUrl: "https://gateway.langwatch.ai/v1",
       },
-      route: { params: {}, query: {} },
+      route: { params: {}, query },
     },
     {
       hasPermission: () => false,
@@ -91,6 +99,51 @@ describe("given the gateway host adapter", () => {
 
       expect(scoped.project()).toBeUndefined();
       expect(scoped.team()).toBeUndefined();
+    });
+  });
+
+  describe("when a screen opens a registered drawer", () => {
+    it("writes the drawer's name and its own parameters, prefixed", () => {
+      const setQuery = vi.fn();
+
+      host({ actions: { setQuery } }).openDrawer({
+        drawer: "routingPolicy",
+        params: { policyId: "rp_1" },
+      });
+
+      expect(setQuery).toHaveBeenCalledWith({
+        [DRAWER_OPEN_PARAM]: "routingPolicy",
+        "drawer.policyId": "rp_1",
+      });
+    });
+
+    it("keeps the reader's own query and drops the previous drawer's", () => {
+      const setQuery = vi.fn();
+
+      host({
+        query: { scope: "team", "drawer.open": "routingPolicy", "drawer.policyId": "rp_stale" },
+        actions: { setQuery },
+      }).openDrawer({ drawer: "routingPolicy", params: { seedScopeType: "ORGANIZATION" } });
+
+      // `drawer.policyId` is gone, so a create cannot open on the policy the
+      // reader was editing a moment ago; `scope` survives, because an overlay
+      // opened over a filtered table must not clear the filter.
+      expect(setQuery).toHaveBeenCalledWith({
+        scope: "team",
+        [DRAWER_OPEN_PARAM]: "routingPolicy",
+        "drawer.seedScopeType": "ORGANIZATION",
+      });
+    });
+
+    it("leaves out a parameter the caller had no value for", () => {
+      const setQuery = vi.fn();
+
+      host({ actions: { setQuery } }).openDrawer({
+        drawer: "routingPolicy",
+        params: { policyId: void 0 },
+      });
+
+      expect(setQuery).toHaveBeenCalledWith({ [DRAWER_OPEN_PARAM]: "routingPolicy" });
     });
   });
 

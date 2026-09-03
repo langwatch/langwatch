@@ -11,10 +11,15 @@
  * configuration and records everything written through it, so an assertion
  * about a navigation or a toast reads off `host.recording` rather than off a spy
  * on a module. `renderWithGatewayHost` mounts a tree underneath it and owns the
- * one piece of state a static double cannot have: the query string. The routing
- * policy editor opens from `?policy=`, so a click that writes the address has to
- * come back as a re-render, or the drawer never opens and the test proves
- * nothing.
+ * one piece of state a static double cannot have: the query string. A screen
+ * reads its own address back — a filter, a page, a selected tab — so a write has
+ * to come back as a re-render or the test proves nothing.
+ *
+ * The routing policy editor is not one of them any more. It opens through the
+ * drawer registry, which the composing application mounts above every page, so
+ * what this double answers for it is `openDrawer`: it records which overlay was
+ * asked for, and the address that carries the request is the application's to
+ * spell.
  *
  * Permissions resolve through `permissionSatisfiedBy`, the authz contract's own
  * hierarchy rule (`<resource>:manage` satisfies `<resource>:view` on the same
@@ -39,6 +44,7 @@ import {
   GatewayHostProvider,
   type GatewayActor,
   type GatewayDeployment,
+  type GatewayDrawer,
   type GatewayFailureNotice,
   type GatewayOrganization,
   type GatewayPlan,
@@ -51,10 +57,23 @@ import {
 
 export type GatewayQuery = Readonly<Record<string, string | undefined>>;
 
+/** One overlay a screen asked the application to open. */
+export type RecordedGatewayDrawerOpen = {
+  drawer: GatewayDrawer;
+  params: Readonly<Record<string, string | undefined>>;
+};
+
 /** Everything a screen wrote through the host, in the order it wrote it. */
 export type GatewayHostRecording = {
   navigations: string[];
   queries: Array<{ next: GatewayQuery; replace: boolean }>;
+  /**
+   * RECORDED RATHER THAN SPELLED. The `drawer.` vocabulary is the composing
+   * application's — its adapter writes `?drawer.open=<name>` plus one
+   * `drawer.<key>` per parameter, and its own suite pins that. What this
+   * package can state is WHICH overlay a click asked for, and with what.
+   */
+  drawerOpens: RecordedGatewayDrawerOpen[];
   successes: GatewaySuccessNotice[];
   failures: GatewayFailureNotice[];
 };
@@ -120,7 +139,13 @@ export class FakeGatewayHost extends GatewayHostPort {
   static create(options: FakeGatewayHostOptions = {}): FakeGatewayHost {
     return new FakeGatewayHost({
       options,
-      recording: { navigations: [], queries: [], successes: [], failures: [] },
+      recording: {
+        navigations: [],
+        queries: [],
+        drawerOpens: [],
+        successes: [],
+        failures: [],
+      },
       query: options.query ?? {},
     });
   }
@@ -133,9 +158,8 @@ export class FakeGatewayHost extends GatewayHostPort {
   private readonly granted: ReadonlySet<string>;
   private readonly commitQuery: ((next: GatewayQuery) => void) | undefined;
   /**
-   * Built once per instance rather than per call. `useGatewayRouter` memoizes
-   * on the reading, and a fresh object every render would rebuild the router on
-   * every render with it.
+   * Built once per instance rather than per call: the screens memoize on the
+   * reading, and a fresh object every render would rebuild the router with it.
    */
   private readonly routeReading: GatewayRouteReading;
 
@@ -239,6 +263,16 @@ export class FakeGatewayHost extends GatewayHostPort {
     this.recording.navigations.push(to);
   }
 
+  openDrawer(request: {
+    drawer: GatewayDrawer;
+    params?: Readonly<Record<string, string | undefined>>;
+  }): void {
+    this.recording.drawerOpens.push({
+      drawer: request.drawer,
+      params: request.params ?? {},
+    });
+  }
+
   succeeded(notice: GatewaySuccessNotice): void {
     this.recording.successes.push(notice);
   }
@@ -271,8 +305,10 @@ export function recordingGatewayToaster(): RecordingGatewayToaster {
  * The address, held where React can see it change.
  *
  * `setQuery` replaces the whole query string — a key left out is a key removed —
- * which is the contract the port states and the one the routing policy screen
- * relies on to drop `?policy=` when the editor closes.
+ * which is the contract the port states and the one every screen that filters,
+ * paginates or selects a tab relies on. The routing policy editor is no longer
+ * among them: it opens through the drawer registry, so what the double answers
+ * for it is `openDrawer`.
  */
 function GatewayHostHarness({ host, children }: { host: FakeGatewayHost; children: ReactNode }) {
   const [query, setQuery] = useState<GatewayQuery>(host.query);

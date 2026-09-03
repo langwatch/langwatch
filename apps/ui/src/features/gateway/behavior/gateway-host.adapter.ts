@@ -16,6 +16,7 @@
 import type {
   GatewayActor,
   GatewayDeployment,
+  GatewayDrawer,
   GatewayFailureNotice,
   GatewayOrganization,
   GatewayPlan,
@@ -26,6 +27,9 @@ import type {
   GatewayTeam,
 } from "@langwatch/gateway-web/screens/gateway";
 import { GatewayHostPort } from "@langwatch/gateway-web/screens/gateway";
+
+/** The key `openDrawer` writes the drawer's name under. */
+export const DRAWER_OPEN_PARAM = "drawer.open";
 
 export type GatewayHostReadings = {
   scope: GatewayScope;
@@ -138,6 +142,27 @@ export class UiGatewayHost extends GatewayHostPort {
 
   navigate(to: string): void {
     this.actions.navigate(to);
+  }
+
+  openDrawer({
+    drawer,
+    params = {},
+  }: {
+    drawer: GatewayDrawer;
+    params?: Readonly<Record<string, string | undefined>>;
+  }): void {
+    // Every other `drawer.*` key is dropped, exactly as `openDrawer` does:
+    // leaving a previous drawer's parameters behind is what makes an editor
+    // open on the row the reader looked at before this one.
+    const next: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(this.readings.route.query)) {
+      if (!key.startsWith("drawer.")) next[key] = value;
+    }
+    next[DRAWER_OPEN_PARAM] = drawer;
+    for (const [name, value] of Object.entries(params)) {
+      if (value !== void 0) next[`drawer.${name}`] = value;
+    }
+    this.actions.setQuery(next);
   }
 
   succeeded(notice: GatewaySuccessNotice): void {

@@ -1,20 +1,27 @@
 /**
- * The overlay this family owns, by the name the address uses.
+ * The two overlays this family owns, by the names the address uses.
  *
- * `automations.screen.tsx` renders this same component inline off its own
- * `?automation=<id>` key, and that is not a duplicate registration: the screen
- * owns the address it opens from its own rows, and `?drawer.open=` is how a
- * link from OUTSIDE the application opens it. Every alert email carries such a
- * link — `templating/template-context.ts` mints
- * `…/automations?drawer.open=automation&drawer.automationId=<id>&drawer.source=email-link`
- * as `trigger.editUrl` — and so do the trace explorer's Automate button, the
- * command palette and Langy's relay links. None of them opened anything until
- * this export let the composing application register the name.
+ * ONE MECHANISM, NOT TWO. `automations.screen.tsx` used to render both of these
+ * inline off query keys of its own — `?automation=<id>` and
+ * `?viewAutomation=<id>` — because the drawer registry is composition a
+ * feature-web package may not reach. It still may not reach it, and it does not
+ * have to: the registry is addressed by a query string, and the host writes
+ * query strings. So the screen names a drawer, the host spells
+ * `?drawer.open=<name>`, and the same editor has ONE address whichever way in
+ * the reader took (`dev/docs/best_practices/drawers.md`).
  *
- * The two keys cannot both be set by anything that mints one, so a URL opens
- * exactly one editor. The component takes `onClose` and does not close itself,
- * which is what lets the screen pass the write that clears its own key while
- * the registry adapter passes the navigator's `closeDrawer`.
+ * That mattered because the other ways in were never the screen's. Every alert
+ * email carries `…/automations?drawer.open=automation&drawer.automationId=<id>&drawer.source=email-link`
+ * as `trigger.editUrl` (`templating/template-context.ts`), the REST API hands
+ * out the same shape as `platformUrl`, and so do the trace explorer's Automate
+ * button, the command palette and Langy's relay links. None of them opened
+ * anything until this export let the composing application register the name.
+ *
+ * Neither component closes itself, which is what lets one component serve every
+ * caller: the drawers doc's rule is that a target calling `closeDrawer` clears
+ * the caller's stack too, so the close arrives as a prop and the registry
+ * adapter passes the navigator's own.
  */
 
 export { AutomationDrawer } from "../features/authoring/ui/sections/automation-drawer";
+export { ViewAutomationDrawer } from "../features/authoring/ui/sections/view-automation-drawer";
