@@ -24,7 +24,7 @@ export function rateLimit({
     max: 100,
     storage: hasSecondaryStorage ? "secondary-storage" : "memory",
     customRules: {
-      "/sign-in/email": { window: 60 * 15, max: 30 },
+      "/sign-in/email": { window: 60 * 15, max: 50 },
       "/sign-up/email": { window: 60 * 60, max: 50 },
       "/sign-in/social": { window: 60 * 15, max: 50 },
       // BetterAuth's password reset endpoints are `request-password-reset`
