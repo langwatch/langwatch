@@ -154,6 +154,34 @@ describe("Feature: the project's Slack integration", () => {
       expect(legacy).toHaveLength(2);
     });
 
+    /** @scenario "Removing the connection reports how many automations stop delivering" */
+    it("counts the rest as delivering through the project integration", async () => {
+      await storeSlackAutomation({ slackBotToken: "enc(xoxb-a)" });
+      await storeSlackAutomation({});
+      await storeSlackAutomation({});
+
+      const dependents = await repo.countAllDeliveringThroughIntegration({
+        projectId: projectId(),
+      });
+
+      expect(dependents).toBe(2);
+    });
+
+    /** @scenario "Removing the connection reports how many automations stop delivering" */
+    it("leaves a deleted automation out of the count", async () => {
+      const row = await storeSlackAutomation({});
+      await prisma.trigger.update({
+        where: { id: row.id, projectId: projectId() },
+        data: { deleted: true },
+      });
+
+      const dependents = await repo.countAllDeliveringThroughIntegration({
+        projectId: projectId(),
+      });
+
+      expect(dependents).toBe(0);
+    });
+
     /** @scenario "Switching a legacy automation to the project integration" */
     it("clears the token and leaves the rest of the delivery alone", async () => {
       const row = await storeSlackAutomation({

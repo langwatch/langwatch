@@ -40,6 +40,17 @@ export interface SlackIntegrationRepository {
   }): Promise<LegacySlackTokenAutomation[]>;
 
   /**
+   * How many live automations in the project deliver Slack messages through
+   * the project integration — the exact complement of
+   * `findAllWithOwnSlackToken` over the same rows. It is a count rather than a
+   * list because the only caller states a number: what stops delivering if the
+   * connection goes away.
+   */
+  countAllDeliveringThroughIntegration(params: {
+    projectId: string;
+  }): Promise<number>;
+
+  /**
    * Drop the stored token from one automation's Slack params, leaving every
    * other field alone. The outcomes are distinct so a bulk switch can report
    * them honestly: `already_clear` is a row that carries no token — correct,

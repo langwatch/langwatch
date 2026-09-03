@@ -312,6 +312,10 @@ Phase-2 structure per the bug-bash plan: **one reference PR first, no fan-out un
 
 Sequencing: R0 → F1 ∥ F2 ∥ F5 ∥ F6 → F3 → F4. F6's list interactivity needs only R0; its one F2-dependent subtask — the legacy-token row nudge — waits for F2 and lands as a follow-up inside the F6 files.
 
+### Status
+
+R0 has landed, and its scenarios in `specs/automations/source-merge.feature` are bound: the wizard, the edit-on-overview rule, the cap-advice seats and the unified list. The Slack project integration and the legacy-token migration (F2–F4) have landed and bind theirs too. What is still `@unimplemented` there is what the remaining units own — the list's filter chips (F6), the template that ships its graph (F5), and the wire `source` alias (F1) — each binding as its unit lands, per F7 above.
+
 ## References
 
 - [#6717](https://github.com/langwatch/langwatch/issues/6717) — the recorded decisions; [#6716](https://github.com/langwatch/langwatch/issues/6716) — defects folded in where Phase-2-shaped (template-ships-graph, type-lock); [#6896](https://github.com/langwatch/langwatch/issues/6896) — deferred follow-ups adjacent to this design

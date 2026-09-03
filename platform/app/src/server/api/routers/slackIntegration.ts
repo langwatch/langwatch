@@ -1,13 +1,15 @@
 /**
  * tRPC router for the project's Slack integration (ADR-093 §5).
  *
- *   getStatus:            whether Slack is connected for a project and which
- *                         workspace it reaches. Never the token.
+ *   getStatus:            whether Slack is connected for a project, which
+ *                         workspace it reaches, and how many automations post
+ *                         through it. Never the token.
  *   getLegacyTokenCensus: the automations in the project that still carry their
  *                         own Slack token — the migration's progress meter.
  *   connect:              set up or rotate the connection. The token is
  *                         validated against Slack before anything is stored.
- *   disconnect:           drop the connection.
+ *   disconnect:           drop the connection, reporting how many automations
+ *                         were posting through it.
  *   switchToIntegration:  clear the stored token on one or several automations
  *                         so their delivery falls through to the integration.
  *
@@ -90,7 +92,7 @@ export const slackIntegrationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ ctx, input }) => {
-      await createSlackIntegrationService({ prisma: ctx.prisma }).remove({
+      return createSlackIntegrationService({ prisma: ctx.prisma }).remove({
         projectId: input.projectId,
       });
     }),

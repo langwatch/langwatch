@@ -13,6 +13,24 @@ const projectScope = (projectId: string) => ({
   scopeId: projectId,
 });
 
+/** Every live Slack automation in one project — the population both token
+ *  reads below partition. */
+const liveSlackAutomationsIn = (projectId: string) => ({
+  projectId,
+  deleted: false,
+  action: TriggerAction.SEND_SLACK_MESSAGE,
+});
+
+/**
+ * Whether an automation's stored params carry a token of its own. A
+ * `slackBotToken` key that is present but empty means the same as absent, so
+ * the answer is read off the value rather than the key.
+ */
+const carriesOwnSlackToken = (actionParams: unknown): boolean => {
+  const params = (actionParams ?? {}) as Partial<SlackActionParams>;
+  return typeof params.slackBotToken === "string" && !!params.slackBotToken;
+};
+
 export class PrismaSlackIntegrationRepository
   implements SlackIntegrationRepository
 {
@@ -83,20 +101,31 @@ export class PrismaSlackIntegrationRepository
     projectId: string;
   }): Promise<LegacySlackTokenAutomation[]> {
     const rows = await this.prisma.trigger.findMany({
-      where: {
-        projectId,
-        deleted: false,
-        action: TriggerAction.SEND_SLACK_MESSAGE,
-      },
+      where: liveSlackAutomationsIn(projectId),
       select: { id: true, name: true, actionParams: true },
       orderBy: { createdAt: "asc" },
     });
     return rows
-      .filter((row) => {
-        const params = (row.actionParams ?? {}) as Partial<SlackActionParams>;
-        return typeof params.slackBotToken === "string" && params.slackBotToken;
-      })
+      .filter((row) => carriesOwnSlackToken(row.actionParams))
       .map(({ id, name }) => ({ id, name }));
+  }
+
+  /**
+   * The same population read the same way, kept on the other side of the same
+   * predicate: an automation with no token of its own has nothing to deliver
+   * with except the project integration. Counted in memory for the reason the
+   * read above is filtered in memory — an empty token string is not a token.
+   */
+  async countAllDeliveringThroughIntegration({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<number> {
+    const rows = await this.prisma.trigger.findMany({
+      where: liveSlackAutomationsIn(projectId),
+      select: { actionParams: true },
+    });
+    return rows.filter((row) => !carriesOwnSlackToken(row.actionParams)).length;
   }
 
   async clearOwnSlackToken({

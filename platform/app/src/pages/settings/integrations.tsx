@@ -455,6 +455,7 @@ function SlackProjectConnection({
         projectName={projectName}
         connected={connected}
         canManage={canManage}
+        dependentAutomations={status.data?.dependentAutomations ?? 0}
         onChanged={refresh}
       />
     </VStack>
@@ -615,6 +616,31 @@ function useSlackConnection({
   return { connect, disconnect };
 }
 
+/**
+ * What disconnecting costs, in the number the reader needs to weigh it: every
+ * automation posting through this connection carries no token of its own, so
+ * removing it is the moment they stop posting. Naming the count is the whole
+ * point of the confirmation — a project with none loses nothing, and should not
+ * be warned as though it did.
+ */
+function confirmDisconnectSlack(dependentAutomations: number): {
+  title: string;
+  message: string;
+  confirmLabel: string;
+} {
+  const message =
+    dependentAutomations === 0
+      ? "Nothing delivers through this connection yet."
+      : dependentAutomations === 1
+        ? "1 automation delivers through this connection and will stop delivering until Slack is reconnected."
+        : `${dependentAutomations} automations deliver through this connection and will stop delivering until Slack is reconnected.`;
+  return {
+    title: "Disconnect Slack?",
+    message,
+    confirmLabel: "Disconnect Slack",
+  };
+}
+
 /** Paste a bot token to connect, or paste a new one to rotate — the same form
  *  and the same write, because Slack revalidates either way and the ciphertext
  *  is replaced either way. */
@@ -623,16 +649,19 @@ function SlackTokenForm({
   projectName,
   connected,
   canManage,
+  dependentAutomations,
   onChanged,
 }: {
   projectId: string;
   projectName: string | null;
   connected: boolean;
   canManage: boolean;
+  dependentAutomations: number;
   onChanged: () => void;
 }) {
   const [token, setToken] = useState("");
   const [isFormShown, setIsFormShown] = useState(false);
+  const [isDisconnectConfirming, setIsDisconnectConfirming] = useState(false);
 
   const { connect, disconnect } = useSlackConnection({
     projectName,
@@ -653,6 +682,7 @@ function SlackTokenForm({
   }
 
   if (connected && !isFormShown) {
+    const confirmation = confirmDisconnectSlack(dependentAutomations);
     return (
       <HStack gap={2}>
         <Button
@@ -666,10 +696,23 @@ function SlackTokenForm({
           variant="outline"
           size="sm"
           loading={disconnect.isPending}
-          onClick={() => disconnect.mutate({ projectId })}
+          onClick={() => setIsDisconnectConfirming(true)}
         >
           Disconnect
         </Button>
+        <ConfirmDialog
+          open={isDisconnectConfirming}
+          onOpenChange={setIsDisconnectConfirming}
+          title={confirmation.title}
+          message={confirmation.message}
+          confirmLabel={confirmation.confirmLabel}
+          tone="danger"
+          loading={disconnect.isPending}
+          onConfirm={() => {
+            setIsDisconnectConfirming(false);
+            disconnect.mutate({ projectId });
+          }}
+        />
       </HStack>
     );
   }

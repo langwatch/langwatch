@@ -26,6 +26,9 @@ type VerifyResult =
 class FakeSlackIntegrationRepository implements SlackIntegrationRepository {
   rows = new Map<string, SlackIntegration>();
   legacy: LegacySlackTokenAutomation[] = [];
+  /** Automations carrying no token of their own — everything the project
+   *  integration is the only delivery credential for. */
+  deliveringThroughIntegration: LegacySlackTokenAutomation[] = [];
   unswitchable = new Set<string>();
   clearedIds: string[] = [];
   /** Rows that exist and carry no token — the `already_clear` case. Kept apart
@@ -68,6 +71,10 @@ class FakeSlackIntegrationRepository implements SlackIntegrationRepository {
 
   async findAllWithOwnSlackToken(_params: { projectId: string }) {
     return this.legacy;
+  }
+
+  async countAllDeliveringThroughIntegration(_params: { projectId: string }) {
+    return this.deliveringThroughIntegration.length;
   }
 
   async clearOwnSlackToken({
@@ -125,6 +132,7 @@ describe("SlackIntegrationService", () => {
         slackTeamName: "Acme HQ",
         connectedAt: expect.any(Date),
         updatedAt: expect.any(Date),
+        dependentAutomations: 0,
       });
       expect(JSON.stringify(status)).not.toContain("xoxb-live");
       expect(repo.rows.get("project-1")?.botTokenEncrypted).toBe(
@@ -303,6 +311,68 @@ describe("SlackIntegrationService", () => {
         service.clearLegacyTokens({ projectId: "project-1" }),
       ).rejects.toMatchObject({ code: "slack_integration_missing" });
       expect(repo.clearedIds).toEqual([]);
+    });
+  });
+
+  describe("when automations in the project deliver through the integration", () => {
+    /** @scenario "Removing the connection reports how many automations stop delivering" */
+    it("names them in the status a client reads", async () => {
+      const { repo, service } = makeService();
+      await service.setup({ ...setupInput, botToken: "xoxb-live" });
+      repo.deliveringThroughIntegration = [
+        { id: "automation-1", name: "Error spike" },
+        { id: "automation-2", name: "Latency watch" },
+      ];
+
+      const status = await service.getStatus({ projectId: "project-1" });
+
+      expect(status.dependentAutomations).toBe(2);
+    });
+
+    /** @scenario "Removing the connection reports how many automations stop delivering" */
+    it("reports how many were delivering through it when it is removed", async () => {
+      const { repo, service } = makeService();
+      await service.setup({ ...setupInput, botToken: "xoxb-live" });
+      repo.deliveringThroughIntegration = [
+        { id: "automation-1", name: "Error spike" },
+        { id: "automation-2", name: "Latency watch" },
+      ];
+
+      const result = await service.remove({ projectId: "project-1" });
+
+      expect(result).toEqual({ dependentAutomations: 2 });
+      expect(repo.rows.size).toBe(0);
+    });
+
+    /** @scenario "Removing the connection reports how many automations stop delivering" */
+    it("counts them before the connection is gone, not after", async () => {
+      // Counting after the delete would answer about a project that no longer
+      // has an integration, so the number the caller states would always be
+      // whatever the post-delete read happens to return.
+      const { repo, service } = makeService();
+      await service.setup({ ...setupInput, botToken: "xoxb-live" });
+      repo.deliveringThroughIntegration = [
+        { id: "automation-1", name: "Error spike" },
+      ];
+      repo.deleteForProject = async ({ projectId }) => {
+        repo.rows.delete(projectId);
+        repo.deliveringThroughIntegration = [];
+      };
+
+      const result = await service.remove({ projectId: "project-1" });
+
+      expect(result).toEqual({ dependentAutomations: 1 });
+    });
+
+    /** @scenario "Removing the connection reports how many automations stop delivering" */
+    it("reports none when every automation carries its own token", async () => {
+      const { repo, service } = makeService();
+      await service.setup({ ...setupInput, botToken: "xoxb-live" });
+      repo.legacy = [{ id: "automation-1", name: "Error spike" }];
+
+      const result = await service.remove({ projectId: "project-1" });
+
+      expect(result).toEqual({ dependentAutomations: 0 });
     });
   });
 });

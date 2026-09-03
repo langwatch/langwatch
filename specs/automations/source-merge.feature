@@ -14,14 +14,6 @@ Feature: One automation flow with a subject choice
   derived alias beside the unchanged kind discriminator; no screen shows
   the word.
 
-  The reference implementation (R0) binds the wizard, the edit-on-overview
-  rule, the cap-advice seats and the unified list; the Slack project
-  integration and the legacy-token migration (F2-F4) landed and bind their
-  scenarios below. What is still @unimplemented is what the later units own:
-  the list's filter chips (F6), the template that ships its graph (F5), and
-  the wire `source` alias (F1). Each binds as its unit lands, per the plan
-  in the ADR's final section.
-
   See dev/docs/adr/093-automations-source-merge.md.
 
   Background:
@@ -240,6 +232,21 @@ Feature: One automation flow with a subject choice
       When the user replaces the token in settings
       Then subsequent deliveries use the new token
       And no automation was edited
+
+    @unit
+    Scenario: Removing the connection reports how many automations stop delivering
+      Given the project has a Slack integration two automations deliver through
+      When the connection is removed
+      Then the removal reports the two automations that were delivering through it
+      And the connection status named the same two while it was connected
+
+    @integration
+    Scenario: Disconnecting Slack is confirmed with what stops delivering
+      Given the user can manage the project
+      And the project has a Slack integration three automations deliver through
+      When the user chooses to disconnect Slack in settings
+      Then a confirmation says the three automations stop delivering until Slack is reconnected
+      And the connection is still there until the user confirms
 
   Rule: An automation's own stored token outranks the project integration
 

@@ -28,15 +28,21 @@ export interface SlackIntegrationStatus {
   slackTeamName: string | null;
   connectedAt: Date | null;
   updatedAt: Date | null;
+  /**
+   * How many automations in the project post through this connection, so a
+   * client can say what stops delivering before it removes it. Carrying no
+   * token of their own, they have nothing else to post with.
+   */
+  dependentAutomations: number;
 }
 
-const DISCONNECTED: SlackIntegrationStatus = {
+const DISCONNECTED = {
   connected: false,
   slackTeamId: null,
   slackTeamName: null,
   connectedAt: null,
   updatedAt: null,
-};
+} as const;
 
 /** Outcome of switching several automations off their own tokens at once. */
 export interface LegacyTokenClearResult {
@@ -72,14 +78,18 @@ export class SlackIntegrationService {
   }: {
     projectId: string;
   }): Promise<SlackIntegrationStatus> {
-    const row = await this.repo.findByProject({ projectId });
-    if (!row) return DISCONNECTED;
+    const [row, dependentAutomations] = await Promise.all([
+      this.repo.findByProject({ projectId }),
+      this.repo.countAllDeliveringThroughIntegration({ projectId }),
+    ]);
+    if (!row) return { ...DISCONNECTED, dependentAutomations };
     return {
       connected: true,
       slackTeamId: row.slackTeamId,
       slackTeamName: row.slackTeamName,
       connectedAt: row.createdAt,
       updatedAt: row.updatedAt,
+      dependentAutomations,
     };
   }
 
@@ -131,11 +141,26 @@ export class SlackIntegrationService {
       slackTeamName: row.slackTeamName,
       connectedAt: row.createdAt,
       updatedAt: row.updatedAt,
+      dependentAutomations:
+        await this.repo.countAllDeliveringThroughIntegration({ projectId }),
     };
   }
 
-  async remove({ projectId }: { projectId: string }): Promise<void> {
+  /**
+   * Drop the connection, and say how many automations were posting through it.
+   * Every one of them carried no token of its own, so removal is the moment
+   * their delivery stops — the count is read before the delete, because after
+   * it there is nothing left to attribute them to.
+   */
+  async remove({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<{ dependentAutomations: number }> {
+    const dependentAutomations =
+      await this.repo.countAllDeliveringThroughIntegration({ projectId });
     await this.repo.deleteForProject({ projectId });
+    return { dependentAutomations };
   }
 
   /**
