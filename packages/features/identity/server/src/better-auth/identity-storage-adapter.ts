@@ -350,7 +350,7 @@ function identityCustomAdapter({
           // what keeps a subject collision between two IdPs from answering
           // with the wrong person's account.
           if (!(await routesToIdentity({ userId: query.userId }))) return null;
-          const row = await accounts.findByProviderSubject({
+          const row = await accounts.tryFindByProviderSubject({
             userId: query.userId,
             providerId: query.providerId,
             providerAccountId: query.accountId,
@@ -389,12 +389,12 @@ function identityCustomAdapter({
           // the fold lets one enterprise IdP's subject resolve another IdP's
           // user. `Account` is unique on this same pair; the identity branch
           // namespaces identically.
-          const resolved = await resolution.resolveByProviderSubject({
+          const resolved = await resolution.tryResolveByProviderSubject({
             providerId: query.providerId,
             providerAccountId: query.accountId,
           });
           if (!resolved?.finalized) return null;
-          const row = await accounts.findByProviderSubject({
+          const row = await accounts.tryFindByProviderSubject({
             userId: resolved.userId,
             providerId: query.providerId,
             providerAccountId: query.accountId,
@@ -530,7 +530,7 @@ function identityCustomAdapter({
       ) {
         return [...where];
       }
-      const resolved = await resolution.resolveByIdentifierValue({
+      const resolved = await resolution.tryResolveByIdentifierValue({
         normalizedValue: normalizeIdentifierValue(clause.value),
       });
       if (!resolved?.finalized) return [...where];

@@ -1,6 +1,6 @@
 import type { SubmitHandler } from "react-hook-form";
 import { OrganizationUserRole } from "../model/prisma-types";
-import type { MembersForm } from "../ui/blocks/add-members-form";
+import type { MembersForm } from "../model/member-invite-form";
 // The seat-quote modal is `@langwatch/workflow-web`'s singleton store; see
 // `use-license-enforcement.ts` for why the address travels and the modal does not.
 import { useUpgradeModalStore } from "@langwatch/workflow-web/stores/upgradeModalStore";

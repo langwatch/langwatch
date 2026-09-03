@@ -89,7 +89,7 @@ export interface IdentityAccountsPort {
    * another's. `Account` is unique on exactly this pair, and the identity
    * branch has to namespace the same way.
    */
-  findByProviderSubject(args: {
+  tryFindByProviderSubject(args: {
     userId: string;
     providerId: string;
     providerAccountId: string;
@@ -154,7 +154,7 @@ export interface IdentityResolution {
  */
 export interface IdentityResolutionPort {
   /** Sign-in by any verified email. The value arrives D01-normalized. */
-  resolveByIdentifierValue(args: {
+  tryResolveByIdentifierValue(args: {
     normalizedValue: string;
   }): Promise<IdentityResolution | null>;
   /**
@@ -164,7 +164,7 @@ export interface IdentityResolutionPort {
    * two enterprise IdPs both fold to `oidc`, and a subject is unique only
    * WITHIN an issuer.
    */
-  resolveByProviderSubject(args: {
+  tryResolveByProviderSubject(args: {
     providerId: string;
     providerAccountId: string;
   }): Promise<IdentityResolution | null>;

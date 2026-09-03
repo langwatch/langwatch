@@ -9,16 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { RandomColorAvatar } from "../../ui/elements/random-color-avatar";
-
-/** One waiting request, as the panel needs it. The requester's ADDRESS is not
- *  here — the domain is what was matched and what an admin is deciding on. */
-export interface PendingJoinRequest {
-  joinRequestId: string;
-  name: string;
-  domain: string;
-  requestedAt: Date;
-  expiresAt: Date | null;
-}
+import type { PendingJoinRequest } from "../../model/pending-join-request";
 
 interface JoinRequestsTableProps {
   requests: PendingJoinRequest[];

@@ -131,7 +131,7 @@ describe("given the front door in either colour mode", () => {
      * pinned to each other here.
      */
     it("upgrades the same variables the theme emits, on a display that can show them", () => {
-      const styles = sourceOf("ui/sections/auth-front-door.css");
+      const styles = sourceOf("ui/elements/auth-front-door.css");
 
       expect(styles).toContain("@media (color-gamut: p3)");
       expect(styles).toContain("--chakra-colors-front-door-action:");
@@ -159,7 +159,7 @@ describe("given the hosted panel on a narrow viewport", () => {
 describe("given somebody who has asked for less motion", () => {
   describe("when the front door animates anything", () => {
     it("declares every animation inside a no-preference query", () => {
-      const styles = sourceOf("ui/sections/auth-front-door.css");
+      const styles = sourceOf("ui/elements/auth-front-door.css");
       const animations = [...styles.matchAll(/animation:/g)].length;
       const guarded = [
         ...styles.matchAll(/@media \(prefers-reduced-motion: no-preference\)/g),

@@ -434,7 +434,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     };
   }
 
-  async redriveDeadMessage(params: {
+  async tryRedriveDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
@@ -471,7 +471,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     return { messageKey: message.messageKey };
   }
 
-  async discardDeadMessage(params: {
+  async tryDiscardDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
@@ -588,7 +588,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     }));
   }
 
-  async releaseLapsedLease(params: {
+  async tryReleaseLapsedLease(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;

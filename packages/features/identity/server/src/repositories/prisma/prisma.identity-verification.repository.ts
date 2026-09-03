@@ -91,7 +91,7 @@ export class PrismaIdentityVerificationRepository
     ]);
   }
 
-  async findByIdentifierId({
+  async tryFindByIdentifierId({
     identifierId,
   }: {
     identifierId: string;
@@ -126,7 +126,7 @@ export class PrismaIdentityVerificationRepository
         where: { identifier },
         orderBy: { createdAt: "desc" },
       });
-      // The same newest-row rule `findByIdentifierId` reads by, so completion
+      // The same newest-row rule `tryFindByIdentifierId` reads by, so completion
       // is checked against the record it was offered.
       const current = rows[0];
       if (!current) return false;

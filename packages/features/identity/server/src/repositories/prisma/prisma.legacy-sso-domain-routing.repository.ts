@@ -34,7 +34,7 @@ export class LegacySsoDomainRoutingRepository
     private readonly instanceMethod: () => Promise<SignInMethod | null>,
   ) {}
 
-  async findConnectionForDomain({
+  async tryFindConnectionForDomain({
     domain,
   }: {
     domain: string;

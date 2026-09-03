@@ -1,9 +1,9 @@
 import {
   authFailureMessage,
   isCredentialRejection,
-} from "./auth-failure-message";
-import { signIn } from "../behavior/auth-client";
-import { credentialSignInFailure } from "./credential-sign-in";
+} from "../model/auth-failure-message";
+import { signIn } from "./auth-client";
+import { credentialSignInFailure } from "../model/credential-sign-in";
 
 /**
  * One attempt at a password, and the three things it can turn out to be.

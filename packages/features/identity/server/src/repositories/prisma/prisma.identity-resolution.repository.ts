@@ -36,7 +36,7 @@ export class PrismaIdentityResolutionRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async resolveByIdentifierValue({
+  async tryResolveByIdentifierValue({
     normalizedValue,
   }: {
     normalizedValue: string;
@@ -54,7 +54,7 @@ export class PrismaIdentityResolutionRepository
    * subject resolve another IdP's user. This is the pair `Account` is unique
    * by, and a partial unique index enforces it here too.
    */
-  async resolveByProviderSubject({
+  async tryResolveByProviderSubject({
     providerId,
     providerAccountId,
   }: {

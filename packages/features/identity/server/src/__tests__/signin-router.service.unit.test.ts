@@ -48,28 +48,28 @@ function build({
   breakGlassAllowed?: boolean;
 } = {}) {
   const records: SignInRoutingRecord[] = [];
-  const findConnectionForDomain = vi.fn().mockResolvedValue(byDomain);
+  const tryFindConnectionForDomain = vi.fn().mockResolvedValue(byDomain);
   const listActiveConnections = vi.fn().mockResolvedValue(active);
   const service = new SignInRouterService({
-    domains: { findConnectionForDomain, listActiveConnections },
+    domains: { tryFindConnectionForDomain, listActiveConnections },
     policy: { resolvePolicy: async () => policy },
     breakGlass: { allow: async () => breakGlassAllowed },
     recorder: { decided: (record) => records.push(record) },
   });
-  return { service, records, findConnectionForDomain, listActiveConnections };
+  return { service, records, tryFindConnectionForDomain, listActiveConnections };
 }
 
 describe("SignInRouterService", () => {
   describe("when an address is submitted", () => {
     it("asks the domain port about the normalized domain only", async () => {
-      const { service, findConnectionForDomain, listActiveConnections } =
+      const { service, tryFindConnectionForDomain, listActiveConnections } =
         build({ byDomain: ACME });
 
       const decision = await service.route({
         identifier: "Sam.J+news@Acme.com",
       });
 
-      expect(findConnectionForDomain).toHaveBeenCalledWith({
+      expect(tryFindConnectionForDomain).toHaveBeenCalledWith({
         domain: "acme.com",
       });
       expect(listActiveConnections).not.toHaveBeenCalled();
@@ -108,13 +108,13 @@ describe("SignInRouterService", () => {
 
   describe("when no address has been asked for yet", () => {
     it("asks the domain port for the connections it could auto-redirect to", async () => {
-      const { service, findConnectionForDomain, listActiveConnections } =
+      const { service, tryFindConnectionForDomain, listActiveConnections } =
         build({ active: [ACME] });
 
       const decision = await service.route({ identifier: null });
 
       expect(listActiveConnections).toHaveBeenCalledTimes(1);
-      expect(findConnectionForDomain).not.toHaveBeenCalled();
+      expect(tryFindConnectionForDomain).not.toHaveBeenCalled();
       expect(decision.reasonCode).toBe("sole_active_connection");
     });
   });
@@ -122,7 +122,7 @@ describe("SignInRouterService", () => {
   describe("when the break-glass parameter is used", () => {
     /** @scenario "The break-glass path always reaches a local sign-in" */
     it("answers the local method set without reading the connection store", async () => {
-      const { service, findConnectionForDomain, listActiveConnections } =
+      const { service, tryFindConnectionForDomain, listActiveConnections } =
         build({ active: [ACME] });
 
       const decision = await service.route({
@@ -132,7 +132,7 @@ describe("SignInRouterService", () => {
 
       expect(decision.outcome).toBe("method_picker");
       expect(decision.methodSet).toEqual([PASSWORD]);
-      expect(findConnectionForDomain).not.toHaveBeenCalled();
+      expect(tryFindConnectionForDomain).not.toHaveBeenCalled();
       expect(listActiveConnections).not.toHaveBeenCalled();
     });
 

@@ -81,7 +81,7 @@ export interface ProcessOpsRepository {
    * (tenancy carried on every mutation); returns the message key for the
    * audit trail, or null when it was not dead (or not that instance's).
    */
-  redriveDeadMessage(params: {
+  tryRedriveDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
@@ -93,7 +93,7 @@ export interface ProcessOpsRepository {
    * discarded row. Returns the message key for the audit trail, or null when
    * the message was not dead (or not that instance's).
    */
-  discardDeadMessage(params: {
+  tryDiscardDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
@@ -130,7 +130,7 @@ export interface ProcessOpsRepository {
    * delivery's lease can never be released from under it. Returns the
    * message key for the audit trail, or null when nothing matched.
    */
-  releaseLapsedLease(params: {
+  tryReleaseLapsedLease(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
@@ -172,10 +172,10 @@ export class NullProcessOpsRepository implements ProcessOpsRepository {
   }> {
     return { woke: false, previousWakeAt: null };
   }
-  async redriveDeadMessage(): Promise<null> {
+  async tryRedriveDeadMessage(): Promise<null> {
     return null;
   }
-  async discardDeadMessage(): Promise<null> {
+  async tryDiscardDeadMessage(): Promise<null> {
     return null;
   }
   async redriveAllDeadMessages(): Promise<number> {
@@ -187,7 +187,7 @@ export class NullProcessOpsRepository implements ProcessOpsRepository {
   async findAttempts(): Promise<OutboxAttemptView[]> {
     return [];
   }
-  async releaseLapsedLease(): Promise<null> {
+  async tryReleaseLapsedLease(): Promise<null> {
     return null;
   }
 }

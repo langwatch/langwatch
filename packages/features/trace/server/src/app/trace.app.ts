@@ -590,7 +590,7 @@ export class TraceApp {
     spanId: string;
     protections: unknown;
   }): Promise<PromptStudioSpanResult | null> {
-    return this.dependencies.traces.read.getSpanForPromptStudio(input);
+    return this.dependencies.traces.read.tryGetSpanForPromptStudio(input);
   }
 
   // -------------------------------------------------------------------------

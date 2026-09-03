@@ -309,7 +309,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
     return this.prisma;
   }
 
-  async getUserOrgRole({
+  async tryGetUserOrgRole({
     userId,
     organizationId,
   }: {
@@ -359,7 +359,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
 
 
 
-  async findPrimaryIntentById(
+  async tryFindPrimaryIntentById(
     organizationId: string,
   ): Promise<OrganizationIntent | null> {
     const org = await this.prisma.organization.findUnique({
@@ -516,7 +516,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
     ]);
   }
 
-  async findProvisioningSummaryById(
+  async tryFindProvisioningSummaryById(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null> {
     return this.prisma.organization.findUnique({
@@ -695,7 +695,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
     });
   }
 
-  async findMembership(params: {
+  async tryFindMembership(params: {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationMemberSummary | null> {

@@ -1,7 +1,7 @@
 /**
  * Production LangWatchQL provisioning — pure composition only.
  *
- * `provisioning.ts`, `views.ts` and `postgresMapping.ts` generate the SQL;
+ * `provisioning.ts`, `views.ts` and `postgres-mapping.ts` generate the SQL;
  * this module decides which of it a real deploy runs and in what order, from
  * the runtime `LWQL_*` connection. No I/O happens here — every function
  * takes its inputs as parameters and returns SQL statements, a name, or a
@@ -24,12 +24,12 @@
  */
 
 import { lwqlTenantCapability } from "./capability";
-import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
+import { LWQL_VIEW_CATALOG } from "./catalog/lwql-views";
 import type { LangWatchQLViewDefinition } from "./catalog/types";
 import { isPostgresResident } from "./catalog/types";
 import type { LangWatchQLConnection } from "./executor";
 import { KEY_MAP_COLUMNS, type LangWatchQLNames, qualified } from "./provisioning";
-import { postgresLiteral, postgresQuoted } from "./sqlText";
+import { postgresLiteral, postgresQuoted } from "./sql-text";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,

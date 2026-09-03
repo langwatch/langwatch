@@ -112,7 +112,7 @@ function harness(options?: {
   const carried: string[] = [];
   const service = new IdentityBackfillService(
     {
-      findUser: async () => user,
+      tryFindUser: async () => user,
       findAccountRows: async () => accounts,
       findIdentifierRows: async () => [...rows.values()],
     },

@@ -35,7 +35,7 @@ import type { SsoConnectionService } from "./sso-connection.service";
 
 /** Where the legacy strings are read from. */
 export interface LegacySsoOrganizationRepository {
-  findLegacySso(args: { organizationId: string }): Promise<{
+  tryFindLegacySso(args: { organizationId: string }): Promise<{
     ssoDomain: string;
     ssoProvider: string;
   } | null>;
@@ -95,7 +95,7 @@ export class SsoConnectionGrandfatherService {
   }: {
     organizationId: string;
   }): Promise<SsoConnectionGrandfatherOutcome> {
-    const legacy = await this.deps.legacy.findLegacySso({ organizationId });
+    const legacy = await this.deps.legacy.tryFindLegacySso({ organizationId });
     // Nothing to grandfather is a finished organization, not a skipped one:
     // there is no legacy path left for it to be held on.
     if (!legacy) return { status: "finalized", report: { kind: "no_legacy_sso" } };
@@ -147,8 +147,8 @@ export class SsoConnectionGrandfatherService {
     }[] = [];
     for (const domain of domains) {
       const [legacy, connection] = await Promise.all([
-        this.deps.legacyRouting.findConnectionForDomain({ domain }),
-        this.deps.connectionRouting.findConnectionForDomain({ domain }),
+        this.deps.legacyRouting.tryFindConnectionForDomain({ domain }),
+        this.deps.connectionRouting.tryFindConnectionForDomain({ domain }),
       ]);
       const comparison = compareConnectionRouting({ legacy, connection });
       if (!comparison.matches) disagreements.push({ domain, comparison });

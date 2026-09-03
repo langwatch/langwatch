@@ -14,7 +14,7 @@ import type {
 } from "@langwatch/analytics-contract";
 import type { Protections } from "@langwatch/trace-server";
 import { lwqlTenantCapability } from "../langwatch-ql/capability";
-import { LWQL_VIEW_CATALOG } from "../langwatch-ql/catalog/lwqlViews";
+import { LWQL_VIEW_CATALOG } from "../langwatch-ql/catalog/lwql-views";
 import {
   type LangWatchQLViewDefinition,
   lwqlAllowedTables,
@@ -35,7 +35,7 @@ import {
   type LangWatchQLGranularityResolution,
   resolveLangWatchQLGranularity,
   resolveLangWatchQLTimeWindow,
-} from "../langwatch-ql/resolveTimeWindow";
+} from "../langwatch-ql/resolve-time-window";
 import { describeLangWatchQLSchema } from "../langwatch-ql/schema";
 import type { LangWatchQLTimeWindow } from "@langwatch/analytics-contract";
 import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "@langwatch/analytics-contract";

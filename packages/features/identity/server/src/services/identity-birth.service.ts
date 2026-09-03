@@ -94,7 +94,7 @@ export class IdentityBirthService implements IdentityBirthPort {
     const command = this.attachCommand({ userId, email, createdAtMs });
     const staged = { type: ATTACH_IDENTIFIER_COMMAND_TYPE, data: command };
 
-    const occupant = await this.deps.rows.findUserAtPinnedId({ userId });
+    const occupant = await this.deps.rows.tryFindUserAtPinnedId({ userId });
     if (occupant !== null) {
       throw new IdentityEmailInUseError(
         "born_finalized: the address this sign-up normalizes to already has a user",

@@ -87,7 +87,7 @@ export class IdentityBackfillService {
   }: {
     userId: string;
   }): Promise<IdentityBackfillOutcome> {
-    const user = await this.reads.findUser({ userId });
+    const user = await this.reads.tryFindUser({ userId });
     if (!user) {
       // A vanished user has no history to adopt and no gate to open that
       // anything would consult; finalizing records that this pass looked.

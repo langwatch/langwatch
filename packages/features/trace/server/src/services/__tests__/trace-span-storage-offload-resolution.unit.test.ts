@@ -6,7 +6,7 @@
  * The fix: SpanStorageService now accepts optional SpanReadBlobResolutionDeps.
  * When present, getSpansByTraceId/getSpanById call getNormalizedSpansByTraceId
  * → resolveOffloadedTraces → mapNormalizedSpansToSpans instead of delegating
- * directly to getSpansByTraceId/getSpanByIds on the repository.
+ * directly to getSpansByTraceId/tryGetSpanByIds on the repository.
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
@@ -91,7 +91,7 @@ function makeNormalizedSpan(
 
 /**
  * Builds a SpanStorageRepository stub whose getNormalizedSpansByTraceId
- * returns the given spans, and whose getSpansByTraceId / getSpanByIds delegate
+ * returns the given spans, and whose getSpansByTraceId / tryGetSpanByIds delegate
  * to the NullSpanStorageRepository (return empty/null) so any resolved result
  * must come from the resolution path, not the raw-Span path.
  */
@@ -102,7 +102,7 @@ function makeStubRepository(normalizedSpans: NormalizedSpan[]): SpanStorageRepos
     getNormalizedSpansByTraceId: vi.fn(async () => normalizedSpans),
     // Keep raw paths returning empty so tests can distinguish the two paths.
     getSpansByTraceId: vi.fn(async () => []),
-    getSpanByIds: vi.fn(async () => null),
+    tryGetSpanByIds: vi.fn(async () => null),
   } as unknown as SpanStorageRepository;
 }
 

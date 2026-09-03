@@ -17,7 +17,7 @@
  * test), so it is passed to the generators instead of being baked into an entry
  * that would then be wrong everywhere else.
  *
- * @see ./lwqlViews.ts — the catalog itself
+ * @see ./lwql-views.ts — the catalog itself
  * @see specs/analytics/lwql-api.feature
  */
 

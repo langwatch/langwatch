@@ -237,7 +237,7 @@ export const CARD_TAXONOMY = {
  * it and ignores the `color(display-p3 …)` it cannot parse:
  *   - `p3Layers(fallback, p3)` returns the pair as an array for Emotion's
  *     fallback-value form (`css={{ background: p3Layers(a, b) }}`);
- *   - the CSS utility classes in langyTheme.css (`.langy-accent-wash`,
+ *   - the CSS utility classes in langy-theme.css (`.langy-accent-wash`,
  *     `.langy-accent-ring`) declare the same pair for className consumers.
  *
  * AI_ACCENT_P3 is the amber in P3 (≈ #ED8926 → color(display-p3 0.89 0.53 0.17)).

@@ -65,8 +65,8 @@ export {
   type LangWatchQLExecutor,
   type LangWatchQLResultLimits,
 } from "./langwatch-ql/executor";
-export { MAX_LWQL_LENGTH } from "./langwatch-ql/sqlText";
-export { lwqlGranularityStepSchema, lwqlTimeWindowSchema } from "./langwatch-ql/timeWindowSchema";
+export { MAX_LWQL_LENGTH } from "./langwatch-ql/sql-text";
+export { lwqlGranularityStepSchema, lwqlTimeWindowSchema } from "./langwatch-ql/time-window-schema";
 
 /**
  * The filter picker: the values one field can offer, and the two facts a door
@@ -74,7 +74,7 @@ export { lwqlGranularityStepSchema, lwqlTimeWindowSchema } from "./langwatch-ql/
  */
 export { FilterOptionsAdapter } from "./adapters/filter-options.adapter";
 export { FilterService, type GetFilterOptionsInput } from "./services/filter.service";
-export { FilterOptionsRepository, type FindFilterOptionsInput } from "./ports/filter-options.port";
+export { FilterOptionsPort, type FindFilterOptionsInput } from "./ports/filter-options.port";
 export type { FilterOption } from "./filters/clickhouse/types";
 export {
   filterFieldRequiresKey,
@@ -138,4 +138,4 @@ export {
   productionPostgresApprovedViewStatements,
   productionPostgresReaderGrantStatements,
   withTenancyOptOut,
-} from "./langwatch-ql/productionProvisioning";
+} from "./langwatch-ql/production-provisioning";

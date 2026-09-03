@@ -103,7 +103,7 @@ export abstract class TraceLegacyReadPort {
   ): Promise<DistinctFieldNamesResult>;
 
   /** One LLM span reshaped for the prompt studio, or null when it is not one. */
-  abstract getSpanForPromptStudio(input: {
+  abstract tryGetSpanForPromptStudio(input: {
     projectId: string;
     spanId: string;
     protections: unknown;

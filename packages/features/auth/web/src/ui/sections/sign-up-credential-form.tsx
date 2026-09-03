@@ -1,4 +1,4 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { Alert, Button, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -18,7 +18,7 @@ import { authApi as api } from "../../behavior/auth-api";
 import { signIn } from "../../behavior/auth-client";
 import { credentialSignInFailure } from "../../model/credential-sign-in";
 import { rememberLastUsedMethod } from "../../model/last-used-method";
-import "./auth-front-door.css";
+import "../elements/auth-front-door.css";
 import { SHAPE } from "../../model/front-door-theme";
 import { EmailPill } from "../elements/email-pill";
 import { FrontDoorField } from "../elements/front-door-field";

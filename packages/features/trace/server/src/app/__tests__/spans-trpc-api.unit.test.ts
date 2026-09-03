@@ -26,10 +26,10 @@ function traceApp(read: TraceLegacyReadPort): TraceApp {
 
 function harness({
   getTracesWithSpans = vi.fn(async () => []),
-  getSpanForPromptStudio = vi.fn(async () => null),
+  tryGetSpanForPromptStudio = vi.fn(async () => null),
 }: {
   getTracesWithSpans?: ReturnType<typeof vi.fn>;
-  getSpanForPromptStudio?: ReturnType<typeof vi.fn>;
+  tryGetSpanForPromptStudio?: ReturnType<typeof vi.fn>;
 } = {}) {
   const trpc = initTRPC.context<TestContext>().create();
   const getViewerProtections = vi.fn(async () => ({ canSeeCosts: true }));
@@ -43,12 +43,12 @@ function harness({
   return {
     getViewerProtections,
     getTracesWithSpans,
-    getSpanForPromptStudio,
+    tryGetSpanForPromptStudio,
     caller: router.createCaller({
       app: {
         traces: traceApp({
           getTracesWithSpans,
-          getSpanForPromptStudio,
+          tryGetSpanForPromptStudio,
         } as unknown as TraceLegacyReadPort),
       },
     }),
@@ -124,7 +124,7 @@ describe("SpansTrpcApi", () => {
   describe("given the span is an LLM span", () => {
     it("answers with what the prompt studio opens on", async () => {
       const { caller } = harness({
-        getSpanForPromptStudio: vi.fn(async () => ({ spanId: "span-1" })) as ReturnType<
+        tryGetSpanForPromptStudio: vi.fn(async () => ({ spanId: "span-1" })) as ReturnType<
           typeof vi.fn
         >,
       });

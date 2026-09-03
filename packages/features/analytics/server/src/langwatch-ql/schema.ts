@@ -8,7 +8,7 @@
 import type { LangWatchQLSchema } from "@langwatch/analytics-contract";
 
 import type { Protections } from "@langwatch/trace-server";
-import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
+import { LWQL_VIEW_CATALOG } from "./catalog/lwql-views";
 import {
   type LangWatchQLViewDefinition,
   lwqlColumnGates,

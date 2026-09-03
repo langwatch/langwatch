@@ -12,7 +12,7 @@ export class PrismaIdentityBackfillRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findUser({
+  async tryFindUser({
     userId,
   }: {
     userId: string;

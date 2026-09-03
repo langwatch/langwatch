@@ -32,19 +32,19 @@
  * statement here fails with UNKNOWN_SETTING (115).
  *
  * Every name emitted below is interpolated into SQL text, so it goes through
- * `./sqlText.ts`: `assertIdentifier` for identifiers and the literal escapers
+ * `./sql-text.ts`: `assertIdentifier` for identifiers and the literal escapers
  * for values.
  *
  * Some LangWatchQL datasets live in PostgreSQL rather than ClickHouse. The access
  * model here applies to them unchanged — the path that maps them in is
- * `./postgresMapping.ts`.
+ * `./postgres-mapping.ts`.
  *
- * @see ./postgresMapping.ts — the PostgreSQL-resident datasets this model covers
- * @see ./sqlText.ts — the escaping and identifier rules these statements obey
+ * @see ./postgres-mapping.ts — the PostgreSQL-resident datasets this model covers
+ * @see ./sql-text.ts — the escaping and identifier rules these statements obey
  * @see specs/analytics/lwql-api.feature
  */
 
-import { assertIdentifier, clickHouseLiteral } from "./sqlText";
+import { assertIdentifier, clickHouseLiteral } from "./sql-text";
 
 /**
  * Server-level ClickHouse config declaring the `custom_` settings prefix.
@@ -208,7 +208,7 @@ export const DEFAULT_LWQL_RESOURCE_LIMITS: LangWatchQLResourceLimits = {
 
 /**
  * Validates every configured name, and that the tenant setting carries the
- * declared prefix. Exported for `./postgresMapping.ts`, whose engine tables are
+ * declared prefix. Exported for `./postgres-mapping.ts`, whose engine tables are
  * created in this same LangWatchQL database and so must clear the same checks.
  */
 export function assertNames(names: LangWatchQLNames): LangWatchQLNames {
@@ -227,7 +227,7 @@ export function assertNames(names: LangWatchQLNames): LangWatchQLNames {
 }
 
 /**
- * `database.table`, both validated. Exported for `./postgresMapping.ts`, which
+ * `database.table`, both validated. Exported for `./postgres-mapping.ts`, which
  * qualifies its engine tables into the same LangWatchQL database.
  */
 export function qualified(

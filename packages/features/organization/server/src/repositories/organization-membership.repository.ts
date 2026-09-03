@@ -266,7 +266,7 @@ export interface UpdateTeamMemberRoleInput {
 }
 
 export interface OrganizationRepository {
-  getUserOrgRole(params: {
+  tryGetUserOrgRole(params: {
     userId: string;
     organizationId: string;
   }): Promise<OrganizationUserRole | null>;
@@ -274,7 +274,7 @@ export interface OrganizationRepository {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null>;
-  findPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null>;
+  tryFindPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null>;
 
   // --- New methods for router delegation ---
 
@@ -293,7 +293,7 @@ export interface OrganizationRepository {
   /** Every organization on the instance, newest first. Instance-admin only. */
   findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
 
-  findProvisioningSummaryById(
+  tryFindProvisioningSummaryById(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null>;
 
@@ -330,7 +330,7 @@ export interface OrganizationRepository {
    * `getMemberById` there is no caller pre-check: the management surface
    * authenticates through the organization credential, not a session user.
    */
-  findMembership(params: {
+  tryFindMembership(params: {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationMemberSummary | null>;

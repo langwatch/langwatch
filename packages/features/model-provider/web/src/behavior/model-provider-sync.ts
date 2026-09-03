@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
-import type { api } from "../behavior/model-provider-api";
+import type { api } from "./model-provider-api";
 
 /**
  * BroadcastChannel name for cross-tab model-provider sync.

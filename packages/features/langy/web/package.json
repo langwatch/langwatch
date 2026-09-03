@@ -18,7 +18,7 @@
       "types": "./src/features/asaplangy/index.ts",
       "default": "./src/features/asaplangy/index.ts"
     },
-    "./langy-theme.css": "./src/features/langy/langyTheme.css",
+    "./langy-theme.css": "./src/ui/elements/langy-theme.css",
     "./screens/langy-layout": {
       "types": "./src/screens/langy-layout/index.ts",
       "default": "./src/screens/langy-layout/index.ts"

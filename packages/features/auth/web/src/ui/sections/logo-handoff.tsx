@@ -1,7 +1,7 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { useEffect } from "react";
 import { useReducedMotion } from "../../behavior/use-reduced-motion";
-import "./auth-front-door.css";
+import "../elements/auth-front-door.css";
 import { beginEntrance, endEntrance } from "../../model/entrance";
 
 /**

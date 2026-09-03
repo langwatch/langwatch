@@ -28,7 +28,7 @@ export class InMemoryVerificationStore implements IdentityVerificationRepository
     this.records.set(record.identifierId, record);
   }
 
-  async findByIdentifierId({ identifierId }: { identifierId: string }) {
+  async tryFindByIdentifierId({ identifierId }: { identifierId: string }) {
     return this.records.get(identifierId) ?? null;
   }
 

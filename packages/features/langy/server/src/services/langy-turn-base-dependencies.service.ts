@@ -23,7 +23,7 @@ export class LangyTurnBaseDependenciesService {
     requestedConversationId: string | null;
     adoptConversationId?: boolean;
     modelOverride?: string;
-  }) {
+  }): ReturnType<LangyTurnBaseDependenciesService["enrich"]> {
     const results = await this.read(input);
     const resolved = this.requireResolved(input.projectId, results);
     return this.enrich(input, resolved);

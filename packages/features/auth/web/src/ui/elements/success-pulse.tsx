@@ -1,5 +1,5 @@
-/// <reference path="../../types/ambient.d.ts" />
-import "../sections/auth-front-door.css";
+/// <reference path="../../model/ambient.d.ts" />
+import "./auth-front-door.css";
 
 /**
  * One soft ring, once, where something has just worked: an address confirmed,

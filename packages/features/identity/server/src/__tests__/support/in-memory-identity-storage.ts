@@ -69,7 +69,7 @@ export class InMemoryIdentityStorage
       .map((identifier) => this.assemble(identifier));
   }
 
-  async findByProviderSubject({
+  async tryFindByProviderSubject({
     userId,
     providerId,
     providerAccountId,
@@ -170,7 +170,7 @@ export class InMemoryIdentityStorage
     }
   }
 
-  async resolveByIdentifierValue({
+  async tryResolveByIdentifierValue({
     normalizedValue,
   }: {
     normalizedValue: string;
@@ -182,7 +182,7 @@ export class InMemoryIdentityStorage
     );
   }
 
-  async resolveByProviderSubject({
+  async tryResolveByProviderSubject({
     providerId,
     providerAccountId,
   }: {
@@ -269,7 +269,7 @@ export const inertIdentityPorts = {
     async findByAccountIds() {
       return [];
     },
-    async findByProviderSubject() {
+    async tryFindByProviderSubject() {
       return null;
     },
     createCredential: refuses("createCredential"),
@@ -279,10 +279,10 @@ export const inertIdentityPorts = {
     mirrorSecretsOntoAccounts: refuses("mirrorSecretsOntoAccounts"),
   } satisfies IdentityAccountsPort,
   resolution: {
-    async resolveByIdentifierValue() {
+    async tryResolveByIdentifierValue() {
       return null;
     },
-    async resolveByProviderSubject() {
+    async tryResolveByProviderSubject() {
       return null;
     },
   } satisfies IdentityResolutionPort,

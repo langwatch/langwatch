@@ -1,4 +1,4 @@
-import type { LwqlKeyMapRow } from "../../langwatch-ql/productionProvisioning";
+import type { LwqlKeyMapRow } from "../../langwatch-ql/production-provisioning";
 import type { ClickHouseClientResolver } from "./clickhouse.filter-options.repository";
 
 /**

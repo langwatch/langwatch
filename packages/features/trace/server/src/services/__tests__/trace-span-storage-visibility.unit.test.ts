@@ -24,7 +24,7 @@ const makeSpan = (startedDaysAgo: number, id = "span-1"): Span =>
 const makeService = (spans: Span[]) =>
   new SpanStorageService({
     getSpansByTraceId: vi.fn().mockResolvedValue(spans),
-    getSpanByIds: vi.fn().mockResolvedValue(spans[0] ?? null),
+    tryGetSpanByIds: vi.fn().mockResolvedValue(spans[0] ?? null),
     findSpansPaginated: vi.fn().mockResolvedValue({ spans, total: spans.length }),
     findSpansSince: vi.fn().mockResolvedValue(spans),
   } as never);

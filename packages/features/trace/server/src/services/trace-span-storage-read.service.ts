@@ -141,7 +141,7 @@ export class SpanStorageService {
    * are what it fails on. Rendering a span is `getSpanById`'s job, not this.
    */
   async getNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
-    return this.repository.findNormalizedSpanById(params);
+    return this.repository.tryFindNormalizedSpanById(params);
   }
 
   /**
@@ -158,7 +158,7 @@ export class SpanStorageService {
       span ? (applyVisibilityGate([span], params.visibilityCutoffMs)[0] ?? null) : null;
 
     if (!this.blobResolutionDeps) {
-      return gateOne(await this.repository.getSpanByIds(params));
+      return gateOne(await this.repository.tryGetSpanByIds(params));
     }
 
     // Resolve the single span via the normalized+resolve path.

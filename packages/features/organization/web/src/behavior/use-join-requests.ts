@@ -1,7 +1,7 @@
 import type { DomainJoinSetting } from "@langwatch/identity-contract";
 import { useCallback, useMemo, useState } from "react";
 import { api } from "../behavior/organization-api";
-import type { PendingJoinRequest } from "../ui/blocks/join-requests-table";
+import type { PendingJoinRequest } from "../model/pending-join-request";
 import { useOrganizationToaster, useShowErrorToast } from "../behavior/organization-feedback";
 
 /**

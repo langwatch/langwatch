@@ -227,7 +227,7 @@ export class JoinRequestsService {
       throw new JoinNotAvailableError("join requests are not enabled here");
     }
     const domain = this.provenDomainOrRefuse({ verifiedEmail });
-    const candidate = await this.deps.candidates.findCandidateOrganization({
+    const candidate = await this.deps.candidates.tryFindCandidateOrganization({
       organizationId,
       domain,
     });
@@ -696,7 +696,7 @@ export class JoinRequestsService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const rejectedAt = await this.deps.reads.findLastRejectionAt({
+    const rejectedAt = await this.deps.reads.tryFindLastRejectionAt({
       userId,
       organizationId,
     });
@@ -728,7 +728,7 @@ export class JoinRequestsService {
         `automatic joining refused for the public email domain ${domain}`,
       );
     }
-    const candidate = await this.deps.candidates.findCandidateOrganization({
+    const candidate = await this.deps.candidates.tryFindCandidateOrganization({
       organizationId,
       domain,
     });

@@ -135,7 +135,7 @@ export class PrismaIdentityAccountsRepository implements IdentityAccountsPort {
    * `provider` vocabulary collapses every enterprise IdP into `oidc` and a
    * subject is unique only WITHIN an issuer, so it cannot be the match key.
    */
-  async findByProviderSubject({
+  async tryFindByProviderSubject({
     userId,
     providerId,
     providerAccountId,

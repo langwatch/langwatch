@@ -22,7 +22,7 @@ export interface IdentityVerificationRepository {
   /** Minting replaces any prior record for the same identifier — a newer
    *  mint invalidates every older link. */
   replaceForIdentifier(record: IdentityVerificationRecord): Promise<void>;
-  findByIdentifierId(args: {
+  tryFindByIdentifierId(args: {
     identifierId: string;
   }): Promise<IdentityVerificationRecord | null>;
   /** Deletes the record if and only if it still names this verification;

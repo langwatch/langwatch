@@ -28,9 +28,9 @@
  * browser is a drift bug waiting for the first change. Importing anything
  * server-side here — the handled errors, the remediation registry — would ship
  * that to every browser. The policy those errors belong to lives next door in
- * `./resolveTimeWindow.ts`, which the browser never loads.
+ * `./resolve-time-window.ts`, which the browser never loads.
  *
- * @see ./resolveTimeWindow.ts — what a surface may and may not do with these
+ * @see ./resolve-time-window.ts — what a surface may and may not do with these
  * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -175,7 +175,7 @@ export function describeLangWatchQLGranularityStep(
  * Vocabulary rather than policy, and so it lives here: the dashboard widget
  * cites this number in the notice it shows when a period forced its step
  * coarser, and that notice renders in the browser. The arithmetic that enforces
- * the ceiling stays in `./resolveTimeWindow.ts`, which the browser never loads
+ * the ceiling stays in `./resolve-time-window.ts`, which the browser never loads
  * — importing that module for the constant alone would ship the handled-error
  * registry and everything it reaches to every page.
  */

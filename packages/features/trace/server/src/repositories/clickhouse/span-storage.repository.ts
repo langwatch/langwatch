@@ -221,18 +221,18 @@ const SINGLE_TRACE_READ_SETTINGS = {
 } as const;
 
 /**
- * Settings for the single-span fetch paths (`getSpanByIds`, `getSpanEvents`).
+ * Settings for the single-span fetch paths (`tryGetSpanByIds`, `getSpanEvents`).
  * Locks `query_plan_optimize_lazy_materialization=1` per-query so the LazilyRead
  * optimiser stays engaged even if a future cluster/profile config flips it off.
  *
  * Investigation (dev CH 25.10.1.3832 against a fat span: 19 attrs / 127 events
  * / ~88KB Events.Attributes):
  *
- *   getSpanByIds   Form A (ORDER BY UpdatedAt DESC LIMIT 1)
+ *   tryGetSpanByIds   Form A (ORDER BY UpdatedAt DESC LIMIT 1)
  *     read_bytes = 14,933       (~15KB) - heavy columns deferred past LIMIT
- *   getSpanByIds   Form B (scalar-subquery dedup, doc "Anti-Pattern 1" form)
+ *   tryGetSpanByIds   Form B (scalar-subquery dedup, doc "Anti-Pattern 1" form)
  *     read_bytes = 9,706,538    (~9.7MB)
- *   getSpanByIds   Form A, LazilyRead disabled
+ *   tryGetSpanByIds   Form A, LazilyRead disabled
  *     read_bytes = 9,692,701    (~9.7MB) - matches Form B, hence the lock
  *
  *   getSpanEvents  Form A (inner ORDER BY DESC LIMIT 1, ARRAY JOIN outside)
@@ -929,7 +929,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getSpanByIds({
+  async tryGetSpanByIds({
     tenantId,
     traceId,
     spanId,
@@ -939,7 +939,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     spanId: string;
   } & OccurredAtHint): Promise<Span | null> {
-    EventUtils.validateTenantId({ tenantId }, "SpanStorageClickHouseRepository.getSpanByIds");
+    EventUtils.validateTenantId({ tenantId }, "SpanStorageClickHouseRepository.tryGetSpanByIds");
 
     try {
       return await this.readTraceSpans<Span | null>(
@@ -996,10 +996,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * **Returns a span with empty `events` and `links`**: it reads
    * {@link DERIVATION_SPAN_SELECT}, which omits those nested columns because no
    * derivation consumer reads them and they are what this read fails on. Do not
-   * reach for this method to render a span — {@link getSpanByIds} is the read
+   * reach for this method to render a span — {@link tryGetSpanByIds} is the read
    * that returns one whole.
    */
-  async findNormalizedSpanById({
+  async tryFindNormalizedSpanById({
     tenantId,
     traceId,
     spanId,
@@ -1007,7 +1007,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
     EventUtils.validateTenantId(
       { tenantId },
-      "SpanStorageClickHouseRepository.findNormalizedSpanById",
+      "SpanStorageClickHouseRepository.tryFindNormalizedSpanById",
     );
 
     try {
@@ -1044,8 +1044,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   /**
-   * Single-span fetch shared by {@link getSpanByIds} and
-   * {@link findNormalizedSpanById}. WHERE pins (TenantId, TraceId, SpanId) - the
+   * Single-span fetch shared by {@link tryGetSpanByIds} and
+   * {@link tryFindNormalizedSpanById}. WHERE pins (TenantId, TraceId, SpanId) - the
    * primary key prefix - so we hit a tiny granule range. ORDER BY
    * UpdatedAt DESC LIMIT 1 deliberately picks up CH 25.10's
    * LazilyRead optimiser: heavy columns (SpanAttributes, Events.*,
@@ -1531,7 +1531,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 event_attrs AS attributes
               FROM (
                 -- Single-span fetch. Same rationale and same investigation
-                -- as getSpanByIds (see SINGLE_SPAN_FETCH_SETTINGS comment).
+                -- as tryGetSpanByIds (see SINGLE_SPAN_FETCH_SETTINGS comment).
                 -- LazilyRead survives through this subquery + ARRAY JOIN
                 -- composition: Events.Timestamp / Events.Name /
                 -- Events.Attributes are deferred past the inner LIMIT 1

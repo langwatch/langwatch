@@ -15,6 +15,7 @@ import {
   ArchivedExperimentWriteError,
   ExperimentRepository,
   type ExperimentRowState,
+  type WorkbenchWriteResult,
 } from "../experiment.repository";
 
 /**
@@ -342,7 +343,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     expectedVersion?: number;
     actor: WorkbenchActor;
     commitMessage?: string;
-  }) {
+  }): Promise<WorkbenchWriteResult> {
     return await this.database.$transaction(async (transaction) => {
       const row = await transaction.experiment.findFirst({
         where: { id: input.id, projectId: input.projectId, archivedAt: null },

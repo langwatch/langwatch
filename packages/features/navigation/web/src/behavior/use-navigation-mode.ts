@@ -3,7 +3,7 @@ import { useNavigationHost } from "../model/navigation-host";
 import {
   type NavigationModeResolution,
   resolveNavigationMode,
-} from "../model/resolve-navigation-mode";
+} from "./resolve-navigation-mode";
 import { useNavigationModeStore } from "./navigation-mode.store";
 
 export type { NavigationModeResolution };

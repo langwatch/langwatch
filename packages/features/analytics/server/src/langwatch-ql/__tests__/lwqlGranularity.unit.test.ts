@@ -17,7 +17,7 @@ import {
   LangWatchQLGranularityTooFineError,
   LangWatchQLReservedGranularityTypeError,
 } from "../errors";
-import { LWQL_GRANULARITY_MAX_BUCKETS, resolveLangWatchQLGranularity } from "../resolveTimeWindow";
+import { LWQL_GRANULARITY_MAX_BUCKETS, resolveLangWatchQLGranularity } from "../resolve-time-window";
 import { LWQL_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
 import type { LangWatchQLParameter } from "../validation/validate";
 

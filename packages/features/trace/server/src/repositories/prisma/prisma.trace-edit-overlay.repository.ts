@@ -46,7 +46,7 @@ function isUniqueConstraintViolation(error: unknown): boolean {
 export class TraceEditOverlayRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findByProjectAndTrace({
+  async tryFindByProjectAndTrace({
     projectId,
     traceId,
   }: {

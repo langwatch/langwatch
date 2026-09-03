@@ -1,8 +1,8 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { Text } from "@chakra-ui/react";
 import { usePublicEnv } from "../../behavior/use-public-env";
 import { LEGAL_LINKS } from "../../model/legal-links";
-import "../sections/auth-front-door.css";
+import "./auth-front-door.css";
 
 /**
  * The small print both doors carry: what continuing means, said once, in the

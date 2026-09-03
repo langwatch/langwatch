@@ -146,7 +146,7 @@ export class VerificationCeremonyService {
     if (!(await this.deps.isLatched({ userId }))) {
       refuse("user's identifier backfill is not finalized; no live events yet");
     }
-    const record = await this.store.findByIdentifierId({ identifierId });
+    const record = await this.store.tryFindByIdentifierId({ identifierId });
     if (!record) refuse("no ceremony in flight for this identifier");
     if (
       record.verificationId !== verificationId ||

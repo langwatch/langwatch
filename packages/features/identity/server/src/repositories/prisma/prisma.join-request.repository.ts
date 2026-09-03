@@ -59,7 +59,7 @@ export class PrismaJoinRequestReadRepository
 
   /** The cool-down read: when this person was last told no by this
    *  organization. Null when they never were. */
-  async findLastRejectionAt({
+  async tryFindLastRejectionAt({
     userId,
     organizationId,
   }: {
@@ -159,7 +159,7 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     });
   }
 
-  async findCandidateOrganization({
+  async tryFindCandidateOrganization({
     organizationId,
     domain,
   }: {

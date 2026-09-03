@@ -24,10 +24,12 @@ import {
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types";
 import { api } from "../../behavior/organization-api";
-import {
-  getDefaultTeamRoleForOrganizationRole,
-  type TeamRoleValue,
-} from "../../model/member-role-constraints";
+import { getDefaultTeamRoleForOrganizationRole } from "../../model/member-role-constraints";
+import type {
+  InviteData,
+  MembersForm,
+  TeamAssignment,
+} from "../../model/member-invite-form";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
 import {
   LITE_MEMBER_EXPLANATION,
@@ -44,22 +46,6 @@ import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Select } from "@langwatch/design-system/select";
 
 type Option = { label: string; value: string; description?: string };
-
-type TeamAssignment = {
-  teamId: string;
-  role: TeamRoleValue;
-  customRoleId?: string | null;
-};
-
-type InviteData = {
-  email: string;
-  orgRole: OrganizationUserRole;
-  teams: TeamAssignment[];
-};
-
-export type MembersForm = {
-  invites: InviteData[];
-};
 
 // Internal form shape — flattened: one email input, shared role + teams
 type InternalForm = {

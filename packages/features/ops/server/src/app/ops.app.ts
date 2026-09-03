@@ -142,12 +142,12 @@ export type OpsProcessExplorer = {
     ref: OpsProcessRef;
     actorUserId: string;
   }): Promise<{ requeued: number }>;
-  redriveDeadMessage(input: {
+  tryRedriveDeadMessage(input: {
     ref: OpsProcessRef;
     messageId: string;
     actorUserId: string;
   }): Promise<{ redriven: boolean }>;
-  discardDeadMessage(input: {
+  tryDiscardDeadMessage(input: {
     ref: OpsProcessRef;
     messageId: string;
     actorUserId: string;
@@ -161,7 +161,7 @@ export type OpsProcessExplorer = {
     actorUserId: string;
   }): Promise<{ discarded: number }>;
   getOutboxAttempts(input: { outboxId: string; projectId: string }): Promise<OutboxAttemptView[]>;
-  releaseLapsedLease(input: {
+  tryReleaseLapsedLease(input: {
     ref: OpsProcessRef;
     messageId: string;
     actorUserId: string;

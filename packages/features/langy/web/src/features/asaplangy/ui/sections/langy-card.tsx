@@ -2,7 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import type { ReactNode } from "react";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
-import "../../../langy/langyTheme.css";
+import "../../../../ui/elements/langy-theme.css";
 import { CARD_TAXONOMY, type LangyCardIntent, SERIF, TYPE } from "../../model/tokens";
 import { LangyPanelSurface } from "./langy-panel-surface";
 

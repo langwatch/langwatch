@@ -1,4 +1,4 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { Alert, Box, Button, Input, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
@@ -6,11 +6,11 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { authApi as api } from "../../behavior/auth-api";
 import Link from "../elements/router-link";
-import "./auth-front-door.css";
+import "../elements/auth-front-door.css";
 import { SHAPE } from "../../model/front-door-theme";
 import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled";
 import { useRetryCountdown } from "../../behavior/use-retry-countdown";
-import { attemptCredentialSignIn } from "../../model/attempt-credential-sign-in";
+import { attemptCredentialSignIn } from "../../behavior/attempt-credential-sign-in";
 import { describeRemainingWait } from "../../model/credential-sign-in";
 import { rememberLastUsedMethod } from "../../model/last-used-method";
 import { EmailPill } from "../elements/email-pill";

@@ -29,7 +29,7 @@ export class SsoConnectionDomainRoutingRepository
     private readonly isMethodConfigured: (methodId: string) => Promise<boolean>,
   ) {}
 
-  async findConnectionForDomain({
+  async tryFindConnectionForDomain({
     domain,
   }: {
     domain: string;

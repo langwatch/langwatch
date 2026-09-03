@@ -107,7 +107,7 @@ export function LangyMark({
  * `active` tightens the loop for the "working" state. Both loops are slow on
  * purpose — this is a background that breathes, not one that pulses. Static
  * under `prefers-reduced-motion: reduce` (belt-and-braces: the hook drops the
- * animation prop, and `langyTheme.css` also kills it via `.langy-mesh`).
+ * animation prop, and `langy-theme.css` also kills it via `.langy-mesh`).
  */
 export function LangyMeshLayer({
   active = false,

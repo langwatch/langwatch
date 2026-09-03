@@ -26,7 +26,7 @@ const logger = createLogger("langwatch:identity:signin-router");
 export interface SignInDomainRoutingPort {
   /** The connection owning an email domain, or null when none does — the
    *  same null a domain nobody ever configured produces. */
-  findConnectionForDomain(input: {
+  tryFindConnectionForDomain(input: {
     domain: string;
   }): Promise<RoutableConnection | null>;
   /** Every connection this instance could auto-redirect to with no address
@@ -160,7 +160,7 @@ export class SignInRouterService {
   }> {
     if (domain) {
       return {
-        domainConnection: await this.domains.findConnectionForDomain({
+        domainConnection: await this.domains.tryFindConnectionForDomain({
           domain,
         }),
         activeConnections: [],

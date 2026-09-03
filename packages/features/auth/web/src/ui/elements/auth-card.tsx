@@ -1,8 +1,8 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { Box, Card, Container, Heading, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-import "../sections/auth-front-door.css";
+import "./auth-front-door.css";
 import { FullLogo } from "./full-logo";
 
 /**

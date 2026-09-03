@@ -26,7 +26,7 @@ import {
   type ContentCategory,
 } from "@langwatch/data-privacy-contract";
 import type { FieldProtection } from "./field-protection";
-import { clickHouseLiteral } from "../sqlText";
+import { clickHouseLiteral } from "../sql-text";
 
 /**
  * Which read-time gate governs each data-privacy content category.

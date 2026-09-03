@@ -1,10 +1,10 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { Box, IconButton, Input } from "@chakra-ui/react";
 import { Eye, EyeOff } from "lucide-react";
 import type { Ref } from "react";
 import { useState } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
-import "../sections/auth-front-door.css";
+import "./auth-front-door.css";
 import { SHAPE } from "../../model/front-door-theme";
 import { FIELD_FOCUS, FIELD_SURFACE } from "./front-door-field";
 

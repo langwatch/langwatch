@@ -17,7 +17,7 @@ import {
   LangWatchQLGranularityRequiresTimeWindowError,
   LangWatchQLReservedGranularityTypeError,
 } from "../errors";
-import { assertLangWatchQLGranularityDeclaration } from "../resolveTimeWindow";
+import { assertLangWatchQLGranularityDeclaration } from "../resolve-time-window";
 import type { LangWatchQLParameter } from "../validation/validate";
 import { validateLangWatchQL } from "../validation/validate";
 

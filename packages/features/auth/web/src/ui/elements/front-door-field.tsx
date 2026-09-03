@@ -1,8 +1,8 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { type ReactNode, useId } from "react";
 import type { FieldError } from "react-hook-form";
-import "../sections/auth-front-door.css";
+import "./auth-front-door.css";
 import { MONO_FONT } from "../../model/front-door-theme";
 
 /**

@@ -1,8 +1,8 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { Box, Flex } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { usePublicEnv } from "../../behavior/use-public-env";
-import "./auth-front-door.css";
+import "../elements/auth-front-door.css";
 import { CastleSnake } from "../elements/castle-snake";
 import { FrontDoorGround } from "./front-door-ground";
 import { FrontDoorValuePanel } from "../elements/front-door-value-panel";

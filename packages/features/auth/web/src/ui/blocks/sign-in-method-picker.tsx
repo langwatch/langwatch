@@ -1,10 +1,10 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { Alert, Badge, HStack, Text, VStack } from "@chakra-ui/react";
 import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
 import { signInMethodActionLabel } from "../../model/method-labels";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy";
-import "../sections/auth-front-door.css";
+import "../elements/auth-front-door.css";
 import { MONO_FONT } from "../../model/front-door-theme";
 import { MethodButton } from "../elements/method-button";
 import { PasskeySignInButton } from "../elements/passkey-sign-in-button";

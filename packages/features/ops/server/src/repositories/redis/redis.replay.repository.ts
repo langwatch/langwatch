@@ -79,7 +79,7 @@ export class ReplayRedisRepository implements ReplayRepository {
     );
   }
 
-  async getLockHolder(): Promise<string | null> {
+  async tryGetLockHolder(): Promise<string | null> {
     return this.redis.get(REPLAY_LOCK_KEY);
   }
 

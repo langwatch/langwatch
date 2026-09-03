@@ -45,7 +45,7 @@ class StubRouting implements SignInDomainRoutingPort {
     private readonly byDomain: Record<string, RoutableConnection | null>,
   ) {}
 
-  async findConnectionForDomain({ domain }: { domain: string }) {
+  async tryFindConnectionForDomain({ domain }: { domain: string }) {
     return this.byDomain[domain] ?? null;
   }
 
@@ -102,7 +102,7 @@ function grandfatherOf({
   return new SsoConnectionGrandfatherService({
     connections: serviceOf(connections),
     legacy: {
-      findLegacySso: async () => ({ ssoDomain, ssoProvider: "okta" }),
+      tryFindLegacySso: async () => ({ ssoDomain, ssoProvider: "okta" }),
     },
     legacyRouting,
     connectionRouting,

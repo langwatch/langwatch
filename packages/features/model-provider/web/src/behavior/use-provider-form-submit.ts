@@ -19,7 +19,7 @@ import {
 import {
   broadcastModelProvidersUpdated,
   invalidateModelProviderQueries,
-} from "../model/model-provider-sync";
+} from "./model-provider-sync";
 import type { ExtraHeader } from "./use-extra-headers";
 
 /** Snapshot of all form state needed at submission time. */

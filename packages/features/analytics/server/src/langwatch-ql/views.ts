@@ -40,14 +40,14 @@
  * directly reads the map unfiltered (still tenant-scoped, because the row
  * policy is on the source). The gateway's `allowedTables` is what keeps the
  * physical table unnameable. See the module comment in
- * `./catalog/contentGating.ts` for how the views themselves strip content keys.
+ * `./catalog/content-gating.ts` for how the views themselves strip content keys.
  *
- * @see ./catalog/lwqlViews.ts — the catalog these statements are built from
+ * @see ./catalog/lwql-views.ts — the catalog these statements are built from
  * @see ./provisioning.ts — the access model applied over them
  * @see specs/analytics/lwql-api.feature
  */
 
-import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
+import { LWQL_VIEW_CATALOG } from "./catalog/lwql-views";
 import {
   columnExpression,
   isPostgresResident,
@@ -62,7 +62,7 @@ import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   postgresApprovedViewStatement,
   postgresEngineTableStatement,
-} from "./postgresMapping";
+} from "./postgres-mapping";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
@@ -114,7 +114,7 @@ import {
  * above for a correctness problem they do not have.
  *
  * Re-measured on every run by the pruning case in
- * `__tests__/lwqlViews.integration.test.ts`.
+ * `__tests__/lwql-views.integration.test.ts`.
  */
 export const SHIPPED_LWQL_DEDUP: LangWatchQLDedupStrategy = "final";
 
@@ -269,27 +269,11 @@ function sourceRelation({
  * rather than a leak — but it is why `lwqlPolicyCoverageQuery` auditing
  * that policy matters here too.
  *
- * ## Why the `LIMIT 1`
- *
- * The self-policy narrows the subquery to one *hash*, not to one *row*. The key
- * map is `ENGINE = MergeTree ORDER BY KeyHash`, which enforces no uniqueness,
- * so a retried provisioning step or a re-issued key leaves two rows the policy
- * both admits and the scalar subquery fails the whole query with
- * `INCORRECT_RESULT_OF_SCALAR_SUBQUERY`. That failure is invisible from the
- * query text and takes out every PostgreSQL-resident dataset for the affected
- * key at once. Bounding it is safe because duplicates are copies: a hash maps
- * to one API key, which belongs to one project, so every admitted row carries
- * the same `TenantId` and which one is taken cannot change the answer. `LIMIT
- * 1` is the bound that keeps the shape scalar — an `IN (subquery)` would stop
- * pushing down and hand the primary the full scan this predicate exists to
- * prevent.
- *
- * ## Why this is a performance control and not a security boundary
- *
- * The row policy still applies underneath it, so a wrong predicate costs a
- * wrong read and never a wrong answer. Proven directly rather than argued: with
- * the predicate hard-coded to a foreign tenant, PostgreSQL really does read and
- * ship that tenant's rows, and the caller receives zero — see
+ * This is a performance control and not a security boundary: the row policy
+ * still applies underneath it, so a wrong predicate costs a wrong read and never
+ * a wrong answer. Proven directly rather than argued: with the predicate
+ * hard-coded to a foreign tenant, PostgreSQL really does read and ship that
+ * tenant's rows, and the caller receives zero — see
  * `__tests__/postgresEngineIsolation.integration.test.ts`.
  */
 function postgresTenantPredicate({ names }: { names: LangWatchQLNames }): string {
@@ -300,6 +284,18 @@ function postgresTenantPredicate({ names }: { names: LangWatchQLNames }): string
   // silently widen — but failing at provisioning time is not a risk worth
   // taking for two characters.
   const keyMap = `${assertIdentifier(names.database, "database")}.${assertIdentifier(names.keyMapTable, "keyMapTable")}`;
+  // The self-policy narrows the subquery to one *hash*, not to one *row*. The
+  // key map is `ENGINE = MergeTree ORDER BY KeyHash`, which enforces no
+  // uniqueness, so a retried provisioning step or a re-issued key leaves two
+  // rows the policy both admits and the scalar subquery fails the whole query
+  // with `INCORRECT_RESULT_OF_SCALAR_SUBQUERY`. That failure is invisible from
+  // the query text and takes out every PostgreSQL-resident dataset for the
+  // affected key at once. Bounding it is safe because duplicates are copies: a
+  // hash maps to one API key, which belongs to one project, so every admitted
+  // row carries the same `TenantId` and which one is taken cannot change the
+  // answer. `LIMIT 1` is the bound that keeps the shape scalar — an
+  // `IN (subquery)` would stop pushing down and hand the primary the full scan
+  // this predicate exists to prevent.
   return (
     `WHERE ${sourceColumn(TENANT_COLUMN)} = (\n` +
     `    SELECT ${KEY_MAP_ALIAS}.${quotedColumn(KEY_MAP_COLUMNS.tenantId)}\n` +

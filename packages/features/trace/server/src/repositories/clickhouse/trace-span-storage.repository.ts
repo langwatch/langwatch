@@ -294,7 +294,7 @@ export class TraceSpanStorageClickHouseRepository {
    * RETURNS A SPAN WITH EMPTY `events` AND `links`: it reads
    * {@link DERIVATION_SPAN_SELECT}. Do not reach for it to render a span.
    */
-  async findNormalizedSpanById(input: {
+  async tryFindNormalizedSpanById(input: {
     tenantId: string;
     traceId: string;
     spanId: string;
@@ -302,7 +302,7 @@ export class TraceSpanStorageClickHouseRepository {
   }): Promise<NormalizedSpan | null> {
     EventUtils.validateTenantId(
       { tenantId: input.tenantId },
-      "TraceSpanStorageClickHouseRepository.findNormalizedSpanById",
+      "TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById",
     );
 
     try {

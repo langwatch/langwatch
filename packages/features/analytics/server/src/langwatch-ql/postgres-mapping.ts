@@ -20,11 +20,11 @@
  * name, which is what lets one row-policy shape serve every LangWatchQL object.
  *
  * Every name emitted below is interpolated into SQL text, so it goes through
- * `./sqlText.ts`: `postgresQuoted` on the PostgreSQL side, `assertIdentifier`
+ * `./sql-text.ts`: `postgresQuoted` on the PostgreSQL side, `assertIdentifier`
  * on the ClickHouse side, and the literal escapers for values.
  *
  * @see ./provisioning.ts — the ClickHouse access model applied over these tables
- * @see ./sqlText.ts — the escaping and identifier rules these statements obey
+ * @see ./sql-text.ts — the escaping and identifier rules these statements obey
  * @see specs/analytics/lwql-api.feature
  */
 
@@ -34,7 +34,7 @@ import {
   clickHouseLiteral,
   postgresLiteral,
   postgresQuoted,
-} from "./sqlText";
+} from "./sql-text";
 
 /** Connection details of the named collection ClickHouse dials PostgreSQL with. */
 export interface PostgresNamedCollection {

@@ -1,10 +1,10 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { Button, HStack, Input, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import "./auth-front-door.css";
+import "../elements/auth-front-door.css";
 import { SHAPE } from "../../model/front-door-theme";
 import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field";

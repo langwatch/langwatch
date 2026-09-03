@@ -83,17 +83,17 @@ export class ShadowComparingDomainRoutingRepository
     this.recorder = deps.recorder ?? defaultRecorder;
   }
 
-  async findConnectionForDomain({
+  async tryFindConnectionForDomain({
     domain,
   }: {
     domain: string;
   }): Promise<RoutableConnection | null> {
-    const decided = await this.deciding.findConnectionForDomain({ domain });
+    const decided = await this.deciding.tryFindConnectionForDomain({ domain });
     await this.compare({
       lookup: "domain",
       domain,
       decided,
-      read: () => this.shadow.findConnectionForDomain({ domain }),
+      read: () => this.shadow.tryFindConnectionForDomain({ domain }),
     });
     return decided;
   }

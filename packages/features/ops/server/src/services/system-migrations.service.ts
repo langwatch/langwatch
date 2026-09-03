@@ -62,7 +62,7 @@ export type MigrationEnrollmentRecord = OpsMigrationEnrollmentRecord;
  */
 export interface SystemMigrationEnrollmentStore {
   findAll(): Promise<MigrationEnrollmentRecord[]>;
-  findOrganizationById(args: {
+  tryFindOrganizationById(args: {
     organizationId: string;
   }): Promise<{ id: string; name: string } | null>;
   isEnrolled(args: { organizationId: string; migrationName: string }): Promise<boolean>;
@@ -371,7 +371,7 @@ export class SystemMigrationsService {
     if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
     this.requireRegisteredMigration(migrationName);
     this.requireEnrollmentDecidesSomething(migrationName);
-    const organization = await this.deps.enrollments.findOrganizationById({
+    const organization = await this.deps.enrollments.tryFindOrganizationById({
       organizationId,
     });
     if (!organization) {
@@ -611,7 +611,7 @@ export class SystemMigrationsService {
     if (!this.deps.isSaaS() && !migration.runsAutomaticallyOnSelfHosted) {
       throw new MigrationNotAvailableOnInstallationError();
     }
-    const organization = await this.deps.enrollments.findOrganizationById({
+    const organization = await this.deps.enrollments.tryFindOrganizationById({
       organizationId,
     });
     if (!organization) {

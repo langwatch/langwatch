@@ -76,7 +76,7 @@ export class PrismaIdentityNewbornRepository {
    * than adopted — and refused before the append, so the attach fact never
    * lands in the standing user's stream.
    */
-  async findUserAtPinnedId({
+  async tryFindUserAtPinnedId({
     userId,
   }: {
     userId: string;

@@ -297,7 +297,7 @@ export class ReplayService {
       // Mirror the catch-path guard: only a takeover by ANOTHER run skips
       // finalization. A null holder (lock expired, no successor) still
       // finalizes so a completed run is never left stuck in "running".
-      const lockHolder = await this.repo.getLockHolder();
+      const lockHolder = await this.repo.tryGetLockHolder();
       if (lockHolder !== null && lockHolder !== params.runId) return;
 
       if (result.batchErrors > 0) {
@@ -339,7 +339,7 @@ export class ReplayService {
       // finalizing here would overwrite the successor's "running" status with
       // this stale run's cancelled/failed state. A null holder (expired, no
       // successor) still finalizes so the run's end state stays observable.
-      const lockHolder = await this.repo.getLockHolder();
+      const lockHolder = await this.repo.tryGetLockHolder();
       if (lockHolder !== null && lockHolder !== params.runId) {
         logger.warn(
           { runId: params.runId, lockHolder },
@@ -364,7 +364,7 @@ export class ReplayService {
   }
 
   private async updateProgress(params: { runId: string; progress: ReplayProgress }): Promise<void> {
-    const lockHolder = await this.repo.getLockHolder();
+    const lockHolder = await this.repo.tryGetLockHolder();
     if (lockHolder !== params.runId) return;
 
     const current = await this.repo.getStatus();

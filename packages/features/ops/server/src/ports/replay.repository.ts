@@ -16,7 +16,7 @@ export interface ReplayRepository {
    */
   refreshLock(params: { runId: string; ttlSeconds: number }): Promise<boolean>;
   releaseLock(params: { runId: string }): Promise<void>;
-  getLockHolder(): Promise<string | null>;
+  tryGetLockHolder(): Promise<string | null>;
 
   isCancelled(): Promise<boolean>;
   setCancelled(params: { ttlSeconds: number }): Promise<void>;
@@ -43,7 +43,7 @@ export class NullReplayRepository implements ReplayRepository {
 
   async releaseLock(): Promise<void> {}
 
-  async getLockHolder(): Promise<string | null> {
+  async tryGetLockHolder(): Promise<string | null> {
     return null;
   }
 

@@ -147,7 +147,7 @@ import { type LangyProposal, MessageContent, type ProposalHandlers } from "./mes
 import { RecentChatsView } from "./recent-chats-view";
 // Langy's own skin: scoped warm/cream palette + serif display face. The
 // `.langy-root` class (below) is where the Chakra semantic-token overrides land.
-import "../../langyTheme.css";
+import "../../../../ui/elements/langy-theme.css";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 
 // The same feature key Langy's chat route resolves against. Used to seed the
@@ -2272,7 +2272,7 @@ function LangyPanel({
         aria-hidden={!isOpen && !peeking}
         role="complementary"
         aria-label="Langy assistant"
-        // The peek's identity for CSS (langyTheme.css): the phase drives the
+        // The peek's identity for CSS (langy-theme.css): the phase drives the
         // seam's brightness, the mode picks which edge it runs along, and
         // `working` breathes it while a turn is still running underneath — so
         // a minimised panel still shows that it is busy.
@@ -2432,13 +2432,13 @@ function LangyPanel({
       >
         {/* Texture, under the content (which stacks at zIndex 1) and inert to
           the pointer. Two gates on purpose: the JSX renders it in the FLOATING
-          card only (the docked card stays plain), and langyTheme.css shows it
+          card only (the docked card stays plain), and langy-theme.css shows it
           on the dark ground only (light is the app's own clean surface). */}
         {floating ? <Box className="langy-signal-grid" aria-hidden /> : null}
         {/* A whisper of the brand rising from the top of the panel, so the ink
           ground has depth and a hint of identity instead of reading flat. Dark
           only, always on, single-digit alpha — see `.langy-panel-glow` in
-          langyTheme.css. */}
+          langy-theme.css. */}
         {floating ? <Box className="langy-panel-glow" aria-hidden /> : null}
         {/* The "fold": a living seam splitting the panel into two faint brand
           tones, moving with Langy's own activity — never the cursor. Both

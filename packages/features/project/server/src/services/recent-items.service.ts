@@ -88,7 +88,7 @@ export class RecentItemsService {
   ): Promise<RecentItem | null> {
     switch (type) {
       case "prompt": {
-        const prompt = await this.repository.getPromptById(id, projectId);
+        const prompt = await this.repository.tryGetPromptById(id, projectId);
         if (!prompt || prompt.deletedAt) return null;
         return {
           id: prompt.id,
@@ -99,7 +99,7 @@ export class RecentItemsService {
         };
       }
       case "workflow": {
-        const workflow = await this.repository.getWorkflowById(id, projectId);
+        const workflow = await this.repository.tryGetWorkflowById(id, projectId);
         if (!workflow || workflow.archivedAt) return null;
         return {
           id: workflow.id,
@@ -110,7 +110,7 @@ export class RecentItemsService {
         };
       }
       case "dataset": {
-        const dataset = await this.repository.getDatasetById(id, projectId);
+        const dataset = await this.repository.tryGetDatasetById(id, projectId);
         if (!dataset || dataset.archivedAt) return null;
         return {
           id: dataset.id,
@@ -121,7 +121,7 @@ export class RecentItemsService {
         };
       }
       case "evaluation": {
-        const monitor = await this.repository.getMonitorById(id, projectId);
+        const monitor = await this.repository.tryGetMonitorById(id, projectId);
         if (!monitor) return null;
         return {
           id: monitor.id,
@@ -132,7 +132,7 @@ export class RecentItemsService {
         };
       }
       case "annotation": {
-        const queue = await this.repository.getAnnotationQueueById(id, projectId);
+        const queue = await this.repository.tryGetAnnotationQueueById(id, projectId);
         if (!queue) return null;
         return {
           id: queue.id,

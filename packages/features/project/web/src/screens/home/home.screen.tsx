@@ -9,7 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { LuCalendarClock } from "react-icons/lu";
-// The page's serif display voice (Sentient) is declared in langyTheme.css.
+// The page's serif display voice (Sentient) is declared in langy-theme.css.
 // Imported HERE, not just via Langy components, so the greeting, banner, and
 // recents headings render the real face on every home — including the one
 // where no Langy surface mounts.

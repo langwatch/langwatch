@@ -43,11 +43,11 @@ import {
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
   LWQL_DIAGNOSTIC_CODES,
 } from "../../langwatch-ql/diagnostics";
-import { MAX_LWQL_LENGTH } from "../../langwatch-ql/sqlText";
+import { MAX_LWQL_LENGTH } from "../../langwatch-ql/sql-text";
 import {
   lwqlGranularityStepSchema,
   lwqlTimeWindowSchema,
-} from "../../langwatch-ql/timeWindowSchema";
+} from "../../langwatch-ql/time-window-schema";
 import { type LangWatchQLRestPorts, lwqlProject } from "./langwatch-ql-route-guards";
 
 /** The app every route in this family is registered on. */

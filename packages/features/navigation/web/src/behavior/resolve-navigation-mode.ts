@@ -1,4 +1,4 @@
-import { DEFAULT_NAVIGATION_MODE, type NavigationMode } from "../behavior/navigation-mode.store";
+import { DEFAULT_NAVIGATION_MODE, type NavigationMode } from "./navigation-mode.store";
 
 export type NavigationModeResolution =
   | { status: "ready"; mode: NavigationMode }

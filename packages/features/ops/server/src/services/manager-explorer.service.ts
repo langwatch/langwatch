@@ -211,12 +211,12 @@ export class ManagerExplorerService {
   }
 
   /** One dead message back to pending, audited. */
-  async redriveDeadMessage(params: {
+  async tryRedriveDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     actorUserId: string;
   }): Promise<{ redriven: boolean }> {
-    const result = await this.fleet.redriveDeadMessage({
+    const result = await this.fleet.tryRedriveDeadMessage({
       ref: params.ref,
       messageId: params.messageId,
       now: Date.now(),
@@ -236,12 +236,12 @@ export class ManagerExplorerService {
    * delete — the row stays as its own audit trail
    * (specs/ops/dead-letter-recovery.feature).
    */
-  async discardDeadMessage(params: {
+  async tryDiscardDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     actorUserId: string;
   }): Promise<{ discarded: boolean }> {
-    const result = await this.fleet.discardDeadMessage({
+    const result = await this.fleet.tryDiscardDeadMessage({
       ref: params.ref,
       messageId: params.messageId,
       now: Date.now(),
@@ -322,12 +322,12 @@ export class ManagerExplorerService {
    * slow, and completion after this release re-delivers — is absorbed by the
    * message-key idempotency and stated in the confirm copy.
    */
-  async releaseLapsedLease(params: {
+  async tryReleaseLapsedLease(params: {
     ref: ProcessRef;
     messageId: string;
     actorUserId: string;
   }): Promise<{ released: boolean }> {
-    const result = await this.fleet.releaseLapsedLease({
+    const result = await this.fleet.tryReleaseLapsedLease({
       ref: params.ref,
       messageId: params.messageId,
       now: Date.now(),

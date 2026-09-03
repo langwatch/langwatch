@@ -179,7 +179,7 @@ export interface SpanStorageRepository {
       limit?: number;
     } & OccurredAtHint,
   ): Promise<NormalizedSpan[]>;
-  getSpanByIds(
+  tryGetSpanByIds(
     params: {
       tenantId: string;
       traceId: string;
@@ -193,9 +193,9 @@ export interface SpanStorageRepository {
    *
    * Derivation-shaped: the returned span carries empty `events` and `links`.
    * Consumers of this read lift scalar span/resource attributes; a caller that
-   * needs a whole span wants `getSpanByIds`.
+   * needs a whole span wants `tryGetSpanByIds`.
    */
-  findNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null>;
+  tryFindNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null>;
   /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the
    * trace-detail read, derived from the spans' OTel events. Events-only
@@ -304,11 +304,11 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async findNormalizedSpanById(_params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
+  async tryFindNormalizedSpanById(_params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
     return null;
   }
 
-  async getSpanByIds(
+  async tryGetSpanByIds(
     _params: {
       tenantId: string;
       traceId: string;

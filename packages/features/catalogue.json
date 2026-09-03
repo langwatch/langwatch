@@ -234,11 +234,27 @@
       ]
     },
     {
+      "id": "navigation",
+      "root": "packages/features/navigation",
+      "classification": "core",
+      "subjects": [
+        "navigation"
+      ]
+    },
+    {
       "id": "notification",
       "root": "packages/features/notification",
       "classification": "core",
       "subjects": [
         "notification"
+      ]
+    },
+    {
+      "id": "onboarding",
+      "root": "packages/features/onboarding",
+      "classification": "core",
+      "subjects": [
+        "onboarding"
       ]
     },
     {

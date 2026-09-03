@@ -26,7 +26,7 @@ export interface BackfillAccountRow {
  * write the pass owns besides its facts is on IdentityUsersRepository.
  */
 export interface IdentityBackfillRepository {
-  findUser(args: { userId: string }): Promise<BackfillUserRow | null>;
+  tryFindUser(args: { userId: string }): Promise<BackfillUserRow | null>;
   findAccountRows(args: { userId: string }): Promise<BackfillAccountRow[]>;
   findIdentifierRows(args: {
     userId: string;

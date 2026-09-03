@@ -39,6 +39,6 @@ export class ClickHouseTraceStoredSpanReaderAdapter extends TraceStoredSpanReade
     spanId: string;
     occurredAtMs: number;
   }): Promise<NormalizedSpan | null> {
-    return this.repository.findNormalizedSpanById(input);
+    return this.repository.tryFindNormalizedSpanById(input);
   }
 }

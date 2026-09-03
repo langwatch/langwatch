@@ -95,7 +95,7 @@ describe("langyTheme token emission", () => {
     });
   });
 
-  describe("given the panel's ambient textures in langyTheme.css", () => {
+  describe("given the panel's ambient textures in langy-theme.css", () => {
     const css = readFileSync(
       /**
        * The sheet is `@langwatch/langy-web`'s now, and this test reads it as a
@@ -103,7 +103,7 @@ describe("langyTheme token emission", () => {
        * and a bundler would hand back a module. Resolved from the package's own
        * root, which vitest runs this from.
        */
-      join(process.cwd(), "../../packages/features/langy/web/src/features/langy/langyTheme.css"),
+      join(process.cwd(), "../../packages/features/langy/web/src/ui/elements/langy-theme.css"),
       "utf8",
     );
     // One rule per selector in the sheet, so anchoring on the selector and

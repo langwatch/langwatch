@@ -49,3 +49,28 @@ Feature: The background worker resolves a plan the way the interactive one does
       names rather than added afterwards
     And a plan whose tier does not carry it leaves it unset
     And so does the same organization when the subscription rows cannot be read
+
+  @unit
+  Scenario: A licensed self-hosted deployment resolves the plan its licence names here too
+    Given a self-hosted deployment whose organization activated an Enterprise
+      licence
+    When their plan is resolved in this process
+    Then it is the plan the licence names, with the seats the licence sold
+    And the message ceiling stays unlimited, because self-hosted volume is never
+      metered
+    And no missing licence source is reported, because this process composed one
+
+  @unit
+  Scenario: A licence predating a tier entitlement still carries it here
+    Given an Enterprise licence signed before the webhook entitlement existed
+    When their plan is resolved in this process
+    Then the entitlement comes back set, so a licensed customer's batches leave
+      rather than being dropped by the background half while the endpoint page
+      says they are enabled
+
+  @unit
+  Scenario: A worker holding its connection composes the licence source
+    Given a background worker that opened a typed Prisma client
+    When its plan provider is composed
+    Then it reports no missing licence source, because the licence row rides the
+      same connection every other read does

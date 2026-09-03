@@ -62,7 +62,7 @@ function harness(overrides?: {
   } as unknown as IdentityLedgerWriter;
 
   const rows = {
-    findUserAtPinnedId: vi.fn(async () =>
+    tryFindUserAtPinnedId: vi.fn(async () =>
       overrides?.occupiedBy === undefined ? null : { id: overrides.occupiedBy },
     ),
     claim: vi.fn(async () => {

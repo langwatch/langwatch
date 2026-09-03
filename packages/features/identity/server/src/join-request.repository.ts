@@ -41,7 +41,7 @@ export interface JoinCandidateRepository {
   /** One organization's own candidacy, for the "you named it directly" path.
    *  Null when it does not exist — which the boundary answers exactly as it
    *  answers an organization that exists and is closed. */
-  findCandidateOrganization(args: {
+  tryFindCandidateOrganization(args: {
     organizationId: string;
     domain: string;
   }): Promise<JoinCandidateOrganization | null>;

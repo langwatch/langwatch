@@ -3,7 +3,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { FilterOption } from "../filters/clickhouse/types";
-import type { FilterOptionsRepository } from "../ports/filter-options.port";
+import type { FilterOptionsPort } from "../ports/filter-options.port";
 
 export type GetFilterOptionsInput = {
   projectId: string;
@@ -28,7 +28,7 @@ export class FilterService {
    * rather than a fault - it fails at the call, with the same message it
    * always did, instead of at boot.
    */
-  constructor(private readonly repository: FilterOptionsRepository | null) {}
+  constructor(private readonly repository: FilterOptionsPort | null) {}
 
   async getFilterOptions(input: GetFilterOptionsInput): Promise<FilterOption[]> {
     return await this.tracer.withActiveSpan(

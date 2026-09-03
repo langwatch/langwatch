@@ -28,7 +28,7 @@ class StubRouting implements SignInDomainRoutingPort {
     private readonly failure?: Error,
   ) {}
 
-  async findConnectionForDomain() {
+  async tryFindConnectionForDomain() {
     if (this.failure) throw this.failure;
     return this.answer;
   }
@@ -62,7 +62,7 @@ describe("sso connection routing shadow mode", () => {
         recorder,
       });
 
-      const decided = await port.findConnectionForDomain({
+      const decided = await port.tryFindConnectionForDomain({
         domain: "acme.com",
       });
 
@@ -91,7 +91,7 @@ describe("sso connection routing shadow mode", () => {
         recorder,
       });
 
-      const decided = await port.findConnectionForDomain({
+      const decided = await port.tryFindConnectionForDomain({
         domain: "acme.com",
       });
 
@@ -112,7 +112,7 @@ describe("sso connection routing shadow mode", () => {
         recorder,
       });
 
-      await port.findConnectionForDomain({ domain: "acme.com" });
+      await port.tryFindConnectionForDomain({ domain: "acme.com" });
 
       expect(records[0]?.comparison?.matches).toBe(true);
     });
@@ -129,7 +129,7 @@ describe("sso connection routing shadow mode", () => {
         recorder,
       });
 
-      const decided = await port.findConnectionForDomain({
+      const decided = await port.tryFindConnectionForDomain({
         domain: "acme.com",
       });
 

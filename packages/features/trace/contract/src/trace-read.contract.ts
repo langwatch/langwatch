@@ -103,7 +103,7 @@ export interface DistinctFieldNamesResult {
 }
 
 /**
- * Result structure for getSpanForPromptStudio.
+ * Result structure for tryGetSpanForPromptStudio.
  * Contains all the data needed to populate the prompt studio UI.
  */
 export interface PromptStudioSpanResult {

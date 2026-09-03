@@ -239,11 +239,11 @@ export class OrganizationMembershipService {
     return this.dependencies.repository;
   }
 
-  async getUserOrgRole(params: {
+  async tryGetUserOrgRole(params: {
     userId: string;
     organizationId: string;
   }): Promise<OrganizationUserRole | null> {
-    return this.repo.getUserOrgRole(params);
+    return this.repo.tryGetUserOrgRole(params);
   }
 
   async getUserOrgRoleByTeamId(params: {
@@ -258,7 +258,7 @@ export class OrganizationMembershipService {
    * (legacy org). Consumed by the home resolver to pin the "/" landing.
    */
   async getPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
-    return this.repo.findPrimaryIntentById(organizationId);
+    return this.repo.tryFindPrimaryIntentById(organizationId);
   }
 
   /**
@@ -401,7 +401,7 @@ export class OrganizationMembershipService {
   async getProvisioningSummary(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null> {
-    return this.repo.findProvisioningSummaryById(organizationId);
+    return this.repo.tryFindProvisioningSummaryById(organizationId);
   }
 
   /**
@@ -477,7 +477,7 @@ export class OrganizationMembershipService {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationMemberSummary & { teams: MemberTeamBinding[] }> {
-    const membership = await this.repo.findMembership(params);
+    const membership = await this.repo.tryFindMembership(params);
     if (!membership) {
       throw new MemberNotFoundError(params.userId);
     }
@@ -505,7 +505,7 @@ export class OrganizationMembershipService {
     if (params.actingUserId != null && params.actingUserId === params.userId) {
       throw new CannotRemoveSelfError();
     }
-    const membership = await this.repo.findMembership({
+    const membership = await this.repo.tryFindMembership({
       organizationId: params.organizationId,
       userId: params.userId,
     });
@@ -544,7 +544,7 @@ export class OrganizationMembershipService {
       throw new CannotDisableSelfError();
     }
 
-    const membership = await this.repo.findMembership({
+    const membership = await this.repo.tryFindMembership({
       organizationId,
       userId,
     });
@@ -623,7 +623,7 @@ export class OrganizationMembershipService {
     const { organizationId, userId, role, teamRoleUpdates, currentUserId } = params;
     const prisma = clientFromRepo(this.repo);
 
-    const currentMember = await this.repo.findMembership({
+    const currentMember = await this.repo.tryFindMembership({
       organizationId,
       userId,
     });

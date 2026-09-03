@@ -6,7 +6,7 @@ import {
   lwqlKeyMapTableQualifiedName,
   productionLangWatchQLNames,
   type LwqlKeyMapRow,
-} from "../langwatch-ql/productionProvisioning";
+} from "../langwatch-ql/production-provisioning";
 import type { LwqlKeyMapRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository";
 
 const logger = createLogger("langwatch:lwql-key-map-service");

@@ -107,7 +107,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
   }
 
   /** The service's existence check for the organization being enrolled. */
-  async findOrganizationById({
+  async tryFindOrganizationById({
     organizationId,
   }: {
     organizationId: string;

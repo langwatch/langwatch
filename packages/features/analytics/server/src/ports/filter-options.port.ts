@@ -13,6 +13,6 @@ export interface FindFilterOptionsInput extends ClickHouseFilterQueryParams {
   field: FilterField;
 }
 
-export abstract class FilterOptionsRepository {
+export abstract class FilterOptionsPort {
   abstract findOptions(input: FindFilterOptionsInput): Promise<FilterOption[]>;
 }

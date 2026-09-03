@@ -1,4 +1,4 @@
-/// <reference path="../../types/ambient.d.ts" />
+/// <reference path="../../model/ambient.d.ts" />
 import { MeshGradient, Warp } from "@paper-design/shaders-react";
 import {
   type CSSProperties,
@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useReducedMotion } from "../../behavior/use-reduced-motion";
-import "./auth-front-door.css";
+import "../elements/auth-front-door.css";
 import { useTweenedGround } from "../../behavior/use-tweened-ground";
 import { resolveGroundShift } from "../../model/ground-palette";
 import { useFrontDoorStage } from "../../model/ground-stage";

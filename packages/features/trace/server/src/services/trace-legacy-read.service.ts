@@ -833,7 +833,7 @@ export class TraceService {
    * @param protections - Field redaction protections
    * @returns PromptStudioSpanResult or null if not found
    */
-  async getSpanForPromptStudio({
+  async tryGetSpanForPromptStudio({
     projectId,
     spanId,
     protections,
@@ -843,10 +843,10 @@ export class TraceService {
     protections: Protections;
   }): Promise<PromptStudioSpanResult | null> {
     return this.tracer.withActiveSpan(
-      "TraceService.getSpanForPromptStudio",
+      "TraceService.tryGetSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
-        return this.clickHouseService.getSpanForPromptStudio({
+        return this.clickHouseService.tryGetSpanForPromptStudio({
           projectId,
           spanId,
           protections,

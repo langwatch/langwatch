@@ -608,7 +608,7 @@ export class OpsTrpcApi {
       processRedriveDeadMessage: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
         async ({ ctx, input }) => {
           const { messageId, ...ref } = input;
-          return ctx.app.ops.processes.redriveDeadMessage({
+          return ctx.app.ops.processes.tryRedriveDeadMessage({
             ref,
             messageId,
             actorUserId: ctx.actor().id,
@@ -620,7 +620,7 @@ export class OpsTrpcApi {
       processDiscardDeadMessage: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
         async ({ ctx, input }) => {
           const { messageId, ...ref } = input;
-          return ctx.app.ops.processes.discardDeadMessage({
+          return ctx.app.ops.processes.tryDiscardDeadMessage({
             ref,
             messageId,
             actorUserId: ctx.actor().id,
@@ -669,7 +669,7 @@ export class OpsTrpcApi {
       processReleaseLapsedLease: manage(procedure.input(opsProcessMessageInputSchema)).mutation(
         async ({ ctx, input }) => {
           const { messageId, ...ref } = input;
-          return ctx.app.ops.processes.releaseLapsedLease({
+          return ctx.app.ops.processes.tryReleaseLapsedLease({
             ref,
             messageId,
             actorUserId: ctx.actor().id,

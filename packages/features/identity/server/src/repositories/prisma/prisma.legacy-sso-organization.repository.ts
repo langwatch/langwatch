@@ -17,7 +17,7 @@ export class PrismaLegacySsoOrganizationRepository
 {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findLegacySso({
+  async tryFindLegacySso({
     organizationId,
   }: {
     organizationId: string;

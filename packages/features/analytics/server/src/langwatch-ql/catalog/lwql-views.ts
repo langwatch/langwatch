@@ -22,6 +22,24 @@
  * describes how a row got written or how long it is kept, which is not
  * something the API promises to keep stable.
  *
+ * @see ./types.ts — the shapes, the grain contract each entry declares, and the
+ *   derivations the validator reads
+ * @see specs/analytics/lwql-api.feature
+ */
+
+import { contentFilteredMapSql } from "./content-gating";
+import { LWQL_POSTGRES_CATALOG } from "./postgres-views";
+import type { LangWatchQLViewDefinition } from "./types";
+
+/**
+ * How long after a write a row can be missing from these views.
+ *
+ * The projections are folded by the event-sourcing pipeline, so the number the
+ * schema endpoint publishes is about that pipeline, not about ClickHouse.
+ */
+const PROJECTION_FRESHNESS = "seconds behind ingestion";
+
+/**
  * ## Two datasets over one trace, and why that is not two answers
  *
  * `traces` and `trace_metrics` are both one row per trace, and `evaluations`
@@ -47,45 +65,18 @@
  * trace whose root span never arrived contributes sums and no count. A
  * distinct-trace count is a question for `trace_metrics`.
  *
- * ## Grain
+ * The two analytics projections are both sorted by a leading business time, and
+ * they answer grain differently: `trace_analytics` freezes its `OccurredAt` as a
+ * storage anchor, so the engine's key and the trace are the same row, while
+ * `evaluation_analytics` writes its progress watermark into `OccurredAt`, which
+ * moves — so that entry pins the `in-tuple` strategy and is deduplicated by the
+ * evaluation rather than by the engine's key. The `_by_minute` rollups are
+ * `AggregatingMergeTree`s, whose rows for one key are summed rather than
+ * superseded; their measures declare `summed` and `../views.ts` derives the cast
+ * back to a plain type from it.
  *
- * Most source tables are `ReplacingMergeTree`s carrying more than one version
- * of a row until merges catch up, so each view deduplicates and each entry
- * states two things about its rows. `dedup.keyColumns` is the source's whole
- * `ORDER BY` — the key the *engine* collapses on, which is what `FINAL` can
- * promise and nothing more. `grainColumns` is what one row of the *dataset* is,
- * declared only where the two differ, which is where the sort key leads with a
- * business time so that range scans are monotonic. Both analytics projections
- * are sorted that way, and they answer it differently: `trace_analytics` freezes
- * its `OccurredAt` as a storage anchor, so the engine's key and the trace are
- * the same row, while `evaluation_analytics` writes its progress watermark into
- * `OccurredAt`, which moves — so that entry pins the `in-tuple` strategy and is
- * deduplicated by the evaluation rather than by the engine's key.
- *
- * The `_by_minute` rollups are `AggregatingMergeTree`s instead, whose rows for
- * one key are summed rather than superseded — which their entries declare,
- * because reading one as if it had versions would expose each unmerged partial
- * row as its own answer. Their measures declare `summed` and the cast back to a
- * plain type is derived from it. See `../views.ts` for how, and for the
- * measurement behind the default.
- *
- * @see ./types.ts — the shapes, and the derivations the validator reads
- * @see specs/analytics/lwql-api.feature
+ * Traces: one row per trace, the summary the fold maintains.
  */
-
-import { contentFilteredMapSql } from "./contentGating";
-import { LWQL_POSTGRES_CATALOG } from "./postgresViews";
-import type { LangWatchQLViewDefinition } from "./types";
-
-/**
- * How long after a write a row can be missing from these views.
- *
- * The projections are folded by the event-sourcing pipeline, so the number the
- * schema endpoint publishes is about that pipeline, not about ClickHouse.
- */
-const PROJECTION_FRESHNESS = "seconds behind ingestion";
-
-/** Traces: one row per trace, the summary the fold maintains. */
 const TRACES: LangWatchQLViewDefinition = {
   name: "traces",
   sourceTable: "trace_summaries",

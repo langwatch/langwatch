@@ -9,7 +9,7 @@ import type {
   SupportedClickHouseFilterDefinition,
 } from "../../filters/clickhouse/types";
 import {
-  FilterOptionsRepository,
+  FilterOptionsPort,
   type FindFilterOptionsInput,
 } from "../../ports/filter-options.port";
 
@@ -27,7 +27,7 @@ const logger = createLogger("langwatch:filters:repository");
  * what is genuinely its own - validating the caller, tracing the call, and
  * deciding that an unsupported field simply has no options.
  */
-export class FilterOptionsClickHouseRepository extends FilterOptionsRepository {
+export class FilterOptionsClickHouseRepository extends FilterOptionsPort {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {
     super();
   }

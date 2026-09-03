@@ -109,7 +109,7 @@ function harness({
   const reads = {
     findRequest: vi.fn(async () => held),
     findPendingRequest: vi.fn(async () => pending),
-    findLastRejectionAt: vi.fn(async () => lastRejectionAt),
+    tryFindLastRejectionAt: vi.fn(async () => lastRejectionAt),
     findPendingForOrganization: vi.fn(async () => []),
     findPendingForUser: vi.fn(async () => []),
   };
@@ -120,7 +120,7 @@ function harness({
     reads: reads as never,
     candidates: {
       findCandidateOrganizations: vi.fn(async () => candidates),
-      findCandidateOrganization: vi.fn(
+      tryFindCandidateOrganization: vi.fn(
         async ({ organizationId }: { organizationId: string }) =>
           candidates.find(
             (candidate) => candidate.organizationId === organizationId,

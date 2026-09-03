@@ -29,19 +29,19 @@ const mockRevokeAllBrowserSessions = vi.fn();
 describe("OrganizationMembershipService", () => {
   const mockRepo: OrganizationRepository = {
     getClient: vi.fn(),
-    getUserOrgRole: vi.fn(),
+    tryGetUserOrgRole: vi.fn(),
     getUserOrgRoleByTeamId: vi.fn(),
-    findPrimaryIntentById: vi.fn(),
+    tryFindPrimaryIntentById: vi.fn(),
     createAndAssign: vi.fn(),
     createForProvisioning: vi.fn(),
     findAllProvisioningSummaries: vi.fn(),
-    findProvisioningSummaryById: vi.fn(),
+    tryFindProvisioningSummaryById: vi.fn(),
     deleteProvisionedOrganization: vi.fn(),
     getAllForUser: vi.fn(),
     getOrganizationWithMembers: vi.fn(),
     getMemberById: vi.fn(),
     getAllMembers: vi.fn(),
-    findMembership: vi.fn(),
+    tryFindMembership: vi.fn(),
     findAllMembers: vi.fn(),
     findMemberTeamBindings: vi.fn(),
     deleteMember: vi.fn(),
@@ -177,14 +177,14 @@ describe("OrganizationMembershipService", () => {
           }),
         ).rejects.toMatchObject({ code: "cannot_remove_self" });
 
-        expect(mockRepo.findMembership).not.toHaveBeenCalled();
+        expect(mockRepo.tryFindMembership).not.toHaveBeenCalled();
         expect(mockRepo.deleteMember).not.toHaveBeenCalled();
       });
     });
 
     describe("when the membership does not exist", () => {
       it("refuses with member_not_found", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue(null);
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue(null);
 
         await expect(
           service.deleteMember({
@@ -200,7 +200,7 @@ describe("OrganizationMembershipService", () => {
 
     describe("when another member is removed", () => {
       it("delegates to the repository", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue(membership);
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue(membership);
 
         await service.deleteMember({
           organizationId: "org-123",
@@ -220,7 +220,7 @@ describe("OrganizationMembershipService", () => {
 
     describe("when the credential acts as nobody", () => {
       it("cannot trip the self-removal guard", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue(membership);
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue(membership);
 
         await service.deleteMember({
           organizationId: "org-123",
@@ -250,7 +250,7 @@ describe("OrganizationMembershipService", () => {
 
     describe("when the membership does not exist", () => {
       it("refuses with member_not_found", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue(null);
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue(null);
 
         await expect(
           service.setMemberDisabled({
@@ -276,7 +276,7 @@ describe("OrganizationMembershipService", () => {
 
       /** @scenario "Disabling a member revokes their live browser sessions" */
       it("revokes every browser session that member holds", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue(activeMember);
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue(activeMember);
 
         await service.setMemberDisabled({
           organizationId: "org-123",
@@ -293,7 +293,7 @@ describe("OrganizationMembershipService", () => {
 
       /** @scenario "Re-enabling a member revokes nothing" */
       it("revokes nothing when the seat is given back", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
           ...activeMember,
           disabledAt: new Date("2026-08-01T00:00:00Z"),
         });
@@ -328,7 +328,7 @@ describe("OrganizationMembershipService", () => {
           } as unknown as OrganizationSessionRevocationPort,
           grantCache,
         });
-        vi.mocked(mockRepo.findMembership).mockResolvedValue(activeMember);
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue(activeMember);
 
         await expect(
           withoutAuth.setMemberDisabled({
@@ -347,7 +347,7 @@ describe("OrganizationMembershipService", () => {
         // Disabling writes a column, not a grant, so nothing else bumps the
         // authz epoch. Without this the revocation an admin just performed
         // stays invisible to any cached snapshot until it ages out.
-        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
           userId: "user-456",
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
@@ -371,7 +371,7 @@ describe("OrganizationMembershipService", () => {
 
       /** @scenario Disabling or re-enabling a membership takes effect on the next request */
       it("retires them again on re-enable, so nobody waits out a cache to get back in", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
           userId: "user-456",
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
@@ -400,7 +400,7 @@ describe("OrganizationMembershipService", () => {
       });
 
       it("delegates to the repository without a seat check", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
           userId: "user-456",
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
@@ -431,7 +431,7 @@ describe("OrganizationMembershipService", () => {
 
     describe("when re-enabling a member the plan has no seat for", () => {
       it("refuses with member_seat_limit_reached", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
           userId: "user-456",
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
@@ -462,7 +462,7 @@ describe("OrganizationMembershipService", () => {
 
     describe("when re-enabling a member the plan has a seat for", () => {
       it("delegates to the repository", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
           userId: "user-456",
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
@@ -497,7 +497,7 @@ describe("OrganizationMembershipService", () => {
   describe("when reading one member", () => {
     describe("when the user is not a member", () => {
       it("refuses with member_not_found", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue(null);
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue(null);
 
         await expect(
           service.getMember({ organizationId: "org-123", userId: "ghost" }),
@@ -507,7 +507,7 @@ describe("OrganizationMembershipService", () => {
 
     describe("when the member exists", () => {
       it("returns the membership with its team bindings", async () => {
-        vi.mocked(mockRepo.findMembership).mockResolvedValue({
+        vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
           userId: "user-456",
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,

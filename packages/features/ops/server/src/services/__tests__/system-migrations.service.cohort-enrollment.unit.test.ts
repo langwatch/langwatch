@@ -53,7 +53,7 @@ function serviceWith({
     isSaaS: () => isSaaS,
     enrollments: {
       findAll: vi.fn(),
-      findOrganizationById: vi.fn(),
+      tryFindOrganizationById: vi.fn(),
       isEnrolled: vi.fn(),
       countEnrolledByMigration: vi.fn(),
       countOrganizations: vi.fn(),
