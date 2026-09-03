@@ -34,7 +34,6 @@
   "scripts": {
     "start": "tsx $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/worker.entrypoint.ts",
     "dev": "tsx watch $(test -f ../../.env && echo --env-file=../../.env) $(test -f ../../.env.portless && echo --env-file=../../.env.portless) src/worker.entrypoint.ts",
-    "task:webhook-signature-vectors": "tsx src/tasks/webhook-signature-vectors.entrypoint.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
@@ -86,7 +85,6 @@
     "@langwatch/github-server": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/identity-eventing": "workspace:*",
     "@langwatch/identity-server": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/langy-server": "workspace:*",

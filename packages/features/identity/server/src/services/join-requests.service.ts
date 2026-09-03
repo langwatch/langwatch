@@ -18,17 +18,15 @@ import {
   organizationAdmitsDomain,
   resolveJoinLookup,
 } from "@langwatch/identity-contract";
-import type {
-  JoinCandidateRepository,
-  JoinRequestService,
-} from "@langwatch/identity-server";
+import type { JoinCandidateRepository } from "../join-request.repository";
+import type { JoinRequestService } from "../join-request.service";
 import {
   approveJoinCommandId,
   newJoinRequestCommandId,
   newJoinRequestId,
-} from "@langwatch/identity-server";
+} from "../join-request-id";
 import { createLogger } from "@langwatch/observability";
-import { JOIN_REQUEST_EXPIRY_MS } from "@langwatch/identity-eventing";
+import { JOIN_REQUEST_EXPIRY_MS } from "../processes/join-request-lifecycle.process";
 import type { PrismaJoinRequestReadRepository } from "../repositories/prisma/prisma.join-request.repository";
 
 const logger = createLogger("langwatch:identity:join-requests");

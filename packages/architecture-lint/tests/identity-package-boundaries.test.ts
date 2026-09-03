@@ -25,12 +25,6 @@ const IDENTITY_SERVER_SRC = join(
   "server",
   "src",
 );
-const IDENTITY_EVENTING_SRC = join(
-  REPO_ROOT,
-  "packages",
-  "identity-eventing",
-  "src",
-);
 
 function sourceFiles(root: string): string[] {
   const files: string[] = [];
@@ -73,10 +67,10 @@ const FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE = [
   /prisma\/client/,
 ];
 
-/** …plus the framework, for the two packages that must never reach it. */
+/** …plus the framework, for the pure core, which must stay isomorphic. */
 const FORBIDDEN_FRAMEWORK = [/event-sourcing/, /^@langwatch\/eventing(?:\/|$)/];
 
-const FORBIDDEN_FOR_BOTH = [
+const FORBIDDEN_FOR_CONTRACT = [
   ...FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE,
   ...FORBIDDEN_FRAMEWORK,
 ];
@@ -90,7 +84,7 @@ describe("identity package boundaries", () => {
         for (const specifier of importSpecifiers(file)) {
           const forbidden =
             specifier.startsWith("node:") ||
-            FORBIDDEN_FOR_BOTH.some((pattern) => pattern.test(specifier));
+            FORBIDDEN_FOR_CONTRACT.some((pattern) => pattern.test(specifier));
           if (forbidden)
             offenders.push(`${relative(REPO_ROOT, file)} -> ${specifier}`);
         }
@@ -99,50 +93,21 @@ describe("identity package boundaries", () => {
     });
   });
 
-  /**
-   * Seven files in `@langwatch/identity-server` import `@langwatch/eventing`
-   * directly, which ADR-115 says only `@langwatch/identity-eventing` may do.
-   *
-   * They are listed rather than allowed. This guard lived in the platform
-   * application, whose whole suite was red, so nothing read what it said; the
-   * violations are older than this file's move and none of them was introduced
-   * by it. Recorded as a baseline so the rule keeps biting on the eighth file
-   * while the identity lane decides between moving these adapters behind
-   * `identity-eventing` and amending the ADR. Shrink this list when they land;
-   * never add to it.
-   */
-  const EVENTING_IMPORT_BASELINE = [
-    "packages/features/identity/server/src/adapters/identity-ledger.adapter.ts -> @langwatch/eventing",
-    "packages/features/identity/server/src/adapters/join-request-ledger.adapter.ts -> @langwatch/eventing",
-    "packages/features/identity/server/src/repositories/prisma/prisma.identity-projection.repository.ts -> @langwatch/eventing",
-    "packages/features/identity/server/src/repositories/prisma/prisma.join-request-projection.repository.ts -> @langwatch/eventing",
-    "packages/features/identity/server/src/repositories/prisma/prisma.mfa-enrollment-projection.repository.ts -> @langwatch/eventing",
-    "packages/features/identity/server/src/repositories/prisma/prisma.scim-sync-projection.repository.ts -> @langwatch/eventing",
-  ];
-
   describe("when the server runtime's sources are scanned", () => {
-    /** @scenario "The identity server runtime reads no storage engine and no environment" */
-    it("import no Prisma, the app, or the event-sourcing framework, and read no process.env", () => {
-      const offenders: string[] = [];
-      for (const file of sourceFiles(IDENTITY_SERVER_SRC)) {
-        for (const specifier of importSpecifiers(file)) {
-          if (FORBIDDEN_FOR_BOTH.some((pattern) => pattern.test(specifier))) {
-            offenders.push(`${relative(REPO_ROOT, file)} -> ${specifier}`);
-          }
-        }
-        if (/process\.env/.test(readFileSync(file, "utf8"))) {
-          offenders.push(`${relative(REPO_ROOT, file)} reads process.env`);
-        }
-      }
-      expect(offenders.sort()).toEqual(EVENTING_IMPORT_BASELINE);
-    });
-  });
-
-  describe("when the event-sourcing layer's sources are scanned", () => {
-    /** @scenario "The identity event-sourcing layer reads no storage engine and no environment" */
+    /**
+     * @scenario "The identity server runtime reads no storage engine and no environment"
+     *
+     * `@langwatch/eventing` is no longer forbidden here: the core-application
+     * exit folded the separate event-sourcing package — the framework envelope,
+     * commands, folds, process managers and the four pipeline definitions the
+     * worker registers — into this package, since nothing outside it composed
+     * the two separately. This package is the ONE identity package that owns
+     * the event-sourcing framework directly now; the pure core above still
+     * may not reach it.
+     */
     it("import no Prisma and no app, and read no process.env", () => {
       const offenders: string[] = [];
-      for (const file of sourceFiles(IDENTITY_EVENTING_SRC)) {
+      for (const file of sourceFiles(IDENTITY_SERVER_SRC)) {
         for (const specifier of importSpecifiers(file)) {
           if (
             FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE.some((pattern) =>

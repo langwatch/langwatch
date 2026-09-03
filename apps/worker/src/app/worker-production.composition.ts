@@ -35,7 +35,7 @@ import {
   PostgresSsoConnectionPipelineAdapter,
   type SsoConnectionPipelineDatabase,
   type ScimSyncPipelineDatabase,
-} from "@langwatch/identity-eventing";
+} from "@langwatch/identity-server";
 import {
   type LangySessionKeyReapDatabase,
   OtelLangySessionKeyMetricsAdapter,
@@ -332,7 +332,7 @@ export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
  * The ONE identity ledger this graph still RECEIVES (ADR-101).
  *
  * The other three — `identity`, `scim-sync` and `join-requests` — are composed
- * below from `@langwatch/identity-eventing`'s Postgres seams, because every
+ * below from `@langwatch/identity-server`'s Postgres seams, because every
  * dependency they take is either a Postgres binding or the mail gateway this
  * process now owns. The connection ledger is not: its teardown port revokes a
  * torn-down connection's directory tokens through the SCIM service, and no

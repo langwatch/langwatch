@@ -58,7 +58,7 @@ import {
 import type { ScimSyncLedger } from "../scim-sync-ledger";
 import type { IdentityEventingPort } from "../ports/identity-eventing.port";
 import { createLogger } from "@langwatch/observability";
-import { SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-eventing";
+import { SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
 
 const logger = createLogger("langwatch:identity:scim-sync-ledger");
 

@@ -43,16 +43,14 @@ import {
   REQUEST_JOIN_COMMAND_TYPE,
   WITHDRAW_JOIN_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
-import type { JoinRequestLedger } from "@langwatch/identity-server";
+import type { JoinRequestLedger } from "../join-request-ledger";
 import { createLogger } from "@langwatch/observability";
 import { IdentityEventingPort } from "../ports/identity-eventing.port";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
-import {
-  JOIN_REQUEST_PIPELINE_NAME,
-  type JoinRequestEvent,
-  type JoinRequestFoldState,
-  joinRequestEventsFor,
-} from "@langwatch/identity-eventing";
+import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
+import type { JoinRequestEvent } from "./join-request-pipeline-definition.adapter";
+import type { JoinRequestFoldState } from "../projections/join-request-state.projection";
+import { joinRequestEventsFor } from "./join-request-pipeline-definition.adapter";
 
 const logger = createLogger("langwatch:identity:join-request-ledger");
 

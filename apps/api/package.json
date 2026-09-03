@@ -22,6 +22,10 @@
       "types": "./src/app-trpc/index.ts",
       "default": "./src/app-trpc/index.ts"
     },
+    "./app-trpc/types": {
+      "types": "./src/app-trpc/app-trpc.types.ts",
+      "default": "./src/app-trpc/app-trpc.types.ts"
+    },
     "./app-rest": {
       "types": "./src/app-rest/index.ts",
       "default": "./src/app-rest/index.ts"
@@ -104,7 +108,6 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/hosted-mcp-server": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
-    "@langwatch/identity-eventing": "workspace:*",
     "@langwatch/identity-server": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/langy-contract": "workspace:*",

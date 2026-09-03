@@ -41,8 +41,7 @@ import {
   type EventSourcedQueueProcessor,
   EventStoreProducerOnly,
 } from "@langwatch/eventing";
-import { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "@langwatch/identity-eventing";
-import { IdentityEventingPort } from "@langwatch/identity-server";
+import { IdentityEventingPort, JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PrismaConnection } from "@langwatch/prisma-client";

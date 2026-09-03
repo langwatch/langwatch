@@ -6,7 +6,7 @@ import type {
   JoinWithdrawalCause,
 } from "@langwatch/identity-contract";
 import type { JoinRequest, PrismaClient } from "@langwatch/prisma-client/generated";
-import type { JoinRequestFoldState } from "@langwatch/identity-eventing";
+import type { JoinRequestFoldState } from "../../projections/join-request-state.projection";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,

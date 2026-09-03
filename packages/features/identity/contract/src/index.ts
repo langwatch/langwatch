@@ -490,3 +490,21 @@ export {
   type VerificationMethod,
   verificationMethodSchema,
 } from "./vocabulary";
+/**
+ * The four pipelines' framework identity — folded in from the identity
+ * server's event-sourcing layer (ADR-101, ADR-115, ADR-117): the pipeline
+ * name and aggregate type every event stamps. The wire schemas that extend
+ * these payloads with the `@langwatch/eventing` envelope stay in
+ * `@langwatch/identity-server`, next to the pipeline definitions — this
+ * package stays framework-free so the frontend can import it verbatim.
+ */
+export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./identity-events";
+export {
+  JOIN_REQUEST_AGGREGATE_TYPE,
+  JOIN_REQUEST_PIPELINE_NAME,
+} from "./join-request-events";
+export { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "./scim-sync-events";
+export {
+  SSO_CONNECTION_AGGREGATE_TYPE,
+  SSO_CONNECTION_PIPELINE_NAME,
+} from "./sso-connection-events";

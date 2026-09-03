@@ -13,7 +13,8 @@ import { adoptUserEmailCommandId } from "../identity-command-id";
 import { type IdentityReservationRepository } from "../identity-reservations.repository";
 import { IdentityEngineUnavailableError, type IdentityBirthPort, type IdentityNewborn } from "../better-auth/identity-birth";
 import { createLogger } from "@langwatch/observability";
-import { type IdentityEvent, identityEventsFor } from "@langwatch/identity-eventing";
+import type { IdentityEvent } from "../adapters/identity-pipeline-definition.adapter";
+import { identityEventsFor } from "../adapters/identity-pipeline-definition.adapter";
 import type { IdentityLedgerWriter } from "../adapters/identity-ledger.adapter";
 import type { PrismaIdentityNewbornRepository } from "../repositories/prisma/prisma.identity-newborn.repository";
 

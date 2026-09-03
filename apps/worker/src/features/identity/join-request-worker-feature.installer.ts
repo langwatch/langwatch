@@ -1,4 +1,4 @@
-import type { JoinRequestPipeline } from "@langwatch/identity-eventing";
+import type { JoinRequestPipeline } from "@langwatch/identity-server";
 import { WorkerFeatureHandlePort, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 

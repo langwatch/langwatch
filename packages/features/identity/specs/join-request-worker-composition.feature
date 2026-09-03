@@ -61,10 +61,10 @@ Feature: Composing the join-request ledger in a background worker
     And the fold writes the JoinRequest row on that client
 
   @unit
-  Scenario: One JoinRequest repository serves the fold and its guards
+  Scenario: Split JoinRequest repositories share one Prisma client
     Given a composed join-request pipeline
     When a guard reads a request's state
-    Then it reads the rows the fold writes, through one repository
+    Then it reads the rows the fold writes, through the same Prisma client
 
   @unit
   Scenario: The expiry wake dispatches a command rather than writing the row

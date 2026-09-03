@@ -19,7 +19,7 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "@langwatch/eventing";
-import type { JoinRequestFoldState } from "@langwatch/identity-eventing";
+import type { JoinRequestFoldState } from "../../projections/join-request-state.projection";
 import { describe, expect, it, vi } from "vitest";
 import { IdentityEventingPort } from "../../ports/identity-eventing.port";
 import { JoinRequestLedgerWriter } from "../join-request-ledger.adapter";

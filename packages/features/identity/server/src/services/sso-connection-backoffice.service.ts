@@ -7,7 +7,7 @@ import {
 import type { SsoConnectionService } from "../sso-connection.service";
 import { newSsoConnectionCommandId, newSsoConnectionId } from "../sso-connection-id";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { rowToConnection } from "@langwatch/identity-eventing";
+import { rowToConnection } from "../repositories/prisma/prisma.sso-connection-projection.repository";
 
 /**
  * What the back office reads and commands (D05 tier 1).

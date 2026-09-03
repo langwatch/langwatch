@@ -3,17 +3,13 @@ import {
   emptyIdentityHeads,
   reduceIdentity,
 } from "@langwatch/identity-contract";
-import {
-  IdentityGuards,
-  type IdentityHeadsRepository,
-  IdentityService,
-} from "@langwatch/identity-server";
+import { IdentityGuards } from "../../guards";
+import type { IdentityHeadsRepository } from "../../identity-heads.repository";
+import { IdentityService } from "../../identity.service";
 import { describe, expect, it, vi } from "vitest";
-import {
-  type IdentityEvent,
-  type IdentityFoldState,
-  identityEventsFor,
-} from "@langwatch/identity-eventing";
+import type { IdentityEvent } from "../identity-pipeline-definition.adapter";
+import type { IdentityFoldState } from "../../projections/identity-state.projection";
+import { identityEventsFor } from "../identity-pipeline-definition.adapter";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
@@ -24,7 +20,7 @@ import { identityProjectionConvergenceTimeoutsTotal } from "../identity-ledger.m
 import {
   inMemoryIdentityReservations,
   inMemoryIdentityUsers,
-} from "@langwatch/identity-eventing/testing";
+} from "../../testing";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

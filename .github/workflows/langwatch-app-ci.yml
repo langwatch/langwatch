@@ -510,6 +510,12 @@ jobs:
       # @langwatch/identity-server its storage-port runtime — same raw
       # TypeScript, same shard-1 arrangement as authz. Both get the typecheck
       # step the authz pair lacks: sources and tests are only compiled here.
+      #
+      # identity-server also carries the event-sourcing layer that used to
+      # ship as its own package: the framework envelope, commands, folds,
+      # process managers and the four pipeline definitions the worker
+      # registers, folded back in during the core-application exit since
+      # nothing outside it composed the two separately.
       - name: Run @langwatch/identity-contract unit tests
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/identity-contract run test
@@ -525,19 +531,6 @@ jobs:
       - name: Typecheck @langwatch/identity-server
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/identity-server run typecheck
-
-      # @langwatch/identity-eventing is the third of the identity trio: the
-      # framework envelope, commands, folds, process managers and the four
-      # pipeline definitions the worker registers. It carries the seven suites
-      # that moved out of the monolith with them, so without these steps that
-      # coverage would run nowhere.
-      - name: Run @langwatch/identity-eventing unit tests
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/identity-eventing run test
-
-      - name: Typecheck @langwatch/identity-eventing
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/identity-eventing run typecheck
 
       # @langwatch/system-migrations is the in-place data-migration runner
       # (ADR-092 stage B) — same raw-TypeScript, shard-1 arrangement.

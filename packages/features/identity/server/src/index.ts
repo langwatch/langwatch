@@ -33,6 +33,15 @@
  * and the app's frontend-boundary test fails the build the day that stops
  * being true. That is why node:crypto sits on the root entry rather than
  * behind a subpath.
+ *
+ * The event-sourcing layer ADR-115 split out into its own package
+ * (the envelope, the command handlers, the folds, the two process managers
+ * and the four pipeline definitions the worker registers) — folded back into
+ * this package below, since nothing outside it composed the two separately
+ * and the split had become a same-package import graph wearing two package
+ * names. `createIdentityProducerPipeline` and its three siblings, and the
+ * four `Postgres*PipelineAdapter` composition seams, are what apps/api and
+ * apps/worker still reach from here.
  */
 export {
   computeIdentifierHash,
@@ -68,8 +77,8 @@ export { issuerForProviderId } from "./better-auth/account-queries";
 /**
  * The row mappings the fold writes through and every guard reads back
  * through. Exported because the Postgres projection stores that write these
- * rows live with the fold that owns their shape (`@langwatch/identity-eventing`),
- * and a second copy of either mapping would eventually disagree with this one
+ * rows live beside the fold that owns their shape, in this same package, and
+ * a second copy of either mapping would eventually disagree with this one
  * about what a column means.
  */
 export {
@@ -82,6 +91,56 @@ export {
   type MfaEnrollmentRow,
   mfaEnrollmentRowToState,
 } from "./repositories/prisma/prisma.mfa-enrollment.mapper";
+/**
+ * The identity platform's event-sourcing layer (ADR-101, ADR-115, ADR-116,
+ * ADR-117), folded into this package in the core-application exit: the
+ * framework envelope over `@langwatch/identity-contract`'s fact payloads,
+ * the thin command handlers that run this package's own guards, the fold
+ * projections, the two process managers, the four pipeline definitions the
+ * worker registers, and the Postgres binding of the two folds this package
+ * owns outright — the Identifier/MfaEnrollment head and the ScimSyncState
+ * head — behind postgres.*.adapter seams. Every factory still takes its
+ * stores and ports as arguments; the app supplies the connection-teardown
+ * and join-lifecycle ports.
+ *
+ * Producer variants exist for a process that only SENDS commands on a
+ * pipeline (the API): the same definition the worker drains, with every
+ * consumer-side dependency (a fold store, a guard's reads, mail, teardown)
+ * a stand-in that refuses by name if ever called, so a producer's routing
+ * triple can never drift from the worker's.
+ */
+export {
+  createIdentityProducerPipeline,
+  createJoinRequestProducerPipeline,
+  createScimSyncProducerPipeline,
+  createSsoConnectionProducerPipeline,
+} from "./adapters/producer.identity-pipelines.adapter";
+export {
+  type IdentityPipelineDatabase,
+  PostgresIdentityPipelineAdapter,
+  type PostgresIdentityPipelineOptions,
+} from "./adapters/postgres.identity-pipeline.adapter";
+export {
+  PostgresJoinRequestPipelineAdapter,
+  type JoinRequestPipelineDatabase,
+  type PostgresJoinRequestPipelineOptions,
+} from "./adapters/postgres.join-request-pipeline.adapter";
+export {
+  PostgresScimSyncPipelineAdapter,
+  type PostgresScimSyncPipelineOptions,
+  type ScimSyncPipelineDatabase,
+} from "./adapters/postgres.scim-sync-pipeline.adapter";
+export {
+  PostgresSsoConnectionPipelineAdapter,
+  type PostgresSsoConnectionPipelineOptions,
+  type SsoConnectionPipelineDatabase,
+} from "./adapters/postgres.sso-connection-pipeline.adapter";
+export type { IdentityPipeline } from "./adapters/identity-pipeline-definition.adapter";
+export type { JoinRequestPipeline } from "./adapters/join-request-pipeline-definition.adapter";
+export type { ScimSyncPipeline } from "./adapters/scim-sync-pipeline-definition.adapter";
+/** The day-7-reminder/day-14-expiry process manager's registered name, named
+ *  by a caller that asserts on which process a wake dispatched through. */
+export { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "./processes/join-request-lifecycle.process";
 export {
   type IdentityGuardsComposition,
   type IdentityGuardsDatabase,

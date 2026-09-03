@@ -1,7 +1,7 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { DEFAULT_DOMAIN_JOIN_SETTING, type DomainJoinSetting } from "@langwatch/identity-contract";
-import { newJoinRequestCommandId } from "@langwatch/identity-server";
+import { newJoinRequestCommandId } from "../join-request-id";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -10,7 +10,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
-import type { JoinRequestLifecyclePort } from "@langwatch/identity-eventing";
+import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process";
 import type { JoinRequestNotificationMailPort } from "../ports/join-request-notification-mail.port";
 import type {
   JoinMembershipPort,

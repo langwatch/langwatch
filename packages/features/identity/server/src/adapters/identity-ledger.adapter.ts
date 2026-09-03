@@ -53,16 +53,14 @@ import {
   PROPOSE_LINK_COMMAND_TYPE,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
-import type { IdentityLedger } from "@langwatch/identity-server";
+import type { IdentityLedger } from "../identity-ledger";
 import { createLogger } from "@langwatch/observability";
 import { IdentityEventingPort } from "../ports/identity-eventing.port";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
-import {
-  IDENTITY_PIPELINE_NAME,
-  type IdentityEvent,
-  type IdentityFoldState,
-  identityEventsFor,
-} from "@langwatch/identity-eventing";
+import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
+import type { IdentityEvent } from "./identity-pipeline-definition.adapter";
+import type { IdentityFoldState } from "../projections/identity-state.projection";
+import { identityEventsFor } from "./identity-pipeline-definition.adapter";
 import {
   identityCommitDurationSeconds,
   identityProjectionConvergenceTimeoutsTotal,

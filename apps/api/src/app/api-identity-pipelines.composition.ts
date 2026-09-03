@@ -30,7 +30,7 @@
  *
  * ## One definition, two registrations
  *
- * Each pipeline is built from `@langwatch/identity-eventing`'s own producer
+ * Each pipeline is built from `@langwatch/identity-server`'s own producer
  * variant, which supplies stand-ins for the consumer-side dependencies — the
  * Postgres heads, the guards that read them, the mail the lifecycle sends —
  * so the definition can be CONSTRUCTED and refuses by name if one is ever
@@ -82,11 +82,13 @@ import {
   createJoinRequestProducerPipeline,
   createScimSyncProducerPipeline,
   createSsoConnectionProducerPipeline,
+} from "@langwatch/identity-server";
+import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
   SCIM_SYNC_PIPELINE_NAME,
   SSO_CONNECTION_PIPELINE_NAME,
-} from "@langwatch/identity-eventing";
+} from "@langwatch/identity-contract";
 
 /** The one shape a command dispatcher has, checked rather than asserted. */
 export type ApiIdentityCommandSender = { send(data: unknown): Promise<unknown> };
