@@ -35,9 +35,11 @@ find_free_port() {
   echo "$port"
 }
 
+# The ui lane's published port, and the api lane's beside it. Both are searched
+# independently: a worktree that finds 5560 free may still find 6560 taken.
 APP_PORT=$(find_free_port 5560)
-AI_SERVER_PORT=$(find_free_port 3456)
-export APP_PORT AI_SERVER_PORT
+API_PORT=$(find_free_port 6560)
+export APP_PORT API_PORT
 
 # Strip any stale http://localhost:<oldport> exports of NEXTAUTH_URL /
 # BASE_HOST so dynamic-port worktrees don't 403 on login (lw#3453). Real
@@ -59,14 +61,11 @@ fi
 # on the host before containers start.
 # ---------------------------------------------------------------------------
 echo "Preparing host files..."
-(
-  cd platform/app
-  if [ ! -d node_modules ]; then
-    echo "Installing host dependencies..."
-    pnpm install
-  fi
-  pnpm run start:prepare:files 2>/dev/null || echo "WARNING: start:prepare:files had errors (non-fatal)"
-)
+if [ ! -d node_modules ]; then
+  echo "Installing host dependencies..."
+  pnpm install
+fi
+pnpm run start:prepare:files 2>/dev/null || echo "WARNING: start:prepare:files had errors (non-fatal)"
 
 # ---------------------------------------------------------------------------
 # Build compose command with optional profile
@@ -108,7 +107,7 @@ $COMPOSE_CMD up -d
 # ---------------------------------------------------------------------------
 cat > .dev-port <<EOF
 APP_PORT=${APP_PORT}
-AI_SERVER_PORT=${AI_SERVER_PORT}
+API_PORT=${API_PORT}
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
 VOLUME_PREFIX=${VOLUME_PREFIX}
 BASE_URL=http://localhost:${APP_PORT}
@@ -117,6 +116,7 @@ EOF
 echo ""
 echo "Services starting in background."
 echo "  App:        http://localhost:${APP_PORT}"
+echo "  API:        http://localhost:${API_PORT}  (also at /api on the app port)"
 echo "  Project:    ${COMPOSE_PROJECT_NAME}"
 echo "  Port file:  .dev-port"
 echo ""

@@ -18,7 +18,7 @@ import (
 // maxRSSOverrideMB <= 0 keeps domain.DefaultTypecheckReapLimits' RSS ceiling
 // (env parsing is composition-root-only, so this comes in as a resolved value,
 // same as slotsOverride).
-func (o *Orchestrator) Typecheck(ctx context.Context, lwDir string, extraArgs []string, slotsOverride, maxRSSOverrideMB int) error {
+func (o *Orchestrator) Typecheck(ctx context.Context, repoDir string, extraArgs []string, slotsOverride, maxRSSOverrideMB int) error {
 	if o.sem == nil {
 		return fmt.Errorf("semaphore not wired")
 	}
@@ -51,7 +51,7 @@ func (o *Orchestrator) Typecheck(ctx context.Context, lwDir string, extraArgs []
 	// typechecking. The pid marker is what agent shells honor, and it only
 	// convinces a descendant.
 	env := []string{"CHECK_SLOTS=0", "CHECK_QUEUE_HELD=" + strconv.Itoa(os.Getpid())}
-	return o.sup.RunOnceBounded(ctx, "typecheck", lwDir, shell, env, ReapLimits(rl))
+	return o.sup.RunOnceBounded(ctx, "typecheck", repoDir, shell, env, ReapLimits(rl))
 }
 
 // shellQuote single-quotes s for safe interpolation into a `bash -lc` string,

@@ -45,8 +45,15 @@ works everywhere. Hostname routing is opt-in — `pnpm dev` uses the plain
 
 ```bash
 haven up                 # registers hostnames, starts + supervises the stack
-haven up +workers        # …with a standalone workers lane (sticky, per worktree)
+haven up +langy          # …with the langy agent manager too (sticky, per worktree)
 ```
+
+Every stack runs the three Node applications as three lanes — `ui`
+(`@langwatch/ui`, Vite), `api` (`@langwatch/platform-api`) and `workers`
+(`@langwatch/worker`) — each `pnpm --filter <package> dev` from the workspace
+root. They are not selectable: a stack running two of the three would serve
+pages and quietly process no jobs. `app.<slug>` is the ui lane's hostname, and
+`/api` under it proxies to the api lane on loopback.
 
 Open <https://langwatch.localhost> to see every stack across your worktrees.
 
@@ -63,15 +70,16 @@ haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
                  switch between "all" and per-service logs, q detaches (the stack
                  keeps running; haven down stops it). +svc/-svc picks services and
-                 sticks (+langy, -nlp, +workers, -gateway); a fresh worktree runs
-                 app + nlp + gateway + idp, langy off. -w watches the Go services via
+                 sticks (+langy, -nlp, -gateway); a fresh worktree runs
+                 ui + api + workers + nlp + gateway + idp, langy off. -w watches
+                 the Go services via
                  air; -d detaches without the view; --rebuild forces images
 haven down       stop this worktree's stack — data is always kept;
                  --all stops every stack, the shared servers, daemon, and proxy
 haven restart    bounce one supervised service (or all) in place; `restart obs`
                  bounces the observability stack; `restart langy --rebuild`
                  re-images first
-haven idp        run ONLY the IdP simulator — no app, API or databases — routed
+haven idp        run ONLY the IdP simulator — no ui, api or databases — routed
                  at idp.langwatch.localhost; --tenants <n> sizes the range
 haven logs       captured service logs from any terminal, attached or detached:
                  all interleaved, `haven logs nlp` filters, -t tails,
@@ -268,9 +276,11 @@ like an auth or routing bug rather than a dead stack. haven does not restart
 what it did not start; `haven up` is the recovery, and it deregisters the dead
 entry's routes before it provisions.
 
-The resolved config lands in `.env.portless`, which every TS entry
-point loads **last with `override: true`** so it beats anything pinned in `.env`
-(that repo runs `dotenv.config({ override: true })`).
+The resolved config lands in `.env.portless` **at the workspace root**, beside
+`.env` — where every application in `apps/` resolves both from. It is loaded
+**last, with `override: true`**, so it beats anything pinned in `.env`. Each
+supervised lane is also handed the same variables directly, so a lane never
+depends on the file having been read.
 
 ### Why native processes, not kind/k8s (yet)
 
@@ -331,7 +341,7 @@ registry, and dashboard stay the same.
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API
   tokens exist on every worktree and every machine. See the doc comment at
-  the top of `platform/app/prisma/seed.ts` for the exact values (admin email +
+  the top of `packages/prisma-client/prisma/seed.ts` for the exact values (admin email +
   password, ingestion key `sk-lw-local-development-key` (override
   `LANGWATCH_LOCAL_API_KEY`), a private full-access personal access token,
   and a public ingestion-only token).

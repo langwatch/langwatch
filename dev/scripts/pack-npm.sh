@@ -21,8 +21,8 @@
 #
 # The exclusion is root-only — a lockfile one directory down ships fine — so
 # the whole artifact is staged under `app/`. That is also the layout the CLI
-# already expects: locatePackageSource() finds the app root by walking up for
-# `platform/app/package.json`, so nesting is transparent to it (see
+# already expects: locatePackageSource() finds the workspace root by walking up
+# for the root manifest, so nesting is transparent to it (see
 # apps/server/src/services/app-dir.ts).
 #
 # `apps/server/distribution-files.json` stays the single source of truth for
@@ -110,17 +110,17 @@ mkdir -p "$APP"
 EXCLUDES=(
   --exclude=node_modules
   # No ignore files in the staged tree. npm/pnpm pack honours a .gitignore
-  # inside an included directory, and platform/app/.gitignore lists `/dist` and
-  # `*.generated.ts` — both REQUIRED at runtime (the prebuilt vite client, and
-  # the generated types the app imports). Carrying it into staging silently
-  # strips them, the app tree arrives without dist/client, and first boot
-  # falls back to a full on-runner `vite build`.
+  # inside an included directory, and a nested one listing `/dist` or
+  # `*.generated.ts` would strip files that are REQUIRED at runtime (the
+  # prebuilt browser bundle, and the generated types the applications import).
+  # Carrying one into staging silently drops them, apps/ui arrives without
+  # dist/client, and first boot falls back to a full on-runner `vite build`.
   #
-  # This is exactly what the deleted platform/app/.npmignore existed to prevent:
-  # an .npmignore overrides the sibling .gitignore, which is why the old file
-  # had to restate the broad excludes explicitly. Staging replaces that
-  # mechanism — the copy below IS the allowlist, so no ignore file should get
-  # a second say over it.
+  # This is exactly what the deleted .npmignore files existed to prevent: an
+  # .npmignore overrides the sibling .gitignore, which is why the old ones had
+  # to restate the broad excludes explicitly. Staging replaces that mechanism —
+  # the copy below IS the allowlist, so no ignore file should get a second say
+  # over it.
   --exclude=.gitignore
   --exclude=.npmignore
   --exclude=.git
@@ -136,15 +136,13 @@ EXCLUDES=(
   --exclude=playwright-report
   --exclude=blob-report
   # NOT `--exclude=reports`. rsync matches a bare name at ANY depth, and the
-  # app has two real source directories called that —
-  # platform/app/src/server/app-layer/reports (imported by presets.ts) and
-  # platform/app/src/components/analytics/reports. Excluding the name dropped
-  # both, and the published server died at first boot with
+  # shipped trees hold real source directories called that. Excluding the name
+  # dropped them, and the published server died at first boot with
   #   Cannot find module './reports/report-chart.service'
   # inside the ClickHouse migration, ~20 minutes in. The pattern was carried
-  # over from platform/app/.npmignore, where it was meant for the GDPR report
-  # output directory at platform/app/reports — a runtime artifact that a clean
-  # checkout does not even have.
+  # over from a deleted .npmignore, where it was meant for the GDPR report
+  # OUTPUT directory — a runtime artifact that a clean checkout does not even
+  # have.
   #
   # Every remaining bare name here was checked against the shipped trees for
   # the same collision: `test`, `tests` and `notebooks` match only genuine
@@ -159,8 +157,8 @@ EXCLUDES=(
   --exclude=.dockerignore
   --exclude=.github
   # The server bundles' source maps, re-included ahead of the blanket *.map
-  # exclude below (rsync takes the FIRST matching rule). start:app and
-  # start:workers run node with --enable-source-maps, so without these every
+  # exclude below (rsync takes the FIRST matching rule). The published
+  # applications run node with --enable-source-maps, so without these every
   # production stack trace an end user reports is a bundle offset instead of a
   # real file and line. They are safe to publish: the bundles are built with
   # sourcesContent:false, so a map carries path and position data only, never
@@ -187,7 +185,7 @@ EXCLUDES=(
   # very much present: haven writes .env.portless (mode 0600, with
   # the admin password and access tokens in it) and the quickstart picker
   # writes .env.dev-up. Listing the variants individually shipped
-  # .env.portless into a real tarball — deleting platform/app/.npmignore removed
+  # .env.portless into a real tarball — deleting the .npmignore files removed
   # the `.env*.local` rule that used to catch some of them, and because this
   # script also strips .gitignore/.npmignore from the staged tree, this array
   # is the ONLY filter left. `.env.example` is tracked documentation and is
@@ -197,8 +195,8 @@ EXCLUDES=(
   --include=.env.example
   --exclude=.env
   --exclude=.env.*
-  # Keys and certificates. `*.pem` was in the deleted platform/app/.npmignore and
-  # was not carried across; a TLS key, JWT signing key or SSH key dropped
+  # Keys and certificates. `*.pem` was in a deleted .npmignore and was not
+  # carried across; a TLS key, JWT signing key or SSH key dropped
   # anywhere under a shipped directory would otherwise be published.
   --exclude=*.pem
   --exclude=*.key
@@ -210,7 +208,7 @@ EXCLUDES=(
   # `npm config set --location=project` and most CI setups write registry auth.
   --exclude=.npmrc
   # Logs. Debug logs routinely carry registry URLs and, on auth failure, token
-  # fragments, and `pnpm dev:app` tees the whole dev server into server.log.
+  # fragments, and a dev run can tee a whole lane into a .log file.
   # The tarball is public, so every log is stripped wherever it sits rather
   # than only the two filenames that were named here before. No tracked file
   # in any shipped tree ends in `.log`, and the guard below fails loudly if one
@@ -236,22 +234,17 @@ EXCLUDES=(
 # failure recorded above, which reached npm and killed the published server at
 # first boot.
 ANCHORED_EXCLUDES=(
-  # A local download, not source.
-  platform/app/quickwit
-  platform/app/quickwit-*
-  platform/app/.sentryclirc
-  # `pnpm licenses` writes this report.
-  platform/app/licenses.json
-  platform/app/prisma/db.sqlite*
-  platform/app/e2e/auth.json
+  # A saved Playwright storage state — a real signed-in session.
+  apps/ui/e2e/auth.json
+  # A local sqlite scratch database beside the schema.
+  packages/prisma-client/prisma/db.sqlite*
 )
 
 # Rewrite ANCHORED_EXCLUDES into rsync patterns for one `files` entry, into the
 # global `anchored` array. rsync anchors a leading-slash pattern at the top of
 # the transfer, and this script copies one entry at a time with the entry
-# itself as that top, so `platform/app/licenses.json` becomes `/app/licenses.json`
-# while the entry is `platform/app` and disappears entirely for every other
-# entry.
+# itself as that top, so `apps/ui/e2e/auth.json` becomes `/ui/e2e/auth.json`
+# while the entry is `apps/ui` and disappears entirely for every other entry.
 anchored=()
 anchored_patterns_for() {
   local entry="$1" path

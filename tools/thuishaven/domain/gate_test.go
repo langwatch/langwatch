@@ -45,7 +45,7 @@ func TestClassifyCommandGatesOnlyWhatIsHeavy(t *testing.T) {
 				"./node_modules/.bin/tsc --noEmit --project ./tsconfig.tsgo.json",
 				"pnpm exec tsc --noEmit -p tsconfig.json",
 				"pnpm exec tsgo --noEmit -p tsconfig.tsgo.json",
-				"cd platform/app && tsc -p tsconfig.tsgo.tests.json",
+				"cd apps/api && tsc -p tsconfig.test.json",
 			} {
 				if _, heavy := ClassifyCommand(cmd); !heavy {
 					t.Fatalf("%q should be gated", cmd)
@@ -59,8 +59,8 @@ func TestClassifyCommandGatesOnlyWhatIsHeavy(t *testing.T) {
 		// that has a developer wondering why `cat` was queued.
 		t.Run("but naming the config file is not running the compiler", func(t *testing.T) {
 			for _, cmd := range []string{
-				"cat platform/app/tsconfig.json",
-				"grep -n strict platform/app/tsconfig.json",
+				"cat apps/api/tsconfig.json",
+				"grep -n strict apps/api/tsconfig.json",
 				"git diff tsconfig.json",
 				"/x/bin/mytsc --noEmit",
 				"node dev/scripts/check-queue.mjs ./node_modules/.bin/tsc.real --noEmit -p tsconfig.json",

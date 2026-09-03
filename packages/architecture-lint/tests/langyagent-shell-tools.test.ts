@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-// src/__tests__/ -> ../../ = platform/app/ -> ../../../../ = repo root
+// packages/architecture-lint/tests/ -> ../../.. = repo root
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(HERE, "../../..");
 const DOCKERFILE = readFileSync(

@@ -89,14 +89,14 @@ func GuardSeedTargets(dotenv map[string]string, getenv EnvLookup) error {
 	return nil
 }
 
-// LoadDotenv merges .env then .env.portless from lwDir into a single map (later
+// LoadDotenv merges .env then .env.portless from repoDir into a single map (later
 // files override earlier ones, matching the app's own load order). It is the
 // shared entry point both cmd (the `haven seed` guard) and app (the always-seed
 // on `haven up`) use so they validate one, identical view of the dotenv layers.
-func LoadDotenv(lwDir string) map[string]string {
+func LoadDotenv(repoDir string) map[string]string {
 	env := map[string]string{}
 	for _, name := range []string{".env", ".env.portless"} {
-		ReadEnvFile(filepath.Join(lwDir, name), env)
+		ReadEnvFile(filepath.Join(repoDir, name), env)
 	}
 	return env
 }

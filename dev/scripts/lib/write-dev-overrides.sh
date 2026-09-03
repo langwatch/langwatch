@@ -8,7 +8,7 @@
 #
 # Credentials NEVER go in the overlay (only non-rotating infrastructure
 # shape: bucket/endpoint/region/connection-host). Credentials live in
-# `.env`, refreshed by the operator (see platform/app/scripts/refresh-dev-s3-env.sh
+# `.env`, refreshed by the operator (see dev/scripts/refresh-dev-s3-env.sh
 # for the SSO/STS workflow).
 #
 # Presets (passed as $1):
@@ -127,7 +127,7 @@ EOF
   # local. ONLY non-rotating infra shape goes in the overlay (bucket /
   # endpoint / region). Credentials (S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,
   # S3_SESSION_TOKEN) must already be in `.env` — operator runs
-  # `bash platform/app/scripts/refresh-dev-s3-env.sh` when the SSO session
+  # `bash dev/scripts/refresh-dev-s3-env.sh` when the SSO session
   # expires (~hourly). The launcher checks for stale creds before starting.
   case "$preset" in
     dev-storage)

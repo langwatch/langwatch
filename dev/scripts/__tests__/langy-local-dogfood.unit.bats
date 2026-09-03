@@ -10,7 +10,7 @@ REPO_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)"
 
 setup() {
   TEST_DIR="$(mktemp -d)"
-  mkdir -p "$TEST_DIR/dev/scripts/dogfood" "$TEST_DIR/platform/app" "$TEST_DIR/bin"
+  mkdir -p "$TEST_DIR/dev/scripts/dogfood" "$TEST_DIR/apps/api" "$TEST_DIR/bin"
   cp "$REPO_DIR/dev/scripts/dogfood/langy-local.sh" "$TEST_DIR/dev/scripts/dogfood/"
   DOCTOR="$TEST_DIR/dev/scripts/dogfood/langy-local.sh"
   ENV_FILE="$TEST_DIR/.env"

@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 // Resolve .env.example relative to this test file's location:
-// platform/app/src/__tests__/ -> repository root -> .env.example
+// packages/architecture-lint/tests/ -> repository root -> .env.example
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENV_EXAMPLE_PATH = path.join(HERE, "../../../.env.example");
 

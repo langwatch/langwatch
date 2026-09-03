@@ -51,12 +51,12 @@ func TestShouldDisableGoogleDLPMatchesTheAppsBooleanRule(t *testing.T) {
 func TestOptingBackIntoDLPIsNotOverriddenByHavensOwnOverlay(t *testing.T) {
 	const key = "LANGWATCH_DISABLE_GOOGLE_DLP"
 
-	lwDir := t.TempDir()
-	writeFile(t, filepath.Join(lwDir, ".env"), key+"=false\n")
-	writeFile(t, filepath.Join(lwDir, ".env.portless"), key+"=true\n")
+	repoRoot := t.TempDir()
+	writeFile(t, filepath.Join(repoRoot, ".env"), key+"=false\n")
+	writeFile(t, filepath.Join(repoRoot, ".env.portless"), key+"=true\n")
 
 	t.Run("given the merged layers, haven reads back its own overlay", func(t *testing.T) {
-		merged := domain.LoadDotenv(lwDir)
+		merged := domain.LoadDotenv(repoRoot)
 
 		if got := merged[key]; got != "true" {
 			t.Fatalf("precondition failed: merged layers gave %q, want %q — "+
@@ -70,7 +70,7 @@ func TestOptingBackIntoDLPIsNotOverriddenByHavensOwnOverlay(t *testing.T) {
 	// operatorEnvIn is the reader operatorEnvKnobs actually uses, so swapping it
 	// back to the merged layers fails here rather than passing quietly.
 	t.Run("when the operator env reader is consulted", func(t *testing.T) {
-		operator := operatorEnvIn(lwDir)
+		operator := operatorEnvIn(repoRoot)
 
 		value, isSet := operator[key]
 		if !isSet {

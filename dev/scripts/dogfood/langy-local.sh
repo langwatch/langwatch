@@ -124,7 +124,7 @@ fi
 echo "services:"
 if listening "$APP_PORT"; then ok "app on :$APP_PORT"; else
   bad "app not listening on :$APP_PORT"
-  hint "cd \"$ROOT/platform/app\" && pnpm dev   (or make -C \"$ROOT\" quickstart)"
+  hint "cd \"$ROOT\" && pnpm dev   (or make -C \"$ROOT\" quickstart)"
 fi
 if listening "$GATEWAY_PORT"; then ok "AI gateway on :$GATEWAY_PORT"; else
   bad "AI gateway not listening on :$GATEWAY_PORT"

@@ -14,6 +14,6 @@ import (
 // guard validates and the environment the seed connects to are provably the same.
 // A stray production DATABASE_URL, whether pinned in .env or exported in the
 // shell, is caught here instead of being seeded into.
-func guardSeedEnv(lwDir string) error {
-	return domain.GuardSeedTargets(domain.LoadDotenv(lwDir), os.Getenv)
+func guardSeedEnv(repoDir string) error {
+	return domain.GuardSeedTargets(domain.LoadDotenv(repoDir), os.Getenv)
 }

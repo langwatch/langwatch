@@ -14,8 +14,24 @@ func TestDefaultSelectionIsLean(t *testing.T) {
 	if sel.Langy {
 		t.Error("langy is opt-in — a fresh worktree must not start it")
 	}
-	if sel.Workers {
-		t.Error("workers default to in-process, not a standalone lane")
+}
+
+// The workers lane is not selectable any more: the background worker is its own
+// application, so every stack runs it. The delta has to be refused BY NAME
+// rather than falling through to "unknown service", which reads as a typo — and
+// the failure it prevents is the silent one, a stack that boots and quietly
+// processes no jobs.
+//
+// @scenario "A retired service delta is refused by name"
+func TestWorkersIsNoLongerSelectable(t *testing.T) {
+	for _, delta := range []string{"+workers", "-workers"} {
+		_, err := ApplySelectionDeltas(DefaultSelection(), []string{delta})
+		if err == nil {
+			t.Fatalf("%s was accepted; the workers lane always runs", delta)
+		}
+		if !strings.Contains(err.Error(), "its own process") {
+			t.Errorf("%s error = %q, want it to say the worker is its own process", delta, err)
+		}
 	}
 }
 
@@ -37,7 +53,7 @@ func TestApplySelectionDeltas(t *testing.T) {
 
 	t.Run("when naming an unknown service, it fails listing the valid ones", func(t *testing.T) {
 		_, err := ApplySelectionDeltas(DefaultSelection(), []string{"+nlpgo"})
-		if err == nil || !strings.Contains(err.Error(), "workers, gateway, nlp, langy") {
+		if err == nil || !strings.Contains(err.Error(), "gateway, nlp, langy, idp") {
 			t.Fatalf("want the service list in the error, got %v", err)
 		}
 	})
@@ -53,7 +69,6 @@ func TestApplySelectionDeltas(t *testing.T) {
 // @scenario "Up reconciles a running stack"
 func TestSelectionFromStack(t *testing.T) {
 	st := Stack{
-		HasStandaloneWorkers: false,
 		Services: []Service{
 			{Name: "app", Port: 100},
 			{Name: "gateway", Port: 101},
@@ -80,10 +95,7 @@ func TestSelectionFromStack(t *testing.T) {
 // @scenario "Status shows the selection"
 func TestDescribeNamesTheDeltas(t *testing.T) {
 	got := DefaultSelection().Describe()
-	if !strings.Contains(got, "workers (in-process)") {
-		t.Errorf("Describe() = %q, want the in-process workers note", got)
-	}
-	for _, on := range []string{"app", "gateway", "nlp"} {
+	for _, on := range []string{"ui", "api", "workers", "gateway", "nlp"} {
 		if !strings.Contains(got, on) {
 			t.Errorf("Describe() = %q, want the selected service %q named", got, on)
 		}

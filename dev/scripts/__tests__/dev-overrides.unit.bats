@@ -148,12 +148,12 @@ teardown() {
 
 # --- frontend-only ---
 
-# @scenario "frontend-only pins host-side Redis for in-process workers, no other compose"
+# @scenario "frontend-only pins host-side Redis for the worker lane, no other compose"
 @test "frontend-only pins host-side REDIS_URL but no DB/CH/NLP overrides" {
-  # frontend-only runs no app/DB/CH compose, but `pnpm dev` runs the BullMQ
-  # workers in-process and the dev.sh launcher brings up a local redis for
-  # them. REDIS_URL must be the host-side localhost (pnpm dev runs on the
-  # host, not in the docker network). DB / CH / NLP still come from .env.
+  # frontend-only runs no application/DB/CH compose, but `pnpm dev` runs the
+  # BullMQ worker lane on the host and the dev.sh launcher brings up a local
+  # redis for it. REDIS_URL must be the host-side localhost (pnpm dev runs on
+  # the host, not in the docker network). DB / CH / NLP still come from .env.
   write_dev_overrides frontend-only "$OUT"
   result=$(cat "$OUT")
   [[ "$result" == *"NEXTAUTH_PROVIDER=email"* ]]

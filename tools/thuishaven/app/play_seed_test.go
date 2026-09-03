@@ -35,23 +35,14 @@ type fakeContainer struct{}
 func (fakeContainer) Ensure(context.Context) (string, error) { return "unix:///fake.sock", nil }
 func (fakeContainer) Profile() string                        { return "fake" }
 
-// playCheckout is a complete-enough checkout for the launcher: a lockfile (so
-// the dependency install resolves a workspace root), the app directory, and an
-// already-built api bundle. The bundle is part of "complete enough" because
-// preparePlaySandbox refuses to continue without one — these are seed tests, so
-// they start from a checkout that has been built and say nothing about the
-// build itself; TestPreparePlaySandbox* covers that.
+// playCheckout is a complete-enough checkout for the launcher: a lockfile, so
+// the dependency install resolves a workspace root. Nothing is built first —
+// each lane runs its own package's `dev` script, so there is no artefact the
+// prep has to produce before a lane can start.
 func playCheckout(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "pnpm-lock.yaml"), []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	bundle := filepath.Join(dir, "platform", "app", apiBundleRelPath)
-	if err := os.MkdirAll(filepath.Dir(bundle), 0o750); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(bundle, []byte("// built\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return dir
@@ -85,10 +76,7 @@ func launchPlay(t *testing.T, sup *fakeSupervisor, preset string) *Orchestrator 
 	t.Helper()
 	o := playOrchestrator(sup)
 	checkout := playCheckout(t)
-	sandbox := PlaySandbox{
-		Number: 4913, Checkout: checkout,
-		LwDir: filepath.Join(checkout, "platform", "app"), Preset: preset,
-	}
+	sandbox := PlaySandbox{Number: 4913, Checkout: checkout, Preset: preset}
 	if err := o.PlayLaunch(context.Background(), sandbox); err != nil {
 		t.Fatalf("PlayLaunch(%q): %v", preset, err)
 	}

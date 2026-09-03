@@ -148,7 +148,7 @@ func TestWriteSelectionStatesEveryService(t *testing.T) {
 
 	t.Run("given a selection with everything on", func(t *testing.T) {
 		dir := t.TempDir()
-		on := domain.Selection{Workers: true, Gateway: true, NLP: true, Langy: true}
+		on := domain.Selection{Gateway: true, NLP: true, Langy: true, IDP: true}
 
 		t.Run("when it is written and read back", func(t *testing.T) {
 			if err := s.WriteSelection(dir, on); err != nil {

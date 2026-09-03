@@ -56,10 +56,9 @@ func TestStripInheritedEnvFilesRemovesUntrackedSecretsAndKeepsTheReposOwn(t *tes
 		gitAddCommit(t, checkout, ".env.example")
 
 		// What the hook would have copied in.
-		mustWrite(t, filepath.Join(checkout, "platform", "app"), ".env", "OPENAI_API_KEY=sk-real-secret\n")
-		mustWrite(t, filepath.Join(checkout, "platform", "app"), ".env.portless", "DATABASE_URL=postgres://real\n")
 		mustWrite(t, filepath.Join(checkout, "sdks", "python"), ".env", "ANTHROPIC_API_KEY=sk-ant-real\n")
 		mustWrite(t, checkout, ".env", "STRIPE_SECRET_KEY=sk_live_real\n")
+		mustWrite(t, checkout, ".env.portless", "DATABASE_URL=postgres://real\n")
 
 		t.Run("when the sandbox strips inherited env files", func(t *testing.T) {
 			if err := StripInheritedEnvFiles(checkout); err != nil {
@@ -67,10 +66,9 @@ func TestStripInheritedEnvFilesRemovesUntrackedSecretsAndKeepsTheReposOwn(t *tes
 			}
 
 			for _, gone := range []string{
-				filepath.Join("platform", "app", ".env"),
-				filepath.Join("platform", "app", ".env.portless"),
 				filepath.Join("sdks", "python", ".env"),
 				".env",
+				".env.portless",
 			} {
 				if _, err := os.Stat(filepath.Join(checkout, gone)); !os.IsNotExist(err) {
 					t.Errorf("%s survived into the sandbox; it carries the developer's secrets", gone)

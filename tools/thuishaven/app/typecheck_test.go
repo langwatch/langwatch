@@ -34,7 +34,7 @@ func TestTypecheckDisablesTheScriptsOwnQueue(t *testing.T) {
 		log: zap.NewNop(),
 	}
 
-	if err := orch.Typecheck(context.Background(), "/repo/platform/app", nil, 3, 0); err != nil {
+	if err := orch.Typecheck(context.Background(), "/repo", nil, 3, 0); err != nil {
 		t.Fatalf("Typecheck: %v", err)
 	}
 
@@ -60,7 +60,7 @@ func TestTypecheckCountsAgainstTheSharedChecksSemaphore(t *testing.T) {
 		log: zap.NewNop(),
 	}
 
-	if err := orch.Typecheck(context.Background(), "/repo/platform/app", nil, 1, 0); err != nil {
+	if err := orch.Typecheck(context.Background(), "/repo", nil, 1, 0); err != nil {
 		t.Fatalf("Typecheck: %v", err)
 	}
 

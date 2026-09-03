@@ -153,7 +153,7 @@ var envHelpText = `Environment variables.
                                  worktree and agent authenticates with the same
                                  key. Same story for the rest of the seeded
                                  identity (admin login, PATs) — see
-                                 platform/app/prisma/seed.ts's header comment.
+                                 the seed script's header comment.
 
   ClickHouse
     LANGWATCH_HAVEN_CH=0         Do not manage ClickHouse (use .env CLICKHOUSE_URL).

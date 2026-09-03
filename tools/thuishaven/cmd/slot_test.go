@@ -372,7 +372,7 @@ func TestIsQueueCommand(t *testing.T) {
 		"   ",
 		"-zsh",
 		"/bin/bash -l",
-		"node /repo/platform/app/scripts/__tests__/check-queue.unit.test.ts",
+		"node /repo/dev/scripts/__tests__/check-queue.unit.test.ts",
 		"/opt/homebrew/bin/havenclone slot run",
 	}
 	for _, command := range refused {

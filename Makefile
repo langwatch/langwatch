@@ -157,7 +157,7 @@ service-watch:
 # expire ~hourly; this rotates the three S3_*_KEY/TOKEN lines in
 # .env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
 refresh-dev-s3:
-	@bash platform/app/scripts/refresh-dev-s3-env.sh
+	@bash dev/scripts/refresh-dev-s3-env.sh
 
 # Run all *.unit.bats tests under dev/scripts/__tests__/. Dev-only — these
 # tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /
@@ -291,24 +291,24 @@ else
 	@:
 endif
 
-# Run the app (pnpm dev, which also auto-starts the Go aigateway) alongside
-# the Go nlpgo engine. nlpgo is the `nlpgo` subcommand of the cmd/service
-# monobinary, run the same way as aigateway (`make service svc=nlpgo`). We pin
-# SERVER_ADDR=:5561 so it binds the port the app expects (LANGWATCH_NLP_SERVICE
-# → http://localhost:5561) and doesn't collide with langevals on :5562.
-# LANGWATCH_ENDPOINT points nlpgo's evaluator/agent-workflow callbacks back at
-# the local app.
+# The whole local stack in one terminal: the three applications (ui, api,
+# workers) plus the Go aigateway and nlpgo engines. `pnpm dev` starts all five
+# itself now — dev/scripts/dev-stack.sh derives every port and skips a Go lane
+# that is already listening — so this target is one line pointing at it, kept
+# because `make start` is in the README and in muscle memory.
 start:
-	cd platform/app && pnpm concurrently --kill-others \
-		'pnpm dev' \
-		'SERVER_ADDR=:5561 LANGWATCH_ENDPOINT=http://localhost:5560 make -C .. service svc=nlpgo'
+	pnpm dev
 
 start/postgres:
 	@echo "Starting Postgres..."
 	@docker compose -f infra/compose.yml --project-directory . up -d postgres
 
+# A watching typecheck of one application (default apps/api):
+#   make tsc-watch app=apps/ui
+# It never takes a check-queue slot — a `--watch` run would hold one for the
+# whole session, which is exactly what the queue exists to prevent.
 tsc-watch:
-	cd platform/app && pnpm tsc-watch
+	pnpm exec tsc --noEmit --watch --preserveWatchOutput -p $(or $(app),apps/api)/tsconfig.json
 
 # Single entry point — interactive launcher or non-interactive mode runner.
 # (#3860 AC#1, AC#2). Positional usage via MAKECMDGOALS:
@@ -371,10 +371,28 @@ endif
 worktree:
 	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
+# Re-derive the SDK clients from the OpenAPI document.
+#
+# The GENERATOR is gone. `generateOpenAPISpec` was deleted with the monolith's
+# task lane, because twelve of its sixteen module inputs no longer existed —
+# so the document at apps/api/src/features/discovery/openapi-document.json is
+# a checked-in artifact with nothing that regenerates it. This target now
+# refuses rather than pretending, because the failure it would otherwise hide
+# is the worst kind: both SDKs regenerating cleanly from a document that has
+# silently stopped tracking the routes the API serves.
+#
+# To regenerate the CLIENTS from the document as it stands, run the two
+# commands below by hand. To regenerate the DOCUMENT, the API process needs a
+# generator again — see the "openapi-completeness" note in
+# .github/workflows/langwatch-app-ci.yml.
 sync-all-openapi:
-	cd platform/app && pnpm run task generateOpenAPISpec
-	cd sdks/typescript && pnpm run generate:openapi-types
-	cd sdks/python && make generate/api-client
+	@echo "sync-all-openapi: the OpenAPI document has no generator." >&2
+	@echo "  apps/api/src/features/discovery/openapi-document.json is checked in and" >&2
+	@echo "  nothing regenerates it since the monolith's task lane was deleted." >&2
+	@echo "  To refresh the CLIENTS from it as it stands:" >&2
+	@echo "    cd sdks/typescript && pnpm run generate:openapi-types" >&2
+	@echo "    cd sdks/python && make generate/api-client" >&2
+	@exit 1
 
 # Included last on purpose (see the note next to `include dev/boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real

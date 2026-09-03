@@ -157,7 +157,7 @@ setup() {
 setup_env_fixture() {
   TMP="$(mktemp -d)"
   pushd "$TMP" > /dev/null
-  mkdir -p platform/app services/langevals node_modules/foo .next dist build vendor coverage
+  mkdir -p apps/api services/langevals node_modules/foo .next dist build vendor coverage
   : > .env
   : > services/langevals/.env
   : > .env

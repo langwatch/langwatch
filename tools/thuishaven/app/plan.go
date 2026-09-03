@@ -23,7 +23,7 @@ func goServiceShell(repoRoot, svc string, shouldWatch bool) string {
 // planChildren turns a resolved stack into the supervised process set, layering
 // the overlay env (hostname URLs + ports) onto each child and giving each Go
 // service its SERVER_ADDR.
-func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, langyDockerHost string) []Child {
+func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, langyDockerHost string) []Child {
 	base := st.OverlayEnv()
 	logPath := func(name string) string {
 		return filepath.Join(o.cfg.Home, "logs", st.Slug, name+".log")
@@ -57,28 +57,20 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true")
 	}
 	out = append(out, Child{
-		Name: "app", Dir: lwDir, Color: palette[1], LogPath: logPath("app"),
-		Shell: "pnpm -s run dev:vite",
+		Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath("ui"),
+		Shell: "pnpm -s --filter " + UIPackage + " dev",
 		Env:   nodeEnv(),
-		// Hold the web (vite) until the API answers /api/health. The app proxies
-		// /api to the API (start:app), which is a bigger process and boots slower;
-		// a browser that loads the web before the API is up gets stuck in an auth
-		// redirect loop. Gating the lane means the hostname simply isn't served
-		// until the stack can actually handle a request.
+		// Hold the browser application (vite) until the API answers /api/health.
+		// It proxies /api to the API lane, which is a much bigger process and
+		// boots slower; a browser that loads the SPA before the API is up gets
+		// stuck in an auth redirect loop. Gating the lane means the hostname
+		// simply isn't served until the stack can actually handle a request.
 		ReadyProbeURL: fmt.Sprintf("http://127.0.0.1:%d/api/health", st.APIPort),
 	})
-	// In-process worker mode (the default): the app process (start:app ->
-	// start.ts) hosts the worker stack itself, so there is no separate
-	// `workers` lane below — one Node process instead of two, saving its RAM.
-	// `haven up +workers` selects the standalone lane instead.
-	apiEnv := nodeEnv()
-	if !opts.Selection.Workers {
-		apiEnv = append(apiEnv, "WORKERS_IN_PROCESS=1")
-	}
 	out = append(out, Child{
-		Name: "api", Dir: lwDir, Color: palette[3], LogPath: logPath("api"),
-		Shell: "pnpm -s run start:app",
-		Env:   apiEnv,
+		Name: "api", Dir: repoDir, Color: palette[3], LogPath: logPath("api"),
+		Shell: "pnpm -s --filter " + APIPackage + " dev",
+		Env:   nodeEnv(),
 	})
 	if opts.Selection.Gateway {
 		out = append(out, Child{
@@ -123,16 +115,42 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 		langy.LogPath = logPath("langyagent")
 		out = append(out, langy)
 	}
-	if opts.Selection.Workers {
-		out = append(out, Child{
-			// green, not red: workers are a healthy background lane, and a red
-			// prefix reads as an error even on ordinary info logs. Red (palette[5])
-			// is reserved for genuine failures, so no lane label uses it —
-			// TestNoLaneIsRed pins that.
-			Name: "workers", Dir: lwDir, Color: palette[0], LogPath: logPath("workers"),
-			Shell: "pnpm -s run start:workers",
-			Env:   append(nodeEnv(), "START_WORKERS=true"),
-		})
-	}
+	out = append(out, Child{
+		// green, not red: workers are a healthy background lane, and a red
+		// prefix reads as an error even on ordinary info logs. Red (palette[5])
+		// is reserved for genuine failures, so no lane label uses it —
+		// TestNoLaneIsRed pins that.
+		//
+		// Unconditional: the background worker is its own application now
+		// (apps/worker), so there is no in-process mode left to choose and
+		// nothing reads WORKERS_IN_PROCESS or START_WORKERS. Every stack runs
+		// the three Node lanes — a stack that quietly did no background
+		// processing would look identical to a healthy one until a job was
+		// expected to have run.
+		Name: "workers", Dir: repoDir, Color: palette[0], LogPath: logPath("workers"),
+		Shell: "pnpm -s --filter " + WorkerPackage + " dev",
+		Env:   nodeEnv(),
+	})
 	return out
 }
+
+// The three Node applications a stack supervises, by workspace package name.
+// planChildren runs each with `pnpm --filter <pkg> dev` from the workspace
+// root, so the lane never depends on a path staying where it is.
+const (
+	// UIPackage is the browser application — Vite, which serves the routed
+	// app.<slug> hostname and proxies /api to the API lane.
+	UIPackage = "@langwatch/ui"
+	// APIPackage is the interactive API process: tRPC, REST, SSE.
+	APIPackage = "@langwatch/platform-api"
+	// WorkerPackage is the background process: queues, schedulers, projections.
+	WorkerPackage = "@langwatch/worker"
+)
+
+// UIDirRel is where the browser application lives inside the workspace. Only
+// the Vite lane's own working directory needs it — the HMR-gate marker is
+// resolved by the plugin against that directory, not the workspace root.
+const UIDirRel = "apps/ui"
+
+// UIDir is the Vite lane's working directory inside a checkout.
+func UIDir(repoDir string) string { return filepath.Join(repoDir, UIDirRel) }

@@ -2,7 +2,7 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   // Oxlint's default plugin set plus vitest and jest, which is what lets the
   // test-quality rules below (noFocusedTests and friends, carried from the
-  // deleted platform/app/biome.jsonc) be named at all. Setting this key
+  // deleted biome.jsonc) be named at all. Setting this key
   // REPLACES the default set, so the four defaults are restated here.
   "plugins": ["react", "unicorn", "typescript", "oxc", "vitest", "jest"],
   "jsPlugins": [
@@ -37,10 +37,10 @@
     // oxlint already walked these paths for the architecture rules, so they
     // rode along for free rather than adding another tool.
     //
-    // platform/app/** now has its own block further down, with its own
-    // measured baselines. The two blocks are separate because the two trees
-    // arrived with different backlogs, not because they deserve different
-    // rules; converging them is follow-up work.
+    // A second block further down carries the ruleset the deleted platform
+    // application's biome.jsonc contributed. The two blocks are separate
+    // because the two trees arrived with different backlogs, not because they
+    // deserve different rules; converging them is follow-up work.
     //
     // EVERY RULE HERE IS `error`, AND EVERY ONE WAS MEASURED FIRST.
     // There is no warn tier: oxlint has no reviewdog wiring here, so a
@@ -49,10 +49,8 @@
     // was already clean, or because this change made it clean. That is
     // what keeps `pnpm lint:architecture` a gate rather than a report.
     //
-    // The globs also cover apps/**, the application workspaces the feature
-    // extraction moves code into: same rules, same doctrine, so a file does
-    // not change its checks by moving. platform/app/** is held by its own
-    // block below.
+    // The globs cover apps/** as well as packages/**: same rules, same
+    // doctrine, so a file does not change its checks by moving.
     // ------------------------------------------------------------------
     {
       "files": [
@@ -156,7 +154,7 @@
     //                                     wants this, but no threshold cheap
     //                                     enough to adopt is tight enough to
     //                                     mean anything -- the same trap
-    //                                     the platform/app block below documents
+    //                                     the second block below documents
     //   typescript/no-extraneous-class     54 in 47 files
     //   typescript/no-import-type-side-effects  34 in 33 files
     //   no-loop-func                        2, and both are the same deliberate
@@ -251,35 +249,35 @@
     },
 
     // ==================================================================
-    // CODE QUALITY, platform/app/** only.
+    // CODE QUALITY, the second ruleset.
     //
-    // These rules arrive from platform/app/biome.jsonc, which was deleted
-    // when Biome was removed from the repository. Biome was the app's
-    // general-purpose linter and Oxlint was the packages' one; there is now
-    // one linter, so the app's ruleset has to live here or stop existing.
+    // These rules arrive from the deleted platform application's biome.jsonc:
+    // Biome was that application's general-purpose linter and Oxlint was the
+    // packages' one, and when Biome was removed this is where its ruleset had
+    // to live or stop existing. The application it was measured over is gone;
+    // the ruleset is not, so it applies to the trees the code moved into.
     //
     // Same doctrine as the packages/** block above, and the same reason for
-    // it: every rule is `error`, there is no warn tier, and every count
-    // below was measured with oxlint 1.78.0 over the paths `pnpm lint`
-    // actually passes -- platform/app/{src,scripts,e2e,prisma,vite}.
-    //
-    // Biome's own baselines are quoted where they differ. They were measured
-    // over `src, ee, scripts, e2e, prisma, vite, packages`, and two of those
-    // are gone: `platform/app/ee` was moved into packages/enterprise, and
-    // packages/** has its own block above. So a smaller number here is
-    // usually the scope, not a rule that stopped finding things.
+    // it: every rule is `error`, there is no warn tier, and every count below
+    // was measured with oxlint 1.78.0 at the commit that removed Biome. The
+    // counts are HISTORY now — they record what the rule found in the tree it
+    // came from, not what it finds here.
     //
     // Where Biome's severity was `warn` it was blocking on ADDED lines only,
     // through a reviewdog pass that no longer exists. A warn tier cannot be
-    // carried across; a rule with a backlog is `error` plus an enumerated
-    // debt register below, which can only shrink.
+    // carried across, so every rule here is `error`. The enumerated debt
+    // register that used to sit below is gone with the files it named.
     // ==================================================================
     {
       "files": [
-        "platform/app/**/*.ts",
-        "platform/app/**/*.tsx",
-        "platform/app/**/*.mts",
-        "platform/app/**/*.cts"
+        "apps/**/*.ts",
+        "apps/**/*.tsx",
+        "apps/**/*.mts",
+        "apps/**/*.cts",
+        "packages/**/*.ts",
+        "packages/**/*.tsx",
+        "packages/**/*.mts",
+        "packages/**/*.cts"
       ],
       "rules": {
         // -- Constructs that cannot mean what they say -----------------
@@ -456,7 +454,7 @@
     // ------------------------------------------------------------------
 
     // ------------------------------------------------------------------
-    // TEST FILES, platform/app/**.
+    // TEST FILES.
     //
     // Biome scoped its test-quality rules to test files for a reason it
     // wrote down: unscoped, noFocusedTests matches any function called
@@ -464,11 +462,16 @@
     // ------------------------------------------------------------------
     {
       "files": [
-        "platform/app/**/*.test.ts",
-        "platform/app/**/*.test.tsx",
-        "platform/app/**/*.spec.ts",
-        "platform/app/**/*.spec.tsx",
-        "platform/app/**/__tests__/**"
+        "apps/**/*.test.ts",
+        "apps/**/*.test.tsx",
+        "apps/**/*.spec.ts",
+        "apps/**/*.spec.tsx",
+        "apps/**/__tests__/**",
+        "packages/**/*.test.ts",
+        "packages/**/*.test.tsx",
+        "packages/**/*.spec.ts",
+        "packages/**/*.spec.tsx",
+        "packages/**/__tests__/**"
       ],
       "rules": {
         "vitest/no-focused-tests": "error", // was noFocusedTests, 0
@@ -487,431 +490,11 @@
         // Biome turned noEmptyBlockStatements off for test files.
         "no-empty": "off"
       }
-    },
-
-    // The two files that wrap Chakra's Dialog and Drawer are the ones
-    // allowed to import them. Carried verbatim from biome.jsonc.
-    {
-      "files": [
-        "platform/app/src/components/ui/dialog.tsx",
-        "platform/app/src/components/ui/drawer.tsx"
-      ],
-      "rules": {
-        "no-restricted-imports": "off"
-      }
-    },
-
-    // ==================================================================
-    // DEBT REGISTER, platform/app/**.
-    //
-    // Every rule above is `error` for the whole app. These blocks name the
-    // files that already violate one, so the rule blocks everywhere else and
-    // cannot be added to without a reviewer watching a path appear in this
-    // list. There is no wildcard and there is no blanket downgrade.
-    //
-    // Bracketed directory names are backslash-escaped because a glob reads a
-    // bare `[[...route]]` as a character class, which silently matches
-    // nothing -- an unescaped entry looks pinned and pins nothing.
-    //
-    // Measured with oxlint 1.78.0 over platform/app/{src,scripts,e2e,prisma,
-    // vite} at the commit that removed Biome: 396 findings, pinned as 253
-    // (file, rule) pairs.
-    // ==================================================================
-
-    // eqeqeq -- 56 finding(s) in 24 file(s), was noDoubleEquals.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/components/AddDatasetRecordDrawer.tsx",
-        "platform/app/src/components/analytics/CustomGraph.tsx",
-        "platform/app/src/components/analytics/SummaryMetric.tsx",
-        "platform/app/src/components/checks/CheckConfigForm.tsx",
-        "platform/app/src/components/checks/DynamicZodForm.tsx",
-        "platform/app/src/components/checks/PreconditionsField.tsx",
-        "platform/app/src/components/checks/TryItOut.tsx",
-        "platform/app/src/components/experiments/BatchEvaluation.tsx",
-        "platform/app/src/components/experiments/BatchEvaluationV2.tsx",
-        "platform/app/src/components/experiments/BatchEvaluationV2/BatchEvaluationSummary.tsx",
-        "platform/app/src/components/experiments/DSPyExperiment.tsx",
-        "platform/app/src/components/filters/FieldsFilters.tsx",
-        "platform/app/src/components/traces/AddParticipants.tsx",
-        "platform/app/src/components/traces/TracesMapping.tsx",
-        "platform/app/src/hooks/useOrganizationTeamProject.ts",
-        "platform/app/src/optimization_studio/components/OptimizationStudio.tsx",
-        "platform/app/src/pages/\\[project\\]/evaluations/\\[id\\]/edit.tsx",
-        "platform/app/src/pages/onboarding/\\[team\\]/project.tsx",
-        "platform/app/src/pages/settings/annotation-scores.tsx",
-        "platform/app/src/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx",
-        "platform/app/src/server/analytics/registry.ts",
-        "platform/app/src/server/evaluations/runEvaluation.ts",
-        "platform/app/src/server/routes/collector.ts",
-        "platform/app/src/server/tracer/collector/common.ts"
-      ],
-      "rules": { "eqeqeq": "off" }
-    },
-
-    // no-cond-assign -- 19 finding(s) in 14 file(s), the condition half of noAssignInExpressions.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/e2e/langy/fake-tab-run.ts",
-        "platform/app/e2e/langy/langy-agent.ts",
-        "platform/app/scripts/check-feature-parity.ts",
-        "platform/app/src/experiments-v3/components/EvaluatorPanel/__tests__/ComparisonConfigForm.judgePromptParity.unit.test.ts",
-        "platform/app/src/experiments-v3/utils/httpAgentUtils.ts",
-        "platform/app/src/experiments-v3/utils/mappingValidation.ts",
-        "platform/app/src/features/traces-v2/components/SearchBar/filterHighlight.ts",
-        "platform/app/src/features/traces-v2/components/TraceDrawer/markdownView/buildTraceMarkdown.ts",
-        "platform/app/src/server/analytics/clickhouse/__tests__/memory-safety.test.ts",
-        "platform/app/src/server/app-layer/clients/clickhouse/__tests__/cold-scan-detector.coverage.unit.test.ts",
-        "platform/app/src/server/evaluations/__tests__/shipped-evaluator-types.unit.test.ts",
-        "platform/app/src/server/routes/__tests__/hono-bridge-streaming.test.ts",
-        "platform/app/src/server/routes/langy-relay.ts",
-        "platform/app/src/utils/emotionTestCss.ts"
-      ],
-      "rules": { "no-cond-assign": "off" }
-    },
-
-    // no-unneeded-ternary -- 2 finding(s) in 2 file(s), was noUselessTernary.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/components/evaluators/EvaluatorEditorShared.tsx",
-        "platform/app/src/server/evaluations/preconditions.ts"
-      ],
-      "rules": { "no-unneeded-ternary": "off" }
-    },
-
-    // default-param-last -- 2 finding(s) in 2 file(s), was useDefaultParameterLast.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/server/app-layer/traces/trace-io-extraction.service.ts",
-        "platform/app/src/server/traces/mappers/trace-summary.mapper.ts"
-      ],
-      "rules": { "default-param-last": "off" }
-    },
-
-    // unicorn/prefer-optional-catch-binding -- 3 finding(s) in 2 file(s), was noUselessCatchBinding.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/components/traces/SpanDetails.tsx",
-        "platform/app/src/server/tracer/collector/common.ts"
-      ],
-      "rules": { "unicorn/prefer-optional-catch-binding": "off" }
-    },
-
-    // no-param-reassign -- 10 finding(s) in 7 file(s), was noParameterAssign.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/scripts/seed-lib/__tests__/mass-metrics.unit.test.ts",
-        "platform/app/scripts/seed-lib/seed-primitives.ts",
-        "platform/app/src/components/MetadataTag.tsx",
-        "platform/app/src/hooks/useSimulationStreamingState.ts",
-        "platform/app/src/server/app-layer/presets.ts",
-        "platform/app/src/server/mailer/triggerEmail.tsx",
-        "platform/app/src/server/tracer/tracesMapping.ts"
-      ],
-      "rules": { "no-param-reassign": "off" }
-    },
-
-    // no-return-assign -- 10 finding(s) in 4 file(s), was noReturnAssign.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/e2e/code-agent/auth0-code-agent.scenario.test.ts",
-        "platform/app/src/components/home/HomePageBanners.tsx",
-        "platform/app/src/server/traces/trace.service.ts"
-      ],
-      "rules": { "no-return-assign": "off" }
-    },
-
-    // typescript/no-invalid-void-type -- 15 finding(s) in 12 file(s), was noConfusingVoidType.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/components/evaluators/EvaluatorEditorShared.tsx",
-        "platform/app/src/components/prompt-textarea/hooks/useVariableMenu.ts",
-        "platform/app/src/components/prompt-textarea/types.ts",
-        "platform/app/src/components/settings/DepartmentPicker.tsx",
-        "platform/app/src/components/settings/governance/routingPolicies/useRoutingPolicyMutations.ts",
-        "platform/app/src/experiments-v3/utils/evaluatorEditorCallbacks.ts",
-        "platform/app/src/features/auth-front-door/components/IdentifierStepForm.tsx",
-        "platform/app/src/features/auth-front-door/components/VerificationFirstSignUp.tsx",
-        "platform/app/src/features/langy/components/MessageContent.tsx",
-        "platform/app/src/pages/settings/teams.tsx",
-        "platform/app/src/prompts/forms/fields/message-history-fields/PromptMessagesField.tsx",
-        "platform/app/src/server/better-auth/hooks.ts"
-      ],
-      "rules": { "typescript/no-invalid-void-type": "off" }
-    },
-
-    // no-else-return -- 20 finding(s) in 17 file(s), was noUselessElse.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/components/Markdown.tsx",
-        "platform/app/src/components/analytics/CustomGraph.tsx",
-        "platform/app/src/components/experiments/BatchEvaluation.tsx",
-        "platform/app/src/components/experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults.tsx",
-        "platform/app/src/hooks/useFilterParams.ts",
-        "platform/app/src/hooks/useLicenseEnforcement.tsx",
-        "platform/app/src/runtime/app/internal-api/project.router.ts",
-        "platform/app/src/server/analytics/clickhouse/aggregation-builder.ts",
-        "platform/app/src/server/api/routers/organization.ts",
-        "platform/app/src/server/api/utils.ts",
-        "platform/app/src/server/experiments-v3/execution/workflowBuilder.ts",
-        "platform/app/src/server/routes/auth.ts",
-        "platform/app/src/server/routes/evaluations-legacy.ts",
-        "platform/app/src/server/routes/misc.ts",
-        "platform/app/src/server/tracer/collector/common.ts",
-        "platform/app/src/server/tracer/otel.traces.ts",
-        "platform/app/src/utils/parsePythonInsideJson.ts"
-      ],
-      "rules": { "no-else-return": "off" }
-    },
-
-    // unicorn/no-lonely-if -- 29 finding(s) in 26 file(s), was useCollapsedIf.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/components/AddMembersForm.tsx",
-        "platform/app/src/components/CascadeArchiveDialog.tsx",
-        "platform/app/src/components/agents/AgentCodeEditorDrawer.tsx",
-        "platform/app/src/components/agents/AgentWorkflowEditorDrawer.tsx",
-        "platform/app/src/components/evaluations/OnlineEvaluationDrawer.tsx",
-        "platform/app/src/features/briefing/mocks/briefingMocks.ts",
-        "platform/app/src/features/langy/components/capabilities/LangyDatasetCard.tsx",
-        "platform/app/src/features/onboarding/hooks/use-generic-onboarding-flow.ts",
-        "platform/app/src/features/traces-v2/components/FilterSidebar/FilterSidebar.tsx",
-        "platform/app/src/features/traces-v2/hooks/useTraceFreshness.ts",
-        "platform/app/src/hooks/useSimulationUpdateListener.ts",
-        "platform/app/src/optimization_studio/components/History.tsx",
-        "platform/app/src/prompts/prompt-playground/components/prompt-browser/tab/usePromptBrowserTabController.ts",
-        "platform/app/src/server/analytics/analytics-comparator.ts",
-        "platform/app/src/server/analytics/clickhouse/aggregation-builder.ts",
-        "platform/app/src/server/analytics/lwql/validation/validate.ts",
-        "platform/app/src/server/api/routers/automations.ts",
-        "platform/app/src/server/app-layer/evaluations/evaluation-execution.service.ts",
-        "platform/app/src/server/app-layer/organizations/repositories/organization.prisma.repository.ts",
-        "platform/app/src/server/evaluations/preconditions.ts",
-        "platform/app/src/server/evaluations/runEvaluation.ts",
-        "platform/app/src/server/experiments-v3/execution/__tests__/orchestrator.integration.test.ts",
-        "platform/app/src/server/tracer/otel.traces.ts",
-        "platform/app/src/utils/dbMassDeleteProtection.ts",
-        "platform/app/src/utils/dbOrganizationIdProtection.ts",
-        "platform/app/src/utils/sse/fetchSSE.ts"
-      ],
-      "rules": { "unicorn/no-lonely-if": "off" }
-    },
-
-    // typescript/ban-ts-comment -- 37 finding(s) in 20 file(s), was noTsIgnore.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/app/api/dataset/\\[\\[...route\\]\\]/app.ts",
-        "platform/app/src/components/analytics/CustomGraph.tsx",
-        "platform/app/src/components/analytics/SummaryMetric.tsx",
-        "platform/app/src/components/checks/CheckConfigForm.tsx",
-        "platform/app/src/components/checks/EvaluatorSelection.tsx",
-        "platform/app/src/components/experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults.tsx",
-        "platform/app/src/components/experiments/DSPyExperiment.tsx",
-        "platform/app/src/components/filters/FilterToggle.tsx",
-        "platform/app/src/hooks/useDrawer.ts",
-        "platform/app/src/hooks/useFilterParams.ts",
-        "platform/app/src/optimization_studio/components/OptimizationStudio.tsx",
-        "platform/app/src/optimization_studio/components/Optimize.tsx",
-        "platform/app/src/optimization_studio/components/drawers/StudioDrawerWrapper.tsx",
-        "platform/app/src/optimization_studio/components/properties/EvaluatorPropertiesPanel.tsx",
-        "platform/app/src/optimization_studio/hooks/usePostEvent.tsx",
-        "platform/app/src/server/routes/collector.ts",
-        "platform/app/src/server/routes/workflows.ts",
-        "platform/app/src/server/tracer/collector/common.ts",
-        "platform/app/src/server/tracer/otel.traces.test.ts",
-        "platform/app/src/server/tracer/otel.traces.ts"
-      ],
-      "rules": { "typescript/ban-ts-comment": "off" }
-    },
-
-    // no-empty -- 4 finding(s) in 4 file(s), was noEmptyBlockStatements.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/e2e/auth-regression/iter49-bug36-changepw-rate-limit.ts",
-        "platform/app/scripts/_dogfood_cli_mint_demo.ts",
-        "platform/app/scripts/dogfood/governance/sergey-relogin-as.ts",
-        "platform/app/src/utils/formatLLMError.ts"
-      ],
-      "rules": { "no-empty": "off" }
-    },
-
-    // typescript/no-empty-object-type -- 2 finding(s) in 2 file(s), was noEmptyInterface / noBannedTypes.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/components/ui/layouts/PageLayout.tsx",
-        "platform/app/src/runtime/api/__tests__/nlp-lambda.aws.adapter.unit.test.ts"
-      ],
-      "rules": { "typescript/no-empty-object-type": "off" }
-    },
-
-    // prefer-const -- 5 finding(s) in 4 file(s), was useConst.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/experiments-v3/execution/runIdentification.ts",
-        "platform/app/src/server/analytics/lwql/__tests__/lwqlClickHouseHarness.ts",
-        "platform/app/src/server/app-layer/langy/ui-actions/__tests__/ui-action.service.unit.test.ts",
-        "platform/app/src/server/traces/clickhouse-trace.service.ts"
-      ],
-      "rules": { "prefer-const": "off" }
-    },
-
-    // no-unused-vars -- 151 finding(s) in 94 file(s), was noUnusedImports + noUnusedVariables + noUnusedFunctionParameters.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/e2e/langy/langy-agent.ts",
-        "platform/app/e2e/langy/langy.scenario.test.ts",
-        "platform/app/scripts/dogfood/governance/sergey-relogin-as.ts",
-        "platform/app/scripts/seed-realistic-platform-data.ts",
-        "platform/app/src/app/api/dataset/\\[\\[...route\\]\\]/error-handler.ts",
-        "platform/app/src/app/api/organizations/\\[\\[...route\\]\\]/app.ts",
-        "platform/app/src/app/api/workflows/post_event/__tests__/post-event-evaluator.integration.test.ts",
-        "platform/app/src/app/api/workflows/post_event/__tests__/post-event.integration.test.ts",
-        "platform/app/src/components/MainMenu.tsx",
-        "platform/app/src/components/NavigationFooter.tsx",
-        "platform/app/src/components/PeriodSelector.tsx",
-        "platform/app/src/components/filters/FieldsFilters.tsx",
-        "platform/app/src/components/home/__tests__/LangyHomeHero.integration.test.tsx",
-        "platform/app/src/components/llmPromptConfigs/ParameterField.tsx",
-        "platform/app/src/components/members/InvitesTable.tsx",
-        "platform/app/src/components/ops/migrations/MigrationsContent.tsx",
-        "platform/app/src/components/ops/queues/BlockedCard.tsx",
-        "platform/app/src/components/ops/queues/DlqCard.tsx",
-        "platform/app/src/components/prompt-textarea/__tests__/PromptTextAreaWithVariables.test.tsx",
-        "platform/app/src/components/prompt-textarea/__tests__/templateLogicAutocomplete.integration.test.tsx",
-        "platform/app/src/components/prompts/PromptEditorDrawer.tsx",
-        "platform/app/src/components/prompts/__tests__/PromptEditorDrawer.test.tsx",
-        "platform/app/src/components/scenarios/ScenarioFormDrawer.tsx",
-        "platform/app/src/components/settings/ChangePasswordDialog.tsx",
-        "platform/app/src/components/settings/ModelProviderCredentialsSection.tsx",
-        "platform/app/src/components/suites/SuiteSidebar.tsx",
-        "platform/app/src/components/suites/__tests__/SuiteDetailPanel.integration.test.tsx",
-        "platform/app/src/components/traces/SpanDetails.tsx",
-        "platform/app/src/components/variables/VariableInsertMenu.tsx",
-        "platform/app/src/experiments-v3/__tests__/PromptEditorLocalChanges.integration.test.tsx",
-        "platform/app/src/experiments-v3/hooks/useExecuteEvaluation.ts",
-        "platform/app/src/experiments-v3/utils/normalizeComparison.ts",
-        "platform/app/src/features/analytics-query/__tests__/vegaLazyBoundary.unit.test.ts",
-        "platform/app/src/features/command-bar/command-registry.ts",
-        "platform/app/src/features/command-bar/components/CommandBarResults.tsx",
-        "platform/app/src/features/command-bar/hooks/useCommandBarItems.ts",
-        "platform/app/src/features/command-bar/hooks/useFilteredCommands.ts",
-        "platform/app/src/features/langy/components/LangyPanel.tsx",
-        "platform/app/src/features/langy/components/LangyPlanCard.tsx",
-        "platform/app/src/features/langy/components/MessageContent.tsx",
-        "platform/app/src/features/langy/components/capabilities/LangyEvalRunCard.tsx",
-        "platform/app/src/features/onboarding/hooks/use-onboarding-flow.ts",
-        "platform/app/src/features/traces-v2/components/FilterSidebar/SidebarSection.tsx",
-        "platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/ConversationView.tsx",
-        "platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/SpanAccordions.tsx",
-        "platform/app/src/hooks/useInviteActions.ts",
-        "platform/app/src/pages/\\[project\\]/__tests__/evaluations.lite-member.integration.test.tsx",
-        "platform/app/src/pages/auth/error.tsx",
-        "platform/app/src/pages/auth/forgot-password.tsx",
-        "platform/app/src/pages/auth/reset-password.tsx",
-        "platform/app/src/pages/gateway/budgets/\\[id\\].tsx",
-        "platform/app/src/pages/governance/__tests__/delegatedViewer.integration.test.tsx",
-        "platform/app/src/pages/governance/inventory.enterprise.tsx",
-        "platform/app/src/pages/settings/members.tsx",
-        "platform/app/src/prompts/prompt-playground/components/prompt-browser/__tests__/PromptTabStrip.integration.test.tsx",
-        "platform/app/src/runtime/app/features/agents.ts",
-        "platform/app/src/server/__tests__/end-user-spend-routing.integration.test.ts",
-        "platform/app/src/server/analytics/lwql/lwql.service.ts",
-        "platform/app/src/server/analytics/lwql/resolveTimeWindow.ts",
-        "platform/app/src/server/api-router.ts",
-        "platform/app/src/server/api/routers/__tests__/license.integration.test.ts",
-        "platform/app/src/server/api/routers/automations.ts",
-        "platform/app/src/server/api/routers/governance/activityMonitor.ts",
-        "platform/app/src/server/app-layer/__tests__/governance-department-spend.integration.test.ts",
-        "platform/app/src/server/app-layer/presets.ts",
-        "platform/app/src/server/app-layer/subscription/__tests__/plan-provider-wiring.unit.test.ts",
-        "platform/app/src/server/app-layer/system-migrations/__tests__/cohort.unit.test.ts",
-        "platform/app/src/server/auth.ts",
-        "platform/app/src/server/better-auth/hooks.ts",
-        "platform/app/src/server/better-auth/index.ts",
-        "platform/app/src/server/clickhouse/__tests__/metrics.unit.test.ts",
-        "platform/app/src/server/data-privacy/redaction/applyContentRedaction.ts",
-        "platform/app/src/server/event-sourcing/pipelines/__tests__/metricsSync.convergence.integration.test.ts",
-        "platform/app/src/server/experiments-v3/execution/orchestrator.ts",
-        "platform/app/src/server/gateway/scopeResolver.ts",
-        "platform/app/src/server/gateway/virtualKey.dto.ts",
-        "platform/app/src/server/gateway/virtualKey.service.ts",
-        "platform/app/src/server/invites/__tests__/invite-resilience.unit.test.ts",
-        "platform/app/src/server/modelProviders/__tests__/modelProvider.routingHandle.integration.test.ts",
-        "platform/app/src/server/routes/__tests__/langy-api-adoption.unit.test.ts",
-        "platform/app/src/server/routes/__tests__/langy-api-wait-mode.unit.test.ts",
-        "platform/app/src/server/routes/auth-cli.ts",
-        "platform/app/src/server/routes/health-checks.ts",
-        "platform/app/src/server/shutdown/budget.ts",
-        "platform/app/src/server/stored-objects/__tests__/azure-blob-driver.integration.test.ts",
-        "platform/app/src/server/stored-objects/__tests__/stored-objects.ingest-read.integration.test.ts",
-        "platform/app/src/server/stored-objects/__tests__/trace-media-extraction.integration.test.ts",
-        "platform/app/src/server/tracer/collector/common.ts",
-        "platform/app/src/server/traces/mappers/span.mapper.ts",
-        "platform/app/src/start.ts",
-        "platform/app/src/utils/auth-client.tsx",
-        "platform/app/src/utils/parsePythonInsideJson.ts",
-        "platform/app/src/utils/sse/fetchSSE.test.ts"
-      ],
-      "rules": { "no-unused-vars": "off" }
-    },
-
-    // jest/no-duplicate-hooks -- 3 finding(s) in 2 file(s), was noDuplicateTestHooks.
-    // Fix a file, delete its line.
-    {
-      "files": [
-        "platform/app/src/server/api/routers/__tests__/personal-workspace-invariants.integration.test.ts",
-        "platform/app/src/server/stored-objects/__tests__/azure-blob-driver.realazure.integration.test.ts"
-      ],
-      "rules": { "jest/no-duplicate-hooks": "off" }
-    },
-
-    // jest/prefer-hooks-on-top -- 1 finding(s) in 1 file(s), was useTestHooksOnTop.
-    // Fix a file, delete its line.
-    {
-      "files": ["platform/app/src/server/tracer/collector/piiCheck.batchEntities.unit.test.ts"],
-      "rules": { "jest/prefer-hooks-on-top": "off" }
-    },
-
-    // max-nested-callbacks -- 27 finding(s) in 16 file(s),
-    // was noExcessiveNestedCallbacks. Pinned at 5 rather than switched off,
-    // the same shape as the max-depth register above: the rule still holds
-    // these files, one level looser. Measured 27 findings at max 3, 2 at
-    // max 4, 0 at max 5.
-    {
-      "files": [
-        "platform/app/src/components/WorkspaceSwitcher.tsx",
-        "platform/app/src/components/annotations/AnnotationsTable.tsx",
-        "platform/app/src/components/settings/ProviderModelSelector.tsx",
-        "platform/app/src/components/useWorkspaceData.ts",
-        "platform/app/src/experiments-v3/components/TargetSection/TargetHeader.tsx",
-        "platform/app/src/features/langy/components/LangyModelPill.tsx",
-        "platform/app/src/features/langy/components/derived-cards/useChoicesRefRows.ts",
-        "platform/app/src/features/ops/foundry-transport.tsx",
-        "platform/app/src/features/traces-v2/components/Toolbar/LensTabs.tsx",
-        "platform/app/src/features/traces-v2/components/TraceDrawer/SpanTabBar.tsx",
-        "platform/app/src/features/traces-v2/components/TraceDrawer/traceAccordions/useSectionFocusGlow.ts",
-        "platform/app/src/features/traces-v2/components/TraceDrawer/waterfallView/WaterfallView.tsx",
-        "platform/app/src/hooks/useProjectsForCopy.ts",
-        "platform/app/src/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore.ts",
-        "platform/app/src/server/routes/ingest/ingestionRoutes.ts",
-        "platform/app/src/server/tracer/otel.traces.ts"
-      ],
-      "rules": { "max-nested-callbacks": ["error", { "max": 5 }] }
     }
+
+    // The debt register that used to close this file is GONE. Every entry in
+    // it named a file in the deleted platform application, so it pinned
+    // nothing; a register that names no existing file reads as coverage and
+    // is only noise. The rules above stand unconditionally.
   ]
 }

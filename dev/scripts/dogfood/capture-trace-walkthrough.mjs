@@ -19,7 +19,7 @@
  *                             me-sessions,admin-tool-catalog-templates,
  *                             admin-governance
  *   PLAYWRIGHT_TEST_PATH      absolute path to @playwright/test index.js
- *                             default = repo's platform/app/node_modules
+ *                             default = the workspace root's node_modules
  */
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
@@ -31,7 +31,7 @@ const __dirname = dirname(__filename);
 
 const pwPath =
   process.env.PLAYWRIGHT_TEST_PATH ??
-  resolve(__dirname, "../../../platform/app/node_modules/@playwright/test/index.js");
+  resolve(__dirname, "../../../node_modules/@playwright/test/index.js");
 const require_ = createRequire(import.meta.url);
 const pwTest = require_(pwPath);
 const { chromium } = pwTest;

@@ -24,7 +24,7 @@ func runDB(ctx context.Context, d deps, inv invocation) error {
 	}
 	switch inv.args[0] {
 	case "reset":
-		if err := guardSeedEnv(d.lwDir); err != nil {
+		if err := guardSeedEnv(d.worktree); err != nil {
 			return err
 		}
 		slug, err := d.orch.ResolveSlug(d.params)
@@ -46,7 +46,7 @@ func runDB(ctx context.Context, d deps, inv invocation) error {
 		if inv.has("--yes") {
 			return fmt.Errorf("db seed is non-destructive (an idempotent upsert, nothing dropped) — no confirmation to give")
 		}
-		if err := guardSeedEnv(d.lwDir); err != nil {
+		if err := guardSeedEnv(d.worktree); err != nil {
 			return err
 		}
 		return d.orch.DBSeed(ctx, d.params, dbPresetArg(inv))

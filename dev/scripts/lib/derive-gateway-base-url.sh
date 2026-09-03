@@ -6,9 +6,9 @@
 # (http://localhost:5560), which is only correct for a single worktree on
 # the default port.
 #
-# Mirrors platform/app/scripts/start.sh's own derivation exactly: PORT + 1000
-# is the API port `pnpm dev` binds its Hono backend to, so a gateway started
-# either way ends up pointed at the same place. An explicit
+# Mirrors dev/scripts/dev-stack.sh's own derivation exactly: PORT + 1000 is the
+# port `pnpm dev` binds the api lane to, so a gateway started either way ends up
+# pointed at the same place. An explicit
 # LW_GATEWAY_BASE_URL, whether inherited from the calling shell or set in
 # .env, always wins; this only fills the gap when nothing set
 # it at all.

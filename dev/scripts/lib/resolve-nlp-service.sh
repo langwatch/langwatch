@@ -2,24 +2,24 @@
 # Resolve the NLP engine address the app is going to dial, so `pnpm dev` starts
 # its engine on that port instead of one nothing talks to.
 #
-# platform/app/scripts/start.sh runs before any Node entry point, and the shell
-# never loads .env. The app does, with `override: true`
-# (platform/app/src/env-load.ts), so a LANGWATCH_NLP_SERVICE pinned in .env is
-# the address it dials and the launcher cannot see it. Without this the launcher
-# reads an unset variable, derives PORT+1, starts an engine there, and every
-# optimization-studio or playground run fails with "LangWatch NLP is
-# unreachable" while a healthy engine sits on the other port.
+# dev/scripts/dev-stack.sh runs before any Node entry point, and the shell never
+# loads .env. The applications do, with `override: true`, so a
+# LANGWATCH_NLP_SERVICE pinned in .env is the address the api lane dials and the
+# launcher cannot see it. Without this the launcher reads an unset variable,
+# derives PORT+1, starts an engine there, and every optimization-studio or
+# playground run fails with "LangWatch NLP is unreachable" while a healthy
+# engine sits on the other port.
 #
-# Precedence mirrors env-load.ts exactly, because the goal is to predict what
-# the app will resolve: .env.portless (the haven overlay, loaded last) beats
-# .env, and both beat the calling shell. Leaving the variable untouched means
-# nothing pinned an address, which is the launcher's cue to derive PORT+1 and
-# point the app at it.
+# Precedence mirrors the applications' own load order, because the goal is to
+# predict what they will resolve: .env.portless (the haven overlay, loaded last)
+# beats .env, and both beat the calling shell. Leaving the variable untouched
+# means nothing pinned an address, which is the launcher's cue to derive PORT+1
+# and point the api lane at it.
 #
-# Usage from platform/app/scripts/start.sh:
+# Usage from dev/scripts/dev-stack.sh:
 #
-#   . "$(dirname "$0")/../../../dev/scripts/lib/resolve-nlp-service.sh"
-#   resolve_nlp_service "$(dirname "$0")/.."
+#   . "$(dirname "$0")/lib/resolve-nlp-service.sh"
+#   resolve_nlp_service "$REPO_ROOT"
 
 # Reads LANGWATCH_NLP_SERVICE out of one env file the way dotenv would: last
 # assignment wins, an optional `export` prefix, single or double quotes, and an
@@ -53,10 +53,11 @@ _nlp_service_from_env_file() {
 }
 
 resolve_nlp_service() {
-  local app_dir="${1:-.}"
+  # The workspace root: both env layers live beside each other there now.
+  local repo_root="${1:-.}"
   local file value
 
-  for file in "$app_dir/.env.portless" "$app_dir/.env"; do
+  for file in "$repo_root/.env.portless" "$repo_root/.env"; do
     if value=$(_nlp_service_from_env_file "$file"); then
       export LANGWATCH_NLP_SERVICE="$value"
       echo "  ✓ nlpgo: LANGWATCH_NLP_SERVICE=${value} (from $(basename "$file"))"

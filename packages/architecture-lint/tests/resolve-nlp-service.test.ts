@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Tests for dev/scripts/lib/resolve-nlp-service.sh, sourced the way
- * platform/app/scripts/start.sh sources it: before the launcher decides which
+ * dev/scripts/dev-stack.sh sources it: before the launcher decides which
  * port to start the Go NLP engine on. The launcher runs ahead of every Node
  * entry point and sees only the calling shell, while the app loads .env (then
  * the .env.portless haven overlay) with override, so the helper has to read
