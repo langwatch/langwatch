@@ -14,7 +14,7 @@ sidebarTitle: Streaming
 | `POST /v1beta/models/{model}:streamGenerateContent` | The method name. The Gemini SDKs call it for you |
 | `POST /v1beta/models/{model}:streamGenerateAnswer` | The method name |
 
-`/v1/embeddings`, `/v1/audio/*` and `/v1/models` return one response and never stream.
+`/v1/embeddings`, `/v1/audio/*`, `/v1/images/*` and `/v1/models` return one response and never stream. On the image routes a `stream` of `true`, or a `partial_images` above zero, answers `400` before any provider is contacted.
 
 ## Start a stream
 

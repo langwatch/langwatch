@@ -672,6 +672,7 @@
               "ai-gateway/api/responses",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/audio",
+              "ai-gateway/api/images",
               "ai-gateway/api/elevenlabs",
               "ai-gateway/api/realtime",
               "ai-gateway/api/gemini-native",
@@ -1640,7 +1641,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1788364549",
+      "source": "/ci/cache/busted/1788455322",
       "destination": "/introduction"
     },
     {

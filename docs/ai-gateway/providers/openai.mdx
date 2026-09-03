@@ -4,7 +4,7 @@ description: Configure OpenAI as a provider behind the LangWatch AI Gateway.
 sidebarTitle: OpenAI
 ---
 
-OpenAI needs only an API key to bind to the gateway. Any valid OpenAI API key in your LangWatch Model Providers table can be referenced by a virtual key and consumed via `/v1/chat/completions`, `/v1/embeddings`, `/v1/responses`, `/v1/images/generations`, `/v1/audio/transcriptions`, and `/v1/audio/speech`.
+OpenAI needs only an API key to bind to the gateway. Any valid OpenAI API key in your LangWatch Model Providers table can be referenced by a virtual key and consumed via `/v1/chat/completions`, `/v1/embeddings`, `/v1/responses`, `/v1/images/generations`, `/v1/images/edits`, `/v1/audio/transcriptions`, and `/v1/audio/speech`.
 
 ## Configure the provider credential
 
@@ -34,10 +34,10 @@ Per-VK overrides available on the binding:
 | `POST /v1/chat/completions` | `POST /v1/chat/completions` | Streaming and non-streaming both supported. |
 | `POST /v1/responses` | `POST /v1/responses` | Reasoning models (o3, o4-mini) and tool use. |
 | `POST /v1/embeddings` | `POST /v1/embeddings` | `text-embedding-3-small`, `text-embedding-3-large`, ada. |
-| `POST /v1/images/generations` | `POST /v1/images/generations` | DALL-E 3. |
+| `POST /v1/images/generations` | `POST /v1/images/generations` | `gpt-image-2`, `gpt-image-1` and `gpt-image-1-mini`. See [Images](/ai-gateway/api/images). |
+| `POST /v1/images/edits` | `POST /v1/images/edits` | Multipart edit on the same models. |
 | `POST /v1/audio/transcriptions` | `POST /v1/audio/transcriptions` | Whisper. |
 | `POST /v1/audio/speech` | `POST /v1/audio/speech` | TTS. |
-| `POST /v1/moderations` | `POST /v1/moderations` | Content moderation. |
 | `GET /v1/models` | `GET /v1/models` | Filtered by the VK's `models_allowed`. |
 
 ## Caching

@@ -282,6 +282,61 @@ describe("resolveCacheWrite1hRate", () => {
   });
 });
 
+describe("image token rates in the static registry", () => {
+  const costs = getStaticModelCosts();
+  const findByModel = (modelId: string) =>
+    costs.find((c) => c.model === modelId);
+  const match = (model: string) => matchModelCostWithFallbacks(model, costs);
+
+  describe("given the token-billed image models the overlay carries", () => {
+    describe("when the registry is built", () => {
+      it("maps the catalog's image rates onto the input and output image rates", () => {
+        // Per token, from OpenAI's pricing page.
+        const expected: Record<
+          string,
+          { text: number; imageIn: number; imageOut: number }
+        > = {
+          "openai/gpt-image-2": { text: 5e-6, imageIn: 8e-6, imageOut: 3e-5 },
+          "openai/gpt-image-1": { text: 5e-6, imageIn: 1e-5, imageOut: 4e-5 },
+          "openai/gpt-image-1-mini": {
+            text: 2e-6,
+            imageIn: 2.5e-6,
+            imageOut: 8e-6,
+          },
+        };
+        for (const [id, rates] of Object.entries(expected)) {
+          const entry = findByModel(id);
+          expect(entry, `${id} missing from the cost registry`).toBeDefined();
+          expect(entry?.inputCostPerToken).toBe(rates.text);
+          expect(entry?.outputCostPerToken).toBe(0);
+          expect(entry?.inputImageCostPerToken).toBe(rates.imageIn);
+          expect(entry?.outputImageCostPerToken).toBe(rates.imageOut);
+        }
+      });
+
+      it("matches each image model to its own rule, bare or vendor-prefixed", () => {
+        expect(match("gpt-image-2")?.model).toBe("openai/gpt-image-2");
+        expect(match("openai/gpt-image-1")?.model).toBe("openai/gpt-image-1");
+        // The mini id starts with the full id, so prefix matching must not
+        // hand it the larger model's rate.
+        expect(match("gpt-image-1-mini")?.model).toBe(
+          "openai/gpt-image-1-mini",
+        );
+      });
+    });
+  });
+
+  describe("given a chat model", () => {
+    describe("when the registry is built", () => {
+      it("carries no image rate", () => {
+        const entry = findByModel("openai/gpt-4o");
+        expect(entry?.inputImageCostPerToken).toBeUndefined();
+        expect(entry?.outputImageCostPerToken).toBeUndefined();
+      });
+    });
+  });
+});
+
 describe("audio token rates in the static registry", () => {
   const costs = getStaticModelCosts();
   const findByModel = (modelId: string) =>

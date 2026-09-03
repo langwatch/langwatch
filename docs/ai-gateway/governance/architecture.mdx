@@ -10,7 +10,7 @@ The LangWatch AI Gateway is two processes. The gateway service is a Go binary on
 
 | Component | Where it runs | What it does |
 |---|---|---|
-| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics`. |
+| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics`. |
 | Request pipeline | Inside the gateway service | Runs each request through interceptors in this order: spend admission, rate limit, policy rules, model resolution, cache rules, budget precheck, guardrails, trace span, then the provider dispatch. |
 | Provider dispatch | Inside the gateway service | Sends the request to the first credential in the routing chain through Bifrost and falls through to the next credential on a provider failure. A per-credential circuit breaker opens after 10 failures in 30 seconds and lets one probe through every 60 seconds. |
 | Auth cache | Inside the gateway service | Caches resolved virtual keys in an in-memory LRU of 10,000 entries. See [Auth cache](#auth-cache). |

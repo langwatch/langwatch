@@ -453,6 +453,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [POST /v1/responses](https://langwatch.ai/docs/ai-gateway/api/responses.md): OpenAI Responses API through the LangWatch AI Gateway, for OpenAI, Azure OpenAI and codex models.
 - [POST /v1/embeddings](https://langwatch.ai/docs/ai-gateway/api/embeddings.md): OpenAI-compatible embeddings endpoint through the LangWatch AI Gateway.
 - [POST /v1/audio/*](https://langwatch.ai/docs/ai-gateway/api/audio.md): Speech synthesis and transcription through the LangWatch AI Gateway on OpenAI's wire, served by OpenAI and ElevenLabs.
+- [POST /v1/images/*](https://langwatch.ai/docs/ai-gateway/api/images.md): Image generation and editing through the LangWatch AI Gateway, on OpenAI's wire.
 - [ElevenLabs API paths](https://langwatch.ai/docs/ai-gateway/api/elevenlabs.md): ElevenLabs' own synthesis, transcription and post-call webhook paths, served by the LangWatch AI Gateway so an ElevenLabs SDK is metered by changing only its base URL and key.
 - [Realtime voice](https://langwatch.ai/docs/ai-gateway/api/realtime.md): Mint a vendor session credential on a virtual key, so voice spend lands under a budget while the media socket runs client to vendor.
 - [Gemini native (/v1beta)](https://langwatch.ai/docs/ai-gateway/api/gemini-native.md): Google's generative-language API paths, forwarded by the LangWatch AI Gateway to a Gemini or Vertex credential without translation.

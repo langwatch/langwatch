@@ -2154,6 +2154,125 @@ Google's own errors are forwarded with Google's status, body and headers, under 
 
 ---
 
+# FILE: ./ai-gateway/api/images.mdx
+
+---
+title: POST /v1/images/*
+description: Image generation and editing through the LangWatch AI Gateway, on OpenAI's wire.
+sidebarTitle: Images
+---
+
+Point your client's `OPENAI_BASE_URL` at the gateway and its `OPENAI_API_KEY` at a LangWatch virtual key. Any client that speaks OpenAI's images API then works with no other code change. These routes get the same governance as chat: virtual-key auth, model allowlists, budgets, rate limits and per-call observability.
+
+Neither route streams. A `stream` of `true`, or a `partial_images` above zero, answers `400` before any provider is contacted.
+
+## Models
+
+Use `openai/gpt-image-2`, `openai/gpt-image-1` or `openai/gpt-image-1-mini` on either route. The cost catalog holds rates for those three. Another OpenAI image model still reaches the provider, and its tokens cost zero until someone adds a catalog entry for it.
+
+Add the OpenAI key once under **Settings > Model Providers**. Every virtual key routed to that provider can then call its image models.
+
+## Generation
+
+```
+POST /v1/images/generations
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: application/json
+```
+
+Body matches OpenAI's [image generation schema](https://developers.openai.com/api/reference/resources/images/methods/generate/).
+
+```bash
+curl https://gateway.langwatch.ai/v1/images/generations \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-image-2",
+    "prompt": "a red bicycle leaning on a white wall",
+    "size": "1024x1024",
+    "quality": "low",
+    "n": 1
+  }'
+```
+
+The response is the standard images JSON, with the base64 image in `data[0].b64_json`.
+
+```javascript
+const image = await client.images.generate({
+  model: "openai/gpt-image-2",
+  prompt: "a red bicycle leaning on a white wall",
+  size: "1024x1024",
+  quality: "low",
+  n: 1,
+});
+const png = Buffer.from(image.data[0].b64_json, "base64");
+```
+
+`response_format` is forwarded only when you send it. The gpt-image family rejects the field and answers in base64; the older dall-e models take it and default to `url`. A value the gateway invented would break one family or the other, so it never sets one.
+
+## Editing
+
+```
+POST /v1/images/edits
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: multipart/form-data
+```
+
+Form matches OpenAI's [image edit schema](https://developers.openai.com/api/reference/resources/images/methods/edit/): one or more `image[]` parts, a `prompt` part, and `model`. A single file may also be sent under `image`. Use one field name or the other. A form that sends files under both answers `400`, because each field orders its own parts and there is no order between the two fields. The optional parts are `mask`, `n`, `size`, `quality`, `background`, `input_fidelity`, `output_format`, `output_compression`, `response_format` and `user`. A part this list does not name is dropped rather than sent to the provider; `stream` and `partial_images` are the exception, and get the same `400` the generation route gives them. `response_format` reaches the provider as sent, and the gpt-image models reject it on this route as well.
+
+```bash
+curl https://gateway.langwatch.ai/v1/images/edits \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -F "model=openai/gpt-image-2" \
+  -F "prompt=put the bicycle on a sandy beach" \
+  -F "size=1024x1024" \
+  -F "image[]=@bicycle.png" \
+  -F "mask=@mask.png"
+```
+
+```javascript
+const edited = await client.images.edit({
+  model: "openai/gpt-image-2",
+  prompt: "put the bicycle on a sandy beach",
+  image: [await toFile(fs.createReadStream("bicycle.png"), "bicycle.png")],
+  size: "1024x1024",
+});
+```
+
+This route caps the whole upload at 64 MiB. A larger one answers `413 payload_too_large` before any provider is contacted.
+
+## Request and response headers
+
+The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
+
+Both routes return the same response headers as [Chat Completions](/ai-gateway/api/chat-completions#response-headers): `X-LangWatch-Gateway-Version`, `X-LangWatch-Gateway-Request-Id`, `X-LangWatch-Fallback-Count`, `X-LangWatch-Budget-Warning`, `Traceparent`, `X-LangWatch-Heartbeat-Active`, and `X-LangWatch-Provider` on a forwarded provider error. `X-LangWatch-Handled-Error` carries the `error.code` when the gateway wrote the error itself, and is removed from a forwarded provider response.
+
+## Errors
+
+Codes these routes raise before the provider is called: `missing_model`, `model_not_allowed`, `model_provider_not_bound`, `model_not_recognized`, `bad_request` and `end_user_required`, all `400`, plus `payload_too_large` at `413` on an oversized edit upload. A provider's own error is forwarded with its status and body. The full table is on [Errors](/ai-gateway/api/errors).
+
+## Credentials
+
+These routes take a direct OpenAI, Azure OpenAI, Gemini, Vertex or Bedrock credential. The three models above are OpenAI's, so a direct OpenAI credential is what most callers need.
+
+An OpenAI credential that sets a base-URL override routes to the generic OpenAI-compatible adapter, which serves no image endpoint. The gateway refuses that credential and names the ones that work.
+
+## Observability and cost measures
+
+An image call produces a gateway trace, the same as a chat call. The gateway reports image tokens separately from the text totals, because an output image token costs several times a text one:
+
+| Attribute | Meaning |
+|---|---|
+| `gen_ai.usage.input_image_tokens` | Image tokens in the prompt. On an edit, this is what you pay to read the images you sent |
+| `gen_ai.usage.output_image_tokens` | Image tokens in the answer. This is what you pay for each generated image |
+| `gen_ai.usage.image_count` | The number of images in the response |
+
+The span records your prompt as its input. The response body is base64 image data, which the gateway never writes to a span. When the model returns a revised prompt, that revised prompt is the span's output.
+
+**Also check:** [Errors](/ai-gateway/api/errors), [Observability](/ai-gateway/observability), [Model aliases](/ai-gateway/model-aliases).
+
+---
+
 # FILE: ./ai-gateway/api/management.mdx
 
 ---
@@ -5513,7 +5632,7 @@ The LangWatch AI Gateway is two processes. The gateway service is a Go binary on
 
 | Component | Where it runs | What it does |
 |---|---|---|
-| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics`. |
+| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics`. |
 | Request pipeline | Inside the gateway service | Runs each request through interceptors in this order: spend admission, rate limit, policy rules, model resolution, cache rules, budget precheck, guardrails, trace span, then the provider dispatch. |
 | Provider dispatch | Inside the gateway service | Sends the request to the first credential in the routing chain through Bifrost and falls through to the next credential on a provider failure. A per-credential circuit breaker opens after 10 failures in 30 seconds and lets one probe through every 60 seconds. |
 | Auth cache | Inside the gateway service | Caches resolved virtual keys in an in-memory LRU of 10,000 entries. See [Auth cache](#auth-cache). |
@@ -7027,7 +7146,7 @@ Now an OpenAI-SDK client that sends `model: "gpt-4o"` reaches the correct Azure 
 
 Identical to OpenAI direct:
 
-- `/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`, `/v1/images/generations`, `/v1/audio/*`, `/v1/moderations`.
+- `/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`, `/v1/images/generations`, `/v1/images/edits`, `/v1/audio/*`.
 
 The gateway translates the outgoing path + query string to Azure's format (`/openai/deployments/{deployment}/chat/completions?api-version=...`).
 
@@ -7371,7 +7490,7 @@ description: Configure OpenAI as a provider behind the LangWatch AI Gateway.
 sidebarTitle: OpenAI
 ---
 
-OpenAI needs only an API key to bind to the gateway. Any valid OpenAI API key in your LangWatch Model Providers table can be referenced by a virtual key and consumed via `/v1/chat/completions`, `/v1/embeddings`, `/v1/responses`, `/v1/images/generations`, `/v1/audio/transcriptions`, and `/v1/audio/speech`.
+OpenAI needs only an API key to bind to the gateway. Any valid OpenAI API key in your LangWatch Model Providers table can be referenced by a virtual key and consumed via `/v1/chat/completions`, `/v1/embeddings`, `/v1/responses`, `/v1/images/generations`, `/v1/images/edits`, `/v1/audio/transcriptions`, and `/v1/audio/speech`.
 
 ## Configure the provider credential
 
@@ -7401,10 +7520,10 @@ Per-VK overrides available on the binding:
 | `POST /v1/chat/completions` | `POST /v1/chat/completions` | Streaming and non-streaming both supported. |
 | `POST /v1/responses` | `POST /v1/responses` | Reasoning models (o3, o4-mini) and tool use. |
 | `POST /v1/embeddings` | `POST /v1/embeddings` | `text-embedding-3-small`, `text-embedding-3-large`, ada. |
-| `POST /v1/images/generations` | `POST /v1/images/generations` | DALL-E 3. |
+| `POST /v1/images/generations` | `POST /v1/images/generations` | `gpt-image-2`, `gpt-image-1` and `gpt-image-1-mini`. See [Images](/ai-gateway/api/images). |
+| `POST /v1/images/edits` | `POST /v1/images/edits` | Multipart edit on the same models. |
 | `POST /v1/audio/transcriptions` | `POST /v1/audio/transcriptions` | Whisper. |
 | `POST /v1/audio/speech` | `POST /v1/audio/speech` | TTS. |
-| `POST /v1/moderations` | `POST /v1/moderations` | Content moderation. |
 | `GET /v1/models` | `GET /v1/models` | Filtered by the VK's `models_allowed`. |
 
 ## Caching
@@ -7453,7 +7572,7 @@ This means: rotating the raw OpenAI key rotates it everywhere; changing a rate l
 
 | Provider | Routes supported | Auth methods | Caching passthrough |
 |---|---|---|---|
-| [OpenAI](/ai-gateway/providers/openai) | chat, responses, embeddings, images, audio, moderations | API key | auto-prefix |
+| [OpenAI](/ai-gateway/providers/openai) | chat, responses, embeddings, images, audio | API key | auto-prefix |
 | [Anthropic](/ai-gateway/providers/anthropic) | messages, chat (translated), streaming | API key | `cache_control` blocks |
 | [Azure OpenAI](/ai-gateway/providers/azure-openai) | chat, responses, embeddings, images, audio | API key, AAD | auto-prefix |
 | [AWS Bedrock](/ai-gateway/providers/bedrock) | messages, chat, embeddings (Titan) | AWS SigV4, IRSA | `cachePoint` |
@@ -8807,7 +8926,7 @@ The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_pla
 
 | Path | Match | Routes |
 |---|---|---|
-| `/v1` | `Prefix` | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/models`, the realtime and ElevenLabs routes |
+| `/v1` | `Prefix` | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
 | `/health` | `Exact`, only with `ingress.healthPath.enabled: true` | The public status endpoint for uptime monitors |
 
 `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the default ingress; `ingress.path: /` publishes every route, including the probes and `/metrics`.
@@ -9598,7 +9717,7 @@ sidebarTitle: Streaming
 | `POST /v1beta/models/{model}:streamGenerateContent` | The method name. The Gemini SDKs call it for you |
 | `POST /v1beta/models/{model}:streamGenerateAnswer` | The method name |
 
-`/v1/embeddings`, `/v1/audio/*` and `/v1/models` return one response and never stream.
+`/v1/embeddings`, `/v1/audio/*`, `/v1/images/*` and `/v1/models` return one response and never stream. On the image routes a `stream` of `true`, or a `partial_images` above zero, answers `400` before any provider is contacted.
 
 ## Start a stream
 

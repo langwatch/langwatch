@@ -24,7 +24,7 @@ This means: rotating the raw OpenAI key rotates it everywhere; changing a rate l
 
 | Provider | Routes supported | Auth methods | Caching passthrough |
 |---|---|---|---|
-| [OpenAI](/ai-gateway/providers/openai) | chat, responses, embeddings, images, audio, moderations | API key | auto-prefix |
+| [OpenAI](/ai-gateway/providers/openai) | chat, responses, embeddings, images, audio | API key | auto-prefix |
 | [Anthropic](/ai-gateway/providers/anthropic) | messages, chat (translated), streaming | API key | `cache_control` blocks |
 | [Azure OpenAI](/ai-gateway/providers/azure-openai) | chat, responses, embeddings, images, audio | API key, AAD | auto-prefix |
 | [AWS Bedrock](/ai-gateway/providers/bedrock) | messages, chat, embeddings (Titan) | AWS SigV4, IRSA | `cachePoint` |
