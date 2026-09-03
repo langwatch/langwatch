@@ -1,4 +1,8 @@
+import { builtinRolePermissions } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
+import { isOrgExclusivePermission } from "~/server/api/rbac";
+import type { Permission } from "~/server/api/rbac";
+import { defaultCliKeyPermissions } from "~/server/api-key/cli-key-defaults";
 import { defaultCliKeyScopes } from "../cliKeyScopeDefaults";
 
 describe("defaultCliKeyScopes()", () => {
@@ -190,6 +194,33 @@ describe("defaultCliKeyScopes()", () => {
         { scopeType: "TEAM", scopeId: "team-1" },
         { scopeType: "PROJECT", scopeId: "proj-personal" },
       ]);
+    });
+  });
+
+  describe("mintability of the organization-chip fallback", () => {
+    // The cross-layer pin for the fallback: the screen's permission list is
+    // `defaultCliKeyPermissions()` intersected with the chip's ceiling, and
+    // the mint (`filterToGrantable`) keeps org-exclusive permissions only
+    // when an ORGANIZATION binding is selected. If either fact drifts, the
+    // fallback chip renders an approve button that can never be enabled, or
+    // the approval 422s server-side — both are the dead end this exists to
+    // prevent.
+    it("keeps the org-member bag inside the CLI defaults, so the chip's approval carries permissions", () => {
+      const defaults = new Set<string>(defaultCliKeyPermissions());
+      const bag = [...builtinRolePermissions("org-member")];
+      expect(bag.length).toBeGreaterThan(0);
+      expect(bag.filter((p) => defaults.has(p))).toEqual(bag);
+    });
+
+    it("holds a bag that is entirely org-exclusive, so a TEAM or PROJECT chip could never mint it", () => {
+      // This is why the fallback offers the ORGANIZATION chip and why a
+      // personal project without its TEAM binding row is skipped: the mint
+      // strips org-exclusive permissions from selections with no
+      // ORGANIZATION binding, and this bag has nothing else to give.
+      const bag = [...builtinRolePermissions("org-member")];
+      expect(
+        bag.filter((p) => isOrgExclusivePermission(p as Permission)),
+      ).toEqual(bag);
     });
   });
 
