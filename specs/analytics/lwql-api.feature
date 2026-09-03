@@ -840,6 +840,25 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the database engine is unchanged
     And provisioning against a database name that differs from the connection URL's is refused
 
+  # P1 (#6635): under LWQL_SELF_PROVISION every app pod runs the convergence at
+  # boot, and it is destructive (CREATE USER OR REPLACE, drop/recreate the
+  # PostgreSQL-engine tables, grants, row policies). Two pods running it at once
+  # race — one recreating the restricted identity while another queries through
+  # it mid-drop. A single global Postgres advisory lock gates entry so the
+  # sequence runs one pod at a time; the convergence is idempotent, so the pod
+  # that waits simply re-runs it.
+  @integration
+  Scenario: Concurrent self-provision runs are serialized by the advisory lock
+    Given two pods run the LangWatchQL self-provision convergence at the same time
+    Then the two locked bodies never overlap
+    And one run finishes before the other starts
+
+  @integration
+  Scenario: The lock is a transaction-scoped Postgres advisory lock on the global key
+    Given a pod holds the LangWatchQL self-provision lock inside its transaction
+    Then another connection cannot acquire the same key while it is held
+    And the key becomes acquirable again once the transaction ends
+
 # --- AC Coverage Map ---
 # Issue #6480 ACs → scenarios (grouped as in the issue body).
 #
