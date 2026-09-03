@@ -249,9 +249,9 @@ Feature: Token Created modal command snippets
 
   @unit
   Scenario: No new highlighting library is added
-    # Verifiable by grepping platform/app/package.json: no new syntax-highlighting dependency added.
+    # Verifiable by grepping packages/design-system/package.json: no new syntax-highlighting dependency added.
     When this feature is implemented
-    Then no syntax-highlighting library other than Shiki appears in platform/app/package.json
+    Then no syntax-highlighting library other than Shiki appears in packages/design-system/package.json
 
   # ─────────────────────────────────────────────────────────────────────
   # THE ONE-TIME REVEAL. A minted token reaches the browser exactly once,

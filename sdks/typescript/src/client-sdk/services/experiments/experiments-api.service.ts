@@ -160,7 +160,7 @@ export interface ExperimentRunsListResponse {
  * Per-row results for a completed experiment run.
  *
  * Mirrors `ExperimentRunWithItems` from the control plane
- * (`platform/app/src/server/experiments-v3/services/types.ts`). Hand-written
+ * (`packages/features/experiment/contract/src/experiment-run.ts`). Hand-written
  * because the `/runs/{runId}/results` route is not yet exposed via the
  * generated OpenAPI types.
  */

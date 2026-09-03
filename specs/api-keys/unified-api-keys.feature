@@ -391,7 +391,7 @@ Feature: Unified API Keys
     Then I get nothing back, so the two cases are indistinguishable
 
   # ─────────────────────────────────────────────────────────────────────
-  # The page, as it behaves after the family moved out of `platform/app`.
+  # The page, as it behaves after the family moved out of `[gone]`.
   # Every one of these held before the move and none was written down: the
   # move is where somebody finally read both halves.
   # ─────────────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ Feature: Shareable privacy rule drawer
   # the policy snapshot the page already read, never from in-memory state.
   #
   # WHICH parameter carries it is not the promise. It was the application's
-  # shared drawer address while the page lived in `platform/app`, and it is the
+  # shared drawer address while the page lived in `[gone]`, and it is the
   # page's own `?rule=` now that the page owns the overlay; both satisfy every
   # scenario below, which is why they are written about the address rather than
   # about a parameter name.

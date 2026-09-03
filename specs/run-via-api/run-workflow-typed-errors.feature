@@ -5,8 +5,8 @@ Feature: Running a workflow via the API surfaces typed errors
   So that I can tell "fix your request" apart from "something broke on your end"
 
   # Implementation:
-  #   platform/app/src/server/workflows/runWorkflow.ts
-  #   platform/app/src/server/routes/misc.ts  (handleWorkflowRun — must not
+  #   [gone] src/server/workflows/runWorkflow.ts
+  #   [gone] src/server/routes/misc.ts  (handleWorkflowRun — must not
   #     swallow the typed error into a flat 500)
 
   Scenario: Running a nonexistent workflow returns 404

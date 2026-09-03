@@ -8,15 +8,16 @@
  * tables to find that out. The engines that USE these lists live behind
  * `@langwatch/redaction/pii`.
  *
- * The application's copies are `ESSENTIAL_PII_ENTITIES` in
- * `platform/app/src/server/data-privacy/redaction/essentialPii.ts` and
- * `PRESIDIO_STRICT_ENTITIES` in
- * `platform/app/src/server/tracer/collector/piiCheck.ts`, with the strict-only
- * difference derived in `app-layer/traces/span-pii-redaction.service.ts`. All
- * three stay as they are while both graphs redact, and all three are pinned
- * here by literal: an identifier that quietly leaves one list stops being
- * detected, and a span that was never scanned for it looks exactly like a span
- * that was scanned and found clean.
+ * There used to be a second copy of each list in the application's ingestion
+ * path. Both are gone: these are the only declarations, and the consumers
+ * import them —
+ * `apps/worker/src/platform/infrastructure/worker-pii-analysis.adapter.ts`
+ * takes `PRESIDIO_STRICT_ENTITIES` from here rather than restating it, and the
+ * strict-only difference is derived in
+ * `packages/features/data-privacy/server/src/services/otlp-span-pii-redaction.service.ts`.
+ * They stay pinned here by literal all the same: an identifier that quietly
+ * leaves a list stops being detected, and a span that was never scanned for it
+ * looks exactly like a span that was scanned and found clean.
  */
 
 /** Identifiers the native, in-process engine detects (pattern + checksum based). */

@@ -395,7 +395,7 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
 
   # ─────────────────────────────────────────────────────────────────────
   # The authorize screen's own states, written down when the page moved
-  # out of `platform/app`. The wire underneath them — the three routes and
+  # out of `[gone]`. The wire underneath them — the three routes and
   # their bodies — is unchanged, because the published CLI polls the other
   # side of it.
   # ─────────────────────────────────────────────────────────────────────

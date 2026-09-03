@@ -8,7 +8,7 @@ Feature: Fresh-clone dev setup friction removal
   # Friction #4 (DB ports) shipped via PR #3860.
 
   # --- Friction #1: ALREADY RESOLVED ON MAIN (2026-05-21) ---
-  # Direct verification of platform/app/package.json on the issue3903 branch (at main HEAD)
+  # Direct verification of packages/design-system/package.json on the issue3903 branch (at main HEAD)
   # found no top-level "overrides" key. Only "pnpm.overrides" remains, which is the
   # canonical pnpm v10 location and not dead code. No fix needed; AC #1 and AC #2 are
   # marked resolved in the issue body. Scenarios moved here as historical context.
@@ -48,7 +48,7 @@ Feature: Fresh-clone dev setup friction removal
 
   @unit
   Scenario: No postinstall script reaches the network to download goose
-    Given the file "platform/app/package.json"
+    Given every tracked "package.json" in the workspace
     When the "scripts.postinstall" and "scripts.prepare" fields are inspected
     Then no script downloads a binary from the network
     And goose installation is left to the host (out of scope here)

@@ -459,14 +459,16 @@ func TestConfigWire_KeyExpiry(t *testing.T) {
 // design and therefore silent: the cap would quietly stop following a changed
 // date. Pin both the field and its unit.
 func TestControlPlaneMaterialiserEmitsTheKeyExpiry(t *testing.T) {
-	src := readControlPlaneSource(t, "src", "server", "gateway", "config.materialiser.ts")
+	src := readControlPlaneSource(t,
+		"packages", "features", "gateway", "server", "src", "services",
+		"gateway-config-materialisation.service.ts")
 
 	// Whitespace-tolerant: a formatter may break the expression across lines
 	// without breaking the contract it expresses.
 	if !regexp.MustCompile(`expires_at:\s*expiresAtWire\(\s*vk\.expiresAt\s*\)`).MatchString(src) {
-		t.Error("config.materialiser.ts no longer emits expires_at from the key's own date")
+		t.Error("gateway-config-materialisation.service.ts no longer emits expires_at from the key's own date")
 	}
 	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.getTime\(\)\s*/\s*1000\s*\)`).MatchString(src) {
-		t.Error("config.materialiser.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
+		t.Error("gateway-config-materialisation.service.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")
 	}
 }

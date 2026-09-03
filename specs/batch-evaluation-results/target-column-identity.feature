@@ -6,7 +6,7 @@ Feature: Target column identity on the results page
   # A board can hold two targets with the identical stored name, for example
   # the same prompt added twice with a different configuration. The workbench
   # already tells them apart with a "(1)" / "(2)" suffix added at display time
-  # (platform/app/src/experiments-v3/utils/variantDisambiguation.ts). The
+  # (packages/features/experiment/contract/src/workbench/variant-disambiguation.ts). The
   # results page must read the same way.
   #
   # A run also carries the whole board in its Targets snapshot, even when the

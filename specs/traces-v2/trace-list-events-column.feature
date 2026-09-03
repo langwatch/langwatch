@@ -1,9 +1,9 @@
 # Trace list Events column — Gherkin Spec
 # Implementation:
-#   platform/app/src/features/traces-v2/components/TraceTable/registry/cells/trace/EventsCell.tsx
-#   platform/app/src/features/traces-v2/hooks/useTraceListEvents.ts
-#   platform/app/src/server/api/routers/tracesV2.ts (`listEvents`)
-#   platform/app/src/server/app-layer/traces/repositories/span-storage.clickhouse.repository.ts
+#   packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/events-cell.tsx
+#   packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-list-events.ts
+#   [gone] src/server/api/routers/tracesV2.ts (`listEvents`)
+#   [gone] src/server/app-layer/traces/repositories/span-storage.clickhouse.repository.ts
 #
 # Trace-level events are OTel span events, stored on `stored_spans`. They are
 # deliberately NOT folded onto `trace_summaries` (that hoist grew the fold

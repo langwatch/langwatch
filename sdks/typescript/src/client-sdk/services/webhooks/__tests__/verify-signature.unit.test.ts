@@ -4,7 +4,7 @@
  * The cases are not written here. They are read from
  * `specs/webhooks/signature-vectors.json`, which is generated from the
  * server's signing code by
- * `platform/app/src/tasks/generateWebhookSignatureVectors.ts` and asserted
+ * `packages/egress/src/webhook/signature-vectors.ts` and asserted
  * against that code by a suite on the platform side. Three implementations
  * agreeing with their own local idea of the algorithm is not agreement, so
  * this suite and the Python one read the SAME file and neither can be made

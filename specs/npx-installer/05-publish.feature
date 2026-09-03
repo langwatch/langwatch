@@ -59,7 +59,8 @@ Feature: CI smoke + publish for `@langwatch/server`
       | schedule          | "0 4 * * *" (nightly, UTC)                                                |
       | push paths        | package.json, pnpm-workspace.yaml, apps/server/**                         |
       | push paths        | langwatch_nlp/pyproject.toml, services/langevals/**/pyproject.toml        |
-      | push paths        | services/aigateway/**, platform/app/package.json, platform/app/scripts/** |
+      | push paths        | services/aigateway/**, cmd/service/**                                     |
+      | push paths        | apps/api/package.json, apps/worker/package.json                           |
 
   # =========================================================================
   # Publish job
@@ -72,7 +73,7 @@ Feature: CI smoke + publish for `@langwatch/server`
     And it publishes "@langwatch/server@3.1.1" to npm
 
   Scenario: Version-lock guard refuses mismatched tag and package version
-    Given "platform/app/package.json" version is "3.1.1"
+    Given "apps/api/package.json" version is "3.1.1"
     But the release tag is "v3.2.0"
     When the publish job runs
     Then the job fails fast with "version mismatch: tag=v3.2.0 package.json=3.1.1"
@@ -89,7 +90,7 @@ Feature: CI smoke + publish for `@langwatch/server`
     And the resulting tarball contains the prebuilt client at "app/langwatch/dist/client/"
     And the tarball does NOT contain "node_modules" or build caches
     # `pnpm --filter langwatch build` would be WRONG now: since ADR-076 that
-    # filter selects the published TypeScript SDK. The app is @langwatch/web.
+    # filter selects the published TypeScript SDK. The app is the retired platform application.
 
   Scenario: Tarball contains expected directories only
     # Everything ships one level down, under app/ — npm deletes a lockfile at

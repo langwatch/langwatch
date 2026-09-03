@@ -5,8 +5,8 @@ Feature: Langy bootstraps a workbench that is missing pieces
 
   # Taught by skills/prompt-optimization/SKILL.mdx (bootstrap branches and the
   # evaluator inference table). Judge-graded conversations:
-  # platform/app/e2e/langy/langy-optimization-bootstrap.scenario.test.ts and
-  # platform/app/e2e/langy/langy-evaluator-inference.scenario.test.ts.
+  # apps/ui/e2e/langy/langy-optimization-bootstrap.scenario.test.ts and
+  # apps/ui/e2e/langy/langy-evaluator-inference.scenario.test.ts.
 
   @e2e
   Scenario: With a prompt but no dataset, Langy offers to generate an example dataset

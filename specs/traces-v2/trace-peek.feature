@@ -1,5 +1,5 @@
 # Trace Peek — Gherkin Spec
-# Implementation: platform/app/src/features/traces-v2/components/TraceIdPeek.tsx
+# Implementation: packages/features/trace/web/src/ui/sections/explorer/trace-id-peek.tsx
 #
 # IMPORTANT (audit 2026-05-01):
 # The originally-specified "pull-tab + sustained hover + peek panel inline in

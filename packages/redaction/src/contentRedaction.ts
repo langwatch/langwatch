@@ -1,24 +1,23 @@
 /**
  * The NATIVE (in-process) redaction passes, composed for one resolved policy.
  *
- * Harvested byte-for-byte from
- * `platform/app/src/server/data-privacy/redaction/applyContentRedaction.ts`,
- * which stays as it is while both graphs redact: the application's ingestion
- * path and a worker composed from packages must scrub the same substring of
- * the same attribute, or one process stores what the other removed.
+ * This module was harvested byte-for-byte from the application's ingestion
+ * path while both graphs redacted. That second copy is gone: this package is
+ * now the only declaration of these passes, and every process that scrubs a
+ * span imports it, so the two cannot drift into storing what the other
+ * removed.
  *
- * TWO DELIBERATE DIFFERENCES, both mechanical:
+ * TWO SHAPE CONSTRAINTS SURVIVE THE HARVEST, both mechanical:
  *
- *  - The application imports `ResolvedDataPrivacy` from its own
- *    `dataPrivacy.types`, which is the same shape as the contract's. This
- *    package cannot name either: `@langwatch/data-privacy-contract` already
- *    depends on `@langwatch/redaction` for `REDACTION_MARKER_ENTITIES`, so
- *    importing it back would close a cycle. {@link RedactionPolicy} is the
- *    read-only slice these functions actually touch, and a `ResolvedDataPrivacy`
- *    satisfies it structurally — no cast at any call site.
- *  - The application's copy carries an unused import of
- *    `PROVENANCE_ATTR_API_KEY_ID`; nothing in the module references it, and
- *    keeping it would drag an ingest route into a dependency-light package.
+ *  - The policy is read structurally rather than by importing
+ *    `ResolvedDataPrivacy`. This package cannot name it:
+ *    `@langwatch/data-privacy-contract` already depends on
+ *    `@langwatch/redaction` for `REDACTION_MARKER_ENTITIES`, so importing it
+ *    back would close a cycle. {@link RedactionPolicy} is the read-only slice
+ *    these functions actually touch, and a `ResolvedDataPrivacy` satisfies it
+ *    structurally — no cast at any call site.
+ *  - Nothing here references `PROVENANCE_ATTR_API_KEY_ID`, and naming it would
+ *    drag an ingest route into a dependency-light package.
  */
 
 import {

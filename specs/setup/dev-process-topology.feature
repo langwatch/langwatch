@@ -1,5 +1,5 @@
 # Replaces specs/setup/in-process-workers-dev.feature, which described a mode
-# that no longer exists. `platform/app` is gone; the product is three Node
+# that no longer exists. `[gone]` is gone; the product is three Node
 # applications, and each is its own process in development exactly as it is in
 # production. See dev/docs/adr/004-docker-dev-environment.md
 # ("Amendment: three processes, no in-process worker, 2026-09-03").

@@ -6,7 +6,7 @@ Feature: Python SDK Experiment.print_summary for CI/CD parity
   # All `@unimplemented` scenarios in this file describe Python SDK
   # behaviour. The check-feature-parity script only scans
   # `*.test.ts/tsx` files (`TEST_FILE_RE` in
-  # platform/app/scripts/check-feature-parity.ts) under the configured
+  # packages/architecture-lint/src/check-feature-parity.ts) under the configured
   # test roots, so JSDoc `@scenario` markers in `sdks/python/tests/
   # *.py` would not be discovered. Adding a `*.py` test scanner +
   # docstring-tag parser is the structural fix; tracked separately.

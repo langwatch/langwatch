@@ -1,7 +1,7 @@
 Feature: The analytics pages
 
   The nine analytics addresses are served from `@langwatch/analytics-web`
-  rather than from `platform/app`. What a reader can reach, which screen each
+  rather than from the retired platform application. What a reader can reach, which screen each
   address is, and what the charts draw from what the server returned are the
   properties this file states — the ones a move can break silently, where a
   wrong chart looks exactly like a right one.

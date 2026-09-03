@@ -13,7 +13,7 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
   internal endpoint everywhere except the one path that actually runs agents.
 
   Implementations:
-    - TS: platform/app/src/utils/ssrfProtection.ts (scenario runner, webhooks)
+    - TS: packages/ssrf/src/index.ts (scenario runner, webhooks)
     - Go: services/nlpgo/app/engine/blocks/httpblock/ssrf.go (workflow HTTP
       nodes, which is what an HTTP agent runs as, and remote attachments)
 

@@ -49,11 +49,18 @@ var Sets = []Set{
 		Render: func(key int64) string { return fmt.Sprintf("%014d", key) },
 	},
 	{
-		Name:                "ClickHouse",
-		Directory:           "platform/app/src/server/clickhouse/migrations",
-		PreviousDirectories: []string{"langwatch/src/server/clickhouse/migrations"},
-		Key:                 regexp.MustCompile(`^(\d{5})_.*\.sql$`),
-		Format:              "NNNNN_name.sql",
-		Render:              func(key int64) string { return fmt.Sprintf("%05d", key) },
+		Name:      "ClickHouse",
+		Directory: "apps/api/src/tasks/clickhouse-migrate/migrations",
+		PreviousDirectories: []string{
+			"platform/app/src/server/clickhouse/migrations",
+			"langwatch/src/server/clickhouse/migrations",
+		},
+		ForbiddenDirectories: []string{
+			"platform/app/src/server/clickhouse/migrations",
+			"langwatch/src/server/clickhouse/migrations",
+		},
+		Key:    regexp.MustCompile(`^(\d{5})_.*\.sql$`),
+		Format: "NNNNN_name.sql",
+		Render: func(key int64) string { return fmt.Sprintf("%05d", key) },
 	},
 }

@@ -3,7 +3,7 @@
 // Debits are NOT sent from the gateway hot path. The gateway emits spend
 // commands for every request through its spool, and the control plane's
 // debits process manager
-// (platform/app/ee/governance/process-manager/gatewayDebits.process.ts) writes
+// (packages/enterprise/features/governance/server/src/processes/gateway-debit.process.ts) writes
 // the ClickHouse ledger rows from them. Single source of truth, no PG
 // dual-write.
 package budget
@@ -59,7 +59,7 @@ func NewChecker(opts CheckerOptions) *Checker {
 
 // SoftWarnPercent is how much of a budget must be consumed before the gateway
 // attaches a warning to the response. It mirrors the control plane's soft-warn
-// threshold (platform/app/src/server/gateway/budget.service.ts) so the response
+// threshold (packages/features/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts) so the response
 // header, the dashboard banner and the CLI all fire at the same point instead
 // of the header staying silent through the whole band the dashboard already
 // calls a warning.

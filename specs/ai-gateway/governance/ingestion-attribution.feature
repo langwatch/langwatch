@@ -43,10 +43,10 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
     - specs/ai-gateway/governance/architecture-invariants.feature      (TenantId scoping)
 
   Implementation lives at:
-    - platform/app/src/server/governance/activity-monitor/                (subscriber + stamping)
-    - platform/app/ee/governance/services/governanceProject.service.ts    (hidden Gov)
-    - platform/app/src/server/routes/ingest/                              (receivers)
-    - platform/app/src/server/governance/ingestion/ottl/                  (OTTL transforms — guard scope)
+    - packages/enterprise/features/governance/server/src/ (activity-monitor)                (subscriber + stamping)
+    - packages/enterprise/features/governance/server/src/repositories/prisma/prisma.governance-setup-state.repository.ts (hidden Gov)
+    - packages/enterprise/features/governance/server/src/transport/api-rest/                              (receivers)
+    - packages/enterprise/composition/api/src/governance/ottl-gateway.client.ts                  (OTTL transforms — guard scope)
 
   Background:
     Given the org has all four ingestion paths active:

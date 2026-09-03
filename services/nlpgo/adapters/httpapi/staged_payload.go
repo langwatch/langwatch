@@ -1,7 +1,7 @@
 package httpapi
 
 // Staged payload offload — the counterpart to the TS `stagePayload` helper
-// (platform/app/src/server/s3/stagePayload.ts) used by `invokeLambda`.
+// (packages/features/topic/server/src/ports/langevals-payload-staging.port.ts) used by `invokeLambda`.
 //
 // Why this exists
 // ---------------

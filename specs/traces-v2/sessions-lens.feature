@@ -1,12 +1,12 @@
 # Sessions lens, server-grouped session rollups on the traces list
 #
 # Implementation:
-#   platform/app/src/server/app-layer/traces/repositories/session-groups.repository.ts            (row + cursor types, Null repo)
-#   platform/app/src/server/app-layer/traces/repositories/session-groups.clickhouse.repository.ts (GROUP BY conversation id rollup)
-#   platform/app/src/server/app-layer/traces/session-groups.service.ts                            (DTO mapping, cursor codec, coding-agent enrichment)
-#   platform/app/src/server/api/routers/tracesV2.ts                                               (`sessions` procedure)
-#   platform/app/src/features/traces-v2/hooks/useSessionGroups.ts                                 (lens data hook)
-#   platform/app/src/features/traces-v2/components/TraceTable/ConversationLensBody.tsx            (session rows rendering)
+#   packages/features/trace/server/src/repositories/session-groups.repository.ts            (row + cursor types, Null repo)
+#   [gone] src/server/app-layer/traces/repositories/session-groups.clickhouse.repository.ts (GROUP BY conversation id rollup)
+#   [gone] src/server/app-layer/traces/session-groups.service.ts                            (DTO mapping, cursor codec, coding-agent enrichment)
+#   [gone] src/server/api/routers/tracesV2.ts                                               (`sessions` procedure)
+#   packages/features/trace/web/src/ui/sections/explorer/hooks/use-session-groups.ts                                 (lens data hook)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-table/conversation-lens-body.tsx            (session rows rendering)
 #
 # Related specs:
 #   specs/traces-v2/grouping-engine.feature   , the by-conversation grouping this lens replaces the data source of

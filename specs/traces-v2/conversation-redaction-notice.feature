@@ -1,8 +1,8 @@
 # Conversation view: one notice when content was redacted
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/components/TraceDrawer/conversationView/ConversationView.tsx
-#   platform/app/src/components/ui/PIIRedactionNotice.tsx  (the shared alert, its copy and its settings link)
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/conversation-view.tsx
+#   packages/features/trace/web/src/ui/blocks/pii-redaction-notice.tsx  (the shared alert, its copy and its settings link)
 #
 # Motivation: a project's privacy settings replace matched personal data and
 # secrets in place with a typed marker ([EMAIL_ADDRESS], [SECRET], ...). A

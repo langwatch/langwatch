@@ -640,7 +640,7 @@ func TestParseSkipsUnparseableSnippetsWithAWarning(t *testing.T) {
 	// not take the drift check down with it.
 	root := tree(t, map[string]string{
 		"pkg/herr/herr.go": herrPackage,
-		"platform/app/src/features/onboarding/regions/observability/codegen/snippets/go/openai.snippet.go": `package main
+		"packages/features/onboarding/web/src/ui/sections/observability/codegen/snippets/go/openai.snippet.go": `package main
 
 func main() { this is not Go
 `,
@@ -686,12 +686,12 @@ const ErrBusy = herr.Code( this is not Go
 
 // @scenario "A source file that does not parse stops the run"
 func TestParseFailsOnAnUnparseableFileOutsideTheSnippets(t *testing.T) {
-	// The tolerance is scoped by path, not by tree: langwatch/ also holds real,
+	// The tolerance is scoped by path: the packages tree also holds real,
 	// compiled Go, and dropping one of those files drops its codes. Only the
 	// hand-written onboarding snippets under /codegen/snippets/ are exempt.
 	root := tree(t, map[string]string{
 		"pkg/herr/herr.go": herrPackage,
-		"platform/app/src/server/background/probe.go": `package background
+		"packages/features/trace/server/src/background/probe.go": `package background
 
 func main() { this is not Go
 `,
@@ -708,7 +708,7 @@ const ErrBusy = herr.Code("busy")
 	if err == nil {
 		t.Fatal("Parse() error = nil, want an unparseable non-snippet file to fail the run")
 	}
-	if !strings.Contains(err.Error(), "platform/app/src/server/background/probe.go") {
+	if !strings.Contains(err.Error(), "packages/features/trace/server/src/background/probe.go") {
 		t.Errorf("Parse() error = %q, want it to name the file", err)
 	}
 	if warnings.String() != "" {

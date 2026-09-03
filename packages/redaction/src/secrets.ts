@@ -134,7 +134,7 @@ const TOKEN_END = String.raw`(?![A-Za-z0-9_-])`;
 const VENDOR_KEY_PATTERNS = [
   // LangWatch's own API, ingest and legacy personal-access tokens, minted as
   // `{prefix}{lookupId}_{secret}` by
-  // platform/app/src/server/api-key/api-key-token.utils.ts. Matched on the
+  // packages/features/api-key/contract/src/api-key.tokens.ts. Matched on the
   // prefix plus three body characters, like every other known vendor, so a
   // truncated or short-bodied one still redacts: `sk-lw-` would otherwise reach
   // only the generic `sk-` rule and its 20-character floor, and `ik-lw-`
@@ -868,7 +868,7 @@ function guardCustomPattern(pattern: string): string {
 const ORDINARY_TEXT_PROBES = [
   "the user asked the agent to summarise the meeting notes",
   "<task-notification>",
-  "platform/app/src/server/traces/trace.service.ts",
+  "packages/features/trace/server/src/services/trace-legacy-read.service.ts",
   "2026-08-10T14:32:11.482Z",
   "claude-opus-5",
   // The identifiers a tracing product is made of. Without these a pattern like

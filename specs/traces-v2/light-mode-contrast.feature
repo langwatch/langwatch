@@ -1,9 +1,9 @@
 # Trace explorer light-mode contrast
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/components/TracesPage/TracesPage.tsx
-#   platform/app/src/features/traces-v2/components/TraceTable/TraceTableShell.tsx
-#   platform/app/src/features/traces-v2/components/TraceDrawer/panes/*
+#   packages/features/trace/web/src/ui/sections/explorer/traces-page/traces-page.tsx
+#   packages/features/trace/web/src/ui/sections/explorer/trace-table/trace-table-shell.tsx
+#   [gone] src/features/traces-v2/components/TraceDrawer/panes/*
 #
 # Motivation: in light mode the trace table rendered rows on a gray
 # (`bg.muted`) container with a same-color header — operators reported the

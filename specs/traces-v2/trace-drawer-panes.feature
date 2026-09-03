@@ -1,8 +1,8 @@
 # Trace Drawer Panes — DevTools-style layout
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/components/TraceDrawer/TraceDrawerShell.tsx
-#   platform/app/src/features/traces-v2/components/TraceDrawer/panes/*
+#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-drawer-shell.tsx
+#   [gone] src/features/traces-v2/components/TraceDrawer/panes/*
 #   packages/features/trace/web/src/drawer.store.ts (widthPx, paneState, layoutMode)
 #
 # Motivation: the drawer was previously a single scroll container with a

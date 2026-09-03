@@ -1,8 +1,8 @@
 # Trace Explorer default routing — Gherkin Spec
-# Implementation: platform/app/src/hooks/useDrawer.ts (routeTraceDrawerForV2 +
+# Implementation: packages/ui-drawer/src/behavior/use-drawer.ts (routeTraceDrawerForV2 +
 # the openDrawer interception), the legacy path redirects under
-# platform/app/src/pages/[project]/messages/, and the legacy drawer redirect
-# in platform/app/src/components/LegacyTraceDrawerRedirect.tsx
+# [gone] src/pages/[project]/messages/, and the legacy drawer redirect
+# in [gone] src/components/LegacyTraceDrawerRedirect.tsx
 #
 # The Trace Explorer is the default trace experience. The former per-device
 # opt-in is gone: every request to open a trace's details (no matter which

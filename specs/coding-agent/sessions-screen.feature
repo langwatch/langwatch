@@ -2,11 +2,11 @@
 #
 # Implementation:
 #   packages/features/coding-agent/server/src/services/coding-agent.service.ts (the canonical read service)
-#   platform/app/src/server/api/routers/coding-agent.ts                        (codingAgents.sessionsList)
-#   platform/app/src/server/api/routers/coding-agent.gates.ts                  (the title and cost gates)
+#   packages/features/coding-agent/contract/src/coding-agent.ts                        (codingAgents.sessionsList)
+#   packages/features/coding-agent/server/src/transport/api-trpc/coding-agent.gates.ts                  (the title and cost gates)
 #   packages/features/trace/server/src/services/trace-viewer-protections.service.ts (the shared content-visibility rule)
-#   The page and its table live under platform/app/src/pages/me/ and
-#   platform/app/src/components/me/.
+#   The page and its table live under [gone] src/pages/me/ and
+#   [gone] src/components/me/.
 #
 # Related specs:
 #   specs/coding-agent/context-economics.feature    , what the context columns count

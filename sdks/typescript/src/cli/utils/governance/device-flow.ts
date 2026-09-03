@@ -178,7 +178,7 @@ export async function startDeviceCode(
  * "Unknown device" — multi-device users need this to revoke
  * individual sessions without nuking every device they're logged in
  * on (Ariana QA finding). See
- * `platform/app/src/server/routes/auth-cli.ts#clientInfoSchema` for the
+ * `packages/features/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts#clientInfoSchema` for the
  * server contract.
  */
 function collectClientInfo(): {

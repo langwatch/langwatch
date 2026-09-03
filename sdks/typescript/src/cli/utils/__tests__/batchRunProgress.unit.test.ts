@@ -17,7 +17,7 @@ import { fetchBatchRuns, tallyBatchRuns } from "../batchRunProgress";
 
 const mockFetch = vi.fn();
 
-/** Only what `platform/app/src/app/api/**` actually registers. */
+/** Only what `apps/api`'s REST mounts actually register. */
 const REGISTERED = new Set([
   "POST /api/scenario-events",
   "POST /api/scenario-events/browser-tab",

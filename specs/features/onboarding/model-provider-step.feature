@@ -11,8 +11,8 @@ Feature: Model provider step in product onboarding
   # through it at all.
   #
   # Tests:
-  #   platform/app/src/features/onboarding/hooks/__tests__/use-product-flow.unit.test.tsx
-  #   platform/app/src/features/onboarding/components/sections/__tests__/ModelProviderStepScreen.integration.test.tsx
+  #   packages/features/onboarding/web/src/behavior/__tests__/use-product-flow.unit.test.tsx
+  #   [gone] src/features/onboarding/components/sections/__tests__/ModelProviderStepScreen.integration.test.tsx
 
   Background:
     Given I finished the welcome questions and reached the flavour selection

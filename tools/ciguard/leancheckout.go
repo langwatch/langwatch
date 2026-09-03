@@ -23,8 +23,8 @@ var LeanCheckoutWorkflows = []string{
 	".github/workflows/readme-links.yml",
 }
 
-// RequiredExclusions are the repository's marketing media: 165 MB of .gif and
-// .mp4 against 81 MB for platform/, the thing CI builds. Naming a
+// RequiredExclusions are the repository's marketing media: 172 MB of .gif and
+// .mp4 against 93 MB for apps/ and packages/, the thing CI builds. Naming a
 // sparse-checkout makes actions/checkout fetch with --filter=blob:none, so
 // these blobs never cross the wire — a depth-1 clone drops from 180 MB to
 // 42 MB of .git.
@@ -54,8 +54,8 @@ var wholeTreePatterns = []string{"/*", "*", "/**", "**"}
 // taking the whole tree and carving pieces back out.
 //
 // An allowlist cannot pull the media, because anything it does not name is
-// never checked out — `sparse-checkout: platform/app/vitest.durations.json`
-// takes exactly one file. Requiring the media exclusions of such a step is
+// never checked out — `sparse-checkout: .github/scripts` takes exactly that
+// one directory. Requiring the media exclusions of such a step is
 // noise: the negations would be three lines asserting the absence of
 // directories the step already never asked for, and under a non-cone allowlist
 // they change nothing at all.

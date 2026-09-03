@@ -35,7 +35,7 @@ INGEST_KEY_PREFIX = "ik-lw-"
 
 # Mirrors the server's strict new-format body shape:
 # {16-char lookupId}_{48-char secret}, both from an alphanumeric alphabet
-# (see `getTokenType` in platform/app/src/server/api-key/api-key-token.utils.ts).
+# (see `getTokenType` in packages/features/api-key/contract/src/api-key.tokens.ts).
 # Legacy project keys were minted from alphabets that include `_` and `-`, so
 # the mere presence of an underscore does not identify a new-format key.
 _NEW_FORMAT_BODY_RE = re.compile(r"^[0-9A-Za-z]{16}_[0-9A-Za-z]{48}$")

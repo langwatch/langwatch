@@ -154,9 +154,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
       breadcrumb, search result, deep link target)
     Then it filters out kind == "internal_governance" rows
     And any leak of the hidden project to a user surface is treated
-      as a bug (regression test in
-      platform/app/src/components/__tests__/projectFilter.invariant.test.ts
-      asserts every Project consumer applies the filter)
+      as a bug (a regression test asserts every Project consumer
+      applies the filter)
 
   # ---------------------------------------------------------------------------
   # IngestionSource composer — no project picker (per master directive)
@@ -294,7 +293,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
             viewer (does NOT build a bespoke event renderer)
     When the admin navigates to a per-source detail page with events
     Then the events feed reuses the existing
-      platform/app/src/components/messages/MessagesList component
+      the trace list component
       (or the equivalent feed renderer used at /messages)
     And NO bespoke "EventsTable" / "GovernanceEventRow" component
       exists for governance — the existing components handle
@@ -323,8 +322,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   @bdd @ui @ui-contract @regression
   Scenario: Lane-B test suite asserts every Project consumer filters
             kind=internal_governance
-    When the test suite runs
-      platform/app/src/components/__tests__/projectFilter.invariant.test.ts
+    When the Project-consumer invariant suite runs
     Then it enumerates every component / API / hook / repository
       method that loads or renders Projects
     And for each, asserts that a Project with kind="internal_governance"

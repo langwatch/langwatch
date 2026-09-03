@@ -4,15 +4,15 @@ Feature: Customer.io nurturing integration
   So that customer nurturing workflows trigger automatically as users progress through the platform
 
   # All scenarios bound to existing tests in:
-  #   platform/app/ee/billing/nurturing/nurturing.service.unit.test.ts
-  #   platform/app/ee/billing/nurturing/nurturing.service.wiring.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/signupIdentification.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/featureAdoption.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/activityTracking.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/productInterest.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/promptCreation.unit.test.ts
-  #   platform/app/ee/billing/nurturing/hooks/promptCreation.integration.test.ts
-  #   platform/app/src/hooks/__tests__/useAttributionCapture.unit.test.ts
+  #   packages/enterprise/features/billing/server/src/__tests__/nurturing.service.unit.test.ts
+  #   packages/enterprise/features/billing/server/src/__tests__/nurturing.service.wiring.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/signupIdentification.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/featureAdoption.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/activityTracking.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/productInterest.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/promptCreation.unit.test.ts
+  #   [gone] ee/billing/nurturing/hooks/promptCreation.integration.test.ts
+  #   [gone] src/hooks/__tests__/useAttributionCapture.unit.test.ts
 
   All scheduling, sequencing, and email delivery is owned by Customer.io.
   LangWatch nurturing hooks fire-and-forget data through the Pipelines API.

@@ -6,7 +6,7 @@ Feature: Langy runs the prompt improvement loop on the workbench
   # The loop is taught by skills/prompt-optimization/SKILL.mdx and executed
   # through the UI-action channel (specs/langy/langy-ui-actions.feature).
   # These scenarios run as judge-graded conversations against a live stack:
-  # platform/app/e2e/langy/langy-prompt-optimization.scenario.test.ts.
+  # [gone] e2e/langy/langy-prompt-optimization.scenario.test.ts.
   # The scenario adapter attaches no browser tab, so every workbench action a
   # scenario exercises here takes the backend path by construction.
 
@@ -138,7 +138,7 @@ Feature: Langy runs the prompt improvement loop on the workbench
   # A page changes what the agent should say, not what it should do, so the end
   # state is asserted with the same helper the no-page suite uses and the words
   # are graded separately. Covered by
-  # platform/app/e2e/langy/langy-workbench-live.scenario.test.ts, which attaches
+  # [gone] e2e/langy/langy-workbench-live.scenario.test.ts, which attaches
   # a headless stand-in for the page (see specs/langy/langy-ui-actions.feature,
   # "The browser leg is proven end to end against a live stack").
 

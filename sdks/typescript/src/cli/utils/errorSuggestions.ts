@@ -6,7 +6,7 @@
  * sends them they win. Until then the CLI would render a perfectly structured
  * error with no way forward in it, so this table fills the gap client-side for
  * the handful of codes a CLI user hits most — the same code-keyed pattern the
- * app already uses in `platform/app/src/features/langy/logic/langyErrorExplainer.ts`.
+ * app already uses in `packages/features/langy/web/src/features/langy/behavior/logic/langy-error-explainer.ts`.
  *
  * Keys are EXACT codes, never prefix matches: an unknown code gets no invented
  * advice, and a new backend code lands nowhere rather than in the wrong bucket.

@@ -10,8 +10,8 @@ Feature: Secrets Manager
   # written down here, now stated and bound.
   #
   # The vocabulary scenario stays UNTAGGED, and deliberately: the suite that
-  # covers it is `platform/app/src/server/api/__tests__/rbac.secrets.test.ts`,
-  # and `platform/app` is deletes-only while the migration runs, so the
+  # covers it is `[gone] src/server/api/__tests__/rbac.secrets.test.ts`,
+  # and `[gone]` is deletes-only while the migration runs, so the
   # `@scenario` docblock that would bind it cannot be added. It gets its tag
   # when that suite moves into the authz or secret package.
   Scenario: Secrets resource is registered in the RBAC system

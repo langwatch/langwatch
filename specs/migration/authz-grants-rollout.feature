@@ -5,7 +5,7 @@
 # specs/migration/system-migrations-runner.feature.
 #
 # The ADR-110 one-shot migration is registered
-# (platform/app/src/server/app-layer/authz/authz-engine.migration.ts); the
+# ([gone] src/server/app-layer/authz/authz-engine.migration.ts); the
 # scenarios still tagged @unimplemented are the integration-level ones its
 # unit harness cannot honestly bind.
 

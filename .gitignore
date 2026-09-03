@@ -24,9 +24,6 @@ quickwit-*
 /store/
 /data/
 /metadata/
-/platform/app/store/
-/platform/app/data/
-/platform/app/metadata/
 __pycache__
 dist/
 
@@ -138,10 +135,10 @@ uuid
 **/.pr-screenshots/
 
 # Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
-platform/app/e2e/langy/scenario-logs/
+apps/ui/e2e/langy/scenario-logs/
 
 # Per-run red-team crescendo reports (langy-redteam.scenario.test.ts)
-platform/app/e2e/langy/redteam-reports/
+apps/ui/e2e/langy/redteam-reports/
 
 # Agent scratch + dogfood evidence (never track)
 **/.claude/dogfood-evidence/
@@ -154,6 +151,10 @@ server.log
 .langwatch-slug
 .haven.json
 /bin/haven
-platform/app/dev.log
+**/dev.log
 .claude/tmp/
 
+# The nlpgo integration harness compiles the Go engine once and caches the
+# binary here (packages/test-harness/src/nlpgo-subprocess.ts). It used to sit
+# inside the application package, whose own ignore file covered it.
+/.vitest-tmp/

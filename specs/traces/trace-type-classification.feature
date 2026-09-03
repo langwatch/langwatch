@@ -6,7 +6,7 @@ Feature: Trace origin classification
 
   # All scenarios describe the trace projection's origin classification
   # in the event-sourcing pipeline. Need targeted unit tests in
-  # `platform/app/src/server/event-sourcing/pipelines/trace-processing/projections/`
+  # `[gone] src/server/event-sourcing/pipelines/trace-processing/projections/`
   # for the origin-classification projection. Cheap to add.
 
   # =========================================================================
