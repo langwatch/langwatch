@@ -39,16 +39,16 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-/** `…/ee/governance/services/__tests__` → `…/platform/app`. */
-const APP_DIR = resolve(
-  fileURLToPath(new URL("../../../../", import.meta.url)),
-);
-const SRC_DIR = join(APP_DIR, "src");
-const EE_DIR = join(APP_DIR, "ee");
+import {
+  APP_DIR,
+  appSourceFiles,
+  EE_DIR,
+  EXTENSIONS,
+  SRC_DIR,
+} from "./_governanceSourceScan";
 
 const SCORER = join(EE_DIR, "governance/services/logic/nameSimilarity.ts");
 const SUGGESTION_JOB = join(
@@ -74,8 +74,6 @@ const REQUEST_ROOTS = [
     .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
     .map((entry) => join(EE_DIR, "governance/routers", entry.name)),
 ];
-
-const EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js"];
 
 /**
  * Static `import`/`export … from` specifiers. Deliberately not `import()`.
@@ -173,28 +171,9 @@ function reachableFiles({
   return seen;
 }
 
-/** Every source file in the app, tests and generated code excluded. */
-function sourceFiles(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      return ["__tests__", "__mocks__", "node_modules", "generated"].includes(
-        entry.name,
-      )
-        ? []
-        : sourceFiles(path);
-    }
-    if (entry.name.endsWith(".d.ts")) return [];
-    if (/\.(test|spec)\.[cm]?[jt]sx?$/.test(entry.name)) return [];
-    return EXTENSIONS.some((extension) => entry.name.endsWith(extension))
-      ? [path]
-      : [];
-  });
-}
-
 /** Files that import `target` directly, as paths relative to `platform/app`. */
 function directImportersOf(target: string): string[] {
-  return [...sourceFiles(SRC_DIR), ...sourceFiles(EE_DIR)]
+  return appSourceFiles()
     .filter((file) =>
       specifiersOf(readFileSync(file, "utf8")).some(
         (specifier) => resolveLocal({ specifier, fromFile: file }) === target,

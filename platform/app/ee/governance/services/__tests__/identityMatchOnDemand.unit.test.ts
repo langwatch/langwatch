@@ -34,18 +34,12 @@
  * Spec: specs/governance/governance-identity-match-engine.feature
  * Decision: ADR-128 §12
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-/** `…/ee/governance/services/__tests__` → `…/platform/app`. */
-const APP_DIR = resolve(
-  fileURLToPath(new URL("../../../../", import.meta.url)),
-);
-const SRC_DIR = join(APP_DIR, "src");
-const EE_DIR = join(APP_DIR, "ee");
+import { APP_DIR, appSourceFiles, EE_DIR } from "./_governanceSourceScan";
 
 /** Both spellings of the key a matcher calendar entry would have to carry. */
 const IDENTITY_MATCH_KEY = [
@@ -59,30 +53,9 @@ const COMPARATOR_KEY = [
   /\bCOST_ROLLUP_COMPARATOR_TARGET_TYPE\b/,
 ];
 
-const EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js"];
-
-/** Every source file in the app, tests and generated code excluded. */
-function sourceFiles(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      return ["__tests__", "__mocks__", "node_modules", "generated"].includes(
-        entry.name,
-      )
-        ? []
-        : sourceFiles(path);
-    }
-    if (entry.name.endsWith(".d.ts")) return [];
-    if (/\.(test|spec)\.[cm]?[jt]sx?$/.test(entry.name)) return [];
-    return EXTENSIONS.some((extension) => entry.name.endsWith(extension))
-      ? [path]
-      : [];
-  });
-}
-
 /** Files naming any spelling of `key`, as paths relative to `platform/app`. */
 function filesNaming(key: readonly RegExp[]): string[] {
-  return [...sourceFiles(SRC_DIR), ...sourceFiles(EE_DIR)]
+  return appSourceFiles()
     .filter((file) => {
       const source = readFileSync(file, "utf8");
       return key.some((spelling) => spelling.test(source));
