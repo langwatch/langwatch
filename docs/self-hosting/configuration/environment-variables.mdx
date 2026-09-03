@@ -134,7 +134,7 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` selects nothing by itself. S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | - |
+| `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` does not select a backend by itself. S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | - |
 | `AZURE_BLOB_ACCOUNT_NAME` | Azure Storage account name | - |
 | `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key. Required only by `AZURE_BLOB_AUTH_MODE=sharedKey` | - |
 | `AZURE_BLOB_AUTH_MODE` | How to authenticate: `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli` | `sharedKey` |
@@ -217,7 +217,7 @@ Three rules before you configure it:
 - **An account key alongside an identity mode is rejected.** A key that would be silently ignored is worse than no key, since you would believe it was in use.
 - **Bearer tokens require HTTPS.** A plaintext `AZURE_BLOB_ENDPOINT` is refused before any token is sent.
 
-In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, since the identity would have nothing to bind to. Federated Kubernetes identity is supported on **AKS only**, because the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
+In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, since the identity would have no ServiceAccount to bind to. Federated Kubernetes identity is supported on **AKS only**, because the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
 
 On AKS, three things must line up or the token exchange fails with `AADSTS70021` before any storage call is made. The app surfaces that code and this remedy in the error, but they are easier to get right up front:
 
