@@ -108,7 +108,6 @@ export {
   type ApiAuthSessionDependencies,
   type BetterAuthSessionLookup,
 } from "./app/api-auth.composition";
-export { UnavailableApiUserAvatarStorageAdapter } from "./app/api-user-avatar-storage.adapter";
 export {
   ApiHttpListener,
   type ApiHttpListenerOptions,

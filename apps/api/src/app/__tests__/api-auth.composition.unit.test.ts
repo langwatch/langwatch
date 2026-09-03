@@ -26,7 +26,7 @@ import {
   BetterAuthBrowserSessionTransportAdapter,
   type ApiAuthSessionDependencies,
 } from "../api-auth.composition";
-import { UnavailableApiUserAvatarStorageAdapter } from "../api-user-avatar-storage.adapter";
+import { ApiUserAvatarStorageAdapter } from "../../features/user/user-avatar-storage.adapter";
 import { ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy";
 
 const verified: VerifiedBrowserSession = {
@@ -435,7 +435,7 @@ describe("ApiAuthComposition", () => {
 describe("the avatar storage of a process that composes no stored objects", () => {
   /** @scenario "An avatar upload refuses by name on a process with no stored objects" */
   it("refuses the write and names the process", async () => {
-    const storage = UnavailableApiUserAvatarStorageAdapter.create({
+    const storage = ApiUserAvatarStorageAdapter.absent({
       processName: "langwatch-api",
     });
 

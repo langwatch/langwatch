@@ -11535,8 +11535,11 @@ one without the other is not an avatar.
 ### Why it mounts even though this process cannot write an avatar
 
 `UnavailableApiUserAvatarStorageAdapter` still refuses the WRITE by name — the
-API process composes no avatar storage, and that absence is unchanged. Reading
-and writing are separate capabilities here: every avatar already in
+API process composes no avatar storage, and that absence is unchanged. (Closed
+later the same day, and the class is gone with it: see "The avatar upload
+writes, and the composition order is why it could not". The refusal survives as
+`ApiUserAvatarStorageAdapter.absent`.) Reading and writing are separate
+capabilities here: every avatar already in
 `stored_objects` is unreadable while the family is off, and a member list that
 falls back to initials for photos that exist is a worse answer than the one this
 process can actually give. The family is still conditional — on the stored-object
@@ -11773,3 +11776,221 @@ package is precisely how a declared lane rots into a silent one.
   change.
 - **Nothing under `platform/` was created, edited or read.** The one import that
   still pointed there is gone.
+
+## The avatar upload writes, and the composition order is why it could not, 2026-09-03
+
+The read landed this morning; the write stayed a named absence. The recorded
+reason — *"the API process composes no avatar storage"* — was true of one LINE
+and never of the process. `ApiProductionComposition` opens the content-addressed
+store 117 lines below the Auth graph, and it is the same store `/api/files`
+reads through and the same one the scenario-event door already WRITES trace
+media into. What the API process actually lacked was not an object store. It was
+a way for a collaborator composed at line 737 to reach one opened at line 854.
+
+```
+  BEFORE                                  AFTER
+
+  compose()                               compose()
+   │                                       │
+   ├─ resolveAuth                          ├─ resolveAuth
+   │   PostgresUserAdapter                 │   PostgresUserAdapter
+   │    avatarStorage =                    │    avatarStorage =
+   │     Unavailable…Adapter               │     ApiUserAvatarStorageAdapter
+   │       store() → throw                 │       storedObjects: () => …  ──┐
+   │                                       │                                 │
+   │  (117 lines later)                    │  (117 lines later)              │
+   │                                       │                                 │
+   └─ composeProductInfra                  └─ composeProductInfra            │
+       storedObjectApp  ─► /api/files          storedObjectApp ─► /api/files │
+       storedObjectBytes ─► trace media        storedObjectBytes ─► trace    │
+                                                        ▲        media      │
+                                               the SAME instance ───────────┘
+                                               resolved at the UPLOAD,
+                                               not at composition
+
+  user.setAvatar                          user.setAvatar
+   codec.parse             ✓               codec.parse             ✓
+   ensurePersonalWorkspace ✓               ensurePersonalWorkspace ✓
+   avatarStorage.store     ✗ Error         avatarStorage.store     ✓
+   repository.setAvatar    never ran        purpose   = user_avatar
+                                            ownerKind = user
+                                           repository.setAvatar    ✓
+                                                    │
+  GET /api/user-avatar/<p>/<id>                     ▼
+    nothing was ever written       GET /api/user-avatar/<p>/<id>
+    → 404 avatar_not_found           purpose ✓ ownerKind ✓ → 200 bytes
+```
+
+### What the write needed, and what it did not
+
+It needed four things, and the process held all four:
+
+- **A byte write into the store the read reads.** `StoredObjectsService`
+  (`productInfra.storedObjectBytes`) — the same instance `StoredObjectApp`'s
+  `files` half answers `readById` from, so an avatar written here is one the
+  route finds. `ApiTraceMediaStore` already occupies this seam for trace media.
+- **The purpose and the owner kind.** `USER_AVATAR_PURPOSE` and
+  `USER_AVATAR_OWNER_KIND`, read from the SAME two constants
+  `createUserAvatarRestApp` compares against. The route serves an object only
+  when both match, so a write stamping either differently would store a photo
+  nobody can ever load — indistinguishable, to the customer, from an upload
+  that silently did nothing.
+- **The media type**, which the codec has already validated against the
+  declared bytes' magic number before the storage is reached.
+- **The size ceiling.** This is the one thing the retired platform got from
+  composition and this process does not: it built a DEDICATED stored-object
+  service with `maximumUploadBytes: USER_AVATAR_MAX_BYTES`. `apps/api` shares
+  one content-addressed store with trace media, whose ceiling is far larger, so
+  the avatar ceiling had to travel with the avatar write or stop existing. The
+  adapter restates it and raises the codec's own `UserAvatarTooLargeError`.
+
+It did NOT need a second stored-object service, a delivery policy, an upload
+token signer or an id deriver — the four things the platform's
+`createProcessUserAvatarStoredObjectService` composed. Those exist for the
+upload CEREMONY (`createUpload` / `confirmUpload`), and an avatar arrives whole
+in a tRPC mutation.
+
+### The thunk is the whole mechanism
+
+The Auth graph composes third, because every other door in the process stands on
+the browser session it verifies; the product-infrastructure half composes
+fifteenth, because it stands on the execution, product-group and trace halves,
+all of which stand on that session. Neither order can move. So the adapter takes
+`() => StoredObjectsService | undefined` and resolves it at the UPLOAD — the
+only moment it is needed — which is the same shape the read side already uses
+for `userAvatarObjects: () => …` and every packaged family's services.
+
+One test drives exactly that: an adapter built over an entry that is empty when
+`create` is called and filled afterwards still writes. Without it the thunk is
+an implementation detail nobody would notice regressing into a direct read.
+
+### Judgment calls
+
+- **The write goes through `storedObjectBytes`, not `StoredObjectApp`.** The
+  read lane went the other way on purpose, and the reasons do not transfer.
+  `StoredObjectApp` exposes NO byte write — its portable half
+  (`ApiStoredObjectPortableAbsence`) refuses by name on this process — so
+  routing the write through the application would have meant adding a write
+  port to the stored-object package and rewiring every composer of it. And the
+  read's reason for going through the application was that the application's
+  own projection had to be FIXED rather than routed around; a write has no
+  equivalent gate to fix, because the write is what SETS the columns the read
+  gates on. `storedObjectBytes` is the same instance behind
+  `StoredObjectApp.files`, which is the property that actually matters.
+- **`UnavailableApiUserAvatarStorageAdapter` is DELETED, not kept.** Nothing
+  outside `apps/api` imported it — it was exported from the package index and
+  had one call site — and keeping two classes would have meant two copies of one
+  refusal message. The refusal itself is untouched and still named:
+  `ApiUserAvatarStorageAdapter.absent({ processName })` is the same behaviour
+  under a name that says which capability is absent rather than which class is,
+  and the same path runs when a process composes the Auth graph and no product
+  infrastructure at all. `specs/server/api-process-auth.feature`'s
+  "An avatar upload refuses by name on a process with no stored objects" still
+  binds, now to a test that sits beside the write it is the absence of.
+- **The refusal stays a plain `Error`.** Unchanged from the previous lane's
+  reasoning: nothing a caller sends causes it and nothing they can send avoids
+  it, so it degrades to a generic failure carrying the trace id rather than
+  dressing a deployment shape up as a customer's mistake. No new error code was
+  minted and `apps/ui/src/model/errors/` was not touched.
+- **The store seam is `Pick<StoredObjectsService, "storeFromBytes">`.** Honestly
+  all the adapter reaches for, and a narrowed seam is one a test can put a real
+  double in front of rather than casting a half-built service into place.
+- **`avatarStorage` is an OPTION on `ApiAuthCompositionOptions`, not something
+  the Auth composition resolves.** The object store belongs to the
+  product-infrastructure half; a second one composed inside the Auth graph would
+  be a second answer to where a project's bytes live.
+
+### Binding the eleven the read lane did not adopt
+
+`specs/settings/user-avatar-upload.feature` was **4/15** at the start of this
+lane and is **15/15** now. Every one of the eleven describes behaviour that
+still exists, so none was marked away; each is bound where the behaviour lives.
+
+| Scenario | Bound at |
+| --- | --- |
+| Uploading a photo stores it and sets it as the user's avatar | `user.service.unit.test.ts` (store + the URL written to the profile) and `user-avatar-storage.unit.test.ts` (the purpose, owner kind and owner id the bytes are stamped with; the late-resolved store) |
+| The profile settings show a live preview before saving | `avatar-upload-control.integration.test.tsx` — the cropped photo replaces the dialog's avatar and NOTHING is sent |
+| Removing the photo reverts to the fallback avatar | `user.service.unit.test.ts` (the column goes to null, not back to the SSO photo) and the element test (initials return) |
+| An oversized image is rejected | the codec suite, the service suite (storage and profile untouched) and the adapter's own ceiling |
+| A non-image file is rejected | the codec suite and the service suite |
+| An uploaded photo wins over the SSO provider photo | `user.service.unit.test.ts` over a stateful repository whose photo starts as the provider's |
+| Signing in again through SSO does not overwrite an uploaded photo | `user.service.unit.test.ts` — `updateLastLogin`, which is what a fresh sign-in writes through this service, records the login and touches no avatar |
+| A signed-in teammate can load another user's uploaded avatar | `api-rest.packaged-families.integration.test.ts` — a different `userId` is served the same object |
+| An unauthenticated request cannot load an avatar image | the same suite, over the process's REAL `createApiDualCredentialAuth`: 401 before any object is read |
+| The uploaded photo renders wherever a person is shown | the shared avatar element's render test, with a spec comment saying the four named surfaces inherit one fallback chain rather than implementing four |
+| A user without a photo still shows their initials everywhere | the same element test, with no `<img>` to break |
+
+Two scenarios gained a line rather than a binding alone. "Uploading a photo"
+now says the stored image is MARKED as a user's photo, because the marking is
+the only thing standing between a platform-wide readable route and every
+tenant's trace media; and the rendering outline carries a note that the four
+surfaces share one chain, so a reader knows what the single binding pins and
+what inherits it.
+
+One harness repair came with them: the packaged-families suite's error handler
+rendered a Hono `HTTPException` as a 500, because it only knew `httpStatus`.
+The dual-credential verifier's 401 is an `HTTPException`, so without the repair
+the unauthenticated case would have asserted the harness rather than the door.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/features/user/user-avatar-storage.adapter.ts` | NEW. `ApiUserAvatarStorageAdapter` — `storeFromBytes` under the avatar purpose and owner kind, the avatar byte ceiling, and `.absent()` for a process with no store. |
+| `apps/api/src/app/api-user-avatar-storage.adapter.ts` | DELETED. Its one behaviour is `.absent()` above; nothing outside `apps/api` imported it. |
+| `apps/api/src/index.ts` | The deleted class's export removed. |
+| `apps/api/src/app/api-auth.composition.ts` | `avatarStorage?: UserAvatarStoragePort` on the options, defaulting to `.absent()`; the docblock rewritten from "writing an avatar needs a stored-object application" to why the Auth graph must not wait on one. |
+| `apps/api/src/app/api-production.composition.ts` | `resolveAuth` passes the adapter over `() => this.composedProductInfra?.storedObjectBytes`, with the composition order stated at the call. |
+| `apps/api/src/features/user/__tests__/user-avatar-storage.unit.test.ts` | NEW. 4 tests: the stamped write, the ceiling, the late-resolved store, the named refusal. |
+| `apps/api/src/app/__tests__/api-auth.composition.unit.test.ts` | The refusal case re-pointed at `.absent()`. |
+| `apps/api/src/app-rest/__tests__/api-rest.packaged-families.integration.test.ts` | Two avatar cases (teammate read, unauthenticated refusal over the real verifier); the harness error handler honours `HTTPException`. |
+| `packages/features/user/server/src/ports/__tests__/user.service.unit.test.ts` | The SSO-precedence, sign-in and removal cases over a stateful repository; the two refusal cases asserting nothing was written; `@scenario` on the existing store case. |
+| `packages/features/user/server/src/services/__tests__/user-avatar.unit.test.ts` | `@scenario` on the two codec refusals. |
+| `packages/features/user/web/src/ui/sections/__tests__/avatar-upload-control.integration.test.tsx` | NEW. 4 tests: the live preview, the photo, the initials, and the fallback after a removal. |
+| `specs/settings/user-avatar-upload.feature` | The marking step on the upload scenario, and the note above the rendering outline. |
+
+### Gates
+
+- `apps/api`: `vitest run src/features/user src/app-rest src/app-trpc` — **Test
+  Files 8 passed (8)**, **Tests 95 passed (95)** (91 before this lane).
+- `apps/api`: `vitest run src/app` — **Test Files 42 passed (42)**, **Tests 454
+  passed (454)**; the composition suites are where the refusal case moved.
+- `apps/api`: `tsc --noEmit` — **0 errors**.
+- `@langwatch/user-server`: `pnpm test` — **Test Files 4 passed (4)**, **Tests
+  36 passed (36)** (31 before). `pnpm typecheck` — **0 errors**.
+- `@langwatch/user-web`: `pnpm test` — **Test Files 11 passed (11)**, **Tests 89
+  passed (89)** (85 before). `pnpm typecheck` — **0 errors**.
+- `@langwatch/stored-object-server`: `pnpm test` — **Test Files 15 passed (15)**,
+  **Tests 124 passed (124)**. `pnpm typecheck` — **0 errors**. Unchanged: this
+  lane reads the package and does not edit it.
+- `check:feature-parity`: `specs/settings/user-avatar-upload.feature` — **15/15
+  scenarios bound · ✓ all bound**, up from 4/15. `specs/settings/user-avatar.feature`
+  is unchanged at 5/10; nothing in this lane bound a title from it, which
+  matters because a file the ratchet lists must keep at least one unbound
+  scenario.
+- `oxlint` over all ten touched TypeScript files — **no findings**. With
+  `--config .oxlintrc.architecture.json`, **0 errors** and warnings only on
+  lines this lane did not write: 11 in `api-rest.packaged-families.integration.test.ts`,
+  7 in `api-auth.composition.unit.test.ts` and 24 in `user.service.unit.test.ts`,
+  all `require-mock-type-parameters` / `valid-expect` / `require-to-throw-message`
+  on pre-existing lines. Every `vi.fn` this lane added carries its type
+  parameter.
+- `oxfmt --check` over the touched files — clean, except
+  `api-production.composition.ts`, which fails at `HEAD` on hunks unrelated to
+  this lane's thirteen lines (verified against `git show HEAD:` of the same
+  file). Reformatting it would have made the diff its own repair.
+
+### What this lane did NOT do
+
+- **The avatar is still stored in the uploader's PERSONAL workspace project.**
+  `UserService.setAvatar` ensures that workspace and stores under its project
+  id, exactly as before; nothing about tenancy moved.
+- **No new error code.** The write's two failures are an existing
+  `avatar_image_too_large` and a plain `Error` for the deployment-shape
+  refusal, so `apps/ui/src/model/errors/` was neither read nor edited.
+- **No delivery capability, upload token or direct-upload path for avatars.**
+  The bytes arrive whole in the tRPC mutation; the ceremony the platform
+  composed for them served an upload flow that does not exist here.
+- **`copilotkit` stays absent.** Untouched, and now the only entry left.
+- **Nothing under `platform/` was created, edited or read**, and no OpenAPI
+  artifact was regenerated — this lane adds no route.

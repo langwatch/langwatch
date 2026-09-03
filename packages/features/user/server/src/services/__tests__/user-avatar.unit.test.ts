@@ -13,6 +13,7 @@ describe("user avatar validation", () => {
     expect(avatars.parse(`data:image/png;base64,${PNG_BASE64}`).mediaType).toBe("image/png");
   });
 
+  /** @scenario "A non-image file is rejected" */
   it("refuses active or mislabeled content", () => {
     expect(() => avatars.parse("data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=")).toThrow(
       UserAvatarValidationError,
@@ -22,6 +23,7 @@ describe("user avatar validation", () => {
     );
   });
 
+  /** @scenario "An oversized image is rejected" */
   it("refuses decoded payloads over the byte ceiling", () => {
     const encoded = Buffer.alloc(USER_AVATAR_MAX_BYTES + 1).toString("base64");
     expect(() => avatars.parse(`data:image/png;base64,${encoded}`)).toThrow(

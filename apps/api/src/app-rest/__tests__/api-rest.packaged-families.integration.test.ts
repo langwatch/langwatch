@@ -25,6 +25,7 @@ import {
 } from "@langwatch/trace-server";
 import type { UserAvatarObjectReader } from "@langwatch/user-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 
@@ -33,6 +34,7 @@ import {
   type ApiPackagedRestFamilyName,
 } from "../app-rest.packaged-families";
 import { createApiProcessRestFeatures } from "../app-rest.process-features";
+import { createApiDualCredentialAuth } from "../../app/api-dual-credential-auth";
 import { createApiTrackedEventPorts } from "../../features/trace/tracked-event-ports.adapter";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
@@ -243,6 +245,35 @@ describe("given the avatar family over a reader that carries the owner kind", ()
 
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toMatchObject({ error: "avatar_not_found" });
+    });
+  });
+
+  describe("when the caller is a teammate rather than the person in the photo", () => {
+    /** @scenario "A signed-in teammate can load another user's uploaded avatar" */
+    it("serves the photo, because an avatar has to render wherever a person is shown", async () => {
+      const api = mount(withAvatarObject(avatarRead(), { userId: "teammate-2" }));
+
+      // `user-1` uploaded it into their own personal project; `teammate-2` is
+      // a different person and the route still answers. That breadth is the
+      // family's whole point, and it is only safe because of the two refusals
+      // above.
+      const response = await api.fetch("/api/user-avatar/project-9/object-1");
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toBe("image/png");
+    });
+  });
+
+  describe("when the request carries no credential at all", () => {
+    /** @scenario "An unauthenticated request cannot load an avatar image" */
+    it("refuses before any object is read, through the process's real verifier", async () => {
+      const objects = vi.fn<UserAvatarObjectReader["getById"]>(async () => avatarRead());
+      const api = mount(withRealDualAuth({ getById: objects }));
+
+      const response = await api.fetch("/api/user-avatar/project-9/object-1");
+
+      expect(response.status).toBe(401);
+      expect(objects).not.toHaveBeenCalled();
     });
   });
 
@@ -557,16 +588,44 @@ function avatarReader(read: ReturnType<typeof avatarRead>): UserAvatarObjectRead
  * handler keys its rate limit on what that verifier left behind — so a
  * pass-through that set nothing would 500 before any refusal was reached.
  */
-function withAvatarObject(read: ReturnType<typeof avatarRead>): ApiPackagedRestCollaborators {
+function withAvatarObject(
+  read: ReturnType<typeof avatarRead>,
+  caller: { userId: string } = { userId: "user-1" },
+): ApiPackagedRestCollaborators {
   const ports = fullPorts();
   return {
     services: { userAvatarObjects: () => avatarReader(read) },
     ports: {
       ...ports,
       dualAuth: async (c, next) => {
-        c.set("userId", "user-1");
+        c.set("userId", caller.userId);
         await next();
       },
+    },
+  };
+}
+
+/**
+ * The avatar family behind the process's REAL dual-credential verifier.
+ *
+ * The other avatar cases stub the verifier, because what they are about is the
+ * refusal the family itself makes on an object. This one is about the door in
+ * front of it, so the middleware under test has to be the one the process
+ * composes: an anonymous request claims neither credential kind, and
+ * arbitration answers "unclaimed" before any object is read.
+ */
+function withRealDualAuth(objects: UserAvatarObjectReader): ApiPackagedRestCollaborators {
+  return {
+    services: { userAvatarObjects: () => objects },
+    ports: {
+      ...fullPorts(),
+      dualAuth: createApiDualCredentialAuth({
+        apiKeys: { tryResolveToken: async () => null } as never,
+        session: {
+          resolve: async () => null,
+          permitted: async () => false,
+        },
+      }),
     },
   };
 }
@@ -653,6 +712,9 @@ function passThroughSecurity(): AppRestSecurity {
 
 /** A handled refusal must reach the caller at its own status with its own code. */
 const renderHandled: ErrorHandler = (error, c) => {
+  // Hono's own transport-level refusal — what the dual-credential verifier
+  // raises for a request carrying no credential — carries its response with it.
+  if (error instanceof HTTPException) return error.getResponse();
   const handled = error as { httpStatus?: number; code?: string; message?: string };
   if (typeof handled.httpStatus === "number") {
     return c.json(

@@ -34,7 +34,12 @@ Feature: Uploading a custom avatar photo
     Given a signed-in user with no custom avatar
     When they upload a valid image from their profile settings
     Then the image is stored in object storage owned by that user
+    And the stored image is marked as a user's photo rather than as any other
     And the user's avatar now resolves to the uploaded photo
+    # The marking is not description. The photo route is readable by any
+    # signed-in person on the platform and serves an object only when both what
+    # it is FOR and what PRODUCED it are the avatar ones, so a photo stored
+    # under any other marking is one nobody can ever load.
 
   @integration
   Scenario: The profile settings show a live preview before saving
@@ -130,6 +135,11 @@ Feature: Uploading a custom avatar photo
     And people fall back to initials rather than meeting a refusal on every photo
 
   # --- Rendering across the product ------------------------------------------
+
+  # Every person-avatar in the product resolves through ONE shared fallback
+  # chain rather than four independent ones, so what all four surfaces below
+  # show is decided in a single place. The binding pins that place — photo when
+  # there is one, initials when there is not — and the surfaces inherit it.
 
   @integration
   Scenario Outline: The uploaded photo renders wherever a person is shown

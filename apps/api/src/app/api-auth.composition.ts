@@ -6,8 +6,9 @@ import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { PostgresUserAdapter } from "@langwatch/user-server";
+import { PostgresUserAdapter, type UserAvatarStoragePort } from "@langwatch/user-server";
 import type { UserService } from "@langwatch/user-contract";
+import { ApiUserAvatarStorageAdapter } from "../features/user/user-avatar-storage.adapter";
 import type { ApiBrowserSessionConfig } from "../platform/config/api.config";
 import { ApiAuthenticationPort } from "../api-request.policy";
 import {
@@ -15,7 +16,6 @@ import {
   composeApiBetterAuth,
   type ApiPasswordResetMailPort,
 } from "./api-better-auth.composition";
-import { UnavailableApiUserAvatarStorageAdapter } from "./api-user-avatar-storage.adapter";
 
 const logger = createLogger("langwatch:api:auth");
 
@@ -179,6 +179,17 @@ export type ApiAuthCompositionOptions = {
    * the connection is passed rather than assumed absent.
    */
   redis?: RedisConnection | null;
+  /**
+   * Where an uploaded avatar's bytes are written.
+   *
+   * Supplied rather than composed here because the object store belongs to the
+   * product-infrastructure half, which this process opens AFTER the Auth graph
+   * — the browser-session boundary is what every other door stands on, so it
+   * cannot wait on a store it never reads. A caller that names none gets
+   * {@link ApiUserAvatarStorageAdapter.absent}, which refuses the write by name
+   * rather than accepting bytes it would then drop.
+   */
+  avatarStorage?: UserAvatarStoragePort | undefined;
   /** Names this process in the refusal an avatar upload produces. */
   processName: string;
 };
@@ -197,8 +208,9 @@ export type ApiAuthCompositionOptions = {
  * is both over the client this process already composes. The user service
  * under it is the packaged `PostgresUserAdapter` over the same client, with
  * its avatar storage declared absent
- * ({@link UnavailableApiUserAvatarStorageAdapter}) because writing an avatar
- * needs a stored-object application and reading a profile does not.
+ * ({@link ApiUserAvatarStorageAdapter}), bound to the object store this
+ * process opens later: reading a profile needs none, writing an avatar does,
+ * and the Auth graph must not wait on a store it never reads.
  *
  * The transport IS process-bound, and the difference is worth stating exactly.
  * It is not a session table this package could query; it is one configured
@@ -267,9 +279,9 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
       // rows the other tier's queries do not find.
       credentialIssuer: issuerForProviderId("credential"),
       organizations: options.organizations,
-      avatarStorage: UnavailableApiUserAvatarStorageAdapter.create({
-        processName: options.processName,
-      }),
+      avatarStorage:
+        options.avatarStorage ??
+        ApiUserAvatarStorageAdapter.absent({ processName: options.processName }),
     }).build();
 
     const auth = PostgresAuthAdapter.create({

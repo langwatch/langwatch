@@ -238,6 +238,7 @@ import {
   ApiBrowserSessionTransportPort,
   AuthSessionApiAuthenticationAdapter,
 } from "./api-auth.composition";
+import { ApiUserAvatarStorageAdapter } from "../features/user/user-avatar-storage.adapter";
 import { ApiInstanceAdminKeyAdapter } from "./api-instance-admin-key.adapter";
 import { ApiRestObservabilityComposition } from "./api-rest-observability.composition";
 import type { ApiSubscriptionMount } from "../api.application";
@@ -1917,6 +1918,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The SAME Redis Better Auth's own session cache lives in, so revoking a
       // session through this process clears the entry the other tier reads.
       redis: queueInfrastructure?.redis ?? null,
+      // Where an uploaded avatar's bytes land: the content-addressed store the
+      // product-infrastructure half opens, read at the UPLOAD rather than here.
+      // That half composes further down — it stands on the execution, product
+      // and trace halves, all of which stand on the session this graph
+      // verifies — so a store read at this line would always be absent and
+      // every upload would refuse on a process that can serve it. The thunk is
+      // what lets the two orders coexist; the adapter names the refusal when a
+      // process genuinely composed no store.
+      avatarStorage: ApiUserAvatarStorageAdapter.create({
+        storedObjects: () => this.composedProductInfra?.storedObjectBytes,
+        processName: options.config.serviceName,
+      }),
       processName: options.config.serviceName,
       report: LoggedApiAuthAbsence.create(logger),
     });
