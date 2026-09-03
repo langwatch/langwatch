@@ -26,22 +26,30 @@ function recordingWriter() {
   };
 }
 
-const bashCall = (command: string): LocalCall => ({
+const envelope = {
   callId: "call_1",
+  conversationId: "conv_1",
+  turnId: "turn_1",
+  deadlineAt: 0,
+};
+
+const bashCall = (command: string): LocalCall => ({
+  ...envelope,
   tool: "local_bash",
   params: { command },
 });
 
 const editCall = (path: string): LocalCall => ({
-  callId: "call_2",
+  ...envelope,
   tool: "local_edit",
-  params: { path, oldText: "a", newText: "b" },
+  params: { path, edits: [{ oldText: "a", newText: "b" }] },
 });
 
 const bashOutput = (over: Partial<BashOutput>): BashOutput => ({
   stdout: "",
   stderr: "",
   exitCode: 0,
+  truncated: false,
   durationMs: 120,
   ...over,
 });

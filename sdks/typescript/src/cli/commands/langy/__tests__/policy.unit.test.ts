@@ -220,6 +220,41 @@ describe("given a folder shared with a Langy conversation", () => {
     });
   });
 
+  describe("when the same interpreter is written under two names", () => {
+    /** @scenario "Interpreter aliases share one grant" */
+    it("spends one grant on both spellings", () => {
+      const asked = bash("python -m compileall src");
+      expect(asked.kind).toBe("ask");
+      if (asked.kind === "ask") expect(asked.pattern).toBe("python *");
+
+      const grants = ["python *"];
+      expect(bash("python -m compileall src", { grants })).toEqual({
+        kind: "run",
+      });
+      expect(bash("python3 -m compileall src", { grants })).toEqual({
+        kind: "run",
+      });
+      expect(bash("python3 setup.py check", { grants })).toEqual({
+        kind: "run",
+      });
+    });
+
+    it("offers the interpreter as the pattern for every alias", () => {
+      expect(grantPatternFor(["python3", "-m", "compileall"])).toBe("python *");
+      expect(grantPatternFor(["nodejs", "server.js"])).toBe("node *");
+      expect(grantPatternFor(["pip3", "install", "-r", "reqs.txt"])).toBe(
+        "pip *",
+      );
+    });
+
+    it("leaves every other command name alone", () => {
+      expect(grantPatternFor(["pnpm", "typecheck"])).toBe("pnpm typecheck");
+      expect(
+        grantsAllow({ tokens: ["go", "test"], grants: new Set(["python *"]) }),
+      ).toBe(false);
+    });
+  });
+
   describe("when a path points outside the folder", () => {
     /** @scenario "A path outside the folder is refused" */
     it("refuses every escape shape and names the folder that is allowed", () => {

@@ -82,6 +82,13 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Then the command runs without a card
       And a git command with a different first argument still asks
 
+    @unit
+    Scenario: Interpreter aliases share one grant
+      Given I allowed a python command for this session
+      When Langy runs the same command written as python3
+      Then the command runs without a card
+      And the pattern the card offered covers the interpreter
+
     @integration
     Scenario: Denying returns a pushback Langy acts on
       Given a permission card for a command that removes files

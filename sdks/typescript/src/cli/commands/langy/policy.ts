@@ -335,9 +335,37 @@ export function parseCommand(command: string): ParsedCommand {
   return { parts, hasSubstitution };
 }
 
+/**
+ * Interpreter names that run the same program under two spellings.
+ *
+ * A grant is keyed on the command name, so `python3 -m compileall` asked
+ * again after the user had already allowed `python -m compileall`, and the
+ * two cards read the same. The alias folds into one name, and the pattern the
+ * card offers covers the interpreter: what an interpreter runs is its
+ * argument, so a per-argument grant would ask again for the next script
+ * anyway.
+ *
+ * Grants only. Nothing else in the policy reads this: the read-only set and
+ * the refusals still see the name the command actually wrote.
+ */
+export const INTERPRETER_ALIASES: ReadonlyMap<string, string> = new Map([
+  ["python", "python"],
+  ["python3", "python"],
+  ["node", "node"],
+  ["nodejs", "node"],
+  ["pip", "pip"],
+  ["pip3", "pip"],
+]);
+
+/** The name a grant is keyed on. An interpreter alias folds into one name. */
+export function grantName(name: string): string {
+  return INTERPRETER_ALIASES.get(name) ?? name;
+}
+
 /** The pattern "allow for this session" would grant for one command part. */
 export function grantPatternFor(tokens: string[]): string {
   const name = tokens[0] ?? "";
+  if (INTERPRETER_ALIASES.has(name)) return `${grantName(name)} *`;
   const first = tokens.slice(1).find((token) => !token.startsWith("-"));
   return first === undefined ? `${name} *` : `${name} ${first}`;
 }
@@ -352,7 +380,9 @@ export function grantsAllow({
 }): boolean {
   const name = tokens[0];
   if (name === undefined || name === "") return false;
-  return grants.has(grantPatternFor(tokens)) || grants.has(`${name} *`);
+  return (
+    grants.has(grantPatternFor(tokens)) || grants.has(`${grantName(name)} *`)
+  );
 }
 
 /** True when the token names a program by its path rather than by its name. */
