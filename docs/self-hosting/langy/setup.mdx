@@ -36,7 +36,7 @@ credentials of the person who asked. Two controls bound that, both on by
 default on every cluster:
 
 - **Per-worker identity.** Each conversation's worker runs under its own UID
-  with its own credentials and its own opencode password. Workers cannot read
+  with its own credentials and no listener a sibling could dial. Workers cannot read
   each other's keys or reach each other's control ports.
 - **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
   the gateway, and nothing else. Egress to the internet is off until you turn it

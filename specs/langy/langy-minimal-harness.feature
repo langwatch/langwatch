@@ -1,4 +1,4 @@
-Feature: Langy minimal harness
+Feature: Langy minimal worker
   Langy's worker runs with Langy's own system prompt and a tool surface scoped
   to its role. A constraint that can live in configuration lives in
   configuration, not in prompt prose, and the prompt has an enforced size
@@ -8,33 +8,26 @@ Feature: Langy minimal harness
   Scenario: The system prompt is Langy's own, not a coding agent's
     When a worker is provisioned
     Then the agent configuration carries Langy's own prompt
-    And the harness's built-in coding-agent prompt is not used
+    And the agent's own built-in coding-agent prompt is not used
 
   @unit
   Scenario: The worker does not expose tools the panel cannot show
-    When a worker is provisioned
-    Then subagent spawning is denied, because the panel has no way to show it
-    And the harness's own interactive prompt is denied, because Langy asks
+    When a worker session is opened
+    Then only the tools Langy's role needs are enabled
+    And subagent spawning is not among them, because the panel has no way to
+      show it
+    And no built-in interactive prompt is among them, because Langy asks
       through its own question tool, which the panel renders as a choices card
-    And the shell, file, skill, todo, and web fetching tools stay available,
-      since Langy answers questions whose answers are not in LangWatch's docs
+    And the shell, file, skill and todo tools stay available, since Langy
+      answers questions whose answers are not in LangWatch's docs
 
   @unit
   Scenario: The worker runs only the skills we ship it
     Given the host account has its own agent skills installed
     When a worker is provisioned
-    Then the worker does not load them
+    Then the worker is pointed at the skills tree we shipped it, and no other
     And the operator's skills stay out of Langy's system prompt and out of the
       capabilities it offers the user
-
-  @unit
-  Scenario: The harness's own built-in skill is denied by name
-    Given the harness ships a built-in skill for editing its own configuration,
-      which is work Langy does not do for a customer
-    When a worker is provisioned
-    Then that skill is denied by name
-    And every skill we ship stays available, because a rule that denied all of
-      them would also switch the skill tool off
 
   @unit
   Scenario: The prompt fits its size budget

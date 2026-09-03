@@ -60776,15 +60776,15 @@ keywords:
 
 ---
 title: How Langy works
-description: "Each Langy conversation is one opencode worker in a gVisor sandbox: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
+description: "Each Langy conversation is one agent worker in a gVisor sandbox: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
 sidebarTitle: How Langy works
 keywords:
   - how langy works
   - ai agent architecture
-  - opencode harness
+  - langy agent worker
 ---
 
-Langy runs on [opencode](https://github.com/anomalyco/opencode) as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one opencode process per conversation and reaps it when the conversation goes idle.
+Langy runs as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one agent worker process per conversation and reaps it when the conversation goes idle.
 
 The worker does the actual reading, testing, and code editing. Every tool call it makes streams back into the chat as a typed activity, and every turn is a traced run in your project.
 
@@ -60799,7 +60799,7 @@ graph LR
   browser["Browser<br/>(event-sourced chat UI)"]
   control["LangWatch control plane<br/>(turn processor, event log)"]
   manager["langyagent pod<br/>(Go manager)"]
-  worker["opencode worker<br/>(one per conversation, gVisor-sandboxed)"]
+  worker["Agent worker<br/>(one per conversation, gVisor-sandboxed)"]
   cli["langwatch CLI<br/>&rarr; LangWatch API"]
   gateway["LangWatch AI Gateway<br/>(model calls)"]
   github["GitHub App<br/>(bot-authored PRs)"]
@@ -60817,8 +60817,8 @@ graph LR
 |---|---|
 | Browser | The chat panel. Event-sourced: a refresh resumes the conversation, an in-flight turn keeps streaming. |
 | Control plane | The turn processor in the LangWatch app. Admits each turn, dispatches it to the agent, logs every tool call as a typed event. |
-| `langyagent` | The agent service. Spawns one opencode worker per conversation. Single replica; scale vertically. |
-| opencode worker | The coding agent itself, inside the gVisor sandbox, holding that conversation's credentials, repo clone, and skills. Reaped after ~10 minutes idle, home wiped. |
+| `langyagent` | The agent service. Spawns one worker per conversation. Single replica; scale vertically. |
+| Agent worker | The coding agent itself, inside the gVisor sandbox, holding that conversation's credentials, repo clone, and skills. Reaped after ~10 minutes idle, home wiped. |
 
 The agent service is cluster-internal only, never exposed outside; auth and networking details are on the [self-hosting overview](/self-hosting/langy/overview).
 
@@ -61101,7 +61101,7 @@ Langy uses your own model accounts and API keys. Every turn it takes is itself a
     Enable Langy, pick a model or sign in with Codex, and review the first pull request.
   </Card>
   <Card title="How Langy works" icon="diagram-project" href="/langy/how-langy-works">
-    The mechanism: a gVisor-sandboxed opencode worker whose only interface to LangWatch is the `langwatch` CLI.
+    The mechanism: a gVisor-sandboxed agent worker whose only interface to LangWatch is the `langwatch` CLI.
   </Card>
   <Card title="Ask Langy" icon="comments" href="/langy/chat">
     The chat panel and the kinds of questions Langy answers, from regressions to cost spikes.
@@ -61764,7 +61764,7 @@ keywords:
   - ai agent security
 ---
 
-Each conversation runs as a separate `opencode` worker process inside a single agent pod. gVisor is a user-space kernel that sits between the worker and the host kernel, so a worker that runs arbitrary shell (Langy workers spawn `git`, `gh`, and `npm`) has a much smaller pod-to-host escape surface than a normal container.
+Each conversation runs as a separate worker process inside a single agent pod. gVisor is a user-space kernel that sits between the worker and the host kernel, so a worker that runs arbitrary shell (Langy workers spawn `git`, `gh`, and `npm`) has a much smaller pod-to-host escape surface than a normal container.
 
 On LangWatch Cloud the pod always runs under gVisor. Self-hosted, the chart pins the pod to a `gvisor` RuntimeClass by default; on a cluster without one the pod waits rather than silently dropping to the node's runtime. Any sandboxed RuntimeClass works (a Kata class on AKS, for example).
 
@@ -61778,7 +61778,7 @@ Langy is isolated at several layers, from the pod boundary down to the walls bet
 |---|---|---|
 | Pod to host | gVisor (`runsc`) user-space kernel; required RuntimeClass with a render-time chart guard | Kubernetes + chart |
 | Worker to worker (files) | Each conversation gets a distinct Unix UID and a `0700` home; homes are chowned before any secret is written; `/proc/<pid>/environ` is `0400` owned by the worker UID, so a sibling UID gets `EACCES` | Linux file permissions (DAC) |
-| Worker to worker (control port) | Each worker gets a distinct random `OPENCODE_SERVER_PASSWORD`; a per-worker auth proxy terminates the external token and swaps in HTTP Basic upstream; a fail-closed guard refuses to start a worker whose control server does not return `401` to an unauthenticated request | Go auth proxy + opencode |
+| Worker to worker (control port) | A worker binds no listener at all. The manager drives it over a private stdio pipe pair, so there is no port for a sibling worker to reach | Go manager |
 | Worker to external (L7) | Per-worker egress adapter: require-TLS, per-destination throttle, the project's allow-list, an operator FQDN floor, and a TLS SNI cross-check against the CONNECT authority | Go adapter (cooperative, see below) |
 | Worker to external (L3/L4) | Deny-by-default `NetworkPolicy`; outbound `:443` to anywhere is off by default; RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint are carved out and blocked | Container network interface (CNI) |
 | Worker to external (optional, hard) | Cilium `toFQDNs` on the floor, or a per-worker network namespace (ADR-033 Fix B) | Cilium / netns (planned, see below) |
@@ -65150,7 +65150,7 @@ keywords:
   - langy_internal_secret
 ---
 
-The agent-side variables (`LANGY_*`, and `OPENCODE_*` apart from the one below) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret. The control-plane variables (`OPENCODE_AGENT_URL`, `GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
+The agent-side variables (`LANGY_*` apart from the one below) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret. The control-plane variables (`LANGY_AGENT_URL`, `GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
 
 <Info>
 **Also check:** [Setup](/self-hosting/langy/setup), [Register the GitHub App](/self-hosting/langy/github-app), [Networking and egress](/self-hosting/langy/networking-and-egress).
@@ -65165,7 +65165,7 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 | Variable | Description | Required | Default |
 |---|---|---|---|
 | `LANGY_INTERNAL_SECRET` | Shared bearer secret for app-to-agent auth (and the per-frame HMAC base). Lives in the app Secret and is injected into the app, the workers, and the agent pod. The chart generates it when `autogen.enabled` is on; with your own Secret, add the key yourself. | Yes | chart-generated |
-| `OPENCODE_AGENT_URL` | App-side URL of the agent pod (`http://<release>-langyagent:80`). Turns on the Langy backend when set. Wired automatically when `langyagent.chartManaged=true`. | When agent on | unset (chart-set) |
+| `LANGY_AGENT_URL` | App-side URL of the agent pod (`http://<release>-langyagent:80`). Turns on the Langy backend when set. Wired automatically when `langyagent.chartManaged=true`. | When agent on | unset (chart-set) |
 | `ENVIRONMENT` | Deployment environment. Gates the dev-only isolation bypass, so keep it production-like. | No | `production` |
 
 <Warning>
@@ -65176,9 +65176,9 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 
 | Variable | Description | Required | Default |
 |---|---|---|---|
-| `LANGY_MAX_WORKERS` | Max concurrent opencode subprocesses before the pod returns 503. | No | `20` |
+| `LANGY_MAX_WORKERS` | Max concurrent worker subprocesses before the pod returns 503. | No | `20` |
 | `LANGY_WORKER_IDLE_MS` | Idle-worker reap timeout. | No | `600000` (10 min) |
-| `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker's opencode to bind. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
+| `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker to report ready. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
 | `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | Yes | `/workspace` |
 
 ## Egress
@@ -65546,7 +65546,7 @@ The default pins the pod to a `gvisor` RuntimeClass. On a cluster without one, o
 
 The GitHub App and outbound network egress are both optional and off until you configure them.
 
-The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [opencode](/langy/how-langy-works) worker per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
+The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [agent worker](/langy/how-langy-works) per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 
 <Info>
 **Also check:** [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables), [Networking and egress](/self-hosting/langy/networking-and-egress), [The sandbox](/langy/security/sandbox).
@@ -65589,7 +65589,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 graph LR
     Browser["Browser<br/>(event-sourced UI)"] -->|"HTTPS"| App["LangWatch App<br/>(control plane)"]
     App -->|"Bearer LANGY_INTERNAL_SECRET<br/>ClusterIP only"| Agent["langyagent pod<br/>(Go manager)"]
-    Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>opencode worker"]
+    Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>agent worker"]
     Worker -->|"langwatch CLI<br/>(per-session key)"| App
     Worker -->|"LLM traffic<br/>(virtual key)"| Gateway["LangWatch AI Gateway"]
     Gateway -->|"completions"| Providers["LLM Providers<br/>(your accounts / BYOK)"]
@@ -65597,7 +65597,7 @@ graph LR
     App -->|"install tokens"| GitHubAPI["api.github.com"]
 ```
 
-The control plane reaches the agent over cluster DNS at `http://<release>-langyagent:80` (`OPENCODE_AGENT_URL`), authenticated with `LANGY_INTERNAL_SECRET`. The Service is ClusterIP only; a render-time guard blocks any other type, so the agent is never exposed outside the cluster. Each worker's only path to LangWatch data is the `langwatch` CLI, and its only path to the internet is the [L7 egress adapter](/self-hosting/langy/networking-and-egress). LLM traffic goes through the [LangWatch AI Gateway](/ai-gateway/self-hosting/helm), never direct to providers, so every Langy LLM call is traced, budgeted, and policed like any other.
+The control plane reaches the agent over cluster DNS at `http://<release>-langyagent:80` (`LANGY_AGENT_URL`), authenticated with `LANGY_INTERNAL_SECRET`. The Service is ClusterIP only; a render-time guard blocks any other type, so the agent is never exposed outside the cluster. Each worker's only path to LangWatch data is the `langwatch` CLI, and its only path to the internet is the [L7 egress adapter](/self-hosting/langy/networking-and-egress). LLM traffic goes through the [LangWatch AI Gateway](/ai-gateway/self-hosting/helm), never direct to providers, so every Langy LLM call is traced, budgeted, and policed like any other.
 
 ## Where to go next
 
@@ -65664,7 +65664,7 @@ credentials of the person who asked. Two controls bound that, both on by
 default on every cluster:
 
 - **Per-worker identity.** Each conversation's worker runs under its own UID
-  with its own credentials and its own opencode password. Workers cannot read
+  with its own credentials and no listener a sibling could dial. Workers cannot read
   each other's keys or reach each other's control ports.
 - **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
   the gateway, and nothing else. Egress to the internet is off until you turn it
