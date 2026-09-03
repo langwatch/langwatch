@@ -251,31 +251,50 @@ export interface LwqlKeyMapBackfillPlan {
 
 /**
  * Diffs every project's key hash against the key-map table's current rows and
- * returns only what is missing. Pure: takes the already-read existing hash
- * set, computes no I/O.
+ * returns only what is missing. Reads nothing: it takes the already-read
+ * existing hash set, and the only work it does is deriving each project's
+ * capability.
+ *
+ * That derivation is a KDF (`../capability.ts`), which is why this is `async`
+ * and why the hashes are derived up front rather than inside the loop — one
+ * costs roughly 200ms, so a serial loop would put the whole backfill on the
+ * critical path at 200ms a project.
  *
  * Duplicate `(hash, tenant)` pairs are harmless at read time (row filters use
  * `HAVING uniqExact(TenantId) = 1`), but this still de-duplicates within one
  * run — inserting a row already covered by `existingHashes`, or repeated
  * inside `projects` itself, buys nothing and only grows the table.
  */
-export function planLwqlKeyMapBackfill({
+export async function planLwqlKeyMapBackfill({
   projects,
   existingHashes,
 }: {
   projects: readonly { id: string; lwqlKey: string }[];
   existingHashes: ReadonlySet<string>;
-}): LwqlKeyMapBackfillPlan {
+}): Promise<LwqlKeyMapBackfillPlan> {
   const rowsToInsert: LwqlKeyMapRow[] = [];
   const blankKeyProjectIds: string[] = [];
   const plannedHashes = new Set<string>();
 
-  for (const project of projects) {
-    if (!project.lwqlKey) {
+  // A blank key is reported, never hashed: the capability refuses an empty
+  // secret, and this function's contract is to collect those projects rather
+  // than throw on the first one.
+  const derived = await Promise.all(
+    projects.map(async (project) =>
+      project.lwqlKey
+        ? {
+            project,
+            hash: await lwqlTenantCapability({ secret: project.lwqlKey }),
+          }
+        : { project, hash: undefined },
+    ),
+  );
+
+  for (const { project, hash } of derived) {
+    if (hash === undefined) {
       blankKeyProjectIds.push(project.id);
       continue;
     }
-    const hash = lwqlTenantCapability({ secret: project.lwqlKey });
     if (existingHashes.has(hash) || plannedHashes.has(hash)) continue;
     plannedHashes.add(hash);
     rowsToInsert.push({

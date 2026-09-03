@@ -211,8 +211,8 @@ describe("given lwqlPostgresSchemaFromDatabaseUrl", () => {
 
 describe("given planLwqlKeyMapBackfill", () => {
   describe("when a project has a blank lwqlKey", () => {
-    it("surfaces it in blankKeyProjectIds instead of inserting a row", () => {
-      const plan = planLwqlKeyMapBackfill({
+    it("surfaces it in blankKeyProjectIds instead of inserting a row", async () => {
+      const plan = await planLwqlKeyMapBackfill({
         projects: [{ id: "project-blank", lwqlKey: "" }],
         existingHashes: new Set(),
       });
@@ -221,20 +221,20 @@ describe("given planLwqlKeyMapBackfill", () => {
       expect(plan.rowsToInsert).toEqual([]);
     });
 
-    it("does not throw, even though lwqlTenantCapability throws on an empty secret", () => {
-      expect(() =>
+    it("does not reject, even though lwqlTenantCapability rejects on an empty secret", async () => {
+      await expect(
         planLwqlKeyMapBackfill({
           projects: [{ id: "project-blank", lwqlKey: "" }],
           existingHashes: new Set(),
         }),
-      ).not.toThrow();
+      ).resolves.toBeDefined();
     });
   });
 
   describe("when a project's key hash is already in existingHashes", () => {
-    it("excludes it from rowsToInsert", () => {
-      const hash = lwqlTenantCapability({ secret: "already-mapped-key" });
-      const plan = planLwqlKeyMapBackfill({
+    it("excludes it from rowsToInsert", async () => {
+      const hash = await lwqlTenantCapability({ secret: "already-mapped-key" });
+      const plan = await planLwqlKeyMapBackfill({
         projects: [{ id: "project-existing", lwqlKey: "already-mapped-key" }],
         existingHashes: new Set([hash]),
       });
@@ -248,8 +248,8 @@ describe("given planLwqlKeyMapBackfill", () => {
     // Contrived — a unique key is the invariant this table exists to record —
     // but the plan still must not depend on that invariant holding, so it
     // dedupes within a single run rather than inserting both.
-    it("inserts only the first occurrence", () => {
-      const plan = planLwqlKeyMapBackfill({
+    it("inserts only the first occurrence", async () => {
+      const plan = await planLwqlKeyMapBackfill({
         projects: [
           { id: "project-a", lwqlKey: "shared-key" },
           { id: "project-b", lwqlKey: "shared-key" },
@@ -263,15 +263,15 @@ describe("given planLwqlKeyMapBackfill", () => {
   });
 
   describe("when a project has a new, non-blank, not-yet-mapped key", () => {
-    it("includes it in rowsToInsert with its real hash", () => {
-      const plan = planLwqlKeyMapBackfill({
+    it("includes it in rowsToInsert with its real hash", async () => {
+      const plan = await planLwqlKeyMapBackfill({
         projects: [{ id: "project-new", lwqlKey: "brand-new-key" }],
         existingHashes: new Set(),
       });
 
       expect(plan.rowsToInsert).toEqual([
         {
-          KeyHash: lwqlTenantCapability({ secret: "brand-new-key" }),
+          KeyHash: await lwqlTenantCapability({ secret: "brand-new-key" }),
           TenantId: "project-new",
         },
       ]);
@@ -280,9 +280,11 @@ describe("given planLwqlKeyMapBackfill", () => {
   });
 
   describe("when projects mix blank, already-mapped, and new keys", () => {
-    it("handles each independently in a single pass", () => {
-      const existingHash = lwqlTenantCapability({ secret: "existing-key" });
-      const plan = planLwqlKeyMapBackfill({
+    it("handles each independently in a single pass", async () => {
+      const existingHash = await lwqlTenantCapability({
+        secret: "existing-key",
+      });
+      const plan = await planLwqlKeyMapBackfill({
         projects: [
           { id: "project-blank", lwqlKey: "" },
           { id: "project-existing", lwqlKey: "existing-key" },
@@ -294,7 +296,7 @@ describe("given planLwqlKeyMapBackfill", () => {
       expect(plan.blankKeyProjectIds).toEqual(["project-blank"]);
       expect(plan.rowsToInsert).toEqual([
         {
-          KeyHash: lwqlTenantCapability({ secret: "new-key" }),
+          KeyHash: await lwqlTenantCapability({ secret: "new-key" }),
           TenantId: "project-new",
         },
       ]);
