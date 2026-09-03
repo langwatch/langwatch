@@ -177,7 +177,7 @@ env: {}
 #
 # The passwords are mounted from a Secret with optional: true — a Secret missing
 # a key leaves that half unprovisioned (fail-closed) instead of bricking the pod.
-lwql:
+lwqlAccessModel:
   enabled: false
   # Database holding the LWQL objects; must match the app's LWQL_DATABASE.
   database: langwatch

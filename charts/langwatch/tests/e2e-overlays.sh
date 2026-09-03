@@ -1049,12 +1049,12 @@ test_infra_overlays() {
   # subchart's own Go render tests, not this parent-chart harness.
   #
   #   1. The subchart is switched ON by default. Helm cannot derive
-  #      clickhouse.lwql.enabled from lwql.enabled, so the parent values set it,
+  #      clickhouse.lwqlAccessModel.enabled from lwql.enabled, so the parent values set it,
   #      and langwatch.lwql.provisioningGuard fails the render if an operator
   #      turns it off while leaving LWQL enabled — otherwise NOBODY provisions.
   assert_render_refuses "chart-managed: guard refuses LWQL-on with subchart-off" \
-    "requires clickhouse.lwql.enabled=true" \
-    --set clickhouse.lwql.enabled=false
+    "requires clickhouse.lwqlAccessModel.enabled=true" \
+    --set clickhouse.lwqlAccessModel.enabled=false
   #   2. The app still gets the query-time LWQL password on the chart-managed
   #      path: it authenticates as langwatch_lwql regardless of who provisioned,
   #      so cutting the password (the old selfProvisionActive gate) would break

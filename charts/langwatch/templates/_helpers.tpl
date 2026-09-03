@@ -643,10 +643,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{/* No LWQL Secret-name guard is needed under Design C. For chart-managed
      ClickHouse the LWQL passwords live in the ClickHouse credentials Secret, and
-     clickhouse.lwql.existingSecret DEFAULTS EMPTY so both the subchart mount and
+     clickhouse.lwqlAccessModel.existingSecret DEFAULTS EMPTY so both the subchart mount and
      the app/workers env resolve that Secret by the same fallback — renaming the
      app Secret can no longer point either side at the wrong place. When an
-     operator explicitly overrides clickhouse.lwql.existingSecret they own that
+     operator explicitly overrides clickhouse.lwqlAccessModel.existingSecret they own that
      Secret's keys (external-secrets, terraform), and langwatch.clickhouse.lwqlSecretName
      keeps the app reading the very Secret they named, so there is nothing to
      refuse. The old guard fired on a hardcoded default that no longer exists. */}}
@@ -970,7 +970,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
          - external/BYO: the app SELF-PROVISIONS, so the passwords live in the
            app Secret under LWQL_CLICKHOUSE_PASSWORD / LWQL_POSTGRES_READER_PASSWORD. */}}
 {{- if .Values.clickhouse.chartManaged }}
-{{- $lwql := .Values.clickhouse.lwql | default dict }}
+{{- $lwql := .Values.clickhouse.lwqlAccessModel | default dict }}
 - name: LWQL_CLICKHOUSE_PASSWORD
   valueFrom:
     secretKeyRef:
@@ -1275,7 +1275,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* LangWatchQL Secret for chart-managed ClickHouse. Resolves to the SAME Secret
      the clickhouse-serverless subchart mounts the langwatch_lwql user from, so
      the app/workers read the query password from exactly where the pod created
-     it: clickhouse.lwql.existingSecret (tpl'd) when set, else the ClickHouse
+     it: clickhouse.lwqlAccessModel.existingSecret (tpl'd) when set, else the ClickHouse
      credentials Secret.
 
      Both this helper and the subchart's clickhouse-serverless.lwqlSecretName key
@@ -1291,7 +1291,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      truncation never bites in practice, but a hand-emptied existingSecret on a
      >36-char release would diverge. Keep auth.existingSecret set. */}}
 {{- define "langwatch.clickhouse.lwqlSecretName" -}}
-  {{- $lwql := .Values.clickhouse.lwql | default dict -}}
+  {{- $lwql := .Values.clickhouse.lwqlAccessModel | default dict -}}
   {{- if $lwql.existingSecret -}}
     {{- tpl $lwql.existingSecret . -}}
   {{- else -}}
@@ -1422,23 +1422,23 @@ true
 
   For chart-managed ClickHouse the app does NOT self-provision (selfProvisionActive
   is false), so the ONLY provisioner is the clickhouse-serverless subchart, and it
-  renders the access model only when clickhouse.lwql.enabled is true. Helm cannot
+  renders the access model only when clickhouse.lwqlAccessModel.enabled is true. Helm cannot
   derive a subchart value from a parent one, so the parent's values.yaml sets
-  clickhouse.lwql.enabled: true to match lwql.enabled's default — but an operator
+  clickhouse.lwqlAccessModel.enabled: true to match lwql.enabled's default — but an operator
   can still turn one off and leave the other on. If they do (lwql.enabled=true,
-  clickhouse.chartManaged=true, clickhouse.lwql.enabled=false) NOBODY provisions
+  clickhouse.chartManaged=true, clickhouse.lwqlAccessModel.enabled=false) NOBODY provisions
   LWQL and the feature fails closed with no signal. Fail loudly instead.
 
   Note the published-tarball caveat: the vendored clickhouse-serverless-0.3.0.tgz
   predates the lwql values, but Helm passes the value through to the subchart
   regardless of whether the subchart declares it, so reading it here is safe and
-  this guard never fires on the stock default path (clickhouse.lwql.enabled=true).
+  this guard never fires on the stock default path (clickhouse.lwqlAccessModel.enabled=true).
 */}}
 {{- define "langwatch.lwql.provisioningGuard" -}}
 {{- $ch := .Values.clickhouse | default dict }}
-{{- $chLwql := $ch.lwql | default dict }}
+{{- $chLwql := $ch.lwqlAccessModel | default dict }}
 {{- if and .Values.lwql.enabled $ch.chartManaged (not $chLwql.enabled) }}
-{{- fail "lwql.enabled=true with clickhouse.chartManaged=true requires clickhouse.lwql.enabled=true: for chart-managed ClickHouse the app does not self-provision, so the clickhouse-serverless subchart is the only provisioner and it renders the LWQL access model only when clickhouse.lwql.enabled is true. Leaving it false silently disables LangWatchQL. Set clickhouse.lwql.enabled=true (the chart default), or disable the feature with lwql.enabled=false." }}
+{{- fail "lwql.enabled=true with clickhouse.chartManaged=true requires clickhouse.lwqlAccessModel.enabled=true: for chart-managed ClickHouse the app does not self-provision, so the clickhouse-serverless subchart is the only provisioner and it renders the LWQL access model only when clickhouse.lwqlAccessModel.enabled is true. Leaving it false silently disables LangWatchQL. Set clickhouse.lwqlAccessModel.enabled=true (the chart default), or disable the feature with lwql.enabled=false." }}
 {{- end }}
 {{- end -}}
 

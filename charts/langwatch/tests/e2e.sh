@@ -449,7 +449,7 @@ test_lwql() {
   fi
 
   # PostgreSQL bridge, ClickHouse side: the lwql_postgres named collection the
-  # renderer emits when clickhouse.lwql.postgres.host is set (values-e2e wires it
+  # renderer emits when clickhouse.lwqlAccessModel.postgres.host is set (values-e2e wires it
   # to the in-cluster PostgreSQL). Existence only — the collection is config, not
   # dialed at boot; the engine tables that consume it, plus the PostgreSQL reader
   # role and approved views, are the full-model scenario deferred to #7387.

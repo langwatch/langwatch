@@ -2,66 +2,59 @@ package render
 
 import (
 	"crypto/sha256"
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
 
-// lwqlSourceTables is the fixed set of tables the langwatch_lwql user may read,
-// each behind the tenant row filter. Ported verbatim from the shipped SaaS
-// access model (render-config.sh) which mirrors lwqlSourceTables() over the app
-// repo's LWQL view catalog: the first eight are ClickHouse-native sources, the
-// six *_pg entries are the PostgreSQL-engine bridge tables. A catalog addition
-// needs a matching entry here and fails closed without one (the new view's
-// source has no grant, so queries on it are refused rather than unbounded).
+// lwqlCatalogJSON is the manifest that is the single source of truth for the
+// Go side of the LangWatchQL access model. It is embedded rather than read at
+// runtime so the binary carries the lists it renders, and it is the same file a
+// TypeScript CI test (catalog/__tests__/manifestParity.unit.test.ts) asserts
+// equal to the application's LWQL view catalog — so the two below can no longer
+// silently drift from the catalog they mirror.
 //
-// This list is maintained by hand against three others that must agree, and
-// there is a known drift today (batch_evaluations is present here and in the
-// SaaS renderer but absent from the app catalog). Keep the four in sync when
-// editing:
-//   - infra/clickhouse-serverless/render-config.sh (SaaS bash renderer)
-//   - platform/app/src/server/analytics/lwql/catalog/lwqlViews.ts (native views)
-//   - platform/app/src/server/analytics/lwql/catalog/postgresViews.ts (PG bridge)
-var lwqlSourceTables = []string{
-	"trace_summaries",
-	"stored_spans",
-	"evaluation_runs",
-	"simulation_runs",
-	"trace_analytics",
-	"trace_analytics_rollup",
-	"evaluation_analytics",
-	"evaluation_analytics_rollup",
-	"annotations_pg",
-	"experiments_pg",
-	"batch_evaluations_pg",
-	"projects_pg",
-	"prompts_pg",
-	"prompt_versions_pg",
+//go:embed lwql_catalog.json
+var lwqlCatalogJSON []byte
+
+// lwqlCatalog is the parsed manifest. Named fields, not the bare slices, so the
+// embed is unmarshalled exactly once at package init.
+type lwqlCatalog struct {
+	SourceTables []string `json:"sourceTables"`
+	ViewNames    []string `json:"viewNames"`
 }
 
+// lwqlSourceTables is the fixed set of tables the langwatch_lwql user may read,
+// each behind the tenant row filter — eight ClickHouse-native sources followed
+// by the six *_pg PostgreSQL-engine bridge tables. A catalog addition needs a
+// matching entry in lwql_catalog.json and fails closed without one (the new
+// view's source has no grant, so queries on it are refused rather than
+// unbounded). The manifest is the source of truth here; the SaaS
+// render-config.sh is a third list in the langwatch-saas repo and cannot be
+// checked from this repo.
+//
 // lwqlViewNames are the caller-facing views over those sources. They are NOT
 // lwql_* prefixed, so the wildcard grant does not reach them and each needs its
 // own SELECT grant. Grant only, no filter: the views are SQL SECURITY INVOKER,
 // so every read through them hits the source tables' row filters above.
-//
-// Maintained by hand alongside lwqlSourceTables — see the sync note there.
-var lwqlViewNames = []string{
-	"traces",
-	"spans",
-	"evaluations",
-	"simulations",
-	"trace_metrics",
-	"trace_metrics_by_minute",
-	"model_usage_by_minute",
-	"evaluation_metrics",
-	"evaluation_metrics_by_minute",
-	"annotations",
-	"experiments",
-	"batch_evaluations",
-	"projects",
-	"prompts",
-	"prompt_versions",
+var (
+	lwqlSourceTables []string
+	lwqlViewNames    []string
+)
+
+func init() {
+	var catalog lwqlCatalog
+	if err := json.Unmarshal(lwqlCatalogJSON, &catalog); err != nil {
+		// The manifest is embedded from a file in this package, so a parse
+		// failure is a build-time defect, not a runtime condition to recover
+		// from.
+		panic(fmt.Sprintf("lwql: parsing embedded lwql_catalog.json: %v", err))
+	}
+	lwqlSourceTables = catalog.SourceTables
+	lwqlViewNames = catalog.ViewNames
 }
 
 // lwqlUsersFile is users.d/lwql.yaml: the restricted profile beside its only

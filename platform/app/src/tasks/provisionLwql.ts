@@ -56,6 +56,7 @@ import {
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
 } from "../server/analytics/lwql/selfProvisioning";
+import { withLwqlSelfProvisionLock } from "../server/analytics/lwql/selfProvisionLock";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
 
@@ -239,42 +240,53 @@ async function selfProvisionAll({
   }
 
   try {
-    await runPostgresStatements([
-      ...productionPostgresApprovedViewStatements({
-        schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
-      }),
-      // After the views: the reader role's grants name them.
-      ...selfHostedPostgresReaderStatements({
-        schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
-        readerPassword: selfProvision.postgresReaderPassword,
-      }),
-    ]);
-
-    await withAdminClickHouseClient(async (client) => {
-      await runClickHouseStatements({
-        client,
-        statements: selfHostedClickHouseProvisioningStatements({
-          names,
-          restrictedPassword: selfProvision.connection.password,
-          sourceDatabase,
-          postgres: {
-            endpoint,
-            readerPassword: selfProvision.postgresReaderPassword,
-          },
+    // Serialize the destructive convergence across concurrently-booting pods:
+    // the advisory lock is held for the whole transaction, so any other pod
+    // running this task blocks until we release, then re-runs the (idempotent)
+    // convergence itself. The PostgreSQL statements and ClickHouse DDL below
+    // run on their own connections, not `tx` — that is fine, because every pod
+    // gates ENTRY on the same lock, so the sequence is serialized machine-wide.
+    // See selfProvisionLock.ts. A throw here (lock acquisition or body) leaves
+    // the transaction and is caught by the non-fatal handler below, preserving
+    // the boot-never-crashes contract.
+    await withLwqlSelfProvisionLock({ prisma }, async () => {
+      await runPostgresStatements([
+        ...productionPostgresApprovedViewStatements({
+          schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
         }),
-      });
+        // After the views: the reader role's grants name them.
+        ...selfHostedPostgresReaderStatements({
+          schema: lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL),
+          readerPassword: selfProvision.postgresReaderPassword,
+        }),
+      ]);
 
-      // Same non-fatal contract as the explicit path: the backfill is
-      // convergent, so a slow key-map table must not undo the provisioning
-      // above (which this run already committed).
-      try {
-        await backfillKeyMap({ client, names, sourceDatabase });
-      } catch (error) {
-        logger.error(
-          { error: errorMessage(error) },
-          "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
-        );
-      }
+      await withAdminClickHouseClient(async (client) => {
+        await runClickHouseStatements({
+          client,
+          statements: selfHostedClickHouseProvisioningStatements({
+            names,
+            restrictedPassword: selfProvision.connection.password,
+            sourceDatabase,
+            postgres: {
+              endpoint,
+              readerPassword: selfProvision.postgresReaderPassword,
+            },
+          }),
+        });
+
+        // Same non-fatal contract as the explicit path: the backfill is
+        // convergent, so a slow key-map table must not undo the provisioning
+        // above (which this run already committed).
+        try {
+          await backfillKeyMap({ client, names, sourceDatabase });
+        } catch (error) {
+          logger.error(
+            { error: errorMessage(error) },
+            "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
+          );
+        }
+      });
     });
     logger.info("LangWatchQL self-provisioning complete");
   } catch (error) {

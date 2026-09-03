@@ -320,7 +320,7 @@ message.
 {{- end }}
 {{- if and .Values.clickhouse.chartManaged (not .Values.autogen.enabled) }}
 {{- $chSecret := include "langwatch.clickhouse.secretName" . }}
-{{- $chLwql := .Values.clickhouse.lwql | default dict }}
+{{- $chLwql := .Values.clickhouse.lwqlAccessModel | default dict }}
 {{- $lwqlKey := $chLwql.passwordSecretKey | default "lwql_password" }}
 {{- $lwqlPgKey := ($chLwql.postgres | default dict).passwordSecretKey | default "lwql_pg_password" }}
 
@@ -363,7 +363,7 @@ while the backend objects sit ready.
 Whoever owns the ClickHouse server owns the access model. Your ClickHouse is
 chart-managed, so the ClickHouse pods render the LangWatchQL restricted
 identity, its settings profile, grants, tenant row filters and the
-`lwql_postgres` bridge as config at boot — set `clickhouse.lwql.enabled=true`
+`lwql_postgres` bridge as config at boot — set `clickhouse.lwqlAccessModel.enabled=true`
 on the clickhouse-serverless subchart and supply the two LWQL passwords
 (`lwql_password`, `lwql_pg_password`) in the ClickHouse credentials Secret.
 With autogen.enabled=true the chart generates them; with autogen off you

@@ -35,8 +35,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* LWQL secret name: the operator-configured lwql.existingSecret, else the
      ClickHouse auth Secret (which is where an autogen install keeps its keys). */}}
 {{- define "clickhouse-serverless.lwqlSecretName" -}}
-  {{- if .Values.lwql.existingSecret -}}
-    {{- tpl .Values.lwql.existingSecret . -}}
+  {{- if .Values.lwqlAccessModel.existingSecret -}}
+    {{- tpl .Values.lwqlAccessModel.existingSecret . -}}
   {{- else -}}
     {{- include "clickhouse-serverless.secretName" . -}}
   {{- end -}}

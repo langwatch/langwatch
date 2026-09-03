@@ -76,7 +76,7 @@ clickhouse:
   # dialed at ClickHouse boot — so pointing it at the chart's own PostgreSQL
   # Service is sufficient for that existence check. Host is coupled to
   # RELEASE="lw" in e2e.sh (Service <release>-postgresql).
-  lwql:
+  lwqlAccessModel:
     postgres:
       host: "lw-postgresql"
       database: "langwatch"

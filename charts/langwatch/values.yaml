@@ -1860,6 +1860,12 @@ clickhouse:
   ## @param clickhouse.chartManaged [default: true] Manage ClickHouse via this chart using the clickhouse-serverless subchart (false = external).
   chartManaged: true
 
+  # NOT the same as the root `lwql` key (see the LangWatchQL section below):
+  # root `lwql.enabled` is the FEATURE switch (does LangWatchQL run at all, on
+  # either provisioning path); this `clickhouse.lwqlAccessModel` block is the
+  # chart-managed-ClickHouse RENDER switch plus its secret-key wiring — it tells
+  # the clickhouse-serverless subchart to render the access model as config.
+  #
   # LangWatchQL access model, rendered as ClickHouse config by the
   # clickhouse-serverless subchart. Helm cannot derive this from the parent's
   # lwql.enabled, so it is set here to match that default: for chart-managed
@@ -1867,8 +1873,8 @@ clickhouse:
   # for external/BYO ClickHouse), so this must be on or LangWatchQL goes
   # unprovisioned. langwatch.lwql.provisioningGuard fails the render if this is
   # turned off while lwql.enabled stays true.
-  lwql:
-    ## @param clickhouse.lwql.enabled [default: true] Render the LangWatchQL access model (langwatch_lwql user, lwql_restricted profile, row policies, lwql_postgres named collection) as ClickHouse config for chart-managed ClickHouse.
+  lwqlAccessModel:
+    ## @param clickhouse.lwqlAccessModel.enabled [default: true] Render the LangWatchQL access model (langwatch_lwql user, lwql_restricted profile, row policies, lwql_postgres named collection) as ClickHouse config for chart-managed ClickHouse.
     enabled: true
     # Design C: whoever owns the ClickHouse server owns the LangWatchQL access
     # model, so for chart-managed ClickHouse the LWQL passwords live in the
@@ -1881,12 +1887,12 @@ clickhouse:
     # so the query password can never disagree with the one the pod created the
     # langwatch_lwql user from. Set this only to point the pod at a DIFFERENT
     # Secret you own (external-secrets, terraform) — you then own its keys too.
-    ## @param clickhouse.lwql.existingSecret [string, default: ""] Secret the ClickHouse pod mounts the LWQL passwords from. Empty resolves to the ClickHouse credentials Secret (auth.existingSecret, else the autogen-managed <release>-clickhouse). Set only to redirect the mount at a Secret you own.
+    ## @param clickhouse.lwqlAccessModel.existingSecret [string, default: ""] Secret the ClickHouse pod mounts the LWQL passwords from. Empty resolves to the ClickHouse credentials Secret (auth.existingSecret, else the autogen-managed <release>-clickhouse). Set only to redirect the mount at a Secret you own.
     existingSecret: ""
-    ## @param clickhouse.lwql.passwordSecretKey [string, default: lwql_password] Key holding the langwatch_lwql user password. Matches the subchart's default projection and the key url-secret.yaml writes.
+    ## @param clickhouse.lwqlAccessModel.passwordSecretKey [string, default: lwql_password] Key holding the langwatch_lwql user password. Matches the subchart's default projection and the key url-secret.yaml writes.
     passwordSecretKey: lwql_password
     postgres:
-      ## @param clickhouse.lwql.postgres.passwordSecretKey [string, default: lwql_pg_password] Key holding the lwql_postgres reader password. Matches the subchart's default projection; only mounted when clickhouse.lwql.postgres.host is set.
+      ## @param clickhouse.lwqlAccessModel.postgres.passwordSecretKey [string, default: lwql_pg_password] Key holding the lwql_postgres reader password. Matches the subchart's default projection; only mounted when clickhouse.lwqlAccessModel.postgres.host is set.
       passwordSecretKey: lwql_pg_password
 
   # ---------------------------------------------------------------------------
@@ -2021,7 +2027,7 @@ clickhouse:
 #
 #   - Chart-managed ClickHouse (clickhouse.chartManaged=true, the default):
 #     the clickhouse-serverless subchart renders the whole access model as
-#     ClickHouse config at pod boot (clickhouse.lwql.enabled, default true). The
+#     ClickHouse config at pod boot (clickhouse.lwqlAccessModel.enabled, default true). The
 #     app does NOT run provisioning DDL — a second SQL owner of the same names
 #     is startup-fatal (named-collection collision) or wedges access entities
 #     (error 495 on every repair statement). Works at any replica count.
@@ -2034,6 +2040,11 @@ clickhouse:
 # Either way the app authenticates as langwatch_lwql at query time, so the two
 # stable passwords (chart-generated) reach the app on both paths.
 ## @section LangWatchQL (LWQL)
+# NOT the same as `clickhouse.lwqlAccessModel` (in the ClickHouse section above):
+# this root `lwql` key is the FEATURE switch (turns LangWatchQL on/off regardless
+# of who provisions it), while `clickhouse.lwqlAccessModel` is the chart-managed-
+# ClickHouse RENDER switch that tells the clickhouse-serverless subchart to render
+# the access model as config. Both default true so the two agree out of the box.
 lwql:
   ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Chart-managed ClickHouse renders it as config via the clickhouse-serverless subchart; external ClickHouse has the app self-provision it. The feature flag still gates the endpoint.
   enabled: true
