@@ -18,6 +18,7 @@
  * "answered" and "resolved" as the same thing.
  */
 
+import type { AgentType } from "@langwatch/agent-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client";
 
 export type NavigationHomeResolution = {
@@ -211,8 +212,21 @@ export type NavigationApiMap = {
   };
 
   agents: {
+    /**
+     * Every agent in the project, with the one field that decides its address.
+     *
+     * `type` was narrowed out of this map, and the cost was a dead link: with
+     * only an id and a name, the palette wrote `?drawer.open=agentViewer` — a
+     * name that has never been in any drawer registry and has never had a
+     * component — so every agent hit in the command bar opened nothing at all.
+     * The server has always answered the type; see `agentEditorDrawerForType`
+     * for what it decides.
+     */
     getAll: {
-      query: { input: { projectId: string }; output: Array<{ id: string; name: string }> };
+      query: {
+        input: { projectId: string };
+        output: Array<{ id: string; name: string; type: AgentType }>;
+      };
     };
   };
 

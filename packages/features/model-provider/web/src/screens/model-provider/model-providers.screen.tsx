@@ -12,13 +12,15 @@
  * NO CREDENTIAL VALUE IS ON THIS PAGE. The list procedure answers rows whose
  * stored keys the service has already masked, the connection test sends a row
  * id and nothing else, and the one place a key is typed is the editor drawer,
- * which is still `platform/app`'s and which this screen only ADDRESSES.
+ * which this screen only ADDRESSES.
  *
- * Moved from `platform/app/src/pages/settings/model-providers.tsx`. What did not
- * travel with it, and is recorded in `dev/docs/plans/ui-family-move-manifests.md`:
- * the Codex coding-defaults ask, which is queued by the editor drawer's form
- * through a store in `platform/app` and can only be answered by a page mounted
- * in the same module graph as the drawer that queues it.
+ * Moved from `platform/app/src/pages/settings/model-providers.tsx`. The one
+ * thing that did not travel with it has since arrived: the Codex
+ * coding-defaults ask, queued by the editor drawer's form and answered here.
+ * It has to be a PAGE-level mount, because the drawer that queues it closes the
+ * moment the connect completes — a dialog inside the drawer would be unmounted
+ * mid-question — and both halves now live in this package, so the store they
+ * talk through is one module rather than two.
  */
 
 import {
@@ -57,6 +59,7 @@ import {
   type ConnectionTestState,
 } from "../../behavior/use-model-provider-connection-test";
 import { useModelProviderHost } from "../../model/model-provider-host";
+import { CodexCodingDefaultsAskHost } from "../../ui/sections/codex-coding-defaults-ask";
 import {
   addableProviders,
   scopeNamesOf,
@@ -220,6 +223,11 @@ export default function ModelProvidersScreen() {
 
   return (
     <VStack gap={6} width="full" align="start">
+      {/* The Codex post-connect question, mounted at page level because the
+          drawer that queues it closes the moment the connect completes — see
+          `CodexCodingDefaultsAskHost`. Nothing renders until a sign-in queues
+          one. */}
+      <CodexCodingDefaultsAskHost />
       <HStack width="full" marginTop={2}>
         <Heading as="h2">Model Providers</Heading>
         <Spacer />

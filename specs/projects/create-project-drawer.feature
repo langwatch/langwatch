@@ -4,15 +4,14 @@ Feature: Create Project Drawer
   I want to create new projects via a drawer interface
   So that I can add projects without leaving my current page
 
-  # The CreateProjectDrawer page-render flows (entry-point clicks
-  # from settings/team/dropdown, drawer chrome, close mechanisms,
-  # team-selector behaviour, loading-state UI) have no JSDOM
-  # render fixture exercising them today. Validation logic +
-  # multi-org organizationId-prop pathing are bound below to the
-  # underlying unit / integration tests
-  # (`ProjectForm.unit.test.ts`, `CreateProjectDrawer.test.tsx`,
-  # `project.create.planLimit.integration.test.ts`). Cheap follow-
-  # up: write a JSDOM render test for the drawer + entry points.
+  # The drawer came back from `platform/app` in the ownerless-surfaces sweep
+  # (deleted in `cc91631cd8` while three live surfaces kept writing the
+  # address), and the JSDOM render fixture this note used to ask for came with
+  # it: `packages/features/organization/web/src/ui/sections/__tests__/
+  # create-project-drawer.integration.test.tsx`. What is still @unimplemented
+  # below is what neither it nor the validation test reaches — the entry-point
+  # clicks that open the drawer, the chrome's three close mechanisms, the
+  # team-selector's own behaviour, and the plan-limit upgrade path.
 
   Background:
     Given I am logged in as an authenticated user
@@ -65,7 +64,6 @@ Feature: Create Project Drawer
     And I see a close button
     And I see a "Create New Project" title
 
-  @unimplemented
   Scenario: Drawer displays all form fields
     When the CreateProjectDrawer opens
     Then I see a "Project Name" input field
@@ -98,7 +96,6 @@ Feature: Create Project Drawer
     When I press the Escape key
     Then the drawer closes
 
-  @unimplemented
   Scenario: Project name is required
     Given the CreateProjectDrawer is open
     And the project name field is empty
@@ -106,7 +103,6 @@ Feature: Create Project Drawer
     Then validation prevents submission
     And the project name field shows an error state
 
-  @unimplemented
   Scenario: Project name with only whitespace is invalid
     Given the CreateProjectDrawer is open
     When I enter "   " (only spaces) as the project name
@@ -133,7 +129,6 @@ Feature: Create Project Drawer
     When I select "Create new team" from the team selector
     Then a "New Team Name" input field appears
 
-  @unimplemented
   Scenario: New team name is required when creating team
     Given I have selected "Create new team"
     And the new team name field is empty

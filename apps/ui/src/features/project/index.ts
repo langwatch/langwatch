@@ -8,6 +8,7 @@
  */
 
 import { projectApi } from "@langwatch/project-web/screens/project";
+import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
 import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
 import { projectPageLoaders } from "./ui/sections/project-routes";
 
@@ -18,5 +19,27 @@ export const projectApiBinding: UiFeatureApiBinding = uiFeatureApi({
   name: "@langwatch/project-web/screens/project",
   api: projectApi,
 });
+
+/**
+ * The drawers this family serves, by the name the address uses.
+ *
+ * BOTH CAME BACK FROM `platform/app`, deleted in `cc91631cd8`. The Teams page's
+ * header button and its per-team "+ New Project", the team form and the
+ * CLI-auth screen all kept writing `?drawer.open=createProject`, and the Teams
+ * page's overflow menu kept writing `editProject`; every one of them changed
+ * the URL and opened nothing. Their components are
+ * `@langwatch/organization-web`'s, because that is where the openers and every
+ * hook they need already live.
+ */
+export const projectDrawers: UiDrawerRegistry = {
+  createProject: lazyDrawer({
+    factory: () => import("./ui/sections/project-drawers"),
+    key: "CreateProjectDrawer",
+  }),
+  editProject: lazyDrawer({
+    factory: () => import("./ui/sections/project-drawers"),
+    key: "EditProjectDrawer",
+  }),
+};
 
 export { projectPageLoaders };

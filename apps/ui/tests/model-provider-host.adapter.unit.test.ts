@@ -4,11 +4,13 @@
  *
  * Most of the port is a value object over readings the provider already made, so
  * the assertions below concentrate on the one method that composes something:
- * `openPlatformDrawer`, this family's single piece of platform vocabulary. The
+ * `openPlatformDrawer`, this family's single piece of drawer vocabulary. The
  * provider editor, the default-model override and the model-cost editor are all
- * still `platform/app`'s registered drawers — two of them with openers outside
- * this family — so a screen names one and this adapter writes the address the
- * rest of the product already produces.
+ * addressed rather than mounted — two of them by openers outside this family —
+ * so a screen names one and this adapter writes the address the rest of the
+ * product already produces. `llmModelCost` is registered in
+ * `installed-ui-drawers.ts` now; the other two are not, and
+ * `dev/docs/plans/core-application-feature-extraction-plan.md` records why.
  *
  * Getting that address wrong is silent in both directions: a missing
  * `drawer.modelProviderId` opens an empty editor, and a LEFTOVER one from a
@@ -29,7 +31,12 @@ function hostWith(query: Record<string, string | undefined>) {
   const setQuery = vi.fn();
   const host = UiModelProviderHost.create(
     {
-      scope: { organizationId: "org_1", teamId: "team_1", projectId: "project_1" },
+      scope: {
+        organizationId: "org_1",
+        teamId: "team_1",
+        projectId: "project_1",
+        projectSlug: "project-one",
+      },
       availableScopes: { organization: null, teams: [], projects: [] },
       route: { params: {}, query },
     },

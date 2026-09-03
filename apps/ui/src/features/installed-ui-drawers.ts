@@ -29,20 +29,36 @@ import {
 import { warmChunk } from "../behavior/chunk-reload";
 import { agentDrawers } from "./agent";
 import { annotationScoresDrawers } from "./annotation-scores";
+import { automationsDrawers } from "./automations";
 import { datasetDrawers } from "./dataset";
 import { routeTraceDrawerForV2 } from "./drawers";
 import { evaluatorDrawers } from "./evaluator";
+import { experimentDrawers } from "./experiments";
+import { gatewayDrawers } from "./gateway";
+import { opsDrawers } from "./ops";
+import { organizationDrawers } from "./organization";
+import { modelProviderDrawers } from "./model-provider";
+import { projectDrawers } from "./project";
 import { promptDrawers } from "./prompt";
 import { workflowDrawers } from "./workflows";
 import { simulationsDrawers } from "./simulations";
+import { traceDrawers } from "./traces";
 
 export const installedUiDrawers = {
   ...agentDrawers,
   ...annotationScoresDrawers,
+  ...automationsDrawers,
   ...datasetDrawers,
   ...evaluatorDrawers,
+  ...experimentDrawers,
+  ...gatewayDrawers,
+  ...opsDrawers,
+  ...organizationDrawers,
+  ...modelProviderDrawers,
+  ...projectDrawers,
   ...promptDrawers,
   ...simulationsDrawers,
+  ...traceDrawers,
   ...workflowDrawers,
 } satisfies UiDrawerRegistry;
 

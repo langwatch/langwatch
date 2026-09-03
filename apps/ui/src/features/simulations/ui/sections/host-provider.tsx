@@ -31,7 +31,26 @@ import { useLocation, useParams } from "react-router";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { UiScenarioHost } from "../../behavior/host.adapter";
 
-function ScenarioHost({ children }: { children: ReactNode }) {
+function ScenarioHost({
+  children,
+  publishFailures = true,
+}: {
+  children: ReactNode;
+  /**
+   * Whether this mount owns the package's module-scope failure host.
+   *
+   * TRUE FOR A PAGE AND FALSE FOR A DRAWER, because the two are SIBLINGS
+   * rather than nested: `CurrentDrawer` is mounted above the outlet, so a
+   * drawer's host is a second provider standing beside the page's, not inside
+   * it. `setScenarioErrorHost` is a plain assignment, so two publishers means
+   * the drawer's unmount clears the singleton the page is still using — and
+   * every `showErrorToast` the page raises afterwards degrades to a console
+   * warning. The drawer loses nothing by staying off it: the singleton exists
+   * to reach the application's feedback capability, which is the same
+   * capability whichever host published it.
+   */
+  publishFailures?: boolean;
+}) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const scope = session.activeScope();
   const actor = session.currentUser();
@@ -119,8 +138,7 @@ function ScenarioHost({ children }: { children: ReactNode }) {
           },
         },
         {
-          setQuery: (next, options) =>
-            route.setQuery({ ...reading.query, ...next }, options),
+          setQuery: (next, options) => route.setQuery({ ...reading.query, ...next }, options),
           navigate: (to, options) =>
             options?.replace ? navigation.replace(to) : navigation.navigate(to),
           succeeded: (notice) => feedback.succeeded(notice),
@@ -149,9 +167,10 @@ function ScenarioHost({ children }: { children: ReactNode }) {
    * because the host is a new value object whenever the scope moves.
    */
   useEffect(() => {
+    if (!publishFailures) return;
     setScenarioErrorHost(host);
     return () => setScenarioErrorHost(void 0);
-  }, [host]);
+  }, [host, publishFailures]);
 
   return <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>;
 }
@@ -164,5 +183,26 @@ export function withScenarioHost<P extends object>(Screen: ComponentType<P>): Co
     </ScenarioHost>
   );
   Mounted.displayName = `withScenarioHost(${Screen.displayName ?? Screen.name ?? "Screen"})`;
+  return Mounted;
+}
+
+/**
+ * Wraps one of this family's DRAWERS in the same host.
+ *
+ * A drawer needs its own mount for the reason the studio's six recorded: the
+ * registry's host is mounted above the outlet, so a drawer opened from a
+ * workflow, a trace or the command palette renders outside whatever provider
+ * the page below it brought. What it does not take with it is the failure
+ * singleton — see `publishFailures`.
+ */
+export function withScenarioDrawerHost<P extends object>(
+  Drawer: ComponentType<P>,
+): ComponentType<P> {
+  const Mounted = (props: P) => (
+    <ScenarioHost publishFailures={false}>
+      <Drawer {...props} />
+    </ScenarioHost>
+  );
+  Mounted.displayName = `withScenarioDrawerHost(${Drawer.displayName ?? Drawer.name ?? "Drawer"})`;
   return Mounted;
 }

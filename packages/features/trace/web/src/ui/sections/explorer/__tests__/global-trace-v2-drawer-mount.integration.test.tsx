@@ -66,5 +66,34 @@ describe("GlobalTraceV2DrawerMount", () => {
 
       expect(screen.queryByTestId("trace-v2-shell")).not.toBeInTheDocument();
     });
+
+    /**
+     * The host that answers `pathname` decides which spelling arrives.
+     * `platform/app` handed over Next's dynamic-route TEMPLATE; `apps/ui`
+     * hands over react-router's RESOLVED path, and a check that only knows the
+     * template reads the explorer as somewhere else — which is the one answer
+     * that puts two drawers over one trace.
+     */
+    /** @scenario "The Trace Explorer is left to draw its own drawer" */
+    it("skips it under the resolved project path too", () => {
+      mockPathname = "/my-project/traces";
+      useDrawerStore.getState().openTrace("trace-on-traces-page");
+
+      render(<GlobalTraceV2DrawerMount />);
+
+      expect(screen.queryByTestId("trace-v2-shell")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a trace is open on a resolved path that is not the explorer", () => {
+    /** @scenario "The trace drawer opens over a page that is not the Trace Explorer" */
+    it("renders the v2 drawer shell", () => {
+      mockPathname = "/my-project/simulations";
+      useDrawerStore.getState().openTrace("trace-from-a-simulation");
+
+      render(<GlobalTraceV2DrawerMount />);
+
+      expect(screen.getByTestId("trace-v2-shell")).toBeInTheDocument();
+    });
   });
 });

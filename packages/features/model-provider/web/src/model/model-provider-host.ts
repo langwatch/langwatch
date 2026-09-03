@@ -32,6 +32,16 @@ export type ModelProviderHostScope = {
   organizationId: string | undefined;
   teamId: string | undefined;
   projectId: string | undefined;
+  /**
+   * The project's SLUG, which is how it is addressed rather than how it is
+   * stored.
+   *
+   * Asked for by the cost drawer's matching-spans preview: each sample row
+   * opens that span's trace in a new tab, and a trace address is
+   * `/<projectSlug>/traces?...`. Undefined where no project is in scope, which
+   * is what makes the row un-clickable rather than a link to `/undefined`.
+   */
+  projectSlug: string | undefined;
 };
 
 /**

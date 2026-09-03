@@ -36,6 +36,13 @@ import type {
 } from "@langwatch/annotation-contract";
 
 import type {
+  Dataset,
+  DatasetRecord,
+  DatasetRecordEntry,
+  DatasetSummary,
+} from "@langwatch/dataset-contract";
+
+import type {
   PresenceCursorEvent,
   PresenceCursorInput,
   PresenceEvent,
@@ -328,6 +335,20 @@ export type TraceApiMap = {
       };
     };
 
+    /**
+     * Whole traces with their spans, by id.
+     *
+     * `withEditOverlay` is what makes "Add to Dataset" store the reviewer's
+     * correction rather than the raw span: a record added from a corrected
+     * trace carries what the reviewer corrected.
+     */
+    getTracesWithSpans: {
+      query: {
+        input: ProjectScope & { traceIds: string[]; withEditOverlay?: boolean };
+        output: Trace[];
+      };
+    };
+
     /** Whole traces with their spans, by conversation. */
     getTracesWithSpansByThreadIds: {
       query: {
@@ -560,6 +581,58 @@ export type TraceApiMap = {
         };
         output: { id: string; token: string; name: string };
       };
+    };
+  };
+
+  /**
+   * The dataset family's own segment, declared here because the "Add to
+   * Dataset" drawer is this family's and calls it.
+   *
+   * THE SEGMENT NAME IS THE CACHE KEY, which is the whole reason a second
+   * declaration is safe: `dataset.getAll` written here and `dataset.getAll`
+   * written on `@langwatch/dataset-web`'s map hash to the same React Query
+   * entry, so the list this drawer reads is the list the Datasets page reads
+   * and an invalidation from either is seen by both. Declaring the shape twice
+   * is the price of a web package not importing another's procedure map; a
+   * different SPELLING would be a silently split cache.
+   */
+  dataset: {
+    /** Every live dataset in the project, newest first. */
+    getAll: { query: { input: ProjectScope; output: DatasetSummary[] } };
+
+    /** One dataset, or `null` for an archived or missing one. */
+    getById: {
+      query: { input: ProjectScope & { datasetId: string }; output: Dataset | null };
+    };
+
+    /** The trace and thread mapping a dataset is filled from. */
+    updateMapping: {
+      mutation: {
+        input: ProjectScope & {
+          datasetId: string;
+          mapping?: { mapping: Record<string, unknown>; expansions: string[] };
+          threadMapping?: { mapping: Record<string, unknown> };
+        };
+        output: Dataset;
+      };
+    };
+  };
+
+  datasetRecord: {
+    /** Appends entries. What the "Add to Dataset" submit calls. */
+    create: {
+      mutation: {
+        input: ProjectScope & { datasetId: string; entries: DatasetRecordEntry[] };
+        output: DatasetRecord[];
+      };
+    };
+
+    /**
+     * Declared for its INVALIDATION rather than its answer: adding records has
+     * to make the dataset editor's page stale, and nothing here reads it.
+     */
+    getAll: {
+      query: { input: ProjectScope & { datasetId: string }; output: unknown };
     };
   };
 

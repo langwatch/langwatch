@@ -32,10 +32,16 @@
  */
 
 import type {
+  CostRuleMatchingSpansPreview,
+  CostRulePreviewInput,
+  ModelProviderCodexStatus,
   ModelCost,
+  ModelDefaultEffective,
+  ModelDefaultInheritedValues,
   ModelDefaultSnapshot,
   ModelProviderCredentialVerdict,
   ModelProviderListEntry,
+  ModelProviderScopeType,
 } from "@langwatch/model-provider-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client";
 
@@ -92,9 +98,215 @@ export type ModelProviderApiMap = {
       };
     };
 
+    /**
+     * Saves a credential row, and everything hung off it.
+     *
+     * TAKES EITHER TENANT HANDLE. A provider belongs to the organization and
+     * reaches the scopes attached to it, so an organization on the
+     * agent-governance track can manage providers without ever having created a
+     * project; `id` present is an edit of that row, absent is a new one.
+     *
+     * `customKeys` is the only field that carries a secret, and it only ever
+     * travels OUTWARD: a key the customer did not retype arrives back from the
+     * list already masked, and the editor sends the mask through unchanged so
+     * the server knows to leave the stored value alone.
+     */
+    update: {
+      mutation: {
+        input: TenantAnchor & {
+          id?: string;
+          provider: string;
+          name?: string;
+          enabled: boolean;
+          customKeys?: Record<string, unknown> | null;
+          customModels?: unknown;
+          customEmbeddingsModels?: unknown;
+          extraHeaders?: Array<{ key: string; value: string }> | null;
+          defaultModel?: string | null;
+          routingHandle?: string | null;
+          scopes?: Array<{ scopeType: ModelProviderScopeType; scopeId: string }>;
+          scopeType?: ModelProviderScopeType;
+          scopeId?: string;
+          rateLimitRpm?: number | null;
+          rateLimitTpm?: number | null;
+          rateLimitRpd?: number | null;
+          fallbackPriorityGlobal?: number | null;
+          providerConfig?: Record<string, unknown> | null;
+        };
+        output: ModelProviderListEntry;
+      };
+    };
+
+    /**
+     * Probes credentials the customer has just TYPED, before they are stored.
+     *
+     * A mutation despite changing nothing, and the reason is the input: tRPC
+     * sends a query as a GET with its input encoded into the URL, and a secret
+     * in a URL is written to access logs, proxy logs and browser history. The
+     * server's own procedure says the same thing at more length.
+     */
+    validateApiKey: {
+      mutation: {
+        input: TenantAnchor & {
+          provider: string;
+          customKeys: Record<string, string>;
+          scopes?: Array<{ scopeType: ModelProviderScopeType; scopeId: string }>;
+        };
+        output: ModelProviderCredentialVerdict;
+      };
+    };
+
+    /**
+     * Probes a credential that is ALREADY STORED against a base URL.
+     *
+     * Nothing secret travels either way: the row id and the URL go out, a
+     * verdict comes back. That is what makes it safe as a query, unlike the
+     * one above.
+     */
+    validateKeyWithCustomUrl: {
+      query: {
+        input: ProjectScope & { provider: string; customBaseUrl?: string };
+        output: ModelProviderCredentialVerdict;
+      };
+    };
+
+    /**
+     * Whether the deployment manages this provider's credentials itself.
+     *
+     * Enterprise deployments can supply a provider centrally, and the editor
+     * then renders the managed notice in place of the credential fields rather
+     * than inviting a customer to type a key that would be ignored.
+     */
+    isManagedProvider: {
+      query: {
+        input: { organizationId?: string; projectId?: string; provider: string };
+        output: { managed: boolean };
+      };
+    };
+
+    /** Whether a Codex account is connected, and on which plan. */
+    codexStatus: {
+      query: { input: ProjectScope; output: ModelProviderCodexStatus };
+    };
+
+    /**
+     * Codex sign-in, step 1: ask OpenAI for a device code.
+     *
+     * Nothing is stored — the pending sign-in's identifiers travel to the
+     * browser and come back on every poll, so polling survives a server
+     * instance the first call never touched.
+     */
+    codexSignInStart: {
+      mutation: {
+        input: ProjectScope;
+        output: {
+          userCode: string;
+          deviceAuthId: string;
+          verificationUrl: string;
+          intervalSeconds: number;
+        };
+      };
+    };
+
+    /**
+     * Codex sign-in, step 2..n: one poll of the pending authorization.
+     *
+     * Answers `{ status: "pending" }` until the customer approves, then saves
+     * the provider row and hands back the account it connected.
+     */
+    codexSignInPoll: {
+      mutation: {
+        input: ProjectScope & {
+          deviceAuthId: string;
+          userCode: string;
+          scopes: Array<{ scopeType: ModelProviderScopeType; scopeId: string }>;
+          setAsCodingDefaults?: boolean;
+        };
+        output:
+          | { status: "pending" }
+          | { status: "complete"; providerId?: string; email: string; plan: string };
+      };
+    };
+
+    /** Points the coding-assistant roles at the codex model, after the fact. */
+    codexApplyCodingDefaults: {
+      mutation: {
+        input: ProjectScope & {
+          scopes: Array<{ scopeType: ModelProviderScopeType; scopeId: string }>;
+        };
+        output: unknown;
+      };
+    };
+
+    /**
+     * Points ONE role at one model, at one scope.
+     *
+     * The tactical writer behind the editor's "set as default" checkbox, as
+     * against `saveDefaultModelsConfig`, which writes a whole policy. The tier
+     * the caller names is what picks the permission, and the SERVICE is what
+     * applies it.
+     */
+    setRoleAssignmentForScope: {
+      mutation: {
+        input: {
+          role: string;
+          model: string | null;
+          scopeType: ModelProviderScopeType;
+          scopeId: string;
+        };
+        output: unknown;
+      };
+    };
+
     /** Every default-model policy the caller can see, plus the cascade inputs. */
     getDefaultModelsForProject: {
       query: { input: ProjectScope; output: ModelDefaultSnapshot };
+    };
+
+    /**
+     * Writes one default-model policy: the scopes it attaches to, and the
+     * role/feature keys it pins.
+     *
+     * ABSENCE IS THE INHERIT SIGNAL. A key missing from `config` is not "unset
+     * to nothing" but "let the cascade answer", so an edit that clears every
+     * key deletes the policy rather than storing an empty one — which is why
+     * the drawer's own toast has to say "removed" rather than "updated" for
+     * that case.
+     *
+     * Authorized per SCOPE rather than per project: the caller must hold manage
+     * on every scope the policy attaches to and on every one it is removed
+     * from, so a project admin cannot push a default up to organization level.
+     */
+    saveDefaultModelsConfig: {
+      mutation: {
+        input: {
+          id?: string;
+          config: Record<string, string>;
+          scopes: Array<{ scopeType: ModelProviderScopeType; scopeId: string }>;
+        };
+        output: { id: string };
+      };
+    };
+
+    /**
+     * What the cascade WOULD resolve for these scopes if this policy did not
+     * exist.
+     *
+     * Drives the drawer's ghosted inherit placeholder and its "Inherit (from
+     * organization)" dropdown entry. The walk is anchored at the most-specific
+     * picked scope and excludes the picked scopes themselves, so it can never
+     * answer with a narrower tier than the one being edited — and
+     * `excludeConfigId` is what treats the in-progress draft as not yet saved.
+     */
+    getInheritedValuesForScopes: {
+      query: {
+        input: {
+          projectId: string;
+          scopes: Array<{ scopeType: ModelProviderScopeType; scopeId: string }>;
+          excludeConfigId?: string;
+        };
+        output: ModelDefaultInheritedValues;
+      };
     };
 
     deleteDefaultModelsConfig: {
@@ -114,8 +326,19 @@ export type ModelProviderApiMap = {
      */
     getAllForProject: { query: { input: ProjectScope; output: unknown } };
     getAllForProjectForFrontend: { query: { input: ProjectScope; output: unknown } };
+    /**
+     * What one feature key's model resolves to, all cascade tiers considered.
+     *
+     * Declared with its real shape rather than `unknown` because the codex
+     * post-connect ask reads `model` off it to decide whether the question is
+     * already answered — `unknown` reaches the browser as `{}`, and that read
+     * would have been unchecked.
+     */
     getResolvedDefault: {
-      query: { input: ProjectScope & { featureKey: string }; output: unknown };
+      query: {
+        input: ProjectScope & { featureKey: string };
+        output: ModelDefaultEffective | null;
+      };
     };
   };
 
@@ -123,6 +346,48 @@ export type ModelProviderApiMap = {
     /** The cost rules the project's settings page renders. */
     getAllForProject: {
       query: { input: ProjectScope; output: ModelCost[] };
+    };
+
+    /**
+     * Writes one cost rule: a new one when `id` is absent, that one when it is.
+     *
+     * `scopeType`/`scopeId` name the tenant the rule is anchored to, and the
+     * server requires MANAGE on that scope rather than on the project the call
+     * was made from — so an admin can push one policy down the cascade
+     * (PROJECT overrides TEAM overrides ORGANIZATION) without every project
+     * re-entering it. Both default to the calling project.
+     *
+     * The rates are per TOKEN and the three cache rates are optional: absent
+     * means "bill this at the input rate", which is not the same as zero.
+     */
+    createOrUpdate: {
+      mutation: {
+        input: ProjectScope & {
+          id?: string;
+          model: string;
+          regex: string;
+          inputCostPerToken: number;
+          outputCostPerToken: number;
+          cacheReadCostPerToken?: number;
+          cacheCreationCostPerToken?: number;
+          cacheCreation1hCostPerToken?: number;
+          scopeType?: ModelProviderScopeType;
+          scopeId?: string;
+        };
+        output: ModelCost;
+      };
+    };
+
+    /**
+     * Which recently-seen spans this rule would match, priced at the rates
+     * being typed.
+     *
+     * Gated on `traces:view` rather than on the cost permission, because the
+     * answer carries span metadata and not cost configuration. A reader who may
+     * edit costs but not read traces gets the form without the preview.
+     */
+    previewMatchingSpans: {
+      query: { input: CostRulePreviewInput; output: CostRuleMatchingSpansPreview };
     };
 
     delete: {
@@ -152,3 +417,9 @@ export type ModelProviderApiMap = {
  * shell mounts `modelProviderApi.Provider`.
  */
 export const modelProviderApi = createFeatureApi<ModelProviderApiMap>();
+
+/**
+ * The alias the recovered editor modules moved with: `api.modelProvider.…`,
+ * unchanged. Same instance, so it is the same transport and the same cache.
+ */
+export const api = modelProviderApi;

@@ -5,9 +5,11 @@
  * the assertions below concentrate on the two methods that compose something.
  *
  * `openPlatformDrawer` is this family's single piece of platform vocabulary.
- * `traceV2Details` is still `platform/app`'s registered drawer, opened by most
- * of the product, so the chat's View Trace affordance names it and this adapter
- * writes the address the rest of the product already produces. Getting that
+ * `traceV2Details` is the trace drawer, opened by most of the product, so the
+ * chat's View Trace affordance names it and this adapter writes the address the
+ * rest of the product already produces. It is not a REGISTERED drawer and
+ * cannot be — its URL sync has to outlive `?drawer.open=` — so what answers the
+ * address is the mount `ui-app-chrome` draws beside `CurrentDrawer`. Getting that
  * address wrong is silent in both directions: a missing `drawer.traceId` opens
  * an empty drawer, and a LEFTOVER key from a previous drawer opens the one the
  * reader looked at before this one. `openDrawer` clears every `drawer.*` key for

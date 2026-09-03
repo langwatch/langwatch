@@ -14,8 +14,23 @@
  * model with its own module-scope stack", so registering them "would give the
  * application two drawer stacks that agree only on the URL". That file is a
  * re-export of `@langwatch/ui-drawer` now, so there is one stack and they open.
+ *
+ * TWO MORE JOINED THEM, for the same reason and off the same host. The Online
+ * Evaluations screen and every monitor alert email address `onlineEvaluation`,
+ * and the evaluator category selector addresses
+ * `workflowSelectorForEvaluator`; both components read
+ * `@langwatch/workflow-web/studio-host/*` exactly as the three above do, and
+ * neither was exported, so both addresses opened nothing.
  */
 
 export { CodeEvaluatorEditorDrawer } from "./evaluators/code-evaluator-editor-drawer";
 export { EvaluatorCategorySelectorDrawer } from "./evaluators/evaluator-category-selector-drawer";
 export { EvaluatorEditorDrawer } from "./evaluators/evaluator-editor-drawer";
+export {
+  OnlineEvaluationDrawer,
+  type OnlineEvaluationDrawerProps,
+} from "./evaluations/online-evaluation-drawer";
+export {
+  WorkflowSelectorForEvaluatorDrawer,
+  type WorkflowSelectorForEvaluatorDrawerProps,
+} from "../elements/evaluators/workflow-selector-for-evaluator-drawer";

@@ -79,8 +79,17 @@ export type TeamProjectReading = {
   slug: string;
 };
 
-/** A team with its projects, as the teams page lists one. */
+/**
+ * A team with its projects, as the teams page lists one.
+ *
+ * `isPersonal` is declared here rather than on {@link TeamReading} because it
+ * arrives on the LIST reads and not on every procedure typed with that alias.
+ * The edit-project drawer is what needs it: a personal workspace holds only the
+ * project provisioned with it, so it is never offered as somewhere to move a
+ * project to.
+ */
 export type TeamWithProjects = TeamReading & {
+  isPersonal: boolean;
   projects: TeamProjectReading[];
 };
 
@@ -478,6 +487,43 @@ export type OrganizationApiMap = {
   };
 
   project: {
+    /**
+     * Creates a project, and optionally the team to hold it.
+     *
+     * `teamId` and `newTeamName` are the two halves of one choice — pick a team
+     * you have or name a new one — and the server refuses a call that makes
+     * neither. The answer carries the SLUG rather than the id, because that is
+     * what the address of the new project is.
+     */
+    create: {
+      mutation: {
+        input: {
+          organizationId: string;
+          name: string;
+          teamId?: string;
+          newTeamName?: string;
+          language: string;
+          framework: string;
+        };
+        output: { success: boolean; projectSlug: string };
+      };
+    };
+
+    /**
+     * Renames a project, or moves it to another team.
+     *
+     * Every field but `projectId` is optional and only the changed ones are
+     * sent: the same procedure saves the whole project-settings page, and a
+     * drawer that posted its untouched fields back would overwrite settings it
+     * never showed the reader.
+     */
+    update: {
+      mutation: {
+        input: { projectId: string; name?: string; teamId?: string };
+        output: { success: boolean; projectSlug: string };
+      };
+    };
+
     archiveById: {
       mutation: { input: { projectId: string; projectToArchiveId?: string }; output: unknown };
     };

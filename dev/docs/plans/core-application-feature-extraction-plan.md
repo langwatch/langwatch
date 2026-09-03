@@ -11994,3 +11994,769 @@ the unauthenticated case would have asserted the harness rather than the door.
 - **`copilotkit` stays absent.** Untouched, and now the only entry left.
 - **Nothing under `platform/` was created, edited or read**, and no OpenAPI
   artifact was regenerated — this lane adds no route.
+
+## Fourteen addressed drawers registered, and the two links that had already left the product, 2026-09-03
+
+`dev/docs/plans/ownerless-ui-surfaces-census.md` counted the damage by surface
+rather than by comment: 134 of 134 page keys resolve, 33 of 33 settings hrefs
+resolve, and **22 drawer names were addressed by something and registered by
+nothing**. `CurrentDrawer` looks `?drawer.open=<name>` up in the composed
+registry, misses, and renders null — no error, no toast, no log line — so every
+one of those reads as a click that does nothing.
+
+This lane closes the census's group (b): the fourteen whose component already
+existed in a web package and only needed publishing and registering. Group (c)
+— the ones whose component died with `platform/app` — is other lanes'.
+
+| Drawer | Package | Publishing it needed | Mounted by |
+| --- | --- | --- | --- |
+| `agentCodeEditor` | `@langwatch/scenario-web` | a new export | simulations |
+| `agentHttpEditor` | `@langwatch/scenario-web` | a new export | simulations |
+| `workflowSelector` | `@langwatch/scenario-web` | a new export | simulations |
+| `agentList` | `@langwatch/scenario-web` | a new export | simulations |
+| `agentWorkflowTargetEditor` | `@langwatch/scenario-web` | a new export | simulations |
+| `agentTestingPlanEditor` | `@langwatch/scenario-web` | a new export | simulations |
+| `onlineEvaluation` | `@langwatch/evaluator-web` | a new export | workflows (studio host) |
+| `workflowSelectorForEvaluator` | `@langwatch/evaluator-web` | a new export | workflows (studio host) |
+| `guardrails` | `@langwatch/evaluator-web` | a new export | evaluator (no host) |
+| `inviteMember` | `@langwatch/organization-web` | a new `./drawers` entry | organization |
+| `createTeam` | `@langwatch/organization-web` | a new `./drawers` entry | organization |
+| `foundry` | `@langwatch/ops-web` | a new `./drawers` entry | ops |
+| `routingPolicy` | `@langwatch/gateway-web` | a new `./drawers` entry | gateway |
+| `automation` | `@langwatch/automation-web` | a new `./drawers` entry | automations |
+
+### What decided where each one is mounted
+
+`studio-host-drawers.tsx` already stated the rule and this lane applied it
+unchanged: **a feature owns its drawers, and a drawer is mounted where its HOST
+is.** The two are not always the same feature, and the census's own
+recommendation ("add the three to `agentDrawers`") is the case where they are
+not. `agentCodeEditor`, `agentHttpEditor` and `workflowSelector` are the
+addresses `@langwatch/agent-web`'s type selector WRITES, but the components are
+`@langwatch/scenario-web`'s and read that package's
+`useOrganizationTeamProject` and its `agents.*` transport — so all six agent
+overlays are mounted by the simulations feature, and the agent family keeps the
+address and nothing else.
+
+`guardrails` is the case with no host at all: it renders an evaluator picker and
+a code snippet, and the only thing it asks the framework for is the drawer
+stack. It is registered straight off the package entry, unwrapped.
+
+### The host travels with the drawer, not with the address
+
+`CurrentDrawer` is mounted above the outlet, so a drawer opened from a workflow,
+a trace or the command palette renders OUTSIDE whatever provider the page below
+it brought. Every registration here therefore carries its own host mount. That
+is a second, SIBLING provider rather than a nested one, and for
+`@langwatch/scenario-web` that distinction has teeth: its host provider
+publishes the package's module-scope failure host (`setScenarioErrorHost`,
+a plain assignment), so a drawer that published it too would, on unmount, clear
+the singleton the page underneath is still using — and every `showErrorToast`
+that page raises afterwards would degrade to a console warning. Hence
+`withScenarioDrawerHost`, which is `withScenarioHost` with `publishFailures`
+false. It loses nothing: the singleton exists to reach the application's
+feedback capability, and that is the same capability whichever host published
+it.
+
+### Three shapes of adapter, and why each exists
+
+- **`open` is coerced** (`fromDrawerAddress`, new, in `features/drawers`).
+  `CurrentDrawer` spreads the PARSED ADDRESS, so `open` arrives as the drawer
+  NAME. Most drawers read it defensively; the ones that hand it to Chakra's
+  `Drawer.Root` or compare it with `=== true` render CLOSED against an address
+  that says they are open. That is the defect `agent-drawers.tsx` recorded when
+  the type selector moved, and stating it once beat restating it five times.
+- **`onClose` is supplied** for `automation`, `routingPolicy` and `foundry`.
+  All three take the close as a prop rather than calling `closeDrawer`, which is
+  the drawers doc's rule — a target that closes itself clears the caller's stack
+  with it — so the application's adapter is what has to pass one.
+- **A second provider is brought** for `foundry`, which needs `FoundryTransport`
+  as well as `withOpsHost` for the project and API key it sends a generated
+  trace with. `@langwatch/ops-web`'s root barrel published the drawer but not
+  that provider, which is why the new `./drawers` entry publishes both.
+
+### The two links that cannot be fixed after the fact
+
+`packages/features/automation/contract/src/templating/template-context.ts:271`
+mints `…/automations?drawer.open=automation&drawer.automationId=<id>&drawer.source=email-link`
+into every alert email, and
+`packages/features/monitor/server/src/transport/api-rest/monitor.api.ts:142`
+mints `…/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=<id>`
+as every monitor's `platformUrl`. Both had already left the product. **Neither
+template was touched**: registering the name each already writes is the whole
+fix, and it is the only side of it that is still reachable.
+
+### The `?automation=` overlay is NOT collapsed, and the two do not double-open
+
+`automations.screen.tsx` renders `AutomationDrawer` inline off its own
+`?automation=<id>` / `?viewAutomation=<id>` keys, and
+`gateway-routing-policies.screen.tsx` does the same with `?policy=<id>`. Both
+now coexist with a registry entry for the same component. They cannot
+double-open: no minted URL carries both keys, and each screen's own write
+(`router.push("?…")`) REPLACES the whole query string, so following an email
+link and then clicking a row hands over cleanly in one direction and the
+registry entry closes. Collapsing the screens onto the registry as the single
+mechanism is the right end state per the drawers doc and is left as a separate
+change — it rewrites two screens and their suites, and this lane's brief was the
+receiving side.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/scenario/web/src/screens/drawers.ts` | Six exports added: the three `*FromUrl` agent editors, `AgentListDrawer`, `AgentWorkflowTargetEditorDrawer`, and `PlanModal` as `AgentTestingPlanEditorDrawer`. |
+| `packages/features/evaluator/web/src/ui/sections/editor-drawers.ts` | `OnlineEvaluationDrawer` and `WorkflowSelectorForEvaluatorDrawer` — both read the studio host, like the three already there. |
+| `packages/features/evaluator/web/src/ui/sections/drawers.ts` | `GuardrailsDrawer`, in this entry rather than the editor one because it reads no host. |
+| `packages/features/organization/web/src/screens/drawers.ts` | NEW. `InviteMemberDrawer`, `CreateTeamDrawer`. |
+| `packages/features/ops/web/src/screens/drawers.ts` | NEW. `FoundryDrawer` and the `FoundryTransport` it cannot mount without. |
+| `packages/features/gateway/web/src/screens/drawers.ts` | NEW. `RoutingPolicyDrawer`. |
+| `packages/features/automation/web/src/screens/drawers.ts` | NEW. `AutomationDrawer`. |
+| `packages/features/{organization,ops,gateway,automation}/web/package.json` | A `./drawers` subpath each. |
+| `apps/ui/src/features/drawers/model/ui-drawer-address.tsx` | NEW. `isDrawerOpenFromAddress` and `fromDrawerAddress` — the address's `open` is the drawer name, stated once. |
+| `apps/ui/src/features/drawers/index.ts` | Both exported; the docblock's "the one rule that is neither" is now two. |
+| `apps/ui/src/features/simulations/ui/sections/simulations-drawers.tsx` | NEW. The six agent overlays, host-wrapped and `open`-coerced. |
+| `apps/ui/src/features/simulations/ui/sections/host-provider.tsx` | `publishFailures` on `ScenarioHost`, and `withScenarioDrawerHost`. |
+| `apps/ui/src/features/simulations/index.ts` | Six registrations. |
+| `apps/ui/src/features/workflows/ui/sections/studio-host-drawers.tsx` | `OnlineEvaluationDrawer` and `WorkflowSelectorForEvaluatorDrawer`, in the same host as the six. |
+| `apps/ui/src/features/workflows/index.ts` | Two registrations; the docblock's counts corrected (it said six and "only one is this family's", of which none ever was). |
+| `apps/ui/src/features/evaluator/index.ts` | `guardrails`, registered straight off the package entry. |
+| `apps/ui/src/features/organization/ui/sections/organization-drawers.tsx` | NEW. Both drawers, host-wrapped and `open`-coerced. |
+| `apps/ui/src/features/ops/ui/sections/ops-drawers.tsx` | NEW. The Foundry, inside `FoundryTransport`, with the navigator's close. |
+| `apps/ui/src/features/gateway/ui/sections/gateway-drawers.tsx` | NEW. The policy editor, with the four scalars the address carries and the navigator's close. |
+| `apps/ui/src/features/automations/ui/sections/automations-drawers.tsx` | NEW. The authoring drawer, with the email link's `source` marker and the navigator's close. |
+| `apps/ui/src/features/{organization,ops,gateway,automations}/index.ts` | A `*Drawers` map each, and a paragraph naming what was addressing nothing. |
+| `apps/ui/src/features/installed-ui-drawers.ts` | Four maps spread in, by anchored insertion — two sibling lanes are editing this file. |
+| `apps/ui/src/features/agent/ui/sections/agent-drawers.tsx` | The "THE THREE EDITORS IT LEADS TO ARE NOT INSTALLED YET" docblock, rewritten to where they are now. |
+| `apps/ui/tests/agent-host.adapter.unit.test.ts` | Same claim, same correction. |
+| `apps/ui/tests/installed-ui-drawers.integration.test.tsx` | NEW. 22 tests. |
+| `apps/ui/tests/installed-ui-drawers.unit.test.ts` | The four new per-feature maps in `perFeature`, plus the three a sibling lane had installed but not listed, so the shadowing count is whole again. |
+| `specs/automations/authoring-drawer.feature` | `@integration` scenario for the alert email's Edit automation link, under the Rule that already existed for links that outlive a drawer. |
+| `specs/monitors/online-evaluation-drawer.feature` | A Rule and an `@integration` scenario for the monitor's `platformUrl`. |
+| `packages/architecture-lint/src/check-feature-parity.ts` | `specs/monitors/online-evaluation-drawer.feature` out of `LEGACY_INERT` — it enforces one scenario now, and the ratchet fails a listed file that does. |
+
+### The test, and what it can actually catch
+
+`installed-ui-drawers.unit.test.ts` counts the composition, which cannot notice
+a name that is in the registry and still opens nothing. The new integration file
+drives the whole path a call site does: the exact query string a screen, a
+command-bar entry or an outbound email writes, into the real
+`installedUiDrawers`, through the lazy import and the application's own adapter,
+asserting the component on the other side was mounted with what the address
+carried. Each family's package entry and host provider are stubbed, in the shape
+`chrome-drawer.integration.test.tsx` stubs the registry — a stub only answers to
+the export name the registry asks it for, so a misspelled `key` still fails.
+
+Both sabotages were shown to land: renaming the `automation` registry key fails
+2 tests, and dropping `fromDrawerAddress` from `inviteMember` fails the coercion
+case with `expected 'inviteMember' to be true`.
+
+### Gates
+
+- `apps/ui`: `vitest run tests/installed-ui-drawers.integration.test.tsx
+  tests/installed-ui-drawers.unit.test.ts` — **Test Files 2 passed (2)**,
+  **Tests 24 passed (24)**.
+- `apps/ui`: `vitest run tests` — **Test Files 98 passed (98)**, **Tests 1028
+  passed (1028)**, three consecutive clean runs. A later run of the same command
+  is red on nine files that concurrent lanes own and were mid-edit
+  (`ui-app-chrome` now mounts `UiTraceDrawerMount` unconditionally, which throws
+  without a capabilities provider and takes `chrome-drawer.integration.test.tsx`
+  and `trace-drawer-mount.integration.test.tsx` with it; the gateway, governance,
+  personal-workspace, settings-family and `model/errors` suites moved too). None
+  of them touches this lane's files, and the two files this lane owns pass in
+  every run.
+- `apps/ui`: `pnpm typecheck` (which is `tsc --noEmit` plus
+  `tsconfig.test.json`) — **0 errors**.
+- `@langwatch/{scenario,organization,ops,gateway,automation}-web`: `pnpm
+  typecheck` — **0 errors** each.
+- `@langwatch/evaluator-web`: `pnpm typecheck` — **1 error**, and it is not this
+  lane's: `packages/features/trace/web/src/behavior/docs-url.ts:57` uses
+  `import.meta.env` under a tsconfig with no `vite/client` types. Proven
+  pre-existing by removing this lane's three exports from that package and
+  re-running: the error is unchanged. `@langwatch/trace-web`'s own typecheck
+  passes, so the deviation is between the two tsconfigs.
+- `packages/architecture-lint`: `vitest run tests/check-feature-parity.test.ts` —
+  **Test Files 1 passed (1)**, **Tests 16 passed (16)**.
+- `check:feature-parity`: both new scenarios report **BOUND**.
+  `specs/monitors/online-evaluation-drawer.feature` is now an enforced file at
+  **1/1**, and it is out of `staleInert`. The whole-repo run is red at HEAD on
+  this branch (4,633 unbound scenarios, 50 inert files, 2 stale `LEGACY_INERT`
+  entries) and this lane neither adds to nor subtracts from that count beyond
+  its own two bindings.
+- `oxlint` over all 29 touched TypeScript files — **0 findings**.
+- `oxfmt --check` over the same 29 — clean, except
+  `check-feature-parity.ts`, whose one complaint is a `DEFAULT_BATS_TEST_ROOTS`
+  array that fails at `HEAD` on a line this lane did not write (verified against
+  `git show HEAD:`). Reformatting it would have made the diff its own repair.
+
+### What this lane did NOT do
+
+- **No group (c) drawer.** `traceV2Details`, `addDatasetRecord`,
+  `editModelProvider`, `defaultModelOverride`, `llmModelCost`, `createProject`,
+  `editProject`, `targetTypeSelector`, `comparisonLeaderboard` and `agentViewer`
+  need a component built or moved, and belong to the lanes that own those
+  packages. Several landed in the registry while this lane ran.
+- **No email template edited.** Both outbound links keep the address they mint.
+- **The screen-local overlays stay.** See the section above.
+- **`drawer-from-url.tsx` is now a pass-through.** Its three wrappers are what
+  `@langwatch/scenario-web/drawers` publishes for the agent editors, and the
+  application hands each a coerced boolean `open`, so the `??` inside them never
+  fires. It was kept rather than deleted because it is the mechanism
+  `specs/features/scenarios/scenarios-editor-ui-regressions.feature` names.
+- **The five simulations drawers registered before this lane were not
+  re-pointed.** `scenarioRunDetail`, `scenarioEditor`, `suiteEditor`,
+  `agentWorkflowEditor` and `scenarioVersionHistory` are registered straight off
+  `@langwatch/scenario-web/drawers` with no host wrapper, and at least
+  `AgentWorkflowEditorDrawer` calls `useOrganizationTeamProject`, which throws
+  without a `ScenarioHostProvider`. `CurrentDrawer`'s error boundary swallows it
+  and clears the drawer from the URL, so it presents as the same silent
+  non-opening the census names. Wrapping them in `withScenarioDrawerHost` is a
+  one-line-per-entry fix and is the obvious follow-up; it was left out because
+  it is not group (b) and the file is contended.
+- **`apps/ui/src/features/chrome/index.ts:50` still says the residual set is
+  "still a `platform/app` module".** It is the census's row 38 and it is wrong,
+  but the set it describes is shrinking under three lanes at once; correcting it
+  belongs to whoever closes the last one.
+- **Nothing under `platform/` was created, edited or read.**
+
+## Six feature servers were red on one duplicated `@types/node`, 2026-09-03
+
+Six `packages/features/*/server` packages failed their own `pnpm -s typecheck`
+on errors that all pointed at *shared* source — `apps/api/src/rest/body-limit.ts`,
+`packages/group-queue/src/groupQueue.ts`, `packages/redis-client`,
+`packages/eventing`, `packages/otlp` — while those packages typechecked clean in
+their own directories. That split is the tell: the shared source was never
+wrong, the *programs* reading it were.
+
+### Root cause
+
+`--explainFiles` on `packages/features/dashboard/server` listed **two**
+`@types/node` copies in one program, `18.19.130` and `26.2.0`; the green
+comparison package `packages/features/trace/server`, which reaches the same
+`group-queue` source, listed only `26.2.0`. The 18.x copy entered like this:
+
+```
+@langwatch/test-harness -> @testcontainers/clickhouse -> testcontainers
+  -> @types/dockerode -> @types/ssh2@1.15.5
+       package.json: "@types/node": "^18.11.18"
+       index.d.ts:   /// <reference types="node" />   <- resolves to ITS OWN copy
+```
+
+`@types/node` declares **global modules**, so a second copy is a second
+`stream/web`. That is exactly what the first error said out loud — it named
+`import("stream/web")` and `import("node:stream/web")` as different types — and
+it is why every ioredis `.on(...)` / `.once(...)` became "this expression is not
+callable": the delegate's `EventEmitter` base was a union of two incompatible
+declarations. The tree carried five majors in all: 10.17.60, 18.19.130, 22.20.1,
+24.13.3 and 26.2.0.
+
+Fixed at the cause, in the one place pnpm honours overrides (the root
+`pnpm-workspace.yaml`, per ADR-076): `"@types/node": ^26.0.1`, in the version
+alignment block beside `@better-auth/utils`, which is there for the identical
+"one copy or the types stop being their own" reason. `pnpm install --offline`
+was enough — no network. The lockfile now resolves exactly one
+`@types/node@26.2.0`, and `@types/ssh2`'s own `node` link points at it. **No
+shared source was edited and no cast was added.** The `^22`/`^24` stragglers in
+eight member manifests were drift, not a requirement; all eight still typecheck.
+
+A path-scoped pin was rejected: six different packages request the 18.x line
+(`@types/ssh2`, `@anthropic-ai/sdk`, `@browserbasehq/sdk`, `@ibm-cloud/watsonx-ai`,
+`ibm-cloud-sdk-core`, `openai`), so pinning one edge only moves the bug.
+
+### The seventh error, which was unrelated
+
+`packages/features/authz/server` was red on TS2740 instead: the in-memory audit
+double owed 17 unused `AuditLogDelegate` members because
+`AuthzAuditDatabase = Pick<PrismaClient, "auditLog">` read as a narrowing but
+was not one — `Pick` selects the *whole delegate*. Narrowed to the single call
+the repository makes, `createMany`, as a structural seam. That is what
+`postgres.authz.adapter.ts` already says the feature's Postgres seams are ("no
+generated database type crosses into the feature"), and the composition root in
+`apps/worker/src/app/worker-production.composition.ts` is where the real client
+is still proven to satisfy it. The written row is named once as
+`AuthzAuditInsert` (`AuthzAuditRow` with `metadata` as `Prisma.InputJsonValue`,
+which is the column's type), and the test double implements that instead of the
+delegate. `Pick<PrismaClient["auditLog"], "createMany">` was tried first and
+rejected: it keeps Prisma's generic `createMany<T>(args?: SelectSubset<T, …>)`
+signature, which no hand-written double can satisfy.
+
+### Verification
+
+All per-package, in each package's own directory; the root `pnpm typecheck` was
+not run.
+
+| Package | Before | After |
+| --- | --- | --- |
+| `packages/features/annotation/server` | 1 error | **0** |
+| `packages/features/dashboard/server` | 10 errors | **0** |
+| `packages/features/evaluation/server` | 7 errors | **0** |
+| `packages/features/experiment/server` | 6 errors | **0** |
+| `packages/features/scenario/server` | 11 errors | **0** |
+| `packages/features/authz/server` | 1 error | **0** |
+| `apps/api`, `apps/worker` | 0 | **0** |
+| `group-queue`, `redis-client`, `eventing`, `otlp` | 0 | **0** |
+| `dataset/server`, `stored-object/server`, and the four enterprise `^24` servers | 0 | **0** |
+
+Suites, run one at a time: `apps/api` **103 files / 1050 tests passed**;
+`apps/worker` **60 / 452**; `group-queue` **15 / 112**; `redis-client` **4 / 42**;
+`eventing` **114 files, 1031 passed + 2 todo**; `otlp` **7 / 150**;
+`authz/server` **47 / 461**. The five feature packages also pass
+(`experiment` **20 / 5248**, `evaluation` **26 / 214**, `dashboard` **7 / 81**,
+`annotation` **2 / 10**). `scenario/server` reports 2 failed *files* and **0
+failed tests**: `cancellation-channel.integration.test.ts` and
+`scenario-tab-registry.integration.test.ts` throw their own "require Redis"
+guard at import with no Redis running — environmental, and untouched by this
+change. `oxlint` and `oxfmt --check` are clean on both edited TypeScript files.
+
+## Two ownerless drawers answered: the trace drawer is mounted again, and "Add to Dataset" exists again, 2026-09-03
+
+The ownerless-surfaces census counted 17 registered drawers against 22 that a
+live call site still addresses. Two of the 22 are the ones a reader reaches
+first, and they failed in opposite ways.
+
+`traceV2Details` was not a registration that went missing — it was a MOUNT that
+did. `installDrawerOpenRewrite(routeTraceDrawerForV2)` turns every
+`traceDetails` open in the product into a `traceV2Details` open, and
+`CurrentDrawer` renders `null` for a name its registry does not hold: no error,
+no toast, no log line. Only `/:project/traces` worked, because that page draws
+its own shell off the drawer store. `platform/app` had both halves — a NOOP
+registry entry for the name and a real `<GlobalTraceV2DrawerMount>` beside
+`<CurrentDrawer>` in `DashboardPageBody` — and when the shell moved into
+`@langwatch/navigation-web` only the registry half was carried across.
+
+`addDatasetRecord` was a component that no longer existed anywhere. Three
+surfaces write the address — the explorer's bulk-action bar, the trace drawer's
+overflow menu, and the annotation queue's end-of-walk hand-off — and
+`AddDatasetRecordDrawer.tsx` was deleted in `cc91631cd8` along with the picker,
+the mapping preview and the remembered-dataset hook it is made of.
+
+```
+  BEFORE                                     AFTER
+
+  any screen                                 any screen
+   │ openDrawer("traceDetails", {traceId})    │ openDrawer("traceDetails", …)
+   ▼                                          ▼
+  routeTraceDrawerForV2                      routeTraceDrawerForV2
+   │ → "traceV2Details"                       │ → "traceV2Details"
+   ▼                                          ▼
+  ?drawer.open=traceV2Details                ?drawer.open=traceV2Details
+   │                                          │
+   ▼                                          ├────────────┐
+  UiAppChrome                                 ▼            ▼
+   └─ CurrentDrawer                          UiAppChrome  (store)
+       installedUiDrawers["traceV2Details"]   ├─ CurrentDrawer  → null
+        = undefined  ──►  renders null        └─ UiTraceDrawerMount
+                          NOTHING OPENS            withTraceHost
+                                                    └─ GlobalTraceV2DrawerMount
+  /:project/traces only:                                 hydrator: URL → store
+   TracesPage └─ TraceDrawerMount ──► shell               isTraceExplorerPath?
+                                                            yes → null (the page
+                                                                   draws its own)
+                                                            no  → TraceV2DrawerShell
+
+
+  BEFORE                                     AFTER
+
+  bulk bar ─┐                                bulk bar ─┐
+  overflow ─┼─► ?drawer.open=                overflow ─┼─► ?drawer.open=
+  my-queue ─┘     addDatasetRecord           my-queue ─┘     addDatasetRecord
+                     │                                          │
+                     ▼                                          ▼
+              installedUiDrawers               traceDrawers.addDatasetRecord
+                = undefined                     = lazyDrawer(trace-drawers)
+                   NOTHING OPENS                     │
+                                                     ▼
+  component: DELETED cc91631cd8                withTraceHost(AddDatasetRecordDrawer)
+   AddDatasetRecordDrawer.tsx                   ├─ DatasetSelector
+   datasets/DatasetSelector.tsx                 ├─ DatasetMappingPreview
+   datasets/DatasetMappingPreview.tsx           │   └─ TracesMapping / ThreadMapping
+   hooks/useLocalStorageSelectedDataSetId.ts    └─ DatasetEditor ◄── injected by
+                                                                    apps/ui, hosted
+                                                                    on the studio host
+```
+
+### Why the trace drawer is mounted and not registered
+
+Because its URL sync has to outlive `?drawer.open=`. `useTraceDrawerUrlHydrator`
+does three things a registry entry cannot: it clears the drawer store when the
+parameter goes, it re-asserts the address when the reader's browser-back would
+drop an unsaved trace correction, and it lets a click render the drawer in the
+same frame by writing the store rather than waiting for the URL to round-trip.
+A registered component is mounted only WHILE the parameter names it, so
+registering `traceV2Details` would unmount the hydrator at exactly the moment it
+has work to do. `platform/app` reached the same conclusion and said so at the
+registry entry — *"the registry entry stays as a noop … CurrentDrawer rendering
+it would just double-mount"*.
+
+### The skip that stopped skipping
+
+`GlobalTraceV2DrawerMount` already knew to stand down on the Trace Explorer, and
+the check was `router.pathname.startsWith("/[project]/traces")` — Next's
+dynamic-route TEMPLATE. `apps/ui` answers the same port from react-router's
+RESOLVED path (`/acme/traces`), so the check would have said "not the explorer"
+on the one page that draws its own shell, and put two drawers over one trace.
+One project segment, whichever way it is spelled, is now what it matches
+(`model/trace-explorer-path.ts`).
+
+### Judgment calls
+
+- **The mount is lazy and the chrome is not.** `platform/app` imported it
+  eagerly into `DashboardPageBody`; here the chrome is on the path to every
+  signed-in page and `screens/traces/index.ts` is already in the boot graph
+  (the transport binding is read from it), so naming the component there would
+  put the waterfall, the transcript renderer and their syntax highlighters in
+  the first chunk a reader downloads. It is published as a LOADER, the shape
+  the screens already use.
+- **The dataset editor is injected, not imported and not navigated to.**
+  "+ Create New" and "Edit Columns" open `@langwatch/dataset-web`'s
+  `AddOrEditDatasetDrawer`, which runs on the STUDIO host — mounted by
+  `apps/ui`, and a feature package may not mount it. `drawers.md`'s answer is to
+  NAVIGATE to the registered `addOrEditDataset`, and that is not available here
+  either: this package's drawer navigator carries only what a URL carries
+  (complex props and flow callbacks "did not travel", by its own docblock) and
+  the editor's `onSuccess` is a required function. So `apps/ui` hands the
+  already-hosted editor in as a prop. A composition that hands in none renders
+  no "+ Create New" button rather than a dead one.
+- **The dataset procedures are declared on the trace map.** `dataset.getAll`,
+  `dataset.getById`, `dataset.updateMapping` and `datasetRecord.create` now
+  appear on `TraceApiMap` under the dataset family's own segment names, which is
+  what keeps them on the same React Query cache entry as
+  `@langwatch/dataset-web`'s map. This is the pattern the file already follows
+  for `annotation`, `prompts`, `evaluators`, `organization` and six more.
+- **Two dependencies were written by hand rather than added.** `use-debounce`
+  and `usehooks-ts` are not this package's dependencies and each contributed one
+  small hook, so `behavior/use-debounced-callback.ts` and
+  `behavior/use-local-storage-selected-dataset-id.ts` are local. The second
+  keeps the recovered validation — a remembered dataset id is checked against
+  the project before it is written back — and drops only the cross-hook sync,
+  which had one reader.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/trace/web/src/model/trace-explorer-path.ts` | NEW. `isTraceExplorerPath`, matching the resolved path and the Next template both. |
+| `packages/features/trace/web/src/ui/sections/explorer/global-trace-v2-drawer-mount.tsx` | Uses it; docblock rewritten to say why this is a mount and not a registration. |
+| `packages/features/trace/web/src/screens/traces/index.ts` | `traceDrawerMount`, a `TraceScreenLoader` for the mount. |
+| `packages/features/trace/web/src/ui/sections/drawers.ts` | NEW. The package's drawer entry: `AddDatasetRecordDrawer` and its two types. |
+| `packages/features/trace/web/src/ui/sections/datasets/add-dataset-record-drawer.tsx` | RECOVERED from `cc91631cd8^:platform/app/src/components/AddDatasetRecordDrawer.tsx`. The toaster and failure reporting are this package's; the editor arrives as a prop. |
+| `packages/features/trace/web/src/ui/sections/datasets/dataset-selector.tsx` | RECOVERED from `cc91631cd8^:platform/app/src/components/datasets/DatasetSelector.tsx`. `onCreateNew` is optional now. |
+| `packages/features/trace/web/src/ui/sections/datasets/dataset-mapping-preview.tsx` | RECOVERED from `cc91631cd8^:platform/app/src/components/datasets/DatasetMappingPreview.tsx`, reading the preview table through `@langwatch/dataset-web`'s export rather than a copy. |
+| `packages/features/trace/web/src/behavior/use-local-storage-selected-dataset-id.ts` | RECOVERED from `cc91631cd8^:platform/app/src/hooks/useLocalStorageSelectedDataSetId.ts`, without `usehooks-ts`. |
+| `packages/features/trace/web/src/behavior/use-debounced-callback.ts` | NEW. The one `use-debounce` behaviour the mapping preview needs, `cancel()` included. |
+| `packages/features/trace/web/src/ui/sections/trace-api.ts` | `traces.getTracesWithSpans`, and the `dataset` / `datasetRecord` segments. |
+| `packages/features/trace/web/package.json` | `./drawers` export; `@langwatch/dataset-web` dependency. |
+| `apps/ui/src/features/traces/ui/sections/trace-drawer-mount.tsx` | NEW. `withTraceHost` over the lazily-loaded mount. |
+| `apps/ui/src/features/traces/ui/sections/trace-drawers.tsx` | NEW. `withTraceHost(AddDatasetRecordDrawer)` with the studio-hosted editor handed in. |
+| `apps/ui/src/features/traces/index.ts` | `traceDrawers` and `UiTraceDrawerMount`. |
+| `apps/ui/src/features/installed-ui-drawers.ts` | `...traceDrawers` — 18 registered names. |
+| `apps/ui/src/features/chrome/ui/sections/ui-app-chrome.tsx` | `<UiTraceDrawerMount />` beside `<CurrentDrawer />`, with the reason for the pairing. |
+| `apps/ui/tests/trace-drawer-mount.integration.test.tsx` | NEW. 3 tests through the real chrome route, capability ports, trace host and URL sync; only the drawer's shell is stubbed. |
+| `apps/ui/tests/chrome-drawer.integration.test.tsx`, `apps/ui/tests/chrome-layout.integration.test.tsx` | The new mount stubbed — both suites mount no capability ports. |
+| `packages/features/trace/web/src/ui/sections/explorer/__tests__/global-trace-v2-drawer-mount.integration.test.tsx` | Two cases for the resolved path, in both directions. |
+| `packages/features/trace/web/src/ui/sections/datasets/__tests__/add-dataset-record-drawer.close.integration.test.tsx` | PORTED from `379b452def^:platform/app/src/components/__tests__/AddDatasetRecordDrawer.close.integration.test.tsx`. |
+| `packages/features/trace/web/src/ui/sections/datasets/__tests__/dataset-selector.integration.test.tsx` | PORTED from the same commit's `datasets/__tests__/DatasetSelector.integration.test.tsx`, plus the no-editor case. |
+| `packages/features/trace/web/src/ui/sections/datasets/__tests__/dataset-mapping-preview.expansions.integration.test.tsx` | PORTED from the same commit's `datasets/__tests__/DatasetMappingPreview.expansions.integration.test.tsx`. |
+| `apps/ui/tests/prompt-host.adapter.unit.test.ts` | Census row 39's stale claim — "`traceV2Details` is still `platform/app`'s registered drawer" — replaced with what actually answers the address. |
+| `specs/traces-v2/default-drawer-routing.feature` | New Rule: the drawer is mounted once, on every page. Two scenarios, both bound. |
+
+### Gates
+
+- `@langwatch/trace-web`: `pnpm test:unit` — **Test Files 234 passed (234)**,
+  **Tests 1836 passed (1836)** (231 / 1818 before). `pnpm typecheck` — **0
+  errors**, from a cleared `.tsbuildinfo`.
+- `apps/ui`: `vitest run tests` — **Test Files 98 passed (98)**, **Tests 1028
+  passed (1028)** (97 / 1025 before).
+- `apps/ui`: `pnpm typecheck` (both projects, tests included) — **0 errors**.
+  It reported one error mid-lane, in
+  `tests/model-provider-host.adapter.unit.test.ts`, against a `projectSlug`
+  field a sibling lane was adding to `ModelProviderHostScope` at the time; that
+  lane has since fixed its own test.
+- `check:feature-parity`: `specs/datasets/add-to-dataset-picker.feature` —
+  **5/5 · ✓ all bound**, up from 0/5.
+  `specs/datasets/add-to-dataset-span-mapping.feature` — **6/6 · ✓ all bound**,
+  up from 5/6. `specs/traces-v2/drawer-stacking.feature` — 5/7, up from 2/7.
+  `specs/traces-v2/default-drawer-routing.feature` — 8/18, up from 6/16 over two
+  more scenarios. Repository-wide unbound: **4634**, down from 4658; unknown
+  annotations unchanged at 352.
+- Both fixes were sabotaged and both bit: dropping `<UiTraceDrawerMount />` from
+  the chrome fails "opens the trace drawer over the page the reader is on";
+  narrowing `isTraceExplorerPath` back to the Next template fails "leaves the
+  drawer to the page", and removing the check entirely fails the same case.
+- `oxlint` over every touched file — **0 errors**, and the only two warnings are
+  pre-existing lines this lane did not write (an unused `Evaluation` type import
+  and the triple-slash reference at the top of `screens/traces/index.ts`).
+- `oxfmt --check` over the new files — clean.
+
+### What this lane did NOT do
+
+- **Nothing under `platform/` was created or edited.** The four recovered files
+  were read out of git history with `git show <commit>^:<path>` and written into
+  `packages/features/trace/web`.
+- **The other 20 ownerless drawers are untouched.** `editModelProvider`,
+  `defaultModelOverride`, `llmModelCost`, `createProject`, `editProject`,
+  `targetTypeSelector`, `comparisonLeaderboard` and `agentViewer` still have no
+  component anywhere; `automation`, `onlineEvaluation`, `guardrails`,
+  `inviteMember`, `createTeam` and the scenario editors have one that is not
+  exported or not addressed by `?drawer.open=`. The census rows stand.
+- **The `addOrEditDataset` registration was not repaired.** Opened straight from
+  a URL it calls a required `props.onSuccess` that nothing supplies. This lane
+  routes around it by handing the component in with callbacks rather than
+  navigating; the registered entry's own latent crash is somebody's to fix.
+- **No new error code and no presentation-registry entry.** The drawer's one
+  failure path reports through this package's existing `showErrorToast`, which
+  resolves its words from the code-keyed registry already.
+
+## Seven ownerless drawers recovered, and the eighth was never a drawer at all, 2026-09-03
+
+The ownerless-surfaces census's group (c) is the harsh group: not a component
+that exists somewhere unexported, but a component that no longer exists. Eight
+names were left in it after the trace lane took two. Seven of them died with
+`platform/app` in `cc91631cd8`, and one of them had never been alive.
+
+The seven are not evenly bad. `editModelProvider` is the one that made the rest
+of the product unusable: a fresh organization has no credential, every model
+surface asks for one, the Model Providers screen's Add menu and every row's Edit
+write `?drawer.open=editModelProvider`, and nothing opened — so there was no way
+to enter a key at all. `llmModelCost` and `defaultModelOverride` are the two
+tables on the same settings screen whose Add and Edit did nothing.
+`createProject` and `editProject` are the Teams screen's, and `createProject` is
+also what the CLI-auth screen offers someone who has just run `langwatch login`
+with nowhere to write to. `targetTypeSelector` is the front door of Evaluations
+v3 — Run Evaluation opens it first — and `comparisonLeaderboard` is the
+batch-results comparison a reader asks for after a run.
+
+The eighth, `agentViewer`, was a PHANTOM in the exact way `evaluatorViewer`
+turned out to be. It is in no registry, in `platform/app`'s forty-five-name one
+either, and there has never been a component by that name. Three places in
+`@langwatch/navigation-web` addressed it, so every agent found in the command
+bar was a link that changed the address bar and opened nothing. It was never
+recovered because there was nothing to recover; the three call sites now
+address the editor the agent's own kind decides, which is what the rest of the
+product has always done.
+
+```
+  BEFORE                                     AFTER
+
+  Model Providers screen                     Model Providers screen
+   ├─ Add ▾  ──────┐                          ├─ Add ▾  ──────┐
+   └─ row · Edit ──┴─► ?drawer.open=          └─ row · Edit ──┴─► ?drawer.open=
+                         editModelProvider                          editModelProvider
+                          │                                          │
+  Model Costs                                Model Costs             │
+   ├─ Add / Edit / Clone ─► llmModelCost       ├─ Add/Edit/Clone ─► llmModelCost
+  Default Models                             Default Models          │
+   └─ + Add config / Edit ─► default…          └─ + Add / Edit ──► default…
+  Teams                                      Teams                   │
+   ├─ New project ────► createProject          ├─ New project ──► createProject
+   └─ row · Edit ─────► editProject            └─ row · Edit ───► editProject
+  Evaluations v3                             Evaluations v3          │
+   └─ Run Evaluation ─► targetTypeSelector     └─ Run Evaluation ► targetType…
+  Batch results                              Batch results           │
+   └─ Compare ────────► comparisonLeaderboard  └─ Compare ──────► comparison…
+                          │                                          │
+                          ▼                                          ▼
+                   installedUiDrawers[name]              installedUiDrawers[name]
+                     = undefined                           = lazyDrawer(…)
+                        │                                          │
+                        ▼                                          ▼
+                   CurrentDrawer renders null           with<Family>Host(Drawer)
+                   NOTHING OPENS, no error,              ├─ model-provider: 3
+                   no toast, no log line                 ├─ organization:    2
+                                                         └─ experiment:      2
+  components: DELETED cc91631cd8                        32 registered ─► 39
+
+
+  BEFORE                                     AFTER
+
+  command bar · type "checkout agent"        command bar · type "checkout agent"
+   │ agents.getAll → {id, name}               │ agents.getAll → {id, name, type}
+   ▼                                          ▼
+  /acme/agents?drawer.open=agentViewer       agentEditorDrawerForType(type)
+              &drawer.agentId=agent_1         ├─ "code"      → agentCodeEditor
+   │                                          ├─ "http"      → agentHttpEditor
+   ▼                                          ├─ "workflow"  → agentWorkflowEditor
+  installedUiDrawers["agentViewer"]           └─ "signature" → null
+    = undefined  (and never defined,             │                    │
+       in ANY registry, ever)                    ▼                    ▼
+   │                                     /acme/agents?drawer.open=   /acme/agents
+   ▼                                        agentCodeEditor&…          (the list;
+  NOTHING OPENS                                                        no editor
+                                                                       exists)
+  paste "agent_1" into the bar               paste "agent_1" into the bar
+   └─ same dead address                       └─ /acme/agents  (an id carries no
+                                                  kind, so the list is the
+                                                  honest destination)
+```
+
+### What decided where each one landed
+
+The owning family, and nothing else. `llmModelCost`, `defaultModelOverride` and
+`editModelProvider` are `@langwatch/model-provider-web`'s — all three are
+addressed from its own two screens, and the credential editor is the screen's
+own Add menu. `createProject` and `editProject` went to
+`@langwatch/organization-web`, because a project is a member of a team and the
+drawer's own team picker reads the organization graph the package already holds;
+there is no `project-web`. `targetTypeSelector` and `comparisonLeaderboard` are
+`@langwatch/experiment-web`'s, next to the two surfaces that open them.
+
+Nothing landed in `apps/ui` except the registration and the host: one
+`ui/sections/*-drawers.tsx` per family wrapping the package's export in that
+family's `with*Host()`, and one `...spread` in `installed-ui-drawers.ts`. That
+is the same shape the fourteen-drawer lane used the day before.
+
+### Two package cycles, named rather than stubbed
+
+`defaultModelOverride` calls `syncLangyAfterDefaultModelWrite` after every write
+and reads `langyFirstPartyLinkProps` for one link attribute. Both belong to
+`@langwatch/langy-web`, and `langy-web` already depends on
+`model-provider-web` — so importing them back is a cycle, and the honest options
+were to move them or to name the loss.
+
+The write path is not lost: the sync's observable job is to make the pill that
+shows the resolved default re-read it, and `utils.modelProvider.invalidate()`
+does exactly that, because tRPC's cache keys on the procedure path and
+`getResolvedDefault` is under `modelProvider`. What is NOT carried over is the
+langy store's own in-memory follow, which matters only to a langy panel open in
+the same tab at the moment the default changes. The link attribute is declared
+locally with a docblock naming its owner and the cycle. Both are marked at the
+call site so the next person moving langy's first-party helpers into a shared
+module knows what to come back for.
+
+### Every procedure was checked before the drawer was registered
+
+The brief's rule was to leave a drawer unregistered rather than stub a procedure
+that no longer exists. Every one the recovered code reaches is mounted on
+`apps/api` today: `project.create`, `project.update`,
+`llmModelCost.createOrUpdate`, `llmModelCost.previewMatchingSpans`,
+`modelProvider.update`, `validateApiKey`, `validateKeyWithCustomUrl`,
+`isManagedProvider`, `codexStatus`, `codexSignInStart`, `codexSignInPoll`,
+`codexApplyCodingDefaults`, `setRoleAssignmentForScope`,
+`saveDefaultModelsConfig`, `getInheritedValuesForScopes` and
+`getResolvedDefault`. So all seven are registered, and none is a stub.
+
+Two client-side maps were wrong rather than missing, and both were corrected
+against the server's own schema: `extraHeaders` is an array of `{key, value}`
+and not a record, and `setRoleAssignmentForScope` takes no `projectId`.
+
+### The gap the recovery closed on the way past
+
+`CodexCodingDefaultsAsk` was deleted with everything else, and the Model
+Providers screen's docblock recorded its absence as a known gap. It is a page
+-level ask, not a drawer, so it is mounted at the top of
+`model-providers.screen.tsx` and the docblock now says the gap is closed rather
+than describing it.
+
+### The command bar's api map was the actual bug
+
+`agents.getAll` returns a discriminated union on `type` and always has —
+`agentSchema` is four variants, one per kind. `navigation-web`'s hand-written
+client map declared the output as `{id, name}`, and with no `type` in hand the
+palette could not pick an editor, so it wrote a name that opens nothing. Adding
+the one field the server already answers is what makes the three real editors
+addressable. `@langwatch/agent-contract` is a zod-only contract package and
+`agent-web` does not depend on `navigation-web`, so the dependency introduces no
+cycle.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/model-provider/web/src/ui/sections/edit-model-provider-drawer.tsx` | RECOVERED from `cc91631cd8^:platform/app/src/components/EditModelProviderDrawer.tsx`. |
+| `packages/features/model-provider/web/src/ui/sections/model-provider-form.tsx` | RECOVERED from `.../settings/ModelProviderForm.tsx`; the toaster and failure reporting go through the host port. |
+| `.../ui/sections/model-provider-{credentials,advanced,extra-headers,routing,scope}-section.tsx` | RECOVERED from the five `settings/ModelProvider*Section.tsx`. The credentials section's unused `projectId` prop is dropped. |
+| `.../ui/sections/model-provider-custom-model-input.tsx`, `add-custom-model-dialog.tsx`, `add-custom-embeddings-model-dialog.tsx`, `registry-models-modal.tsx` | RECOVERED from the matching `settings/*.tsx`. |
+| `.../ui/sections/codex-sign-in.tsx`, `codex-coding-defaults-ask.tsx` | RECOVERED from `settings/CodexSignIn.tsx` and `settings/CodexCodingDefaultsAsk.tsx`. `<Link isExternal>` is not a Chakra prop; `target`/`rel` replace it. |
+| `.../ui/sections/llm-model-cost-drawer.tsx`, `llm-model-cost-matching-spans.tsx` | RECOVERED from `settings/LLMModelCostDrawer.tsx` and `settings/LLMModelCostMatchingSpans.tsx`. |
+| `.../ui/sections/default-model-override-drawer.tsx` | RECOVERED from `settings/DefaultModelOverrideDrawer.tsx`, the largest of them at 812 lines. |
+| `.../ui/elements/small-label.tsx` | RECOVERED from `components/SmallLabel.tsx`. |
+| `.../ui/elements/modelProviders/icons-map.tsx` | Gains `inferProvider` and `ProviderIcon`, which the recovered sections read. |
+| `.../behavior/use-{model-provider-form,provider-form-submit,credential-keys,required-credential-keys,credential-probe-gate,custom-models,default-provider-selection,extra-headers,model-provider-fields,model-provider-api-key-validation,codex-device-sign-in}.ts` | RECOVERED from the matching `platform/app/src/hooks/*.ts` and `settings/useCodexDeviceSignIn.ts`. |
+| `.../behavior/use-organization-team-project.ts` | NEW. `useOrganizationTeamProject` was a 770-line application module reading the session and the router; this derives the same three answers from the host port's existing readings and fetches nothing. |
+| `.../behavior/model-provider-feedback.ts` | NEW. `toaster.create` and `showErrorToast` re-bound to the host port, call shapes unchanged. A `warning` is routed to `failed`, not `succeeded`. |
+| `.../model/{model-provider-helpers,model-provider-sync,safe-regex,relative-time,model-provider-field-metadata,scope-assignment,zod-field-errors,langy-first-party-link}.ts` | RECOVERED from `platform/app/src/utils/*` and the inline helpers of the deleted components. |
+| `.../behavior/model-provider-api.ts` | The sixteen procedures above added to the hand-written map, plus an `api` alias for the name the recovered modules already call. |
+| `.../behavior/use-all-model-providers-list.ts` | RECOVERED additions from `hooks/useAllModelProvidersList.ts`: `isReady`, `isResolvableProviderId`, `findModelProviderById`. |
+| `.../model/model-provider-host.ts` | `ModelProviderHostScope` gains `projectSlug`, which the recovered navigation needs. |
+| `.../screens/model-provider/model-providers.screen.tsx` | Mounts `<CodexCodingDefaultsAskHost />`; the recorded gap in its docblock is now a closed one. |
+| `.../src/testing.tsx` | Fake host answers `projectSlug`; `isReportedGlobally(_error: unknown)` so a test can override it. |
+| `packages/features/organization/web/src/ui/sections/create-project-drawer.tsx` | RECOVERED from `.../components/projects/CreateProjectDrawer.tsx`. `gtag` becomes `react-contextual-analytics`' `emit`; `window.location.href` becomes `host.navigate`. |
+| `packages/features/organization/web/src/ui/sections/edit-project-drawer.tsx` | RECOVERED from `.../components/projects/EditProjectDrawer.tsx`. Only changed fields are sent; personal workspaces are filtered out of the team picker. |
+| `packages/features/organization/web/src/ui/blocks/project-form.tsx` | RECOVERED from `.../components/projects/ProjectForm.tsx`. |
+| `packages/features/organization/web/src/model/project-form-validation.ts` | RECOVERED from `.../components/projects/projectFormValidation.ts`. |
+| `packages/features/organization/web/src/behavior/handled-error-form.tsx` | NEW. `readHandledError` / `applyHandledErrorToForm` / `HandledErrorAlert` for this family — the fifth family-local copy, documented as such. |
+| `packages/features/organization/web/src/behavior/organization-api.ts` | `project.create` and `project.update`; `TeamWithProjects` gains `isPersonal`. |
+| `packages/features/experiment/web/src/ui/sections/batch-results/comparison-leaderboard-drawer.tsx` | RECOVERED from `.../components/ComparisonLeaderboardDrawer.tsx`; three platform imports repointed, nothing else changed. |
+| `packages/features/experiment/web/src/ui/sections/experiments-v3/target-type-selector-drawer.tsx` | RECOVERED from `.../components/targets/TargetTypeSelectorDrawer.tsx`. |
+| `packages/features/{model-provider,experiment}/web/src/ui/sections/drawers.ts`, `organization/web/src/ui/sections/project-drawers.ts` | NEW package drawer entries. organization-web exports `./drawers/project`, since `./drawers` is the members-and-teams lane's. |
+| `apps/ui/src/features/model-provider/ui/sections/model-provider-drawers.tsx` | NEW. The three drawers under `withModelProviderHost`. |
+| `apps/ui/src/features/project/ui/sections/project-drawers.tsx` | NEW. `createProject` and `editProject` under `withOrganizationHost`, via `fromDrawerAddress`. |
+| `apps/ui/src/features/experiments/ui/sections/experiment-drawers.tsx` | NEW. Both under `withWorkflowHost`; the leaderboard renders nothing without an `evaluatorId`. |
+| `apps/ui/src/features/{model-provider,project,experiments}/index.ts` | `modelProviderDrawers`, `projectDrawers`, `experimentDrawers`. |
+| `apps/ui/src/features/model-provider/ui/sections/model-provider-host-provider.tsx` | Derives `teamId` and `projectSlug` from the organization graph in one memo. |
+| `apps/ui/src/features/installed-ui-drawers.ts` | Three imports and three spreads, by anchored insertion only — two sibling lanes held the same file. **32 registered names → 39.** |
+| `packages/features/navigation/web/src/behavior/navigation-api.ts` | `agents.getAll` answers `type`, which the server has always sent. |
+| `packages/features/navigation/web/src/model/command-entity-registry.ts` | `agentEditorDrawerForType` and `agentPath`; the `agent_` prefix's `pathBuilder` lands on the agents list. |
+| `packages/features/navigation/web/src/behavior/use-command-search.ts` | Search hits address the editor their kind decides. |
+| `packages/features/navigation/web/src/behavior/use-activity-tracker.ts` | Recognises the three real editor drawers instead of the phantom. |
+| `packages/features/navigation/web/package.json` | `@langwatch/agent-contract`. |
+| `packages/architecture-lint/src/check-feature-parity.ts` | `specs/projects/create-project-drawer.feature` removed from `LEGACY_INERT`. |
+| `dev/docs/plans/ownerless-ui-surfaces-census.md` | The eight group (c) rows this lane owns, answered. |
+
+### Tests
+
+| File | What it covers |
+| --- | --- |
+| `packages/features/model-provider/web/src/ui/sections/__tests__/edit-model-provider-drawer.integration.test.tsx` | NEW — 5. `platform/app` shipped this drawer with no render test at all, which is why deleting it broke nothing. The credential typed reaches `modelProvider.update` and is probed first; the field is a password input; the hint under it is what says where a key comes from. |
+| `packages/features/model-provider/web/src/ui/sections/__tests__/llm-model-cost-drawer.error-handling.integration.test.tsx` | PORTED — 2 — from `cc91631cd8^:platform/app/src/components/settings/__tests__/LLMModelCostDrawer.lite-member.integration.test.tsx`. Three platform mocks became one fake host. |
+| `packages/features/organization/web/src/model/__tests__/project-form-validation.unit.test.ts` | PORTED — 9 — from `cc91631cd8^:platform/app/src/components/projects/__tests__/ProjectForm.unit.test.ts`. |
+| `packages/features/organization/web/src/ui/sections/__tests__/create-project-drawer.integration.test.tsx` | NEW — 9. |
+| `packages/features/organization/web/src/ui/sections/__tests__/edit-project-drawer.integration.test.tsx` | NEW — 6. The Chakra `Select` is driven the way `evaluators.screen.test.tsx` drives one: portalled options by role, `pointerEventsCheck: 0`, and the combobox's text content as the assertion. |
+| `packages/features/experiment/web/src/ui/sections/experiments-v3/__tests__/target-type-selector-drawer.integration.test.tsx` | NEW — 10. |
+| `packages/features/experiment/web/src/ui/sections/batch-results/__tests__/comparison-leaderboard-drawer.gate.integration.test.tsx` | NEW — 4. |
+| `packages/features/navigation/web/src/model/__tests__/command-entity-registry.unit.test.ts` | +6. The three editors, the two destinations that have none, and one that asserts no agent address ever names `agentViewer` again. |
+
+### Gates
+
+- `@langwatch/model-provider-web`: `pnpm test` — **Test Files 10 passed (10)**,
+  **Tests 79 passed (79)** (8 / 72 before). `pnpm typecheck` — **0 errors**.
+- `@langwatch/organization-web`: `pnpm test` — **Test Files 11 passed (11)**,
+  **Tests 116 passed (116)** (8 / 92 before). `pnpm typecheck` — **0 errors**.
+- `@langwatch/experiment-web`: `pnpm test` — **Test Files 60 passed (60)**,
+  **Tests 601 passed (601)** (58 / 587 before). `pnpm typecheck` — one error,
+  and it is `packages/features/trace/web/src/behavior/docs-url.ts:57`
+  (`import.meta.env` on `ImportMeta`), committed at `e7c6cc272f` and untouched
+  by this lane.
+- `@langwatch/navigation-web`: `pnpm test` — **Test Files 27 passed (27)**,
+  **Tests 183 passed (183)** (27 / 177 before). `pnpm typecheck` — **0 errors**.
+- `apps/ui`: `vitest run tests` — **Test Files 98 passed (98)**, **Tests 1028
+  passed (1028)**. `pnpm typecheck` — **0 errors**.
+- `check:feature-parity`: `specs/projects/create-project-drawer.feature`
+  **4/4 · ✓ all bound** (0/4, and inert); `specs/projects/project-creation-flow.feature`
+  **7/7 · ✓ all bound**; `specs/experiments-v3/target-type-selector.feature`
+  **7/7 · ✓ all bound** (new); `specs/navigation/command-bar-agent-address.feature`
+  **6/6 · ✓ all bound** (new); `specs/settings/llm-model-cost-drawer-error-handling.feature`
+  **2/2 · ✓ all bound**; `specs/projects/edit-project-team.feature` 7/19, up
+  from 3/15; `specs/model-providers/provider-configuration.feature` gains two
+  bound scenarios.
+- `oxlint` over every file this lane touched — **0 errors, 0 warnings**.
+- `oxfmt --check` over the 58 new files — clean. The modified files are left
+  alone: the repository is not uniformly formatted (an untouched
+  `navigation-web` module fails the same check), and reformatting a file two
+  lanes are editing buys nothing and costs a merge.
+
+### What this lane did NOT do
+
+- **Nothing under `platform/` was created or edited.** Every recovered file was
+  read with `git show cc91631cd8^:<path>` and written into a feature package.
+- **`agentViewer` was not recovered, because it never existed.** Deciding that
+  the command bar should stop addressing it was the brief's own alternative, and
+  it is the only answer that leaves no dead link behind.
+- **The langy store's follow after a default-model write is not carried over.**
+  The pill re-reads because the query cache is invalidated; a langy panel open in
+  the same tab will not update itself until it refetches. Marked at both call
+  sites.
+- **No new error code and no presentation-registry entry.** Every failure path
+  recovered here reports through the host with the raw error and a
+  `fallbackTitle`; the words come from the application's code-keyed registry.
+- **The group (b) drawers and the dataset drawers are untouched**, as are
+  `trace-web` and the census rows that belong to those lanes.

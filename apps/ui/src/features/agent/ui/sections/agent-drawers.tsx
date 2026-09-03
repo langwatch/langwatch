@@ -14,13 +14,13 @@
  * renders closed. It reads the way every other registered drawer reads it now:
  * anything defined and not `false` means open.
  *
- * THE THREE EDITORS IT LEADS TO ARE NOT INSTALLED YET. `agentCodeEditor`,
- * `agentHttpEditor` and `workflowSelector` are still `platform/app` modules
- * behind a code editor, an outputs section and a scenario mapping section, and
- * none of those has a package home. So a pick writes the next address and
- * nothing opens — the same recorded gap this whole move is closing, one drawer
- * further in. The caller's own `onSelect` still fires, which is what the flows
- * that pass one actually act on.
+ * THE THREE EDITORS IT LEADS TO ARE REGISTERED, AND NOT HERE. `agentCodeEditor`,
+ * `agentHttpEditor` and `workflowSelector` are `@langwatch/scenario-web`
+ * components that read that package's host, so they are mounted by the
+ * simulations feature — `features/simulations/ui/sections/simulations-drawers`
+ * states the rule and the reasoning. This family writes the address and owns
+ * nothing else about them; the caller's own `onSelect` still fires alongside,
+ * which is what the flows that pass one act on.
  */
 
 import {

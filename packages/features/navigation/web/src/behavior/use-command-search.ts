@@ -4,7 +4,13 @@ import { useDebounceValue } from "usehooks-ts";
 import { useNavigationHost } from "../model/navigation-host";
 import { navigationApi } from "./navigation-api";
 import { MIN_SEARCH_QUERY_LENGTH, SEARCH_DEBOUNCE_MS } from "../model/command-bar-constants";
-import { findEntityByPrefix, isSpanId, isTraceId, traceIcon } from "../model/command-entity-registry";
+import {
+  agentPath,
+  findEntityByPrefix,
+  isSpanId,
+  isTraceId,
+  traceIcon,
+} from "../model/command-entity-registry";
 import type { SearchResult } from "../model/command-bar-types";
 
 /**
@@ -147,7 +153,7 @@ export function useCommandSearch(query: string, isOpen: boolean) {
           label: a.name,
           description: "Agent",
           icon: Bot,
-          path: `/${projectSlug}/agents?drawer.open=agentViewer&drawer.agentId=${a.id}`,
+          path: agentPath({ projectSlug, agentId: a.id, type: a.type }),
           type: "agent",
         });
       });

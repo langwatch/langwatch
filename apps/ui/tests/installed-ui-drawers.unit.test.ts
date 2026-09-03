@@ -14,20 +14,36 @@ import { describe, expect, it } from "vitest";
 
 import { agentDrawers } from "../src/features/agent";
 import { annotationScoresDrawers } from "../src/features/annotation-scores";
+import { automationsDrawers } from "../src/features/automations";
 import { datasetDrawers } from "../src/features/dataset";
 import { evaluatorDrawers } from "../src/features/evaluator";
+import { experimentDrawers } from "../src/features/experiments";
+import { gatewayDrawers } from "../src/features/gateway";
 import { installedUiDrawers } from "../src/features/installed-ui-drawers";
+import { modelProviderDrawers } from "../src/features/model-provider";
+import { opsDrawers } from "../src/features/ops";
+import { organizationDrawers } from "../src/features/organization";
+import { projectDrawers } from "../src/features/project";
 import { promptDrawers } from "../src/features/prompt";
 import { simulationsDrawers } from "../src/features/simulations";
+import { traceDrawers } from "../src/features/traces";
 import { workflowDrawers } from "../src/features/workflows";
 
 const perFeature = [
   agentDrawers,
   annotationScoresDrawers,
+  automationsDrawers,
   datasetDrawers,
   evaluatorDrawers,
+  experimentDrawers,
+  gatewayDrawers,
+  modelProviderDrawers,
+  opsDrawers,
+  organizationDrawers,
+  projectDrawers,
   promptDrawers,
   simulationsDrawers,
+  traceDrawers,
   workflowDrawers,
 ];
 

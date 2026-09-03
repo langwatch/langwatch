@@ -33,6 +33,21 @@ export const evaluatorDrawers: UiDrawerRegistry = {
     factory: () => import("./ui/sections/evaluator-drawers"),
     key: "EvaluatorListDrawer",
   }),
+  /**
+   * The one drawer here that reads no host, so it is registered as the package
+   * publishes it rather than through `evaluator-drawers`.
+   *
+   * `guardrails` renders an evaluator picker and the code a customer pastes to
+   * call that evaluator as a guardrail; the only thing it asks the framework
+   * for is the drawer stack, since picking an evaluator navigates to
+   * `evaluatorList` and comes back with the choice. `@langwatch/monitor-web`'s
+   * Online Evaluations screen writes the address and nothing opened, because
+   * the component was never exported.
+   */
+  guardrails: lazyDrawer({
+    factory: () => import("@langwatch/evaluator-web/drawers"),
+    key: "GuardrailsDrawer",
+  }),
 };
 
 export { evaluatorPageLoaders };

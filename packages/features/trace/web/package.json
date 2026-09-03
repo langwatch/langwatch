@@ -38,6 +38,10 @@
       "types": "./src/behavior/drawer.store.ts",
       "default": "./src/behavior/drawer.store.ts"
     },
+    "./drawers": {
+      "types": "./src/ui/sections/drawers.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
     "./explorer/components/TraceDrawer/Chip": {
       "types": "./src/ui/elements/explorer/trace-drawer/chip.tsx",
       "default": "./src/ui/elements/explorer/trace-drawer/chip.tsx"
@@ -151,6 +155,7 @@
     "@langwatch/coding-agent-web": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/dataset-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",

@@ -14,6 +14,10 @@
       "types": "./src/screens/gateway/index.ts",
       "default": "./src/screens/gateway/index.ts"
     },
+    "./drawers": {
+      "types": "./src/screens/drawers.ts",
+      "default": "./src/screens/drawers.ts"
+    },
     "./surfaces/budget-overview": {
       "types": "./src/surfaces/budget-overview/index.ts",
       "default": "./src/surfaces/budget-overview/index.ts"

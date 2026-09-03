@@ -38,7 +38,7 @@ type OrganizationGraphEntry = {
   teams: Array<{
     id: string;
     name: string;
-    projects: Array<{ id: string; name: string }>;
+    projects: Array<{ id: string; name: string; slug: string }>;
   }>;
 };
 
@@ -56,14 +56,23 @@ function ModelProviderHost({ children }: { children: ReactNode }) {
     [organizations.data, activeScope.organizationId],
   );
 
-  const teamId = useMemo(() => {
-    if (!activeScope.projectId) return void 0;
+  /**
+   * The team the project in scope belongs to, and the project's own slug.
+   *
+   * Both are derived from the one graph read rather than asked for again: the
+   * providers page needs the team for its filter's "This Team" and for the
+   * cascade, and the cost drawer's matching-spans preview needs the slug,
+   * because a trace address is `/<projectSlug>/traces?...`.
+   */
+  const { teamId, projectSlug } = useMemo(() => {
+    if (!activeScope.projectId) return { teamId: void 0, projectSlug: void 0 };
     for (const team of organization?.teams ?? []) {
-      if (team.projects.some((project) => project.id === activeScope.projectId)) {
-        return team.id;
-      }
+      const project = team.projects.find(
+        (candidate) => candidate.id === activeScope.projectId,
+      );
+      if (project) return { teamId: team.id, projectSlug: project.slug };
     }
-    return void 0;
+    return { teamId: void 0, projectSlug: void 0 };
   }, [organization, activeScope.projectId]);
 
   // Everything the reader can SEE: the scope filter's options, and the names the
@@ -94,6 +103,7 @@ function ModelProviderHost({ children }: { children: ReactNode }) {
             organizationId: activeScope.organizationId ?? void 0,
             teamId,
             projectId: activeScope.projectId ?? void 0,
+            projectSlug,
           },
           availableScopes,
           route: reading,
@@ -109,6 +119,7 @@ function ModelProviderHost({ children }: { children: ReactNode }) {
       activeScope.organizationId,
       activeScope.projectId,
       teamId,
+      projectSlug,
       availableScopes,
       reading,
       route,

@@ -147,6 +147,18 @@ Feature: Staged automation authoring drawer
       When the app resolves that URL
       Then it opens the automation authoring drawer
 
+    # The link is minted into a message that has already left the product, so a
+    # name that does not resolve cannot be corrected afterwards: every alert we
+    # have ever sent lands on the automations list with nothing open, and the
+    # reader is given no error to report. The receiving side is where this is
+    # fixed — the application registers the name the email already writes.
+    @integration
+    Scenario: An alert email's Edit automation link opens the automation it names
+      Given an alert email whose Edit automation link carries the automation's id
+      When the recipient follows that link into the application
+      Then the automation authoring drawer opens on that automation
+      And the drawer is told the reader arrived from an email
+
   Rule: Notifications configure templates; actions configure destinations
 
     Scenario: An email notification configures recipients and templates

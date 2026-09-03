@@ -31,6 +31,8 @@ import {
   CodeEvaluatorEditorDrawer as CodeEvaluatorEditor,
   EvaluatorCategorySelectorDrawer as EvaluatorCategorySelector,
   EvaluatorEditorDrawer as EvaluatorEditor,
+  OnlineEvaluationDrawer as OnlineEvaluation,
+  WorkflowSelectorForEvaluatorDrawer as WorkflowSelectorForEvaluator,
 } from "@langwatch/evaluator-web/editor-drawers";
 import { PromptEditorDrawer as PromptEditor } from "@langwatch/prompt-web/components/prompts/PromptEditorDrawer";
 
@@ -42,3 +44,18 @@ export const CodeEvaluatorEditorDrawer = withWorkflowHost(CodeEvaluatorEditor);
 export const EvaluatorCategorySelectorDrawer = withWorkflowHost(EvaluatorCategorySelector);
 export const EvaluatorEditorDrawer = withWorkflowHost(EvaluatorEditor);
 export const PromptEditorDrawer = withWorkflowHost(PromptEditor);
+
+/**
+ * The two that joined them, off the same host and for the same reason.
+ *
+ * `onlineEvaluation` is the widest of the eight: the Online Evaluations screen
+ * opens it, a trace's evaluation row opens it with the monitor it failed on,
+ * Langy's capability registry names it, and EVERY MONITOR ALERT EMAIL carries
+ * `?drawer.open=onlineEvaluation&drawer.monitorId=<id>` out of the product.
+ * `workflowSelectorForEvaluator` is what the evaluator category selector hands
+ * over to when a reader chooses to write their own evaluator as a workflow.
+ * Both read `@langwatch/workflow-web/studio-host/*` for the project, the
+ * transport and the router, so both are mounted in the host the six above are.
+ */
+export const OnlineEvaluationDrawer = withWorkflowHost(OnlineEvaluation);
+export const WorkflowSelectorForEvaluatorDrawer = withWorkflowHost(WorkflowSelectorForEvaluator);

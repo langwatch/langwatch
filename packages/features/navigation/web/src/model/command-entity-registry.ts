@@ -10,7 +10,65 @@ import {
   Table,
   Workflow,
 } from "lucide-react";
+import type { AgentType } from "@langwatch/agent-contract";
+
 import type { SearchResult } from "./command-bar-types";
+
+/**
+ * The address the whole product uses for ONE agent.
+ *
+ * Three editors, one per kind, and the kind is what picks between them — the
+ * same rule `apps/api`'s `createAgentPlatformUrlBuilder` applies when it mints
+ * an agent's link for the REST API and for Langy's deep links, and the same one
+ * `@langwatch/agent-web`'s `getAgentEditorDrawer` applies on the agents page.
+ *
+ * WHAT THIS ONE ANSWERS THAT NEITHER OF THOSE DOES is "and what if there is no
+ * editor". A signature agent has none, and the command bar lists every agent
+ * the project has, so `null` is a real answer here where agent-web's version
+ * throws: a palette that threw on a search result would take the whole overlay
+ * down for a kind of agent that is perfectly valid.
+ *
+ * `agentViewer` USED TO BE THE ANSWER and never worked. It was in no drawer
+ * registry, had no component, and every agent hit in the palette wrote it — so
+ * the reader clicked and the page did not move. Recorded in
+ * `dev/docs/plans/ownerless-ui-surfaces-census.md` as the one ownerless drawer
+ * that never existed in the first place.
+ */
+export type AgentEditorDrawerName = "agentCodeEditor" | "agentHttpEditor" | "agentWorkflowEditor";
+
+export function agentEditorDrawerForType(type: AgentType): AgentEditorDrawerName | null {
+  switch (type) {
+    case "code":
+      return "agentCodeEditor";
+    case "http":
+      return "agentHttpEditor";
+    case "workflow":
+      return "agentWorkflowEditor";
+    case "signature":
+      return null;
+  }
+}
+
+/**
+ * Where a search hit on an agent goes.
+ *
+ * With no editor for its kind — and from the id-paste path, which carries no
+ * kind at all — the agents list is the honest destination: the reader lands
+ * where every agent is, rather than on an address that opens nothing.
+ */
+export function agentPath({
+  projectSlug,
+  agentId,
+  type,
+}: {
+  projectSlug: string;
+  agentId: string;
+  type?: AgentType;
+}): string {
+  const drawer = type ? agentEditorDrawerForType(type) : null;
+  if (!drawer) return `/${projectSlug}/agents`;
+  return `/${projectSlug}/agents?drawer.open=${drawer}&drawer.agentId=${encodeURIComponent(agentId)}`;
+}
 
 /**
  * Entity configuration for command bar ID detection.
@@ -43,7 +101,10 @@ export const entityRegistry: EntityConfig[] = [
     type: "agent",
     icon: Bot,
     label: "Agent",
-    pathBuilder: (id, p) => `/${p}/agents?drawer.open=agentViewer&drawer.agentId=${id}`,
+    // An id pasted into the palette carries no kind, and the kind is what
+    // picks the editor — so this lands on the agents list rather than guessing
+    // one of three drawers and being wrong two-thirds of the time.
+    pathBuilder: (id, p) => agentPath({ projectSlug: p, agentId: id }),
   },
   {
     prefix: "dataset_",

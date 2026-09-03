@@ -61,6 +61,15 @@ vi.mock("../../../behavior/model-provider-api", () => ({
       getDefaultModelsForProject: {
         useQuery: () => ({ data: void 0, isLoading: true }),
       },
+      // The Codex post-connect ask is mounted at page level (its own drawer
+      // closes before the question can be asked), and it reads the resolved
+      // Langy default to decide whether the question is already answered. It
+      // renders nothing until a sign-in queues one, but the read happens on
+      // every render, so leaving this out fails the whole file on a TypeError.
+      getResolvedDefault: { useQuery: () => ({ data: void 0, isLoading: false }) },
+      codexApplyCodingDefaults: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
       deleteDefaultModelsConfig: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
@@ -173,7 +182,7 @@ function renderPage(host: FakeModelProviderHost) {
 
 function hostWithoutProject(grants = ["project:manage", "organization:view"]) {
   return new FakeModelProviderHost({
-    scope: { organizationId: "org-1", teamId: "team-1", projectId: void 0 },
+    scope: { organizationId: "org-1", teamId: "team-1", projectId: void 0, projectSlug: void 0 },
     grants: new Set(grants),
     availableScopes: ORGANIZATION_ONLY_SCOPES,
   });
@@ -181,7 +190,7 @@ function hostWithoutProject(grants = ["project:manage", "organization:view"]) {
 
 function hostWithProject(grants = ["project:manage", "organization:view"]) {
   return new FakeModelProviderHost({
-    scope: { organizationId: "org-1", teamId: "team-1", projectId: "proj-1" },
+    scope: { organizationId: "org-1", teamId: "team-1", projectId: "proj-1", projectSlug: "web-app" },
     grants: new Set(grants),
     availableScopes: ORGANIZATION_ONLY_SCOPES,
   });

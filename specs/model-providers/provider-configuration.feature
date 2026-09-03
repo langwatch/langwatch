@@ -3,26 +3,35 @@ Feature: Model Provider Configuration
   I want to set up API keys, models, and provider-specific settings
   So that I can use the provider for LangWatch operations
 
-  # Most remaining @unimplemented scenarios describe the provider drawer UI
-  # (toggles, Custom Models section, extra-headers). Need a JSDOM render of
-  # `ModelProviderForm` + the Custom Models / Extra Headers subforms. The
-  # masking/preservation pieces are bound to `modelProvider.service.unit.test.ts`
-  # (mergeCustomKeys / maskApiKeys). Aspirational pending the form harness.
+  # The JSDOM render harness this file kept asking for now exists:
+  # `packages/features/model-provider/web/src/ui/sections/__tests__/
+  # edit-model-provider-drawer.integration.test.tsx`, written when the drawer was
+  # recovered from `platform/app` (deleted in `cc91631cd8`, which is why a
+  # customer could not add or edit a credential at all). It covers the headline
+  # path — the drawer opens on the provider the address names, the typed key is
+  # probed, and it reaches `modelProvider.update` as typed. What is still
+  # @unimplemented below is the rest of the drawer's surface: the Azure gateway
+  # toggle, the Custom Models section and the extra-headers subform. The
+  # masking/preservation pieces stay bound to `modelProvider.service.unit.test.ts`
+  # (mergeCustomKeys / maskApiKeys).
 
   Background:
     Given I am logged in
     And I have access to a project
     And I have "project:manage" permission
 
-  @visual
+  @integration
   Scenario: OpenAI provider form fields
     When I open the model provider configuration drawer for "openai"
     Then I see the following fields:
-      | field           | type       |
-      | OPENAI_API_KEY  | text input |
-      | OPENAI_BASE_URL | text input |
-    And I see a "Custom Models" section
+      | field           | type           |
+      | OPENAI_API_KEY  | concealed text |
+      | OPENAI_BASE_URL | text input     |
+    And each field says where its value comes from
     And I see a "Save" button
+    # The field keeps the environment variable's own name rather than prose:
+    # it is what the provider's dashboard and the deployment's configuration
+    # both call it, so the hint underneath is what carries the explanation.
 
   @visual
   Scenario: Azure provider form fields
@@ -49,7 +58,7 @@ Feature: Model Provider Configuration
     When I open the model provider configuration drawer for "openai"
     Then I do not see an "Extra Headers" section
 
-  @integration @unimplemented
+  @integration
   Scenario: Configure API keys with manual input
     Given I open the model provider configuration drawer for "openai"
     When I enter "sk-test123" in the "OPENAI_API_KEY" field

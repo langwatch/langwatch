@@ -27,6 +27,12 @@ export const simulationsApiBinding: UiFeatureApiBinding = uiFeatureApi({
  * layout route mounted `CurrentDrawer`; that gap is closed, and these are the
  * addresses this family writes. `agentTypeSelector` is `@langwatch/agent-web`'s
  * and is registered there.
+ *
+ * THE LAST SIX ARE THE AGENT EDITORS. Each is wrapped in this family's host
+ * before it is registered, because `CurrentDrawer` is mounted above the outlet
+ * and a drawer opened from a workflow or the command palette renders outside
+ * whatever provider the page below it brought. See
+ * `ui/sections/simulations-drawers.tsx` for the whole argument.
  */
 export const simulationsDrawers: UiDrawerRegistry = {
   scenarioRunDetail: lazyDrawer({
@@ -48,6 +54,30 @@ export const simulationsDrawers: UiDrawerRegistry = {
   agentWorkflowEditor: lazyDrawer({
     factory: () => import("@langwatch/scenario-web/drawers"),
     key: "AgentWorkflowEditorDrawer",
+  }),
+  agentCodeEditor: lazyDrawer({
+    factory: () => import("./ui/sections/simulations-drawers"),
+    key: "AgentCodeEditorDrawer",
+  }),
+  agentHttpEditor: lazyDrawer({
+    factory: () => import("./ui/sections/simulations-drawers"),
+    key: "AgentHttpEditorDrawer",
+  }),
+  workflowSelector: lazyDrawer({
+    factory: () => import("./ui/sections/simulations-drawers"),
+    key: "WorkflowSelectorDrawer",
+  }),
+  agentList: lazyDrawer({
+    factory: () => import("./ui/sections/simulations-drawers"),
+    key: "AgentListDrawer",
+  }),
+  agentWorkflowTargetEditor: lazyDrawer({
+    factory: () => import("./ui/sections/simulations-drawers"),
+    key: "AgentWorkflowTargetEditorDrawer",
+  }),
+  agentTestingPlanEditor: lazyDrawer({
+    factory: () => import("./ui/sections/simulations-drawers"),
+    key: "AgentTestingPlanEditorDrawer",
   }),
 };
 

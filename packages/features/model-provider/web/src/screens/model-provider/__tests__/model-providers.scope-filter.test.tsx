@@ -38,6 +38,15 @@ vi.mock("../../../behavior/model-provider-api", () => ({
       delete: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
       testConnection: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
       getDefaultModelsForProject: { useQuery: () => ({ data: void 0, isLoading: true }) },
+      // The Codex post-connect ask is mounted at page level (its own drawer
+      // closes before the question can be asked), and it reads the resolved
+      // Langy default to decide whether the question is already answered. It
+      // renders nothing until a sign-in queues one, but the read happens on
+      // every render, so leaving this out fails the whole file on a TypeError.
+      getResolvedDefault: { useQuery: () => ({ data: void 0, isLoading: false }) },
+      codexApplyCodingDefaults: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
       deleteDefaultModelsConfig: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
@@ -105,7 +114,7 @@ const OTHER_TEAM_ROW = {
 
 function hostAt(query: Record<string, string | undefined>) {
   return new FakeModelProviderHost({
-    scope: { organizationId: "org-1", teamId: "team-1", projectId: "proj-1" },
+    scope: { organizationId: "org-1", teamId: "team-1", projectId: "proj-1", projectSlug: "web-app" },
     availableScopes: AVAILABLE,
     query,
   });

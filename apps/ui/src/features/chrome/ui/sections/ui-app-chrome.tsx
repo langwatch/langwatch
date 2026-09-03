@@ -45,6 +45,17 @@
  * a portal, and a reader who follows `?drawer.open=…` onto a legacy page is
  * asking for the same drawer. So the mount is unconditional and the shell stays
  * conditional.
+ *
+ * IT MOUNTS THE TRACE DRAWER BESIDE THE REGISTRY, AND THAT IS NOT A SECOND
+ * FRAMEWORK. One drawer in the product cannot be a registry entry: the trace
+ * drawer keeps its open trace in a store and syncs the URL onto it, and that
+ * sync has to keep running after `?drawer.open=` has gone — it is what clears
+ * the store, and what holds the drawer open over an unsaved correction.
+ * `platform/app` reached the same conclusion and registered the name against a
+ * noop, mounting the real shell from `DashboardPageBody` next to
+ * `CurrentDrawer`. That pairing is what this restores: without it every "View
+ * trace" affordance outside `/:project/traces` wrote an address that opened
+ * nothing.
  */
 
 import { NavigationShell, useNavigationTracking } from "@langwatch/navigation-web/chrome";
@@ -53,6 +64,7 @@ import { Outlet, useMatches } from "react-router";
 import { installedUiDrawers } from "../../../installed-ui-drawers";
 import { isUiInstalledPage } from "../../../installed-ui-page-keys";
 import { NavigationHostSection } from "../../../navigation";
+import { UiTraceDrawerMount } from "../../../traces";
 import { uiMatchedPageKey } from "../../../../ui/sections/ui-route-objects";
 
 export default function UiAppChrome() {
@@ -60,6 +72,7 @@ export default function UiAppChrome() {
     <NavigationHostSection commandBar>
       <UiAppChromeBody />
       <CurrentDrawer drawers={installedUiDrawers} />
+      <UiTraceDrawerMount />
     </NavigationHostSection>
   );
 }

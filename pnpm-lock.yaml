@@ -6022,6 +6022,15 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../design-system
+      '@langwatch/enterprise-managed-provider-web':
+        specifier: workspace:*
+        version: link:../../../enterprise/features/managed-provider/web
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../feature-flag/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../handled-error
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../contract
@@ -6031,6 +6040,9 @@ importers:
       '@langwatch/prompt-web':
         specifier: workspace:*
         version: link:../../prompt/web
+      '@langwatch/ui-drawer':
+        specifier: workspace:*
+        version: link:../../../ui-drawer
       '@langwatch/workflow-web':
         specifier: workspace:*
         version: link:../../workflow/web
@@ -6052,6 +6064,15 @@ importers:
       use-debounce:
         specifier: ^10.0.6
         version: 10.1.1(react@19.2.8)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+      zod-validation-error:
+        specifier: ^5.0.0
+        version: 5.0.0(zod@4.4.3)
+      zustand:
+        specifier: ^4.5.7
+        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
     devDependencies:
       '@chakra-ui/react':
         specifier: ^3.36.0
@@ -6218,6 +6239,9 @@ importers:
 
   packages/features/navigation/web:
     dependencies:
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:../../agent/contract
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract

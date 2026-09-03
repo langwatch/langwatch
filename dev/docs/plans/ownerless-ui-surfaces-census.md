@@ -155,16 +155,16 @@ several of these before any of the commented ones.**
 | --- | --- | --- | --- |
 | `traceV2Details` / `traceDetails` | Evaluator Try-it-out, prompt studio chat, simulations, langy links, command bar, evaluation results | `@langwatch/trace-web` (`GlobalTraceV2DrawerMount`, unexported/unmounted) | c |
 | `addDatasetRecord` | Trace explorer bulk-action bar, trace overflow menu, annotation my-queue | **none anywhere** | c |
-| `editModelProvider` | Model Providers screen, evaluator type selector | **none** | c |
-| `defaultModelOverride` | Default Models table | **none** | c |
-| `llmModelCost` | Model Costs screen | **none** | c |
-| `createProject` | Teams screen, team form, CLI-auth screen | **none** | c |
-| `editProject` | Teams screen | **none** | c |
-| `targetTypeSelector` | Evaluations v3 table, Run Evaluation button | **none** | c |
-| `comparisonLeaderboard` | Batch evaluation results | partial — `ComparisonLeaderboardChart` exists, drawer wrapper does not | c |
+| `editModelProvider` | Model Providers screen, evaluator type selector | `@langwatch/model-provider-web/drawers` — **registered** (2026-09-03) | c |
+| `defaultModelOverride` | Default Models table | `@langwatch/model-provider-web/drawers` — **registered** (2026-09-03) | c |
+| `llmModelCost` | Model Costs screen | `@langwatch/model-provider-web/drawers` — **registered** (2026-09-03) | c |
+| `createProject` | Teams screen, team form, CLI-auth screen | `@langwatch/organization-web/drawers/project` — **registered** (2026-09-03) | c |
+| `editProject` | Teams screen | `@langwatch/organization-web/drawers/project` — **registered** (2026-09-03) | c |
+| `targetTypeSelector` | Evaluations v3 table, Run Evaluation button | `@langwatch/experiment-web/drawers` — **registered** (2026-09-03) | c |
+| `comparisonLeaderboard` | Batch evaluation results | `@langwatch/experiment-web/drawers` — **registered** (2026-09-03) | c |
 | `automation` | **Alert emails** (`automation/contract/src/templating/template-context.ts:271`), trace explorer Automate button, command bar, langy links | `@langwatch/automation-web` has the drawer, but the screen reads `?automation=<id>` / `?viewAutomation=<id>`, not `?drawer.open=automation` | b |
 | `routingPolicy` | Gateway virtual-key screen (`gateway-virtual-key.screen.tsx:487`, an `href`) | `@langwatch/gateway-web` has the drawer, but the screen reads `?policy=<id>` | b |
-| `agentViewer` | Command-bar entity search, command entity registry | **none** (never in the old registry either) | c |
+| `agentViewer` | Command-bar entity search, command entity registry | **retired** (2026-09-03) — never a drawer; both call sites now address the real per-kind agent editor | c |
 | `agentCodeEditor` | Agent type selector, scenario agent list, experiments target editor, langy relay links | `@langwatch/scenario-web` (unexported) | b |
 | `agentHttpEditor` | Agent type selector, scenario agent list, experiments target editor | `@langwatch/agent-web/screens/agent-management` (**exported**) | b |
 | `workflowSelector` | Agent type selector | `@langwatch/scenario-web` (unexported) | b |

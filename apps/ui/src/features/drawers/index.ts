@@ -10,8 +10,10 @@
  * which spreads one map per feature exactly as `installed-ui-features.ts`
  * spreads one loader registry per feature.
  *
- * THIS FEATURE HOLDS THE ONE RULE THAT IS NEITHER: the trace funnel, which
- * `platform/app` hard-coded inside the navigator itself.
+ * THIS FEATURE HOLDS THE RULES THAT ARE NEITHER: the trace funnel, which
+ * `platform/app` hard-coded inside the navigator itself, and the reading of
+ * `open` every family's drawer adapter has to make.
  */
 
 export { routeTraceDrawerForV2 } from "./model/ui-trace-drawer-routing";
+export { fromDrawerAddress, isDrawerOpenFromAddress } from "./model/ui-drawer-address";

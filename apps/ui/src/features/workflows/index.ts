@@ -22,14 +22,14 @@ export const workflowApiBinding: UiFeatureApiBinding = uiFeatureApi({
 /**
  * The drawers mounted in the STUDIO host, by the name the address uses.
  *
- * SIX OF THEM AND ONLY ONE IS THIS FAMILY'S COMPONENT: three are published by
+ * EIGHT OF THEM AND NOT ONE IS THIS FAMILY'S COMPONENT: five are published by
  * `@langwatch/evaluator-web`, two by `@langwatch/dataset-web` and one by
  * `@langwatch/prompt-web`. What they share is the host they read — every one
  * came out of `platform/app` with the studio slice, already wired to
  * `@langwatch/workflow-web/studio-host/*` — and a drawer is mounted where its
  * host is. See `ui/sections/studio-host-drawers` for the whole argument.
  *
- * Lazy, like every page loader here, so six editors and a CSV parser stay out
+ * Lazy, like every page loader here, so seven editors and a CSV parser stay out
  * of the bundle until a reader opens one.
  */
 export const workflowDrawers: UiDrawerRegistry = {
@@ -56,6 +56,14 @@ export const workflowDrawers: UiDrawerRegistry = {
   promptEditor: lazyDrawer({
     factory: () => import("./ui/sections/studio-host-drawers"),
     key: "PromptEditorDrawer",
+  }),
+  onlineEvaluation: lazyDrawer({
+    factory: () => import("./ui/sections/studio-host-drawers"),
+    key: "OnlineEvaluationDrawer",
+  }),
+  workflowSelectorForEvaluator: lazyDrawer({
+    factory: () => import("./ui/sections/studio-host-drawers"),
+    key: "WorkflowSelectorForEvaluatorDrawer",
   }),
 };
 

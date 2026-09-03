@@ -2,26 +2,29 @@ import type React from "react";
 import { useRouter } from "../../../behavior/next-router";
 import { useTraceDrawerUrlHydrator } from "./hooks/use-trace-drawer-url-hydrator";
 import { useDrawerStore } from "../../../index";
+import { isTraceExplorerPath } from "../../../model/trace-explorer-path";
 import { TraceV2DrawerShell } from "./trace-drawer";
 
 /**
- * Mounts the v2 trace drawer at the global dashboard layout so it
- * works on any page — `/simulations`, evaluation results,
- * anywhere the operator can trigger `openDrawer("traceV2Details", …)`.
+ * Mounts the v2 trace drawer above whatever page the reader is on, so
+ * `openDrawer("traceV2Details", …)` opens the trace from anywhere —
+ * `/simulations`, evaluation results, the command bar, a langy link.
  *
- * Skipped on the `/[project]/traces` route because `TracesPage` already
- * mounts its own `<TraceDrawerMount>` (and runs
- * `useTraceDrawerUrlHydrator` itself) — double-mounting would render
- * two stacked shells.
+ * THE HYDRATOR IS WHY THIS IS A MOUNT AND NOT A REGISTERED DRAWER. A registry
+ * entry is mounted only while `?drawer.open=` names it, and the URL → store
+ * sync has to outlive that: it is what clears the store when the parameter goes
+ * and what holds the drawer open over an unsaved correction the reader is about
+ * to lose. `platform/app` registered the name against a NOOP for exactly this
+ * reason and mounted the real shell from `DashboardPageBody`; `apps/ui`'s
+ * chrome route mounts it beside `CurrentDrawer`.
+ *
+ * Skipped on the Trace Explorer, which already mounts its own
+ * `<TraceDrawerMount>` (and runs `useTraceDrawerUrlHydrator` itself) —
+ * double-mounting would render two stacked shells.
  */
 export const GlobalTraceV2DrawerMount: React.FC = () => {
   const router = useRouter();
-  // `pathname` is the Next.js dynamic-route template, not the resolved
-  // URL, so this match works regardless of which project slug is in
-  // the URL. The startsWith covers sub-routes too if any get added
-  // later under /traces (e.g. /[project]/traces/…).
-  const isTracesPage = router.pathname.startsWith("/[project]/traces");
-  if (isTracesPage) return null;
+  if (isTraceExplorerPath(router.pathname)) return null;
   return <GlobalTraceV2DrawerMountInner />;
 };
 

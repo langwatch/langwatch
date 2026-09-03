@@ -106,6 +106,13 @@ export function parseEntityUrl(path: string, projectSlug: string): EntityMatch |
   return null;
 }
 
+/** The drawers that put ONE agent on screen; see `agentEditorDrawerForType`. */
+const AGENT_EDITOR_DRAWERS = new Set([
+  "agentCodeEditor",
+  "agentHttpEditor",
+  "agentWorkflowEditor",
+]);
+
 /**
  * Parse drawer-based entity access from URL query params.
  */
@@ -119,8 +126,11 @@ function parseDrawerEntity(fullUrl: string, projectSlug: string): EntityMatch | 
       return null;
     }
 
-    // Agent viewer drawer
-    if (drawerOpen === "agentViewer") {
+    // One of the three agent editors — the ids that actually exist in the
+    // drawer registry, one per kind of agent. (`agentViewer` was a phantom id
+    // in exactly the way `evaluatorViewer` was: no drawer ever answered to it,
+    // so this branch matched only links that opened nothing.)
+    if (AGENT_EDITOR_DRAWERS.has(drawerOpen ?? "")) {
       const agentId = url.searchParams.get("drawer.agentId");
       if (agentId) {
         return {

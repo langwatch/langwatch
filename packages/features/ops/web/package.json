@@ -21,6 +21,10 @@
     "./screens/ops": {
       "types": "./src/screens/ops/index.ts",
       "default": "./src/screens/ops/index.ts"
+    },
+    "./drawers": {
+      "types": "./src/screens/drawers.ts",
+      "default": "./src/screens/drawers.ts"
     }
   },
   "scripts": {

@@ -23,6 +23,10 @@
       "types": "./src/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx",
       "default": "./src/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx"
     },
+    "./drawers": {
+      "types": "./src/ui/sections/drawers.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
     "./experiments-v3/components/EvaluatorPanel/ComparisonConfigForm": {
       "types": "./src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx",
       "default": "./src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx"

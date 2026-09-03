@@ -10,11 +10,12 @@
  * non-winning row from that Record entirely, so an id lookup against it
  * silently misses (#5380). The providers table lists rows, so it reads this.
  *
- * A family-local narrowing of `platform/app/src/hooks/useAllModelProvidersList.ts`,
- * which keeps three non-family callers there — the provider editor drawer, its
- * form, and their tests. What did NOT travel is `findModelProviderById` and
- * `isResolvableProviderId`: both exist for the drawer's edit-target resolution,
- * and neither screen resolves a row by id.
+ * Harvested from `platform/app/src/hooks/useAllModelProvidersList.ts`. The
+ * providers table took the hook alone; `findModelProviderById`,
+ * `isResolvableProviderId` and the `isReady` signal followed when the provider
+ * editor drawer was recovered, because those three exist for exactly one
+ * question — "is there a specific stored row to resolve, and has the list
+ * settled enough to say" — and the drawer is what asks it.
  */
 
 import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
@@ -74,6 +75,48 @@ export function useAllModelProvidersList() {
      * a permission failure shows the empty surface instead of spinning forever.
      */
     isLoading: activeQuery.isLoading,
+    /**
+     * Whether the list has actually ARRIVED, which is not the negation of
+     * `isLoading`.
+     *
+     * The editor drawer gates its form on this rather than on `!isLoading`: a
+     * disabled query is not loading and has no data either, and mounting the
+     * form off an empty list is what would silently drop a stored row's values
+     * on save.
+     */
+    isReady: activeQuery.isSuccess,
     refetch: activeQuery.refetch,
   } as const;
+}
+
+/**
+ * Whether `modelProviderId` names an actual stored row.
+ *
+ * Neither absent nor the Add-flow sentinel `"new"`. Shared so every caller that
+ * branches on "is there a specific row to resolve" uses the same rule.
+ */
+export function isResolvableProviderId(modelProviderId: string | undefined): boolean {
+  return !!modelProviderId && modelProviderId !== "new";
+}
+
+/**
+ * Resolves a single row by id out of the flat list above.
+ *
+ * Shared by the editor form's edit-target memo and the drawer's title lookup so
+ * the two can never resolve different rows for the same id — #5380 was exactly
+ * two separate resolvers drifting.
+ *
+ * Generic over the row rather than pinned to one shape: it resolves out of
+ * whatever list the caller holds, and naming a concrete type would hand every
+ * caller back something narrower than what it passed in.
+ */
+export function findModelProviderById<T extends { id: string }>({
+  providers,
+  modelProviderId,
+}: {
+  providers: readonly T[];
+  modelProviderId: string | undefined;
+}): T | undefined {
+  if (!isResolvableProviderId(modelProviderId)) return undefined;
+  return providers.find((candidate) => candidate.id === modelProviderId);
 }

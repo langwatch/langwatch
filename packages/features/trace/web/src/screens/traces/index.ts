@@ -35,6 +35,25 @@ export const traceScreens = {
 
 export type TraceScreenName = keyof typeof traceScreens;
 
+/**
+ * The trace drawer's global mount, which the chrome renders once above the
+ * outlet — beside its own `CurrentDrawer` and outside any page.
+ *
+ * A LOADER RATHER THAN THE COMPONENT, for the reason the screens are loaders:
+ * this module is in the application's boot graph (the transport binding is read
+ * from it), and the drawer drags shiki, mermaid, tiptap and the whole waterfall
+ * behind it. Naming the component here would put all of that in the chunk a
+ * reader downloads before they have asked for a trace.
+ *
+ * WHY THE MOUNT IS NOT A REGISTERED DRAWER is in the module it loads: the
+ * URL → store sync has to outlive the `?drawer.open=` parameter, and a registry
+ * entry does not.
+ */
+export const traceDrawerMount: TraceScreenLoader = () =>
+  import("../../ui/sections/explorer/global-trace-v2-drawer-mount").then((module) => ({
+    default: module.GlobalTraceV2DrawerMount,
+  }));
+
 export { api as traceApi, api as traceApiHooks } from "../../ui/sections/trace-api";
 export type { RouterOutputs as TraceRouterOutputs, TraceApiMap } from "../../ui/sections/trace-api";
 export {

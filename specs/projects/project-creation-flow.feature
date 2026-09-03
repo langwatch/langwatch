@@ -4,21 +4,18 @@ Feature: Project Creation Flow
   I want to create a new project successfully
   So that I can start tracking my LLM application
 
-  # End-to-end creation flow scenarios (success toast, error toast,
-  # duplicate-name handling, drawer close, redirect, form reset,
-  # tracking event) all need a JSDOM render fixture wiring the
-  # drawer to the mutation. The "calls correct API endpoint"
-  # scenario is partially bound to `CreateProjectDrawer.test.tsx`
-  # (multi-org org-id assertion). Cheap follow-up: a single happy-
-  # path test asserting toast / closeDrawer / trackEvent on success
-  # would bind several scenarios in one shot.
+  # The JSDOM render fixture this file kept asking for now exists:
+  # `packages/features/organization/web/src/ui/sections/__tests__/
+  # create-project-drawer.integration.test.tsx`, written when the drawer was
+  # recovered from `platform/app`. What is still @unimplemented below is what
+  # that fixture genuinely does not reach — the new-team branch, and the two
+  # form-reset scenarios, which are about a second mount rather than a submit.
 
   Background:
     Given I am logged in as an authenticated user
     And I have permission to create projects
     And I am within my organization's project limit
 
-  @unimplemented
   Scenario: Create project with all required fields
     Given the CreateProjectDrawer is open
     When I enter "My New Chatbot" as the project name
@@ -51,16 +48,17 @@ Feature: Project Creation Flow
       | framework      | "other"           |
       | organizationId | current org id    |
 
-  @unimplemented
   Scenario: Handle API error gracefully
     Given the CreateProjectDrawer is open with valid data
     And the API will return an error
     When I submit the form
-    Then I see an error toast notification
+    Then I see the refusal in the form itself
     And the drawer remains open
     And I can retry the submission
+    # In the form and not as a toast, deliberately: a rejected create is a
+    # state that is still true rather than a moment that has passed, and a
+    # toast would scroll away from a form the reader is still looking at.
 
-  @unimplemented
   Scenario: Handle duplicate project name error
     Given a project named "Existing Project" already exists
     And the CreateProjectDrawer is open
@@ -81,13 +79,11 @@ Feature: Project Creation Flow
     When creation succeeds
     Then the success toast includes "My Bot"
 
-  @unimplemented
   Scenario: Optional redirect to new project
     Given a redirect is configured after creation
     When I successfully create project "New Bot"
     Then I am redirected to the new project's dashboard
 
-  @unimplemented
   Scenario: Stay on current page when no redirect configured
     Given I am on the settings/projects page
     And no redirect is configured
@@ -109,7 +105,6 @@ Feature: Project Creation Flow
     And I open the drawer again
     Then the form fields are empty/default
 
-  @unimplemented
   Scenario: Track project creation event
     When I successfully create a project
     Then a tracking event is sent with project creation details

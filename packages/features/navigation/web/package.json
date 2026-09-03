@@ -31,6 +31,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",

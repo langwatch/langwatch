@@ -55,6 +55,7 @@ export class FakeModelProviderHost extends ModelProviderHostPort {
         organizationId: "org-1",
         teamId: "team-1",
         projectId: "proj-1",
+        projectSlug: "web-app",
       }
     );
   }
@@ -91,7 +92,12 @@ export class FakeModelProviderHost extends ModelProviderHostPort {
     this.failures.push(failure);
   }
 
-  isReportedGlobally(): boolean {
+  /**
+   * Takes the error even though the default answer ignores it, so a suite that
+   * needs "this ONE failure was already on screen" can override with a real
+   * predicate — which is the only interesting shape of this question.
+   */
+  isReportedGlobally(_error: unknown): boolean {
     return this.options.reportedGlobally ?? false;
   }
 

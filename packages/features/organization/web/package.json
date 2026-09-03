@@ -8,6 +8,14 @@
   ],
   "type": "module",
   "exports": {
+    "./drawers": {
+      "types": "./src/screens/drawers.ts",
+      "default": "./src/screens/drawers.ts"
+    },
+    "./drawers/project": {
+      "types": "./src/ui/sections/project-drawers.ts",
+      "default": "./src/ui/sections/project-drawers.ts"
+    },
     "./screens/organization": {
       "types": "./src/screens/organization/index.ts",
       "default": "./src/screens/organization/index.ts"
@@ -33,6 +41,7 @@
     "lodash-es": "^4.17.21",
     "lucide-react": "^1.22.0",
     "papaparse": "^5.5.3",
+    "react-contextual-analytics": "^1.1.2",
     "react-hook-form": "^7.65.0",
     "use-debounce": "^10.0.6"
   },

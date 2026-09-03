@@ -110,6 +110,19 @@ const SHELL_READINGS = {
   pathname: "/here",
 };
 
+/**
+ * The trace drawer's global mount, stubbed.
+ *
+ * The chrome mounts it beside `CurrentDrawer` because the trace drawer cannot
+ * be a registry entry (its URL sync has to outlive `?drawer.open=`). It reads
+ * the trace family's host, which reads this application's capability ports —
+ * and a suite about the LAYOUT mounts none of those. Its own wiring is asserted
+ * in `trace-drawer-mount.integration.test.tsx`.
+ */
+vi.mock("../src/features/traces", () => ({
+  UiTraceDrawerMount: () => null,
+}));
+
 vi.mock("../src/features/installed-ui-page-keys", () => ({
   isUiInstalledPage: (key: string) => key === "pages/served-here",
 }));

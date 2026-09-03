@@ -1,0 +1,307 @@
+/**
+ * The form behind `createProject`: a name, and a team to put it in.
+ *
+ * RECOVERED FROM `platform/app/src/components/projects/ProjectForm.tsx`,
+ * deleted in `cc91631cd8`. It lands in this package rather than in
+ * `@langwatch/project-web` because everything it asks for already lives here —
+ * the organization in scope, the teams under it, the drawer navigator and the
+ * feedback port — and because two of its three openers are this family's own
+ * screens (the Teams page and the team form). The third is the CLI-auth screen,
+ * which addresses the drawer by name and needs nothing of this module.
+ *
+ * FOUR NAMES CAME OUT OF `~/features/errors` AND ONE OF THEM DID NOT TRAVEL.
+ * `applyHandledErrorToForm` and `HandledErrorAlert` are answered by
+ * `behavior/handled-error-form`, which decides WHERE a refusal lands; the
+ * code-keyed registry that decides what it SAYS stays the application's, and a
+ * failure this package cannot name reads as the action that failed plus the
+ * generic line. That is what the registry itself answers for an unlisted code.
+ */
+
+import {
+  Box,
+  Button,
+  createListCollection,
+  Field,
+  HStack,
+  Input,
+  type ListCollection,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { Plus } from "lucide-react";
+import type React from "react";
+import { useEffect, useMemo, useState } from "react";
+import { type Control, Controller, type SubmitHandler, useForm } from "react-hook-form";
+
+import { Select } from "@langwatch/design-system/select";
+
+import { applyHandledErrorToForm, HandledErrorAlert } from "../../behavior/handled-error-form";
+import { api } from "../../behavior/organization-api";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
+import {
+  NEW_TEAM_VALUE,
+  validateNewTeamName,
+  validateProjectName,
+} from "../../model/project-form-validation";
+
+export interface ProjectFormData {
+  name: string;
+  teamId: string;
+  newTeamName?: string;
+}
+
+export interface ProjectFormProps {
+  onSubmit: (data: ProjectFormData & { language: string; framework: string }) => void;
+  isLoading?: boolean;
+  /** The submit mutation's error, passed straight through — handled or not. */
+  error?: unknown;
+  defaultTeamId?: string;
+  /** Required for creating projects in a different organization via the dropdown menu.
+   * Ensures teams are fetched from the target organization, not the current context. */
+  organizationId?: string;
+}
+
+export function ProjectForm(props: ProjectFormProps): React.ReactElement {
+  const {
+    onSubmit: onSubmitProp,
+    isLoading = false,
+    error,
+    defaultTeamId,
+    organizationId: organizationIdProp,
+  } = props;
+  const { organization: currentOrganization } = useOrganizationTeamProject();
+
+  // Use the explicitly passed organizationId if provided, otherwise fall back to the current organization
+  const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
+
+  const form = useForm<ProjectFormData>({
+    defaultValues: {
+      name: "",
+      // Seed from defaultTeamId so the form always submits a valid teamId
+      // even when teams.data is slow to arrive OR the RBAC-filtered teams
+      // response is empty (finding #82: Settings→+ New Project on an org
+      // with a default team but no projects yet was throwing
+      // "Either teamId or newTeamName must be provided" because the
+      // teams.useQuery-driven useEffect below never fired a reset).
+      teamId: defaultTeamId ?? "",
+    },
+  });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+    control,
+  } = form;
+
+  const teamId = watch("teamId");
+
+  /**
+   * The part of the submit failure the form itself could not put on a field.
+   *
+   * The mutation lives in the parent drawer, but the inputs live here, so the
+   * rejection has to come back down as a prop and be lifted onto the form on
+   * arrival. Without this the whole thing rendered as one alert reading
+   * "There's a problem with the name and the team" over an untouched form,
+   * leaving the user to work out which of the two the server meant.
+   *
+   * `hasFormErrorSlot` stays at its default `false` on purpose: the alert
+   * below IS this form's form-level slot, and it says more than
+   * `<FormServerError>` would — tips, docs link, error id. So the bridge
+   * claims only what it can mark on an input, and whatever it declines
+   * (a form-level complaint, a field with no input on screen, an error that
+   * isn't a validation failure at all) falls through to the alert intact.
+   */
+  const [unclaimedError, setUnclaimedError] = useState<unknown>(null);
+  useEffect(() => {
+    if (!error) {
+      setUnclaimedError(null);
+      return;
+    }
+    setUnclaimedError(applyHandledErrorToForm({ error, form }) ? null : error);
+  }, [error, form]);
+
+  const teams = api.team.getTeamsWithMembers.useQuery(
+    { organizationId: effectiveOrganizationId ?? "" },
+    { enabled: !!effectiveOrganizationId },
+  );
+
+  // Set default team when teams are loaded
+  useEffect(() => {
+    if (teams.data && teams.data.length > 0 && !teamId) {
+      // Use defaultTeamId if provided and valid, otherwise use first team
+      const teamIdToUse =
+        defaultTeamId && teams.data.some((t: { id: string }) => t.id === defaultTeamId)
+          ? defaultTeamId
+          : (teams.data[0]?.id ?? "");
+
+      reset((prev) => ({
+        ...prev,
+        teamId: teamIdToUse,
+      }));
+    }
+  }, [teams.data, teamId, reset, defaultTeamId]);
+
+  const onSubmit: SubmitHandler<ProjectFormData> = (data) => {
+    onSubmitProp({ ...data, language: "other", framework: "other" });
+  };
+
+  const showTeamSelector =
+    teams.data?.some((team: { projects: unknown[] }) => team.projects.length > 0) ?? false;
+
+  const teamOptions = useMemo(() => {
+    return (
+      teams.data?.map((team: { id: string; name: string }) => ({
+        label: team.name,
+        value: team.id,
+      })) ?? []
+    );
+  }, [teams.data]);
+
+  const teamCollection = useMemo(() => createListCollection({ items: teamOptions }), [teamOptions]);
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <VStack align="stretch" gap={6}>
+        <Text fontSize="sm" color="fg.muted">
+          You can set up separate projects for each service or LLM feature of your application (for
+          example, one for your ChatBot, another for that Content Generation feature).
+        </Text>
+
+        <Field.Root invalid={!!errors.name}>
+          <Field.Label>Project Name</Field.Label>
+          <Input
+            {...register("name", {
+              required: "Project name is required",
+              validate: validateProjectName,
+            })}
+            placeholder="AI Project"
+          />
+          {errors.name && <Field.ErrorText>{errors.name.message}</Field.ErrorText>}
+        </Field.Root>
+
+        {showTeamSelector && (
+          <>
+            <Field.Root invalid={!!errors.teamId}>
+              <Field.Label>Team</Field.Label>
+              <TeamSelectWithCreateButton
+                control={control}
+                teamCollection={teamCollection}
+                teamOptions={teamOptions}
+              />
+            </Field.Root>
+
+            {teamId === NEW_TEAM_VALUE && (
+              <Field.Root invalid={!!errors.newTeamName}>
+                <Field.Label>New Team Name</Field.Label>
+                <Input
+                  {...register("newTeamName", {
+                    validate: (value) => validateNewTeamName(teamId, value),
+                  })}
+                  placeholder="Engineering Team"
+                />
+                {errors.newTeamName && (
+                  <Field.ErrorText>{errors.newTeamName.message}</Field.ErrorText>
+                )}
+              </Field.Root>
+            )}
+          </>
+        )}
+
+        {!!unclaimedError && (
+          <HandledErrorAlert error={unclaimedError} fallbackTitle="Couldn't save this project" />
+        )}
+
+        <HStack width="full">
+          <Spacer />
+          <Button colorPalette="orange" type="submit" loading={isLoading} disabled={isLoading}>
+            Create
+          </Button>
+        </HStack>
+      </VStack>
+    </form>
+  );
+}
+
+function TeamSelectWithCreateButton({
+  control,
+  teamCollection,
+  teamOptions,
+}: {
+  control: Control<ProjectFormData>;
+  teamCollection: ListCollection<{ label: string; value: string }>;
+  teamOptions: Array<{ label: string; value: string }>;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <Controller
+      control={control}
+      name="teamId"
+      rules={{ required: "Team is required" }}
+      render={({ field }) => (
+        <Select.Root
+          collection={teamCollection}
+          value={[field.value]}
+          open={isOpen}
+          onOpenChange={(details) => setIsOpen(details.open)}
+          onValueChange={(details) => {
+            const selectedValue = details.value[0];
+            if (selectedValue) {
+              field.onChange(selectedValue);
+            }
+          }}
+        >
+          <Select.Trigger>
+            <Select.ValueText placeholder="Select team">
+              {() =>
+                field.value === NEW_TEAM_VALUE ? (
+                  <Text color="fg.muted">New team</Text>
+                ) : (
+                  (teamOptions.find((o) => o.value === field.value)?.label ?? "Select team")
+                )
+              }
+            </Select.ValueText>
+          </Select.Trigger>
+          <Select.Content paddingY={2}>
+            {teamOptions.map((option) => (
+              <Select.Item key={option.value} item={option}>
+                {option.label}
+              </Select.Item>
+            ))}
+            <Box
+              borderTop="1px solid"
+              borderColor="border"
+              marginTop={2}
+              marginX={-1}
+              marginBottom={-2}
+              background="bg.muted"
+            >
+              <Button
+                width="full"
+                fontWeight="500"
+                color="fg.muted"
+                paddingY={4}
+                paddingX={3}
+                justifyContent="flex-start"
+                variant="ghost"
+                colorPalette="gray"
+                size="sm"
+                borderRadius="none"
+                onClick={() => {
+                  field.onChange(NEW_TEAM_VALUE);
+                  setIsOpen(false);
+                }}
+              >
+                <Plus size={16} />
+                <Text fontSize={14}>Create new team</Text>
+              </Button>
+            </Box>
+          </Select.Content>
+        </Select.Root>
+      )}
+    />
+  );
+}

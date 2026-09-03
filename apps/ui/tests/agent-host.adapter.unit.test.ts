@@ -4,9 +4,9 @@
  * Most of the port is a value object over readings the provider already made, so
  * the assertions below concentrate on the one method that composes something:
  * `openAgentEditor`, which is this family's single piece of platform vocabulary.
- * The code, HTTP and workflow editors are still `platform/app`'s registered
- * drawers, so the screen names one and this adapter writes the address the rest
- * of the product already produces for an agent.
+ * The code, HTTP and workflow editors belong to `@langwatch/scenario-web` and
+ * are registered by the simulations feature, whose host they read, so the
+ * screen names one and this adapter writes the address that opens it.
  *
  * Getting that address wrong is silent in both directions: a missing
  * `drawer.agentId` opens an empty editor, and a LEFTOVER one from a previous
