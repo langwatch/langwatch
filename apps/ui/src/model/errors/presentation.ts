@@ -750,6 +750,15 @@ const presentations = {
     title: "Your browser couldn't prepare that photo",
     describe: () => "Try another browser, or a different image.",
   },
+  avatar_not_found: {
+    // The READ side, not the upload: `/api/user-avatar` answers this whenever
+    // there is no photo at a URL — it was removed, it never existed, or the
+    // object is not a photo at all. The route is what an `<img>` tag loads, so
+    // in practice a person sees their initials rather than this copy; it is
+    // here for the rare case where the failure surfaces as a message.
+    title: "That photo is no longer available",
+    describe: () => "The person may have removed it. Reload the page to see their current photo.",
+  },
 
   // ---- model providers (Codex / OpenAI account) ----
   codex_auth_failed: {

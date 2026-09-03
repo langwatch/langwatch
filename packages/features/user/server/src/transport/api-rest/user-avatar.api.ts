@@ -6,14 +6,22 @@
  * that must be visible wherever a person is shown, so this route authorizes ANY
  * authenticated caller on the platform — not only users who share an
  * organization with the uploader. For exactly that reason it MUST only ever
- * serve objects tagged with the `user_avatar` purpose. Any other purpose is a
- * 404 here, so this broad-read route can never be used to exfiltrate the
- * trace/scenario media that /api/files protects.
+ * serve objects whose purpose AND owner kind are the avatar ones. Anything else
+ * is refused with {@link UserAvatarNotFoundError}, so this broad-read route can
+ * never be used to exfiltrate the trace/scenario media that /api/files
+ * protects. The refusal carries ONE code for every reason there is no avatar at
+ * a URL — see that error for why the three are not told apart.
+ *
+ * That check is only as good as what the process's read hands it: a reader that
+ * answered a row without `ownerKind` would fail the comparison on every object,
+ * including real avatars. `StoredObjectFileRow` carries both columns for this
+ * reason.
  *
  * (This is still strictly more private than the status quo: SSO provider photos
  * are fetched from fully public CDN URLs today.)
  *
- * Spec: specs/settings/user-avatar.feature
+ * Spec: specs/settings/user-avatar-upload.feature (serving), and
+ * specs/settings/user-avatar.feature (the upload's refusals).
  */
 import { Readable } from "node:stream";
 
@@ -21,6 +29,7 @@ import {
   safeUserAvatarMediaType,
   USER_AVATAR_OWNER_KIND,
   USER_AVATAR_PURPOSE,
+  UserAvatarNotFoundError,
 } from "@langwatch/user-contract";
 import type { Env, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -155,7 +164,7 @@ export function createUserAvatarRestApp<
     const projectId = c.req.param("projectId");
     const id = c.req.param("id");
     if (!projectId || !id) {
-      return jsonResponse({ status: "not_found" }, 404);
+      throw new UserAvatarNotFoundError(id ?? "");
     }
 
     // Per-caller rate limit, keyed on the authenticated identity (dualAuth
@@ -181,19 +190,24 @@ export function createUserAvatarRestApp<
       return jsonResponse({ error: "avatar temporarily unavailable" }, 502);
     }
 
-    // A missing row, or ANY object that is not a user avatar, is a 404 — the
+    // A missing row, or ANY object that is not a user avatar, is refused — the
     // purpose/owner check is the security boundary that keeps this broadly
-    // readable route from serving trace/scenario media (see file header).
+    // readable route from serving trace/scenario media (see file header). BOTH
+    // halves are checked: `purpose` says what the object is for and
+    // `owner_kind` says what produced it, and an object carrying one without
+    // the other is not an avatar.
     if (
       !result ||
       result.metadata.purpose !== USER_AVATAR_PURPOSE ||
       result.metadata.ownerKind !== USER_AVATAR_OWNER_KIND
     ) {
-      return jsonResponse({ status: "not_found" }, 404);
+      throw new UserAvatarNotFoundError(id);
     }
 
+    // The row is an avatar but the bytes are gone. The SAME refusal, so this
+    // route never confirms that an id exists to a caller it would not serve.
     if (result.status === "missing") {
-      return jsonResponse({ status: "missing" }, 404);
+      throw new UserAvatarNotFoundError(id);
     }
 
     return streamAvatarResponse({

@@ -80,3 +80,23 @@ export class UserNotFoundError extends NotFoundError {
     this.name = "UserNotFoundError";
   }
 }
+
+/**
+ * There is no avatar at this URL.
+ *
+ * ONE code for every refusal `/api/user-avatar` makes, deliberately. The route
+ * is readable by any authenticated caller on the platform, so a caller who
+ * could tell "no such object" from "that object is not an avatar" from "the
+ * avatar's bytes are gone" would be holding an existence oracle over every
+ * project's object ids. Nothing renders this body — the consumer is an `<img>`
+ * tag reading the status — so there is nothing the three answers would let a
+ * customer do differently.
+ */
+export class UserAvatarNotFoundError extends NotFoundError {
+  declare readonly code: "avatar_not_found";
+
+  constructor(id: string) {
+    super("avatar_not_found", "Avatar", id);
+    this.name = "UserAvatarNotFoundError";
+  }
+}

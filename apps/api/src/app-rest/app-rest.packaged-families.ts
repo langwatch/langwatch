@@ -97,7 +97,11 @@ import { createFilesRestApp } from "@langwatch/stored-object-server";
 import type { SuiteApp } from "@langwatch/suite-server";
 import { createSuiteRestApp } from "@langwatch/suite-server";
 import { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
-import { createMeRestApp } from "@langwatch/user-server";
+import {
+  createMeRestApp,
+  createUserAvatarRestApp,
+  type UserAvatarObjectReader,
+} from "@langwatch/user-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { WorkflowEvaluationTrigger } from "@langwatch/workflow-server";
 import { createWorkflowsRestApp } from "@langwatch/workflow-server";
@@ -167,6 +171,18 @@ export type ApiPackagedRestServices = Readonly<{
   simulations?: (() => SimulationService) | undefined;
   storedObjects?: (() => StoredObjectApp) | undefined;
   suites?: (() => SuiteApp) | undefined;
+  /**
+   * One avatar object's metadata and bytes, for `/api/user-avatar`.
+   *
+   * Held apart from `storedObjects` even though this process builds both from
+   * the same application: the avatar read is authorized for ANY authenticated
+   * caller on the platform, and it is safe only because the reader answers the
+   * object's OWNER KIND and the family refuses everything that is not an
+   * avatar. A process whose object read cannot name the owner kind must leave
+   * this entry off — the family would then be a door onto every tenant's trace
+   * media — which is what this being its own condition preserves.
+   */
+  userAvatarObjects?: (() => UserAvatarObjectReader) | undefined;
   /**
    * Recording a customer's feedback event as the one span that carries it,
    * plus the second validation pass, the id, the error sink and the rendered
@@ -632,6 +648,20 @@ export function mountApiPackagedRestFamilies(options: {
       : null,
   );
 
+  const userAvatarObjects = services.userAvatarObjects;
+  mount(
+    "user-avatar",
+    userAvatarObjects && dualAuth
+      ? () =>
+          createUserAvatarRestApp({
+            security,
+            dualAuth,
+            userAvatarObjects,
+            rateLimit: ports.rateLimit,
+          }).hono
+      : null,
+  );
+
   const suites = services.suites;
   mount(
     "suites",
@@ -720,12 +750,9 @@ export function mountApiPackagedRestFamilies(options: {
       : null,
   );
 
-  // The two families this process cannot build at all, named here rather than
-  // silently missing. `/api/user-avatar` needs the object's OWNER KIND to keep
-  // its broad read from serving trace media, and this process's file read
-  // answers a row that does not carry one; `/api/copilotkit` dispatches
-  // through an adapter that reaches the retired studio's runtime.
-  report?.absent("user-avatar");
+  // The one family this process cannot build at all, named here rather than
+  // silently missing: `/api/copilotkit` dispatches through an adapter that
+  // reaches the retired studio's runtime.
   report?.absent("copilotkit");
 
   return features;

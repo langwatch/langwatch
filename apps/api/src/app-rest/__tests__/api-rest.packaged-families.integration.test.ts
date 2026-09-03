@@ -23,7 +23,9 @@ import {
   TrackedEventSpanService,
   type TrackedEventPorts,
 } from "@langwatch/trace-server";
+import type { UserAvatarObjectReader } from "@langwatch/user-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -67,6 +69,7 @@ const FAMILY_PATHS: ReadonlyArray<readonly [ApiPackagedRestFamilyName, string]> 
   ["tracked-events", "/api/track_event"],
   ["triggers", "/api/triggers"],
   ["triggers", "/api/trigger/slack"],
+  ["user-avatar", "/api/user-avatar"],
   ["webhooks", "/api/webhooks/v1"],
   ["workflows", "/api/workflows"],
 ];
@@ -103,8 +106,7 @@ describe("given a process that composed none of the packaged services", () => {
       expect(new Set(absent)).toEqual(
         new Set([
           ...new Set(FAMILY_PATHS.map(([family]) => family)),
-          // The two this process cannot build at all, named unconditionally.
-          "user-avatar",
+          // The one this process cannot build at all, named unconditionally.
           "copilotkit",
         ]),
       );
@@ -186,6 +188,77 @@ describe("given the byte-serving file family", () => {
       );
 
       expect(api.claims("/api/files/project-1/object-1")).toBe(false);
+    });
+  });
+});
+
+/**
+ * The avatar family, whose read is authorized for ANY authenticated caller on
+ * the platform.
+ *
+ * That breadth is only safe because the family refuses every object whose
+ * purpose and owner kind are not the avatar ones, and that refusal is only real
+ * if the process's object read ANSWERS the owner kind. It did not, which is why
+ * this family was a named absence; these drive the mounted family over a reader
+ * that carries both columns.
+ *
+ * Spec: specs/settings/user-avatar-upload.feature
+ */
+describe("given the avatar family over a reader that carries the owner kind", () => {
+  describe("when a signed-in caller loads an avatar", () => {
+    /** @scenario "The avatar route serves an object whose purpose and owner kind are the avatar ones" */
+    it("streams the bytes with the stored media type", async () => {
+      const api = mount(withAvatarObject(avatarRead()));
+
+      const response = await api.fetch("/api/user-avatar/project-9/object-1");
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toBe("image/png");
+      expect(response.headers.get("Content-Length")).toBe("3");
+    });
+  });
+
+  describe("when the same caller asks for an object that is not an avatar", () => {
+    /** @scenario "An object that is not a user avatar is refused rather than served" */
+    it("refuses by code rather than serving another tenant's trace media", async () => {
+      const api = mount(
+        withAvatarObject(
+          avatarRead({ purpose: "trace_content", ownerKind: "span", mediaType: "audio/mpeg" }),
+        ),
+      );
+
+      const response = await api.fetch("/api/user-avatar/project-9/object-1");
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({ error: "avatar_not_found" });
+    });
+  });
+
+  describe("when the object is tagged as an avatar but was produced by something else", () => {
+    /** @scenario "An object that is not a user avatar is refused rather than served" */
+    it("refuses on the owner kind alone, so the purpose is not the only gate", async () => {
+      const api = mount(withAvatarObject(avatarRead({ ownerKind: "span" })));
+
+      const response = await api.fetch("/api/user-avatar/project-9/object-1");
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({ error: "avatar_not_found" });
+    });
+  });
+
+  describe("when this process composed no dual-credential verifier", () => {
+    /** @scenario "The avatar route is left off a process that cannot authenticate an image request" */
+    it("leaves the family off rather than 401ing every member list", () => {
+      const api = mount(
+        collaboratorsWith(
+          { userAvatarObjects: () => avatarReader(avatarRead()) },
+          {
+            withoutDualAuth: true,
+          },
+        ),
+      );
+
+      expect(api.claims("/api/user-avatar")).toBe(false);
     });
   });
 });
@@ -375,6 +448,7 @@ function fullCollaborators(): ApiPackagedRestCollaborators {
       storedObjects: anyService,
       suites: anyService,
       trackedEvents: anyService,
+      userAvatarObjects: anyService,
       webhooks: anyService,
       workflows: anyService,
     },
@@ -447,6 +521,54 @@ class RecordingCommands extends TraceIngressCommandPort {
   async recordSpan(data: RecordSpanCommandData): Promise<void> {
     this.sent.push(data);
   }
+}
+
+/**
+ * One avatar read, in the shape the process's adapter answers with.
+ *
+ * The defaults are a real avatar; each test overrides only the field whose
+ * refusal it is about, so what a case changes IS what it claims.
+ */
+function avatarRead(overrides: { purpose?: string; ownerKind?: string; mediaType?: string } = {}): {
+  status: "available";
+  metadata: { byteLength: number; mediaType: string; purpose: string; ownerKind: string };
+  stream: Readable;
+} {
+  return {
+    status: "available",
+    metadata: {
+      byteLength: 3,
+      mediaType: overrides.mediaType ?? "image/png",
+      purpose: overrides.purpose ?? "user_avatar",
+      ownerKind: overrides.ownerKind ?? "user",
+    },
+    stream: Readable.from([Buffer.from([1, 2, 3])]),
+  };
+}
+
+function avatarReader(read: ReturnType<typeof avatarRead>): UserAvatarObjectReader {
+  return { getById: async () => read };
+}
+
+/**
+ * The avatar family over a session-authenticated caller.
+ *
+ * The dual-auth verifier is the family's own credential resolution, and the
+ * handler keys its rate limit on what that verifier left behind — so a
+ * pass-through that set nothing would 500 before any refusal was reached.
+ */
+function withAvatarObject(read: ReturnType<typeof avatarRead>): ApiPackagedRestCollaborators {
+  const ports = fullPorts();
+  return {
+    services: { userAvatarObjects: () => avatarReader(read) },
+    ports: {
+      ...ports,
+      dualAuth: async (c, next) => {
+        c.set("userId", "user-1");
+        await next();
+      },
+    },
+  };
 }
 
 function collaboratorsWith(

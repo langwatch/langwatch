@@ -41,10 +41,22 @@ export type StoredObjectHead =
   | { status: "missing"; mediaType: string }
   | { status: "not_found" };
 
-/** The row the file surface builds its response from. */
+/**
+ * The row the file surface builds its response from.
+ *
+ * `purpose` and `owner_kind` are BOTH here because they are both gates rather
+ * than description. `/api/files` picks the permission category from the
+ * purpose; `/api/user-avatar` is readable by any authenticated caller on the
+ * platform and is safe only because it refuses every object whose owner kind is
+ * not the avatar one. The columns exist on the row and the repository already
+ * selects them — projecting only `purpose` here is what left the avatar family
+ * unmountable, because a broad read that cannot see the owner kind cannot
+ * refuse another tenant's trace media.
+ */
 export interface StoredObjectFileRow {
   id: string;
   purpose: string;
+  owner_kind: string;
   media_type: string;
   size_bytes: number;
 }

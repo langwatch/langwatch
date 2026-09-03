@@ -58,6 +58,7 @@ import type { ApiTraceIngestComposition } from "./api-trace-ingest.composition";
 import { createApiTrackedEventPorts } from "../features/trace/tracked-event-ports.adapter";
 import { createAgentPlatformUrlBuilder } from "../features/agent/agent-platform-url";
 import { createDatasetDirectUploadAuthorizer } from "../features/dataset/dataset-direct-upload-auth";
+import { createApiUserAvatarObjectReader } from "../features/user/user-avatar-objects.adapter";
 import { createScenarioRunPlatformUrlBuilder } from "../features/scenario/scenario-run-platform-url";
 import {
   MemoryAgentCacheEntryStore,
@@ -215,6 +216,12 @@ export function composeApiPackagedRest(
         ? {
             monitors: () => options.productInfra!.monitorApp,
             storedObjects: () => options.productInfra!.storedObjectApp,
+            // The SAME application `/api/files` reads through, in the shape the
+            // avatar family takes. Its row carries the owner kind, which is
+            // what makes the family's refusal of every non-avatar object a real
+            // check rather than a comparison against a field nobody projected.
+            userAvatarObjects: () =>
+              createApiUserAvatarObjectReader(() => options.productInfra!.storedObjectApp),
           }
         : {}),
       ...(options.agentGroup
@@ -449,7 +456,7 @@ export class LoggedApiPackagedRestAbsence extends ApiPackagedRestAbsenceReport {
 
 const CONSEQUENCE: Partial<Record<ApiPackagedRestFamilyName, string>> = {
   "user-avatar":
-    "API process serves no /api/user-avatar: its broad read is safe only because it refuses any object whose owner kind is not the avatar one, and this process's file read answers a row that does not carry the owner kind. Serving it without that check would let one authenticated caller pull another tenant's trace media.",
+    "API process serves no /api/user-avatar: it composed no stored-object read, or no dual-credential verifier for the browser to load an image with. Every member list, annotation and presence bar falls back to initials rather than the photo a person uploaded.",
   "tracked-events":
     "API process serves neither /api/events/track nor /api/track_event: recording a feedback event needs the trace command queue this process did not register, and a door mounted without one would answer 200 to a rating it then dropped.",
   copilotkit:

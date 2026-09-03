@@ -177,6 +177,7 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
         reportError: refuse<void>("The tracked-event error sink"),
         describeValidationError: refuse<string>("Tracked-event validation prose"),
       }),
+      userAvatarObjects: refuse("Avatar object reads"),
       webhooks: refuse("Webhooks"),
       workflows: refuse("Workflows"),
     },

@@ -49,6 +49,7 @@ export const APP_ERROR_CODES = [
   "avatar_image_too_large",
   "avatar_image_type_unsupported",
   "avatar_image_unreadable",
+  "avatar_not_found",
   "avatar_rate_limited",
   "billing_currency_unsupported",
   "billing_customer_deleted",

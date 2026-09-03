@@ -94,6 +94,41 @@ Feature: Uploading a custom avatar photo
     When an unauthenticated request is made for that avatar image
     Then the request is rejected
 
+  # The avatar route is readable by ANY signed-in person on the platform, because
+  # a photo has to show wherever a person is shown and that crosses organizations.
+  # What keeps that breadth from being a door onto every tenant's trace and
+  # scenario media is the route's own refusal: it serves an object only when both
+  # what the object is FOR and what PRODUCED it are the avatar ones. That check
+  # is only real if the object read answers with the owner kind, which is why
+  # these scenarios describe the read and not only the upload.
+
+  @integration
+  Scenario: The avatar route serves an object whose purpose and owner kind are the avatar ones
+    Given a signed-in person and a stored photo uploaded by a user
+    When they request that photo by its address
+    Then the image is served to them with the type it was stored as
+
+  @integration
+  Scenario: An object that is not a user avatar is refused rather than served
+    Given a signed-in person and a stored object that is trace media rather than a photo
+    When they request it through the avatar address
+    Then no bytes are served
+    And the refusal says there is no photo at that address
+
+  @unit
+  Scenario: A URL with no avatar behind it is refused the same way as a foreign object
+    Given a signed-in person and an address with no photo behind it
+    When they request it through the avatar address
+    Then the refusal is the same one a foreign object gets
+    And they learn nothing about whether an object with that address exists
+
+  @integration
+  Scenario: The avatar route is left off a process that cannot authenticate an image request
+    Given a deployment whose photo route cannot accept a browser's own credentials
+    When the deployment starts
+    Then the photo route is not served at all
+    And people fall back to initials rather than meeting a refusal on every photo
+
   # --- Rendering across the product ------------------------------------------
 
   @integration

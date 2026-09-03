@@ -2734,7 +2734,7 @@ neither has a caller in this repository.
 | — | `/api/organization/*` (10 routes) | org policy + Enterprise gate on every route | versioned management envelope | plan gate after RBAC | yes | **moved** — 7 of 10 answer; the 3 invitation routes refuse `service_unavailable` (no `InviteService`) |
 | — | `/api/prompts/*` (13 routes) | req(prompts:view/create/update/manage) | — | `:id{.+?}` sub-resources before the bare `:id{.+}` | yes | **moved** — over the product-group half's `PromptApp`; the nurturing trail logs instead of firing |
 | — | `/api/v1/secret`, `/api/v1/secrets`, `/api/secret` (5 ops × 3 bases) | per-op RBAC | — | — | yes | **already served by `apps/api`** (`ApiSecretRestFeature`, plus `/api/secrets`) |
-| — | the 30 families of the packaged enumeration | mixed | — | mounted per family, conditionally | mixed | **moved** → `apps/api/src/app-rest/app-rest.packaged-families.ts`, bound by `composeApiPackagedRest`. `createAppRestFeatures` is **deleted**: 27 families mount from services this process already composes, and 2 (`user-avatar`, `copilotkit`) are named absences logged at boot |
+| — | the 30 families of the packaged enumeration | mixed | — | mounted per family, conditionally | mixed | **moved** → `apps/api/src/app-rest/app-rest.packaged-families.ts`, bound by `composeApiPackagedRest`. `createAppRestFeatures` is **deleted**: 29 families mount from services this process already composes, and 1 (`copilotkit`) is a named absence logged at boot |
 
 ##### What moved, and the shape the rest follows
 
@@ -8117,10 +8117,13 @@ that depends on it, to satisfy one operator door.
 
 ### Named absences
 
-- **`user-avatar`.** The family's broad read is safe only because it refuses any
-  object whose owner kind is not the avatar one, and this process's file read
-  answers a row that does not carry the owner kind. Mounting it would let one
-  authenticated caller pull another tenant's trace media.
+- ~~**`user-avatar`.**~~ **CLOSED, 2026-09-03.** The claim was that this
+  process's file read answers a row that does not carry the owner kind. The
+  ROW carries it — `stored_objects.owner_kind` is selected by
+  `StoredObjectsRepository.findById` and present on every `StoredObject` — and
+  what did not carry it was `StoredObjectFileRow`, the four-field projection
+  the file-read port narrows to. The column is projected now and the family is
+  mounted. See "The avatar route answers, and the owner kind is why".
 - ~~**`tracked-events`** (`/api/events/track`, `/api/track_event`).~~ **CLOSED,
   2026-09-03.** The claim was that no package owned the span builder; it does —
   `TrackedEventSpanService` moved with the worker conversion. Both URLs are
@@ -11005,7 +11008,8 @@ always answered a malformed event with and what a deployed client reads.
 - **`UNSERVED_AT_BASELINE`: two entries deleted.** `POST /api/events/track`
   is now served AND described; `POST /api/track_event` is served and
   hand-described. The remaining absences (`user-avatar`, `copilotkit`) are
-  unchanged.
+  unchanged. (`user-avatar` was closed later the same day — see "The avatar
+  route answers, and the owner kind is why".)
 
 ### File → change
 
@@ -11276,6 +11280,13 @@ stale, and its own config says CI does not run it. Fixing the two mock
 specifiers is what the guard asks for; repointing four test files' imports is
 the browser lane's own job.
 
+**Closed 2026-09-03:** all four `analytics/web` browser files now import `../../src/…`,
+the two themed chart adapters under their real `Themed…` names and the workbench through
+`StubAnalyticsHost` rather than a `MemoryRouter` the package never depended on; its
+`analytics-api` mock exports `analyticsApi`, not the monolith's `api`.
+`test:browser` **4 files / 5 tests passed** in real chromium and `test` **34 files / 274
+tests passed** — CI still runs only the second, as `vitest.browser.config.ts` says.
+
 ### Gates
 
 - `@langwatch/test-harness`: **Test Files 12 passed (12)**, **Tests 137 passed (137)**.
@@ -11421,3 +11432,193 @@ bound. The file is named for its level honestly rather than being renamed to
 sneak into the unit lane; closing it means the package declaring a
 `test:integration` script and CI calling it, which is a package-manifest and
 workflow change this lane did not make.
+
+## The avatar route answers, and the owner kind is why, 2026-09-03
+
+The `user-avatar` absence was recorded in three places — the packaged mount,
+the boot log's `CONSEQUENCE` map, and this plan's "Named absences" — and all
+three said the same thing: *"this process's file read answers a row that does
+not carry the owner kind."*
+
+That was true of a TYPE and never of the data. `stored_objects.owner_kind` is a
+column; `StoredObjectsRepository.findById` names it in its SELECT list; every
+`StoredObject` the ClickHouse repository parses carries it. What did not carry
+it was `StoredObjectFileRow` — the four-field shape `StoredObjectFileReadPort`
+narrows the row to, written when `/api/files` was the only caller and `purpose`
+was the only gate anyone needed. The value was read out of the database, parsed,
+held in memory, and then dropped one interface short of the check that needed
+it.
+
+```
+  BEFORE                                        AFTER
+
+  stored_objects (ClickHouse)                   stored_objects (ClickHouse)
+    project_id                                    project_id
+    purpose      ─┐                               purpose      ─┐
+    owner_kind   ─┼── SELECTed                    owner_kind   ─┼── SELECTed
+    media_type   ─┤                               media_type   ─┤
+    size_bytes   ─┘                               size_bytes   ─┘
+         │                                             │
+         ▼                                             ▼
+  StoredObjectsRepository.findById              StoredObjectsRepository.findById
+         │  StoredObject { owner_kind ✓ }              │  StoredObject { owner_kind ✓ }
+         ▼                                             ▼
+  StoredObjectFileRow                           StoredObjectFileRow
+    { id, purpose, media_type, size_bytes }       { id, purpose, owner_kind,
+         owner_kind DROPPED HERE ✗                    media_type, size_bytes }  ✓
+         │                                             │
+         ▼                                             ▼
+  StoredObjectApp.readById                      StoredObjectApp.readById
+         │                                             │
+         ├──► /api/files            (mounted)          ├──► /api/files          (mounted)
+         │                                             │
+         └──► /api/user-avatar                         └──► createApiUserAvatarObjectReader
+                report.absent("user-avatar")                  │ purpose   ──┐
+                CONSEQUENCE: "the row does                    │ ownerKind ──┤
+                 not carry the owner kind"                    │ mediaType   │
+                                                              │ byteLength  │
+                GET /api/user-avatar/... -> 404               ▼             │
+                (Hono's own; no handler ran)         /api/user-avatar       │
+                                                       │                    │
+                                                       │  purpose == user_avatar
+                                                       │  ownerKind == user  ◄┘
+                                                       │        │
+                                                 both ─┤        ├─ either not
+                                                 hold  ▼        ▼  avatar's
+                                                200 bytes    404 avatar_not_found
+```
+
+### What the row actually carries
+
+`packages/features/stored-object/server/src/repositories/clickhouse/stored-objects.row.ts`
+declares eleven columns, `owner_kind` among them, described as *"Type of entity
+that produced this object (e.g. `span`, `scenario_event`)"*. The repository's
+`findById` reads all eleven by name. `StoredObjectsService.getById` returns that
+whole row beside the stream. Nothing was missing from the data path; the loss
+was one structural narrowing at `StoredObjectApp`, which is exactly the shape
+the retired platform's own `AppUserAvatarReadCompatibilityAdapter` had to reach
+past — it read `historical.row.owner_kind` off the service directly, because the
+application's file-read port could not tell it.
+
+So the close is a projection, not a new read: one field added to
+`StoredObjectFileRow`, and the concrete `StoredObjectsService` satisfies it
+structurally with no change at all. No new query, no second store, no extra
+round trip.
+
+### The refusal is one code, deliberately
+
+The family already refused a non-avatar object. It did so with
+`jsonResponse({ status: "not_found" }, 404)` — a hand-rolled body, which is the
+thing `HandledError` exists to stop. It now throws `UserAvatarNotFoundError`
+(`avatar_not_found`, 404, fault `customer`), and the process's own `onError`
+renders it, so the refusal has a stable code a test can assert on instead of
+prose that a copy edit would silently rewrite.
+
+ONE code covers all four ways there is no avatar at a URL: no row, a row that is
+not an avatar, a row whose bytes are gone, and a malformed path. That is a
+narrowing of what the route used to say, and it is the point. `/api/user-avatar`
+authorizes ANY authenticated caller on the platform — an avatar has to render
+wherever a person is shown, which crosses organizations — so a caller able to
+tell "no such object" from "that object is not an avatar" from "the avatar's
+bytes are gone" would hold an existence oracle over every tenant's object ids.
+Nothing reads the body: the consumer is an `<img src>` tag, and the only
+grep-able reader of the old `{ status: "missing" }` shape was the platform test
+deleted with the application.
+
+Both halves of the check are kept, and one test drives each. `purpose` says what
+an object is FOR and `owner_kind` says what PRODUCED it, and an object holding
+one without the other is not an avatar.
+
+### Why it mounts even though this process cannot write an avatar
+
+`UnavailableApiUserAvatarStorageAdapter` still refuses the WRITE by name — the
+API process composes no avatar storage, and that absence is unchanged. Reading
+and writing are separate capabilities here: every avatar already in
+`stored_objects` is unreadable while the family is off, and a member list that
+falls back to initials for photos that exist is a worse answer than the one this
+process can actually give. The family is still conditional — on the stored-object
+read AND on the dual-credential verifier — and `CONSEQUENCE` now names what a
+process missing either of those costs.
+
+### Judgment calls
+
+- **The reader is built from `StoredObjectApp`, not from `StoredObjectsService`.**
+  The bytes service is right there on `productInfra` and would have skipped the
+  adapter entirely. Going through the application is what puts the avatar read
+  on the SAME object `/api/files` reads through, so the two doors cannot answer
+  from two stores, and it is what forced the projection to be fixed at the port
+  rather than routed around.
+- **`createApiUserAvatarObjectReader` lives in `apps/api`, not in either
+  package.** `user` is a core feature and the content-addressed store belongs to
+  the stored-object vertical; neither package may import the other. It is the
+  same seam `ApiTraceMediaStore` occupies for the write direction.
+- **The 502 stays a `jsonResponse`.** A storage read that fails is an infra
+  failure, and dressing it as a handled error would promise the caller an action
+  they do not have. The route's long-standing degradation — a 502 saying the
+  avatar is temporarily unavailable — is lifted unchanged.
+- **The `avatar_not_found` copy is written even though almost nobody reads it.**
+  The registry is exhaustive over `APP_ERROR_CODES` and the guard scans
+  `packages/`, so the code needs an entry either way; the words describe the one
+  case where the failure surfaces as a message rather than a fallback avatar.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/stored-object/server/src/app/stored-object.app.ts` | `owner_kind` added to `StoredObjectFileRow`, with the docblock saying it is a gate and not description. |
+| `packages/features/user/contract/src/user.errors.ts` | NEW `UserAvatarNotFoundError` (`avatar_not_found`, 404), and why one code covers all four refusals. |
+| `packages/features/user/server/src/transport/api-rest/user-avatar.api.ts` | The three `jsonResponse(…404)` refusals replaced by that error; header rewritten to name the owner-kind half of the gate and the spec that covers serving. |
+| `apps/api/src/features/user/user-avatar-objects.adapter.ts` | NEW. `createApiUserAvatarObjectReader` — `StoredObjectApp.readById` in the shape the family takes, carrying `purpose` and `ownerKind`. |
+| `apps/api/src/app-rest/app-rest.packaged-families.ts` | `userAvatarObjects?: () => UserAvatarObjectReader` on the services; the family mounted on that plus `dualAuth`; `report?.absent("user-avatar")` deleted. |
+| `apps/api/src/app/api-packaged-rest.composition.ts` | The reader bound off `productInfra.storedObjectApp`; the `CONSEQUENCE` entry rewritten from "the row does not carry the owner kind" to what a process missing the read or the verifier costs. |
+| `apps/api/src/tasks/openapi-document/openapi-document.surface.ts` | `userAvatarObjects: refuse("Avatar object reads")`, so the description-only surface builds the family instead of listing it as uncoverable. |
+| `apps/ui/src/model/errors/codes.ts`, `presentation.ts` | `avatar_not_found` listed and given copy. |
+| `packages/features/user/server/src/transport/api-rest/__tests__/user-avatar-read.unit.test.ts` | NEW. 5 tests: served, refused on purpose, refused on owner kind alone, no row, bytes gone — every refusal asserted on `code`. |
+| `apps/api/src/app-rest/__tests__/api-rest.packaged-families.integration.test.ts` | `["user-avatar", "/api/user-avatar"]` in `FAMILY_PATHS`; the family out of the unconditional-absence set; 4 tests driving the mounted family over a reader that carries the owner kind. |
+| `specs/settings/user-avatar-upload.feature` | 4 scenarios (3 `@integration`, 1 `@unit`) for the read: served, refused, indistinguishable refusals, and left off without a verifier. |
+
+### Gates
+
+- `apps/api`: `vitest run src/app-rest src/features/user` — **Test Files 4
+  passed (4)**, **Tests 49 passed (49)** (45 before this lane).
+- `apps/api`: `tsc --noEmit` — **0 errors**.
+- `apps/api`: `task:openapi-check` — **exit 0**. `served: 303`,
+  `documented: 317`, `added: 0`, `changed: 0`, `removed: 3 (0 outside the
+  baseline)`, `undescribed: 11`. Unchanged from before the mount: the avatar
+  routes carry no `describeRoute`, so the family serves two operations and
+  publishes none. `docs/api-reference/openapiLangWatch.json` and
+  `apps/api/src/features/discovery/` were neither regenerated nor edited. What
+  did change is the checker's "families this description could not cover" list,
+  which is down from two to one — `copilotkit` alone.
+- `@langwatch/user-server`: `pnpm test` — **Test Files 4 passed (4)**, **Tests
+  31 passed (31)** (26 before). `pnpm typecheck` — **0 errors**.
+- `@langwatch/user-contract`: `pnpm test` — **Test Files 1 passed (1)**, **Tests
+  4 passed (4)**. `pnpm typecheck` — **0 errors**.
+- `@langwatch/stored-object-server`: `pnpm test` — **Test Files 15 passed (15)**,
+  **Tests 124 passed (124)**. `pnpm typecheck` — **0 errors**.
+- `apps/ui`: `vitest run src/model/errors` — **Test Files 8 passed (8)**,
+  **Tests 223 passed (223)**; `pnpm typecheck` (both projects) — **0 errors**,
+  which is what makes the exhaustive `presentation.ts` registry a real gate on
+  the new code.
+- `check:feature-parity`: `specs/settings/user-avatar-upload.feature` —
+  **4/15 scenarios bound**, the four this lane added. The other eleven were
+  unbound at `HEAD` (the file was **0/11**) and this lane did not adopt them.
+- `oxlint` over all eleven touched files — **no findings**. With
+  `--config .oxlintrc.architecture.json`, **2 findings**, both pre-existing and
+  on lines this lane did not edit: the two `handleAvatarRead(c as never, …)`
+  call sites in `user-avatar.api.ts` (`langwatch(api-context-services)`), which
+  are byte-identical to `HEAD` and only moved line numbers.
+- `oxfmt` run over the three files it reformatted; the two unrelated hunks it
+  rewrote in `stored-object.app.ts` were reverted, since that file — and this
+  plan — fail `oxfmt --check` at `HEAD` and repairing them is not this lane's
+  diff.
+
+### What this lane did NOT do
+
+- **No avatar can be uploaded through this process.** The write refusal is
+  untouched and still says so by name.
+- **`copilotkit` stays absent.** Its adapter reaches the retired studio's
+  post-event module, the platform Lambda runtime and a browser package. Nothing
+  about it was read or edited.
+- **Nothing under `platform/` was created, edited or read**, and no
+  OpenAPI artifact was regenerated.
