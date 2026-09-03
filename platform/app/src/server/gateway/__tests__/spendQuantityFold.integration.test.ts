@@ -71,6 +71,9 @@ function confirmedState(
       output_audio_tokens: 0,
       input_chars: 0,
       audio_ms: 0,
+      input_image_tokens: 0,
+      output_image_tokens: 0,
+      image_count: 0,
       ...usage,
     },
     rateVersion: "registry@2026-08-14",
@@ -132,6 +135,9 @@ describe("gateway spend quantities through the fold store (real CH)", () => {
                 cache_creation_1h_tokens: 17,
                 input_chars: 4000,
                 audio_ms: 1234,
+                input_image_tokens: 323,
+                output_image_tokens: 1600,
+                image_count: 1,
               },
               43_200_000,
             ),
@@ -151,6 +157,9 @@ describe("gateway spend quantities through the fold store (real CH)", () => {
           cache_creation_1h_tokens: 17,
           input_chars: 4000,
           audio_ms: 1234,
+          input_image_tokens: 323,
+          output_image_tokens: 1600,
+          image_count: 1,
         });
       });
     });
@@ -220,7 +229,50 @@ describe("gateway spend quantities through the fold store (real CH)", () => {
           input_chars: 0,
           audio_ms: 0,
           input_audio_tokens: 0,
+          input_image_tokens: 0,
+          output_image_tokens: 0,
+          image_count: 0,
         });
+      });
+    });
+  });
+
+  describe("given an image edit the fold committed", () => {
+    describe("when the store reads it back", () => {
+      it("round-trips its image tokens and image count", async () => {
+        const gatewayRequestId = `req-image-${nanoid(10)}`;
+        await repository().upsertFromFold([
+          {
+            tenantId: TENANT,
+            gatewayRequestId,
+            state: {
+              ...confirmedState(
+                {
+                  input_tokens: 14,
+                  input_image_tokens: 323,
+                  output_image_tokens: 1600,
+                  image_count: 1,
+                },
+                67_330_000,
+              ),
+              model: "openai/gpt-image-2",
+              requestType: "image.edit",
+            },
+          },
+        ]);
+
+        const read = await repository().readForFold({
+          tenantId: TENANT,
+          gatewayRequestId,
+        });
+
+        expect(read?.usage).toMatchObject({
+          input_tokens: 14,
+          input_image_tokens: 323,
+          output_image_tokens: 1600,
+          image_count: 1,
+        });
+        expect(read?.costNanoUsd).toBe(67_330_000);
       });
     });
   });
