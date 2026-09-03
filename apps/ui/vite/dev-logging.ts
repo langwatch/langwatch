@@ -144,7 +144,10 @@ export function createDevLogger(options: DevLoggerOptions): Logger {
       write("warn", message);
     },
     error: (message, logOptions) => {
-      if (logOptions?.error) loggedErrors.add(logOptions.error);
+      // `LogErrorOptions.error` may be a `RollupError`, which is a plain log
+      // shape (optional `name`) rather than a real `Error`. Only real
+      // instances go in the set — `hasErrorLogged` only ever queries with one.
+      if (logOptions?.error instanceof Error) loggedErrors.add(logOptions.error);
       if (reportedAsUnreachable(message)) return;
       write("error", message);
     },

@@ -2847,6 +2847,17 @@ const presentations = {
     describe: () =>
       "Codex runs on your OpenAI account, and it has no allowance left for now. Wait for it to reset, or raise the limit with OpenAI.",
   },
+  langy_codex_session_expired: {
+    // fault: provider. Same fact as the plain gateway `codex_session_expired`
+    // entry above; the panel aliases to that entry for its own lookup (see
+    // `REGISTRY_CODE_ALIASES` in langy-error-explainer.ts) so it can hang a
+    // "Sign in to Codex" action off the card, but this registry's `satisfies`
+    // is exhaustive over every enumerated code regardless of who aliases it —
+    // an agent or CLI caller reading this code raw still needs its own words.
+    title: "Your Codex sign-in expired",
+    describe: () =>
+      "Codex runs on your OpenAI account, and its sign-in has expired. Sign in to Codex again to keep going.",
+  },
   langy_model_not_allowed: {
     title: "That model isn't available here",
     describe: () =>

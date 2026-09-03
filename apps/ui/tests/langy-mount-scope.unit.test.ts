@@ -22,7 +22,8 @@ function layoutAncestors({ path, layout }: { path: string; layout: string }): nu
       const isLayout = "page" in route && route.page === layout;
       const below = depth + (isLayout ? 1 : 0);
       if (route.path === path) return below;
-      const found = route.children ? walk(route.children, below) : null;
+      const children = "page" in route ? route.children : undefined;
+      const found = children ? walk(children, below) : null;
       if (found !== null) return found;
     }
     return null;

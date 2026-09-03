@@ -25,27 +25,63 @@ const scripts = (
   }
 ).scripts;
 
+/** `scripts[name]` is a `noUncheckedIndexedAccess` lookup; the script must exist. */
+function requiredScript(name: string): string {
+  const script = scripts[name];
+  if (script === undefined) {
+    throw new Error(`apps/ui/package.json has no "${name}" script`);
+  }
+  return script;
+}
+
 function configLoaderOf(script: string): "bundle" | "runner" | "native" {
   const flag = /--configLoader\s+(\S+)/.exec(script)?.[1];
   return (flag ?? "bundle") as "bundle" | "runner" | "native";
+}
+
+/** Sets an env var for the duration of `run`, restoring (or deleting) it after. */
+async function withEnv<T>(key: string, value: string, run: () => Promise<T>): Promise<T> {
+  const previous = process.env[key];
+  process.env[key] = value;
+  try {
+    return await run();
+  } finally {
+    if (previous === undefined) delete process.env[key];
+    else process.env[key] = previous;
+  }
+}
+
+/** Deletes an env var for the duration of `run`, restoring it after. */
+async function withoutEnv<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const previous = process.env[key];
+  delete process.env[key];
+  try {
+    return await run();
+  } finally {
+    if (previous !== undefined) process.env[key] = previous;
+  }
 }
 
 describe("given the apps/ui Vite config", () => {
   describe("when Vite loads it with the loader the package scripts name", () => {
     /** @scenario "The Vite config loads the way the dev and build scripts load it" */
     it("resolves without a module resolution error", async () => {
-      const loader = configLoaderOf(scripts.dev);
-      expect(configLoaderOf(scripts.build)).toBe(loader);
-      process.env.BASE_HOST ??= "http://localhost:5560";
-      process.env.NODE_ENV ??= "development";
+      const loader = configLoaderOf(requiredScript("dev"));
+      expect(configLoaderOf(requiredScript("build"))).toBe(loader);
 
-      const loaded = await loadConfigFromFile(
-        { command: "serve", mode: "development" },
-        "vite.config.ts",
-        packageRoot,
-        undefined,
-        undefined,
-        loader,
+      // Set and restore our own env rather than `??=`: whatever the shell
+      // already carries for BASE_HOST/NODE_ENV must not change the outcome.
+      const loaded = await withEnv("BASE_HOST", "http://localhost:5560", () =>
+        withEnv("NODE_ENV", "development", () =>
+          loadConfigFromFile(
+            { command: "serve", mode: "development" },
+            "vite.config.ts",
+            packageRoot,
+            undefined,
+            undefined,
+            loader,
+          ),
+        ),
       );
 
       expect(loaded?.config).toBeDefined();
@@ -55,16 +91,14 @@ describe("given the apps/ui Vite config", () => {
   describe("when no BASE_HOST is set for the dev server", () => {
     /** @scenario "The Vite config loads the way the dev and build scripts load it" */
     it("takes the dev server's own address instead of refusing to boot", async () => {
-      const previous = process.env.BASE_HOST;
-      delete process.env.BASE_HOST;
-      try {
+      await withoutEnv("BASE_HOST", async () => {
         const loaded = await loadConfigFromFile(
           { command: "serve", mode: "development" },
           "vite.config.ts",
           packageRoot,
           undefined,
           undefined,
-          configLoaderOf(scripts.dev),
+          configLoaderOf(requiredScript("dev")),
         );
         const inject = loaded?.config.plugins
           ?.flat()
@@ -81,9 +115,7 @@ describe("given the apps/ui Vite config", () => {
         )?.[1];
         expect(content).toBeDefined();
         expect(parsePublicAppConfigMetaContent(content!).appBaseUrl).toBe("http://localhost:5560");
-      } finally {
-        if (previous !== undefined) process.env.BASE_HOST = previous;
-      }
+      });
     });
   });
 });

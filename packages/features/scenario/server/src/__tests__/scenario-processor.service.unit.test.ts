@@ -285,6 +285,7 @@ describe("ScenarioProcessorService", () => {
 
     result.resolve({
       success: true,
+      resolvedModels: null,
       telemetry: { endpoint: "https://app.langwatch.ai", apiKey: "project-key" },
       data: {
         context: {
