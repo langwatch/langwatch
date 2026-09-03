@@ -79,6 +79,13 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "mcp/typescript/src",
   "sdks/typescript/src",
   "sdks/python/src",
+  // The identity front-door e2e pass runs against a live app with no other
+  // suite behind it — a Playwright ceremony against a real virtual WebAuthn
+  // authenticator and a real Postgres-backed verification token is the only
+  // place several of these scenarios are proven end-to-end. Without this
+  // root their `@scenario` bindings would be invisible to the checker even
+  // though the tests exist and run in `e2e-ci.yml`.
+  "tests/agentic-e2e/tests",
   // The agent plugin is hand-authored manifests plus a bundle, so its only
   // tests are the ones that read those manifests and spawn that bundle. Without
   // this root, every scenario describing what the published plugin does could

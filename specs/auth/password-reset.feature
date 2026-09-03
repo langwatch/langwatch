@@ -98,7 +98,7 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   # session is opened by the reset endpoint itself, after every old session
   # is revoked, so the device that set the password is the one device signed
   # in afterwards.
-  @integration
+  @integration @e2e
   Scenario: Submitting a valid new password with a token resets it and signs me in
     Given I open /auth/reset-password with a valid token
     When I enter a new password and a matching confirmation and submit
@@ -183,7 +183,7 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   # runs, and sending somebody to a settings page to press a second button was
   # a step that existed only because this screen used to have no session.
 
-  @integration
+  @integration @e2e
   Scenario: A completed reset offers a passkey rather than assuming one
     Given I have just set a new password from a valid link
     Then the screen confirms the reset and offers to add a passkey
@@ -197,7 +197,7 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     Then the confirmation and the way to sign in are both still there
     And the offer does not come back on this screen
 
-  @integration
+  @integration @e2e
   Scenario: Accepting the offer adds the passkey on this screen
     Given I am offered a passkey after resetting my password
     When I ask for one
@@ -213,14 +213,19 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     And it never shows the code itself or an internal message
     And the way on is still there
 
-  # --- Full end-to-end (manual dogfood) ---
+  # --- Full end-to-end ---
 
-  # Verified manually in the QA phase against a real database and a real
-  # SendGrid send: request a reset for a seeded credential user, open the
-  # emailed link, set a new password, and sign in with it. There is no
-  # automated full-stack auth e2e harness with email interception in this
-  # repo, so this stays @unimplemented and is proved via browser QA in the PR.
-  @e2e @unimplemented
+  # No inbox exists in CI to receive the "emailed" link — there is still no
+  # full-stack auth e2e harness with real EMAIL interception in this repo.
+  # What changed: the request endpoint writes its single-use token row
+  # BEFORE it ever tries to send mail (`runInBackgroundOrAwait` around
+  # `sendResetPassword`, better-auth's own `password.mjs`), so a Playwright
+  # test can call the request endpoint directly and read that row straight
+  # out of Postgres — reproducing exactly what clicking the email does,
+  # without needing the email. See
+  # `tests/agentic-e2e/tests/front-door/password-reset.test.ts` and its
+  # `db.ts` for the coupling this leans on.
+  @e2e
   Scenario: A user who forgot their password resets it and signs in with the new one
     Given a credential user who forgot their password
     When they request a reset, open the emailed link, and set a new password

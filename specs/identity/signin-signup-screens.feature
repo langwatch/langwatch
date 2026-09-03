@@ -192,6 +192,18 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
     But I am not signed in
     And the screen tells me to open the link we sent to that address
 
+  # Bug-bash finding: sign-up asks for no name (onboarding does, where the
+  # question is worth a field — see `displayName.ts`'s own comment), so
+  # every account this door creates starts out exactly the shape that bug
+  # was: the header menu once interpolated the gap straight into its
+  # copy and read "null (sam@acme.com)".
+  @e2e
+  Scenario: An account with no display name is called by its email, never null
+    Given I signed up and set no name
+    When I open the account menu
+    Then I am called by my email address
+    And the word "null" appears nowhere in it
+
   # The link IS the first sign-in. It is a single-use secret sent to the
   # address, so spending it proves the address the way a magic link does, and
   # the session it opens is the one the password would have opened. Asking for
@@ -200,7 +212,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
   # yet, the screen it landed on read the projection and said no account
   # existed. One link is one way in: reopened inside its grace window it
   # confirms again but opens no second session, and offers the way in instead.
-  @integration
+  @integration @e2e
   Scenario: Opening the link is what signs me in for the first time
     Given I signed up and have not opened the confirmation link
     When I open the link
@@ -237,7 +249,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
   #
   # Creating the account only once the ceremony succeeds is what keeps an
   # abandoned attempt free: asking for options writes nothing down.
-  @unit
+  @unit @e2e
   Scenario: Signing up with a passkey creates the account and the session together
     Given I have typed an address that has no account
     When I create a passkey instead of choosing a password
@@ -474,6 +486,34 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
     When my sign-in is refused for it
     Then the screen says how long is actually left, from the answer it got
     And the submit stands down until the wait is over
+
+  # Bug-bash finding: a stray refusal was left on screen behind a sign-in
+  # that had already worked. The rejected-field scenario above covers a
+  # submit the server said no to; this is the opposite case, and just as
+  # important — the card must have nothing to say once it has said yes.
+  @e2e
+  Scenario: A successful sign-in shows no error
+    When I sign in with the correct password
+    Then no alert or toast appears on the page I land on
+
+  # Bug-bash finding: the ordinary case — a person kept getting logged out
+  # and signing back in, the way a shared machine or a flaky network makes
+  # somebody do — must stay comfortably inside the budget the rate-limited
+  # scenario above describes running OUT of.
+  @e2e
+  Scenario: Signing in and out repeatedly does not trip the sign-in rate limit
+    When I sign out and sign back in with a password several times in a row
+    Then none of those sign-ins is refused for the installation's rate limit
+
+  # Bug-bash finding: the reset link that sits under the password field
+  # carries the address already typed, so asking for it again on the next
+  # screen is not asking a second time. See password-reset.feature's own
+  # note that this carry is bound here, on the screen the link is drawn on.
+  @e2e
+  Scenario: The forgot-password link carries the address already typed
+    Given I typed my address on the log-in screen
+    When I follow the "Forgot password?" link
+    Then the address travels with it, in the URL fragment rather than the query
 
   # The surrounding panel is the hosted product's case, and it is composed
   # AROUND the card rather than into it: the component that authenticates a

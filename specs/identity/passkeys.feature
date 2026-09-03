@@ -62,7 +62,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   # ── Registering ────────────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration @e2e
   Scenario: Registering a passkey from settings adds a way in
     Given "sam" is signed in
     When "sam" registers a passkey from their security settings
@@ -121,7 +121,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
   # dialog in the way of the product with nothing behind it. What the session
   # recorded it proved (D06) is the answer, and a session that recorded nothing
   # is not read as a password.
-  @integration
+  @integration @e2e
   Scenario: The passkey offer follows a password, not a federated sign-in
     Given "sam" holds no passkey and the offer is theirs to see
     When "sam" reaches the product having signed in with a password
@@ -396,7 +396,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
   # reverse proxy, and on every preview host, the address we dial ourselves on
   # is not the address the person's browser typed. The public one is the only
   # one the browser ever signed for.
-  @unit
+  @unit @e2e
   Scenario: The passkey relying party is the deployment's public address
     Given a deployment whose internal address differs from its public one
     When better-auth's passkey plugin is configured
