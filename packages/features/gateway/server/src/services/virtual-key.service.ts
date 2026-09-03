@@ -292,6 +292,32 @@ export class VirtualKeyService {
   }
 
   /**
+   * Display names for the keys a page of spend rows names.
+   *
+   * The spend surfaces read ids out of the ClickHouse ledger and need a label
+   * per id. It goes through this service — and therefore through
+   * `findMetaByIds`, which selects three columns — because the alternative was
+   * what the API process actually did: a `prisma.virtualKey.findMany` written
+   * in its own gateway composition, on the table that carries every key's
+   * hashed secret, its previous secret and the window that one stays valid in.
+   *
+   * Fenced by the owning organization even though the ids alone would find the
+   * rows: a read that can only answer within one tenant cannot be made to leak
+   * by a caller that assembled its id list somewhere unexpected. An empty id
+   * list asks nothing and answers nothing.
+   */
+  async resolveNames(input: {
+    organizationId: string;
+    virtualKeyIds: readonly string[];
+  }): Promise<Array<{ id: string; name: string }>> {
+    const rows = await this.repository.findMetaByIds({
+      organizationId: input.organizationId,
+      ids: [...input.virtualKeyIds],
+    });
+    return rows.map((row) => ({ id: row.id, name: row.name }));
+  }
+
+  /**
    * Customer-facing single read. A product-managed key reports as absent
    * rather than forbidden — the caller has no legitimate use for one, and a
    * distinct error would confirm the id exists.

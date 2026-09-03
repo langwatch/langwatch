@@ -356,13 +356,14 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
       });
       return new Map(groups.map((group) => [group.id, group._count.members]));
     },
-    // VirtualKey is organization-scoped, so the lookup is fenced by the owning
-    // organization and never by the raw ids off the spend rows alone.
-    resolveVirtualKeyNames: ({ organizationId, virtualKeyIds }) =>
-      prisma.virtualKey.findMany({
-        where: { id: { in: [...virtualKeyIds] }, organizationId },
-        select: { id: true, name: true },
-      }),
+    // The label per key a page of spend rows carries, read through the gateway
+    // feature's OWN persistence rather than by a key-table `findMany` written
+    // here. `VirtualKey` holds every key's hashed secret, its previous
+    // secret and the window that one stays valid in; the repository behind
+    // `resolveNames` selects an id, a name and a display prefix, and the
+    // organization fence that keeps a caller's id list from reaching another
+    // tenant's rows lives with it rather than being restated per call site.
+    resolveVirtualKeyNames: (input) => virtualKeys.resolveNames(input),
     isOrganizationMember: async ({ organizationId, userId }) =>
       (await prisma.organizationUser.findFirst({
         where: { organizationId, userId },

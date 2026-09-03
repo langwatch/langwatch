@@ -1,11 +1,20 @@
 export { PostgresUserAdapter } from "./adapters/postgres.user.adapter";
 export {
+  PostgresUserCredentialAdapter,
+  type PostgresUserCredentialAdapterOptions,
+  type UserCredentialDatabase,
+} from "./adapters/postgres.user-credential.adapter";
+export {
   PersonalProjectKeyRequiredError,
   PersonalUsageKeyMismatchError,
   UserApp,
   type UserAppDependencies,
 } from "./app/user.app";
-export { UserAvatarStoragePort } from "./ports/user.port";
+export { UserAvatarStoragePort, UserPasswordHasherPort } from "./ports/user.port";
+export {
+  UserCredentialService,
+  type UserPasswordRotationOutcome,
+} from "./services/user-credential.service";
 export { UserService } from "./services/user.service";
 export {
   IdentityTrpcApi,

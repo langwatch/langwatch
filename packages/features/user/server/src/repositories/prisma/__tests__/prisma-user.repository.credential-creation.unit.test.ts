@@ -1,11 +1,44 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  PrismaUserRepository,
-  type UserDatabase,
-} from "../prisma.user.repository";
+import { PrismaUserRepository, type UserDatabase } from "../prisma.user.repository";
+
+/**
+ * Every scalar column on `model User`. Prisma returns all of them from a
+ * `create` that names no `select`, so a mock answering `{ id }` regardless is
+ * a mock of a row shape the database never sends — which is how a `.strict()`
+ * parse over the real row stayed green here while signup 500'd in production.
+ */
+const FULL_USER_ROW = {
+  id: "user-1",
+  name: null,
+  email: "ada@example.com",
+  emailVerified: false,
+  image: null,
+  pendingSsoSetup: false,
+  userHashKey: null,
+  twoFactorEnabled: false,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  lastLoginAt: null,
+  deactivatedAt: null,
+  lastHomePath: null,
+  tracesExplorerTourDismissedAt: null,
+  passkeyNudgeDismissedAt: null,
+};
+
+/** Projects `FULL_USER_ROW` through a `select`, the way Prisma would. */
+function selectFrom(select?: Record<string, boolean>): Record<string, unknown> {
+  if (!select) return { ...FULL_USER_ROW };
+  return Object.fromEntries(
+    Object.keys(select)
+      .filter((column) => select[column])
+      .map((column) => [column, FULL_USER_ROW[column as keyof typeof FULL_USER_ROW]]),
+  );
+}
 
 function makeDatabase() {
-  const userCreate = vi.fn(async () => ({ id: "user-1" }));
+  const userCreate = vi.fn(async (args: { select?: Record<string, boolean> }) =>
+    selectFrom(args.select),
+  );
   const accountCreate = vi.fn(async () => ({}));
   const accountUpdate = vi.fn(async () => ({}));
   const userUpdate = vi.fn(async () => ({}));
@@ -55,6 +88,7 @@ describe("PrismaUserRepository credential creation", () => {
     ).resolves.toEqual({ id: "user-1" });
     expect(userCreate).toHaveBeenCalledWith({
       data: { name: "Ada", email: "ada@example.com" },
+      select: { id: true },
     });
     expect(accountCreate).toHaveBeenCalledWith({
       data: {
@@ -77,6 +111,39 @@ describe("PrismaUserRepository credential creation", () => {
 
     expect(accountCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ password: null, provider: "credential" }),
+    });
+  });
+
+  describe("when the new row is read back", () => {
+    /**
+     * `createdUserSchema` is `.strict()` on `{ id }`. A `create` that names no
+     * `select` hands it every scalar on `User`, and the parse throws
+     * `unrecognized_keys` — from inside the repository, on an unhandled
+     * channel, so both signup routes answered 500. Asking for the id alone is
+     * what keeps the row and the schema the same shape.
+     */
+    it("asks for the id alone, so a credential signup survives the full row", async () => {
+      const { database, userCreate } = makeDatabase();
+
+      await expect(
+        PrismaUserRepository.create(database, "local:credential").createCredentialUser({
+          name: "Ada",
+          email: "ada@example.com",
+          passwordHash: "hash",
+        }),
+      ).resolves.toEqual({ id: "user-1" });
+      expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true });
+    });
+
+    it("asks for the id alone on the passkey route too", async () => {
+      const { database, userCreate } = makeDatabase();
+
+      await expect(
+        PrismaUserRepository.create(database, "local:credential").createPasskeyUser({
+          email: "ada@example.com",
+        }),
+      ).resolves.toEqual({ id: "user-1" });
+      expect(userCreate.mock.calls[0]?.[0].select).toEqual({ id: true });
     });
   });
 

@@ -149,6 +149,15 @@ export type Auth0PasswordChangeOutcome =
 export type UnlinkAccountOutcome = "unlinked" | "last_account" | "not_found";
 
 /**
+ * What a credential rotation can answer.
+ *
+ * The user feature's own `UserCredentialService` word, restated on the port so
+ * a process may implement it without importing the service — the same reason
+ * `UnlinkAccountOutcome` is spelled here.
+ */
+export type PasswordRotationOutcome = "rotated" | "no_password" | "wrong_password";
+
+/**
  * The process capabilities this transport needs that are not the user's own.
  *
  * The /me dashboard's usage, budget and CLI-bootstrap answers are declared as
@@ -182,21 +191,21 @@ export type UserTrpcPorts = Readonly<{
 
   // -- credentials ---------------------------------------------------------
   hashPassword(input: Readonly<{ password: string }>): Promise<string>;
-  /** Constant-time-ish comparison of a candidate against a stored hash. */
-  passwordMatches(input: Readonly<{ password: string; hash: string }>): Promise<boolean>;
   /**
-   * The account row a `credential` sign-in reads, or null when the account has
-   * no password at all. `password` is the stored HASH.
+   * Verifies the current password and replaces it, as ONE operation.
+   *
+   * The stored hash is deliberately absent from this surface. It used to
+   * arrive here — a `tryFindCredentialAccount` that answered with
+   * `Account.password` and a `writeCredentialPassword` that took its
+   * replacement — which meant the comparison was written in a transport and
+   * the read that produced the hash was written in a process composition. Both
+   * halves now live in the user feature's own credential service, and what
+   * crosses this boundary is the word for what happened.
    */
-  tryFindCredentialAccount(
+  rotatePassword(
     ctx: UserTrpcContext,
-    input: Readonly<{ userId: string }>,
-  ): Promise<Readonly<{ id: string; password: string | null }> | null>;
-  /** Replaces the stored hash on one credential account row. */
-  writeCredentialPassword(
-    ctx: UserTrpcContext,
-    input: Readonly<{ accountId: string; passwordHash: string }>,
-  ): Promise<void>;
+    input: Readonly<{ userId: string; currentPassword: string; newPassword: string }>,
+  ): Promise<PasswordRotationOutcome>;
   /**
    * The Auth0 DATABASE identity (`auth0|<id>`), which is the only linked
    * identity whose password we can change. Social identities federated
@@ -754,30 +763,27 @@ export class UserTrpcApi {
           return { success: true };
         }
 
-        const credentialAccount = await ports.tryFindCredentialAccount(ctx, { userId: user.id });
-
-        if (!credentialAccount?.password) {
+        // Verify-and-replace as ONE call. Split into a read of the stored hash
+        // and a write of its replacement, this transport would be holding the
+        // hash — and the two refusals below would be decisions made a long way
+        // from the rows they are about.
+        const rotation = await ports.rotatePassword(ctx, {
+          userId: user.id,
+          currentPassword: input.currentPassword,
+          newPassword: input.newPassword,
+        });
+        if (rotation === "no_password") {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "User not found or password not set",
           });
         }
-
-        const passwordMatch = await ports.passwordMatches({
-          password: input.currentPassword,
-          hash: credentialAccount.password,
-        });
-        if (!passwordMatch) {
+        if (rotation === "wrong_password") {
           throw new TRPCError({
             code: "UNAUTHORIZED",
             message: "Current password is incorrect",
           });
         }
-
-        await ports.writeCredentialPassword(ctx, {
-          accountId: credentialAccount.id,
-          passwordHash: await ports.hashPassword({ password: input.newPassword }),
-        });
 
         // Best practice: invalidate all OTHER sessions of this user after a
         // password change. The current tab stays logged in (the user just

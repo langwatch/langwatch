@@ -148,7 +148,13 @@ import type { OrganizationUserRole, PrismaClient } from "@langwatch/prisma-clien
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserService } from "@langwatch/user-contract";
-import { UserApp, type IdentityTrpcPorts, type UserTrpcPorts } from "@langwatch/user-server";
+import {
+  PostgresUserCredentialAdapter,
+  UserApp,
+  UserPasswordHasherPort,
+  type IdentityTrpcPorts,
+  type UserTrpcPorts,
+} from "@langwatch/user-server";
 import { z } from "zod";
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
@@ -338,12 +344,7 @@ export type ApiIdentityCollaborators = Readonly<{
  * `ApiOwnedUserPorts`, of which this is the twin.
  */
 type ApiOwnedUserPorts =
-  | "tryFindCredentialAccount"
-  | "writeCredentialPassword"
-  | "tryFindAuth0DatabaseAccount"
   | "emailIsTaken"
-  | "listLinkedAccounts"
-  | "unlinkAccount"
   | "isOrganizationMember"
   | "tryGetOrganizationName"
   | "tryGetUserContact"
@@ -361,6 +362,31 @@ export const signUpDataSchema = z.object({}).passthrough();
 
 /** The bcrypt cost every stored credential in this database was written at. */
 const PASSWORD_HASH_COST = 10;
+
+/**
+ * The stored password format, stated ONCE for this process.
+ *
+ * bcrypt at cost 10, which is what every credential row in the database
+ * already carries. The cost is spelled here rather than taken from
+ * configuration on purpose — it is part of the stored format, and a process
+ * that hashed at a different cost would write rows the other tier's
+ * verification still reads but whose cost nobody can account for.
+ *
+ * A port implementation rather than two loose closures because the comparison
+ * has one caller now: `UserCredentialService`, which is the only code in the
+ * deployment that ever holds a stored hash. `hashPassword` stays on the port
+ * bag beside it for the two calls that mint a FIRST password — sign-up and
+ * `setPassword` — where there is nothing to compare against.
+ */
+class BcryptPasswordHasher extends UserPasswordHasherPort {
+  hash({ password }: { password: string }): Promise<string> {
+    return hash(password, PASSWORD_HASH_COST);
+  }
+
+  matches({ password, hash: stored }: { password: string; hash: string }): Promise<boolean> {
+    return compare(password, stored);
+  }
+}
 
 /**
  * A capability this deployment does not hold.
@@ -680,6 +706,20 @@ export function composeApiIdentityCollaborators(
   const logger = createLogger("langwatch:api:identity");
   const unavailable = (capability: string) =>
     new ApiCapabilityUnavailableError({ capability, processName });
+
+  // -- the credential half of the /settings/authentication screens -----------
+  //
+  // The stored-password format, and the user feature's own reader over the
+  // rows it is stored on. Composed here, beside the two sign-in ceremonies,
+  // because this half already states the format every credential row in the
+  // database was written at; composed AT ALL because the four answers it
+  // serves used to be `prisma.account` statements written in the API's tRPC
+  // ports composition, one of them selecting the hash itself.
+  const passwords = new BcryptPasswordHasher();
+  const credentials = PostgresUserCredentialAdapter.create({
+    database: prisma,
+    passwords,
+  }).build();
 
   // -- the membership half, and the organization application over it ---------
 
@@ -1138,16 +1178,41 @@ export function composeApiIdentityCollaborators(
       trackServerEvent: () => undefined,
 
       /**
-       * The stored password format, unchanged: bcrypt at cost 10, which is
-       * what every credential row in the database already carries. The cost is
-       * spelled here rather than taken from configuration on purpose — it is
-       * part of the stored format, and a process that hashed at a different
-       * cost would write rows the other tier's verification still reads but
-       * whose cost nobody can account for.
+       * The FIRST password a sign-up or `setPassword` writes. There is nothing
+       * to compare against on either path, so this is a mint rather than a
+       * rotation — {@link BcryptPasswordHasher} is the same format either way.
        */
-      hashPassword: ({ password }: { password: string }) => hash(password, PASSWORD_HASH_COST),
-      passwordMatches: ({ password, hash: stored }: { password: string; hash: string }) =>
-        compare(password, stored),
+      hashPassword: ({ password }: { password: string }) => passwords.hash({ password }),
+
+      /**
+       * The four account-row answers, through the user feature's own
+       * persistence.
+       *
+       * They were `prisma.account` statements in
+       * `api-trpc-ports.composition.ts` — including a `select` naming
+       * `password`, the bcrypt hash a credential sign-in is checked against.
+       * Nothing leaked, but the read was written where no rule about that
+       * column applies: `prisma-containment` governs which modules may NAME
+       * the client, and a composition that already holds one walks past it.
+       *
+       * `rotatePassword` is the shape that closes it. Verification and
+       * replacement are one call on `UserCredentialService`, so the hash it
+       * reads is compared and discarded inside that service and no port above
+       * it is ever handed one.
+       */
+      rotatePassword: (
+        _ctx: unknown,
+        input: Readonly<{ userId: string; currentPassword: string; newPassword: string }>,
+      ) => credentials.rotatePassword(input),
+
+      tryFindAuth0DatabaseAccount: (_ctx: unknown, input: Readonly<{ userId: string }>) =>
+        credentials.tryFindAuth0DatabaseAccount(input),
+
+      listLinkedAccounts: (_ctx: unknown, input: Readonly<{ userId: string }>) =>
+        credentials.listLinkedAccounts(input),
+
+      unlinkAccount: (_ctx: unknown, input: Readonly<{ userId: string; accountId: string }>) =>
+        credentials.unlinkAccount(input),
 
       /**
        * The Auth0 tenant is the deployment's own, and changing a password in it

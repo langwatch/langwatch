@@ -16347,3 +16347,218 @@ Four, one per claim, each run on its own:
 - **No datastore test.** The `ScheduledJob` writes are exercised against a fake table; `PrismaScheduledJobStore`'s raw `claim`/`settleClaim` still have no integration coverage, which stays the datastore lane's.
 - **The edit fix was not swept for siblings.** `createTriggerCommandSchema` and the other strict command schemas in that file were not audited for the same extraction-era omission.
 - **Nothing under `platform/` was created, edited or read.**
+
+## The two reads the last ledger named, closed, 2026-09-03
+
+`1b95215e9e` moved the setup checklist's provider read into the model-provider
+feature and ended by naming two sites that carried "the same *kind* of risk — a
+table with a secret on it, read past the package that owns the secret's
+format":
+
+| Site | What it read |
+| --- | --- |
+| `api-trpc-ports.composition.ts:396` | `prisma.account.findFirst({ ..., select: { id: true, password: true } })` — the credential **password hash**. `:405` wrote it, `:412` and `:427` read the same table |
+| `api-gateway.composition.ts:362` | `prisma.virtualKey.findMany` — gateway key names, organization-fenced, so narrower |
+
+Both are closed. `grep -n "prisma\.account\.\|prisma\.virtualKey\." apps/api/src/**/*.ts`
+now returns **nothing**.
+
+### The account read was worse than the count suggested
+
+Four sites, not two, and the fourth was a transaction:
+
+```
+api-trpc-ports.composition.ts
+  :396 tryFindCredentialAccount   findFirst  select { id, password }   ← THE HASH
+  :405 writeCredentialPassword    update     data   { password }
+  :412 tryFindAuth0DatabaseAccount findFirst select { providerAccountId }
+  :427 listLinkedAccounts         findMany   select { id, provider, providerAccountId }
+  :441 unlinkAccount              $transaction(Serializable) → count / findFirst / delete
+```
+
+And the hash did not stop there. It was READ in the API composition, handed
+across a port boundary into `@langwatch/user-server`'s tRPC transport, compared
+there against a `passwordMatches` port the *identity* composition supplied, and
+the replacement written back through a second port. Three modules in two
+packages each held a piece of one decision, and the one column that must never
+travel travelled through all three.
+
+```
+BEFORE                                       AFTER
+
+user.api.ts  changePassword                  user.api.ts  changePassword
+  ports.tryFindCredentialAccount ──┐           ports.rotatePassword ─────────┐
+     → prisma.account.findFirst    │  HASH        (userId, current, new)     │
+  ports.passwordMatches(hash) ◄────┘           ← "rotated" | "no_password"   │
+  ports.hashPassword(new)                        | "wrong_password"          │
+  ports.writeCredentialPassword                                              │
+     → prisma.account.update                  UserCredentialService ◄────────┘
+                                                ├ UserCredentialRepository   (the hash
+                                                └ UserPasswordHasherPort      lives and
+                                                                              dies here)
+```
+
+### The shape it moved to
+
+`@langwatch/user-server` already owned this table — `PrismaUserRepository`
+writes the credential row at sign-up and `setFirstPassword` takes a
+`passwordHash` and answers `"set" | "already_set"`, never the column. The
+rotation is the same grammar, one step further: it takes the two plaintexts and
+answers a word, so no caller ever holds a stored hash at all.
+
+```
+composeApiIdentityCollaborators (apps/api)
+  │
+  ├─ BcryptPasswordHasher            ← cost 10, the deployment's stored format,
+  │    implements UserPasswordHasherPort   stated ONCE for the process
+  │
+  └─ PostgresUserCredentialAdapter.create({ database: prisma, passwords }).build()
+       └─ UserCredentialService
+            ├ rotatePassword    read hash → compare → write replacement → a word
+            ├ tryFindAuth0DatabaseAccount
+            ├ listLinkedAccounts
+            └ unlinkAccount     the Serializable transaction, moved whole
+                 └─ PrismaUserCredentialRepository
+                      Pick<PrismaClient, "account" | "$transaction">
+```
+
+Four decisions, each a fork:
+
+1. **A second repository over `Account`, not more methods on `UserRepository`.**
+   That one is composed wherever a profile is read — a name, an avatar, a tour
+   preference — and folding the credential reads into it would hand every such
+   process a reader that returns a hash. This one is composed only where
+   somebody can change their own password.
+2. **The ports went to `collaborators`, not to a new option.** The module's own
+   docblock already says which entries live where: row reads on this
+   process's connection, and *"the entries that reach a SERVICE this process
+   does not compose arrive as `ApiTrpcCollaborators`"*. They now reach a
+   service, so `ApiOwnedUserPorts` — spelled twice, in
+   `app-trpc.collaborators.ts` and in the identity composition as its declared
+   twin — lost all five names and gained none. No option threading through
+   `ApiTrpcFeaturesComposition.tryCompose`, whose fourteen existing call sites
+   would all have had to change to answer one question.
+3. **The hasher is a port, not a bcrypt import.** The cost factor is part of
+   the stored format rather than a choice a feature package gets to make, and
+   `hashPassword` on the tRPC port bag stays beside it for the two calls that
+   mint a FIRST password (sign-up, `setPassword`) where there is nothing to
+   compare against. `passwordMatches` is gone from that bag entirely: its only
+   caller was the comparison that now happens inside the service.
+4. **`unlinkAccount` moved with them even though it holds no secret.** It is a
+   read of the same table, and leaving it behind would have left a `where` on
+   the credential rows written where no rule about them applies — and would
+   have made the containment test partial, since a client that refuses the
+   delegate cannot refuse it only sometimes.
+
+### The gateway read was one line and an existing method
+
+`GatewayVirtualKeysPort.findMetaByIds` already existed, already selected three
+columns, and was already fenced by the owning organization —
+`GatewayUsageService` has been calling it all along. The composition had a
+second, hand-written `findMany` for the same question. `VirtualKeyService`
+gained `resolveNames`, which is what the composition forwards to now, and the
+empty-id short circuit came with it: the hand-written version issued
+`id: { in: [] }` against a table nobody had asked about.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/user/server/src/repositories/user-credential.repository.ts` | **New.** The abstract repository, five methods, plus `UserCredentialAccount` / `UserLinkedAccount` / `UnlinkUserAccountOutcome`. Private to the feature — `private-runtime-export` keeps `repositories/` off the package root |
+| `.../repositories/prisma/prisma.user-credential.repository.ts` | **New.** The five statements, moved verbatim including the Serializable transaction. `Pick<PrismaClient, "account" \| "$transaction">` at the seam; `UserCredentialDatabase` is declared here and re-exported from the adapter, never from the index |
+| `.../services/user-credential.service.ts` | **New.** `rotatePassword` (read → compare → write → a word) plus the three account reads. The class docblock states the invariant it exists for |
+| `.../ports/user.port.ts` | **+`UserPasswordHasherPort`** — `hash` and `matches`, the deployment's stored format as one port |
+| `.../adapters/postgres.user-credential.adapter.ts` | **New.** The typed seam, and the reason it is not an option on `PostgresUserAdapter` |
+| `.../server/src/index.ts` | Exports the adapter, the service, the two ports and the database type |
+| `.../transport/api-trpc/user.api.ts` | `UserTrpcPorts` loses `tryFindCredentialAccount`, `writeCredentialPassword` and `passwordMatches`, gains `rotatePassword`; `changePassword` maps the three outcomes onto the two `TRPCError`s it already raised, unchanged in code and copy |
+| `.../services/__tests__/user-credential.service.unit.test.ts` | **New.** 5 tests: the rotation writes the deployment's format, the answer carries nothing it read, a wrong password writes nothing, and the two shapes of "no password" are distinguished from it |
+| `apps/api/src/app-trpc/app-trpc.collaborators.ts` | `ApiOwnedUserPorts` drops the five account entries; the docblock says where they went |
+| `apps/api/src/app/api-trpc-collaborators.identity.composition.ts` | **+`BcryptPasswordHasher`** over the cost the file already spelled; composes `PostgresUserCredentialAdapter` beside the two sign-in ceremonies; publishes the four ports; drops the same five names from its twin list |
+| `apps/api/src/app/api-trpc-ports.composition.ts` | The five account statements deleted; the `user` group keeps `User` reads only. Module docblock names the limit of its own rule 1 |
+| `packages/features/gateway/server/src/services/virtual-key.service.ts` | **+`resolveNames`** over `findMetaByIds`, with the organization fence and the empty-list short circuit |
+| `apps/api/src/app/api-gateway.composition.ts` | `resolveVirtualKeyNames` forwards to it |
+| `apps/api/src/app/__tests__/api-trpc-ports.composition.integration.test.ts` | **New.** 8 tests. The composition's client has an `account` `Proxy` that throws on any property read; the real `UserCredentialService` answers over its own client; one test keeps `emailIsTaken` on this connection so the rule is not read as "this composition reads nothing" |
+| `apps/api/src/app/__tests__/api-gateway.composition.integration.test.ts` | **New.** 2 tests, over the real `composeApiGateway` |
+| `packages/features/user/specs/user.feature` | **+1 scenario** tagged `@integration`, which takes the file off the parity check's `newInert` hard-failure list |
+| `specs/ai-gateway/virtual-keys.feature` | **+1 scenario** tagged `@integration` |
+
+### Gates
+
+- `apps/api`: `vitest run src/app` — **48 files / 525 tests** (was 46 / 515). `tsc --noEmit` — **0 errors**. Full `pnpm test` — 1143 of 1145 passing; the two failures are `src/platform/config/__tests__/api.config.unit.test.ts` expecting a config shape without `opsUrl` / `licensing.publicKey`, a file this lane did not touch and which is clean in `git status`. `tsc -p tsconfig.test.json` reports 3 errors, all in test files this lane did not touch (`api-automation.composition`, `agent-group`, `trace-group`).
+- `@langwatch/user-server`: `pnpm test` — **5 files / 43 tests** (was 4 / 36). Five of the seven new tests are this pass's; the other two landed concurrently in another lane's `prisma-user.repository.credential-creation.unit.test.ts`, alongside a `createdUserSelect` fix in `PrismaUserRepository` that this lane did not write and did not touch. `pnpm typecheck` — 0 errors.
+- `@langwatch/gateway-server`: `pnpm test` — 37 files / 289 tests, unchanged. `pnpm typecheck` — 0 errors.
+- Feature parity: `packages/features/user/specs/user.feature` was one of the `newInert` hard failures — a file whose every scenario was untagged, so it reported `0/0 · ✓ all bound` while enforcing nothing. It now reports **1 enforced, bound, 0 unbound**. `specs/ai-gateway/virtual-keys.feature` went from 27 enforced to **28, still 0 unbound**.
+- `architecture-lint`: `pnpm test` — 38 files / 498 tests passing. The CLI's output names **no new module**: nothing under `user-credential`, nothing in `features/user/server`, nothing on `virtual-key.service`. No `feature-source-layout`, `feature-source-filename`, `typed-prisma-seam`, `prisma-containment`, `private-runtime-export`, `port-modules`, `service-quality` or `service-results` violation was introduced.
+- `oxlint` over the 15 touched files: four warnings, and all four are byte-identical to the same run against `git show HEAD:` of those files (one `no-useless-fallback-in-spread` in each of `api-trpc-ports.composition.ts` and `virtual-key.service.ts`, two `no-unused-vars` in the latter's destructure). `oxfmt --check`: every new file is clean. `app-trpc.collaborators.ts`, `api-trpc-collaborators.identity.composition.ts` and `api-trpc-ports.composition.ts` were **already** not `oxfmt`-clean at HEAD, so they were left alone and the inserted regions were written to the formatter's shape by hand — verified by formatting a copy and diffing, which shows no difference inside any region this pass wrote.
+
+### The sabotage
+
+Three, one at a time, each restored byte-identically afterwards (`diff` against
+a pre-edit copy, no `git restore`).
+
+1. **`rotatePassword` re-implemented in `api-trpc-ports.composition.ts`** as a
+   direct `prisma.account.findFirst` + `update`. **3 of the 8 tests failed**,
+   all with `the ports composition reached prisma.account.findFirst`. The guard
+   is the `Proxy`'s `get` trap, so it does not depend on the shape of the
+   `where`: any reach for the delegate fails, including one that only wanted an
+   id. The five tests that survived are the linked-account, unlink and
+   `emailIsTaken` cases, which is correct — they are about different rows.
+2. **`resolveVirtualKeyNames` restored to the hand-written `findMany`.** Both
+   gateway tests failed, and on two independent grounds: the query assertion
+   (the composition's own selection omits `displayPrefix`, which the
+   repository's has) and the empty-list case (the hand-written version issues
+   `id: { in: [] }` where the repository asks nothing). The fake honours
+   `select`, so the sabotaged version still returned exactly the right names —
+   the only thing that gave it away was the statement it sent.
+3. **The service's comparison and absence check both broken** — `!matches`
+   became `matches === null` and `!account?.passwordHash` became `!account`.
+   **2 of the 5 unit tests failed**: the wrong-password refusal and the
+   passkey-only account. The three that survived are the happy path and the
+   two that assert what the answer carries, which are correctly indifferent to
+   both edits and fail on their own sabotage instead.
+
+### The rest of the class, after this pass
+
+The reference grep — `grep -n "this.prisma\.\|prisma\.[a-z]*\.\(find\|create\|update\|delete\)" apps/api/src/app/*.ts` —
+returns **64 sites**, down from 68 at this branch's HEAD (the four that
+disappeared are the account statements; the Serializable transaction's three
+`tx.account.*` calls never matched the pattern). What is left is `workflow` (17
+across three files), `project` (11), `user` (7), `organization` /
+`organizationUser` (9), `workflowVersion` (5), `team` / `teamUser` /
+`organizationInvite` (5), `monitor` (3), `batchEvaluation`, `agent`, `group`,
+`cost` and `llmPromptConfig`.
+
+**Not one of the 64 selects a secret column**, which is the property that
+matters and is worth stating as a fact rather than an impression, because two
+of those tables do carry one:
+
+- `User.userHashKey` — the per-user HMAC key identity event payload hashes are
+  minted under (ADR-101 §4), shredded on erasure. Every `prisma.user` read left
+  in a composition names its columns: `{ id, name }` twice, `{ email, name }`,
+  `{ email, emailVerified }`, `{ lastHomePath }`, `{ id }`, and one
+  existence check with no `select` that returns the row — `emailIsTaken`, in
+  the file this pass just cleaned. That last one is the only site where the key
+  crosses a process boundary at all, into a boolean nobody reads it from; it is
+  the next candidate of this class, and it is narrower than either read closed
+  here.
+- `OrganizationInvite.inviteCode` — a bearer token. Both remaining reads look a
+  row up BY the code a caller presented and select the organization and the
+  inviter, never the code itself. That is the safe direction.
+
+`VirtualKey` and `Account` are now the two tables in this tree that no
+composition names at all.
+
+The two the previous ledger left in its own file are still there and still
+correct to leave: `api-trpc-collaborators.product.composition.ts` reads the
+project row the setup rollup IS, and its `llmPromptConfig.findFirst` is the
+prompt step — the same shape as the provider step it fixed, but no spec states
+an invariant over that table, and inventing one to justify a seam is the wrong
+order.
+
+### What this pass did NOT do
+
+- **The other three scenarios in `packages/features/user/specs/user.feature` are still untagged.** They describe deactivation, the email change and the avatar upload, which `UserService`'s own suite and the avatar tests already cover — binding them is a reading pass over those suites, not a code change.
+- **`prisma.account` still has eight other readers**, and every one of them is inside a package that owns the table rather than a composition root: `@langwatch/identity-server`'s accounts, backfill, projection and secret-carry repositories, `@langwatch/identity-eventing`'s projection store, `@langwatch/auth-server`'s better-auth hooks, `PrismaUserRepository`, and the Prisma seed. Two of those — the better-auth hooks and the seed — are transport and tooling rather than repositories, which is a seam of the same family and was not this lane's to move.
+- **`PrismaUserRepository` still takes the older hand-written `UserDatabase` shape** rather than a `Pick` of the generated client. Narrowing it touches `PostgresUserAdapter` and every composition that builds it, which is a different change.
+- **`VirtualKeyService.create` still takes the whole `PrismaClient`** and builds its three repositories internally, so the gateway composition test cannot refuse the delegate outright the way the credential one can. What it pins instead is that exactly one statement shape reaches the table and that it is the repository's.
+- **Nothing under `platform/` was created, edited or read.**

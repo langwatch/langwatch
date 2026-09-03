@@ -17,3 +17,16 @@ Feature: Canonical user lifecycle
     Then Organization supplies the user's personal project
     And the bytes are stored with the user-avatar purpose
     And the User service stores the compatibility delivery URL
+
+  # The stored password hash is the one column in this feature that must not
+  # travel. It used to: the API process read it on its own connection and the
+  # comparison happened in a transport, which meant the rule about that column
+  # lived nowhere in particular.
+  @integration
+  Scenario: Credential password hashes never leave the user feature
+    Given a signed-in person who holds a credential sign-in method
+    When they change their password
+    Then the current password is verified and the new one stored in one operation
+    And the stored hash is read and written by the User feature's own persistence
+    And the process composing the request never reads the account rows itself
+    And what the operation answers with is the outcome, never the stored hash

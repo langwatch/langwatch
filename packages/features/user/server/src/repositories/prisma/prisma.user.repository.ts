@@ -65,6 +65,14 @@ const userFullProfileSelect = {
   tracesExplorerTourDismissedAt: true,
 } satisfies Prisma.UserSelect;
 
+/**
+ * A freshly created user is read back as its id and nothing else, because
+ * `createdUserSchema` is `.strict()` on exactly `{ id }`. Without this select
+ * Prisma returns every scalar on `User` — fifteen of them — and the parse
+ * throws `unrecognized_keys` on the one row shape no test ever built.
+ */
+const createdUserSelect = { id: true } satisfies Prisma.UserSelect;
+
 export class PrismaUserRepository extends UserRepository {
   private constructor(
     private readonly database: UserDatabase,
@@ -111,6 +119,7 @@ export class PrismaUserRepository extends UserRepository {
     const created = await this.database.$transaction(async (transaction) => {
       const user = await transaction.user.create({
         data: { name: input.name, email: input.email },
+        select: createdUserSelect,
       });
       const parsedUser = createdUserSchema.parse(user);
       await transaction.account.create({
@@ -132,6 +141,7 @@ export class PrismaUserRepository extends UserRepository {
     const created = await this.database.$transaction(async (transaction) => {
       const user = await transaction.user.create({
         data: { name: null, email: input.email },
+        select: createdUserSelect,
       });
       const parsedUser = createdUserSchema.parse(user);
       await transaction.account.create({

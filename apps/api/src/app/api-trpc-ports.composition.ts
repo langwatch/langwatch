@@ -8,10 +8,15 @@
  *
  *  1. The entries that were ROW READS now run on this process's own guarded
  *     Prisma connection instead of the one hanging off a request context.
- *     There were about forty of them — the workflow copy lineage, the account
+ *     There were about forty of them — the workflow copy lineage, the user
  *     rows behind the /me screens, the studio's published components — and
  *     every one of them already had its project or user id in hand. They never
  *     needed a service locator, only a connection.
+ *
+ *     Four of them have since left again, and the reason names the limit of
+ *     rule 1: they read `Account`, where the stored password hash lives, and
+ *     "a row read with an id already in hand" is not a licence to select a
+ *     credential column. They are the user feature's own reads now.
  *  2. The entries that reach a SERVICE this process does not compose arrive as
  *     {@link ApiTrpcCollaborators}, named one by one, and their absence is a
  *     refusal to compose the record rather than a record whose procedures fail
@@ -389,66 +394,28 @@ export function createApiTrpcPorts<
     /** The two answers `github.*` reaches, forwarded whole for the same reason. */
     github: collaborators.github,
 
+    /**
+     * The user rows this connection answers, and the four it deliberately
+     * does not.
+     *
+     * `Account` — the table a person's sign-in methods live on, and the table
+     * the bcrypt password hash lives ON — is not read here at all any more.
+     * Four entries used to be, one of them a `select` naming `password`. They
+     * arrive through `collaborators.user` now, answered by the user feature's
+     * own `UserCredentialService`, which compares a hash and discards it
+     * rather than handing it out. `specs` state the invariant; the composition
+     * test hands this function a client whose `account` delegate refuses every
+     * access, and the four answers still come back.
+     *
+     * What is left is `User`, a different table with no credential on it.
+     */
     user: {
       ...collaborators.user,
-
-      tryFindCredentialAccount: (_ctx: unknown, { userId }: Readonly<{ userId: string }>) =>
-        prisma.account.findFirst({
-          where: { userId, provider: "credential" },
-          select: { id: true, password: true },
-        }),
-
-      writeCredentialPassword: async (
-        _ctx: unknown,
-        { accountId, passwordHash }: Readonly<{ accountId: string; passwordHash: string }>,
-      ) => {
-        await prisma.account.update({
-          where: { id: accountId },
-          data: { password: passwordHash },
-        });
-      },
-
-      tryFindAuth0DatabaseAccount: (_ctx: unknown, { userId }: Readonly<{ userId: string }>) =>
-        prisma.account.findFirst({
-          where: {
-            userId,
-            provider: "auth0",
-            providerAccountId: { startsWith: "auth0|" },
-          },
-          select: { providerAccountId: true },
-        }),
 
       emailIsTaken: async (_ctx: unknown, { email }: Readonly<{ email: string }>) =>
         (await prisma.user.findFirst({
           where: { email: { equals: email, mode: "insensitive" } },
         })) !== null,
-
-      listLinkedAccounts: (_ctx: unknown, { userId }: Readonly<{ userId: string }>) =>
-        prisma.account.findMany({
-          where: { userId },
-          select: { id: true, provider: true, providerAccountId: true },
-        }),
-
-      // Serializable isolation prevents the read of the account count from
-      // being a stale snapshot if a concurrent unlink commits between this
-      // transaction's count and its delete.
-      unlinkAccount: (
-        _ctx: unknown,
-        { userId, accountId }: Readonly<{ userId: string; accountId: string }>,
-      ) =>
-        prisma.$transaction(
-          async (tx) => {
-            const accountCount = await tx.account.count({ where: { userId } });
-            if (accountCount <= 1) return "last_account" as const;
-            const account = await tx.account.findFirst({
-              where: { id: accountId, userId },
-            });
-            if (!account) return "not_found" as const;
-            await tx.account.delete({ where: { id: accountId } });
-            return "unlinked" as const;
-          },
-          { isolationLevel: "Serializable" },
-        ),
 
       isOrganizationMember: async (
         _ctx: unknown,

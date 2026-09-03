@@ -68,18 +68,20 @@ import type { AnyAppTraceGroupTrpcPorts } from "./app-trpc.trace-group";
 
 /**
  * The `user.*` entries this process answers from its own Prisma connection:
- * the account rows behind the /me screens, the credential and Auth0 lookups,
- * the organization membership probe and the first-project slug. Every one of
- * them is a row read with a project or user id already in hand, which is why
- * they moved with the connection rather than staying behind a port.
+ * the user rows behind the /me screens, the organization membership probe and
+ * the first-project slug. Every one of them is a row read with a project or
+ * user id already in hand, which is why they moved with the connection rather
+ * than staying behind a port.
+ *
+ * The five that used to be here and are not any more — `rotatePassword`,
+ * `tryFindAuth0DatabaseAccount`, `listLinkedAccounts` and `unlinkAccount`, and
+ * the credential read and write the first replaced — are reads of `Account`,
+ * the table the stored password hash lives on. They now reach the user
+ * feature's own `UserCredentialService` and arrive as collaborators, which is
+ * what the second half of this module's contract is for.
  */
 type ApiOwnedUserPorts =
-  | "tryFindCredentialAccount"
-  | "writeCredentialPassword"
-  | "tryFindAuth0DatabaseAccount"
   | "emailIsTaken"
-  | "listLinkedAccounts"
-  | "unlinkAccount"
   | "isOrganizationMember"
   | "tryGetOrganizationName"
   | "tryGetUserContact"
