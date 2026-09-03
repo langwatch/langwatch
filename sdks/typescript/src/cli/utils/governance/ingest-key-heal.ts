@@ -56,9 +56,10 @@ const TOOL_BY_AGENT: Record<string, string> = {
  * Re-mint the personal ingest key for `agent` and rewrite its wiring, or null
  * when this device is not in a position to: no login to mint with, a tool
  * pinned to a project (that path is `langwatch instrument --project`), a
- * rejected token that is not the cached personal key (a pasted credential is
- * the user's, never overwritten), or a server that says the cached key is
- * still live, in which case the 401 means something else.
+ * rejected token that is not exactly the cached personal key (a pasted
+ * credential is the user's, never overwritten, and a request that carried no
+ * bearer at all was rejected for another reason), or a server that says the
+ * cached key is still live, in which case the 401 means something else.
  */
 export async function healRevokedIngestKey({
   agent,
@@ -77,10 +78,11 @@ export async function healRevokedIngestKey({
   if (!deps.isLoggedIn(cfg)) return null;
   if (cfg.tool_project_keys?.[tool]?.secret) return null;
 
+  // Only the cached personal key is ours to replace, and only when it is
+  // demonstrably the credential that was rejected. A 401 the device carried
+  // no bearer for, or carried someone else's, is not this key's failure.
   const cached = cfg.default_personal_ingest_keys?.[agent]?.secret;
-  if (!cached || (rejectedToken !== undefined && rejectedToken !== cached)) {
-    return null;
-  }
+  if (!cached || rejectedToken !== cached) return null;
 
   const resolved = await deps.resolveLiveIngestionKey({
     cfg,
@@ -89,6 +91,21 @@ export async function healRevokedIngestKey({
   });
   if (!resolved.minted) return null;
 
+  // Wire before caching. A cache that names a key the tool is not wired
+  // with is worse than no cache: the next 401 would compare the rejected
+  // token against a key this device never exported with, and the heal would
+  // decline. An install that wrote no target is a failed heal too, not only
+  // one that reports a required failure: both leave the tool on the dead key.
+  const wiring = deps.installTelemetryWiring({
+    cfg,
+    tool,
+    endpoint: resolved.endpoint,
+    token: resolved.token,
+  });
+  if (wiring.requiredFailures.length > 0 || wiring.labels.length === 0) {
+    return null;
+  }
+
   cfg.default_personal_ingest_keys = {
     ...(cfg.default_personal_ingest_keys ?? {}),
     [agent]: { secret: resolved.token, prefix: resolved.prefix },
@@ -96,16 +113,9 @@ export async function healRevokedIngestKey({
   try {
     deps.saveConfig(cfg);
   } catch {
-    // The wiring below still lands; only the cache write failed.
+    // The tool is wired with the new key either way; only the cache write
+    // failed, which costs a re-mint the next time the hook heals.
   }
-
-  const wiring = deps.installTelemetryWiring({
-    cfg,
-    tool,
-    endpoint: resolved.endpoint,
-    token: resolved.token,
-  });
-  if (wiring.requiredFailures.length > 0) return null;
 
   return {
     endpoint: `${resolved.endpoint}/v1/logs`,

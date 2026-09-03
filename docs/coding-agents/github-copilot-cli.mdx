@@ -84,7 +84,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument copilot --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument copilot --personal` | Back to your personal workspace |
 
-LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own.
+LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest, and the machine that held it mints a fresh one with `langwatch instrument copilot`.
 
 Replace `copilot` with `code` for the Visual Studio Code extension. The two are separate, so you can send the command-line tool to a team project and keep the editor on your personal workspace.
 

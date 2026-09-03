@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/observability";
+
 import type { PrismaClient } from "~/generated/prisma/client";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
@@ -44,6 +46,16 @@ export interface IssuedIngestionKey {
 }
 
 /**
+ * Live personal ingest keys one workspace may hold per (sourceType, template).
+ * Sized for a person's real machines with room to spare: a few laptops, a few
+ * cloud machines, and the forks of a golden image that share their parent's
+ * key rather than minting their own.
+ */
+export const PERSONAL_INGEST_KEYS_PER_TOOL_CAP = 10;
+
+const logger = createLogger("langwatch:governance:ingestion-key");
+
+/**
  * Issues and rotates "ingestion keys": project-scoped, ingest-only ApiKeys.
  *
  * An ingestion key is one row of the single ApiKey primitive (`ik-lw-` prefix,
@@ -74,14 +86,6 @@ export interface IssuedIngestionKey {
  * key list bounded without a rotation: past it, the key that has gone unused
  * the longest is revoked, which is the machine most likely gone.
  */
-/**
- * Live personal ingest keys one workspace may hold per (sourceType, template).
- * Sized for a person's real machines with room to spare: a few laptops, a few
- * cloud machines, and the forks of a golden image that share their parent's
- * key rather than minting their own.
- */
-export const PERSONAL_INGEST_KEYS_PER_TOOL_CAP = 10;
-
 export class IngestionKeyService {
   private readonly apiKeys: ApiKeyService;
   private readonly apiKeyRepo: ApiKeyRepository;
@@ -285,6 +289,16 @@ export class IngestionKeyService {
    * first. A key never used ranks by its creation time, so a fresh machine
    * that has not exported yet is not the first to go when the list is full.
    * Revocations do not hold for the projection, like the rotation's.
+   *
+   * Best-effort by design, and it runs after the new key exists. Two devices
+   * minting at the same moment read the same live list and can pick the same
+   * key to retire; the loser of that race gets `ApiKeyAlreadyRevokedError`,
+   * and a key someone revoked from the API-keys page mid-call reads the same
+   * way. Neither is a reason to fail a mint whose key is already live and
+   * already returned to the device, so an eviction that fails is logged and
+   * the rest still run. The bound is self-correcting: the list is recounted
+   * on every mint, so a race that leaves one key over the cap is trimmed by
+   * the next one.
    */
   private async revokePastCap({
     callerUserId,
@@ -322,13 +336,20 @@ export class IngestionKeyService {
       .sort((a, b) => lastActivityMs(a) - lastActivityMs(b))
       .slice(0, excess);
     for (const key of doomed) {
-      await this.apiKeys.revoke({
-        id: key.id,
-        callerUserId,
-        callerIsAdmin: true,
-        organizationId,
-        awaitProjection: false,
-      });
+      try {
+        await this.apiKeys.revoke({
+          id: key.id,
+          callerUserId,
+          callerIsAdmin: true,
+          organizationId,
+          awaitProjection: false,
+        });
+      } catch (error) {
+        logger.warn(
+          { error, apiKeyId: key.id, projectId, sourceType },
+          "could not retire a personal ingest key past the cap",
+        );
+      }
     }
   }
 

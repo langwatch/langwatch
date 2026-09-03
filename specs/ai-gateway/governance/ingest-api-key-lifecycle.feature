@@ -150,6 +150,22 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     When a device mints a personal key for "codex"
     Then no "claude_code" key is revoked
 
+  # The cap runs after the new key exists, and it is the only part of the mint
+  # that touches keys the caller does not own. Two devices minting at the same
+  # moment read the same list and can pick the same key to retire, and a key
+  # revoked from the API-keys page mid-call reads the same way. A device whose
+  # key is already live must not be told the mint failed, so a retirement that
+  # fails is logged and the mint stands. The bound is recounted on every mint,
+  # so the next one trims what a race left over.
+
+  @unit @ingest-api-key @issue @personal @create-only
+  Scenario: An eviction that fails does not fail the mint
+    Given a personal mint past the cap
+    And the key it picked to retire was already revoked by another device
+    When the mint finishes
+    Then the caller still receives the new key
+    And the remaining keys past the cap are still retired
+
   # ---------------------------------------------------------------------------
   # Ingest-only RBAC — the genuinely-write-only guarantee
   # ---------------------------------------------------------------------------

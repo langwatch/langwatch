@@ -38,9 +38,12 @@
 #
 # One command serves all three: the git work, the fingerprint, the payload and
 # the endpoint resolution are tool-agnostic and only the seam differs. It must
-# never write to stdout (a Claude Code SessionStart hook's stdout is injected
-# into the user's session context) and must never fail the session (always exit
-# zero).
+# never fail the session (always exit zero), and it writes to stdout for one
+# reason only: the Claude Code notice after a key heals (see "A revoked ingest
+# key heals itself"), a single JSON line carrying `systemMessage` and nothing
+# the model reads. Every other path stays silent, a failed heal and the
+# non-Claude tools included, because a Claude Code SessionStart hook's stdout
+# is read as its answer to the session.
 
 Feature: Coding agent session context hook
 
@@ -321,6 +324,20 @@ Rule: A revoked ingest key heals itself
     And a collector that answers 401
     When the hook runs
     Then no new key is minted
+
+  @unit
+  Scenario: A 401 the device sent no key with is not this key's failure
+    Given a hook whose telemetry target carries no authorization header
+    And a collector that answers 401
+    When the hook runs
+    Then no personal key is minted
+
+  @unit
+  Scenario: Wiring that writes no target leaves the cached key in place
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a device where writing the tool's wiring lands no target
+    When the hook runs
+    Then the new key is not cached and the hook reports no healed target
 
   @unit
   Scenario: A payload that never arrives does not outlive the session

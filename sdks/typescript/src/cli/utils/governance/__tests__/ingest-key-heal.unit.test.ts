@@ -162,6 +162,23 @@ describe("healRevokedIngestKey", () => {
     });
   });
 
+  describe("given a 401 the device carried no key with", () => {
+    /** @scenario "A 401 the device sent no key with is not this key's failure" */
+    it("mints nothing, because the rejection is not this key's", async () => {
+      const d = deps();
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: undefined,
+        deps: d,
+      });
+
+      expect(healed).toBeNull();
+      expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
+      expect(d.installTelemetryWiring).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given wiring that cannot be written", () => {
     it("reports no target rather than a half-wired tool", async () => {
       const d = deps({
@@ -179,6 +196,29 @@ describe("healRevokedIngestKey", () => {
       });
 
       expect(healed).toBeNull();
+      expect(d.saveConfig).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given wiring that reports no failure but writes no target", () => {
+    /** @scenario "Wiring that writes no target leaves the cached key in place" */
+    it("leaves the cache on the old key, so the next 401 can heal", async () => {
+      const d = deps({
+        installTelemetryWiring: vi.fn().mockReturnValue({
+          labels: [],
+          warnings: ["could not write ~/.claude/settings.json: EACCES"],
+          requiredFailures: [],
+        }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      expect(healed).toBeNull();
+      expect(d.saveConfig).not.toHaveBeenCalled();
     });
   });
 });

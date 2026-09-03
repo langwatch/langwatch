@@ -65,7 +65,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument codex --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument codex --personal` | Back to your personal workspace |
 
-LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own.
+LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest, and the machine that held it mints a fresh one with `langwatch instrument codex`.
 
 The wrapper accepts the same flags: `langwatch codex --project acme-app` pins the project and then starts Codex. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Codex reads it.
 

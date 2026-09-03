@@ -156,6 +156,30 @@ describe("IngestionKeyService.issueForPersonalProject", () => {
     });
   });
 
+  describe("when a key picked for eviction was already revoked", () => {
+    /** @scenario "An eviction that fails does not fail the mint" */
+    it("still returns the fresh key, and still evicts the rest", async () => {
+      const others = Array.from(
+        { length: PERSONAL_INGEST_KEYS_PER_TOOL_CAP + 1 },
+        (_, i) => liveKey({ id: `ak_${i}`, createdAt: day(i + 1) }),
+      );
+      apiKeyRepo.findIngestKeysForProject.mockResolvedValue([
+        liveKey({ id: "ak_new", createdAt: day(30) }),
+        ...others,
+      ]);
+      // Another device minting at the same moment retired ak_0 first.
+      apiKeys.revoke.mockRejectedValueOnce(new Error("already revoked"));
+
+      const issued = await service.issueForPersonalProject(PARAMS);
+
+      expect(issued.apiKeyId).toBe("ak_new");
+      const revoked = apiKeys.revoke.mock.calls.map(
+        (call) => (call[0] as { id: string }).id,
+      );
+      expect(revoked).toEqual(["ak_0", "ak_1"]);
+    });
+  });
+
   describe("when the caller has no personal workspace", () => {
     it("refuses before minting anything", async () => {
       workspace.findExisting.mockResolvedValue(null);
