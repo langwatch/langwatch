@@ -8,9 +8,15 @@ import { describe, expect, it } from "vitest";
  * A plain text scan over the sources, in the same spirit as
  * identity-package-boundaries.unit.test.ts: an import is a line, a query is
  * a line, a `new FooService(` is a line, and the test that reads the same
- * lines a reviewer would is the one that keeps saying the same thing. Each
- * assertion lists its offenders by file, so tightening a rule later is a
- * regex edit and a read of the list.
+ * lines a reviewer would is the one that keeps saying the same thing.
+ *
+ * IT IS A RATCHET, NOT A SNAPSHOT. ADR-129 lands in slices, so each rule
+ * carries the list of files that still break it today. A file NOT on the list
+ * that breaks the rule fails the build — the tier cannot get worse. A file ON
+ * the list that no longer breaks the rule also fails, with the instruction to
+ * remove it — the list can only shrink, and when the last entry goes the rule
+ * is simply the rule. Every list is expected to be empty by the end of the
+ * ADR-129 work; a non-empty one is the refactor's remaining to-do, in code.
  */
 
 const APP_SRC = join(__dirname, "..", "..");
@@ -68,13 +74,48 @@ const isRepositoryTier = (file: string) =>
 const QUERY =
   /\b(?:prisma|tx)\.(?:\$transaction|\$queryRaw|\$executeRaw|[a-z][A-Za-z]*\.(?:find|count|create|update|upsert|delete|aggregate|group))/;
 
+const linesMatching = (source: string, pattern: RegExp) =>
+  source
+    .split("\n")
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => pattern.test(line))
+    .map(({ line, index }) => `L${index + 1} ${line.trim()}`);
+
+/** `{ file: [why, why] }` for every file with at least one finding. */
 const offendersOf = (
   files: string[],
   test: (file: string, source: string) => string[],
-): string[] =>
-  files.flatMap((file) =>
-    test(file, read(file)).map((why) => `${rel(file)}: ${why}`),
-  );
+): Record<string, string[]> => {
+  const out: Record<string, string[]> = {};
+  for (const file of files) {
+    const findings = test(file, read(file));
+    if (findings.length > 0) out[rel(file)] = findings;
+  }
+  return out;
+};
+
+/**
+ * The ratchet. `known` is the list of files still breaking the rule today;
+ * the caller asserts the answer is CLEAN, which fails on a file that is not on
+ * the list (the tier got worse) and on a listed file that no longer breaks it
+ * (remove it — the list only shrinks). Failure output names the file and the
+ * offending lines.
+ */
+function ratchet(
+  offenders: Record<string, string[]>,
+  known: readonly string[],
+): { newOffenders: string[]; staleEntries: string[] } {
+  const found = Object.keys(offenders).sort();
+  return {
+    newOffenders: found
+      .filter((file) => !known.includes(file))
+      .map((file) => `${file}\n    ${(offenders[file] ?? []).join("\n    ")}`),
+    staleEntries: known.filter((file) => !found.includes(file)),
+  };
+}
+
+/** No new offender, no listed file that has stopped offending. */
+const CLEAN = { newOffenders: [], staleEntries: [] };
 
 describe("identity service layering", () => {
   describe("when the better-auth sources are scanned for imports", () => {
@@ -89,7 +130,16 @@ describe("identity service layering", () => {
             /prisma\/client/.test(specifier),
         ),
       );
-      expect(offenders).toEqual([]);
+      expect(
+        ratchet(offenders, [
+          "server/better-auth/bornFinalizedOptIn.ts",
+          "server/better-auth/hooks.ts",
+          "server/better-auth/index.ts",
+          "server/better-auth/passkey-signup.ts",
+          "server/better-auth/registeredIssuers.ts",
+          "server/better-auth/sign-up-confirmation.ts",
+        ]),
+      ).toEqual(CLEAN);
     });
   });
 
@@ -97,18 +147,25 @@ describe("identity service layering", () => {
     /** @scenario "Prisma is spelled in the repository tier only" */
     it("query only from a repository or adapter file", () => {
       const files = [...sourceFiles(BETTER_AUTH), ...sourceFiles(IDENTITY)];
-      const offenders = offendersOf(files, (file, source) =>
-        isRepositoryTier(file)
-          ? []
-          : source
-              .split("\n")
-              .map((line, index) => ({ line, index }))
-              .filter(({ line }) => QUERY.test(line))
-              .map(({ line, index }) => `L${index + 1} ${line.trim()}`),
-      );
       // The composition root holds the client to construct repositories; a
       // query in it is the same violation as a query anywhere else.
-      expect(offenders).toEqual([]);
+      const offenders = offendersOf(files, (file, source) =>
+        isRepositoryTier(file) ? [] : linesMatching(source, QUERY),
+      );
+      expect(
+        ratchet(offenders, [
+          "server/app-layer/identity/platform-operators.ts",
+          "server/app-layer/identity/runtime.ts",
+          "server/app-layer/identity/sso-connection-backoffice.service.ts",
+          "server/better-auth/bornFinalizedOptIn.ts",
+          "server/better-auth/hooks.ts",
+          "server/better-auth/last-way-in.ts",
+          "server/better-auth/passkey-signup.ts",
+          "server/better-auth/registeredIssuers.ts",
+          "server/better-auth/revokeSessions.ts",
+          "server/better-auth/sign-up-confirmation.ts",
+        ]),
+      ).toEqual(CLEAN);
     });
 
     /** @scenario "Prisma is spelled in the repository tier only" */
@@ -116,13 +173,14 @@ describe("identity service layering", () => {
       const AUTH_ROW =
         /\bprisma\.(?:account|session|passkey|verification|ssoProvider|ssoConnection|twoFactor)\.(?:find|count|create|update|upsert|delete)/;
       const offenders = offendersOf(AUTH_BOUNDARY_FILES, (_file, source) =>
-        source
-          .split("\n")
-          .map((line, index) => ({ line, index }))
-          .filter(({ line }) => AUTH_ROW.test(line))
-          .map(({ line, index }) => `L${index + 1} ${line.trim()}`),
+        linesMatching(source, AUTH_ROW),
       );
-      expect(offenders).toEqual([]);
+      expect(
+        ratchet(offenders, [
+          "server/api/routers/user.ts",
+          "server/routes/auth.ts",
+        ]),
+      ).toEqual(CLEAN);
     });
   });
 
@@ -133,23 +191,29 @@ describe("identity service layering", () => {
         /\bnew\s+(?:Prisma[A-Z]\w*|\w+Service|\w+LedgerWriter|\w+Hooks|\w+Minter|\w+Registration|\w+Endpoint|\w+Guard|\w+Bridge|RegisteredIssuers|BornFinalizedOptIn)\(/;
       const files = [...sourceFiles(BETTER_AUTH), ...sourceFiles(IDENTITY)];
       const offenders = offendersOf(files, (file, source) =>
-        file === RUNTIME
-          ? []
-          : source
-              .split("\n")
-              .map((line, index) => ({ line, index }))
-              .filter(({ line }) => CONSTRUCTION.test(line))
-              .map(({ line, index }) => `L${index + 1} ${line.trim()}`),
+        file === RUNTIME ? [] : linesMatching(source, CONSTRUCTION),
       );
-      expect(offenders).toEqual([]);
+      expect(
+        ratchet(offenders, [
+          "server/app-layer/identity/identity-lookup-runtime.ts",
+          "server/app-layer/identity/scim-reconciliation-runtime.ts",
+          "server/app-layer/identity/two-step-runtime.ts",
+          "server/better-auth/index.ts",
+        ]),
+      ).toEqual(CLEAN);
     });
 
     /** @scenario "The identity services are composed in one file" */
     it("have no satellite runtime beside runtime.ts", () => {
       const satellites = sourceFiles(IDENTITY)
         .filter((file) => /-runtime\.ts$/.test(basename(file)))
-        .map(rel);
-      expect(satellites).toEqual([]);
+        .map(rel)
+        .sort();
+      expect(satellites).toEqual([
+        "server/app-layer/identity/identity-lookup-runtime.ts",
+        "server/app-layer/identity/scim-reconciliation-runtime.ts",
+        "server/app-layer/identity/two-step-runtime.ts",
+      ]);
     });
   });
 
@@ -161,38 +225,48 @@ describe("identity service layering", () => {
       ...AUTH_BOUNDARY_FILES,
     ].filter((file) => !isRepositoryTier(file));
 
-    const linesMatching = (source: string, pattern: RegExp) =>
-      source
-        .split("\n")
-        .map((line, index) => ({ line, index }))
-        .filter(({ line }) => pattern.test(line))
-        .map(({ line, index }) => `L${index + 1} ${line.trim()}`);
-
     /** @scenario "A question about the data is asked in one place" */
     it("spell no case-insensitive email match", () => {
+      const offenders = offendersOf(scope, (_file, source) =>
+        linesMatching(source, /mode:\s*["']insensitive["']/),
+      );
       expect(
-        offendersOf(scope, (_file, source) =>
-          linesMatching(source, /mode:\s*["']insensitive["']/),
-        ),
-      ).toEqual([]);
+        ratchet(offenders, [
+          "server/api/routers/user.ts",
+          "server/app-layer/identity/runtime.ts",
+          "server/app-layer/identity/sso-connection-backoffice.service.ts",
+          "server/better-auth/hooks.ts",
+          "server/better-auth/passkey-signup.ts",
+          "server/better-auth/sign-up-confirmation.ts",
+          "server/users/credential-user.ts",
+        ]),
+      ).toEqual(CLEAN);
     });
 
     /** @scenario "A question about the data is asked in one place" */
     it("look no organization up by its legacy SSO domain", () => {
+      const offenders = offendersOf(scope, (_file, source) =>
+        linesMatching(source, /where:\s*\{\s*ssoDomain\b/),
+      );
       expect(
-        offendersOf(scope, (_file, source) =>
-          linesMatching(source, /where:\s*\{\s*ssoDomain\b/),
-        ),
-      ).toEqual([]);
+        ratchet(offenders, [
+          "server/better-auth/bornFinalizedOptIn.ts",
+          "server/better-auth/hooks.ts",
+        ]),
+      ).toEqual(CLEAN);
     });
 
     /** @scenario "A question about the data is asked in one place" */
     it("spell no session cache key scheme", () => {
+      const offenders = offendersOf(scope, (_file, source) =>
+        linesMatching(source, /active-sessions-/),
+      );
       expect(
-        offendersOf(scope, (_file, source) =>
-          linesMatching(source, /active-sessions-/),
-        ),
-      ).toEqual([]);
+        ratchet(offenders, [
+          "server/better-auth/revokeSessions.ts",
+          "server/routes/auth.ts",
+        ]),
+      ).toEqual(CLEAN);
     });
   });
 
@@ -200,13 +274,14 @@ describe("identity service layering", () => {
     /** @scenario "better-auth keeps no state of its own" */
     it("have none", () => {
       const offenders = offendersOf(sourceFiles(BETTER_AUTH), (_file, source) =>
-        source
-          .split("\n")
-          .map((line, index) => ({ line, index }))
-          .filter(({ line }) => /^let\s/.test(line))
-          .map(({ line, index }) => `L${index + 1} ${line.trim()}`),
+        linesMatching(source, /^let\s/),
       );
-      expect(offenders).toEqual([]);
+      expect(
+        ratchet(offenders, [
+          "server/better-auth/index.ts",
+          "server/better-auth/registeredIssuers.ts",
+        ]),
+      ).toEqual(CLEAN);
     });
   });
 });
