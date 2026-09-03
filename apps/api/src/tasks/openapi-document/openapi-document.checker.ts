@@ -98,9 +98,21 @@ export type OpenApiDriftReport = Readonly<{
  */
 export const UNSERVED_AT_BASELINE: readonly string[] = [
   // The coding-agent transcript join on a trace read. `mountTracesRest` leaves
-  // the route unregistered on purpose — this process composes neither the
-  // session store nor the log canonicaliser, and an empty transcript reads as
-  // "the agent did nothing" — so a 404 is the deliberate answer.
+  // the route unregistered on purpose, and the ONE collaborator it is waiting
+  // for is the CANONICAL LOG READ — `LogService.getLogsByTraceId` over
+  // `log_records`, which `composeApiTraceReadStack` refuses by name. This
+  // process composes no log signal at all: its OTLP receiver takes traces
+  // only, it depends on no `@langwatch/log-server`, and `LogRuntimeAdapter`
+  // (the one composition path that package publishes) requires a
+  // `LogRedactionPort` no privacy graph here can supply. Without it the
+  // derivation reads the legacy log table alone, which has taken no write
+  // since the canonical cutover, so it would answer an empty transcript —
+  // "the agent did nothing" — for every trace ingested since. A 404 is the
+  // deliberate answer until the log read is composed.
+  //
+  // The coding-agent SESSION STORE is not the gap: the org group composes one,
+  // and the transcript reads no session anyway — only the contract's pure
+  // derivation.
   "GET /api/traces/{traceId}/transcript",
   // Two entries at the document ROOT, which are residue rather than routes.
   // The retired generator described each family from a standalone app and

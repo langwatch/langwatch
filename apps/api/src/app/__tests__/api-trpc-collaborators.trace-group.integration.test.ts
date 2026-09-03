@@ -906,6 +906,36 @@ describe("given an API process that composed the real observability collaborator
     });
   });
 
+  describe("when a trace's log records are read on this process", () => {
+    /**
+     * The one collaborator keeping `GET /api/traces/{traceId}/transcript`
+     * unmounted, read through the same call the transcript join makes first.
+     *
+     * The stack composes the LEGACY log table for real and refuses the
+     * canonical one, and canonical `log_records` is the only table still
+     * taking writes — so answering from what is composed would derive an empty
+     * transcript for every trace ingested since the cutover. It refuses
+     * instead, and this pins that: the day a process composes the canonical
+     * read, this test goes red and the transcript door can be mounted.
+     */
+    /** @scenario "the transcript is not served without the canonical log read it derives from" */
+    it("refuses by name rather than answering the legacy table's rows alone", async () => {
+      const clickHouse = testClickHouse([]);
+      const group = composeRealGroup(clickHouse);
+
+      await expect(
+        group.traces.readTraceLogRecords({
+          projectId: "project-1",
+          traceId: "trace-1",
+          occurredAtMs: 1_700_000_000_000,
+        }),
+      ).rejects.toMatchObject({
+        code: "service_unavailable",
+        meta: { capability: "the canonical log read" },
+      });
+    });
+  });
+
   describe("when the legacy grid's own ports are asked for", () => {
     it("carries a real input parser and a real span digest", async () => {
       const clickHouse = testClickHouse([]);

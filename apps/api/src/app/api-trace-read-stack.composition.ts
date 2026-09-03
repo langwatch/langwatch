@@ -37,8 +37,10 @@
  *     derivation the packaged `TraceService` takes: this process folds no
  *     trace projections, so the span-tree and query-catalogue reads answer off
  *     the stored spans and the projection-backed ones answer empty;
- *   - the LOG canonicaliser, so a coding-agent transcript read refuses rather
- *     than presenting a trace's log records uninterpreted;
+ *   - the CANONICAL LOG READ, so a coding-agent transcript read refuses rather
+ *     than deriving a transcript from the legacy log table alone — which has
+ *     taken no write since the canonical cutover, and would answer "this agent
+ *     did nothing" for every trace ingested since;
  *   - the EVALUATION summaries the grid labels its rows with, when the
  *     execution half composed none.
  */
@@ -688,13 +690,22 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       repository: resolve
         ? new LogRecordStorageClickHouseRepository(resolve as never)
         : new NullLogRecordStorageRepository(),
-      // The log CANONICALISER is the log feature's, and this process composes
-      // none: a transcript read refuses rather than presenting a trace's log
-      // records uninterpreted, which reads as "this agent said nothing".
-      canonical: refuseAll(
-        (capability) => this.refuse(capability),
-        "the log canonicaliser",
-      ),
+      // The CANONICAL LOG READ — `LogService.getLogsByTraceId` over the
+      // `log_records` table — is the log feature's, and this process composes
+      // none. It is the ONE collaborator keeping
+      // `GET /api/traces/{traceId}/transcript` off this process: the read
+      // above answers only `stored_log_records`, which stopped receiving
+      // writes at the canonical cutover, so every trace ingested since would
+      // derive an empty transcript that reads as "this agent said nothing".
+      //
+      // Composable only through `LogRuntimeAdapter` (`@langwatch/log-server`),
+      // whose `create` and `createUnavailable` BOTH require a
+      // `LogRedactionPort`. That port is the PII redaction service, and this
+      // process composes no privacy graph at all — no analysis transport, no
+      // tokenizer, no `tracePrivacy` config — so there is nothing here to
+      // build one from. The read cap it also takes is not the gap:
+      // `TRACE_LOG_READ_CAP` ships from `@langwatch/trace-server`.
+      canonical: refuseAll((capability) => this.refuse(capability), "the canonical log read"),
     }) as unknown as TraceAppDependencies["traces"]["logRecords"];
   }
 

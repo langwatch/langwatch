@@ -11053,3 +11053,149 @@ always answered a malformed event with and what a deployed client reads.
   reflowed three untouched lines in the first of them; those three are the only
   cosmetic changes this lane did not author.
 - Nothing under `platform/` was created, edited or read.
+
+## The transcript's absence, named exactly: the canonical log read, 2026-09-03
+
+`GET /api/traces/{traceId}/transcript` is one of the three operations left on
+`UNSERVED_AT_BASELINE`, and the reason recorded for it — in the checker, in the
+mount, in the read stack and four times in this plan — was *"this process
+composes neither the coding-agent session store nor the log canonicaliser"*.
+Half of that is no longer true, and the half that is true was named too vaguely
+to act on. **The route stays unmounted, and the one collaborator it is waiting
+for is the CANONICAL LOG READ.**
+
+```
+  THE READ, AS THE DOOR WOULD MAKE IT              WHAT THIS PROCESS HOLDS
+
+  GET /api/traces/{traceId}/transcript
+    └─ TracesV2TrpcApi.readCodingAgentTranscript
+        ├─ loadSpansFullWithProtections
+        │    └─ enrichCodingAgentSpansFromLogs
+        │         └─ logRecords.getLogsByTraceId ──┐
+        ├─ loadTraceLogsWithProtections            │
+        │    └─ app.readTraceLogRecords ───────────┤
+        │                                          ▼
+        │                            LogRecordStorageService
+        │                              ├─ repository  stored_log_records
+        │                              │                ✔ composed, ClickHouse
+        │                              └─ canonical   log_records
+        │                                               ✘ refuseAll(
+        │                                                   "the canonical
+        │                                                    log read")
+        └─ codingAgents.buildTranscript              ✔ pure, contract-owned
+```
+
+Both legs read the trace's logs, and both reach the same refusal. It is not a
+soft one: `LogRecordStorageService.getLogsByTraceId` runs the two tables in one
+`Promise.all`, so the door would answer 503 on every call, not an empty
+transcript.
+
+### Before and after, on the recorded reason
+
+```
+  BEFORE — what four places said         AFTER — what is actually the case
+
+  "composes neither the coding-agent     SESSION STORE ...... composed
+   session store nor the log               the org group builds CodingAgentApp
+   canonicaliser, and an empty             over CodingAgentProjectionPersistence
+   transcript reads as 'the agent          on this process's own ClickHouse; it
+   did nothing'"                           serves /api/coding-agents/* today.
+                                           And the transcript reads no session
+                                           at all — only the contract's pure
+                                           derivation: buildTranscript,
+                                           logContentKeys, contentAttrKeys.
+
+                                         CANONICAL LOG READ ... ABSENT
+                                           LogService.getLogsByTraceId over
+                                           log_records. The one composition
+                                           path the log package publishes is
+                                           LogRuntimeAdapter, and BOTH its
+                                           constructors — create and
+                                           createUnavailable — require a
+                                           LogRedactionPort. This process
+                                           composes no privacy graph at all
+                                           (no analysis transport, no
+                                           tokenizer, no tracePrivacy config),
+                                           depends on no @langwatch/log-server,
+                                           and its OTLP receiver takes TRACES
+                                           only. Nothing here builds one.
+```
+
+The consequence sentence survives the correction, and gets sharper: canonical
+`log_records` is the only log table still taking writes, so a transcript
+derived from `stored_log_records` alone would be empty for every trace ingested
+since the cutover — "this agent did nothing", which is a different and wrong
+fact. A 404 from a door that does not claim to serve it is the honest answer.
+
+### Why this is a stop and not a mount
+
+Mounting would mean composing an entire signal's read path into a process that
+composes none of that signal — a new `@langwatch/log-server` dependency, a
+`LogRedactionPort` with no source, and a `LogService` built through neither of
+the package's two constructors. That is a redesign of the log feature's
+composition wearing a trace route's clothes, and it would change what
+`tracesV2.traceLogs` and the read-path Claude Code enrichment answer on this
+process as a side effect. The read cap is NOT the gap: `TRACE_LOG_READ_CAP`
+ships from `@langwatch/trace-server`, and the tenant-keyed ClickHouse resolver
+is already here. It is the redaction port, and through it the whole privacy
+graph.
+
+What closes this: a process that composes the log signal — the redaction port
+first, then `LogRuntimeAdapter`, then `canonical` on `composeLogRecords`. On
+that day `mountTracesRest` gains a `readCodingAgentTranscript` bound to
+`TracesV2TrpcApi.readCodingAgentTranscript` over the read stack it already
+holds, plus a real `CodingAgentService` (the org group's, or the contract's
+pure derivation) in place of the `refuseAll` on `TraceApp`; the entry leaves
+`UNSERVED_AT_BASELINE`; and the two tests below go red on the same day, which
+is what makes them the tripwire rather than a description.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/app/api-trace-read-stack.composition.ts` | The refusal capability renamed from `"the log canonicaliser"` to `"the canonical log read"`, and the header bullet plus the `composeLogRecords` comment now name the exact collaborator, its one composition path, and why that path cannot be built here. |
+| `apps/api/src/features/trace/trace-rest.mount.ts` | The unsupplied-port comment names the canonical log read as the single blocker, and records that the session store is composed and never read by this join. |
+| `apps/api/src/tasks/openapi-document/openapi-document.checker.ts` | The `UNSERVED_AT_BASELINE` entry's comment rewritten to the same fact. The entry itself stays: the route is still not served. |
+| `apps/api/src/app/api-trpc-collaborators.trace-group.composition.ts` | The comment over the `evaluations` / `codingAgents` stand-ins records that neither is what keeps the join off — the log read throws first — so wiring `codingAgents` through buys nothing on its own. |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.trace-group.integration.test.ts` | NEW test over the REAL composed read stack: `TraceApp.readTraceLogRecords` rejects with `service_unavailable` and `meta.capability = "the canonical log read"` — the executable proof of the absence, and the tripwire for the day it closes. |
+| `apps/api/src/features/trace/__tests__/trace-rest.integration.test.ts` | The stale `describe` title ("no coding-agent session store") corrected, and the 404 test bound to the new scenario. |
+| `specs/coding-agent/transcript-rest.feature` | One `@integration` scenario: the door is not served without the canonical log read, and the log-record read refuses by name rather than answering an empty set. |
+
+Nothing in `@langwatch/trace-server` or `@langwatch/log-server` was edited, and
+no route was registered or unregistered.
+
+### The four earlier records
+
+The route table row (this plan, REST wave 3c), its named-absence paragraph and
+the OpenAPI entry's table row all carry the old sentence. They are dated
+records of what was believed then and are left as written; this entry is the
+correction, and the three code sites that a reader actually acts on now say the
+same thing it does.
+
+### Gates
+
+- `apps/api`: `vitest run src/app-rest src/features/trace src/tasks/openapi-document`
+  — **Test Files 7 passed (7)**, **Tests 75 passed (75)**.
+- `apps/api`: `vitest run src/app/__tests__/api-trpc-collaborators.trace-group.integration.test.ts`
+  — **Test Files 1 passed (1)**, **Tests 30 passed (30)** (29 before this lane).
+- `apps/api`: `tsc --noEmit` **0 errors**; `tsc --noEmit -p tsconfig.test.json`
+  **0 errors**.
+- `task:openapi-check`: `served: 303`, `documented: 317`, `removed: 3 (0
+  outside the baseline)`, `undescribed: 11`, `added: 0`, `changed: 0` —
+  unchanged, which is the point: nothing was mounted and nothing was dropped.
+- `check:feature-parity`: `specs/coding-agent/transcript-rest.feature` — the
+  new scenario is bound TWICE (the route test and the refusal proof). The file
+  still reports **8 unbound of 11**, unchanged by this lane and pre-existing:
+  those eight are the captured-content visibility matrix, whose bindings lived
+  in `platform/app/.../tracesV2.transcript-{read,visibility}.*` and were
+  deleted with the monolith in `379b452def`. Rebinding them means porting those
+  two suites into `@langwatch/trace-server`, which belongs to whoever composes
+  the log read.
+- `oxlint`: no new warning on any touched file — the six warnings under them
+  (unused imports, empty spread fallbacks) are all on lines this lane did not
+  write. `oxfmt`: every line this lane wrote is formatted, checked by running
+  the formatter on a copy and diffing; the remaining drift in
+  `api-trace-read-stack.composition.ts`,
+  `api-trpc-collaborators.trace-group.{composition,integration.test}.ts` and
+  `trace-rest.integration.test.ts` is pre-existing and left where it was.
+- Nothing under `platform/` was created, edited or read.

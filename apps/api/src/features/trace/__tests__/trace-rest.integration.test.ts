@@ -125,14 +125,17 @@ describe("given the v1 trace reads over this process's read stack", () => {
     });
   });
 
-  describe("when the process composed no coding-agent session store", () => {
+  describe("when the process composed no canonical log read", () => {
+    /** @scenario "the transcript is not served without the canonical log read it derives from" */
     it("does not register the transcript route at all", async () => {
       const { api } = mount({});
 
       const response = await api.fetch(`/api/traces/${TRACE_ID}/transcript`);
 
       // 404 from a door that honestly does not serve it, rather than an empty
-      // transcript that reads as "this agent did nothing".
+      // transcript that reads as "this agent did nothing". The transcript is
+      // derived from a trace's log records, and the legacy log table this
+      // process still reads has taken no write since the canonical cutover.
       expect(response.status).toBe(404);
     });
   });

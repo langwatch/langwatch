@@ -409,6 +409,14 @@ export function composeApiTraceGroupCollaborators(
     // Both are read only by the coding-agent transcript join, which this
     // process does not serve; a call refuses rather than answering an empty
     // transcript that reads as "this agent did nothing".
+    //
+    // What keeps that join off is the CANONICAL LOG READ the read stack
+    // refuses (see `composeApiTraceReadStack`), not these two: the join's
+    // first log read throws before either is reached. `codingAgents` here
+    // stands in for a service this process DOES compose elsewhere (the org
+    // group's), and the join needs only its pure derivation — so wiring it
+    // through is a step for whoever composes the log read, and buys nothing
+    // on its own.
     evaluations: refuseAll<TraceAppDependencies["evaluations"]>(refuse, "trace evaluation read"),
     codingAgents: refuseAll<TraceAppDependencies["codingAgents"]>(refuse, "coding-agent read"),
     share,
