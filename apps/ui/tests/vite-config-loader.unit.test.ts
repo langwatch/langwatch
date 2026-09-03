@@ -11,6 +11,10 @@
 
 import { readFileSync } from "fs";
 import path from "path";
+import {
+  PUBLIC_APP_CONFIG_META_NAME,
+  parsePublicAppConfigMetaContent,
+} from "@langwatch/config/public-app-config";
 import { loadConfigFromFile } from "vite";
 import { describe, expect, it } from "vitest";
 
@@ -45,6 +49,41 @@ describe("given the apps/ui Vite config", () => {
       );
 
       expect(loaded?.config).toBeDefined();
+    });
+  });
+
+  describe("when no BASE_HOST is set for the dev server", () => {
+    /** @scenario "The Vite config loads the way the dev and build scripts load it" */
+    it("takes the dev server's own address instead of refusing to boot", async () => {
+      const previous = process.env.BASE_HOST;
+      delete process.env.BASE_HOST;
+      try {
+        const loaded = await loadConfigFromFile(
+          { command: "serve", mode: "development" },
+          "vite.config.ts",
+          packageRoot,
+          undefined,
+          undefined,
+          configLoaderOf(scripts.dev),
+        );
+        const inject = loaded?.config.plugins
+          ?.flat()
+          .find(
+            (plugin) =>
+              plugin && "name" in plugin && plugin.name === "inject-development-public-config",
+          );
+        expect(inject).toBeDefined();
+        const html = await (
+          inject as { transformIndexHtml: (html: string) => string | Promise<string> }
+        ).transformIndexHtml("<html><head></head><body></body></html>");
+        const content = new RegExp(`name="${PUBLIC_APP_CONFIG_META_NAME}" content="([^"]+)"`).exec(
+          html,
+        )?.[1];
+        expect(content).toBeDefined();
+        expect(parsePublicAppConfigMetaContent(content!).appBaseUrl).toBe("http://localhost:5560");
+      } finally {
+        if (previous !== undefined) process.env.BASE_HOST = previous;
+      }
     });
   });
 });

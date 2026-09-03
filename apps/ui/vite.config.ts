@@ -128,8 +128,16 @@ function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
 
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = loadDevHttpsCredentials();
+  // The dev server is its own public address. `dev-stack.sh` aligns BASE_HOST
+  // to PORT for the whole stack; a lone `pnpm dev:ui` with no `.env` gets the
+  // same answer here instead of a boot refusal naming an env var.
   const publicConfig =
-    command === "serve" ? resolveUiPublicBootstrap(process.env).publicConfig : undefined;
+    command === "serve"
+      ? resolveUiPublicBootstrap({
+          ...process.env,
+          BASE_HOST: process.env.BASE_HOST ?? `http://localhost:${FRONTEND_PORT}`,
+        }).publicConfig
+      : undefined;
 
   // Diagnostic: when Vite hot-restarts on a config change, the https block is
   // re-evaluated but in-process TLS state can land in a broken pair (server

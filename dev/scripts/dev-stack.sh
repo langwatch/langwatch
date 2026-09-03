@@ -192,8 +192,12 @@ NAMES_STR=$(
   IFS=,
   echo "${NAMES[*]}"
 )
+# A lane that exits non-zero takes the stack down with its error as the last
+# thing printed. Restarting it (`--restart-tries -1`) turned a config refusal
+# into an endless reboot loop that scrolled the cause off the screen; the
+# lanes that reload on file changes (vite, tsx watch, air) do that themselves.
 exec pnpm -s exec concurrently \
-  --restart-tries -1 \
+  --kill-others-on-fail \
   --names "$NAMES_STR" \
   --prefix-colors "green,blue,yellow,magenta,cyan" \
   "${COMMANDS[@]}"

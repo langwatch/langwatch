@@ -219,3 +219,11 @@ Feature: A dev stack does not outlive whoever started it
     When the ports are cleared
     Then our own stack is stopped and that process is left running
     And the ports are not reported free, because one of them is not
+
+  @unit
+  Scenario: A lane that fails takes the stack down instead of rebooting in a loop
+    Given a stack whose lanes are started the way pnpm dev starts them
+    And one lane exits with an error as soon as it starts
+    When the stack runs
+    Then the other lanes are stopped and the stack exits with a failure
+    And the failed lane is not restarted
