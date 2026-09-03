@@ -3,6 +3,7 @@ import type { QueueSendOptions, TriggerContext } from "@langwatch/eventing";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import {
+  TOPIC_ASSIGNED_EVENT_TYPE,
   TRACK_EVENT_SPAN_NAME,
   type TraceProcessingEvent,
   type TraceSummaryData,
@@ -188,6 +189,7 @@ describe("createEvaluationTriggerSubscriber", () => {
     describe("when the causality depth says the span came from an evaluation", () => {
       /**
        * @scenario "A span emitted by an evaluator never triggers another evaluation"
+       * @scenario "Incoming span with causality_depth=1 does not trigger evaluations"
        *
        * This is the money loop. An online evaluator's workflow emits spans;
        * those spans land on a trace; that trace would trigger the same
@@ -565,6 +567,256 @@ describe("createEvaluationTriggerSubscriber", () => {
         expect(built.name).toBe("evaluationTrigger");
         expect(built.spec.fold).toBe("traceSummary");
       });
+    });
+  });
+});
+
+function topicAssignedEvent(): TraceProcessingEvent {
+  return {
+    id: "event-topic",
+    aggregateId: "trace-1",
+    aggregateType: "trace",
+    tenantId: "tenant-1",
+    createdAt: Date.now(),
+    occurredAt: Date.now(),
+    type: TOPIC_ASSIGNED_EVENT_TYPE,
+    version: 1,
+    data: {},
+    metadata: {},
+  } as unknown as TraceProcessingEvent;
+}
+
+describe("createEvaluationTriggerSubscriber — origin, cutoff and processing-cap dispatch", () => {
+  describe("when trace has explicit application origin", () => {
+    /** @scenario "Evaluation trigger runs on traces with explicit application origin" */
+    it("dispatches evaluation commands", async () => {
+      const { built, dispatch, listMonitors } = subscriber({});
+
+      await run(built, spanEvent(), foldState({ attributes: { "langwatch.origin": "application" } }));
+
+      expect(listMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(dispatch.sent).toHaveLength(1);
+    });
+  });
+
+  describe("when trace has origin=evaluation (no longer hardcoded skip)", () => {
+    /** @scenario "Evaluation trigger dispatches for any known origin (preconditions filter)" */
+    it("dispatches normally — preconditions filter, not the subscriber", async () => {
+      // Per user direction post-2026-05-11 plan-mode debate: origin is a
+      // user-configurable precondition, not a hardcoded subscriber guard.
+      // The depth signal (per-span) is the sole hard rule.
+      const { built, dispatch } = subscriber({});
+
+      await run(built, spanEvent(), foldState({ attributes: { "langwatch.origin": "evaluation" } }));
+
+      expect(dispatch.sent).toHaveLength(1);
+    });
+  });
+
+  describe("when trace has no origin", () => {
+    /** @scenario "Evaluation trigger skips traces with empty origin and no SDK info" */
+    it("returns early without dispatching evaluations", async () => {
+      const { built, dispatch, listMonitors } = subscriber({});
+
+      await run(built, spanEvent(), foldState({ attributes: {} }));
+
+      expect(listMonitors).not.toHaveBeenCalled();
+      expect(dispatch.sent).toEqual([]);
+    });
+  });
+
+  describe("when the event is a derived enrichment (topic assignment)", () => {
+    /** @scenario a topic assignment does not re-run evaluations */
+    it("does not dispatch evaluations", async () => {
+      const { built, dispatch, listMonitors } = subscriber({});
+
+      await run(
+        built,
+        topicAssignedEvent(),
+        foldState({ attributes: { "langwatch.origin": "application" } }),
+      );
+
+      expect(listMonitors).not.toHaveBeenCalled();
+      expect(dispatch.sent).toEqual([]);
+    });
+  });
+
+  describe("when the trace is older than the evaluation cutoff", () => {
+    /** @scenario evaluations do not re-run for a trace older than the cutoff */
+    it("does not dispatch even on a genuine new span", async () => {
+      const { built, dispatch } = subscriber({});
+      const state = foldState({
+        attributes: { "langwatch.origin": "application" },
+        occurredAt: Date.now() - 25 * 60 * 60 * 1000,
+      });
+
+      await run(built, spanEvent(), state);
+
+      expect(dispatch.sent).toEqual([]);
+    });
+
+    /** @scenario a new span on a recent trace re-runs evaluations */
+    it("dispatches for a recent trace", async () => {
+      const { built, dispatch } = subscriber({});
+      const state = foldState({
+        attributes: { "langwatch.origin": "application" },
+        occurredAt: Date.now(),
+      });
+
+      await run(built, spanEvent(), state);
+
+      expect(dispatch.sent).toHaveLength(1);
+    });
+  });
+
+  describe("when the trace exceeds the processing cap", () => {
+    /** @scenario Evaluations run for a trace under the processing cap */
+    it("dispatches evaluations for a trace just under the cap", async () => {
+      const { built, dispatch } = subscriber({});
+      const state = foldState({
+        attributes: { "langwatch.origin": "application" },
+        spanCount: MAX_PROCESSED_SPANS - 1,
+        occurredAt: Date.now(),
+      });
+
+      await run(built, spanEvent(), state);
+
+      expect(dispatch.sent).toHaveLength(1);
+    });
+
+    /** @scenario Evaluations are skipped for a trace over the processing cap */
+    it("skips evaluation dispatch once the trace passes the cap (span still stored elsewhere)", async () => {
+      const { built, dispatch, listMonitors } = subscriber({});
+      const state = foldState({
+        attributes: { "langwatch.origin": "application" },
+        spanCount: MAX_PROCESSED_SPANS,
+        occurredAt: Date.now(),
+      });
+
+      await run(built, spanEvent(), state);
+
+      expect(listMonitors).not.toHaveBeenCalled();
+      expect(dispatch.sent).toEqual([]);
+    });
+  });
+});
+
+describe("detectCausalityLoop (pure) — verbatim spec titles", () => {
+  /** @scenario Incoming span with no causality_depth attribute is treated as depth 0 */
+  it("returns null when no causality_depth attribute is present", () => {
+    const reason = detectCausalityLoop({
+      spanAttributes: [{ key: "service.name", value: { stringValue: "x" } }],
+    });
+    expect(reason).toBeNull();
+  });
+});
+
+describe("createEvaluationTriggerSubscriber — causality depth (handler-level)", () => {
+  describe("loop prevention via per-span causality_depth", () => {
+    /** @scenario Incoming span with causality_depth=0 still triggers evaluations */
+    it("dispatches when inbound span has causality_depth=0", async () => {
+      const { built, dispatch } = subscriber({});
+      const state = foldState({ attributes: { "langwatch.origin": "application" } });
+      const event = spanEvent({
+        attributes: [{ key: "langwatch.reserved.causality_depth", value: { intValue: 0 } }],
+      });
+
+      await run(built, event, state);
+
+      expect(dispatch.sent).toHaveLength(1);
+    });
+
+    /** @scenario LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses depth check */
+    it("bypasses the depth check when the kill-switch flag is enabled", async () => {
+      const { built, dispatch } = subscriber({ guardDisabled: true });
+      const state = foldState({ attributes: { "langwatch.origin": "application" } });
+      const event = spanEvent({
+        attributes: [{ key: "langwatch.reserved.causality_depth", value: { intValue: 5 } }],
+      });
+
+      await run(built, event, state);
+
+      expect(dispatch.sent).toHaveLength(1);
+    });
+  });
+});
+
+/**
+ * The guards below used to live inside `handle`, so every span of a 10k-span
+ * trace was serialized, gzipped and blobbed into Redis before the queue's dedup
+ * threw the job away. They are pure and read only the payload `handle` receives,
+ * so `shouldDispatch` rejects them pre-enqueue instead (ADR-026).
+ */
+describe("evaluationTrigger relevance check", () => {
+  const withOrigin = (overrides: Partial<TraceSummaryData> = {}) =>
+    foldState({ attributes: { "langwatch.origin": "application" }, ...overrides });
+
+  const shouldDispatch = ({
+    event,
+    state,
+  }: {
+    event: TraceProcessingEvent;
+    state: TraceSummaryData;
+  }): boolean => {
+    const { built } = subscriber({});
+    const context: TriggerContext<TraceSummaryData> = {
+      tenantId: "tenant-1",
+      aggregateId: "trace-1",
+      state,
+    };
+    // The subscriber always declares one.
+    return built.spec.when!(event, context);
+  };
+
+  describe("given a trace with a resolved origin", () => {
+    /** @scenario "The origin guard admits a genuine message event before enqueue" */
+    it("agrees to react to a recent span event", () => {
+      expect(shouldDispatch({ event: spanEvent(), state: withOrigin() })).toBe(true);
+    });
+
+    /** @scenario "The origin guard filters a non-message event before enqueue" */
+    it("declines a topic-assigned event", () => {
+      expect(shouldDispatch({ event: topicAssignedEvent(), state: withOrigin() })).toBe(false);
+    });
+
+    /** @scenario "The evaluation trigger declines a synthetic span before enqueue" */
+    it("declines a synthetic span", () => {
+      const synthetic = spanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
+      expect(shouldDispatch({ event: synthetic, state: withOrigin() })).toBe(false);
+    });
+
+    /** @scenario "The evaluation trigger dispatches nothing past the span processing cap" */
+    it("dispatches no evaluation once the span count reaches the processing cap", async () => {
+      // The cap guard deliberately lives in the handler, not the pre-enqueue
+      // guard: the pre-enqueue guard runs once per event of a coalesced
+      // batch and would multiply the once-per-crossing warn by the batch size.
+      const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
+      expect(shouldDispatch({ event: spanEvent(), state: atCap })).toBe(true);
+
+      const { built, dispatch } = subscriber({});
+      await run(built, spanEvent(), atCap);
+      expect(dispatch.sent).toEqual([]);
+
+      // A coalesced batch can jump the span count clean past the cap without
+      // ever landing on it, so the guard is `>=`, not `===`.
+      const pastCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS + 1 });
+      const { built: builtPast, dispatch: dispatchPast } = subscriber({});
+      await run(builtPast, spanEvent(), pastCap);
+      expect(dispatchPast.sent).toEqual([]);
+
+      const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
+      const { built: builtBelow, dispatch: dispatchBelow } = subscriber({});
+      await run(builtBelow, spanEvent(), belowCap);
+      expect(dispatchBelow.sent).toHaveLength(1);
+    });
+  });
+
+  describe("given a trace whose origin is unresolved", () => {
+    /** @scenario "The origin guard filters a trace with no resolved origin before enqueue" */
+    it("declines a span event", () => {
+      expect(shouldDispatch({ event: spanEvent(), state: foldState({ attributes: {} }) })).toBe(
+        false,
+      );
     });
   });
 });

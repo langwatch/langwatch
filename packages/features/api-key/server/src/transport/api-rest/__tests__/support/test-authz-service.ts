@@ -11,6 +11,7 @@ export class TestAuthzService extends AuthzService {
   can = unsupported<AuthzService["can"]>();
   canAnyByIds = unsupported<AuthzService["canAnyByIds"]>();
   canBatchByIds = unsupported<AuthzService["canBatchByIds"]>();
+  canBatchPermissionsByIds = unsupported<AuthzService["canBatchPermissionsByIds"]>();
   check = unsupported<AuthzService["check"]>();
   checkByIds = unsupported<AuthzService["checkByIds"]>();
   checkDetailed = unsupported<AuthzService["checkDetailed"]>();

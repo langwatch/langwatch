@@ -12,6 +12,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { EventingRecordSpanAdapter } from "../../adapters/eventing.record-span.adapter";
 import {
+  enforceApiKeyIdOnTraceRequest,
+  PROVENANCE_ATTR_API_KEY_ID,
+  stampIngestKeyProvenanceOnTraceRequest,
+} from "../../services/ingest-key-provenance.rules";
+import {
   TraceSpanContentDropPort,
   TraceSpanCostEnrichmentPort,
   TraceSpanPiiRedactionPort,
@@ -110,6 +115,7 @@ function harness(spool?: TraceSpanSpoolPort) {
 }
 
 describe("RecordSpanCommand", () => {
+  /** @scenario Reserved causality_depth attribute passes through strip */
   it("emits the stable span event identity after preparing a cloned span", async () => {
     const input = commandData({
       span: {
@@ -209,5 +215,83 @@ describe("RecordSpanCommand", () => {
     const queued = command(commandData({ spoolRef: "sha256:abc" }));
 
     await expect(handler.handle(queued)).rejects.toThrow("no blobStore configured");
+  });
+
+  /** @scenario A turn's usage is counted once across the worker and gateway views */
+  it("preserves langwatch.reserved.skip_token_accumulation on the emitted span (usage-dedup contract)", async () => {
+    // The Langy telemetry relay stamps this on mediated worker model-call
+    // spans: the gateway's gen_ai span in the same trace is the meter, and
+    // the trace-summary fold reads the stamp to count the usage once.
+    // Stripping it would silently double every Langy turn's token/cost
+    // totals.
+    const input = commandData({
+      span: {
+        ...commandData().span,
+        attributes: [
+          {
+            key: "langwatch.reserved.skip_token_accumulation",
+            value: { stringValue: "true" },
+          },
+        ],
+      },
+    });
+    const { handler } = harness();
+
+    const events = await handler.handle(command(input));
+    const spanReceivedEvent = spanReceivedEventSchema.parse(
+      events.find((event) => event.type === SPAN_RECEIVED_EVENT_TYPE),
+    );
+
+    const skipAttr = spanReceivedEvent.data.span.attributes.find(
+      (attribute) => attribute.key === "langwatch.reserved.skip_token_accumulation",
+    );
+    expect(skipAttr).toBeDefined();
+    expect(skipAttr!.value).toEqual({ stringValue: "true" });
+  });
+
+  describe("given the receiver has written ingest provenance", () => {
+    // The receiver's output has to survive this handler intact. Both halves
+    // have been broken here before: the handler strips whole attribute
+    // namespaces, so a provenance name that lands in one is deleted between
+    // the receiver writing it and the span being stored.
+    async function emittedResourceAfterReceiver(apiKeyId: string | null) {
+      const input = commandData({ resource: { attributes: [] } });
+      const request = { resourceSpans: [{ resource: input.resource }] };
+      stampIngestKeyProvenanceOnTraceRequest(request, {
+        apiKeyId: "key_abc",
+        sourceType: "claude_code",
+        organizationId: "org_1",
+      });
+      enforceApiKeyIdOnTraceRequest(request, apiKeyId);
+      input.resource = request.resourceSpans[0]!.resource;
+
+      const { handler } = harness();
+      const events = await handler.handle(command(input));
+      const spanReceivedEvent = spanReceivedEventSchema.parse(
+        events.find((event) => event.type === SPAN_RECEIVED_EVENT_TYPE),
+      );
+      return spanReceivedEvent.data.resource!.attributes;
+    }
+
+    /** @scenario The receiver-written API key id survives the ingestion pipeline */
+    it("keeps the API key id on the emitted resource", async () => {
+      const emitted = await emittedResourceAfterReceiver("key_abc");
+
+      const stampedId = emitted.find((attribute) => attribute.key === PROVENANCE_ATTR_API_KEY_ID);
+      expect(stampedId?.value.stringValue).toBe("key_abc");
+    });
+
+    it("keeps the ingest-key provenance attributes alongside it", async () => {
+      const emitted = await emittedResourceAfterReceiver("key_abc");
+
+      const source = emitted.find((attribute) => attribute.key === "langwatch.source");
+      expect(source?.value.stringValue).toBe("claude_code");
+    });
+
+    it("emits no API key id when the request had no ApiKey row", async () => {
+      const emitted = await emittedResourceAfterReceiver(null);
+
+      expect(emitted.some((attribute) => attribute.key === PROVENANCE_ATTR_API_KEY_ID)).toBe(false);
+    });
   });
 });

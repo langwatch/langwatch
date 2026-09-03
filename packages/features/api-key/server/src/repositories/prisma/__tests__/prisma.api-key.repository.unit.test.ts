@@ -118,7 +118,7 @@ describe("PrismaApiKeyRepository", () => {
    */
   describe("when looking up an organization's ingestion key", () => {
     it("scopes the lookup to the caller's organization", async () => {
-      const findFirst = vi.fn(async () => null);
+      const findFirst = vi.fn(async (_args: unknown) => null);
       const database = { apiKey: { findFirst } } as unknown as PrismaApiKeyDatabase;
       const repository = PrismaApiKeyRepository.create(database);
 

@@ -312,4 +312,23 @@ describe("given the worker composition root and no application module", () => {
       ]);
     });
   });
+
+  describe("when spanCommandShardCount is set above one", () => {
+    /** @scenario "The pipeline shards the command while leaving the fold per-trace" */
+    it("keeps the trace-summary fold keyed per trace, not per span", () => {
+      const definition = build({ spanCommandShardCount: 8 });
+
+      expect(definition.foldProjections.get("traceSummary")?.definition.key).toBe(undefined);
+    });
+  });
+
+  describe("when spanCommandShardCount is left at its default of one", () => {
+    /** @scenario "The pipeline preserves the trace-only key when sharding is off" */
+    it("installs no getGroupKey on the recordSpan command", () => {
+      const cmd = build().commands.find((c) => c.name === "recordSpan");
+
+      expect(cmd).toBeDefined();
+      expect(cmd!.options?.getGroupKey).toBeUndefined();
+    });
+  });
 });

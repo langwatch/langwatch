@@ -164,6 +164,28 @@ describe("OtlpSpanCostEnrichmentService", () => {
           "langwatch.model.outputCostPerToken": 0.000_015,
         });
       });
+
+      /** @scenario "A custom model cost can set its own hour-long cache write rate" */
+      it("stamps the hour-long cache write rate the rule defines", async () => {
+        const { port } = catalog([
+          cost({
+            model: "claude-opus-5",
+            regex: "^claude-opus-5$",
+            inputCostPerToken: 0.000_005,
+            outputCostPerToken: 0.000_025,
+            cacheCreationCostPerToken: 0.000_006_25,
+            cacheCreation1hCostPerToken: 0.000_01,
+          }),
+        ]);
+        const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
+        const target = span([
+          { key: "gen_ai.request.model", value: { stringValue: "claude-opus-5" } },
+        ]);
+
+        await service.enrichSpan({ span: target, tenantId: "project-1" });
+
+        expect(rates(target)["langwatch.model.cacheCreation1hCostPerToken"]).toBe(0.000_01);
+      });
     });
   });
 
@@ -243,6 +265,32 @@ describe("OtlpSpanCostEnrichmentService", () => {
           expect(rates(target)["langwatch.model.inputCostPerToken"]).toBe(7);
         }
       });
+
+      /** @scenario "A coding agent's model is found under the attribute it uses" */
+      it("matches the rule against the bare `model` attribute and stamps its rates", async () => {
+        const { port } = catalog([
+          cost({
+            model: "claude-opus-5",
+            regex: "^claude-opus-5$",
+            inputCostPerToken: 0.000_004,
+            outputCostPerToken: 0.000_02,
+            cacheCreation1hCostPerToken: 0.000_008,
+          }),
+        ]);
+        const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
+        const target = span(
+          [{ key: "model", value: { stringValue: "claude-opus-5" } }],
+          "claude_code.llm_request",
+        );
+
+        await service.enrichSpan({ span: target, tenantId: "project-1" });
+
+        expect(rates(target)).toEqual({
+          "langwatch.model.inputCostPerToken": 0.000_004,
+          "langwatch.model.outputCostPerToken": 0.000_02,
+          "langwatch.model.cacheCreation1hCostPerToken": 0.000_008,
+        });
+      });
     });
 
     describe("when the span is any other span", () => {
@@ -260,6 +308,23 @@ describe("OtlpSpanCostEnrichmentService", () => {
         ]);
         const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
         const target = span([{ key: "model", value: { stringValue: "sonnet" } }], "my-llm-call");
+
+        await service.enrichSpan({ span: target, tenantId: "project-1" });
+
+        expect(rates(target)).toEqual({});
+        expect(listCosts).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A dormant cost rule is not woken by an unrelated span's model attribute" */
+      it("leaves a non-coding-agent span with a bare `model` unenriched", async () => {
+        const { port, listCosts } = catalog([
+          cost({ model: "claude-opus-5", regex: "^claude-opus-5$", inputCostPerToken: 0.000_004 }),
+        ]);
+        const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
+        const target = span(
+          [{ key: "model", value: { stringValue: "claude-opus-5" } }],
+          "POST /v1/chat",
+        );
 
         await service.enrichSpan({ span: target, tenantId: "project-1" });
 

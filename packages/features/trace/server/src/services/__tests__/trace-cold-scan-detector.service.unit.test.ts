@@ -21,7 +21,7 @@ import { TIME_PARTITIONED_TABLES } from "../trace-cold-scan-detector.service";
  */
 const migrationDir = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../../../../../../../apps/api/src/tasks/clickhouse-migrate/migrations",
+  "../../../../../../../packages/clickhouse-client/migrations",
 );
 
 /**
@@ -96,9 +96,7 @@ function partitionedTablesIn(up: string): Map<string, string> {
   while ((match = createRe.exec(up)) !== null) {
     const table = match[1];
     if (!table) continue;
-    const partitionBy = /PARTITION BY\s+([^\n]+)/i.exec(
-      statementAt(up, match.index),
-    );
+    const partitionBy = /PARTITION BY\s+([^\n]+)/i.exec(statementAt(up, match.index));
     if (partitionBy?.[1]) found.set(table, partitionBy[1].trim());
   }
 
@@ -124,22 +122,15 @@ function partitionedTablesFromMigrations(): Map<string, string> {
  * At least one declared column must appear in the PARTITION BY expression,
  * else the detector is looking for a predicate that could never prune.
  */
-function declaresAUsableColumn(
-  columns: readonly string[],
-  expression: string,
-): boolean {
-  return columns.some((column) =>
-    new RegExp(`\\b${column}\\b`, "i").test(expression),
-  );
+function declaresAUsableColumn(columns: readonly string[], expression: string): boolean {
+  return columns.some((column) => new RegExp(`\\b${column}\\b`, "i").test(expression));
 }
 
 /**
  * Entries whose declared columns appear nowhere in the table's real PARTITION
  * BY, rendered for the failure message.
  */
-function pruneColumnMismatches(
-  partitioned: ReadonlyMap<string, string>,
-): string[] {
+function pruneColumnMismatches(partitioned: ReadonlyMap<string, string>): string[] {
   return Object.entries(TIME_PARTITIONED_TABLES)
     .map(([table, columns]) => {
       const expression = partitioned.get(table);

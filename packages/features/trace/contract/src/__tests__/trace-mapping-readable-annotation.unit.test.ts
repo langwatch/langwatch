@@ -46,7 +46,7 @@ describe("given an annotation left on part of a trace", () => {
     it("names the span and the field the comment was left on", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           comment: "too terse",
           anchorKind: "field",
           anchorId: SPAN_ID,
@@ -64,7 +64,7 @@ describe("given an annotation left on part of a trace", () => {
     it("falls back to the span id when the trace does not carry that span", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           comment: "too terse",
           anchorKind: "span",
           anchorId: MISSING_SPAN_ID,
@@ -80,7 +80,7 @@ describe("given an annotation left on part of a trace", () => {
     it("says the comment is about a message", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           comment: "wrong tone",
           anchorKind: "message",
           anchorId: TRACE_ID,
@@ -100,7 +100,7 @@ describe("given an annotation left on the trace's own output", () => {
     it("names the trace with enough id to find it again", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           comment: "it's ok",
           anchorKind: "field",
           anchorId: TRACE_ID,
@@ -120,7 +120,7 @@ describe("given an annotation about the whole trace", () => {
     it("reads as the author and their comment, with no part named", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           comment: "too terse",
         }),
         traceId: TRACE_ID,
@@ -135,7 +135,7 @@ describe("given an annotation carrying everything a reviewer can leave", () => {
   const everything = () =>
     buildReadableAnnotation({
       annotation: annotationWith({
-        user: { name: "Ada" },
+        user: { id: "user-ada", name: "Ada" },
         comment: "too terse",
         isThumbsUp: false,
         scoreOptions: {
@@ -177,7 +177,7 @@ describe("given an annotation suggesting what an input should have been", () => 
     it("reads as a suggested input when the comment is on the trace's own input", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           comment: "the user asked something else",
           expectedOutput: "what the user meant to ask",
           anchorKind: "field",
@@ -196,7 +196,7 @@ describe("given an annotation suggesting what an input should have been", () => 
     it("reads as a suggested input when the comment is on a span's input", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           expectedOutput: "capital of the Netherlands",
           anchorKind: "field",
           anchorId: SPAN_ID,
@@ -215,7 +215,7 @@ describe("given an annotation suggesting what an input should have been", () => 
     it("still reads as a suggested output when the comment is on an output", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           expectedOutput: "Amsterdam",
           anchorKind: "field",
           anchorId: SPAN_ID,
@@ -238,7 +238,7 @@ describe("given an annotation scored against the project's scores", () => {
     it("names the score rather than its id", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           scoreOptions: { "score-abc123": { value: "mild", reason: null } },
         }),
         traceId: TRACE_ID,
@@ -252,7 +252,7 @@ describe("given an annotation scored against the project's scores", () => {
     it("joins the answers of a score that takes several", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           scoreOptions: {
             "score-abc123": { value: ["mild", "vague"], reason: null },
           },
@@ -267,7 +267,7 @@ describe("given an annotation scored against the project's scores", () => {
     it("leaves out a score the reviewer did not answer", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           comment: "too terse",
           scoreOptions: { "score-abc123": { value: null, reason: null } },
         }),
@@ -281,7 +281,7 @@ describe("given an annotation scored against the project's scores", () => {
     it("names the score by its id when the project no longer has it", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           scoreOptions: { "score-removed": { value: "mild" } },
         }),
         traceId: TRACE_ID,
@@ -325,7 +325,7 @@ describe("given an annotation written across several lines", () => {
     it("holds it as a single line", () => {
       const line = buildReadableAnnotation({
         annotation: annotationWith({
-          user: { name: "Ada" },
+          user: { id: "user-ada", name: "Ada" },
           comment: "too terse\n\nand it skipped the second question",
           expectedOutput: "A fuller\nanswer.",
         }),
@@ -346,7 +346,7 @@ describe("given an annotation with only a thumbs rating", () => {
       expect(
         buildReadableAnnotation({
           annotation: annotationWith({
-            user: { name: "Ada" },
+            user: { id: "user-ada", name: "Ada" },
             isThumbsUp: true,
           }),
           traceId: TRACE_ID,
@@ -358,7 +358,7 @@ describe("given an annotation with only a thumbs rating", () => {
       expect(
         buildReadableAnnotation({
           annotation: annotationWith({
-            user: { name: "Ada" },
+            user: { id: "user-ada", name: "Ada" },
             comment: "too terse",
           }),
           traceId: TRACE_ID,

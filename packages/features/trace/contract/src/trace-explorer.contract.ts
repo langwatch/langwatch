@@ -7,9 +7,9 @@ import { TRACE_NAME_MIN_LENGTH } from "./trace.constants";
  *
  * They live in the contract because two packages have to agree on them and
  * neither may import the other: `@langwatch/trace-server` parses them at the
- * tRPC procedure, and `@langwatch/trace-web` types its hooks against them
- * through the portable router shape in `@langwatch/platform-api-contract`. A
- * copy in either package would be a copy that can drift.
+ * tRPC procedure, and `@langwatch/trace-web` types its hooks against the
+ * router `apps/api` exports. A copy in either package would be a copy that
+ * can drift.
  */
 
 /**
