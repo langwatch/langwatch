@@ -1293,20 +1293,12 @@ export function initializeDefaultApp(options?: {
       });
   }
 
-  // ADR-128 §12: the identity match engine has no calendar entry here on
-  // purpose. It used to be booked nightly on every governance tenant, and
-  // nothing writes `DiscoveredPerson` yet, so every one of those passes read an
-  // empty table on every tenant, for ever. The engine stays and runs when
-  // something asks it to; the trigger arrives with the feed that discovers
-  // people, and it is a call site — `linkProvenMatches` then
-  // `IdentityMatchSuggestionService.recompute`, proof before guesses, because
-  // linking somebody proven closes every guess about them.
-  //
-  // Whatever composes that caller belongs on the worker role, and that is the
-  // boundary the whole §12 design rests on: the name scorer measured 2.9
-  // seconds of blocked event loop at this ADR's own example size, so composing
-  // it anywhere a request could reach it would put that on a page load. A test
-  // walks the import graph to prove no request path does.
+  // ADR-128 §12: the match engine gets no calendar entry, deliberately —
+  // nothing writes `DiscoveredPerson` yet, so a standing appointment would read
+  // an empty table on every tenant for ever. Its trigger arrives with the feed
+  // that discovers people and is a call site, not a schedule. Compose that
+  // caller on the worker role: the name scorer measured 2.9 seconds of blocked
+  // event loop at the ADR's example size.
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
