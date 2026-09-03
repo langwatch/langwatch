@@ -39,7 +39,10 @@ import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";
 
-import { attributedUserBucketScopeId, bucketScopeIdFor } from "../../adapters/gateway-bucket-scope.adapter";
+import {
+  attributedUserBucketScopeId,
+  bucketScopeIdFor,
+} from "../../adapters/gateway-bucket-scope.adapter";
 import { bucketPeriodFloorMs } from "../../adapters/gateway-period.adapter";
 import {
   VirtualKeyCryptoAdapter,
@@ -126,7 +129,9 @@ export type GatewayInternalRestPorts = Readonly<{
    * road for a 401 from OpenAI's codex backend then refuses by name.
    */
   refreshCodex?:
-    | ((input: { providerRowId: string }) => Promise<
+    | ((input: {
+        providerRowId: string;
+      }) => Promise<
         | { status: "refreshed"; accessToken: string; accountId: string }
         | { status: "not_connected" }
         | { status: "session_expired" }
@@ -298,99 +303,99 @@ function logAuthDecision(
 
 function verifyGatewaySignature(secretOf: () => string | undefined) {
   return async function verify(c: Context, next: Next) {
-  const secret = secretOf();
-  if (!secret) {
-    logAuthDecision(c, "gateway_internal_secret_missing", 500);
-    return c.json(
-      {
-        error: {
-          type: "internal_error",
-          code: "gateway_internal_secret_missing",
-          message: "LW_GATEWAY_INTERNAL_SECRET not configured on control-plane",
+    const secret = secretOf();
+    if (!secret) {
+      logAuthDecision(c, "gateway_internal_secret_missing", 500);
+      return c.json(
+        {
+          error: {
+            type: "internal_error",
+            code: "gateway_internal_secret_missing",
+            message: "LW_GATEWAY_INTERNAL_SECRET not configured on control-plane",
+          },
         },
-      },
-      500,
-    );
-  }
+        500,
+      );
+    }
 
-  const presentedSig = c.req.header("X-LangWatch-Gateway-Signature");
-  const presentedTs = c.req.header("X-LangWatch-Gateway-Timestamp");
-  if (!presentedSig || !presentedTs) {
-    logAuthDecision(c, "missing_signature", 401, {
-      hasSignature: Boolean(presentedSig),
-      hasTimestamp: Boolean(presentedTs),
+    const presentedSig = c.req.header("X-LangWatch-Gateway-Signature");
+    const presentedTs = c.req.header("X-LangWatch-Gateway-Timestamp");
+    if (!presentedSig || !presentedTs) {
+      logAuthDecision(c, "missing_signature", 401, {
+        hasSignature: Boolean(presentedSig),
+        hasTimestamp: Boolean(presentedTs),
+      });
+      return c.json(
+        {
+          error: {
+            type: "permission_denied",
+            code: "missing_signature",
+            message: "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
+          },
+        },
+        401,
+      );
+    }
+
+    const body = await c.req.raw.clone().text();
+    const url = new URL(c.req.url);
+    const canonical = buildGatewayCanonicalString({
+      method: c.req.method,
+      path: url.pathname,
+      timestamp: presentedTs,
+      body,
     });
-    return c.json(
-      {
-        error: {
-          type: "permission_denied",
-          code: "missing_signature",
-          message: "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
-        },
-      },
-      401,
-    );
-  }
+    const expected = computeGatewaySignature(secret, canonical);
 
-  const body = await c.req.raw.clone().text();
-  const url = new URL(c.req.url);
-  const canonical = buildGatewayCanonicalString({
-    method: c.req.method,
-    path: url.pathname,
-    timestamp: presentedTs,
-    body,
-  });
-  const expected = computeGatewaySignature(secret, canonical);
-
-  const a = Buffer.from(expected);
-  const b = Buffer.from(presentedSig);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    logAuthDecision(c, "invalid_signature", 401);
-    return c.json(
-      {
-        error: {
-          type: "permission_denied",
-          code: "invalid_signature",
-          message: "signature mismatch",
+    const a = Buffer.from(expected);
+    const b = Buffer.from(presentedSig);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      logAuthDecision(c, "invalid_signature", 401);
+      return c.json(
+        {
+          error: {
+            type: "permission_denied",
+            code: "invalid_signature",
+            message: "signature mismatch",
+          },
         },
-      },
-      401,
-    );
-  }
+        401,
+      );
+    }
 
-  const ts = Number.parseInt(presentedTs, 10);
-  if (!Number.isFinite(ts)) {
-    logAuthDecision(c, "invalid_timestamp", 401, { presentedTs });
-    return c.json(
-      {
-        error: {
-          type: "permission_denied",
-          code: "invalid_timestamp",
-          message: "X-LangWatch-Gateway-Timestamp must be unix seconds",
+    const ts = Number.parseInt(presentedTs, 10);
+    if (!Number.isFinite(ts)) {
+      logAuthDecision(c, "invalid_timestamp", 401, { presentedTs });
+      return c.json(
+        {
+          error: {
+            type: "permission_denied",
+            code: "invalid_timestamp",
+            message: "X-LangWatch-Gateway-Timestamp must be unix seconds",
+          },
         },
-      },
-      401,
-    );
-  }
-  const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - ts) > GATEWAY_SIGNATURE_WINDOW_SECONDS) {
-    logAuthDecision(c, "timestamp_out_of_window", 401, {
-      driftSeconds: now - ts,
-    });
-    return c.json(
-      {
-        error: {
-          type: "permission_denied",
-          code: "timestamp_out_of_window",
-          message: `timestamp drift > ${GATEWAY_SIGNATURE_WINDOW_SECONDS}s`,
+        401,
+      );
+    }
+    const now = Math.floor(Date.now() / 1000);
+    if (Math.abs(now - ts) > GATEWAY_SIGNATURE_WINDOW_SECONDS) {
+      logAuthDecision(c, "timestamp_out_of_window", 401, {
+        driftSeconds: now - ts,
+      });
+      return c.json(
+        {
+          error: {
+            type: "permission_denied",
+            code: "timestamp_out_of_window",
+            message: `timestamp drift > ${GATEWAY_SIGNATURE_WINDOW_SECONDS}s`,
+          },
         },
-      },
-      401,
-    );
-  }
+        401,
+      );
+    }
 
-  await next();
-  return undefined;
+    await next();
+    return undefined;
   };
 }
 
@@ -411,7 +416,6 @@ function notImplemented(c: Context) {
 }
 
 // ── routes ──────────────────────────────────────────────────────────────
-
 
 /**
  * §4.1 — resolve a raw virtual key to a signed JWT + current revision.
@@ -499,10 +503,6 @@ function virtualKeyStatusRejection({
   return null;
 }
 
-
-
-
-
 // §4.5: `/budget/debit` is removed. Cost recording rides the spend
 // commands the gateway posts below: the debits process manager
 // (platform/app/ee/governance/process-manager/gatewayDebits.process.ts) joins
@@ -510,7 +510,6 @@ function virtualKeyStatusRejection({
 // `gateway_budget_ledger_events` table, once per applicable budget. Single
 // source of truth, no PG dual-write. See the migration
 // 00017_create_gateway_budget_ledger.sql for the CH schema.
-
 
 /**
  * §9 — startup bootstrap. Paginated stream of all non-revoked VK JWTs so the
@@ -540,27 +539,21 @@ async function bucketSpentMicroUsd(params: {
   bucketScopeId: string;
   periodFloorMs: number | undefined;
 }): Promise<number> {
-  const projectIds = await params.store.listProjectIdsForOrganization(
-    params.budget.organizationId,
-  );
+  const projectIds = await params.store.listProjectIdsForOrganization(params.budget.organizationId);
   if (projectIds.length === 0) return 0;
-  const spends = await params.budgetRepository.getSpendForTargetsAcrossTenants(
-    projectIds,
-    [
-      {
-        budgetId: params.budget.id,
-        scope: params.budget.scopeType,
-        scopeId: params.bucketScopeId,
-        window: params.budget.window,
-        match: "exact",
-        periodFloorMs: params.periodFloorMs,
-      },
-    ],
-  );
+  const spends = await params.budgetRepository.getSpendForTargetsAcrossTenants(projectIds, [
+    {
+      budgetId: params.budget.id,
+      scope: params.budget.scopeType,
+      scopeId: params.bucketScopeId,
+      window: params.budget.window,
+      match: "exact",
+      periodFloorMs: params.periodFloorMs,
+    },
+  ]);
   const spentUsd = Number.parseFloat(spends[0]?.spentUsd ?? "0") || 0;
   return Math.round(spentUsd * 1_000_000);
 }
-
 
 // ── spend command ingest (spend-command spine) ──────────────────────────
 
@@ -919,7 +912,6 @@ async function sendSpendCommands(
   return null;
 }
 
-
 // ── realtime voice sessions (ADR-097) ───────────────────────────────────
 
 const reserveRealtimeSessionSchema = z.object({
@@ -1117,7 +1109,8 @@ export function createGatewayInternalRestApp(options: {
           error: {
             type: "unavailable",
             code: "codex_refresh_unavailable",
-            message: "this deployment composes no model provider service to refresh a Codex session",
+            message:
+              "this deployment composes no model provider service to refresh a Codex session",
           },
         },
         503,

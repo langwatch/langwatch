@@ -22,9 +22,7 @@ export const listChartsCommand = async (options?: {
     const result = await service.list();
     const charts = result.data;
 
-    spinner.succeed(
-      `Found ${charts.length} chart${charts.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${charts.length} chart${charts.length !== 1 ? "s" : ""}`);
 
     return {
       data: result,
@@ -34,9 +32,7 @@ export const listChartsCommand = async (options?: {
           console.log(chalk.gray("No saved charts found."));
           console.log(chalk.gray("Create one with:"));
           console.log(
-            chalk.cyan(
-              '  langwatch chart create --name "My Chart" --sql-file query.sql',
-            ),
+            chalk.cyan('  langwatch chart create --name "My Chart" --sql-file query.sql'),
           );
           return;
         }
@@ -61,9 +57,7 @@ export const listChartsCommand = async (options?: {
 
         console.log();
         console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch chart get <id>")} to view chart details`,
-          ),
+          chalk.gray(`Use ${chalk.cyan("langwatch chart get <id>")} to view chart details`),
         );
       },
     };

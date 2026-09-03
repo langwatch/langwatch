@@ -78,9 +78,9 @@ describe("the anchor a comment is written with", () => {
 
   describe("given a kind that is not a part of a trace", () => {
     it("refuses it on the way in", () => {
-      expect(
-        anchorInput.safeParse({ anchorKind: "gizmo", anchorId: "whatever" }).success,
-      ).toBe(false);
+      expect(anchorInput.safeParse({ anchorKind: "gizmo", anchorId: "whatever" }).success).toBe(
+        false,
+      );
     });
   });
 });
@@ -137,9 +137,7 @@ describe("reading a stored anchor", () => {
 
   describe("given a kind with nothing named", () => {
     it("reads as a comment about the trace as a whole", () => {
-      expect(
-        readableAnnotationAnchor(storedRow({ anchorKind: "span" })).anchorKind,
-      ).toBeNull();
+      expect(readableAnnotationAnchor(storedRow({ anchorKind: "span" })).anchorKind).toBeNull();
     });
   });
 });

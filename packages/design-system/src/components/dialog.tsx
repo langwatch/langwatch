@@ -14,10 +14,7 @@ export interface DialogContentProps extends ChakraDialog.ContentProps {
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement>;
   backdrop?: boolean;
-  backdropProps?: Omit<
-    ChakraDialog.BackdropProps,
-    "bg" | "background" | "backgroundColor"
-  >;
+  backdropProps?: Omit<ChakraDialog.BackdropProps, "bg" | "background" | "backgroundColor">;
   positionerProps?: ChakraDialog.PositionerProps;
 }
 
@@ -55,13 +52,7 @@ export const DialogCloseTrigger = React.forwardRef<
   ChakraDialog.CloseTriggerProps
 >(function DialogCloseTrigger(props, ref) {
   return (
-    <ChakraDialog.CloseTrigger
-      position="absolute"
-      top="2"
-      insetEnd="2"
-      {...props}
-      asChild
-    >
+    <ChakraDialog.CloseTrigger position="absolute" top="2" insetEnd="2" {...props} asChild>
       <CloseButton ref={ref} size="sm">
         {props.children}
       </CloseButton>

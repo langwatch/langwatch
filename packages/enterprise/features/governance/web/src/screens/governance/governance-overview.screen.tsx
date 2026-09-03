@@ -16,7 +16,10 @@ import { useEffect, useState } from "react";
 import GovernanceLayout from "../../ui/sections/governance-layout";
 import { QuarantineFillAlert } from "../../features/overview/ui/sections/quarantine-fill-panel";
 import { SpendByTeamBar } from "../../features/overview/ui/sections/spend-by-team-panel";
-import { type GroupBy, SpendOverTimeChart } from "../../features/overview/ui/blocks/spend-over-time-chart";
+import {
+  type GroupBy,
+  SpendOverTimeChart,
+} from "../../features/overview/ui/blocks/spend-over-time-chart";
 import { InstallCliCard } from "../../ui/elements/install-cli-card";
 import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
 import { Link } from "../../ui/elements/governance-link";

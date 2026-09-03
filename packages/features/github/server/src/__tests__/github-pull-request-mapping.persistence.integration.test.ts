@@ -7,10 +7,7 @@
  */
 import { generateKeyPairSync } from "crypto";
 import { GithubPrismaInstaller } from "@langwatch/github-server";
-import {
-  type GithubPullRequestEvent,
-  type GithubService,
-} from "@langwatch/github-contract";
+import { type GithubPullRequestEvent, type GithubService } from "@langwatch/github-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -41,8 +38,7 @@ const connection = databaseUrl
   : null;
 
 function database(): PrismaClient {
-  if (connection === null)
-    throw new Error("DATABASE_URL is required for this integration suite");
+  if (connection === null) throw new Error("DATABASE_URL is required for this integration suite");
   return connection.client;
 }
 
@@ -57,9 +53,7 @@ let projectId = "";
 
 type GithubPullRequestSummary = GithubPullRequestEvent["pullRequest"];
 
-function pullRequest(
-  overrides: Partial<GithubPullRequestSummary> = {},
-): GithubPullRequestSummary {
+function pullRequest(overrides: Partial<GithubPullRequestSummary> = {}): GithubPullRequestSummary {
   return {
     number: 41,
     htmlUrl: `https://github.com/${repositoryFullName}/pull/41`,
@@ -100,9 +94,7 @@ class GithubHttpFixture {
   setPulls(pulls: readonly GithubPullRequestSummary[]): void {
     this.pulls = pulls;
     this.pullResponse = () =>
-      Promise.resolve(
-        Response.json(this.pulls.map(githubApiPullRequest), { status: 200 }),
-      );
+      Promise.resolve(Response.json(this.pulls.map(githubApiPullRequest), { status: 200 }));
   }
 
   setPullResponse(response: () => Promise<Response>): void {
@@ -126,9 +118,7 @@ class GithubHttpFixture {
         { status: 201 },
       );
     }
-    if (
-      apiPath.toLowerCase() === `/repos/acme-${namespace}/widgets/pulls`.toLowerCase()
-    ) {
+    if (apiPath.toLowerCase() === `/repos/acme-${namespace}/widgets/pulls`.toLowerCase()) {
       this.listingUrls.push(url.toString());
       return await this.pullResponse();
     }
@@ -207,11 +197,7 @@ function branchRequest(headBranch: string, repositoryHost = "github.com") {
   };
 }
 
-async function storedFor(
-  github: GithubService,
-  headBranch: string,
-  repositoryHost = "github.com",
-) {
+async function storedFor(github: GithubService, headBranch: string, repositoryHost = "github.com") {
   return await github.findAllByBranches({
     organizationId,
     repositoryHost,
@@ -565,27 +551,24 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     "ready_for_review",
     "converted_to_draft",
     "synchronize",
-  ])(
-    "persists a webhook action that changes a mapped pull-request field: %s",
-    async (action) => {
-      const { github } = harness();
+  ])("persists a webhook action that changes a mapped pull-request field: %s", async (action) => {
+    const { github } = harness();
 
-      await expect(
-        github.applyPullRequestEvent(
-          webhook({
-            action,
-            state: action === "closed" ? "closed" : "open",
-            title: `Mapped action ${action}`,
-            updatedAt: "2026-08-20T12:00:00.000Z",
-          }),
-        ),
-      ).resolves.toBe(true);
+    await expect(
+      github.applyPullRequestEvent(
+        webhook({
+          action,
+          state: action === "closed" ? "closed" : "open",
+          title: `Mapped action ${action}`,
+          updatedAt: "2026-08-20T12:00:00.000Z",
+        }),
+      ),
+    ).resolves.toBe(true);
 
-      await expect(storedFor(github, "feat/webhook")).resolves.toEqual([
-        expect.objectContaining({ state: action === "closed" ? "closed" : "open" }),
-      ]);
-    },
-  );
+    await expect(storedFor(github, "feat/webhook")).resolves.toEqual([
+      expect.objectContaining({ state: action === "closed" ? "closed" : "open" }),
+    ]);
+  });
 
   it("does not persist a webhook for an installation this process has not recorded", async () => {
     const { github } = harness();
@@ -711,9 +694,9 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
       prCount: 0,
       recheckAfter: new Date(0),
     });
-    await expect(
-      github.coversRepository({ organizationId, repositoryFullName }),
-    ).resolves.toBe(true);
+    await expect(github.coversRepository({ organizationId, repositoryFullName })).resolves.toBe(
+      true,
+    );
     await expect(github.recheckDueBranches()).resolves.toBe(1);
     expect(http.listingUrls).toHaveLength(2);
     await expect(storedFor(github, headBranch)).resolves.toEqual([
@@ -793,9 +776,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
       recheckAfter: expect.any(Date),
     });
     const check = await branchCheck(headBranch);
-    expect(check?.recheckAfter?.getTime()).toBeLessThanOrEqual(
-      Date.now() + 15 * 60 * 1_000,
-    );
+    expect(check?.recheckAfter?.getTime()).toBeLessThanOrEqual(Date.now() + 15 * 60 * 1_000);
     expect(check?.lastRequestedAt.getTime()).toBeGreaterThan(staleDemand.getTime());
     expect(check?.lastRequestedAt.getTime()).toBeGreaterThan(Date.now() - 60_000);
   });

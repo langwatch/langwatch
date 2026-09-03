@@ -164,8 +164,6 @@ export function appRoot(): string {
   }
   const src = locatePackageSource();
   if (!src)
-    throw new Error(
-      "@langwatch/server tree not found (neither relocated nor in source layout)",
-    );
+    throw new Error("@langwatch/server tree not found (neither relocated nor in source layout)");
   return src;
 }

@@ -93,8 +93,7 @@ export const createHarness = () => {
   };
 
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url =
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
 
     if (url.includes("/api/experiment/init")) {
@@ -148,9 +147,7 @@ export const createHarness = () => {
  * no-op and every suite passes its key explicitly, which is what keeps a real
  * key in the developer's environment from changing what a test exercises.
  */
-export const useComparisonHarness = (
-  assign: (harness: ComparisonHarness) => void,
-): void => {
+export const useComparisonHarness = (assign: (harness: ComparisonHarness) => void): void => {
   const previousApiKey = process.env.LANGWATCH_API_KEY;
 
   beforeEach(() => {

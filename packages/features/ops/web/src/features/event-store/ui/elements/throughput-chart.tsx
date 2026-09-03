@@ -40,10 +40,7 @@ const BUCKET_OPTIONS = [
 ];
 
 /** Downsample raw 2s points into averaged buckets. bucketMs=0 means raw. */
-function downsample(
-  raw: DashboardData["throughputHistory"],
-  bucketMs: number,
-): ChartPoint[] {
+function downsample(raw: DashboardData["throughputHistory"], bucketMs: number): ChartPoint[] {
   if (raw.length === 0) return [];
 
   // Raw mode — no aggregation
@@ -246,13 +243,7 @@ function CustomLegend({ showCounts }: { showCounts: boolean }) {
           {item.type === "area" ? (
             <Box width="6px" height="6px" borderRadius="full" bg={item.color} />
           ) : (
-            <Box
-              width="10px"
-              height="2px"
-              bg={item.color}
-              borderRadius="full"
-              opacity={0.7}
-            />
+            <Box width="10px" height="2px" bg={item.color} borderRadius="full" opacity={0.7} />
           )}
           <Text textStyle="xs" color="fg.muted">
             {item.name}

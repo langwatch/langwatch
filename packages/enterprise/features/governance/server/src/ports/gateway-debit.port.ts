@@ -77,14 +77,7 @@ export type GatewayBudgetScope =
   | "GROUP"
   | "ATTRIBUTED_USER";
 
-export type GatewayBudgetWindow =
-  | "MINUTE"
-  | "HOUR"
-  | "DAY"
-  | "WEEK"
-  | "MONTH"
-  | "TOTAL"
-  | "MANUAL";
+export type GatewayBudgetWindow = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
 
 export type GatewayBudgetDefinition = {
   id: string;

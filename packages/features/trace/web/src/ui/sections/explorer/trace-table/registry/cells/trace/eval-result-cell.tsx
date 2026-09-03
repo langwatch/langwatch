@@ -1,10 +1,7 @@
 import { Circle, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 import { getEvalChipDisplay } from "../../../../../../../model/evaluation-results";
-import {
-  EVAL_FIELD_LABELS,
-  type EvalColumnField,
-} from "../../../../../../../index";
+import { EVAL_FIELD_LABELS, type EvalColumnField } from "../../../../../../../index";
 import type { TraceListItem } from "../../../../types/trace";
 import { latestEvalForKey } from "../../../eval-columns";
 import type { CellDef } from "../../types";
@@ -47,20 +44,12 @@ const EvalResultCellView: React.FC<{
 
   if (field === "label") {
     if (!ev.label) return dash;
-    return (
-      <ValueWithDot dotColor={display.color} text={ev.label} textStyle={textStyle} />
-    );
+    return <ValueWithDot dotColor={display.color} text={ev.label} textStyle={textStyle} />;
   }
 
   // Score
   if (display.scoreText == null) return dash;
-  return (
-    <ValueWithDot
-      dotColor={display.color}
-      text={display.scoreText}
-      textStyle={textStyle}
-    />
-  );
+  return <ValueWithDot dotColor={display.color} text={display.scoreText} textStyle={textStyle} />;
 };
 
 function ValueWithDot({
@@ -102,12 +91,7 @@ export function makeEvalCellDef({
     id,
     label: EVAL_FIELD_LABELS[field],
     render: ({ row }) => (
-      <EvalResultCellView
-        row={row}
-        evaluatorKey={evaluatorKey}
-        field={field}
-        density="compact"
-      />
+      <EvalResultCellView row={row} evaluatorKey={evaluatorKey} field={field} density="compact" />
     ),
     renderComfortable: ({ row }) => (
       <EvalResultCellView

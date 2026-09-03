@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import {
-  buildCsvData,
-  buildCsvHeaders,
-  generateCsvContent,
-} from "@langwatch/experiment-web";
+import { buildCsvData, buildCsvHeaders, generateCsvContent } from "@langwatch/experiment-web";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
@@ -12,9 +8,7 @@ import type {
 } from "@langwatch/experiment-web";
 import { transformBatchEvaluationData } from "@langwatch/experiment-web";
 
-const createMinimalData = (
-  overrides: Partial<BatchEvaluationData> = {},
-): BatchEvaluationData => ({
+const createMinimalData = (overrides: Partial<BatchEvaluationData> = {}): BatchEvaluationData => ({
   runId: "run-1",
   experimentId: "exp-1",
   projectId: "project-1",
@@ -28,9 +22,7 @@ const createMinimalData = (
   ...overrides,
 });
 
-const createTargetOutput = (
-  overrides: Partial<BatchTargetOutput> = {},
-): BatchTargetOutput => ({
+const createTargetOutput = (overrides: Partial<BatchTargetOutput> = {}): BatchTargetOutput => ({
   targetId: "target-1",
   output: null,
   cost: null,
@@ -138,9 +130,7 @@ describe("csvExport", () => {
 
     it("exports target output values", () => {
       const data = createMinimalData({
-        targetColumns: [
-          { id: "target-1", name: "GPT-4", type: "prompt", outputFields: [] },
-        ],
+        targetColumns: [{ id: "target-1", name: "GPT-4", type: "prompt", outputFields: [] }],
         rows: [
           {
             index: 0,
@@ -166,9 +156,7 @@ describe("csvExport", () => {
     it("handles null/undefined values gracefully", () => {
       const data = createMinimalData({
         datasetColumns: [{ name: "input", hasImages: false }],
-        targetColumns: [
-          { id: "target-1", name: "Model", type: "prompt", outputFields: [] },
-        ],
+        targetColumns: [{ id: "target-1", name: "Model", type: "prompt", outputFields: [] }],
         rows: [
           {
             index: 0,
@@ -193,9 +181,7 @@ describe("csvExport", () => {
 
     it("exports evaluator results with score, passed, cost and duration", () => {
       const data = createMinimalData({
-        targetColumns: [
-          { id: "target-1", name: "Model", type: "prompt", outputFields: [] },
-        ],
+        targetColumns: [{ id: "target-1", name: "Model", type: "prompt", outputFields: [] }],
         evaluatorNames: { "eval-1": "Accuracy" },
         rows: [
           {
@@ -239,9 +225,7 @@ describe("csvExport", () => {
 
     it("exports error status for failed evaluators", () => {
       const data = createMinimalData({
-        targetColumns: [
-          { id: "target-1", name: "Model", type: "prompt", outputFields: [] },
-        ],
+        targetColumns: [{ id: "target-1", name: "Model", type: "prompt", outputFields: [] }],
         evaluatorNames: { "eval-1": "Check" },
         rows: [
           {
@@ -270,9 +254,7 @@ describe("csvExport", () => {
 
     it("exports skipped status for skipped evaluators", () => {
       const data = createMinimalData({
-        targetColumns: [
-          { id: "target-1", name: "Model", type: "prompt", outputFields: [] },
-        ],
+        targetColumns: [{ id: "target-1", name: "Model", type: "prompt", outputFields: [] }],
         evaluatorNames: { "eval-1": "Check" },
         rows: [
           {
@@ -538,9 +520,7 @@ describe("csvExport", () => {
 
     it("exports target error when present", () => {
       const data = createMinimalData({
-        targetColumns: [
-          { id: "target-1", name: "Model", type: "prompt", outputFields: [] },
-        ],
+        targetColumns: [{ id: "target-1", name: "Model", type: "prompt", outputFields: [] }],
         rows: [
           {
             index: 0,
@@ -716,11 +696,7 @@ describe("csvExport", () => {
 
       // Verify transformation captured all targets
       expect(transformed.targetColumns).toHaveLength(3);
-      expect(transformed.targetColumns.map((t) => t.name)).toEqual([
-        "GPT-4",
-        "GPT-3.5",
-        "Claude",
-      ]);
+      expect(transformed.targetColumns.map((t) => t.name)).toEqual(["GPT-4", "GPT-3.5", "Claude"]);
 
       // Verify each target has its output field detected
       expect(transformed.targetColumns[0]?.outputFields).toContain("output");
@@ -867,8 +843,7 @@ describe("csvExport", () => {
     const ROW_0_REASONING =
       "gpt-5-mini gives the exact reset link; the others bury it in preamble.";
     const ROW_1_REASONING = "Both answers state the same policy with the same caveats.";
-    const ROW_3_REASONING =
-      "gemini-flash produced nothing for this row, so it was not judged.";
+    const ROW_3_REASONING = "gemini-flash produced nothing for this row, so it was not judged.";
 
     const createComparisonColumn = (
       overrides: Partial<BatchComparisonColumn> = {},
@@ -884,10 +859,7 @@ describe("csvExport", () => {
      * The exported row as a header-to-value record, so an assertion names the
      * column it is about instead of counting positions.
      */
-    const exportedRow = (
-      data: BatchEvaluationData,
-      rowIndex: number,
-    ): Record<string, string> => {
+    const exportedRow = (data: BatchEvaluationData, rowIndex: number): Record<string, string> => {
       const { headers, rows } = buildCsvData(data);
       const values = rows[rowIndex] ?? [];
       return Object.fromEntries(
@@ -1001,9 +973,7 @@ describe("csvExport", () => {
           const row = exportedRow(createComparisonData(FULL_RUN_COLUMN), 1);
 
           expect(row.comparison_winner).toBe("tie");
-          expect(row.comparison_candidates).toBe(
-            "gpt-5-mini, claude-sonnet-5, gemini-flash",
-          );
+          expect(row.comparison_candidates).toBe("gpt-5-mini, claude-sonnet-5, gemini-flash");
           expect(row.comparison_reasoning).toBe(ROW_1_REASONING);
         });
       });

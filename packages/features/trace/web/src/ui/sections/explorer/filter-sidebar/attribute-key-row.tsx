@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Collapsible,
-  HStack,
-  Icon,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Collapsible, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useAttributeValues } from "../hooks/use-attribute-values";
@@ -42,9 +34,7 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
   const { values, isLoading } = useAttributeValues(attrKey, open);
 
   const activeCount = useMemo(() => {
-    const valueActive = values.filter(
-      (v) => getValueState(attrKey, v.value) !== "neutral",
-    ).length;
+    const valueActive = values.filter((v) => getValueState(attrKey, v.value) !== "neutral").length;
     return valueActive + (noneActive ? 1 : 0);
   }, [values, attrKey, getValueState, noneActive]);
 

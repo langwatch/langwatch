@@ -10,14 +10,13 @@ import type { PromptTemplateFieldsLookup } from "../../model/experiments-v3/mapp
  * and validation requires nothing of an undrafted prompt target.
  * `PromptTemplateFieldsProvider` supplies the real lookup.
  */
-export const PromptTemplateFieldsContext = createContext<
-  PromptTemplateFieldsLookup | undefined
->(undefined);
+export const PromptTemplateFieldsContext = createContext<PromptTemplateFieldsLookup | undefined>(
+  undefined,
+);
 
 /**
  * The template-field lookup to hand to `getTargetMissingMappings`,
  * `targetHasMissingMappings` or `validateWorkbench`.
  */
-export const usePromptTemplateFields = ():
-  | PromptTemplateFieldsLookup
-  | undefined => useContext(PromptTemplateFieldsContext);
+export const usePromptTemplateFields = (): PromptTemplateFieldsLookup | undefined =>
+  useContext(PromptTemplateFieldsContext);

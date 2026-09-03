@@ -1,8 +1,4 @@
-import {
-  defaultResource,
-  type Resource,
-  resourceFromAttributes,
-} from "@opentelemetry/resources";
+import { defaultResource, type Resource, resourceFromAttributes } from "@opentelemetry/resources";
 import { type Attributes } from "@opentelemetry/api";
 import * as semconv from "@opentelemetry/semantic-conventions/incubating";
 import {
@@ -36,9 +32,7 @@ export function createMergedResource(
     ...(attributes ?? {}),
   });
 
-  return (givenResource ?? defaultResource())
-    .merge(langwatchResource)
-    .merge(userResource);
+  return (givenResource ?? defaultResource()).merge(langwatchResource).merge(userResource);
 }
 
 function hasAttachableProcessorRegistry(obj: unknown): boolean {

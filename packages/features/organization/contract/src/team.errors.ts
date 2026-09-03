@@ -13,11 +13,9 @@ export class TeamSlugConflictError extends HandledError {
   declare readonly code: "team_name_taken";
 
   constructor() {
-    super(
-      "team_name_taken",
-      "A team with this name already exists in the organization.",
-      { httpStatus: 409 },
-    );
+    super("team_name_taken", "A team with this name already exists in the organization.", {
+      httpStatus: 409,
+    });
     this.name = "TeamSlugConflictError";
   }
 }
@@ -52,11 +50,10 @@ export class TeamMemberAlreadyAddedError extends HandledError {
   declare readonly code: "team_member_already_added";
 
   constructor(userId: string) {
-    super(
-      "team_member_already_added",
-      "That member already holds that role on this team",
-      { httpStatus: 409, meta: { userId } },
-    );
+    super("team_member_already_added", "That member already holds that role on this team", {
+      httpStatus: 409,
+      meta: { userId },
+    });
     this.name = "TeamMemberAlreadyAddedError";
   }
 }
@@ -123,15 +120,11 @@ export class LiteMemberViewerOnlyError extends HandledError {
   declare readonly code: "lite_member_viewer_only";
 
   constructor(teamName?: string | null) {
-    super(
-      "lite_member_viewer_only",
-      "A Lite Member seat allows the Viewer team role only.",
-      {
-        meta: teamName ? { teamName } : {},
-        httpStatus: 409,
-        fault: "customer",
-      },
-    );
+    super("lite_member_viewer_only", "A Lite Member seat allows the Viewer team role only.", {
+      meta: teamName ? { teamName } : {},
+      httpStatus: 409,
+      fault: "customer",
+    });
     this.name = "LiteMemberViewerOnlyError";
   }
 }

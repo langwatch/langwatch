@@ -43,9 +43,7 @@ export function LangyRecoveringLine({ message }: { message: string }) {
             css={shimmerCss}
             initial={reduceMotion ? false : { opacity: 0, filter: "blur(5px)", y: 5 }}
             animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-            exit={
-              reduceMotion ? { opacity: 0 } : { opacity: 0, filter: "blur(5px)", y: -5 }
-            }
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, filter: "blur(5px)", y: -5 }}
             transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
           >
             {message}

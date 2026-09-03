@@ -23,9 +23,7 @@ export const removeCommand = async (name: string): Promise<void> => {
     if (!config.prompts[name]) {
       console.error(chalk.red(`Error: Prompt "${name}" not found in dependencies`));
       console.log(
-        chalk.gray(
-          `Available prompts: ${Object.keys(config.prompts).join(", ") || "none"}`,
-        ),
+        chalk.gray(`Available prompts: ${Object.keys(config.prompts).join(", ") || "none"}`),
       );
       process.exit(1);
     }
@@ -81,10 +79,7 @@ export const removeCommand = async (name: string): Promise<void> => {
           const rootMaterializedDir = FileManager.getMaterializedDir();
 
           let currentDir = materializedDir;
-          while (
-            currentDir !== rootMaterializedDir &&
-            currentDir !== path.dirname(currentDir)
-          ) {
+          while (currentDir !== rootMaterializedDir && currentDir !== path.dirname(currentDir)) {
             try {
               const entries = fs.readdirSync(currentDir);
               if (entries.length === 0) {

@@ -77,9 +77,7 @@ export const recordsAddCommand = async (
     entries = parseRecordsJson(jsonStr);
   } catch (error) {
     reportCommandError({
-      error: commandValidationError(
-        error instanceof Error ? error.message : "Invalid JSON input",
-      ),
+      error: commandValidationError(error instanceof Error ? error.message : "Invalid JSON input"),
     });
     process.exit(1);
   }

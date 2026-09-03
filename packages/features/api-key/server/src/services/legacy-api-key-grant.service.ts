@@ -30,10 +30,7 @@ export class LegacyApiKeyGrantService {
     apiKey: Pick<ApiKey, "createdAt">;
     cutoverAt: Date | null;
   }): boolean {
-    return (
-      input.cutoverAt !== null &&
-      input.apiKey.createdAt.getTime() < input.cutoverAt.getTime()
-    );
+    return input.cutoverAt !== null && input.apiKey.createdAt.getTime() < input.cutoverAt.getTime();
   }
 
   static tryLegacyGrantForApiKey(
@@ -92,18 +89,13 @@ export class LegacyApiKeyGrantService {
         return;
       }
       this.holdGuard(apiKey.id);
-      void this.persist(apiKey, binding).catch((error: unknown) =>
-        this.failed(apiKey, error),
-      );
+      void this.persist(apiKey, binding).catch((error: unknown) => this.failed(apiKey, error));
     } catch (error) {
       this.failed(apiKey, error);
     }
   }
 
-  private async persist(
-    apiKey: ApiKey,
-    binding: AuthzLedgerBindingAttach,
-  ): Promise<void> {
+  private async persist(apiKey: ApiKey, binding: AuthzLedgerBindingAttach): Promise<void> {
     const cutoverAt = await this.options.authz.tryGetEngineCutoverAt({
       organizationId: apiKey.organizationId,
     });

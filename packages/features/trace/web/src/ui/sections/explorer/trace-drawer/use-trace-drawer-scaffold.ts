@@ -71,8 +71,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   // through, so the reader can see what went away rather than having to spot an
   // absence. What the corrected trace actually contains is `corrected`, which is
   // what the header counts.
-  const { captured: capturedSpanTree, display: spanTreeQuery } =
-    useSpanTreeWithCaptured();
+  const { captured: capturedSpanTree, display: spanTreeQuery } = useSpanTreeWithCaptured();
   const headerQuery = useTraceHeader({ spans: capturedSpanTree.data });
   // `useTraceHeader` uses React Query's `keepPreviousData`, so the
   // previous trace's data lingers until the new fetch resolves. That
@@ -81,8 +80,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   // so without an explicit id match check we'd briefly show A's
   // header chips, conversation context, etc. under the new selection.
   // Guard by traceId match; the spans tree is keyed on traceId too.
-  const trace =
-    headerQuery.data && headerQuery.data.traceId === traceId ? headerQuery.data : null;
+  const trace = headerQuery.data && headerQuery.data.traceId === traceId ? headerQuery.data : null;
   const spanTree = spanTreeQuery.data && trace ? spanTreeQuery.data : [];
   // Show the full-shell skeleton whenever we have a traceId in the URL but
   // no result yet — including the moment before the project context has
@@ -99,11 +97,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   // Warm sibling trace headers so navigating between turns is instant.
   useConversationPrefetch(trace?.conversationId ?? null, trace?.traceId ?? null);
 
-  const {
-    navigateToTrace,
-    goBack: goBackInTraceHistory,
-    canGoBack,
-  } = useTraceDrawerNavigation();
+  const { navigateToTrace, goBack: goBackInTraceHistory, canGoBack } = useTraceDrawerNavigation();
 
   // Same hook DrawerHeader's refresh button uses — re-instantiated here so
   // the `R` shortcut can fire even if the header is in a refreshing-spinner
@@ -111,8 +105,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
   const { refresh: refreshActiveTrace } = useTraceRefresh(traceId ?? "");
 
   const selectedSpan = useMemo(
-    () =>
-      selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null,
+    () => (selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null),
     [selectedSpanId, spanTree],
   );
 

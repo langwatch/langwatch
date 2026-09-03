@@ -52,7 +52,6 @@ const connection = databaseUrl
   : null;
 const prisma = connection?.client as PrismaClient;
 
-
 const suffix = nanoid(8);
 const ORG_ID = `org-itauth-${suffix}`;
 const OTHER_ORG_ID = `org-other-${suffix}`;

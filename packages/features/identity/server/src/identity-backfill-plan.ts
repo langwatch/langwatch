@@ -5,14 +5,8 @@ import {
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
 import { deriveIdentifierId } from "./crypto/identifier-identity";
-import type {
-  BackfillAccountRow,
-  BackfillUserRow,
-} from "./identity-backfill.repository";
-import {
-  adoptAccountCommandId,
-  adoptUserEmailCommandId,
-} from "./identity-command-id";
+import type { BackfillAccountRow, BackfillUserRow } from "./identity-backfill.repository";
+import { adoptAccountCommandId, adoptUserEmailCommandId } from "./identity-command-id";
 
 /**
  * What the legacy rows IMPLY — the plan a backfill pass states, and the
@@ -70,9 +64,7 @@ export function planIdentifiers({
       occurredAtMs: user.createdAtMs,
       commandId: adoptUserEmailCommandId({ userId: user.id }),
       value: normalizedValue,
-      expectedState: user.emailVerified
-        ? ("VERIFIED" as const)
-        : ("ATTACHED" as const),
+      expectedState: user.emailVerified ? ("VERIFIED" as const) : ("ATTACHED" as const),
     },
     ...accounts.map((account) => {
       const provider = identifierProviderFor(account.provider);

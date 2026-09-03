@@ -104,17 +104,13 @@ export async function verifyOpenTelemetrySetup(): Promise<void> {
       console.debug(`🔍 Test span created with trace ID: ${traceId}`);
 
       if (traceId === "00000000000000000000000000000000") {
-        reject(
-          new Error("OpenTelemetry setup verification failed: trace ID is all zeros"),
-        );
+        reject(new Error("OpenTelemetry setup verification failed: trace ID is all zeros"));
         return;
       }
 
       if (!/^[0-9a-f]{32}$/i.test(traceId)) {
         reject(
-          new Error(
-            `OpenTelemetry setup verification failed: invalid trace ID format: ${traceId}`,
-          ),
+          new Error(`OpenTelemetry setup verification failed: invalid trace ID format: ${traceId}`),
         );
         return;
       }
@@ -304,17 +300,13 @@ export async function pollForTrace(
     }
 
     if (expectedSpanCount === undefined) {
-      console.debug(
-        `⏳ Waiting for trace ${traceId}... (${Date.now() - startTime}ms elapsed)`,
-      );
+      console.debug(`⏳ Waiting for trace ${traceId}... (${Date.now() - startTime}ms elapsed)`);
     }
     await delay(pollInterval);
   }
 
   const expectedMsg = expectedSpanCount ? ` with ${expectedSpanCount} spans` : "";
-  throw new Error(
-    `Timeout waiting for trace ${traceId}${expectedMsg} after ${timeout}ms`,
-  );
+  throw new Error(`Timeout waiting for trace ${traceId}${expectedMsg} after ${timeout}ms`);
 }
 
 /**
@@ -337,9 +329,7 @@ export async function expectTraceToBeIngested(
     try {
       expect(trace.spans!.length).toBe(expectedSpanCount);
     } catch (error) {
-      console.error(
-        `Expected ${expectedSpanCount} spans, but got ${trace.spans!.length}`,
-      );
+      console.error(`Expected ${expectedSpanCount} spans, but got ${trace.spans!.length}`);
       console.error("Spans", trace.spans);
       throw error;
     }

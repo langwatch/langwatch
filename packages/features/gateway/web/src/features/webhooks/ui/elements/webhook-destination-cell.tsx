@@ -19,11 +19,7 @@ export interface WebhookDestinationSummary {
  * account and the queue name, which are the only parts that say which queue
  * this is. The full URL stays in the title.
  */
-function queueLabel(sqs: {
-  queueUrl: string;
-  accountId: string;
-  queueName: string;
-}): string {
+function queueLabel(sqs: { queueUrl: string; accountId: string; queueName: string }): string {
   if (!sqs.accountId || !sqs.queueName) return sqs.queueUrl;
   return `${sqs.accountId}/${sqs.queueName}`;
 }
@@ -36,11 +32,7 @@ function queueLabel(sqs: {
  * queue endpoint has no URL and this column would otherwise be blank on one
  * of the two kinds.
  */
-export function WebhookDestinationCell({
-  endpoint,
-}: {
-  endpoint: WebhookDestinationSummary;
-}) {
+export function WebhookDestinationCell({ endpoint }: { endpoint: WebhookDestinationSummary }) {
   const address = endpoint.sqs ? queueLabel(endpoint.sqs) : (endpoint.url ?? "");
   const fullAddress = endpoint.sqs?.queueUrl ?? endpoint.url ?? "";
   return (

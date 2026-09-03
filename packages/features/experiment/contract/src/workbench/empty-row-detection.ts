@@ -39,9 +39,7 @@ export const isRowEmpty = (row: Record<string, unknown>): boolean => {
 /**
  * Get indices of non-empty rows from a dataset.
  */
-export const getNonEmptyRowIndices = (
-  rows: Record<string, unknown>[],
-): number[] => {
+export const getNonEmptyRowIndices = (rows: Record<string, unknown>[]): number[] => {
   return rows
     .map((row, index) => ({ row, index }))
     .filter(({ row }) => !isRowEmpty(row))

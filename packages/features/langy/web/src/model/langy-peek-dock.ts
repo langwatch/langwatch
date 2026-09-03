@@ -128,9 +128,7 @@ function restingPeekRect({
 }): { left: number; right: number; top: number; bottom: number } {
   if (mode === "floating") {
     const width = resolveFloatingPanelWidth(viewportWidth);
-    const left = dodgeLeft
-      ? FLOATING_PANEL_INSET
-      : viewportWidth - FLOATING_PANEL_INSET - width;
+    const left = dodgeLeft ? FLOATING_PANEL_INSET : viewportWidth - FLOATING_PANEL_INSET - width;
     return {
       left,
       right: left + width,

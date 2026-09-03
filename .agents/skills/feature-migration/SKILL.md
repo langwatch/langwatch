@@ -26,6 +26,7 @@ Use the latest feature inventory. If none exists or ownership is unclear, run
    `typed-prisma-seam` lint rejects any new file that reintroduces
    `database: object` + `as PrismaClient` — the shape that was the old
    convention.
+
 4. Compose one concrete graph at the process root. Inject complete cross-feature
    services, typed configuration, clocks/IDs, and technical ports. Do not use a
    callback bag or service locator.

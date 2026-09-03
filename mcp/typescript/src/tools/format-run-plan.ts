@@ -1,7 +1,4 @@
-import type {
-  RunPlanRunResult,
-  RunPlanScope,
-} from "../langwatch-api-run-plans.js";
+import type { RunPlanRunResult, RunPlanScope } from "../langwatch-api-run-plans.js";
 
 /**
  * The digest every run of a plan returns, whichever tool started it.
@@ -25,21 +22,15 @@ export function formatRunPlanRun(result: RunPlanRunResult): string {
   lines.push(`**Jobs**: ${result.jobCount}`);
 
   if (result.skippedArchived.scenarios.length > 0) {
-    lines.push(
-      `**Skipped archived scenarios**: ${result.skippedArchived.scenarios.join(", ")}`,
-    );
+    lines.push(`**Skipped archived scenarios**: ${result.skippedArchived.scenarios.join(", ")}`);
   }
   if (result.skippedArchived.targets.length > 0) {
-    lines.push(
-      `**Skipped archived targets**: ${result.skippedArchived.targets.join(", ")}`,
-    );
+    lines.push(`**Skipped archived targets**: ${result.skippedArchived.targets.join(", ")}`);
   }
 
   lines.push(`**View**: ${result.platformUrl}`);
   lines.push("");
-  lines.push(
-    "> Use `platform_list_simulation_runs` with the batch run ID to read the results.",
-  );
+  lines.push("> Use `platform_list_simulation_runs` with the batch run ID to read the results.");
 
   return lines.join("\n");
 }
@@ -48,10 +39,7 @@ export function formatRunPlanRun(result: RunPlanRunResult): string {
  * One line saying what a plan covers. A plan stored before scopes existed
  * carries none, and runs the scenario list it already held.
  */
-export function describeRunPlanScope(
-  scope: RunPlanScope | null,
-  scenarioIds: string[],
-): string {
+export function describeRunPlanScope(scope: RunPlanScope | null, scenarioIds: string[]): string {
   if (scope === null) {
     return `hand-picked scenarios (${scenarioIds.length})`;
   }

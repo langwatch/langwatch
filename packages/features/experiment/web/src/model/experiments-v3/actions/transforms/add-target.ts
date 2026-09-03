@@ -1,10 +1,7 @@
 import { nanoid } from "nanoid";
 import type { Field } from "@langwatch/workflow-contract";
 import type { TargetConfig } from "../../types";
-import {
-  inferAllEvaluatorMappings,
-  inferAllTargetMappings,
-} from "../../mapping-inference";
+import { inferAllEvaluatorMappings, inferAllTargetMappings } from "../../mapping-inference";
 import { type AddTargetPayload, addTargetPayloadSchema } from "../schemas";
 import { type Transform, TransformError, type WorkbenchState } from "./types";
 

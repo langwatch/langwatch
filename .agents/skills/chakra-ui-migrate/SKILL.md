@@ -116,10 +116,10 @@ clean diff to work from.
 
 ```tsx
 // v2
-import { ChakraProvider } from "@chakra-ui/react"
-import theme from "./theme"
+import { ChakraProvider } from "@chakra-ui/react";
+import theme from "./theme";
 
-;<ChakraProvider theme={theme}>{children}</ChakraProvider>
+<ChakraProvider theme={theme}>{children}</ChakraProvider>;
 ```
 
 ### New v3 pattern (using Chakra CLI snippets)
@@ -136,13 +136,13 @@ snippets) and automatically installs required npm dependencies — including
 
 ```tsx
 // v3 — app/layout.tsx (Next.js App Router)
-import { Provider } from "@/components/ui/provider"
+import { Provider } from "@/components/ui/provider";
 
-;<html lang="en" suppressHydrationWarning>
+<html lang="en" suppressHydrationWarning>
   <body>
     <Provider>{children}</Provider>
   </body>
-</html>
+</html>;
 ```
 
 The `Provider` file includes `"use client"` — do not add it to `layout.tsx`. See
@@ -154,16 +154,16 @@ Replace `extendTheme` with `createSystem`:
 
 ```ts
 // v2
-import { extendTheme } from "@chakra-ui/react"
+import { extendTheme } from "@chakra-ui/react";
 // v3
-import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react"
+import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
 
-export const theme = extendTheme({ colors: { brand: { 500: "#2196f3" } } })
+export const theme = extendTheme({ colors: { brand: { 500: "#2196f3" } } });
 
 const config = defineConfig({
   theme: { tokens: { colors: { brand: { 500: { value: "#2196f3" } } } } },
-})
-export const system = createSystem(defaultConfig, config)
+});
+export const system = createSystem(defaultConfig, config);
 ```
 
 Pass `system` to `ChakraProvider` via `value={system}`.
@@ -176,18 +176,18 @@ Pass `system` to `ChakraProvider` via `value={system}`.
 
 ```tsx
 // REMOVE these v2 imports and usages:
-import { ColorModeScript } from "@chakra-ui/react"
+import { ColorModeScript } from "@chakra-ui/react";
 // ❌
-import { useColorMode } from "@chakra-ui/react"
+import { useColorMode } from "@chakra-ui/react";
 // ❌ (use next-themes)
-import { useColorModeValue } from "@chakra-ui/react"
+import { useColorModeValue } from "@chakra-ui/react";
 // ❌ (use CSS tokens)
-import { DarkMode, LightMode } from "@chakra-ui/react"
+import { DarkMode, LightMode } from "@chakra-ui/react";
 
 // ❌
 
 // Also remove from _document.tsx:
-;<ColorModeScript initialColorMode={theme.config.initialColorMode} /> // ❌
+<ColorModeScript initialColorMode={theme.config.initialColorMode} />; // ❌
 ```
 
 ### v3 color mode approach
@@ -370,14 +370,18 @@ v3 docs for the specific compound API for each.
 
 ```tsx
 // v2 — @chakra-ui/next-js
-import { LinkOverlay } from "@chakra-ui/next-js"
+import { LinkOverlay } from "@chakra-ui/next-js";
 
 // v3 — asChild pattern
-import NextLink from "next/link"
-<ChakraLink asChild><NextLink href="/about">About</NextLink></ChakraLink>
+import NextLink from "next/link";
+<ChakraLink asChild>
+  <NextLink href="/about">About</NextLink>
+</ChakraLink>;
 
-import NextImage from "next/image"
-<ChakraImage asChild><NextImage src="..." alt="..." /></ChakraImage>
+import NextImage from "next/image";
+<ChakraImage asChild>
+  <NextImage src="..." alt="..." />
+</ChakraImage>;
 ```
 
 ---
@@ -388,36 +392,36 @@ import NextImage from "next/image"
 
 ```ts
 // v3 — single component (recipe)
-import { defineRecipe } from "@chakra-ui/react"
+import { defineRecipe } from "@chakra-ui/react";
 
 // v2
 const buttonStyle = {
   baseStyle: { fontWeight: "bold" },
   variants: { solid: { bg: "blue.500" } },
   defaultProps: { variant: "solid" },
-}
+};
 
 const buttonRecipe = defineRecipe({
   base: { fontWeight: "bold" },
   variants: { variant: { solid: { bg: "blue.500" } } },
   defaultVariants: { variant: "solid" },
-})
+});
 ```
 
 ```ts
 // v3 — slot recipe
-import { defineSlotRecipe } from "@chakra-ui/react"
+import { defineSlotRecipe } from "@chakra-ui/react";
 
 // v2 — multiStyleConfig (multi-part component)
 const cardStyle = multiStyleConfig({
   parts: ["root", "header"],
   baseStyle: { root: { bg: "white" }, header: { fontWeight: "bold" } },
-})
+});
 
 const cardSlotRecipe = defineSlotRecipe({
   slots: ["root", "header"],
   base: { root: { bg: "white" }, header: { fontWeight: "bold" } },
-})
+});
 ```
 
 ### Typegen for custom tokens
@@ -449,14 +453,14 @@ npx @chakra-ui/cli typegen ./theme.ts
 
 ```tsx
 // pages/_app.js
-import { Provider } from "@/components/ui/provider"
+import { Provider } from "@/components/ui/provider";
 
 export default function App({ Component, pageProps }) {
   return (
     <Provider>
       <Component {...pageProps} />
     </Provider>
-  )
+  );
 }
 ```
 

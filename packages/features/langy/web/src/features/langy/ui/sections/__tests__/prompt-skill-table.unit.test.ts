@@ -27,9 +27,7 @@ function skillsNamedInPromptTable(prompt: string): string[] {
   // Both headings, in this order, or the slice silently widens to a suffix of
   // the prompt and this check starts parsing prose that is not the table.
   if (start < 0 || end < 0 || end <= start) {
-    throw new Error(
-      "the prompt no longer has a Skills section followed by a Replies section",
-    );
+    throw new Error("the prompt no longer has a Skills section followed by a Replies section");
   }
   const table = prompt.slice(start, end);
   const named = new Set<string>();

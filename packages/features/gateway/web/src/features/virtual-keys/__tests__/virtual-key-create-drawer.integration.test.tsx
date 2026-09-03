@@ -41,13 +41,11 @@ type ApplicableBudget = {
   managedByVirtualKeyId: string | null;
 };
 
-const { createMutateAsync, applicableBudgetsData, capturedApplicableInputs } = vi.hoisted(
-  () => ({
-    createMutateAsync: vi.fn(),
-    applicableBudgetsData: { rows: [] as ApplicableBudget[] },
-    capturedApplicableInputs: [] as unknown[],
-  }),
-);
+const { createMutateAsync, applicableBudgetsData, capturedApplicableInputs } = vi.hoisted(() => ({
+  createMutateAsync: vi.fn(),
+  applicableBudgetsData: { rows: [] as ApplicableBudget[] },
+  capturedApplicableInputs: [] as unknown[],
+}));
 
 vi.mock("../../../behavior/gateway-api", () => ({
   api: {
@@ -139,9 +137,7 @@ const host = fakeGatewayHost({
       {
         id: TEAM_ID,
         name: "platform",
-        projects: [
-          { id: PROJECT_ID, name: "web-app", slug: "web-app", teamId: TEAM_ID },
-        ],
+        projects: [{ id: PROJECT_ID, name: "web-app", slug: "web-app", teamId: TEAM_ID }],
       },
     ],
   },
@@ -355,9 +351,7 @@ describe("given the new-virtual-key drawer", () => {
     it("persists the absence of a list, the shape that includes future providers", async () => {
       renderDrawer();
 
-      await waitFor(() =>
-        expect(screen.getByTestId("vk-providers-all")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByTestId("vk-providers-all")).toBeInTheDocument());
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
 
@@ -433,9 +427,7 @@ describe("given the new-virtual-key drawer", () => {
       await userEvent.click(screen.getByTestId("vk-ownership-organization"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
 
-      expect(
-        screen.getByText("Pick the project where traces and costs land."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Pick the project where traces and costs land.")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
       expect(createMutateAsync).not.toHaveBeenCalled();
     });
@@ -497,9 +489,7 @@ describe("given the new-virtual-key drawer", () => {
     it("says the key never expires and sends no date", async () => {
       renderDrawer();
 
-      expect(
-        (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value,
-      ).toBe("");
+      expect((screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value).toBe("");
       expect(screen.getByTestId("vk-expiration-resolved").textContent).toContain(
         "This key never expires",
       );
@@ -556,9 +546,7 @@ describe("given the new-virtual-key drawer", () => {
       await submit();
 
       await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
-      expect((lastCreateInput().expiresAt as Date).toISOString()).toBe(
-        "2030-08-20T23:59:59.999Z",
-      );
+      expect((lastCreateInput().expiresAt as Date).toISOString()).toBe("2030-08-20T23:59:59.999Z");
     });
 
     it("holds the save until a date is actually typed", async () => {

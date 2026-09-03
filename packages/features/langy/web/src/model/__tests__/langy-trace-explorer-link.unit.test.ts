@@ -43,8 +43,7 @@ describe("parseTraceSearchCommand", () => {
     describe("when the query is quoted and contains spaces", () => {
       it("keeps it as one value instead of splitting it into stray tokens", () => {
         expect(
-          parseTraceSearchCommand('langwatch trace search -q "payment gateway timeout"')
-            .query,
+          parseTraceSearchCommand('langwatch trace search -q "payment gateway timeout"').query,
         ).toBe("payment gateway timeout");
       });
     });
@@ -65,37 +64,34 @@ describe("parseTraceSearchCommand", () => {
       });
 
       it("keeps an escaped space inside an unquoted value", () => {
-        expect(
-          parseTraceSearchCommand("langwatch trace search -q checkout\\ failed").query,
-        ).toBe("checkout failed");
+        expect(parseTraceSearchCommand("langwatch trace search -q checkout\\ failed").query).toBe(
+          "checkout failed",
+        );
       });
 
       it("unescapes a doubled backslash inside double quotes", () => {
-        expect(parseTraceSearchCommand('langwatch trace search -q "a\\\\b"').query).toBe(
-          "a\\b",
-        );
+        expect(parseTraceSearchCommand('langwatch trace search -q "a\\\\b"').query).toBe("a\\b");
       });
 
       it("leaves a backslash that escapes nothing the shell escapes alone", () => {
         // `sh` only treats \" \\ \$ \` as escapes inside double quotes; a
         // Windows-style path segment must survive intact rather than losing it.
-        expect(
-          parseTraceSearchCommand('langwatch trace search -q "C:\\path"').query,
-        ).toBe("C:\\path");
+        expect(parseTraceSearchCommand('langwatch trace search -q "C:\\path"').query).toBe(
+          "C:\\path",
+        );
       });
 
       it("treats a backslash inside single quotes as literal data", () => {
-        expect(parseTraceSearchCommand("langwatch trace search -q 'a\\b'").query).toBe(
-          "a\\b",
-        );
+        expect(parseTraceSearchCommand("langwatch trace search -q 'a\\b'").query).toBe("a\\b");
       });
     });
 
     describe("when flags are written as --flag=value", () => {
       it("reads the inline value", () => {
-        expect(
-          parseTraceSearchCommand("langwatch trace search --query=refund --limit=5"),
-        ).toEqual({ query: "refund", limit: 5 });
+        expect(parseTraceSearchCommand("langwatch trace search --query=refund --limit=5")).toEqual({
+          query: "refund",
+          limit: 5,
+        });
       });
     });
 
@@ -125,16 +121,14 @@ describe("parseTraceSearchCommand", () => {
 
       it("splits a comma-separated list, the way the CLI itself splits it", () => {
         expect(
-          parseTraceSearchCommand("langwatch trace search --origin evaluation,simulation")
-            .origins,
+          parseTraceSearchCommand("langwatch trace search --origin evaluation,simulation").origins,
         ).toEqual(["evaluation", "simulation"]);
       });
 
       it("trims whitespace around each value", () => {
         expect(
-          parseTraceSearchCommand(
-            "langwatch trace search --origin 'evaluation, simulation'",
-          ).origins,
+          parseTraceSearchCommand("langwatch trace search --origin 'evaluation, simulation'")
+            .origins,
         ).toEqual(["evaluation", "simulation"]);
       });
     });
@@ -276,9 +270,7 @@ describe("buildExplorerQuery", () => {
     });
 
     it("drops whitespace-only entries instead of emitting an empty facet", () => {
-      expect(buildExplorerQuery({ origins: ["  ", " simulation "] })).toBe(
-        "origin:simulation",
-      );
+      expect(buildExplorerQuery({ origins: ["  ", " simulation "] })).toBe("origin:simulation");
     });
   });
 
@@ -313,9 +305,7 @@ describe("buildTraceExplorerHref", () => {
 
       /** @scenario A search over a stated period keeps that period */
       it("carries the query and the exact window in the fragment", () => {
-        const params = fragmentParams(
-          buildTraceExplorerHref({ projectSlug: "acme", search })!,
-        );
+        const params = fragmentParams(buildTraceExplorerHref({ projectSlug: "acme", search })!);
 
         expect(params.get("q")).toBe('"checkout failed"');
         expect(params.get("from")).toBe("1750000000000");
@@ -331,9 +321,7 @@ describe("buildTraceExplorerHref", () => {
       it("carries the window as absolute times, never a rolling preset", () => {
         // A preset ("24h") re-computes against `now` on arrival — a link opened
         // ten minutes later would query a different window than the agent did.
-        const params = fragmentParams(
-          buildTraceExplorerHref({ projectSlug: "acme", search })!,
-        );
+        const params = fragmentParams(buildTraceExplorerHref({ projectSlug: "acme", search })!);
 
         expect(params.get("preset")).toBeNull();
       });

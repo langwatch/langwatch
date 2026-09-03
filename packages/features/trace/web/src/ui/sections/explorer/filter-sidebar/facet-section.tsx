@@ -13,7 +13,10 @@ import {
 import { FacetRow } from "./facet-row";
 import { NoneFacetRow } from "../../../blocks/explorer/filter-sidebar/none-facet-row";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section";
-import type { FacetItem, FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types";
+import type {
+  FacetItem,
+  FacetValueState,
+} from "../../../../behavior/explorer/filter-sidebar/types";
 import { countPresentValues } from "./utils";
 
 interface FacetSectionProps {
@@ -113,9 +116,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   modeToggleProps,
   serverValueSearch,
 }) => {
-  const [expandedInactiveRows, setExpandedInactiveRows] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [expandedInactiveRows, setExpandedInactiveRows] = useState<Set<string>>(() => new Set());
   const toggleInactiveExpand = useCallback((value: string) => {
     setExpandedInactiveRows((prev) => {
       const next = new Set(prev);
@@ -149,19 +150,12 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     if (!searchOpen) setSearchQuery("");
   }, [searchOpen]);
 
-  const handleToggle = useCallback(
-    (value: string) => onToggle(field, value),
-    [onToggle, field],
-  );
-  const handleExclude = useCallback(
-    (value: string) => onExclude(field, value),
-    [onExclude, field],
-  );
+  const handleToggle = useCallback((value: string) => onToggle(field, value), [onToggle, field]);
+  const handleExclude = useCallback((value: string) => onExclude(field, value), [onExclude, field]);
 
   const activeCount = useMemo(
     () =>
-      items.filter((i) => getValueState(i.value) !== "neutral").length +
-      (noneRow?.active ? 1 : 0),
+      items.filter((i) => getValueState(i.value) !== "neutral").length + (noneRow?.active ? 1 : 0),
     [items, getValueState, noneRow?.active],
   );
 
@@ -239,10 +233,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     () => filtered.filter((item) => getValueState(item.value) !== "neutral"),
     [filtered, getValueState],
   );
-  const activeValueSet = useMemo(
-    () => new Set(activeItems.map((i) => i.value)),
-    [activeItems],
-  );
+  const activeValueSet = useMemo(() => new Set(activeItems.map((i) => i.value)), [activeItems]);
   const restItems = useMemo(
     () => filtered.filter((item) => !activeValueSet.has(item.value)),
     [filtered, activeValueSet],
@@ -448,13 +439,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
               // container's overflow (#18b). The small paddingX/paddingY
               // gutter is kept purely for visual breathing room around the
               // focused input.
-              <VStack
-                gap={0.5}
-                align="stretch"
-                marginTop={1}
-                paddingX={0.5}
-                paddingY={0.5}
-              >
+              <VStack gap={0.5} align="stretch" marginTop={1} paddingX={0.5} paddingY={0.5}>
                 <Input
                   ref={searchInputRef}
                   size="xs"
@@ -485,9 +470,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
                     // the same value again removes the filter.
                     const lowered = typed.toLowerCase();
                     const matched = items.find(
-                      (i) =>
-                        i.value.toLowerCase() === lowered ||
-                        i.label.toLowerCase() === lowered,
+                      (i) => i.value.toLowerCase() === lowered || i.label.toLowerCase() === lowered,
                     );
                     e.preventDefault();
                     handleToggle(matched?.value ?? typed);
@@ -496,12 +479,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
                   textStyle="xs"
                 />
                 {serverSearchActive && serverSearch.isFetching && (
-                  <HStack
-                    data-testid="facet-search-spinner"
-                    gap={2}
-                    paddingX={1}
-                    paddingY={1}
-                  >
+                  <HStack data-testid="facet-search-spinner" gap={2} paddingX={1} paddingY={1}>
                     <Spinner size="xs" />
                     <Text textStyle="2xs" color="fg.subtle">
                       Searching all values…
@@ -609,8 +587,7 @@ const ExpandToggle: React.FC<ExpandToggleProps> = ({
         // so the hint points at the always-on search input (which
         // doubles as Enter-to-filter for arbitrary values).
         <Text textStyle="xs" color="fg.subtle" paddingX={1} paddingY={0.5}>
-          {beyondExpanded}+ rare values aren't shown — type a value and press Enter to
-          filter.
+          {beyondExpanded}+ rare values aren't shown — type a value and press Enter to filter.
         </Text>
       )}
       <LinkButton onClick={onShowLess}>Show less</LinkButton>

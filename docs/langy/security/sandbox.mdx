@@ -61,11 +61,10 @@ The defence-in-depth mitigations that **are** shipped today:
 - **Public-subnet node placement (opt-in).** You can schedule the agent pod on a node group that has no route to your private data tier, so a full escape lands somewhere with no path to your databases.
 
 <Note>
-  For a self-hosted install, egress is **denied by default**:
-  `networkPolicy.allowExternalHttps` is `false`, so Langy cannot reach the internet at all
-  until you enable it. Turning it on for GitHub is covered in [Networking and
-  egress](/self-hosting/langy/networking-and-egress) and [the GitHub App
-  setup](/self-hosting/langy/github-app).
+  For a self-hosted install, egress is **denied by default**: `networkPolicy.allowExternalHttps` is
+  `false`, so Langy cannot reach the internet at all until you enable it. Turning it on for GitHub
+  is covered in [Networking and egress](/self-hosting/langy/networking-and-egress) and [the GitHub
+  App setup](/self-hosting/langy/github-app).
 </Note>
 
 ## What the sandbox can and cannot reach
@@ -76,9 +75,9 @@ The defence-in-depth mitigations that **are** shipped today:
 - **Does not keep at rest:** nothing durable lives worker-side. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
 
 <Info>
-  **Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What
-  Langy can do in your GitHub](/langy/security/github-access), [Self-hosting: networking
-  and egress](/self-hosting/langy/networking-and-egress).
+  **Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What Langy can do
+  in your GitHub](/langy/security/github-access), [Self-hosting: networking and
+  egress](/self-hosting/langy/networking-and-egress).
 </Info>
 
 ## Reference

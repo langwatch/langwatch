@@ -1,13 +1,7 @@
 /**
  * Replacement for next/error — simple error page component.
  */
-export default function ErrorPage({
-  statusCode,
-  title,
-}: {
-  statusCode?: number;
-  title?: string;
-}) {
+export default function ErrorPage({ statusCode, title }: { statusCode?: number; title?: string }) {
   return (
     <div
       style={{

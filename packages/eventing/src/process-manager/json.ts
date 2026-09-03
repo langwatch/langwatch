@@ -25,15 +25,7 @@ function isPlainObject(value: object): boolean {
   return proto === null || proto === Object.prototype;
 }
 
-function walk({
-  value,
-  path,
-  seen,
-}: {
-  value: unknown;
-  path: string;
-  seen: Set<object>;
-}): void {
+function walk({ value, path, seen }: { value: unknown; path: string; seen: Set<object> }): void {
   if (value === null) return;
 
   switch (typeof value) {
@@ -71,10 +63,7 @@ function walk({
     });
   } else {
     if (!isPlainObject(obj)) {
-      throw new JsonSafetyError(
-        path,
-        `non-plain object (${obj.constructor?.name ?? "unknown"})`,
-      );
+      throw new JsonSafetyError(path, `non-plain object (${obj.constructor?.name ?? "unknown"})`);
     }
     if (Object.getOwnPropertySymbols(obj).length > 0) {
       throw new JsonSafetyError(path, "symbol-keyed property");

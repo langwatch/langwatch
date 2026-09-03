@@ -129,10 +129,7 @@ export function captureMessage(message: string, options?: CaptureExceptionOption
 /**
  * Captures an exception/error using PostHog
  */
-export function captureException(
-  error: Error | string,
-  options?: CaptureExceptionOptions,
-): void {
+export function captureException(error: Error | string, options?: CaptureExceptionOptions): void {
   const errorMessage = error instanceof Error ? error.message : error;
 
   const errorStack = error instanceof Error && error.stack ? error.stack : undefined;

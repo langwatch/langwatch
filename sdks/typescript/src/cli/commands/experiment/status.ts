@@ -61,20 +61,14 @@ const statusFromResults = async ({
 };
 
 /** A run in one of these states will not move again. */
-const TERMINAL_STATUSES = new Set([
-  "completed",
-  "failed",
-  "stopped",
-  "interrupted",
-]);
+const TERMINAL_STATUSES = new Set(["completed", "failed", "stopped", "interrupted"]);
 
 /** How long `--wait` waits when the caller names no limit. */
 const DEFAULT_WAIT_SECONDS = 60;
 /** How long the command sleeps between reads while waiting. */
 const DEFAULT_POLL_MS = 3_000;
 
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export interface ExperimentStatusOptions {
   runId?: string;
@@ -152,9 +146,7 @@ export const experimentStatusCommand = async (
     if (options?.wait) {
       const seconds = Number(options.timeout ?? DEFAULT_WAIT_SECONDS);
       const limitMs =
-        Number.isFinite(seconds) && seconds >= 0
-          ? seconds * 1000
-          : DEFAULT_WAIT_SECONDS * 1000;
+        Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : DEFAULT_WAIT_SECONDS * 1000;
       const deadline = Date.now() + limitMs;
       const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
 
@@ -170,8 +162,7 @@ export const experimentStatusCommand = async (
           // status it already has and looks again, so a dropped socket at
           // second 12 of a 60 second wait no longer reports a healthy run as
           // failed.
-          lastReadError =
-            error instanceof Error ? error : new Error(String(error));
+          lastReadError = error instanceof Error ? error : new Error(String(error));
         }
       }
       // Still unreadable when the wait ended: the caller has no current answer,
@@ -190,9 +181,7 @@ export const experimentStatusCommand = async (
       table: () => {
         console.log();
         console.log(`  ${chalk.gray("Status:")}   ${color(status.status)}`);
-        console.log(
-          `  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`,
-        );
+        console.log(`  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`);
 
         if (status.startedAt) {
           console.log(

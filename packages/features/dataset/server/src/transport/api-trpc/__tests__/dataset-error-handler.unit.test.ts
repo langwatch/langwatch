@@ -43,9 +43,7 @@ describe("datasetErrorHandler", () => {
   describe("given the resolver succeeds", () => {
     /** @scenario "A successful call passes through the middleware untouched" */
     it("passes the result through untouched", async () => {
-      await expect(
-        datasetErrorHandler({ next: () => Promise.resolve(OK) }),
-      ).resolves.toBe(OK);
+      await expect(datasetErrorHandler({ next: () => Promise.resolve(OK) })).resolves.toBe(OK);
     });
   });
 

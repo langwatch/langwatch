@@ -29,15 +29,11 @@ describe("deriveStatus", () => {
     describe("when its status is derived", () => {
       /** @scenario "An overdue schedule reads as overdue, not as a timestamp" */
       it("reads as overdue rather than as a timestamp", () => {
-        expect(deriveStatus({ job: job({ nextRunAt: at(-2_520_000) }), now: NOW })).toBe(
-          "overdue",
-        );
+        expect(deriveStatus({ job: job({ nextRunAt: at(-2_520_000) }), now: NOW })).toBe("overdue");
       });
 
       it("states how late it is", () => {
-        expect(latenessMs({ job: job({ nextRunAt: at(-2_520_000) }), now: NOW })).toBe(
-          2_520_000,
-        );
+        expect(latenessMs({ job: job({ nextRunAt: at(-2_520_000) }), now: NOW })).toBe(2_520_000);
       });
     });
   });
@@ -47,9 +43,7 @@ describe("deriveStatus", () => {
       it("is not called overdue yet", () => {
         // The loop leases a slot by pushing nextRunAt forward, so a row sits a
         // beat in the past during normal claiming.
-        expect(deriveStatus({ job: job({ nextRunAt: at(-5_000) }), now: NOW })).toBe(
-          "scheduled",
-        );
+        expect(deriveStatus({ job: job({ nextRunAt: at(-5_000) }), now: NOW })).toBe("scheduled");
       });
     });
   });
@@ -57,9 +51,7 @@ describe("deriveStatus", () => {
   describe("given a claimed slot", () => {
     describe("when there are no prior attempts", () => {
       it("reads as running", () => {
-        expect(deriveStatus({ job: job({ currentSlot: at(-1_000) }), now: NOW })).toBe(
-          "running",
-        );
+        expect(deriveStatus({ job: job({ currentSlot: at(-1_000) }), now: NOW })).toBe("running");
       });
     });
 
@@ -130,9 +122,9 @@ describe("compareForAttention", () => {
       const later = job({ nextRunAt: at(600_000) });
       const sooner = job({ nextRunAt: at(60_000) });
 
-      expect(
-        [later, sooner].sort((a, b) => compareForAttention({ a, b, now: NOW }))[0],
-      ).toBe(sooner);
+      expect([later, sooner].sort((a, b) => compareForAttention({ a, b, now: NOW }))[0]).toBe(
+        sooner,
+      );
     });
   });
 });

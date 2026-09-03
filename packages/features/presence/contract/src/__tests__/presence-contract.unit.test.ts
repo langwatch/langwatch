@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  presenceCursorEventSchema,
-  presenceEventSchema,
-  presenceLocationSchema,
-} from "../index";
+import { presenceCursorEventSchema, presenceEventSchema, presenceLocationSchema } from "../index";
 
 describe("presence contract", () => {
   const session = {
@@ -16,9 +12,9 @@ describe("presence contract", () => {
 
   it("validates a portable location and durable snapshot", () => {
     expect(presenceLocationSchema.parse(session.location)).toEqual(session.location);
-    expect(
-      presenceEventSchema.parse({ kind: "snapshot", sessions: [session] }),
-    ).toMatchObject({ kind: "snapshot" });
+    expect(presenceEventSchema.parse({ kind: "snapshot", sessions: [session] })).toMatchObject({
+      kind: "snapshot",
+    });
   });
 
   it("rejects cursor coordinates outside the normalized viewport", () => {

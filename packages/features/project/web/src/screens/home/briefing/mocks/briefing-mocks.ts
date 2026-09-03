@@ -68,8 +68,7 @@ const SCENARIOS: Record<ScenarioKey, ScenarioShape> = {
   },
   empty: {
     label: "Brand-new",
-    headline:
-      "Your project is quiet. Send a trace and I'll start watching for what changes.",
+    headline: "Your project is quiet. Send a trace and I'll start watching for what changes.",
     cells: [],
   },
   traces: {
@@ -168,10 +167,7 @@ const RECEIPTS: Record<ReceiptsKey, BriefingReceipt[] | undefined> = {
       subject: "New error shape",
       detail: "“Provider rate limit” on 4 traces.",
       metric: { text: "new", tone: "up" },
-      ...mockEvidence(
-        'errorMessage:"Provider rate limit"',
-        "New error shape: Provider rate limit",
-      ),
+      ...mockEvidence('errorMessage:"Provider rate limit"', "New error shape: Provider rate limit"),
     },
   ],
   latency: [
@@ -189,8 +185,7 @@ const RECEIPTS: Record<ReceiptsKey, BriefingReceipt[] | undefined> = {
       id: "shared-refund-agent",
       severity: "attention",
       subject: "Shared error signal",
-      detail:
-        "6 errored traces share “refund-agent”. Correlation, not a confirmed cause.",
+      detail: "6 errored traces share “refund-agent”. Correlation, not a confirmed cause.",
       ...mockEvidence(
         'status:error AND traceName:"refund-agent"',
         "Shared error signal: refund-agent",
@@ -216,17 +211,13 @@ const RECEIPTS: Record<ReceiptsKey, BriefingReceipt[] | undefined> = {
       subject: "New error shape",
       detail: "“Provider rate limit” on 4 traces.",
       metric: { text: "new", tone: "up" },
-      ...mockEvidence(
-        'errorMessage:"Provider rate limit"',
-        "New error shape: Provider rate limit",
-      ),
+      ...mockEvidence('errorMessage:"Provider rate limit"', "New error shape: Provider rate limit"),
     },
     {
       id: "shared-refund-agent",
       severity: "attention",
       subject: "Shared error signal",
-      detail:
-        "6 errored traces share “refund-agent”. Correlation, not a confirmed cause.",
+      detail: "6 errored traces share “refund-agent”. Correlation, not a confirmed cause.",
       ...mockEvidence(
         'status:error AND traceName:"refund-agent"',
         "Shared error signal: refund-agent",
@@ -262,22 +253,8 @@ const ASK_HINTS: Record<ScenarioKey, string | undefined> = {
 
 // ── Generate the matrix ──────────────────────────────────────────────────────
 
-const SCEN_ORDER: ScenarioKey[] = [
-  "mixed",
-  "failing",
-  "traces",
-  "passing",
-  "none",
-  "empty",
-];
-const RECEIPT_ORDER: ReceiptsKey[] = [
-  "full",
-  "errors",
-  "latency",
-  "shared",
-  "repeated",
-  "none",
-];
+const SCEN_ORDER: ScenarioKey[] = ["mixed", "failing", "traces", "passing", "none", "empty"];
+const RECEIPT_ORDER: ReceiptsKey[] = ["full", "errors", "latency", "shared", "repeated", "none"];
 
 function buildMocks(): BriefingMock[] {
   const mocks: BriefingMock[] = [];

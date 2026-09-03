@@ -92,9 +92,7 @@ describe("langwatch-api", () => {
         const { searchTraces } = await import("../langwatch-api.js");
         mockErrorResponse(401, "Unauthorized");
 
-        await expect(searchTraces({ startDate: 1000, endDate: 2000 })).rejects.toThrow(
-          "401",
-        );
+        await expect(searchTraces({ startDate: 1000, endDate: 2000 })).rejects.toThrow("401");
       });
     });
   });
@@ -441,9 +439,7 @@ describe("langwatch-api", () => {
       const { searchTraces } = await import("../langwatch-api.js");
       mockErrorResponse(500, "Internal Server Error");
 
-      await expect(searchTraces({ startDate: 1000, endDate: 2000 })).rejects.toThrow(
-        "500",
-      );
+      await expect(searchTraces({ startDate: 1000, endDate: 2000 })).rejects.toThrow("500");
     });
 
     it("includes the response body in the error message", async () => {
@@ -580,10 +576,7 @@ describe("langwatch-api", () => {
 
     it("omits the Tips and Docs sections when absent", async () => {
       const { searchTraces } = await import("../langwatch-api.js");
-      mockErrorResponse(
-        401,
-        JSON.stringify({ error: "unauthorized", message: "Invalid API key" }),
-      );
+      mockErrorResponse(401, JSON.stringify({ error: "unauthorized", message: "Invalid API key" }));
 
       const error = await searchTraces({
         startDate: 1000,
@@ -599,10 +592,7 @@ describe("langwatch-api", () => {
 
     it("ignores an invalid fault value", async () => {
       const { searchTraces } = await import("../langwatch-api.js");
-      mockErrorResponse(
-        500,
-        JSON.stringify({ error: "boom", message: "Boom", fault: "nobody" }),
-      );
+      mockErrorResponse(500, JSON.stringify({ error: "boom", message: "Boom", fault: "nobody" }));
 
       const error = await searchTraces({
         startDate: 1000,

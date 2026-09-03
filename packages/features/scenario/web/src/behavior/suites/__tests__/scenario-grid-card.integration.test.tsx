@@ -179,9 +179,7 @@ describe("<ScenarioGridCard/>", () => {
         { wrapper: Wrapper },
       );
 
-      await user.hover(
-        screen.getByRole("button", { name: "View details for Login Flow" }),
-      );
+      await user.hover(screen.getByRole("button", { name: "View details for Login Flow" }));
 
       expect(prefetchMock).toHaveBeenCalledWith("run_hover");
     });

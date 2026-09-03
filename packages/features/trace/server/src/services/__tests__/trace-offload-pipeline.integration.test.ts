@@ -98,7 +98,15 @@ function makeEventLogBlobStore(contents: Record<string, string>): {
   getFromEventLogSpy: ReturnType<typeof vi.fn>;
 } {
   const getFromEventLogSpy = vi.fn(
-    async ({ field }: { eventId: string; field: string; tenantId: string; aggregateType: string; aggregateId: string }) => {
+    async ({
+      field,
+    }: {
+      eventId: string;
+      field: string;
+      tenantId: string;
+      aggregateType: string;
+      aggregateId: string;
+    }) => {
       if (field in contents) return contents[field]!;
       throw new BlobNotFoundError("evt-test", field, PROJECT_ID);
     },
@@ -219,7 +227,9 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
       expect(Buffer.byteLength(previewValue, "utf-8")).toBeLessThanOrEqual(
         IO_PREVIEW_BYTES + 4, // +4 bytes for the ellipsis character "…" (3 bytes UTF-8)
       );
-      expect(Buffer.byteLength(previewValue, "utf-8")).toBeLessThan(Buffer.byteLength(ONE_MB_OUTPUT, "utf-8"));
+      expect(Buffer.byteLength(previewValue, "utf-8")).toBeLessThan(
+        Buffer.byteLength(ONE_MB_OUTPUT, "utf-8"),
+      );
     });
 
     it("the lean event carries a reserved eventref attribute for langwatch.output", () => {
@@ -260,7 +270,8 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
 
     /** @scenario An online evaluator on an over-threshold trace receives the full output */
     it("the returned span's langwatch.output is the full value byte-identical to the original", () => {
-      const resolvedAttrValue = resolvedResult.resolvedSpans[0]?.spanAttributes?.["langwatch.output"];
+      const resolvedAttrValue =
+        resolvedResult.resolvedSpans[0]?.spanAttributes?.["langwatch.output"];
       expect(resolvedAttrValue).toBe(ONE_MB_OUTPUT);
     });
 

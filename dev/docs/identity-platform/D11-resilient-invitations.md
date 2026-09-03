@@ -30,7 +30,7 @@ Acceptance lookup: invite.email → normalize → all VERIFIED identifiers match
 
 # Out of Scope
 
-- Join requests (D12 — but note the interplay rules there: answering a request with an invite, and invite acceptance auto-withdrawing a pending request). The acceptance *screen* set (D13's invitation-acceptance screen; this deliverable ships the logic inside today's members UI). Team-assignment UX changes.
+- Join requests (D12 — but note the interplay rules there: answering a request with an invite, and invite acceptance auto-withdrawing a pending request). The acceptance _screen_ set (D13's invitation-acceptance screen; this deliverable ships the logic inside today's members UI). Team-assignment UX changes.
 
 # Research
 

@@ -53,11 +53,7 @@ export class PromptServiceTracingDecorator {
     return result;
   }
 
-  async update(
-    span: LangWatchSpan,
-    id: string,
-    params: UpdatePromptBody,
-  ): Promise<PromptResponse> {
+  async update(span: LangWatchSpan, id: string, params: UpdatePromptBody): Promise<PromptResponse> {
     if (shouldCaptureInput()) {
       span.setInput(params);
     }
@@ -123,10 +119,8 @@ export class PromptServiceTracingDecorator {
     if (result.conflictInfo) {
       span.setAttributes({
         "langwatch.prompt.sync.has_conflict": "true",
-        "langwatch.prompt.sync.local_version":
-          result.conflictInfo.localVersion.toString(),
-        "langwatch.prompt.sync.remote_version":
-          result.conflictInfo.remoteVersion.toString(),
+        "langwatch.prompt.sync.local_version": result.conflictInfo.localVersion.toString(),
+        "langwatch.prompt.sync.remote_version": result.conflictInfo.remoteVersion.toString(),
       });
     }
 

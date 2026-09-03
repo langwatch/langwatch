@@ -29,10 +29,7 @@ export abstract class RoleRepository {
     roleIds: string[],
     organizationId: string,
   ): Promise<Array<{ id: string; permissions: string[] }>>;
-  abstract countRoleBindings(input: {
-    roleId: string;
-    organizationId: string;
-  }): Promise<number>;
+  abstract countRoleBindings(input: { roleId: string; organizationId: string }): Promise<number>;
   abstract countAssignedUsers(roleId: string): Promise<number>;
   abstract create(input: { role: RoleCreate; actor: LedgerActor }): Promise<Role>;
   abstract update(input: {
@@ -52,15 +49,8 @@ export abstract class RoleRepository {
     customRoleId: string;
     actor: LedgerActor;
   }): Promise<void>;
-  abstract remove(input: {
-    userId: string;
-    teamId: string;
-    actor: LedgerActor;
-  }): Promise<void>;
-  abstract isExclusiveToApiKey(input: {
-    roleId: string;
-    apiKeyId: string;
-  }): Promise<boolean>;
+  abstract remove(input: { userId: string; teamId: string; actor: LedgerActor }): Promise<void>;
+  abstract isExclusiveToApiKey(input: { roleId: string; apiKeyId: string }): Promise<boolean>;
   abstract removeExclusiveApiKeyRoles(input: {
     roleIds: string[];
     apiKeyId: string;

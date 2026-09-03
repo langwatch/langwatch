@@ -53,9 +53,7 @@ export type AuthRestSession = Readonly<{
  * gate DENIES is coerced to email mode (ADR-027) and must not bounce the user
  * through an IdP it is not allowed to use.
  */
-export type AuthRestFederatedLogout = (input: {
-  returnTo: string;
-}) => Promise<string | null>;
+export type AuthRestFederatedLogout = (input: { returnTo: string }) => Promise<string | null>;
 
 /** Everything the auth door reaches that this feature does not own. */
 export type AuthRestPorts = Readonly<{

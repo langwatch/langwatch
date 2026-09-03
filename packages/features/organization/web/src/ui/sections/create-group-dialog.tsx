@@ -86,9 +86,7 @@ export function CreateGroupDialog({
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
   const availableMemberItems = memberSearch
-    ? allAvailableMembers.filter((m) =>
-        m.label.toLowerCase().includes(memberSearch.toLowerCase()),
-      )
+    ? allAvailableMembers.filter((m) => m.label.toLowerCase().includes(memberSearch.toLowerCase()))
     : allAvailableMembers;
   const availableMemberCollection = createListCollection({
     items: availableMemberItems,
@@ -127,14 +125,7 @@ export function CreateGroupDialog({
               {pendingBindings.length > 0 && (
                 <VStack gap={2} align="stretch" mb={2}>
                   {pendingBindings.map((b, i) => (
-                    <HStack
-                      key={i}
-                      px={3}
-                      py={2}
-                      bg="bg.muted"
-                      borderRadius="md"
-                      fontSize="sm"
-                    >
+                    <HStack key={i} px={3} py={2} bg="bg.muted" borderRadius="md" fontSize="sm">
                       <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
                         {b.customRoleName ?? b.role}
                       </Badge>
@@ -148,9 +139,7 @@ export function CreateGroupDialog({
                         variant="ghost"
                         color="fg.muted"
                         aria-label={`Remove ${b.customRoleName ?? b.role} binding on ${b.scopeName ?? b.scopeId}`}
-                        onClick={() =>
-                          setPendingBindings((prev) => prev.filter((_, j) => j !== i))
-                        }
+                        onClick={() => setPendingBindings((prev) => prev.filter((_, j) => j !== i))}
                       >
                         <X size={14} />
                       </Button>
@@ -172,9 +161,7 @@ export function CreateGroupDialog({
               {pendingMemberIds.length > 0 && (
                 <VStack gap={1} align="stretch" mb={2}>
                   {pendingMemberIds.map((userId) => {
-                    const member = orgMembers.data?.members.find(
-                      (m) => m.userId === userId,
-                    );
+                    const member = orgMembers.data?.members.find((m) => m.userId === userId);
                     return (
                       <HStack key={userId} py={1} fontSize="sm">
                         <RandomColorAvatar
@@ -182,18 +169,14 @@ export function CreateGroupDialog({
                           image={member?.user.image}
                           size="xs"
                         />
-                        <Text flex={1}>
-                          {member?.user.name ?? member?.user.email ?? userId}
-                        </Text>
+                        <Text flex={1}>{member?.user.name ?? member?.user.email ?? userId}</Text>
                         <Button
                           size="xs"
                           variant="ghost"
                           color="fg.muted"
                           aria-label={`Remove ${member?.user.name ?? member?.user.email ?? userId} from group`}
                           onClick={() =>
-                            setPendingMemberIds((prev) =>
-                              prev.filter((id) => id !== userId),
-                            )
+                            setPendingMemberIds((prev) => prev.filter((id) => id !== userId))
                           }
                         >
                           <X size={14} />

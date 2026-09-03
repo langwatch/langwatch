@@ -149,8 +149,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query:
-        "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+      query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
       query_params: { tenantId },
     });
     await ch.close();
@@ -261,32 +260,25 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
           { ts: t(10), name: "exception", attrs: { type: "TimeoutError" } },
           { ts: t(20), name: "span.end", attrs: { phase: "done" } },
         ]),
-        makeEventRow("evt-span-2", [
-          { ts: t(5), name: "process.tick", attrs: { iter: "1" } },
-        ]),
+        makeEventRow("evt-span-2", [{ ts: t(5), name: "process.tick", attrs: { iter: "1" } }]),
         // Stale earlier version of evt-span-1 — dedup must drop it. Override
         // StartTime as well as UpdatedAt: stored_spans is
         // ReplacingMergeTree(StartTime), so a tied StartTime lets the engine
         // collapse the live row at insert time (rows in one INSERT land in a
         // single part, and the engine resolves ties unpredictably). A strictly
         // older StartTime makes the stale row deterministically lose the merge.
-        makeEventRow(
-          "evt-span-1",
-          [{ ts: t(-1000), name: "stale.skip", attrs: { v: "old" } }],
-          {
-            StartTime: new Date(base - 60_000),
-            EndTime: new Date(base - 60_000 + 50),
-            UpdatedAt: new Date(base - 60_000),
-            CreatedAt: new Date(base - 60_000),
-          },
-        ),
+        makeEventRow("evt-span-1", [{ ts: t(-1000), name: "stale.skip", attrs: { v: "old" } }], {
+          StartTime: new Date(base - 60_000),
+          EndTime: new Date(base - 60_000 + 50),
+          UpdatedAt: new Date(base - 60_000),
+          CreatedAt: new Date(base - 60_000),
+        }),
       ]);
     });
 
     afterAll(async () => {
       await ch.exec({
-        query:
-          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: eventsTenantId },
       });
     });
@@ -313,11 +305,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
         traceId: eventsTraceId,
       });
 
-      expect(events.map((e) => e.event_type)).toEqual([
-        "span.end",
-        "process.tick",
-        "span.start",
-      ]);
+      expect(events.map((e) => e.event_type)).toEqual(["span.end", "process.tick", "span.start"]);
       expect(events.find((e) => e.event_type === "exception")).toBeUndefined();
       expect(events.find((e) => e.event_type === "stale.skip")).toBeUndefined();
     });
@@ -409,13 +397,10 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
         rollupRow({
           traceId: noisyTraceId,
           spanId: "noisy-span",
-          events: Array.from(
-            { length: MAX_EVENT_NAMES_PER_TRACE + 5 },
-            (_, i) => ({
-              ts: at(100 + i),
-              name: `event.kind.${String(i).padStart(2, "0")}`,
-            }),
-          ),
+          events: Array.from({ length: MAX_EVENT_NAMES_PER_TRACE + 5 }, (_, i) => ({
+            ts: at(100 + i),
+            name: `event.kind.${String(i).padStart(2, "0")}`,
+          })),
         }),
         // Our own half of the shared trace id, so the read has something to
         // return for it and the isolation assertion is not vacuous.
@@ -428,22 +413,17 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
       // The neighbour's half: same trace id, different tenant. A read missing
       // its tenant predicate would fold this in.
       await insertRows([
-        makeEventRow(
-          "other-tenant-span",
-          [{ ts: at(10), name: "leaked", attrs: {} }],
-          {
-            TenantId: `${rollupTenantId}-neighbour`,
-            TraceId: otherTenantTraceId,
-          },
-        ),
+        makeEventRow("other-tenant-span", [{ ts: at(10), name: "leaked", attrs: {} }], {
+          TenantId: `${rollupTenantId}-neighbour`,
+          TraceId: otherTenantTraceId,
+        }),
       ]);
     });
 
     afterAll(async () => {
       for (const tenant of [rollupTenantId, `${rollupTenantId}-neighbour`]) {
         await ch.exec({
-          query:
-            "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+          query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
           query_params: { tenantId: tenant },
         });
       }
@@ -502,9 +482,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
         timeRange,
       });
 
-      expect(Object.keys(rollups).sort()).toEqual(
-        [feedbackTraceId, chattyTraceId].sort(),
-      );
+      expect(Object.keys(rollups).sort()).toEqual([feedbackTraceId, chattyTraceId].sort());
     });
 
     /** @scenario A trace with no events shows the empty marker */
@@ -637,13 +615,11 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
 
     afterAll(async () => {
       await ch.exec({
-        query:
-          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: hintlessTenantId },
       });
       await ch.exec({
-        query:
-          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: hintlessTenantId },
       });
     });
@@ -680,9 +656,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
             return Reflect.get(target, prop, receiver);
           },
         }) as ClickHouseClient;
-        const recordingRepo = new SpanStorageClickHouseRepository(
-          async () => recordingClient,
-        );
+        const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
         const events = await recordingRepo.getTraceEventsByTraceId({
           tenantId: hintlessTenantId,
@@ -760,13 +734,11 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
 
     afterAll(async () => {
       await ch.exec({
-        query:
-          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: hintlessTenantId },
       });
       await ch.exec({
-        query:
-          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
         query_params: { tenantId: hintlessTenantId },
       });
     });
@@ -798,9 +770,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
           return Reflect.get(target, prop, receiver);
         },
       }) as ClickHouseClient;
-      const recordingRepo = new SpanStorageClickHouseRepository(
-        async () => recordingClient,
-      );
+      const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
         tenantId: hintlessTenantId,
@@ -835,9 +805,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
           return Reflect.get(target, prop, receiver);
         },
       }) as ClickHouseClient;
-      const recordingRepo = new SpanStorageClickHouseRepository(
-        async () => recordingClient,
-      );
+      const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
         tenantId: hintlessTenantId,
@@ -870,9 +838,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
           return Reflect.get(target, prop, receiver);
         },
       }) as ClickHouseClient;
-      const recordingRepo = new SpanStorageClickHouseRepository(
-        async () => recordingClient,
-      );
+      const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
       const spans = await recordingRepo.getNormalizedSpansByTraceId({
         tenantId: hintlessTenantId,

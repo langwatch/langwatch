@@ -127,10 +127,7 @@ export interface ProjectionStore<ProjectionType extends Projection = Projection>
    * }
    * ```
    */
-  storeProjection(
-    projection: ProjectionType,
-    context: ProjectionStoreWriteContext,
-  ): Promise<void>;
+  storeProjection(projection: ProjectionType, context: ProjectionStoreWriteContext): Promise<void>;
 
   /**
    * Optional batch store for persisting multiple projections in a single INSERT.

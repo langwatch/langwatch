@@ -95,9 +95,7 @@ describe("trace", () => {
           task: async () => ({ rows: [] }),
         });
 
-        expect(attributes[SPAN_ATTRIBUTES.unscopedReason]).toBe(
-          "operational part-count check",
-        );
+        expect(attributes[SPAN_ATTRIBUTES.unscopedReason]).toBe("operational part-count check");
       });
     });
   });

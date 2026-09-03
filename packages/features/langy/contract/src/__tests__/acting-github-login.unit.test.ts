@@ -6,10 +6,7 @@
  * username charset so the Co-authored-by trailer is always well-formed.
  */
 import { describe, expect, it } from "vitest";
-import {
-  type LangyCredentialSession,
-  resolveActingGithubLogin,
-} from "@langwatch/langy-contract";
+import { type LangyCredentialSession, resolveActingGithubLogin } from "@langwatch/langy-contract";
 
 function session(user: { name?: string; email?: string }): LangyCredentialSession {
   return { user: { id: "u1", ...user } };
@@ -17,9 +14,7 @@ function session(user: { name?: string; email?: string }): LangyCredentialSessio
 
 describe("resolveActingGithubLogin", () => {
   it("uses the profile name, sanitised to the GitHub username charset", () => {
-    expect(resolveActingGithubLogin(session({ name: "Ada Lovelace" }))).toBe(
-      "ada-lovelace",
-    );
+    expect(resolveActingGithubLogin(session({ name: "Ada Lovelace" }))).toBe("ada-lovelace");
   });
 
   it("falls back to the email local-part when there is no name", () => {

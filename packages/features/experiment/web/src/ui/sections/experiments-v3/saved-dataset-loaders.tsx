@@ -15,11 +15,7 @@ const SavedDatasetLoader = ({ dataset }: { dataset: DatasetReference }) => {
  * Each dataset gets its own query - tRPC handles batching automatically.
  * Renders nothing visible.
  */
-export const SavedDatasetLoaders = ({
-  datasets,
-}: {
-  datasets: DatasetReference[];
-}) => {
+export const SavedDatasetLoaders = ({ datasets }: { datasets: DatasetReference[] }) => {
   const savedDatasets = datasets.filter(
     (d) => d.type === "saved" && d.datasetId && !d.savedRecords,
   );

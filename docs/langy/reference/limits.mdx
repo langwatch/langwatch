@@ -40,15 +40,15 @@ Each chat mints its own LangWatch API key, owned by the requesting user, project
 Langy mints a fresh 1-hour GitHub App installation token per turn, hands it to the worker as an environment variable only, and never stores it at rest. The token carries only `contents:write` and `pull_requests:write`, scoped to the installation's repositories. See [GitHub access](/langy/security/github-access).
 
 <Note>
-  Only the max-workers cap and the idle-reap timeout are configurable. The 20-PRs-per-day
-  cap is hardcoded, and the two token lifetimes are fixed (one by design, one by GitHub).
-  For the full environment-variable reference, see [Environment
+  Only the max-workers cap and the idle-reap timeout are configurable. The 20-PRs-per-day cap is
+  hardcoded, and the two token lifetimes are fixed (one by design, one by GitHub). For the full
+  environment-variable reference, see [Environment
   variables](/self-hosting/langy/environment-variables).
 </Note>
 
 <Info>
-  **Also check:** [Environment variables](/self-hosting/langy/environment-variables),
-  [Pull requests](/langy/pull-requests), [Sandbox](/langy/security/sandbox).
+  **Also check:** [Environment variables](/self-hosting/langy/environment-variables), [Pull
+  requests](/langy/pull-requests), [Sandbox](/langy/security/sandbox).
 </Info>
 
 ## Reference

@@ -122,14 +122,10 @@ describe("the comparison leaderboard's visibility gates", () => {
     it("renders no leaderboard chart and offers no way to switch one on", async () => {
       renderCharts(THREE_VARIANTS, false);
 
-      expect(
-        screen.queryByTestId(`chart-leaderboard-${EVALUATOR_ID}`),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId(`chart-leaderboard-${EVALUATOR_ID}`)).not.toBeInTheDocument();
 
       const menu = await openMetricsMenu();
-      expect(
-        within(menu).queryByText("Comparison (Leaderboard)"),
-      ).not.toBeInTheDocument();
+      expect(within(menu).queryByText("Comparison (Leaderboard)")).not.toBeInTheDocument();
       // The win-rate chart is a different feature and is not gated with it.
       expect(within(menu).getByText("Comparison (Win Rate)")).toBeInTheDocument();
     });
@@ -190,15 +186,11 @@ describe("the comparison leaderboard's visibility gates", () => {
     it("leaves it out at two variants, where win rate already tells the story", async () => {
       renderCharts(TWO_VARIANTS, true);
 
-      expect(
-        screen.queryByTestId(`chart-leaderboard-${EVALUATOR_ID}`),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId(`chart-leaderboard-${EVALUATOR_ID}`)).not.toBeInTheDocument();
       expect(screen.getByTestId(`chart-comparison-${EVALUATOR_ID}`)).toBeInTheDocument();
 
       const menu = await openMetricsMenu();
-      expect(
-        within(menu).queryByText("Comparison (Leaderboard)"),
-      ).not.toBeInTheDocument();
+      expect(within(menu).queryByText("Comparison (Leaderboard)")).not.toBeInTheDocument();
     });
   });
 });

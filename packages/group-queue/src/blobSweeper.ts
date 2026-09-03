@@ -4,11 +4,7 @@ import type { Cluster, Redis as IORedis } from "ioredis";
 import { createTenantId } from "./storage";
 
 import { blobHolderSetKey, blobLeaseSetKey, redisBlobKeyPrefix } from "./blobKeys";
-import {
-  BLOB_SWEEP_LUA,
-  BLOB_SWEEP_OUTCOMES,
-  type BlobSweepOutcome,
-} from "./blobSweepLua";
+import { BLOB_SWEEP_LUA, BLOB_SWEEP_OUTCOMES, type BlobSweepOutcome } from "./blobSweepLua";
 import { CachedLuaScript } from "./cachedLuaScript";
 import { gqBlobSweepTotal } from "./metrics";
 import { GROUP_QUEUE_REGISTRY_KEY } from "./scripts";
@@ -187,10 +183,7 @@ export class BlobSweeper {
     return `${redisBlobKeyPrefix(queueName)}*/*`;
   }
 
-  private parseBlobKey(
-    queueName: string,
-    key: string,
-  ): { projectId: string; hash: string } | null {
+  private parseBlobKey(queueName: string, key: string): { projectId: string; hash: string } | null {
     const suffix = key.slice(redisBlobKeyPrefix(queueName).length);
     const slash = suffix.indexOf("/");
     if (slash <= 0 || slash === suffix.length - 1) return null;

@@ -14,13 +14,7 @@ interface CommandItemProps {
 /**
  * Renders a single command item row in the command bar.
  */
-export function CommandItem({
-  item,
-  index,
-  isSelected,
-  onSelect,
-  onMouseEnter,
-}: CommandItemProps) {
+export function CommandItem({ item, index, isSelected, onSelect, onMouseEnter }: CommandItemProps) {
   const { Icon, color } = getIconInfo(item);
 
   let label = "";

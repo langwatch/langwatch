@@ -27,9 +27,7 @@ export abstract class AnnotationRepository {
   abstract listForProjection(
     input: ListProjectionAnnotationsInput,
   ): Promise<ProjectionAnnotation[]>;
-  abstract listScoreNames(
-    input: ListAnnotationScoreNamesInput,
-  ): Promise<AnnotationScoreName[]>;
+  abstract listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]>;
   abstract upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore>;
   abstract listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]>;
   abstract getScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore>;
@@ -40,8 +38,5 @@ export abstract class AnnotationRepository {
     projectId: string;
     scoreTypeIds: string[];
   }): Promise<number>;
-  abstract countAnnotationQueues(input: {
-    projectId: string;
-    queueIds: string[];
-  }): Promise<number>;
+  abstract countAnnotationQueues(input: { projectId: string; queueIds: string[] }): Promise<number>;
 }

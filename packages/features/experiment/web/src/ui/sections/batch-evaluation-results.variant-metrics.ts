@@ -7,7 +7,10 @@
  * `computeMetricStats` used elsewhere for latency/cost) rather than a single
  * mean, so a "cheaper" claim isn't hiding its own spread.
  */
-import { computeMetricStats, type MetricStats } from "../../model/batch-evaluation-results.metric-stats";
+import {
+  computeMetricStats,
+  type MetricStats,
+} from "../../model/batch-evaluation-results.metric-stats";
 import { bootstrapMeanCI } from "../../model/batch-evaluation-results.bootstrap-ci";
 import type { BatchResultRow } from "./batch-evaluation-results.types";
 

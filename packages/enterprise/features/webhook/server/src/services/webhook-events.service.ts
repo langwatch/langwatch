@@ -70,21 +70,15 @@ export class WebhookEventsService extends WebhookEventsServiceContract {
     id: string;
   }): Promise<WebhookEnvelope | null> {
     const row = await this.options.events.tryReadEmittedEventById({
-      tenantIds: await this.options.tenants.tenantIdsForOrganization(
-        input.organizationId,
-      ),
+      tenantIds: await this.options.tenants.tenantIdsForOrganization(input.organizationId),
       id: input.id,
     });
     return row ? this.options.envelopes.fromSpendRow(row) : null;
   }
 
-  async getEmittedEvents(
-    query: ListWebhookEventsQuery,
-  ): Promise<ListWebhookEventsResult> {
+  async getEmittedEvents(query: ListWebhookEventsQuery): Promise<ListWebhookEventsResult> {
     const page = await this.options.events.readEmittedEventsPage({
-      tenantIds: await this.options.tenants.tenantIdsForOrganization(
-        query.organizationId,
-      ),
+      tenantIds: await this.options.tenants.tenantIdsForOrganization(query.organizationId),
       fromMs: query.fromMs,
       toMs: query.toMs,
       cursor: query.cursor ?? null,

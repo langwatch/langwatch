@@ -21,9 +21,7 @@ export class PulledUsageLedgerProcess {
     return new PulledUsageLedgerProcess(PulledUsageLedgerIntent.create(ledger));
   }
 
-  static scopeId(
-    record: Pick<PulledUsageObservedEventData, "organizationId" | "teamId">,
-  ): string {
+  static scopeId(record: Pick<PulledUsageObservedEventData, "organizationId" | "teamId">): string {
     return record.teamId ?? record.organizationId;
   }
 

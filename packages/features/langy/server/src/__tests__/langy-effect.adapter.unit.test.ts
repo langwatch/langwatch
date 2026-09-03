@@ -116,9 +116,7 @@ describe("LangyEffectPortsAdapter", () => {
     const deps = makeDeps(null);
     const ports = LangyEffectPortsAdapter.create(deps);
 
-    await expect(
-      ports.workerDispatch.dispatchTurn(dispatchParams),
-    ).resolves.toBeUndefined();
+    await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).resolves.toBeUndefined();
     expect(deps.worker.dispatch).not.toHaveBeenCalled();
   });
 
@@ -143,9 +141,9 @@ describe("LangyEffectPortsAdapter", () => {
       deps.worker.dispatch.mockResolvedValue(outcome);
       const ports = LangyEffectPortsAdapter.create(deps);
 
-      await expect(
-        ports.workerDispatch.dispatchTurn(dispatchParams),
-      ).rejects.toBeInstanceOf(LangyTurnDispatchRetry);
+      await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toBeInstanceOf(
+        LangyTurnDispatchRetry,
+      );
     },
   );
 
@@ -204,9 +202,7 @@ describe("LangyEffectPortsAdapter", () => {
     deps.handoffStore.stash.mockRejectedValueOnce(new Error("redis down"));
     const ports = LangyEffectPortsAdapter.create(deps);
 
-    await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toThrow(
-      "redis down",
-    );
+    await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toThrow("redis down");
     expect(deps.revokeSessionKey).toHaveBeenCalledWith({
       apiKeyId: "key-recovered",
       projectId: PROJECT,
@@ -279,9 +275,7 @@ describe("when the agent permanently rejects the dispatch", () => {
     deps.worker.dispatch.mockResolvedValue("unavailable");
     const ports = LangyEffectPortsAdapter.create(deps);
 
-    await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toThrow(
-      /not accepted/,
-    );
+    await expect(ports.workerDispatch.dispatchTurn(dispatchParams)).rejects.toThrow(/not accepted/);
     expect(deps.failTurn.failTurn).not.toHaveBeenCalled();
   });
 });

@@ -41,19 +41,13 @@ export class DataRetentionBackendUnavailableError extends Error {
 }
 
 export abstract class DataRetentionService {
-  abstract getResolvedForProject(input: {
-    projectId: string;
-  }): Promise<ResolvedRetention>;
+  abstract getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention>;
   abstract getRetentionDays(input: {
     projectId: string;
     category: RetentionCategory;
   }): Promise<number>;
-  abstract previewScopeRemoval(input: {
-    scope: ScopeAssignment;
-  }): Promise<ResolvedRetention>;
-  abstract listOrganizationRules(input: {
-    organizationId: string;
-  }): Promise<RetentionPolicy[]>;
+  abstract previewScopeRemoval(input: { scope: ScopeAssignment }): Promise<ResolvedRetention>;
+  abstract listOrganizationRules(input: { organizationId: string }): Promise<RetentionPolicy[]>;
   abstract tryGetPolicyById(input: { id: string }): Promise<RetentionPolicy | null>;
   abstract setForScope(input: {
     scope: ScopeAssignment;
@@ -80,7 +74,5 @@ export abstract class DataRetentionService {
   ): Promise<RetroactiveMutationProgress[]>;
   abstract killRetroactiveMutation(input: KillRetroactiveMutationInput): Promise<void>;
   abstract getTotalStorageBytes(input: StorageMeterTenantInput): Promise<number>;
-  abstract getTotalStorageBytesForTenants(
-    input: StorageMeterTenantsInput,
-  ): Promise<number>;
+  abstract getTotalStorageBytesForTenants(input: StorageMeterTenantsInput): Promise<number>;
 }

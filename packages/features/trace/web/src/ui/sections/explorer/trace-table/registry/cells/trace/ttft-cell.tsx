@@ -47,13 +47,7 @@ export const TtftCell = {
   label: "TTFT",
   render: ({ row }) =>
     row.ttft != null ? (
-      <TtftCellInner
-        ttftMs={row.ttft}
-        textStyle="mono"
-        barWidth="100%"
-        barHeight="2px"
-        gap={0}
-      />
+      <TtftCellInner ttftMs={row.ttft} textStyle="mono" barWidth="100%" barHeight="2px" gap={0} />
     ) : (
       <MonoCell>{dash}</MonoCell>
     ),

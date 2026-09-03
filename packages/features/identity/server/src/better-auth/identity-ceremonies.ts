@@ -40,10 +40,7 @@ export function bridgeAccountCeremonies({
 }: {
   ceremonies: IdentityAccountCeremonies;
   routesToIdentity: IdentityUserGate;
-}): Pick<
-  IdentityAccountCeremonies,
-  "beforeAccountCreate" | "beforeAccountDelete"
-> {
+}): Pick<IdentityAccountCeremonies, "beforeAccountCreate" | "beforeAccountDelete"> {
   const deferred = async (userId: unknown): Promise<boolean> =>
     typeof userId === "string" && (await routesToIdentity({ userId }));
   return {
@@ -139,8 +136,7 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
     // Minted the same way the schema's own `@default(nanoid())` would mint
     // it; better-auth persists a hook-supplied id (forceAllowId is always on
     // for creates), and the backfill links the identifier by this id.
-    const accountRowId =
-      typeof account.id === "string" ? account.id : nanoid();
+    const accountRowId = typeof account.id === "string" ? account.id : nanoid();
     await this.identity.attachIdentifier({
       tenantId: userId,
       userId,
@@ -160,13 +156,10 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
         typeof account.issuer === "string" && account.issuer.length > 0
           ? account.issuer
           : issuerForProviderId(providerId),
-      providerAccountId:
-        typeof account.accountId === "string" ? account.accountId : null,
+      providerAccountId: typeof account.accountId === "string" ? account.accountId : null,
       value,
       occurredAtMs:
-        account.createdAt instanceof Date
-          ? account.createdAt.getTime()
-          : this.clock.now(),
+        account.createdAt instanceof Date ? account.createdAt.getTime() : this.clock.now(),
       ceremony: { flow: "better-auth" },
       actor: { type: "user", id: userId },
     });
@@ -187,13 +180,7 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
    * null — an identifier without a protocol row is precisely what `Account`
    * could never model and `Identifier` can.
    */
-  async beforeEmailChange({
-    userId,
-    email,
-  }: {
-    userId: string;
-    email: string;
-  }): Promise<void> {
+  async beforeEmailChange({ userId, email }: { userId: string; email: string }): Promise<void> {
     if (!(await this.isLatched({ userId }))) return;
     await this.identity.attachIdentifier({
       tenantId: userId,
@@ -214,11 +201,7 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
   /** An `Account` row is about to be deleted: detach what it mirrors. */
   async beforeAccountDelete(account: CeremonyAccountRow): Promise<void> {
     const { id, userId, providerId } = account;
-    if (
-      typeof id !== "string" ||
-      typeof userId !== "string" ||
-      typeof providerId !== "string"
-    ) {
+    if (typeof id !== "string" || typeof userId !== "string" || typeof providerId !== "string") {
       return;
     }
     if (!(await this.isLatched({ userId }))) return;

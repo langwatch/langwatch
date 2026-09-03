@@ -1,7 +1,4 @@
-import type {
-  AuditLogJsonValue,
-  AuditLogService,
-} from "@langwatch/enterprise-audit-log-contract";
+import type { AuditLogJsonValue, AuditLogService } from "@langwatch/enterprise-audit-log-contract";
 import {
   PrismaAuditLogRepository,
   type AuditLogPrismaClient,
@@ -60,9 +57,7 @@ function clientIp(request: AuditLogRequestLike | undefined): string | undefined 
       if (ip) return ip;
     }
   }
-  return request.socket?.remoteAddress
-    ? validIp(request.socket.remoteAddress)
-    : undefined;
+  return request.socket?.remoteAddress ? validIp(request.socket.remoteAddress) : undefined;
 }
 
 function jsonClone(value: unknown): AuditLogJsonValue | undefined {

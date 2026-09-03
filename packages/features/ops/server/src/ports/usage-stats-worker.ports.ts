@@ -24,9 +24,7 @@ export interface UsageStatsCountDelegate {
 
 export interface UsageStatsOrganizationDatabase {
   organization: {
-    findMany(input: {
-      select: { id: true; name: true };
-    }): Promise<UsageStatsOrganization[]>;
+    findMany(input: { select: { id: true; name: true } }): Promise<UsageStatsOrganization[]>;
   };
 }
 
@@ -43,9 +41,7 @@ export interface UsageStatsProjectDatabase {
   annotationScore: UsageStatsCountDelegate;
   batchEvaluation: UsageStatsCountDelegate;
   customGraph: {
-    count(input: {
-      where: { projectId: { in: string[] }; kind: string };
-    }): Promise<number>;
+    count(input: { where: { projectId: { in: string[] }; kind: string } }): Promise<number>;
   };
   dataset: UsageStatsCountDelegate;
   datasetRecord: UsageStatsCountDelegate;
@@ -79,9 +75,7 @@ export interface UsageStatsClickHouseQueryResult {
 }
 
 export abstract class UsageStatsClickHouseClient {
-  abstract query(
-    input: UsageStatsClickHouseQuery,
-  ): Promise<UsageStatsClickHouseQueryResult>;
+  abstract query(input: UsageStatsClickHouseQuery): Promise<UsageStatsClickHouseQueryResult>;
 }
 
 /** Resolves the ClickHouse client for the organization owning a report. */

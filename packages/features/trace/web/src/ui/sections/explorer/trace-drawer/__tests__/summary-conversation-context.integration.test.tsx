@@ -110,9 +110,7 @@ function SummaryBranch({ trace }: { trace: SummaryTrace }) {
             conversationId={trace.conversationId}
             traceId={trace.traceId}
             collapsed={collapsed}
-            onToggleCollapsed={() =>
-              storeState.togglePaneCollapsed("conversationContext")
-            }
+            onToggleCollapsed={() => storeState.togglePaneCollapsed("conversationContext")}
           />
         </Box>
       )}

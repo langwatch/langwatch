@@ -92,13 +92,7 @@ export function TraceEditDiffDialog({ open, onClose, patch }: TraceEditDiffDialo
  * Both sides of the difference, each already diffed and counted, so the dialog
  * can label a tab with what it holds before the reader opens it.
  */
-function useTraceEditDiff({
-  open,
-  patch,
-}: {
-  open: boolean;
-  patch: TraceEditOverlayPatch;
-}): {
+function useTraceEditDiff({ open, patch }: { open: boolean; patch: TraceEditOverlayPatch }): {
   traceLines: DiffLine[];
   spansLines: DiffLine[];
   traceStat: DiffStat;
@@ -154,20 +148,9 @@ function DiffHunks({ lines, stat }: { lines: DiffLine[]; stat: DiffStat }) {
   }
 
   return (
-    <Box
-      as="pre"
-      margin={0}
-      paddingY={2}
-      fontFamily="mono"
-      textStyle="xs"
-      lineHeight="1.6"
-    >
+    <Box as="pre" margin={0} paddingY={2} fontFamily="mono" textStyle="xs" lineHeight="1.6">
       {hunks.map((entry, index) =>
-        entry === "gap" ? (
-          <GapRow key={`gap-${index}`} />
-        ) : (
-          <DiffRow key={index} line={entry} />
-        ),
+        entry === "gap" ? <GapRow key={`gap-${index}`} /> : <DiffRow key={index} line={entry} />,
       )}
     </Box>
   );

@@ -26,9 +26,7 @@ export class EventSourcingService<
   EventType extends Event = Event,
   ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
 > {
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.event-sourcing-service",
-  );
+  private readonly tracer = getLangWatchTracer("langwatch.trace-processing.event-sourcing-service");
   private readonly logger: ReturnType<typeof createLogger>;
 
   private readonly pipelineName: string;
@@ -40,10 +38,7 @@ export class EventSourcingService<
   private readonly router: ProjectionRouter<EventType, ProjectionTypes>;
   private readonly globalRegistry?: ProjectionRegistry<Event>;
   private readonly prepareEventForProjection: (event: EventType) => EventType;
-  private readonly metrics?: EventSourcingServiceOptions<
-    EventType,
-    ProjectionTypes
-  >["metrics"];
+  private readonly metrics?: EventSourcingServiceOptions<EventType, ProjectionTypes>["metrics"];
 
   constructor({
     pipelineName,
@@ -74,8 +69,7 @@ export class EventSourcingService<
     this.allowedEventTypes = new Set(allowedEventTypes);
     this.eventStore = eventStore;
     this.options = serviceOptions ?? {};
-    this.logger =
-      logger ?? createLogger("langwatch.trace-processing.event-sourcing-service");
+    this.logger = logger ?? createLogger("langwatch.trace-processing.event-sourcing-service");
     this.globalRegistry = globalRegistry;
     this.prepareEventForProjection = prepareEventForProjection ?? ((event) => event);
     this.metrics = metrics;
@@ -320,17 +314,15 @@ export class EventSourcingService<
 
         // Enrich events with trace context if missing (for debugging)
         const enrichedEvents: EventType[] = events.map((event) => {
-          const enrichedMetadata =
-            EventUtils.buildEventMetadataWithCurrentProcessingTraceparent(
-              event.metadata,
-              currentTraceparent,
-            );
+          const enrichedMetadata = EventUtils.buildEventMetadataWithCurrentProcessingTraceparent(
+            event.metadata,
+            currentTraceparent,
+          );
           if (enrichedMetadata === event.metadata) {
             return event;
           }
           const hasMetadata =
-            enrichedMetadata &&
-            Object.keys(enrichedMetadata as Record<string, unknown>).length > 0;
+            enrichedMetadata && Object.keys(enrichedMetadata as Record<string, unknown>).length > 0;
           if (!hasMetadata) {
             return event;
           }
@@ -347,9 +339,7 @@ export class EventSourcingService<
         // ADR-022: Derive lean shapes for projection dispatch.
         // storeEvents has already persisted the FULL events to event_log.
         // Map to new array — do NOT mutate enrichedEvents in place.
-        const leanedEvents = enrichedEvents.map((event) =>
-          this.prepareEventForProjection(event),
-        );
+        const leanedEvents = enrichedEvents.map((event) => this.prepareEventForProjection(event));
 
         // Dispatch events to all projections (fold + map) via unified router
         if (
@@ -441,12 +431,7 @@ export class EventSourcingService<
     context: EventStoreReadContext<EventType>,
     options?: { key?: string },
   ): Promise<boolean> {
-    return await this.router.hasProjectionByName(
-      projectionName,
-      aggregateId,
-      context,
-      options,
-    );
+    return await this.router.hasProjectionByName(projectionName, aggregateId, context, options);
   }
 
   /**

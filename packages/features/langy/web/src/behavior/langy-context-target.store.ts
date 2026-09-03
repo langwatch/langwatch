@@ -49,9 +49,7 @@ export type LangyContextTarget = LangyContextChip;
 export const LANGY_CONTEXT_DRAG_MIME = "application/x-langy-context";
 
 /** Read a dragged target back off a drop event, or null if it isn't one. */
-export function readDraggedTarget(
-  transfer: DataTransfer | null,
-): LangyContextTarget | null {
+export function readDraggedTarget(transfer: DataTransfer | null): LangyContextTarget | null {
   const raw = transfer?.getData(LANGY_CONTEXT_DRAG_MIME);
   if (!raw) return null;
   try {
@@ -247,8 +245,7 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()((set
   absorbFlash: null,
   armSource: null,
 
-  setSpotlight: (id) =>
-    set((state) => (state.spotlightId === id ? state : { spotlightId: id })),
+  setSpotlight: (id) => set((state) => (state.spotlightId === id ? state : { spotlightId: id })),
 
   flashAbsorb: (id) =>
     set((state) => ({
@@ -258,8 +255,7 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()((set
   clearAbsorbFlash: (nonce) =>
     set((state) => (state.absorbFlash?.nonce === nonce ? { absorbFlash: null } : state)),
 
-  arm: (source) =>
-    set((state) => (state.armSource === source ? state : { armSource: source })),
+  arm: (source) => set((state) => (state.armSource === source ? state : { armSource: source })),
 
   disarm: (source) =>
     set((state) => {
@@ -296,11 +292,7 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()((set
       if (pending && Date.now() - pending.requestedAt > PENDING_REVEAL_TTL_MS) {
         return { targets, pendingReveal: null };
       }
-      if (
-        pending &&
-        pending.kind === target.kind &&
-        state.revealedIds.size < REVEAL_MAX_TARGETS
-      ) {
+      if (pending && pending.kind === target.kind && state.revealedIds.size < REVEAL_MAX_TARGETS) {
         armRevealTimer();
         const revealedIds = new Set(state.revealedIds);
         revealedIds.add(target.id);
@@ -362,8 +354,7 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()((set
   setActiveChipIds: (ids) =>
     set((state) => {
       const unchanged =
-        ids.length === state.activeChipIds.size &&
-        ids.every((id) => state.activeChipIds.has(id));
+        ids.length === state.activeChipIds.size && ids.every((id) => state.activeChipIds.has(id));
       if (unchanged) return state;
       return { activeChipIds: new Set(ids) };
     }),
@@ -374,8 +365,7 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()((set
       // unchanged result so a mouse drifting across one row doesn't wake a
       // hundred subscribers sixty times a second.
       const sameNear =
-        nearIds.length === state.nearIds.size &&
-        nearIds.every((id) => state.nearIds.has(id));
+        nearIds.length === state.nearIds.size && nearIds.every((id) => state.nearIds.has(id));
       if (sameNear && hoveredId === state.hoveredId) return state;
       return { nearIds: new Set(nearIds), hoveredId };
     }),

@@ -1,10 +1,7 @@
 import { setTimeout as wait } from "node:timers/promises";
 import chalk from "chalk";
 import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import {
-  getEventsForSource,
-  type ActivityEventDetailRow,
-} from "@/cli/utils/governance/cli-api";
+import { getEventsForSource, type ActivityEventDetailRow } from "@/cli/utils/governance/cli-api";
 import { readCommandError, reportCommandError } from "@/cli/utils/errorOutput";
 
 /**
@@ -149,9 +146,7 @@ export function formatEventLine(e: ActivityEventDetailRow): string {
   const target = chalk.magenta(e.target);
   const cost = e.costUsd > 0 ? chalk.yellow(`$${e.costUsd.toFixed(4)}`) : "";
   const tokens =
-    e.tokensInput || e.tokensOutput
-      ? chalk.gray(`${e.tokensInput}/${e.tokensOutput} tok`)
-      : "";
+    e.tokensInput || e.tokensOutput ? chalk.gray(`${e.tokensInput}/${e.tokensOutput} tok`) : "";
   const meta = [cost, tokens].filter(Boolean).join(" ");
   return `${ts}  ${evt}  ${action} → ${target}  ${meta}`;
 }

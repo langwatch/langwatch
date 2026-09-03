@@ -164,9 +164,7 @@ describe("setModelProviderCommand()", () => {
 
   describe("when set fails", () => {
     it("exits with code 1", async () => {
-      mockSet.mockRejectedValue(
-        new ModelProvidersApiError("Failed", "set model provider"),
-      );
+      mockSet.mockRejectedValue(new ModelProvidersApiError("Failed", "set model provider"));
 
       await expect(setModelProviderCommand("openai", { enabled: true })).rejects.toThrow(
         ProcessExitError,

@@ -38,8 +38,7 @@ export function useVisibleTraceIds(): VisibleTraceIds {
   // Mirror useTraceListQuery's key EXACTLY or the cache read misses: the
   // sessions lens pins the trace list to its first batch and stores opaque
   // string cursors that the list query never consumes.
-  const traceCursor =
-    pageCursor && typeof pageCursor === "object" ? pageCursor : undefined;
+  const traceCursor = pageCursor && typeof pageCursor === "object" ? pageCursor : undefined;
   const effectivePage = grouping !== "by-conversation" ? page : 1;
 
   const cached = trpcUtils.tracesV2.list.getData({

@@ -74,9 +74,7 @@ export function useChoicesRefRows(
                   ? {
                       state: "live",
                       ...(row.primary !== undefined ? { primary: row.primary } : {}),
-                      ...(row.secondary !== undefined
-                        ? { secondary: row.secondary }
-                        : {}),
+                      ...(row.secondary !== undefined ? { secondary: row.secondary } : {}),
                     }
                   : { state: "dead" },
               );
@@ -107,8 +105,7 @@ export function useChoicesRefRows(
       }
       rows.set(
         option.id,
-        resolved.get(option.id) ??
-          (projectId ? { state: "pending" } : { state: "plain" }),
+        resolved.get(option.id) ?? (projectId ? { state: "pending" } : { state: "plain" }),
       );
     }
     return rows;

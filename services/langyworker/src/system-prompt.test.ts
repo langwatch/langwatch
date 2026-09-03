@@ -24,9 +24,7 @@ describe("composeSystemPrompt", () => {
 
   describe("when empty or whitespace sections", () => {
     it("drops them instead of emitting empty separators", () => {
-      expect(
-        composeSystemPrompt({ personaPrompt: "  ", agentsMd: "A", turnSystem: "" }),
-      ).toBe("A");
+      expect(composeSystemPrompt({ personaPrompt: "  ", agentsMd: "A", turnSystem: "" })).toBe("A");
     });
   });
 });

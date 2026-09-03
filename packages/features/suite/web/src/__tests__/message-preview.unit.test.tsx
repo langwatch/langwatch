@@ -13,9 +13,7 @@ describe("MessagePreview", () => {
   afterEach(cleanup);
 
   it("renders text content and preserves user alignment", () => {
-    const messages: SuiteRunMessage[] = [
-      { id: "message-1", role: "user", content: "Hello world" },
-    ];
+    const messages: SuiteRunMessage[] = [{ id: "message-1", role: "user", content: "Hello world" }];
 
     const { container } = render(<MessagePreview messages={messages} />, {
       wrapper: Wrapper,

@@ -28,11 +28,7 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
       mcpServers: {
         LangWatch: {
           command: "node",
-          args: [
-            `${__dirname}/../dist/index.js`,
-            "--apiKey",
-            process.env.LANGWATCH_API_KEY!,
-          ],
+          args: [`${__dirname}/../dist/index.js`, "--apiKey", process.env.LANGWATCH_API_KEY!],
         },
       },
     };
@@ -95,9 +91,7 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
 describe("OpenAI Implementation", () => {
   it.skipIf(isCI)("implements LangWatch in an OpenAI bot project", async () => {
     const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-openai-bot-"));
-    execSync(
-      `cp -r tests/fixtures/openai/openai_bot_function_call_input.py ${tempFolder}/main.py`,
-    );
+    execSync(`cp -r tests/fixtures/openai/openai_bot_function_call_input.py ${tempFolder}/main.py`);
 
     const result = await scenario.run({
       name: "OpenAI bot project",

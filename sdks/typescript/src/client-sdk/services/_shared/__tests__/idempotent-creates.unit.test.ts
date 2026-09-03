@@ -20,10 +20,7 @@ import { IDEMPOTENCY_KEY_HEADER, IDEMPOTENT_REPLAY_HEADER } from "../mutation-op
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-const jsonResponse = (
-  body: unknown,
-  init?: { status?: number; replayed?: boolean },
-): Response =>
+const jsonResponse = (body: unknown, init?: { status?: number; replayed?: boolean }): Response =>
   new Response(JSON.stringify(body), {
     status: init?.status ?? 201,
     headers: {
@@ -48,10 +45,7 @@ const CREATES = [
     surface: "virtual keys",
     response: { virtual_key: { id: "vk_1" }, secret: "sk-vk-1" },
     create: (options?: Parameters<VirtualKeysApiService["create"]>[1]) =>
-      new VirtualKeysApiService({ apiKey: "sk-lw-test" }).create(
-        { name: "checkout" },
-        options,
-      ),
+      new VirtualKeysApiService({ apiKey: "sk-lw-test" }).create({ name: "checkout" }, options),
     idOf: (result: unknown) => (result as { virtual_key: { id: string } }).virtual_key.id,
     expectedId: "vk_1",
   },
@@ -173,9 +167,7 @@ describe("Feature: retrying a create without minting a duplicate", () => {
 
         await surface.create({ signal: controller.signal });
 
-        expect((mockFetch.mock.calls[0]?.[1] as RequestInit).signal).toBe(
-          controller.signal,
-        );
+        expect((mockFetch.mock.calls[0]?.[1] as RequestInit).signal).toBe(controller.signal);
       });
     });
   });

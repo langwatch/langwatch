@@ -1,13 +1,4 @@
-import {
-  Box,
-  chakra,
-  Flex,
-  HStack,
-  Icon,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, Flex, HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
@@ -52,13 +43,7 @@ const MAX_DYNAMIC_ITEMS = 10;
 
 type RankedValue = { value: string; count: number; label?: string };
 
-function rankAndSlice({
-  values,
-  query,
-}: {
-  values: readonly RankedValue[];
-  query: string;
-}): {
+function rankAndSlice({ values, query }: { values: readonly RankedValue[]; query: string }): {
   items: string[];
   counts: Record<string, number>;
   labels?: Record<string, string>;
@@ -152,10 +137,10 @@ export const SearchBar: React.FC = () => {
   // none of this — the panel walks the user through model setup itself —
   // so when Langy owns the affordance the primer never blocks the way in.
   const { project } = useOrganizationTeamProject();
-  const { hasEnabledProviders, isLoading: isLoadingProviders } =
-    useModelProvidersSettings({ projectId: project?.id });
-  const askAiNeedsProviderPrimer =
-    !langyRoutesAsk && !isLoadingProviders && !hasEnabledProviders;
+  const { hasEnabledProviders, isLoading: isLoadingProviders } = useModelProvidersSettings({
+    projectId: project?.id,
+  });
+  const askAiNeedsProviderPrimer = !langyRoutesAsk && !isLoadingProviders && !hasEnabledProviders;
   // Both routes work on the user's real traces. In sample mode the rows
   // are hardcoded client-side fixtures with no server footprint, so an
   // AI query would error or hallucinate, and a search handed to Langy
@@ -294,13 +279,7 @@ export const SearchBar: React.FC = () => {
       setAiAutoSubmitSeed(trimmed.length > 0 ? trimmed : null);
       setAiMode(true);
     },
-    [
-      askAiNeedsProviderPrimer,
-      isSamplePreview,
-      langyRoutesAsk,
-      askLangyFromSearch,
-      openLangyAsk,
-    ],
+    [askAiNeedsProviderPrimer, isSamplePreview, langyRoutesAsk, askLangyFromSearch, openLangyAsk],
   );
 
   const handleAiBarClose = useCallback(() => {
@@ -314,10 +293,7 @@ export const SearchBar: React.FC = () => {
   // refreshSuggestion so each keystroke produces one render, not two.
   const { data: facets } = useTraceFacets();
   const valueSourceByField = useMemo(() => {
-    const map = new Map<
-      string,
-      readonly { value: string; count: number; label?: string }[]
-    >();
+    const map = new Map<string, readonly { value: string; count: number; label?: string }[]>();
     for (const facet of facets) {
       if (facet.kind === "categorical") {
         map.set(facet.key, facet.topValues);
@@ -466,12 +442,9 @@ export const SearchBar: React.FC = () => {
                   placeholderText={searchBarPlaceholder(askLabel)}
                 />
               )}
-              {hasContent &&
-                editorFocused &&
-                !suggestionOpen &&
-                !askAiNeedsProviderPrimer && (
-                  <SearchSubmitHint anchorX={cursorAnchorX} askLabel={askLabel} />
-                )}
+              {hasContent && editorFocused && !suggestionOpen && !askAiNeedsProviderPrimer && (
+                <SearchSubmitHint anchorX={cursorAnchorX} askLabel={askLabel} />
+              )}
             </Box>
 
             {/* Only render the badge for non-error statuses — parse errors
@@ -566,9 +539,7 @@ const UnifiedErrorBanner: React.FC<{
               </Text>
               {canExpand && (
                 <IconButton
-                  aria-label={
-                    expanded ? "Collapse error details" : "Expand error details"
-                  }
+                  aria-label={expanded ? "Collapse error details" : "Expand error details"}
                   size="2xs"
                   variant="ghost"
                   color="red.fg"
@@ -599,8 +570,7 @@ const UnifiedErrorBanner: React.FC<{
   );
 };
 
-const IS_MAC =
-  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 
 /**

@@ -1,9 +1,6 @@
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
-import {
-  CLUSTERING_ERROR_CODES,
-  ClusteringError,
-} from "@langwatch/topic-contract";
+import { CLUSTERING_ERROR_CODES, ClusteringError } from "@langwatch/topic-contract";
 import { classifyClusteringError } from "../topic-clustering.intent";
 
 /**

@@ -48,9 +48,7 @@ describe("deriveWaveActivity", () => {
   describe("given a turn in flight", () => {
     describe("when nothing has reached the wire", () => {
       it("waits — it never claims work that isn't happening", () => {
-        expect(derive({ turnInFlight: true, messages: [user, assistant([])] })).toBe(
-          "waiting",
-        );
+        expect(derive({ turnInFlight: true, messages: [user, assistant([])] })).toBe("waiting");
       });
     });
 
@@ -98,10 +96,7 @@ describe("deriveWaveActivity", () => {
         expect(
           derive({
             turnInFlight: true,
-            messages: [
-              user,
-              assistant([{ type: "text", text: "Let me check" }, runningToolPart]),
-            ],
+            messages: [user, assistant([{ type: "text", text: "Let me check" }, runningToolPart])],
           }),
         ).toBe("tool");
       });
@@ -145,16 +140,12 @@ describe("WAVE_MOTION_TARGETS", () => {
       expect(WAVE_MOTION_TARGETS.streaming.energy).toBeGreaterThan(
         WAVE_MOTION_TARGETS[state].energy,
       );
-      expect(WAVE_MOTION_TARGETS.streaming.drift).toBeGreaterThan(
-        WAVE_MOTION_TARGETS[state].drift,
-      );
+      expect(WAVE_MOTION_TARGETS.streaming.drift).toBeGreaterThan(WAVE_MOTION_TARGETS[state].drift);
     }
   });
 
   it("makes thinking a slow deep swell — slower and flatter than streaming", () => {
-    expect(WAVE_MOTION_TARGETS.thinking.drift).toBeLessThan(
-      WAVE_MOTION_TARGETS.streaming.drift,
-    );
+    expect(WAVE_MOTION_TARGETS.thinking.drift).toBeLessThan(WAVE_MOTION_TARGETS.streaming.drift);
     expect(WAVE_MOTION_TARGETS.thinking.flutter).toBeLessThan(
       WAVE_MOTION_TARGETS.streaming.flutter,
     );
@@ -172,9 +163,7 @@ describe("WAVE_MOTION_TARGETS", () => {
       (s) => s !== "settling",
     );
     for (const state of others) {
-      expect(WAVE_MOTION_TARGETS.settling.energy).toBeLessThan(
-        WAVE_MOTION_TARGETS[state].energy,
-      );
+      expect(WAVE_MOTION_TARGETS.settling.energy).toBeLessThan(WAVE_MOTION_TARGETS[state].energy);
     }
   });
 
@@ -189,11 +178,7 @@ describe("WAVE_MOTION_TARGETS", () => {
 });
 
 /** Run the smoother at 60fps for a given duration. */
-function run(
-  from: LangyWaveMotion,
-  activity: LangyWaveActivity,
-  seconds: number,
-): LangyWaveMotion {
+function run(from: LangyWaveMotion, activity: LangyWaveActivity, seconds: number): LangyWaveMotion {
   let motion = from;
   const dt = 1 / 60;
   for (let t = 0; t < seconds; t += dt) {

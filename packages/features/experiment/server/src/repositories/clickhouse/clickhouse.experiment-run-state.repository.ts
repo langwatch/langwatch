@@ -69,12 +69,7 @@ interface ClickHouseExperimentRunRecord {
 
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
   ClickHouseExperimentRunRecord,
-  | "CreatedAt"
-  | "UpdatedAt"
-  | "StartedAt"
-  | "FinishedAt"
-  | "StoppedAt"
-  | "LastEventOccurredAt"
+  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "StoppedAt" | "LastEventOccurredAt"
 >;
 
 export class ExperimentRunStateRepositoryClickHouse<
@@ -97,9 +92,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       CompletedCount: record.CompletedCount,
       FailedCount: record.FailedCount,
       TotalCost: record.TotalCost,
-      TotalDurationMs: record.TotalDurationMs
-        ? parseInt(record.TotalDurationMs, 10)
-        : null,
+      TotalDurationMs: record.TotalDurationMs ? parseInt(record.TotalDurationMs, 10) : null,
       AvgScoreBps: record.AvgScoreBps,
       PassRateBps: record.PassRateBps,
       Targets: record.Targets,
@@ -164,10 +157,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null> {
-    EventUtils.validateTenantId(
-      context,
-      "ExperimentRunStateRepositoryClickHouse.getProjection",
-    );
+    EventUtils.validateTenantId(context, "ExperimentRunStateRepositoryClickHouse.getProjection");
 
     // aggregateId is the composite key (experimentId:runId) — parse to raw values
     const { experimentId, runId } = parseExperimentRunKey(String(aggregateId));
@@ -253,10 +243,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     projection: ProjectionType,
     context: ProjectionStoreWriteContext,
   ): Promise<void> {
-    EventUtils.validateTenantId(
-      context,
-      "ExperimentRunStateRepositoryClickHouse.storeProjection",
-    );
+    EventUtils.validateTenantId(context, "ExperimentRunStateRepositoryClickHouse.storeProjection");
 
     if (!EventUtils.isValidProjection(projection)) {
       throw new ValidationError(
@@ -290,8 +277,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       const retentionPolicy = context.metadata?.retentionPolicy as
         | { experiments?: number | null }
         | undefined;
-      projectionRecord._retention_days =
-        retentionPolicy?.experiments ?? this.defaultRetentionDays;
+      projectionRecord._retention_days = retentionPolicy?.experiments ?? this.defaultRetentionDays;
 
       await client.insert({
         table: TABLE_NAME,
@@ -347,8 +333,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       const retentionPolicy = context.metadata?.retentionPolicy as
         | { experiments?: number | null }
         | undefined;
-      const retentionDays =
-        retentionPolicy?.experiments ?? this.defaultRetentionDays;
+      const retentionDays = retentionPolicy?.experiments ?? this.defaultRetentionDays;
       const records = projections.map((projection) => {
         const { runId } = parseExperimentRunKey(String(projection.aggregateId));
         const record = this.mapProjectionDataToClickHouseRecord(

@@ -136,10 +136,7 @@ interface LangyDevLogState {
     currentTurnId: string | null;
   }) => void;
   /** SIGNAL lane — a freshness signal and the cursor it carried. */
-  recordSignal: (signal: {
-    conversationId: string;
-    cursor: LangyEventCursor | null;
-  }) => void;
+  recordSignal: (signal: { conversationId: string; cursor: LangyEventCursor | null }) => void;
   clear: () => void;
 }
 
@@ -176,8 +173,7 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
     setScrub: (scrubSeq) => set({ scrubSeq }),
     // Disarming also snaps back to live: a closed drawer must never leave the
     // panel frozen in the past.
-    setRecording: (recording) =>
-      set(recording ? { recording } : { recording, scrubSeq: null }),
+    setRecording: (recording) => set(recording ? { recording } : { recording, scrubSeq: null }),
     record: (entry, turnId) =>
       append((seq) => ({
         seq,
@@ -195,8 +191,7 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
         // read it from there so the tag survives even when the store has not
         // adopted the conversation yet (a stop raced against a fresh send).
         conversationId: attributed(
-          typeof (detail as { conversationId?: unknown } | null)?.conversationId ===
-            "string"
+          typeof (detail as { conversationId?: unknown } | null)?.conversationId === "string"
             ? (detail as { conversationId: string }).conversationId
             : undefined,
         ),
@@ -252,8 +247,7 @@ export function tapeForConversation(
   conversationId: string | null,
 ): LangyDevLogRecord[] {
   return records.filter(
-    (record) =>
-      record.conversationId === null || record.conversationId === conversationId,
+    (record) => record.conversationId === null || record.conversationId === conversationId,
   );
 }
 
@@ -273,9 +267,7 @@ export function tapeUpTo(
  * and deterministic — this is what the scrubber shows as "the fold at that
  * moment", recomputed from scratch on every call, never cached state.
  */
-export function replayTurnProjection(
-  records: LangyDevLogRecord[],
-): LangyTurnProjectionState {
+export function replayTurnProjection(records: LangyDevLogRecord[]): LangyTurnProjectionState {
   let projection = initialLangyTurnProjection;
   for (const record of records) {
     if (record.lane !== "durable") continue;
@@ -296,8 +288,7 @@ export function streamRecords(
   records: LangyDevLogRecord[],
 ): Array<Extract<LangyDevLogRecord, { lane: "stream" }>> {
   return records.filter(
-    (record): record is Extract<LangyDevLogRecord, { lane: "stream" }> =>
-      record.lane === "stream",
+    (record): record is Extract<LangyDevLogRecord, { lane: "stream" }> => record.lane === "stream",
   );
 }
 
@@ -333,9 +324,7 @@ export function tokenStreamText(records: LangyDevLogRecord[]): string {
 }
 
 /** How many entries of each kind are on the tape — the shape of a turn at a glance. */
-export function entryKindCounts(
-  records: LangyDevLogRecord[],
-): { kind: string; count: number }[] {
+export function entryKindCounts(records: LangyDevLogRecord[]): { kind: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const record of streamRecords(records)) {
     counts.set(record.entry.type, (counts.get(record.entry.type) ?? 0) + 1);

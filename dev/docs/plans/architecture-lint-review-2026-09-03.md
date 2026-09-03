@@ -22,7 +22,7 @@ the review deliberately did not take.
 The root cause Part A recorded is worth keeping because it is the reason the
 rule looked wired and caught nothing: the thresholds were 30 (warn) and 60
 (error), so the 8–23 line JSDoc paragraphs the composition roots are full of
-never reached the queue. The rule *was* wired into `pnpm lint`, *did* scan
+never reached the queue. The rule _was_ wired into `pnpm lint`, _did_ scan
 `apps/**`, and had no baseline swallowing anything — it was a threshold
 problem alone.
 

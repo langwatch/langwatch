@@ -34,9 +34,7 @@ describe("DispatchError", () => {
 describe("isDispatchError", () => {
   describe("when given a DispatchError instance", () => {
     it("returns true", () => {
-      expect(isDispatchError(new DispatchError({ message: "x", retryable: true }))).toBe(
-        true,
-      );
+      expect(isDispatchError(new DispatchError({ message: "x", retryable: true }))).toBe(true);
     });
   });
 
@@ -116,10 +114,7 @@ describe("toDispatchError", () => {
 
   describe("when the failure has a terminal status", () => {
     it("produces a non-retryable DispatchError", () => {
-      const err = toDispatchError(
-        { response: { status: 404 } },
-        { message: "send failed" },
-      );
+      const err = toDispatchError({ response: { status: 404 } }, { message: "send failed" });
       expect(err.retryable).toBe(false);
     });
   });

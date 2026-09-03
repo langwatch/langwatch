@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  emptyIdentityHeads,
-  type IdentityFact,
-  type IdentityHeads,
-} from "../facts";
+import { emptyIdentityHeads, type IdentityFact, type IdentityHeads } from "../facts";
 import { reduceIdentity } from "../reduce";
 
 const USER = "user_sam";
@@ -132,9 +128,7 @@ describe("reduceIdentity", () => {
           data: { identifierId: "idf_b", previousIdentifierId: null, actor: ACTOR },
         },
       ]);
-      const primaries = Object.values(heads.identifiers).filter(
-        (head) => head.state === "PRIMARY",
-      );
+      const primaries = Object.values(heads.identifiers).filter((head) => head.state === "PRIMARY");
       expect(primaries.map((head) => head.identifierId)).toEqual(["idf_b"]);
       expect(heads.identifiers.idf_a?.state).toBe("VERIFIED");
     });

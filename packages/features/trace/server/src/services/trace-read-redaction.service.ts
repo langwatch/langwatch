@@ -1,7 +1,4 @@
-import {
-  redactSpanContent,
-  redactTraceContent,
-} from "./trace-visibility-window.service";
+import { redactSpanContent, redactTraceContent } from "./trace-visibility-window.service";
 import { PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type {
@@ -117,8 +114,7 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
       } catch {
         // Not valid Python repr either
       }
-      return Array.from(redactions).filter((redaction) => object.includes(redaction))
-        .length > 0
+      return Array.from(redactions).filter((redaction) => object.includes(redaction)).length > 0
         ? ("[REDACTED]" as T)
         : object;
     }
@@ -128,10 +124,7 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
   }
   if (typeof object === "object" && object !== null) {
     return Object.fromEntries(
-      Object.entries(object).map(([key, value]) => [
-        key,
-        redactObject(value, redactions),
-      ]),
+      Object.entries(object).map(([key, value]) => [key, redactObject(value, redactions)]),
     ) as T;
   }
   return object;
@@ -310,26 +303,16 @@ export function applyDerivedTraceEventProtections(
 export function applyTraceProtections(trace: Trace, protections: Protections): Trace {
   // Build redaction set from trace input/output if not visible
   let redactions = new Set<string>([
-    ...(!protections.canSeeCapturedInput
-      ? extractRedactionsForObject(trace.input?.value)
-      : []),
-    ...(!protections.canSeeCapturedOutput
-      ? extractRedactionsForObject(trace.output?.value)
-      : []),
+    ...(!protections.canSeeCapturedInput ? extractRedactionsForObject(trace.input?.value) : []),
+    ...(!protections.canSeeCapturedOutput ? extractRedactionsForObject(trace.output?.value) : []),
   ]);
 
   // Add span inputs/outputs to redactions if not visible
   if (!protections.canSeeCapturedInput && trace.spans) {
-    redactions = new Set([
-      ...redactions,
-      ...extractRedactionsFromAllSpanInputs(trace.spans),
-    ]);
+    redactions = new Set([...redactions, ...extractRedactionsFromAllSpanInputs(trace.spans)]);
   }
   if (!protections.canSeeCapturedOutput && trace.spans) {
-    redactions = new Set([
-      ...redactions,
-      ...extractRedactionsFromAllSpanOutputs(trace.spans),
-    ]);
+    redactions = new Set([...redactions, ...extractRedactionsFromAllSpanOutputs(trace.spans)]);
   }
 
   // Apply protections to trace input
@@ -386,9 +369,7 @@ export function applyTraceProtections(trace: Trace, protections: Protections): T
     metrics: transformedMetrics,
     spans: transformedSpans,
     events: transformedEvents,
-    ...(droppedCategories.length > 0
-      ? { privacy: { ...trace.privacy, droppedCategories } }
-      : {}),
+    ...(droppedCategories.length > 0 ? { privacy: { ...trace.privacy, droppedCategories } } : {}),
   };
 
   // Teaser-redact content of traces beyond the plan's visibility window.

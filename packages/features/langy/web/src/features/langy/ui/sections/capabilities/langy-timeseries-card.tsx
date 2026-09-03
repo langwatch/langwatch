@@ -92,8 +92,7 @@ function valueFormatter(unit: TimeseriesPayload["unit"]) {
     case "usd":
       return (v: number) => formatMoneyShort(v);
     case "ms":
-      return (v: number) =>
-        v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(1)}s`;
+      return (v: number) => (v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(1)}s`);
     case "percent":
       return (v: number) => `${v.toFixed(1)}%`;
     default:
@@ -150,8 +149,7 @@ function percentChange(value: number, baseline: number): number | null {
 export function isPlottable(payload: unknown): payload is TimeseriesPayload {
   const series = (payload as TimeseriesPayload | undefined)?.series;
   return (
-    Array.isArray(series) &&
-    series.some((s) => Array.isArray(s?.points) && s.points.length > 0)
+    Array.isArray(series) && series.some((s) => Array.isArray(s?.points) && s.points.length > 0)
   );
 }
 
@@ -231,11 +229,7 @@ export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
                   y2="1"
                 >
                   <stop offset="0%" stopColor={chart.color(s.color)} stopOpacity={0.28} />
-                  <stop
-                    offset="100%"
-                    stopColor={chart.color(s.color)}
-                    stopOpacity={0.02}
-                  />
+                  <stop offset="100%" stopColor={chart.color(s.color)} stopOpacity={0.02} />
                 </linearGradient>
               ))}
             </defs>
@@ -406,9 +400,7 @@ function SaveToDashboard({ graph, title }: { graph: unknown; title?: string }) {
           // tears down the panel, the conversation and the streaming turn that
           // produced this chart — you would lose the thing you just saved from.
           onClick: () => {
-            void router.push(
-              `/${project.slug}/analytics/reports?dashboard=${dashboardId}`,
-            );
+            void router.push(`/${project.slug}/analytics/reports?dashboard=${dashboardId}`);
           },
         },
       });

@@ -108,13 +108,7 @@ export class RedisStorageMeterCacheStore extends StorageMeterCacheStore {
     const lockTtlSeconds = 60;
     if (this.redis) {
       try {
-        const result = await this.redis.set(
-          lockKey,
-          String(value),
-          "EX",
-          lockTtlSeconds,
-          "NX",
-        );
+        const result = await this.redis.set(lockKey, String(value), "EX", lockTtlSeconds, "NX");
         if (result === "OK") {
           this.locks.set(key, this.now() + lockTtlSeconds * 1_000);
         }

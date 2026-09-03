@@ -35,7 +35,7 @@ struct, and `Hydrate` chains the prefix. One 104-line reflective hydrator
 serves every Go service in the repo, and a reader who has never seen it can
 still tell what `NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS` sets.
 
-It even declines to be clever where cleverness would cost: it *refuses* a
+It even declines to be clever where cleverness would cost: it _refuses_ a
 `time.Duration` field outright, because one config surface with two notations
 for a time span is worse than one notation everybody has to spell out.
 
@@ -63,20 +63,20 @@ Go has one boolean reader: `strconv.ParseBool`.
 
 Every one of those five schemas exists to preserve a different legacy spelling
 of "on". That is a real constraint and the comments explaining it are honest.
-But preserving five conventions *forever*, in a shared package, is a decision
+But preserving five conventions _forever_, in a shared package, is a decision
 nobody made — it is what happens when the migration path becomes the design.
 
 ## The signals, and what finds them
 
-| Signal | Found by | Where |
-| --- | --- | --- |
-| A named function that returns its own argument | `no-identity-function-ts` | `dev/lint/ast-grep/rules/` |
-| A method forwarding to the same name on a collaborator | `no-same-name-delegation-ts` | `dev/lint/ast-grep/rules/` |
-| A class that forwards most of its methods to **one** collaborator | `layer-class` | `packages/architecture-lint/src/overengineering.ts` |
-| A type alias nesting conditional types past 3 | `conditional-type-depth` | same |
-| Overloads differing only by a boolean literal | `overload-by-literal` | same |
-| A comment block over 60 lines | `comment-block-size` | `src/comment-blocks.ts` |
-| A service module over its size ceiling | `service-quality` | `src/service-quality.ts` |
+| Signal                                                            | Found by                     | Where                                               |
+| ----------------------------------------------------------------- | ---------------------------- | --------------------------------------------------- |
+| A named function that returns its own argument                    | `no-identity-function-ts`    | `dev/lint/ast-grep/rules/`                          |
+| A method forwarding to the same name on a collaborator            | `no-same-name-delegation-ts` | `dev/lint/ast-grep/rules/`                          |
+| A class that forwards most of its methods to **one** collaborator | `layer-class`                | `packages/architecture-lint/src/overengineering.ts` |
+| A type alias nesting conditional types past 3                     | `conditional-type-depth`     | same                                                |
+| Overloads differing only by a boolean literal                     | `overload-by-literal`        | same                                                |
+| A comment block over 60 lines                                     | `comment-block-size`         | `src/comment-blocks.ts`                             |
+| A service module over its size ceiling                            | `service-quality`            | `src/service-quality.ts`                            |
 
 The ast-grep rules run from `make lint-rules` and are proved against fixtures
 by `make lint-rules-test`. The architecture-lint policies run from

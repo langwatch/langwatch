@@ -7,11 +7,17 @@ import {
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection";
-import { createInitState, createTestRuntime, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createTestRuntime,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 const runtime = createTestRuntime();
-const applySpanToSummary = (input: { state: ReturnType<typeof createInitState>; span: ReturnType<typeof createTestSpan> }) =>
-  TraceSummaryFoldProjection.applySpanToSummary({ ...input, runtime });
+const applySpanToSummary = (input: {
+  state: ReturnType<typeof createInitState>;
+  span: ReturnType<typeof createTestSpan>;
+}) => TraceSummaryFoldProjection.applySpanToSummary({ ...input, runtime });
 
 function makeTraceNameChangedEvent({
   newName,
@@ -257,7 +263,10 @@ describe("applySpanToSummary() trace name extraction", () => {
       let state = applySpanToSummary({ state: createInitState(), span: lateRoot });
       expect(state.traceName).toBe("auto-instrumented-GET");
 
-      state = projection.apply(state, makeTraceNameChangedEvent({ newName: "Manually labelled trace" }));
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "Manually labelled trace" }),
+      );
       expect(state.traceName).toBe("Manually labelled trace");
 
       // Earlier-named root span shows up after the rename — without the
@@ -282,7 +291,10 @@ describe("applySpanToSummary() trace name extraction", () => {
       const projection = makeProjection();
       let state = createInitState();
 
-      state = projection.apply(state, makeTraceNameChangedEvent({ newName: "Manually labelled trace" }));
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "Manually labelled trace" }),
+      );
       expect(state.traceName).toBe("Manually labelled trace");
       expect(state.rootSpanStartTimeMs).toBeUndefined();
 
@@ -416,7 +428,10 @@ describe("applySpanToSummary() trace name extraction", () => {
       const projection = makeProjection();
       let state = createInitState();
 
-      state = projection.apply(state, makeTraceNameChangedEvent({ newName: "Operator-picked label" }));
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "Operator-picked label" }),
+      );
 
       const span = createTestSpan({
         id: "child-1",
@@ -451,7 +466,10 @@ describe("applySpanToSummary() trace name extraction", () => {
       expect(state.rootSpanStartTimeMs).toBe(1000);
       expect(state.rootSpanType).toBe("agent");
 
-      state = projection.apply(state, makeTraceNameChangedEvent({ newName: "Operator-picked label" }));
+      state = projection.apply(
+        state,
+        makeTraceNameChangedEvent({ newName: "Operator-picked label" }),
+      );
       expect(state.traceNameFromFallback).toBe(false);
       expect(state.rootMetadataFromFallback).toBe(true);
       expect(state.traceName).toBe("Operator-picked label");

@@ -35,8 +35,7 @@ const productOptions: ProductOption[] = [
   {
     key: "via-claude-desktop",
     title: "Via MCP",
-    description:
-      "Connect any MCP client. Claude Desktop, ChatGPT, Cursor, Windsurf, and more",
+    description: "Connect any MCP client. Claude Desktop, ChatGPT, Cursor, Windsurf, and more",
     icon: MessageSquare,
     gradient: "linear-gradient(135deg, rgba(128,90,213,0.05) 0%, transparent 50%)",
   },
@@ -138,12 +137,7 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
             </Box>
 
             <VStack gap={0.5} align="start" flex={1}>
-              <Text
-                fontSize="md"
-                fontWeight="semibold"
-                color="fg"
-                letterSpacing="-0.01em"
-              >
+              <Text fontSize="md" fontWeight="semibold" color="fg" letterSpacing="-0.01em">
                 {opt.title}
               </Text>
               <Text fontSize="sm" color="fg.muted" lineHeight="tall">

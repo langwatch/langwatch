@@ -63,9 +63,7 @@ describe("resultCapViolation", () => {
         sizeBytes: expect.any(Number),
         limitBytes: caps.resultBytes,
       });
-      expect(
-        resultCapViolation({ output: "small", session: undefined, caps }),
-      ).toBeNull();
+      expect(resultCapViolation({ output: "small", session: undefined, caps })).toBeNull();
     });
   });
 
@@ -78,9 +76,7 @@ describe("resultCapViolation", () => {
         sizeBytes: expect.any(Number),
         limitBytes: caps.sessionBytes,
       });
-      expect(
-        resultCapViolation({ output: "ok", session: { id: "s1" }, caps }),
-      ).toBeNull();
+      expect(resultCapViolation({ output: "ok", session: { id: "s1" }, caps })).toBeNull();
     });
   });
 });
@@ -109,9 +105,7 @@ describe("ConnectGateway without Redis", () => {
       replicaCount: 3,
     });
     gateway.mount(createUpgradeRouter(server));
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     url = `ws://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });
 
@@ -126,19 +120,15 @@ describe("ConnectGateway without Redis", () => {
       const socket = new WebSocket(`${url}${CONNECT_PATH}`, {
         headers: { Authorization: "Bearer sk-lw-anything" },
       });
-      const refused = await new Promise<Record<string, unknown>>(
-        (resolve, reject) => {
-          socket.once("message", (raw) => resolve(JSON.parse(raw.toString())));
-          socket.once("error", reject);
-        },
-      );
+      const refused = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        socket.once("message", (raw) => resolve(JSON.parse(raw.toString())));
+        socket.once("error", reject);
+      });
       expect(refused).toMatchObject({
         type: "refused",
         code: "replica_count_unsupported",
       });
-      await new Promise<void>((resolve) =>
-        socket.once("close", () => resolve()),
-      );
+      await new Promise<void>((resolve) => socket.once("close", () => resolve()));
     });
   });
 

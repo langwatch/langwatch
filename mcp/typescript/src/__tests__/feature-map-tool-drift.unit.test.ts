@@ -25,9 +25,7 @@ const REPO_ROOT = join(__dirname, "../../../..");
  * arrays hang off surfaces nested several levels into the tree.
  */
 function toolNamesInFeatureMap(): Set<string> {
-  const map: unknown = JSON.parse(
-    readFileSync(join(REPO_ROOT, "feature-map.json"), "utf-8"),
-  );
+  const map: unknown = JSON.parse(readFileSync(join(REPO_ROOT, "feature-map.json"), "utf-8"));
   const names = new Set<string>();
 
   const walk = (node: unknown): void => {
@@ -70,9 +68,7 @@ describe("feature map MCP tool names", () => {
   describe("given the tools this server registers", () => {
     it("names only tools that exist", () => {
       const registered = registeredToolNames();
-      const missing = [...toolNamesInFeatureMap()]
-        .filter((name) => !registered.has(name))
-        .sort();
+      const missing = [...toolNamesInFeatureMap()].filter((name) => !registered.has(name)).sort();
 
       // Listed, not registered: an agent following the map calls a tool that
       // is not there. Either rename the entry, or register the tool.

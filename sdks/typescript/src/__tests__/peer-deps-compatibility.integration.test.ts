@@ -14,9 +14,7 @@ import { join } from "path";
  * that each peer dep range satisfies the latest stable version on npm.
  */
 
-const sdkPackageJson = JSON.parse(
-  readFileSync(join(__dirname, "../../package.json"), "utf-8"),
-);
+const sdkPackageJson = JSON.parse(readFileSync(join(__dirname, "../../package.json"), "utf-8"));
 const peerDeps: Record<string, string> = sdkPackageJson.peerDependencies;
 
 function getLatestVersion(pkg: string): string {

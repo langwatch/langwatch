@@ -45,12 +45,8 @@ export const useComparisonMode = ({
   onSelectionChange,
 }: UseComparisonModeOptions): UseComparisonModeReturn => {
   // Initialize from URL params if provided
-  const [compareMode, setCompareMode] = useState(
-    () => (initialCompareRunIds?.length ?? 0) >= 2,
-  );
-  const [selectedRunIds, setSelectedRunIds] = useState<string[]>(
-    () => initialCompareRunIds ?? [],
-  );
+  const [compareMode, setCompareMode] = useState(() => (initialCompareRunIds?.length ?? 0) >= 2);
+  const [selectedRunIds, setSelectedRunIds] = useState<string[]>(() => initialCompareRunIds ?? []);
 
   const canCompare = runIds.length >= 2;
 
@@ -65,18 +61,13 @@ export const useComparisonMode = ({
         // Entering compare mode - auto-select current run + next one
         const currentIndex = currentRunId ? runIds.indexOf(currentRunId) : 0;
         const firstRunId = runIds[currentIndex] ?? runIds[0];
-        const secondRunId =
-          runIds[currentIndex + 1] ?? runIds[currentIndex - 1] ?? runIds[1];
+        const secondRunId = runIds[currentIndex + 1] ?? runIds[currentIndex - 1] ?? runIds[1];
 
-        const initialSelection = [firstRunId, secondRunId].filter(
-          (id): id is string => !!id,
-        );
+        const initialSelection = [firstRunId, secondRunId].filter((id): id is string => !!id);
 
         // Ensure we have at least 2 unique runs
         const uniqueSelection = [...new Set(initialSelection)];
-        setSelectedRunIds(
-          uniqueSelection.length >= 2 ? uniqueSelection : runIds.slice(0, 2),
-        );
+        setSelectedRunIds(uniqueSelection.length >= 2 ? uniqueSelection : runIds.slice(0, 2));
 
         return true;
       }

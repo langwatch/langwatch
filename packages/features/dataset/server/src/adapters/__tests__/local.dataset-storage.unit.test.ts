@@ -57,9 +57,7 @@ describe("LocalDatasetStorageAdapter", () => {
       it("keeps the environment variables and the root out of the message", async () => {
         mkdir.mockRejectedValue(errnoError("EROFS"));
 
-        const error = (await writeOneRecord().catch(
-          (e: unknown) => e,
-        )) as HandledError;
+        const error = (await writeOneRecord().catch((e: unknown) => e)) as HandledError;
 
         expect(error.message).not.toContain("S3_BUCKET_NAME");
         expect(error.message).not.toContain("LANGWATCH_LOCAL_STORAGE_PATH");
@@ -88,9 +86,9 @@ describe("LocalDatasetStorageAdapter", () => {
     // SAME-ORIGIN upload URL the browser streams to (ADR-032 v14). Pure — no FS.
     describe("on a local-FS backend", () => {
       it("returns a same-origin staging URL and the tenant-scoped staging key", async () => {
-        const presign = await new LocalDatasetStorageAdapter(
-          ROOT,
-        ).createPresignedUpload({ projectId: "p1" });
+        const presign = await new LocalDatasetStorageAdapter(ROOT).createPresignedUpload({
+          projectId: "p1",
+        });
 
         // Relative URL → the modal's PUT helper reads "/" as same-origin and
         // sends the session cookie (vs an absolute S3 URL → no credentials).

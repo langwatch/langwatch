@@ -18,8 +18,7 @@ function plantColumn(targetId: string) {
   header.setAttribute("data-target-column", targetId);
   const scrollIntoView = vi.fn();
   // jsdom has no layout, so the method does not exist to spy on.
-  (header as unknown as { scrollIntoView: unknown }).scrollIntoView =
-    scrollIntoView;
+  (header as unknown as { scrollIntoView: unknown }).scrollIntoView = scrollIntoView;
   document.body.append(header);
   return scrollIntoView;
 }
@@ -70,9 +69,7 @@ describe("revealTargetColumn", () => {
     });
 
     it("stops looking instead of spinning forever", async () => {
-      const frame = vi.fn((callback: FrameRequestCallback) =>
-        setTimeout(() => callback(0), 0),
-      );
+      const frame = vi.fn((callback: FrameRequestCallback) => setTimeout(() => callback(0), 0));
       vi.stubGlobal("requestAnimationFrame", frame);
 
       revealTargetColumn("target-never");

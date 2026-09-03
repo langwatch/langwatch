@@ -17,8 +17,7 @@ describe("axisTicks", () => {
     expect(rates).toHaveLength(AXIS_INTERVALS + 1);
     expect(counts).toHaveLength(AXIS_INTERVALS + 1);
 
-    const fractionsOf = (ticks: number[]) =>
-      ticks.map((tick) => tick / ticks[ticks.length - 1]!);
+    const fractionsOf = (ticks: number[]) => ticks.map((tick) => tick / ticks[ticks.length - 1]!);
     expect(fractionsOf(rates)).toEqual(fractionsOf(counts));
   });
 

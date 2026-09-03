@@ -13,26 +13,20 @@ describe("extractLiquidVariables()", () => {
 
   describe("when text contains for loops", () => {
     it("extracts the collection as an input variable", () => {
-      const result = extractLiquidVariables(
-        "{% for item in items %}{{ item }}{% endfor %}",
-      );
+      const result = extractLiquidVariables("{% for item in items %}{{ item }}{% endfor %}");
 
       expect(result.inputVariables).toContain("items");
     });
 
     it("identifies loop iterators as loop variables, not input variables", () => {
-      const result = extractLiquidVariables(
-        "{% for item in items %}{{ item }}{% endfor %}",
-      );
+      const result = extractLiquidVariables("{% for item in items %}{{ item }}{% endfor %}");
 
       expect(result.loopVariables).toContain("item");
       expect(result.inputVariables).not.toContain("item");
     });
 
     it("does not extract Liquid keywords as variables", () => {
-      const result = extractLiquidVariables(
-        "{% for item in items %}{{ item }}{% endfor %}",
-      );
+      const result = extractLiquidVariables("{% for item in items %}{{ item }}{% endfor %}");
 
       expect(result.inputVariables).not.toContain("for");
       expect(result.inputVariables).not.toContain("in");
@@ -98,9 +92,7 @@ describe("extractLiquidVariables()", () => {
 
   describe("when text contains simple mustache variables only", () => {
     it("extracts them as input variables (backward compatible)", () => {
-      const result = extractLiquidVariables(
-        "Hello {{ question }}, context: {{ context }}",
-      );
+      const result = extractLiquidVariables("Hello {{ question }}, context: {{ context }}");
 
       expect(result.inputVariables).toContain("question");
       expect(result.inputVariables).toContain("context");
@@ -109,18 +101,14 @@ describe("extractLiquidVariables()", () => {
 
   describe("when text contains if/elsif/else conditions", () => {
     it("extracts condition variables as input variables", () => {
-      const result = extractLiquidVariables(
-        "{% if x %}A{% elsif y %}B{% else %}C{% endif %}",
-      );
+      const result = extractLiquidVariables("{% if x %}A{% elsif y %}B{% else %}C{% endif %}");
 
       expect(result.inputVariables).toContain("x");
       expect(result.inputVariables).toContain("y");
     });
 
     it("does not extract if/elsif/else/endif as variables", () => {
-      const result = extractLiquidVariables(
-        "{% if x %}A{% elsif y %}B{% else %}C{% endif %}",
-      );
+      const result = extractLiquidVariables("{% if x %}A{% elsif y %}B{% else %}C{% endif %}");
 
       expect(result.inputVariables).not.toContain("if");
       expect(result.inputVariables).not.toContain("elsif");

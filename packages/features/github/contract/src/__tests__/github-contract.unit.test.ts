@@ -14,12 +14,11 @@ describe("GitHub install state contract", () => {
     };
 
     expect(githubInstallStatePayloadSchema.safeParse(valid).success).toBe(true);
+    expect(githubInstallStatePayloadSchema.safeParse({ ...valid, nonce: void 0 }).success).toBe(
+      false,
+    );
     expect(
-      githubInstallStatePayloadSchema.safeParse({ ...valid, nonce: void 0 }).success,
-    ).toBe(false);
-    expect(
-      githubInstallStatePayloadSchema.safeParse({ ...valid, attackerField: true })
-        .success,
+      githubInstallStatePayloadSchema.safeParse({ ...valid, attackerField: true }).success,
     ).toBe(false);
   });
 });

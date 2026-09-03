@@ -119,8 +119,7 @@ function buildAdapter(workflow: WorkflowDsl): SerializedWorkflowAgentAdapter {
       data: { outputs?: Array<{ identifier: string; type: string }> };
     }>
   ).find((n) => n.id === "entry");
-  const messagesType =
-    entry?.data.outputs?.find((f) => f.identifier === "messages")?.type ?? "str";
+  const messagesType = entry?.data.outputs?.find((f) => f.identifier === "messages")?.type ?? "str";
   const config: WorkflowAgentData = {
     type: "workflow",
     agentId: "e2e-agent",

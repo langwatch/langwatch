@@ -35,11 +35,7 @@ import {
   type MessageTranslation,
 } from "./message-annotate-cluster";
 import { MessageExpandToggle } from "../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle";
-import {
-  TurnAnnotationBadges,
-  TurnEditTraceAction,
-  TurnSessionCheckbox,
-} from "./turn-annotations";
+import { TurnAnnotationBadges, TurnEditTraceAction, TurnSessionCheckbox } from "./turn-annotations";
 import { TurnSteps, turnHasGenieSteps } from "./turn-steps";
 import type { TurnLayout } from "./types";
 import { formatGap } from "./utils";
@@ -80,10 +76,7 @@ function splitAnnotationsBySide({
     );
   return {
     userAnnotations: summarizeAnnotations(onField("input")),
-    assistantAnnotations: summarizeAnnotations([
-      ...turnAnnotations,
-      ...onField("output"),
-    ]),
+    assistantAnnotations: summarizeAnnotations([...turnAnnotations, ...onField("output")]),
   };
 }
 
@@ -96,9 +89,7 @@ function toMessageTranslation(translation: UseTextTranslationResult): MessageTra
   };
 }
 
-function summarizeAnnotations(
-  items: AnnotationItem[],
-): MessageAnnotationSummary | undefined {
+function summarizeAnnotations(items: AnnotationItem[]): MessageAnnotationSummary | undefined {
   if (items.length === 0) return undefined;
   return {
     count: items.length,
@@ -163,10 +154,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   anchoredAnnotationItems = EMPTY_ANNOTATIONS,
   showSessionCheckbox = false,
 }) {
-  const handleSelect = useCallback(
-    () => onSelect(turn.traceId),
-    [onSelect, turn.traceId],
-  );
+  const handleSelect = useCallback(() => onSelect(turn.traceId), [onSelect, turn.traceId]);
 
   // Translate-to-English per message rather than per turn
   // (specs/traces-v2/message-translation.feature): a reader flips exactly the
@@ -188,8 +176,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
     ),
   });
   const userText = userTranslation.displayTexts.user ?? originalUserText;
-  const assistantText =
-    assistantTranslation.displayTexts.assistant ?? originalAssistantText;
+  const assistantText = assistantTranslation.displayTexts.assistant ?? originalAssistantText;
 
   const { userAnnotations, assistantAnnotations } = useMemo(
     () =>
@@ -252,9 +239,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
 
   // Only a side with text of its own can be translated: an empty message has
   // nothing to flip, and offering it would be a button that does nothing.
-  const userTranslate = originalUserText.trim()
-    ? toMessageTranslation(userTranslation)
-    : undefined;
+  const userTranslate = originalUserText.trim() ? toMessageTranslation(userTranslation) : undefined;
   const assistantTranslate = originalAssistantText.trim()
     ? toMessageTranslation(assistantTranslation)
     : undefined;
@@ -451,12 +436,7 @@ function RedactedTurnLine({
       <VStack align={side === "right" ? "flex-end" : "flex-start"} gap={1} maxWidth="78%">
         <HStack gap={1.5} color={palette.fg}>
           <Icon boxSize="13px">{icon}</Icon>
-          <Text
-            textStyle="2xs"
-            fontWeight="600"
-            textTransform="uppercase"
-            letterSpacing="0.06em"
-          >
+          <Text textStyle="2xs" fontWeight="600" textTransform="uppercase" letterSpacing="0.06em">
             {label}
           </Text>
         </HStack>
@@ -635,10 +615,7 @@ function ThreadMessage({
         )}
 
         {canExpand && (
-          <MessageExpandToggle
-            expanded={expanded}
-            onToggle={() => setExpanded((v) => !v)}
-          />
+          <MessageExpandToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
         )}
 
         {/* Recordings, images and attachments sit under the prose they came
@@ -667,9 +644,7 @@ interface LedgerSegment {
  * cryptic here, and live in the trace header and metrics instead.
  */
 function turnLedgerSegments(turn: TraceListItem): LedgerSegment[] {
-  const segments: LedgerSegment[] = [
-    { id: "duration", text: formatDuration(turn.durationMs) },
-  ];
+  const segments: LedgerSegment[] = [{ id: "duration", text: formatDuration(turn.durationMs) }];
   if (turn.ttft != null && turn.ttft > 0) {
     segments.push({ id: "ttft", text: `ttft ${formatDuration(turn.ttft)}` });
   }

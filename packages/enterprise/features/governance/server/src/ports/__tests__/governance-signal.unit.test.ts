@@ -113,10 +113,7 @@ describe("GovernanceSignalService", () => {
     port.resolved = [resolved("79"), resolved("80"), resolved("100")];
     await GovernanceSignalService.create(port).detectBudgetCrossings([candidate]);
 
-    expect(port.crossings.map(({ kind }) => kind)).toEqual([
-      "threshold_crossed",
-      "breached",
-    ]);
+    expect(port.crossings.map(({ kind }) => kind)).toEqual(["threshold_crossed", "breached"]);
     expect(port.crossings[1]).toMatchObject({
       virtual_key_id: "key-1",
       bucket_scope_id: "key-1:user-1",
@@ -132,9 +129,7 @@ describe("GovernanceSignalService", () => {
     port.failure = new Error("store unavailable");
 
     await expect(
-      GovernanceSignalService.create(port, diagnostics).detectBudgetCrossings([
-        candidate,
-      ]),
+      GovernanceSignalService.create(port, diagnostics).detectBudgetCrossings([candidate]),
     ).resolves.toBeUndefined();
     expect(diagnostics.warnings).toEqual([
       expect.objectContaining({

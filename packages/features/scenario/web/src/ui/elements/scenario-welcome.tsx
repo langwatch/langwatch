@@ -29,9 +29,8 @@ function ScenarioWelcomeContent({ onProceed }: { onProceed(): void }) {
           Welcome to Scenarios
         </Heading>
         <Text fontSize="md" color="fg.muted">
-          Scenarios let you test your agent behavior with repeatable, automated checks.
-          Define situations, set expectations, and verify your agent responds correctly
-          every time.
+          Scenarios let you test your agent behavior with repeatable, automated checks. Define
+          situations, set expectations, and verify your agent responds correctly every time.
         </Text>
       </VStack>
       <VStack gap={4} w="full">

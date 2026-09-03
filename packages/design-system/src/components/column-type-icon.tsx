@@ -27,13 +27,7 @@ export const ColumnTypeIcon = ({ type, size = 12 }: ColumnTypeIconProps) => {
     case "number":
       return <Hash {...iconProps} color="var(--chakra-colors-green-500)" />;
     case "boolean":
-      return (
-        <ToggleLeft
-          size={size + 2}
-          strokeWidth={2.5}
-          color="var(--chakra-colors-teal-500)"
-        />
-      );
+      return <ToggleLeft size={size + 2} strokeWidth={2.5} color="var(--chakra-colors-teal-500)" />;
     case "json":
       return <Braces {...iconProps} color="var(--chakra-colors-purple-500)" />;
     case "chat_messages":

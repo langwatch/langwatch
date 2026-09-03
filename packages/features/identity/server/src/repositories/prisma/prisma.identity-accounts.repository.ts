@@ -1,5 +1,9 @@
 import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
-import type { IdentityAccountRow, IdentityAccountSecrets, IdentityAccountsPort } from "../../better-auth/storage-ports";
+import type {
+  IdentityAccountRow,
+  IdentityAccountSecrets,
+  IdentityAccountsPort,
+} from "../../better-auth/storage-ports";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** The `Identifier` columns an assembled account row is built from. */
@@ -61,9 +65,7 @@ const ACCOUNT_MIRROR_COLUMNS = {
   scope: "scope",
 } as const;
 
-function credentialData(
-  secrets: IdentityAccountSecrets,
-): Record<string, unknown> {
+function credentialData(secrets: IdentityAccountSecrets): Record<string, unknown> {
   return Object.fromEntries(
     CREDENTIAL_COLUMNS.filter((column) => column in secrets).map((column) => [
       column,
@@ -72,16 +74,11 @@ function credentialData(
   );
 }
 
-function accountMirrorData(
-  secrets: IdentityAccountSecrets,
-): Record<string, unknown> {
+function accountMirrorData(secrets: IdentityAccountSecrets): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(ACCOUNT_MIRROR_COLUMNS)
       .filter(([field]) => field in secrets)
-      .map(([field, column]) => [
-        column,
-        secrets[field as keyof IdentityAccountSecrets] ?? null,
-      ]),
+      .map(([field, column]) => [column, secrets[field as keyof IdentityAccountSecrets] ?? null]),
   );
 }
 
@@ -98,11 +95,7 @@ function accountMirrorData(
 export class PrismaIdentityAccountsRepository implements IdentityAccountsPort {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findByUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<IdentityAccountRow[]> {
+  async findByUser({ userId }: { userId: string }): Promise<IdentityAccountRow[]> {
     return this.assemble(
       await this.prisma.identifier.findMany({
         where: {
@@ -199,11 +192,7 @@ export class PrismaIdentityAccountsRepository implements IdentityAccountsPort {
     });
   }
 
-  async deleteCredentials({
-    accountIds,
-  }: {
-    accountIds: readonly string[];
-  }): Promise<number> {
+  async deleteCredentials({ accountIds }: { accountIds: readonly string[] }): Promise<number> {
     if (accountIds.length === 0) return 0;
     const { count } = await this.prisma.accountCredential.deleteMany({
       where: { id: { in: [...accountIds] } },
@@ -211,11 +200,7 @@ export class PrismaIdentityAccountsRepository implements IdentityAccountsPort {
     return count;
   }
 
-  async deleteBridgeAccounts({
-    accountIds,
-  }: {
-    accountIds: readonly string[];
-  }): Promise<number> {
+  async deleteBridgeAccounts({ accountIds }: { accountIds: readonly string[] }): Promise<number> {
     if (accountIds.length === 0) return 0;
     // `deleteMany`, not `delete`: a row the fold has already removed is the
     // expected case rather than an error.
@@ -295,8 +280,7 @@ function toAccountRow({
     // it on the fact (ADR-116); the folded `provider` is the last resort only
     // for a fact stated before either did, since it collapses every generic
     // OAuth and enterprise IdP into `oidc`.
-    providerId:
-      credential?.provider ?? identifier.providerId ?? identifier.provider,
+    providerId: credential?.provider ?? identifier.providerId ?? identifier.provider,
     // Stated on the attach, never derived: a real OIDC connection's issuer
     // is its own URL. Null only for an identifier attached before the fact
     // carried one, where the adapter falls back to the synthetic form.
@@ -310,9 +294,7 @@ function toAccountRow({
   };
 }
 
-function secretsOf(
-  credential: CredentialRow | null,
-): Required<IdentityAccountSecrets> {
+function secretsOf(credential: CredentialRow | null): Required<IdentityAccountSecrets> {
   return {
     password: credential?.password ?? null,
     accessToken: credential?.accessToken ?? null,

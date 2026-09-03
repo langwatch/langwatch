@@ -256,9 +256,7 @@ describe("ProcessRuntime", () => {
         isReplay: false,
       };
 
-      await expect(
-        subscriber!.handle(physicalEvent("physical-1"), context),
-      ).rejects.toThrow(
+      await expect(subscriber!.handle(physicalEvent("physical-1"), context)).rejects.toThrow(
         'Process manager "conflictInbox" revision conflict on event physical-1',
       );
 

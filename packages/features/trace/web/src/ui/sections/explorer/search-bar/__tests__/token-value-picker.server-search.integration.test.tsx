@@ -58,8 +58,7 @@ vi.mock("../../../../../index", async (importOriginal) => {
 
   return {
     ...actual,
-    useUIStore: (selector: (state: unknown) => unknown) =>
-      selector({ setSyntaxHelpOpen: vi.fn() }),
+    useUIStore: (selector: (state: unknown) => unknown) => selector({ setSyntaxHelpOpen: vi.fn() }),
   };
 });
 
@@ -74,22 +73,20 @@ const anchor = {
 
 beforeEach(() => {
   apiMock.useQuery.mockReset();
-  apiMock.useQuery.mockImplementation(
-    (input: { prefix?: string }, opts: { enabled?: boolean }) => {
-      if (!opts?.enabled) return { data: undefined, isLoading: false };
-      const prefix = String(input.prefix ?? "").toLowerCase();
-      if (prefix.includes("finance")) {
-        return {
-          data: {
-            values: [{ value: "finance-prod-99", count: 7 }],
-            totalDistinct: 1,
-          },
-          isLoading: false,
-        };
-      }
-      return { data: { values: [], totalDistinct: 0 }, isLoading: false };
-    },
-  );
+  apiMock.useQuery.mockImplementation((input: { prefix?: string }, opts: { enabled?: boolean }) => {
+    if (!opts?.enabled) return { data: undefined, isLoading: false };
+    const prefix = String(input.prefix ?? "").toLowerCase();
+    if (prefix.includes("finance")) {
+      return {
+        data: {
+          values: [{ value: "finance-prod-99", count: 7 }],
+          totalDistinct: 1,
+        },
+        isLoading: false,
+      };
+    }
+    return { data: { values: [], totalDistinct: 0 }, isLoading: false };
+  });
 });
 
 afterEach(() => cleanup());

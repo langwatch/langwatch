@@ -45,9 +45,7 @@ describe("<ScenarioPicker />", () => {
       it("does not show the archived-scenarios section", () => {
         renderPicker({ archivedIds: [] });
 
-        expect(
-          screen.queryByTestId("archived-scenarios-section"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("archived-scenarios-section")).not.toBeInTheDocument();
       });
     });
   });
@@ -79,9 +77,7 @@ describe("<ScenarioPicker />", () => {
           onRemoveArchived: vi.fn(),
         });
 
-        expect(
-          screen.getByTestId("remove-archived-scenario-scen_old_1"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("remove-archived-scenario-scen_old_1")).toBeInTheDocument();
       });
     });
 
@@ -192,9 +188,7 @@ describe("<ScenarioPicker />", () => {
       it("keeps the flat list", () => {
         renderPicker({ ...groupedProps, testSuites: [] });
 
-        expect(
-          screen.queryByText(PICKER_UNFILED_GROUP_NAME),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText(PICKER_UNFILED_GROUP_NAME)).not.toBeInTheDocument();
         expect(screen.getByText("Double charge")).toBeInTheDocument();
       });
     });

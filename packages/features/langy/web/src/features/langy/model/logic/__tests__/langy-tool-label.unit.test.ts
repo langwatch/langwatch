@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  describeToolCall,
-  effectiveToolName,
-  skillCardDetail,
-} from "../langy-tool-label";
+import { describeToolCall, effectiveToolName, skillCardDetail } from "../langy-tool-label";
 
 /**
  * The frames in this file are the ones that were ON SCREEN in the screenshot
@@ -127,17 +123,13 @@ describe("skillCardDetail", () => {
 
   describe("given a description that is only routing guidance for the model", () => {
     it("gives the card no detail at all, rather than instructing the user", () => {
-      expect(
-        skillCardDetail("Use when you want to understand your agent."),
-      ).toBeUndefined();
+      expect(skillCardDetail("Use when you want to understand your agent.")).toBeUndefined();
     });
   });
 
   describe("given a single-sentence description", () => {
     it("keeps it whole", () => {
-      expect(skillCardDetail("Opens a real pull request.")).toBe(
-        "Opens a real pull request.",
-      );
+      expect(skillCardDetail("Opens a real pull request.")).toBe("Opens a real pull request.");
     });
   });
 

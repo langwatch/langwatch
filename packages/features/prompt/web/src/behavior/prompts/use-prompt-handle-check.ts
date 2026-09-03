@@ -6,10 +6,7 @@ export const usePromptHandleCheck = () => {
   const { project } = useOrganizationTeamProject();
   const trpc = api.useUtils();
 
-  const checkHandleUniqueness = async (params: {
-    handle: string;
-    scope: PromptScope;
-  }) => {
+  const checkHandleUniqueness = async (params: { handle: string; scope: PromptScope }) => {
     const isValid = await trpc.prompts.checkHandleUniqueness.fetch({
       projectId: project?.id ?? "",
       scope: params.scope,

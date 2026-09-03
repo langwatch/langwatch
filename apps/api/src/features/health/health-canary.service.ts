@@ -101,10 +101,7 @@ export async function sendCanary({
     // reason to `unknown`, and pino renders an Error inside `reasons` as `{}`,
     // so this line is the only place the connection-refused / DNS / timeout
     // detail survives at all.
-    logger.error(
-      { probe, transport, url, error },
-      "Health canary transport failed",
-    );
+    logger.error({ probe, transport, url, error }, "Health canary transport failed");
     throw new HealthCheckFailedError({
       probe,
       transport,

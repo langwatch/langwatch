@@ -20,10 +20,7 @@ import GovernanceLayout from "../../ui/sections/governance-layout";
 import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Link } from "../../ui/elements/governance-link";
-import {
-  useGovernanceToaster,
-  type GovernanceToaster,
-} from "../../behavior/governance-feedback";
+import { useGovernanceToaster, type GovernanceToaster } from "../../behavior/governance-feedback";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
 import { useShowErrorToast } from "../../behavior/governance-feedback";
 import { useGovernanceScope } from "../../behavior/governance-session";
@@ -157,10 +154,8 @@ function summariseThresholdConfig(
   const fmtDuration = (sec: number): string => {
     if (sec >= 86400)
       return `${Math.round((sec / 86400) * 10) / 10} day${sec === 86400 ? "" : "s"}`;
-    if (sec >= 3600)
-      return `${Math.round((sec / 3600) * 10) / 10} hour${sec === 3600 ? "" : "s"}`;
-    if (sec >= 60)
-      return `${Math.round((sec / 60) * 10) / 10} minute${sec === 60 ? "" : "s"}`;
+    if (sec >= 3600) return `${Math.round((sec / 3600) * 10) / 10} hour${sec === 3600 ? "" : "s"}`;
+    if (sec >= 60) return `${Math.round((sec / 60) * 10) / 10} minute${sec === 60 ? "" : "s"}`;
     return `${sec} second${sec === 1 ? "" : "s"}`;
   };
   return {
@@ -277,13 +272,7 @@ function RuleSeveritySection({
 }) {
   const meta = SEVERITY_OPTIONS.find((o) => o.value === severity)!;
   return (
-    <Box
-      as="section"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
+    <Box as="section" borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
       <HStack alignItems="start" marginBottom={3}>
         <VStack align="start" gap={0}>
           <HStack gap={2}>
@@ -375,8 +364,7 @@ function buildRulePayload({
     // nothing here crossed the wire, so it is safe to show verbatim.
     toaster.create({
       title: "Invalid JSON in config field",
-      description:
-        parseFailure instanceof SyntaxError ? parseFailure.message : "", // no-raw-error-toast-ok
+      description: parseFailure instanceof SyntaxError ? parseFailure.message : "", // no-raw-error-toast-ok
       type: "error",
     });
     return null;
@@ -410,8 +398,7 @@ function useAnomalyRuleMutations({
       setComposer(null);
       toaster.create({ title: "Rule created", type: "success" });
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't create the rule" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't create the rule" }),
   });
   const update = api.anomalyRules.update.useMutation({
     onSuccess: () => {
@@ -419,16 +406,14 @@ function useAnomalyRuleMutations({
       setComposer(null);
       toaster.create({ title: "Rule updated", type: "success" });
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't update the rule" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't update the rule" }),
   });
   const archive = api.anomalyRules.archive.useMutation({
     onSuccess: () => {
       void refetch();
       toaster.create({ title: "Rule archived", type: "success" });
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't archive the rule" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't archive the rule" }),
   });
   return { create, update, archive };
 }
@@ -495,8 +480,7 @@ function useAnomalyRulesPage() {
     composer,
     setComposer,
     archivingId: pendingRuleId(archiveMutation),
-    archiveRule: (rule: Rule) =>
-      archiveMutation.mutate({ id: rule.id, organizationId: orgId }),
+    archiveRule: (rule: Rule) => archiveMutation.mutate({ id: rule.id, organizationId: orgId }),
     startEdit: (rule: Rule) => setComposer(composerFromRule(rule)),
     startCreate: (severity: Severity) => {
       const fresh = blankComposer();
@@ -773,9 +757,7 @@ function RuleComposer({
                 backgroundColor="white"
                 rows={2}
                 value={composer.description}
-                onChange={(e) =>
-                  setComposer({ ...composer, description: e.target.value })
-                }
+                onChange={(e) => setComposer({ ...composer, description: e.target.value })}
                 placeholder="What this rule guards against and who owns it"
               />
             </VStack>
@@ -815,9 +797,8 @@ function RuleComposer({
                   ))}
                 </datalist>
                 <Text fontSize="xs" color="fg.muted">
-                  Only <code>spend_spike</code> is evaluated by the anomaly subscriber
-                  today. Other rule types (<code>rate_limit</code>,
-                  <code>after_hours</code>, …) are{" "}
+                  Only <code>spend_spike</code> is evaluated by the anomaly subscriber today. Other
+                  rule types (<code>rate_limit</code>,<code>after_hours</code>, …) are{" "}
                   <Link href="/ai-gateway/governance/anomaly-rules" color="blue.600">
                     preview
                   </Link>{" "}
@@ -830,9 +811,7 @@ function RuleComposer({
                 </Text>
                 <select
                   value={composer.scope}
-                  onChange={(e) =>
-                    setComposer({ ...composer, scope: e.target.value as Scope })
-                  }
+                  onChange={(e) => setComposer({ ...composer, scope: e.target.value as Scope })}
                   style={selectStyle}
                 >
                   {SCOPE_OPTIONS.map((o) => (
@@ -858,9 +837,7 @@ function RuleComposer({
                       variant="ghost"
                       fontSize="xs"
                       color="blue.600"
-                      onClick={() =>
-                        setScopeIdMode((m) => (m === "picker" ? "custom" : "picker"))
-                      }
+                      onClick={() => setScopeIdMode((m) => (m === "picker" ? "custom" : "picker"))}
                     >
                       {scopeIdMode === "picker" ? "type a custom ID" : "use picker"}
                     </Button>
@@ -868,9 +845,7 @@ function RuleComposer({
                   {scopeIdMode === "picker" && composer.scope === "source" ? (
                     <select
                       value={composer.scopeId}
-                      onChange={(e) =>
-                        setComposer({ ...composer, scopeId: e.target.value })
-                      }
+                      onChange={(e) => setComposer({ ...composer, scopeId: e.target.value })}
                       style={selectStyle}
                       disabled={sourcesQuery.isLoading}
                     >
@@ -888,9 +863,7 @@ function RuleComposer({
                   ) : scopeIdMode === "picker" && composer.scope === "source_type" ? (
                     <select
                       value={composer.scopeId}
-                      onChange={(e) =>
-                        setComposer({ ...composer, scopeId: e.target.value })
-                      }
+                      onChange={(e) => setComposer({ ...composer, scopeId: e.target.value })}
                       style={selectStyle}
                     >
                       <option value="">— select a source type —</option>
@@ -905,9 +878,7 @@ function RuleComposer({
                       size="sm"
                       backgroundColor="white"
                       value={composer.scopeId}
-                      onChange={(e) =>
-                        setComposer({ ...composer, scopeId: e.target.value })
-                      }
+                      onChange={(e) => setComposer({ ...composer, scopeId: e.target.value })}
                       placeholder={
                         composer.scope === "source_type"
                           ? "otel_generic, workato, ..."
@@ -946,15 +917,10 @@ function RuleComposer({
                 rows={4}
                 fontFamily="mono"
                 value={composer.thresholdConfig}
-                onChange={(e) =>
-                  setComposer({ ...composer, thresholdConfig: e.target.value })
-                }
+                onChange={(e) => setComposer({ ...composer, thresholdConfig: e.target.value })}
                 placeholder="{}"
               />
-              <ThresholdPreview
-                ruleType={composer.ruleType}
-                raw={composer.thresholdConfig}
-              />
+              <ThresholdPreview ruleType={composer.ruleType} raw={composer.thresholdConfig} />
             </VStack>
 
             <Box
@@ -969,9 +935,8 @@ function RuleComposer({
                 <Link href="/governance" color="blue.600">
                   governance dashboard
                 </Link>{" "}
-                today. Slack, PagerDuty, webhook, and email destinations ship in a
-                follow-up release — the composer will gain structured destination fields
-                then. (See{" "}
+                today. Slack, PagerDuty, webhook, and email destinations ship in a follow-up release
+                — the composer will gain structured destination fields then. (See{" "}
                 <Link href="/ai-gateway/governance/anomaly-rules" color="blue.600">
                   anomaly rules docs
                 </Link>{" "}
@@ -1038,11 +1003,7 @@ function ThresholdPreview({ ruleType, raw }: { ruleType: string; raw: string }) 
       <HStack alignItems="start" gap={2}>
         <Badge
           colorPalette={
-            palette.label === "Won't fire"
-              ? "orange"
-              : palette.label === "Invalid"
-                ? "red"
-                : "blue"
+            palette.label === "Won't fire" ? "orange" : palette.label === "Invalid" ? "red" : "blue"
           }
           size="xs"
           variant="subtle"

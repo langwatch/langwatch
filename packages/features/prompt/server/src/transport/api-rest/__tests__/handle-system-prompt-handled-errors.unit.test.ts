@@ -11,10 +11,7 @@
 import { HTTPException } from "hono/http-exception";
 import { describe, expect, it } from "vitest";
 
-import {
-  SystemPromptConflictError,
-  SystemPromptRequiredError,
-} from "@langwatch/prompt-contract";
+import { SystemPromptConflictError, SystemPromptRequiredError } from "@langwatch/prompt-contract";
 
 import { handleSystemPromptHandledErrors } from "../prompt.api";
 

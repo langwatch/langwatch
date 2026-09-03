@@ -12,9 +12,7 @@ export class ClickHouseUsageStatsRepository extends UsageStatsClickHouseReposito
     super();
   }
 
-  static create(
-    clients: UsageStatsClickHouseClientResolver,
-  ): ClickHouseUsageStatsRepository {
+  static create(clients: UsageStatsClickHouseClientResolver): ClickHouseUsageStatsRepository {
     return new ClickHouseUsageStatsRepository(clients);
   }
 
@@ -52,10 +50,7 @@ export class ClickHouseUsageStatsRepository extends UsageStatsClickHouseReposito
     return Number.parseInt(rows[0]?.Total ?? "0", 10);
   }
 
-  async findTraceCount({
-    organizationId,
-    projectIds,
-  }: UsageStatsCountInput): Promise<number> {
+  async findTraceCount({ organizationId, projectIds }: UsageStatsCountInput): Promise<number> {
     if (projectIds.length === 0) {
       return 0;
     }

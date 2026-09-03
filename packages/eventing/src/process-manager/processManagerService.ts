@@ -23,11 +23,7 @@ import type {
   ProcessRef,
   ProcessSignalEnvelope,
 } from "./processManager.types";
-import type {
-  DueWake,
-  NewOutboxMessage,
-  ProcessStore,
-} from "./stores/processStore.types";
+import type { DueWake, NewOutboxMessage, ProcessStore } from "./stores/processStore.types";
 
 export type HandleResult =
   | {
@@ -95,12 +91,8 @@ export class ProcessManagerService<State> {
     this.definition = options.definition;
     this.store = options.store;
     this.tracer = options.tracer ?? trace.getTracer("langwatch.process-manager");
-    this.signalRevisionRetries =
-      options.signalRevisionRetries ?? DEFAULT_SIGNAL_REVISION_RETRIES;
-    if (
-      !Number.isSafeInteger(this.signalRevisionRetries) ||
-      this.signalRevisionRetries < 0
-    ) {
+    this.signalRevisionRetries = options.signalRevisionRetries ?? DEFAULT_SIGNAL_REVISION_RETRIES;
+    if (!Number.isSafeInteger(this.signalRevisionRetries) || this.signalRevisionRetries < 0) {
       throw new RangeError("signalRevisionRetries must be a non-negative safe integer");
     }
   }
@@ -249,9 +241,7 @@ export class ProcessManagerService<State> {
     const { signal, now, createIfMissing = false } = params;
     const evolveSignal = this.definition.evolveSignal;
     if (!evolveSignal) {
-      throw new Error(
-        `Process manager "${this.definition.name}" does not accept external signals`,
-      );
+      throw new Error(`Process manager "${this.definition.name}" does not accept external signals`);
     }
 
     const ref: ProcessRef = {
@@ -282,11 +272,7 @@ export class ProcessManagerService<State> {
         ensureJsonSafe(signal.payload);
         const sourceEventId = `external-signal:${signal.signalId}`;
 
-        for (
-          let conflictCount = 0;
-          conflictCount <= this.signalRevisionRetries;
-          conflictCount++
-        ) {
+        for (let conflictCount = 0; conflictCount <= this.signalRevisionRetries; conflictCount++) {
           if (await this.store.hasConsumedSource({ ref, sourceEventId })) {
             const winning = await this.store.findByRef<State>({ ref });
             if (!winning) return { outcome: "processNotFound" as const };
@@ -335,9 +321,7 @@ export class ProcessManagerService<State> {
           }
 
           if (result.outcome !== "revisionConflict") {
-            throw new Error(
-              `External signal produced unexpected outcome "${result.outcome}"`,
-            );
+            throw new Error(`External signal produced unexpected outcome "${result.outcome}"`);
           }
 
           if (conflictCount < this.signalRevisionRetries) continue;
@@ -363,9 +347,7 @@ export class ProcessManagerService<State> {
    * intents, so it needs neither an instance row nor the transaction that
    * would keep one consistent with an inbox marker.
    */
-  private isTransientEvolution(
-    evolution: ReturnType<ProcessDefinition<State>["evolve"]>,
-  ): boolean {
+  private isTransientEvolution(evolution: ReturnType<ProcessDefinition<State>["evolve"]>): boolean {
     return (
       evolution.nextWakeAt === null &&
       isDeepJsonEqual(evolution.state, this.definition.initialState)

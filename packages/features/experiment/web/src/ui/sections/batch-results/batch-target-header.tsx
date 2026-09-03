@@ -24,7 +24,10 @@ import {
   PassRateCircle,
   useInteractiveTooltip,
 } from "./presentation";
-import { CostStatsTooltip, LatencyStatsTooltip } from "../../elements/batch-results/metric-stats-tooltip";
+import {
+  CostStatsTooltip,
+  LatencyStatsTooltip,
+} from "../../elements/batch-results/metric-stats-tooltip";
 import type { BatchTargetColumn } from "../batch-evaluation-results.types";
 import type { BatchTargetAggregate } from "../batch-evaluation-results.aggregates";
 

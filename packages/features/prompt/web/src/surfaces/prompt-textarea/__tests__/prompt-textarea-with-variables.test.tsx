@@ -2,15 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { forwardRef, useReducer } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -36,15 +28,10 @@ vi.mock("rich-textarea", () => ({
       onBlur?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
       "data-role"?: string;
     }
-  >(
-    (
-      { children, autoHeight, onSelectionChange, "data-role": dataRole, ...props },
-      ref,
-    ) => {
-      // Simple textarea that mimics RichTextarea behavior
-      return <textarea ref={ref} data-role={dataRole} {...props} />;
-    },
-  ),
+  >(({ children, autoHeight, onSelectionChange, "data-role": dataRole, ...props }, ref) => {
+    // Simple textarea that mimics RichTextarea behavior
+    return <textarea ref={ref} data-role={dataRole} {...props} />;
+  }),
 }));
 
 const mockSources: AvailableSource[] = [
@@ -659,9 +646,7 @@ describe("PromptTextAreaWithVariables", () => {
       });
 
       expect(screen.getByTestId("undefined-variables-banner")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("create-missing-variable-button"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("create-missing-variable-button")).not.toBeInTheDocument();
     });
 
     /** @scenario Error banner never covers the last line of the prompt */

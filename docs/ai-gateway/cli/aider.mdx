@@ -47,8 +47,8 @@ export OPENAI_EXTRA_HEADERS="{\"traceparent\": \"$(cat /tmp/aider-trace)\", \"X-
 ```
 
 <Note>
-  `OPENAI_EXTRA_HEADERS` passthrough works with `openai` Python SDK ≥ v1.30. Aider
-  versions pinned to older SDKs ignore it.
+  `OPENAI_EXTRA_HEADERS` passthrough works with `openai` Python SDK ≥ v1.30. Aider versions pinned
+  to older SDKs ignore it.
 </Note>
 
 Every request from that Aider session shares a trace id; the gateway nests its span under it and no cost is double-attributed. See [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation) for the generator helper.

@@ -54,10 +54,7 @@ export type PollResult =
  * adding a status to the enum is a compile error here until it is classified.
  * Mirrors the exhaustive-switch rule in `scenario-run-category.ts`.
  */
-const TERMINAL_STATUS_OUTCOME: Record<
-  ScenarioRunStatus,
-  "run_failed" | "run_error" | null
-> = {
+const TERMINAL_STATUS_OUTCOME: Record<ScenarioRunStatus, "run_failed" | "run_error" | null> = {
   [ScenarioRunStatus.FAILED]: "run_failed",
   [ScenarioRunStatus.ERROR]: "run_error",
   [ScenarioRunStatus.CANCELLED]: "run_error",
@@ -69,9 +66,7 @@ const TERMINAL_STATUS_OUTCOME: Record<
   [ScenarioRunStatus.RUNNING]: null,
 };
 
-function classifyTerminalStatus(
-  status: ScenarioRunStatus,
-): "run_failed" | "run_error" | null {
+function classifyTerminalStatus(status: ScenarioRunStatus): "run_failed" | "run_error" | null {
   // The `?? null` is not dead code. tRPC does not runtime-validate its output,
   // so a status added to the server after this client shipped arrives here
   // unclassified, and the compile-time exhaustiveness above cannot see it.

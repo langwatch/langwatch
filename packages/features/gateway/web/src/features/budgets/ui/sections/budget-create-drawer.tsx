@@ -38,13 +38,7 @@ type BudgetCreateDrawerProps = {
   onCreated: () => void;
 };
 
-type ScopeKind =
-  | "ORGANIZATION"
-  | "GROUP"
-  | "TEAM"
-  | "PROJECT"
-  | "PRINCIPAL"
-  | "VIRTUAL_KEY";
+type ScopeKind = "ORGANIZATION" | "GROUP" | "TEAM" | "PROJECT" | "PRINCIPAL" | "VIRTUAL_KEY";
 type Window = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
 
 const KIND_OPTIONS: Array<{
@@ -68,11 +62,7 @@ const KIND_OPTIONS: Array<{
   },
 ];
 
-export function BudgetCreateDrawer({
-  open,
-  onOpenChange,
-  onCreated,
-}: BudgetCreateDrawerProps) {
+export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCreateDrawerProps) {
   const toaster = useGatewayToaster();
   const { project, team, organization } = useOrganizationTeamProject();
   const [name, setName] = useState("");
@@ -219,9 +209,7 @@ export function BudgetCreateDrawer({
         ? (groupsQuery.data ?? []).map((g) => ({
             id: g.id,
             name:
-              g.memberCount === 1
-                ? `${g.name} (1 member)`
-                : `${g.name} (${g.memberCount} members)`,
+              g.memberCount === 1 ? `${g.name} (1 member)` : `${g.name} (${g.memberCount} members)`,
           }))
         : scopeKind === "TEAM"
           ? teams
@@ -283,8 +271,7 @@ export function BudgetCreateDrawer({
         // The picker gives a local wall-clock string with no zone; the
         // Date constructor reads it in the browser's zone, which is the
         // one the admin typed it in.
-        cycleAnchorAt:
-          isScheduledWindow && cycleAnchorAt ? new Date(cycleAnchorAt) : null,
+        cycleAnchorAt: isScheduledWindow && cycleAnchorAt ? new Date(cycleAnchorAt) : null,
         allowUnreachable: allowUnreachable || undefined,
       });
       onCreated();
@@ -380,9 +367,8 @@ export function BudgetCreateDrawer({
                       {targetsLoading
                         ? "Loading…"
                         : `Pick a ${
-                            KIND_OPTIONS.find(
-                              (o) => o.kind === scopeKind,
-                            )?.label.toLowerCase() ?? "target"
+                            KIND_OPTIONS.find((o) => o.kind === scopeKind)?.label.toLowerCase() ??
+                            "target"
                           }`}
                     </option>
                     {(targetOptions ?? []).map((t) => (
@@ -433,9 +419,7 @@ export function BudgetCreateDrawer({
 
             {submitError && (
               <Field.Root invalid>
-                <Field.ErrorText data-testid="budget-submit-error">
-                  {submitError}
-                </Field.ErrorText>
+                <Field.ErrorText data-testid="budget-submit-error">{submitError}</Field.ErrorText>
                 {scopeUnreachable && (
                   <Button
                     type="button"
@@ -521,9 +505,7 @@ export function BudgetCreateDrawer({
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={onBreach}
-                  onChange={(e) =>
-                    setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")
-                  }
+                  onChange={(e) => setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")}
                 >
                   <option value="BLOCK">Block: reject requests at limit</option>
                   <option value="WARN">Warn: tag responses, keep serving</option>

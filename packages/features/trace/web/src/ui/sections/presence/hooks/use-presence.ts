@@ -28,11 +28,7 @@ interface UsePresenceOptions {
  * - Sends a `leave` on unmount and on `pagehide` so peers see drop-offs
  *   immediately rather than waiting for TTL.
  */
-export function usePresence({
-  projectId,
-  location,
-  enabled = true,
-}: UsePresenceOptions): void {
+export function usePresence({ projectId, location, enabled = true }: UsePresenceOptions): void {
   const sessionId = useTabSessionId();
 
   const setSelfSessionId = usePresenceStore((s) => s.setSelfSessionId);

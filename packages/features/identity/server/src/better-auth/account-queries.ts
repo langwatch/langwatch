@@ -62,25 +62,18 @@ export type AccountQuery =
  */
 export class IdentityUnsupportedStorageQueryError extends HandledError {
   constructor(detail: string) {
-    super(
-      "identity_unsupported_storage_query",
-      "identity_unsupported_storage_query",
-      {
-        httpStatus: 500,
-        fault: "platform",
-        reasons: [new Error(detail)],
-      },
-    );
+    super("identity_unsupported_storage_query", "identity_unsupported_storage_query", {
+      httpStatus: 500,
+      fault: "platform",
+      reasons: [new Error(detail)],
+    });
     this.name = "IdentityUnsupportedStorageQueryError";
   }
 }
 
 const shapeOf = (where: readonly AccountWhere[]): string =>
   where
-    .map(
-      (clause) =>
-        `${clause.field}${clause.operator ? ` ${clause.operator}` : ""}`,
-    )
+    .map((clause) => `${clause.field}${clause.operator ? ` ${clause.operator}` : ""}`)
     .sort()
     .join(", ") || "no predicate";
 
@@ -158,8 +151,7 @@ const only = (where: readonly AccountWhere[], ...fields: string[]): boolean =>
       (clause) =>
         clause.field === field &&
         operatorIsEnumerated(clause) &&
-        (clause.connector === undefined ||
-          clause.connector.toUpperCase() === "AND"),
+        (clause.connector === undefined || clause.connector.toUpperCase() === "AND"),
     ),
   );
 
@@ -172,8 +164,7 @@ const onlyIdIn = (where: readonly AccountWhere[]): boolean => {
     clause.field === "id" &&
     clause.operator?.toLowerCase() === "in" &&
     Array.isArray(clause.value) &&
-    (clause.connector === undefined ||
-      clause.connector.toUpperCase() === "AND")
+    (clause.connector === undefined || clause.connector.toUpperCase() === "AND")
   );
 };
 

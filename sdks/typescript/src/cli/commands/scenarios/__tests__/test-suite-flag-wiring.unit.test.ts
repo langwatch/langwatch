@@ -46,9 +46,7 @@ describe("scenario update, given both test suite flags on one line", () => {
     vi.spyOn(console, "log").mockImplementation(() => {
       // intentionally empty, suppresses output during tests
     });
-    const exit = vi.spyOn(process, "exit").mockImplementation(((
-      code: number,
-    ) => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code: number) => {
       throw new Error(`process.exit(${code})`);
     }) as never);
 

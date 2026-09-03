@@ -64,9 +64,7 @@ function selectPreset(id: string): void {
   const preset = getPresetById(id);
   if (!preset) throw new Error(`the ${id} preset went missing`);
   const { from, to } = preset.compute();
-  useFilterStore
-    .getState()
-    .setTimeRange({ from, to, label: preset.label, presetId: preset.id });
+  useFilterStore.getState().setTimeRange({ from, to, label: preset.label, presetId: preset.id });
 }
 
 /**

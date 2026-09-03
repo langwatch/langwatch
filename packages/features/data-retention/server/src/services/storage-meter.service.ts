@@ -188,8 +188,7 @@ export class StorageMeterService {
 
     const client = await this.resolveClickHouseClient(tenantId);
     const unions = PRODUCTION_STORAGE_METER_TABLES.map(
-      (table) =>
-        `SELECT sum(_size_bytes) AS t FROM ${table} WHERE TenantId = {tenantId:String}`,
+      (table) => `SELECT sum(_size_bytes) AS t FROM ${table} WHERE TenantId = {tenantId:String}`,
     ).join("\n  UNION ALL\n  ");
 
     try {

@@ -2,10 +2,7 @@
  * @vitest-environment jsdom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createStreamingStore,
-  type StreamingMessage,
-} from "../use-simulation-streaming-state";
+import { createStreamingStore, type StreamingMessage } from "../use-simulation-streaming-state";
 
 type Store = ReturnType<typeof createStreamingStore>;
 
@@ -29,9 +26,7 @@ function captureRaf() {
   };
 }
 
-function makeMsg(
-  overrides: Partial<StreamingMessage> & { messageId: string },
-): StreamingMessage {
+function makeMsg(overrides: Partial<StreamingMessage> & { messageId: string }): StreamingMessage {
   return {
     role: "assistant",
     content: "",

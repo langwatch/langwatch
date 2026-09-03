@@ -40,8 +40,7 @@ export function DepartmentPicker({
   const assignTeam = api.departments.assignTeam.useMutation();
   const assignProject = api.departments.assignProject.useMutation();
 
-  const isPending =
-    assignUser.isPending || assignTeam.isPending || assignProject.isPending;
+  const isPending = assignUser.isPending || assignTeam.isPending || assignProject.isPending;
 
   const assign = async (departmentId: string | null) => {
     try {
@@ -82,9 +81,7 @@ export function DepartmentPicker({
     >
       <NativeSelect.Field
         value={value ?? ""}
-        onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-          void assign(e.target.value || null)
-        }
+        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => void assign(e.target.value || null)}
       >
         <option value="">Unassigned</option>
         {departments.map((dept) => (

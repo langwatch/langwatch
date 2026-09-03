@@ -92,10 +92,7 @@ function renderWith(rows: Array<Record<string, unknown>>) {
     error: null,
     refetch: vi.fn(),
   });
-  renderWithGatewayHost(
-    <BudgetsPage />,
-    { host },
-  );
+  renderWithGatewayHost(<BudgetsPage />, { host });
 }
 
 afterEach(() => cleanup());

@@ -6,10 +6,7 @@ import {
   sortRowsByColumn,
   useColumnSort,
 } from "./column-sort";
-import {
-  PULL_REQUEST_STATUS_SORT_RANK,
-  type PullRequestStatus,
-} from "./pull-request-status";
+import { PULL_REQUEST_STATUS_SORT_RANK, type PullRequestStatus } from "./pull-request-status";
 
 /**
  * The Pull Requests table's columns, named against the shared column-sort
@@ -50,10 +47,7 @@ export interface SortablePullRequestRow {
   costUsd: number | null;
 }
 
-const PULL_REQUEST_SORT_RULES: ColumnSortRules<
-  PullRequestSortColumn,
-  SortablePullRequestRow
-> = {
+const PULL_REQUEST_SORT_RULES: ColumnSortRules<PullRequestSortColumn, SortablePullRequestRow> = {
   defaultSort: DEFAULT_PULL_REQUEST_SORT,
   // A measure leads with its largest value, a name leads with A, and a status
   // leads with the work still in flight.
@@ -70,9 +64,7 @@ const PULL_REQUEST_SORT_RULES: ColumnSortRules<
     number: (row) => row.pullRequest?.number ?? null,
     title: (row) => (row.pullRequest?.title || row.headBranch).toLowerCase(),
     status: (row) =>
-      row.snapshotStatus === null
-        ? null
-        : PULL_REQUEST_STATUS_SORT_RANK[row.snapshotStatus],
+      row.snapshotStatus === null ? null : PULL_REQUEST_STATUS_SORT_RANK[row.snapshotStatus],
     lastActivity: (row) => row.lastActivityAtMs,
     models: (row) => row.modelBreakdown[0]?.model.toLowerCase() ?? null,
     tokens: (row) => row.totalTokens,

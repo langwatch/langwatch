@@ -1,8 +1,6 @@
 import { Badge } from "@chakra-ui/react";
 
-export function replayStateColor(
-  state: string,
-): "green" | "red" | "orange" | "blue" | "gray" {
+export function replayStateColor(state: string): "green" | "red" | "orange" | "blue" | "gray" {
   switch (state) {
     case "completed":
       return "green";

@@ -89,10 +89,7 @@ describe("EventsCell", () => {
         renderCell(
           row({
             events: {
-              groups: [
-                group({ name: "tool.output", count: 237 }),
-                group({ name: "first_token" }),
-              ],
+              groups: [group({ name: "tool.output", count: 237 }), group({ name: "first_token" })],
               totalCount: 238,
               distinctCount: 2,
             },
@@ -152,9 +149,7 @@ describe("EventsCell", () => {
           row({
             events: {
               // The read returned 4 of the trace's 40 distinct names.
-              groups: ["a", "b", "c", "d"].map((name, i) =>
-                group({ name, firstTimestamp: i }),
-              ),
+              groups: ["a", "b", "c", "d"].map((name, i) => group({ name, firstTimestamp: i })),
               totalCount: 100,
               distinctCount: 40,
             },
@@ -181,9 +176,7 @@ describe("EventsCell", () => {
     describe("when the Events cell renders", () => {
       /** @scenario The list still renders while events are in flight */
       it("holds the space rather than claiming the trace recorded nothing", () => {
-        const { container } = renderCell(
-          row({ events: NO_TRACE_EVENTS, eventsLoading: true }),
-        );
+        const { container } = renderCell(row({ events: NO_TRACE_EVENTS, eventsLoading: true }));
 
         expect(screen.queryByText("—")).not.toBeInTheDocument();
         expect(container.firstChild).toBeTruthy();

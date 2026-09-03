@@ -26,20 +26,14 @@ import type {
 
 /** The verbs a better-auth ceremony can run (adapter.ts's whole reach). */
 export interface IdentityCeremonyWrites {
-  attachIdentifier(
-    input: AttachIdentifierCommandData,
-  ): Promise<IdentityFact[]>;
-  detachIdentifier(
-    input: DetachIdentifierCommandData,
-  ): Promise<IdentityFact[]>;
+  attachIdentifier(input: AttachIdentifierCommandData): Promise<IdentityFact[]>;
+  detachIdentifier(input: DetachIdentifierCommandData): Promise<IdentityFact[]>;
   eraseUser(input: EraseUserCommandData): Promise<IdentityFact[]>;
 }
 
 /** The one verb the email verification ceremony completes with. */
 export interface IdentityVerificationWrites {
-  verifyIdentifier(
-    input: VerifyIdentifierCommandData,
-  ): Promise<IdentityFact[]>;
+  verifyIdentifier(input: VerifyIdentifierCommandData): Promise<IdentityFact[]>;
 }
 
 /**
@@ -59,13 +53,7 @@ export interface IdentityLinkProposalWrites {
 
 /** The verbs one backfill pass states: adopt, establish, compensate. */
 export interface IdentityAdoptionWrites {
-  attachIdentifier(
-    input: AttachIdentifierCommandData,
-  ): Promise<IdentityFact[]>;
-  verifyIdentifier(
-    input: VerifyIdentifierCommandData,
-  ): Promise<IdentityFact[]>;
-  detachIdentifier(
-    input: DetachIdentifierCommandData,
-  ): Promise<IdentityFact[]>;
+  attachIdentifier(input: AttachIdentifierCommandData): Promise<IdentityFact[]>;
+  verifyIdentifier(input: VerifyIdentifierCommandData): Promise<IdentityFact[]>;
+  detachIdentifier(input: DetachIdentifierCommandData): Promise<IdentityFact[]>;
 }

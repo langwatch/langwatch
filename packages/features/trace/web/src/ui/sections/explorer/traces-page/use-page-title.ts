@@ -26,9 +26,7 @@ function buildTitle({
   const trimmed = queryText.trim();
   if (trimmed) {
     const clipped =
-      trimmed.length > MAX_QUERY_LENGTH
-        ? `${trimmed.slice(0, MAX_QUERY_LENGTH - 1)}…`
-        : trimmed;
+      trimmed.length > MAX_QUERY_LENGTH ? `${trimmed.slice(0, MAX_QUERY_LENGTH - 1)}…` : trimmed;
     return `${prefix} – Traces · ${clipped}`;
   }
 

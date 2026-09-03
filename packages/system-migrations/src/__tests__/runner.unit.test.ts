@@ -13,15 +13,9 @@ class FakeStateRepository implements SystemMigrationStateRepository {
     return `${migrationName}::${tenantId}`;
   }
 
-  async hasFinalizedTenant({
-    migrationName,
-  }: {
-    migrationName: string;
-  }): Promise<boolean> {
+  async hasFinalizedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     return [...this.records.values()].some(
-      (record) =>
-        record.migrationName === migrationName &&
-        record.status === "finalized",
+      (record) => record.migrationName === migrationName && record.status === "finalized",
     );
   }
 
@@ -168,17 +162,12 @@ describe("SystemMigrationRunnerService", () => {
       const migration = migrationOf("m1", async ({ tenantId }) => {
         inFlight += 1;
         peak = Math.max(peak, inFlight);
-        await new Promise((resolve) =>
-          setTimeout(resolve, tenantId === "org-00" ? 40 : 5),
-        );
+        await new Promise((resolve) => setTimeout(resolve, tenantId === "org-00" ? 40 : 5));
         inFlight -= 1;
         completed.push(tenantId);
         return finalized;
       });
-      const ids = Array.from(
-        { length: 12 },
-        (_, i) => `org-${String(i).padStart(2, "0")}`,
-      );
+      const ids = Array.from({ length: 12 }, (_, i) => `org-${String(i).padStart(2, "0")}`);
       const runner = new SystemMigrationRunnerService({
         state,
         lease: new FakeLeaseRepository(),
@@ -248,9 +237,7 @@ describe("SystemMigrationRunnerService", () => {
       expect(migrate).toHaveBeenCalledTimes(1);
       expect(migrate).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "acme" }));
       expect(summary?.skipped).toBe(1);
-      expect(
-        await state.findRecord({ migrationName: "m1", tenantId: "globex" }),
-      ).toBeNull();
+      expect(await state.findRecord({ migrationName: "m1", tenantId: "globex" })).toBeNull();
     });
   });
 
@@ -350,9 +337,9 @@ describe("SystemMigrationRunnerService", () => {
       // migration whose proof still passes and undo the rollback.
       expect(migrate).not.toHaveBeenCalled();
       expect(summary?.alreadyRolledBack).toBe(1);
-      expect(
-        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status,
-      ).toBe("rolled_back");
+      expect((await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status).toBe(
+        "rolled_back",
+      );
     });
   });
 
@@ -387,9 +374,9 @@ describe("SystemMigrationRunnerService", () => {
       // it came from.
       expect(migrate).not.toHaveBeenCalled();
       expect(summary?.alreadyRolledBack).toBe(1);
-      expect(
-        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status,
-      ).toBe("rolled_back");
+      expect((await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status).toBe(
+        "rolled_back",
+      );
     });
   });
 
@@ -463,9 +450,9 @@ describe("SystemMigrationRunnerService", () => {
 
       // A `parked` row would be retried on the next pass and re-finalized -
       // the exact undo the pin exists to prevent.
-      expect(
-        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status,
-      ).toBe("rolled_back");
+      expect((await state.findRecord({ migrationName: "m1", tenantId: "acme" }))?.status).toBe(
+        "rolled_back",
+      );
     });
   });
 
@@ -501,13 +488,7 @@ describe("SystemMigrationRunnerService", () => {
     it("stops that tenant's remaining migrations and carries on with the rest", async () => {
       const lease = new FakeLeaseRepository();
       const touched: string[] = [];
-      const migrationBody = async ({
-        tenantId,
-        name,
-      }: {
-        tenantId: string;
-        name: string;
-      }) => {
+      const migrationBody = async ({ tenantId, name }: { tenantId: string; name: string }) => {
         touched.push(`${name}:${tenantId}`);
         // Outlive the renew interval, then lose the claim to another driver
         // mid-tenant - the case a between-migrations renewal cannot detect.
@@ -538,9 +519,7 @@ describe("SystemMigrationRunnerService", () => {
       expect(touched).toContain("m1:globex");
       expect(touched).toContain("m2:globex");
       expect(summary.tenantsSeen).toBe(2);
-      expect(
-        await state.findRecord({ migrationName: "m2", tenantId: "acme" }),
-      ).toBeNull();
+      expect(await state.findRecord({ migrationName: "m2", tenantId: "acme" })).toBeNull();
     });
   });
 
@@ -601,9 +580,7 @@ describe("SystemMigrationRunnerService", () => {
       const summary = await runner.runPass({ signal: controller.signal });
 
       expect(summary?.tenantsSeen).toBe(1);
-      expect(
-        await state.findRecord({ migrationName: "m1", tenantId: "globex" }),
-      ).toBeNull();
+      expect(await state.findRecord({ migrationName: "m1", tenantId: "globex" })).toBeNull();
       // Every claim released, aborted mid-pass or not.
       expect(lease.heldNames()).toEqual([]);
     });
@@ -611,10 +588,7 @@ describe("SystemMigrationRunnerService", () => {
 
   describe("when the tenant source pages", () => {
     it("walks every page with the last id as the cursor", async () => {
-      const ids = Array.from(
-        { length: 250 },
-        (_, i) => `org-${String(i).padStart(3, "0")}`,
-      );
+      const ids = Array.from({ length: 250 }, (_, i) => `org-${String(i).padStart(3, "0")}`);
       const migrate = vi.fn(async () => finalized);
       const runner = new SystemMigrationRunnerService({
         state,

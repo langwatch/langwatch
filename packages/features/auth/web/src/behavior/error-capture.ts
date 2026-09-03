@@ -34,10 +34,7 @@ export function toError(thrown: unknown): Error {
 }
 
 /** Reports a failure for observability. Never throws, never blocks. */
-export function captureException(
-  error: Error,
-  properties: ErrorCaptureProperties = {},
-): void {
+export function captureException(error: Error, properties: ErrorCaptureProperties = {}): void {
   try {
     client()?.captureException?.(error, { ...properties.tags });
   } catch {

@@ -1,4 +1,1 @@
-export {
-  CloseButton,
-  type CloseButtonProps,
-} from "@langwatch/design-system/close-button";
+export { CloseButton, type CloseButtonProps } from "@langwatch/design-system/close-button";

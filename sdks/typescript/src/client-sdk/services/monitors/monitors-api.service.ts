@@ -129,21 +129,15 @@ export class MonitorsApiService {
   }
 
   async toggle(id: string, enabled: boolean): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(
-      `/api/monitors/${encodeURIComponent(id)}/toggle`,
-      {
-        method: "POST",
-        body: JSON.stringify({ enabled }),
-      },
-    );
+    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}/toggle`, {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+    });
   }
 
   async delete(id: string): Promise<MonitorDeleteResponse> {
-    return this.request<MonitorDeleteResponse>(
-      `/api/monitors/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE",
-      },
-    );
+    return this.request<MonitorDeleteResponse>(`/api/monitors/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
   }
 }

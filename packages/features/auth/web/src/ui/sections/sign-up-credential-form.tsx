@@ -1,10 +1,7 @@
 /// <reference path="../../model/ambient.d.ts" />
 import { Alert, Button, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  PASSWORD_REQUIREMENTS_HINT,
-  passwordProblem,
-} from "@langwatch/identity-contract";
+import { PASSWORD_REQUIREMENTS_HINT, passwordProblem } from "@langwatch/identity-contract";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -121,8 +118,7 @@ export function SignUpCredentialForm({
   // the address follows somebody in rather than standing in front of them, so
   // a slow or failing mailer must not hold up the door it is following them
   // through. A send that does not happen is recoverable from inside the app.
-  const sendConfirmation =
-    api.frontDoor.sendMyAddressConfirmation.useMutation();
+  const sendConfirmation = api.frontDoor.sendMyAddressConfirmation.useMutation();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);
@@ -155,9 +151,7 @@ export function SignUpCredentialForm({
       }
       // A rejected field belongs next to that field. Anything the form has no
       // input for falls through to the alert below.
-      setServerErrorIsOnTheForm(
-        applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }),
-      );
+      setServerErrorIsOnTheForm(applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }));
       return;
     }
 
@@ -233,13 +227,7 @@ export function SignUpCredentialForm({
         ) : null}
         {/* Carried in the form as well as shown above it, so a password
             manager saves the pair it was registered with. */}
-        <input
-          type="hidden"
-          name="email"
-          value={email}
-          autoComplete="username"
-          readOnly
-        />
+        <input type="hidden" name="email" value={email} autoComplete="username" readOnly />
         <FrontDoorField
           label="Password"
           labelEnd={
@@ -271,18 +259,12 @@ export function SignUpCredentialForm({
             call to action — is a screen that asks somebody to plan before
             they can start; one field is a screen that asks them to begin. */}
         {isChoosingPassword ? (
-          <FrontDoorField
-            label="Confirm password"
-            error={form.formState.errors.confirmPassword}
-          >
+          <FrontDoorField label="Confirm password" error={form.formState.errors.confirmPassword}>
             {(id) => (
               <PasswordInput
                 id={id}
                 autoComplete="new-password"
-                registration={form.register(
-                  "confirmPassword",
-                  blurJudged("confirmPassword"),
-                )}
+                registration={form.register("confirmPassword", blurJudged("confirmPassword"))}
               />
             )}
           </FrontDoorField>
@@ -300,10 +282,7 @@ export function SignUpCredentialForm({
             </Alert.Content>
           </Alert.Root>
         ) : register.error && !serverErrorIsOnTheForm ? (
-          <HandledErrorAlert
-            error={register.error}
-            fallbackTitle="Couldn't create your account"
-          />
+          <HandledErrorAlert error={register.error} fallbackTitle="Couldn't create your account" />
         ) : null}
         {/* Arrives with the confirmation. Before that the passkey button IS
             the call to action, and a second primary button under an empty

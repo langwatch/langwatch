@@ -37,9 +37,9 @@ vi.mock("@/cli/utils/governance/config", () => ({
 // The slug path's server boundary: POST /api/auth/cli/project-key.
 const fetchProjectKeyBySlug = vi.fn();
 vi.mock("@/cli/utils/governance/session-api", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/cli/utils/governance/session-api")
-  >("@/cli/utils/governance/session-api");
+  const actual = await vi.importActual<typeof import("@/cli/utils/governance/session-api")>(
+    "@/cli/utils/governance/session-api",
+  );
   return {
     SessionApiError: actual.SessionApiError,
     fetchPersonalProject: vi.fn(),
@@ -184,9 +184,7 @@ describe("loginCommand", () => {
         });
         const errorSpy = console.error as unknown as ReturnType<typeof vi.fn>;
 
-        await expect(loginCommand({ project: "checkout" })).rejects.toThrow(
-          "process.exit(1)",
-        );
+        await expect(loginCommand({ project: "checkout" })).rejects.toThrow("process.exit(1)");
 
         expect(fetchProjectKeyBySlug).not.toHaveBeenCalled();
         const printed = errorSpy.mock.calls.flat().join("\n");
@@ -286,11 +284,7 @@ describe("loginCommand", () => {
           choices: Array<{ value: string; title: string }>;
           initial?: number;
         };
-        expect(call.choices.map((c) => c.value)).toEqual([
-          "keep",
-          "self-hosted",
-          "cloud",
-        ]);
+        expect(call.choices.map((c) => c.value)).toEqual(["keep", "self-hosted", "cloud"]);
         expect(call.choices[0]!.title).toContain("http://localhost:5560");
         expect(call.initial).toBe(0);
       });

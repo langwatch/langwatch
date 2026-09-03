@@ -12,9 +12,7 @@ describe("parseCommand", () => {
   describe("when a valid turn line", () => {
     it("parses turnId, prompt and the optional fields", () => {
       expect(
-        parseCommand(
-          '{"type":"turn","turnId":"t1","prompt":"hi","system":"s","resumeToken":"r"}',
-        ),
+        parseCommand('{"type":"turn","turnId":"t1","prompt":"hi","system":"s","resumeToken":"r"}'),
       ).toEqual({
         type: "turn",
         turnId: "t1",

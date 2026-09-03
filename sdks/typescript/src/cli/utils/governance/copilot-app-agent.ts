@@ -59,9 +59,7 @@ export function copilotAppAgentPath(platform: AppPlatform, home: string): string
 /** Every file the agent writes on this platform — for cleanup. Paths are
  * env-independent, so an empty-env render yields the full set. */
 function copilotAppAgentFiles(platform: AppPlatform, home: string): string[] {
-  return renderLaunchAgent({ platform, home, execPath: "", env: {} }).files.map(
-    (f) => f.path,
-  );
+  return renderLaunchAgent({ platform, home, execPath: "", env: {} }).files.map((f) => f.path);
 }
 
 /**
@@ -168,9 +166,7 @@ function unregisterCommands(platform: AppPlatform): OsCommand[] {
         },
       ];
     case "win32":
-      return [
-        { cmd: "schtasks", args: ["/Delete", "/TN", COPILOT_APP_AGENT_LABEL, "/F"] },
-      ];
+      return [{ cmd: "schtasks", args: ["/Delete", "/TN", COPILOT_APP_AGENT_LABEL, "/F"] }];
   }
 }
 
@@ -195,10 +191,7 @@ export class CopilotAppAgentError extends Error {
   }
 }
 
-export function installCopilotAppAgent(
-  spec: LaunchAgentSpec,
-  io: AgentIo = defaultIo,
-): string {
+export function installCopilotAppAgent(spec: LaunchAgentSpec, io: AgentIo = defaultIo): string {
   const descriptor = renderLaunchAgent(spec);
   for (const file of descriptor.files) {
     io.mkdirp(path.dirname(file.path));

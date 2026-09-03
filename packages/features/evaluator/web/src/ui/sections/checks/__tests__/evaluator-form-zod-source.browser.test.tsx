@@ -57,8 +57,8 @@ function Catalog() {
           Evaluator catalog (Zod-first)
         </Heading>
         <Text fontSize="sm" color="gray.600" marginBottom={4}>
-          {Object.keys(evaluatorsSchema.shape).length} evaluators · schemas and defaults
-          inferred from Zod, no ts-to-zod
+          {Object.keys(evaluatorsSchema.shape).length} evaluators · schemas and defaults inferred
+          from Zod, no ts-to-zod
         </Text>
         <VStack align="stretch" gap={3}>
           {SHOWCASE.map((type) => {
@@ -88,27 +88,19 @@ function Catalog() {
                       <Text fontFamily="mono" minWidth="180px">
                         {name}
                       </Text>
-                      <Badge variant="outline">
-                        {fieldType(fieldSchema as z.ZodTypeAny)}
-                      </Badge>
+                      <Badge variant="outline">{fieldType(fieldSchema as z.ZodTypeAny)}</Badge>
                       <Text color="gray.600">
                         default: {JSON.stringify((defaults as any)[name])}
                       </Text>
                     </HStack>
                   ))}
                 </VStack>
-                <Box
-                  marginTop={3}
-                  paddingTop={2}
-                  borderTopWidth="1px"
-                  borderColor="gray.100"
-                >
+                <Box marginTop={3} paddingTop={2} borderTopWidth="1px" borderColor="gray.100">
                   <Text fontSize="xs" color="gray.500" marginBottom={1}>
                     Trace fields (drive the mapping UI)
                   </Text>
                   <HStack fontSize="sm" gap={2} flexWrap="wrap">
-                    {def.requiredFields.length === 0 &&
-                    def.optionalFields.length === 0 ? (
+                    {def.requiredFields.length === 0 && def.optionalFields.length === 0 ? (
                       <Text color="gray.400">none</Text>
                     ) : (
                       <>

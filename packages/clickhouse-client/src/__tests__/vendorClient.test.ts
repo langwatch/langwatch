@@ -142,9 +142,7 @@ describe("VendorClientResilience", () => {
         // shape that pins it.
         const query = vi
           .fn()
-          .mockRejectedValue(
-            new Error("Code: 202. DB::Exception: Too many simultaneous queries."),
-          );
+          .mockRejectedValue(new Error("Code: 202. DB::Exception: Too many simultaneous queries."));
 
         const client = new VendorClientResilience({
           maxRetries: 2,
@@ -168,9 +166,7 @@ describe("VendorClientResilience", () => {
         const translateQueryError = vi.fn();
         const insert = vi
           .fn()
-          .mockRejectedValue(
-            new Error("Code: 202. DB::Exception: Too many simultaneous queries."),
-          );
+          .mockRejectedValue(new Error("Code: 202. DB::Exception: Too many simultaneous queries."));
 
         const client = new VendorClientResilience({
           maxRetries: 2,
@@ -240,8 +236,7 @@ describe("VendorClientResilience", () => {
           clientAnswering([
             { SeriesId: "s1" },
             {
-              exception:
-                "Code: 241. DB::Exception: Memory limit exceeded. (MEMORY_LIMIT_EXCEEDED)",
+              exception: "Code: 241. DB::Exception: Memory limit exceeded. (MEMORY_LIMIT_EXCEEDED)",
             },
           ]),
         );
@@ -382,8 +377,7 @@ describe("VendorClientResilience", () => {
         const client = new VendorClientResilience({
           metrics: {
             observeDuration: boom,
-            incrementCount: ({ queryType, outcome }) =>
-              void counts.push([queryType, outcome]),
+            incrementCount: ({ queryType, outcome }) => void counts.push([queryType, outcome]),
           },
         }).wrap({
           query: vi.fn().mockResolvedValue({}),

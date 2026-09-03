@@ -45,16 +45,12 @@ export function PrivacyDroppedNotice({ categories }: { categories?: string[] | n
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description fontSize="sm">
-          The {list} {wasWere} dropped by this project's privacy settings before{" "}
-          {itTheyWere} stored, so {itThey} not shown here and cannot be recovered.
+          The {list} {wasWere} dropped by this project's privacy settings before {itTheyWere}{" "}
+          stored, so {itThey} not shown here and cannot be recovered.
         </Alert.Description>
         {hasPermission("project:view") && (
           <Button asChild size="xs" variant="outline" marginTop={1} alignSelf="start">
-            <NextLink
-              href="/settings/data-privacy"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <NextLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
               Privacy settings
             </NextLink>
           </Button>

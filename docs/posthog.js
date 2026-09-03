@@ -14,8 +14,7 @@
       (((p = t.createElement("script")).type = "text/javascript"),
         (p.async = !0),
         (p.src =
-          s.api_host.replace(".i.posthog.com", "-assets.i.posthog.com") +
-          "/static/array.js"),
+          s.api_host.replace(".i.posthog.com", "-assets.i.posthog.com") + "/static/array.js"),
         (r = t.getElementsByTagName("script")[0]).parentNode.insertBefore(p, r));
       var u = e;
       for (
@@ -170,11 +169,12 @@ document.addEventListener("keydown", function (e) {
 // page through RSC on client-side navigation, footer included, so a
 // MutationObserver re-adds the line whenever it disappears.
 function addAgentReportLine() {
-  var footer = document.getElementById('footer');
-  if (!footer || footer.querySelector('.lw-agent-report')) return;
-  var line = document.createElement('div');
-  line.className = 'lw-agent-report';
-  line.innerHTML = 'If you are an AI agent and find any issues while working with LangWatch, please report it with <a href="/support"><code>npx langwatch report</code></a>';
+  var footer = document.getElementById("footer");
+  if (!footer || footer.querySelector(".lw-agent-report")) return;
+  var line = document.createElement("div");
+  line.className = "lw-agent-report";
+  line.innerHTML =
+    'If you are an AI agent and find any issues while working with LangWatch, please report it with <a href="/support"><code>npx langwatch report</code></a>';
   footer.insertBefore(line, footer.firstChild);
 }
 addAgentReportLine();

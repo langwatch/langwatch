@@ -40,14 +40,7 @@ export function TraceCommentList({
 }: TraceCommentListProps) {
   const hasCorrection = comments.some((comment) => comment.expectedOutput);
   return (
-    <VStack
-      align="stretch"
-      gap={3}
-      minWidth="300px"
-      maxWidth="380px"
-      paddingX={3}
-      paddingY={2.5}
-    >
+    <VStack align="stretch" gap={3} minWidth="300px" maxWidth="380px" paddingX={3} paddingY={2.5}>
       <HStack gap={2}>
         <Text textStyle="xs" fontWeight="600">
           {comments.length} annotation{comments.length === 1 ? "" : "s"}
@@ -105,9 +98,7 @@ function CommentRow({
           <Text textStyle="2xs" fontWeight="600">
             {comment.user?.name ?? comment.email ?? "anonymous"}
           </Text>
-          {comment.expectedOutput && (
-            <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />
-          )}
+          {comment.expectedOutput && <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />}
           <Box flex={1} />
           <Text textStyle="2xs" color="fg.subtle">
             {new Date(comment.createdAt).toLocaleDateString()}
@@ -163,8 +154,7 @@ function AnchorBreadcrumb({
     );
   }
 
-  const canJump =
-    isOnThisTrace && canJumpToAnnotationAnchor({ anchor: comment, resolvable });
+  const canJump = isOnThisTrace && canJumpToAnnotationAnchor({ anchor: comment, resolvable });
   if (!canJump) {
     return (
       <HStack gap={1} maxWidth="full">

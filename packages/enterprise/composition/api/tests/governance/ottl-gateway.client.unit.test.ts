@@ -40,9 +40,9 @@ describe("AppGovernanceOttlGateway", () => {
     expect(new Headers(observedInit?.headers).get("X-LangWatch-Gateway-Timestamp")).toBe(
       "1700000000",
     );
-    expect(
-      new Headers(observedInit?.headers).get("X-LangWatch-Gateway-Signature"),
-    ).toMatch(/^[a-f0-9]{64}$/);
+    expect(new Headers(observedInit?.headers).get("X-LangWatch-Gateway-Signature")).toMatch(
+      /^[a-f0-9]{64}$/,
+    );
   });
 
   it("returns the transformed payload using the requested encoding fallback", async () => {

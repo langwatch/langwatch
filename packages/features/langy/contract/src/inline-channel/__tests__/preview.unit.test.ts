@@ -48,8 +48,7 @@ describe("feedLangyDerivedCardPreview", () => {
 
   describe("when a later chunk momentarily breaks validation", () => {
     it("keeps the last validating block — never a non-validating guess", () => {
-      const good =
-        '{"kind": "stats", "blockId": "b1", "items": [{"label": "a", "value": 1}';
+      const good = '{"kind": "stats", "blockId": "b1", "items": [{"label": "a", "value": 1}';
       // The next buffer is mid-way through a new item whose label has not
       // arrived: the item object is dropped by salvage, items still valid —
       // so contrive a buffer that truly fails: kind flips to garbage.
@@ -71,8 +70,7 @@ describe("feedLangyDerivedCardPreview", () => {
 
   describe("when fed the same buffer twice", () => {
     it("returns the same state object (no churn)", () => {
-      const raw =
-        '{"kind": "stats", "blockId": "b1", "items": [{"label": "a", "value": 1}]}';
+      const raw = '{"kind": "stats", "blockId": "b1", "items": [{"label": "a", "value": 1}]}';
       const first = feedLangyDerivedCardPreview(undefined, raw);
       const second = feedLangyDerivedCardPreview(first, raw);
       expect(second).toBe(first);

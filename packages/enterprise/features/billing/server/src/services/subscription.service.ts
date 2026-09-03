@@ -105,8 +105,7 @@ export class BillingSubscriptionService {
     const effectiveTraces = upgradeTraces ? totalTraces : 0;
 
     if (this.seatEventService) {
-      const pricingModel =
-        await this.organizationRepository.tryGetPricingModel(organizationId);
+      const pricingModel = await this.organizationRepository.tryGetPricingModel(organizationId);
       if (pricingModel === "SEAT_EVENT") {
         return this.seatEventService.updateSeatEventItems({
           organizationId,
@@ -116,8 +115,7 @@ export class BillingSubscriptionService {
       }
     }
 
-    const lastSubscription =
-      await this.repository.tryFindLastNonCancelled(organizationId);
+    const lastSubscription = await this.repository.tryFindLastNonCancelled(organizationId);
 
     if (
       lastSubscription?.stripeSubscriptionId &&
@@ -161,8 +159,7 @@ export class BillingSubscriptionService {
     billingInterval?: BillingInterval;
   }): Promise<{ url: string | null }> {
     if (isGrowthSeatEventPlan(plan) && this.seatEventService) {
-      const pricingModel =
-        await this.organizationRepository.tryGetPricingModel(organizationId);
+      const pricingModel = await this.organizationRepository.tryGetPricingModel(organizationId);
       return this.seatEventService.createSeatEventCheckout({
         organizationId,
         customerId,
@@ -174,8 +171,7 @@ export class BillingSubscriptionService {
       });
     }
 
-    const lastSubscription =
-      await this.repository.tryFindLastNonCancelled(organizationId);
+    const lastSubscription = await this.repository.tryFindLastNonCancelled(organizationId);
     if (
       lastSubscription?.stripeSubscriptionId &&
       lastSubscription.status !== SubscriptionStatus.PENDING
@@ -221,8 +217,7 @@ export class BillingSubscriptionService {
     organizationId: string;
   }): Promise<{ url: string }> {
     if (this.seatEventService) {
-      const pricingModel =
-        await this.organizationRepository.tryGetPricingModel(organizationId);
+      const pricingModel = await this.organizationRepository.tryGetPricingModel(organizationId);
       if (pricingModel === "SEAT_EVENT") {
         return this.seatEventService.seatEventBillingPortalUrl({
           customerId,
@@ -277,8 +272,7 @@ export class BillingSubscriptionService {
   }): Promise<{ url: string | null }> {
     if (!this.seatEventService) throw new SeatBillingUnavailableError();
     const teamId = (await this.organizationRepository.tryFindFirstTeamId(organizationId)) ?? "";
-    const pricingModel =
-      await this.organizationRepository.tryGetPricingModel(organizationId);
+    const pricingModel = await this.organizationRepository.tryGetPricingModel(organizationId);
     return this.seatEventService.createSeatEventCheckout({
       organizationId,
       customerId,
@@ -447,8 +441,7 @@ export class BillingSubscriptionService {
 
     const basePriceId = this.itemCalculator.prices[plan as StripePriceName];
     const rawCurrency = stripePricesFile.prices[basePriceId]?.currency?.toLowerCase();
-    const checkoutCurrency =
-      rawCurrency === "usd" || rawCurrency === "eur" ? rawCurrency : "usd";
+    const checkoutCurrency = rawCurrency === "usd" || rawCurrency === "eur" ? rawCurrency : "usd";
     const session = await this.stripe.checkout.sessions.create({
       mode: "subscription",
       currency: checkoutCurrency,

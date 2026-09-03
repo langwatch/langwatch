@@ -98,20 +98,19 @@ Upstream 429s will trigger fallback if the VK has a chain configured. Check `X-L
 - If upstream: add a fallback provider to the VK chain, or request quota from the upstream.
 
 <Warning>
-  **Rate-limit changes look broken when the `/changes` long-poll is unreachable.** The
-  gateway's cached VK bundle only refreshes when the control-plane's
-  `/api/internal/gateway/changes` endpoint is reachable and responding within the
-  gateway's `GATEWAY_LONG_POLL_TIMEOUT + 5s` deadline. If long-polls are timing out (look
-  for `changes long-poll error` in the gateway log), bundles stay stale indefinitely, a
-  fresh `langwatch virtual-keys update` that tightens `rpm` will appear to have no effect.
-  Verify connectivity and client timeout headroom before concluding the limiter itself is
-  broken.
+  **Rate-limit changes look broken when the `/changes` long-poll is unreachable.** The gateway's
+  cached VK bundle only refreshes when the control-plane's `/api/internal/gateway/changes` endpoint
+  is reachable and responding within the gateway's `GATEWAY_LONG_POLL_TIMEOUT + 5s` deadline. If
+  long-polls are timing out (look for `changes long-poll error` in the gateway log), bundles stay
+  stale indefinitely, a fresh `langwatch virtual-keys update` that tightens `rpm` will appear to
+  have no effect. Verify connectivity and client timeout headroom before concluding the limiter
+  itself is broken.
 </Warning>
 
 <Note>
-  **TPM (tokens-per-minute) deferred to v1.1.** Token counts aren't known until the
-  provider replies, so pre-estimation can't be a hard cap. TPM will ship with
-  Redis-coordinated cluster-wide counters in v1.1.
+  **TPM (tokens-per-minute) deferred to v1.1.** Token counts aren't known until the provider
+  replies, so pre-estimation can't be a hard cap. TPM will ship with Redis-coordinated cluster-wide
+  counters in v1.1.
 </Note>
 
 ## `403 tool_not_allowed`
@@ -219,10 +218,9 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 1. **You're still on a static token instead of the per-project resolver.** The gateway resolves the X-Auth-Token from the VK's owning project on every bundle refresh, each tenant's spans route to their own inbox automatically. If you've hand-set `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN` in your pod env, it takes precedence over the per-project token and every project's spans land in whatever project that static token points at. Unset it and let the resolver do its job.
 
    <Info>
-     **Default dev setup needs no config.** The gateway defaults
-     `GATEWAY_OTEL_DEFAULT_ENDPOINT` to `http://localhost:5560/api/otel` and uses the
-     per-project token from the bundle. `pnpm dev` and `make run-dev` need no env
-     override. Override the endpoint only for prod/self-hosted.
+     **Default dev setup needs no config.** The gateway defaults `GATEWAY_OTEL_DEFAULT_ENDPOINT` to
+     `http://localhost:5560/api/otel` and uses the per-project token from the bundle. `pnpm dev` and
+     `make run-dev` need no env override. Override the endpoint only for prod/self-hosted.
    </Info>
 
 2. **Endpoint is empty.** `GATEWAY_OTEL_DEFAULT_ENDPOINT` unset = no exporter wired. Spans are created in-pod and flushed to a no-op channel. Helm umbrella chart defaults this to `http://langwatch-app:5560/api/otel`, if you've overridden to empty, you've disabled trace export.
@@ -230,15 +228,14 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 3. **Auth token 401s at the ingest.** `/api/otel` rejects unauthenticated or expired tokens with 401; the gateway exporter logs the rejection but the hot path is already done. Rotate the token, update the Secret, roll the gateway pod.
 
    <Note>
-     **OTLP 401/403 noise during the first 30s of startup is suppressed by design.** The
-     gateway's OTel startup-error handler swallows transient transport errors (401, 403,
-     connection-refused, no-such-host) for a 30-second grace window OR until the first
-     successful export, whichever comes first. This avoids logspam during cold-boot races
-     where the gateway is up before the control plane has minted the OTLP token. **If you
-     see OTLP 401 floods AFTER that grace window, the control-plane auth pipeline isn't
-     minting tokens**: first-line check is `LW_GATEWAY_INTERNAL_SECRET` parity between the
-     gateway and control plane (mismatched HMAC secret silently breaks the `/resolve-key`
-     handshake that mints the OTLP token).
+     **OTLP 401/403 noise during the first 30s of startup is suppressed by design.** The gateway's
+     OTel startup-error handler swallows transient transport errors (401, 403, connection-refused,
+     no-such-host) for a 30-second grace window OR until the first successful export, whichever
+     comes first. This avoids logspam during cold-boot races where the gateway is up before the
+     control plane has minted the OTLP token. **If you see OTLP 401 floods AFTER that grace window,
+     the control-plane auth pipeline isn't minting tokens**: first-line check is
+     `LW_GATEWAY_INTERNAL_SECRET` parity between the gateway and control plane (mismatched HMAC
+     secret silently breaks the `/resolve-key` handshake that mints the OTLP token).
    </Note>
 
 4. **Endpoint URL 404s.** Before the auto-suffix fix, an endpoint like `http://langwatch-app:5560/api/otel` was treated as the full URL; the Go OTLP exporter hit `/api/otel` and got 404 (the receiver is at `/api/otel/v1/traces`). Recent gateway builds append `/v1/traces` automatically when missing. Bump to the latest image.
@@ -532,13 +529,12 @@ See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
 
 <Note>
   **Browser blank-page on a partial-secret config (legacy)**: between `3941b5239` and the
-  client-skip follow-up, the validator ran inside `createEnvConfig()` and touched the
-  secret keys off the t3-env proxy. The Vite client bundle includes that module, so any
-  browser nav to `/` triggered `@t3-oss/env-core`'s server-leak guard and the page never
-  hydrated (blank screen + a single `Attempted to access a server-side environment
-  variable on the client` console error). Pull to current `feat/ai-gateway` if you see
-  that, the validator now `typeof window === 'undefined'`-gates and reads `process.env`
-  directly, so the client bundle doesn't trip the guard.
+  client-skip follow-up, the validator ran inside `createEnvConfig()` and touched the secret keys
+  off the t3-env proxy. The Vite client bundle includes that module, so any browser nav to `/`
+  triggered `@t3-oss/env-core`'s server-leak guard and the page never hydrated (blank screen + a
+  single `Attempted to access a server-side environment variable on the client` console error). Pull
+  to current `feat/ai-gateway` if you see that, the validator now `typeof window ===
+  'undefined'`-gates and reads `process.env` directly, so the client bundle doesn't trip the guard.
 </Note>
 
 **Fix, generate the missing one(s):**

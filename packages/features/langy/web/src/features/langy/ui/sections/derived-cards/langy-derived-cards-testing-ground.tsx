@@ -387,16 +387,12 @@ function VerifyDemo() {
   const [sent, setSent] = useState(false);
   return (
     <VStack align="stretch" gap={1.5}>
-      <LangyDerivedCardView
-        card={TIMESERIES}
-        projectSlug="demo"
-        onVerify={() => setSent(true)}
-      />
+      <LangyDerivedCardView card={TIMESERIES} projectSlug="demo" onVerify={() => setSent(true)} />
       {sent ? (
         <HStack gap={1.5}>
           <Text textStyle="2xs" color="green.fg">
-            Would send: &quot;Verify &quot;Cost per day — derived from the dataset&quot;
-            with a real analytics query…&quot;
+            Would send: &quot;Verify &quot;Cost per day — derived from the dataset&quot; with a real
+            analytics query…&quot;
           </Text>
           <Button size="xs" variant="ghost" onClick={() => setSent(false)}>
             <RotateCcw size={12} /> Reset

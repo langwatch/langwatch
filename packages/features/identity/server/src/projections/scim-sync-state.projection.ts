@@ -69,9 +69,7 @@ export const scimApplyRecoveredEventSchema = EventSchema.extend({
   type: z.literal(SCIM_APPLY_RECOVERED_EVENT_TYPE),
   data: scimApplyRecoveredPayloadSchema,
 });
-export type ScimApplyRecoveredEvent = z.infer<
-  typeof scimApplyRecoveredEventSchema
->;
+export type ScimApplyRecoveredEvent = z.infer<typeof scimApplyRecoveredEventSchema>;
 
 export const scimApplyRetiredEventSchema = EventSchema.extend({
   type: z.literal(SCIM_APPLY_RETIRED_EVENT_TYPE),
@@ -161,10 +159,7 @@ export class ScimSyncStateFoldProjection
     return emptyScimSync({ scimSyncId: "" });
   }
 
-  private fold(
-    event: ScimSyncEvent,
-    state: ScimSyncFoldState,
-  ): ScimSyncFoldState {
+  private fold(event: ScimSyncEvent, state: ScimSyncFoldState): ScimSyncFoldState {
     const parsed = scimSyncEventSchema.parse(event);
     const next = reduceScimSync({
       state,

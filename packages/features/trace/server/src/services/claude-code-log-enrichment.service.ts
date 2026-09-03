@@ -48,9 +48,7 @@ import type { SpanSummaryRow } from "@langwatch/trace-contract";
  * the `traceId` this join never looks at.
  */
 export type TraceLogRecordReader = TraceApp["logRecords"];
-type TraceLogRecordReadRow = Awaited<
-  ReturnType<TraceLogRecordReader["getLogsByTraceId"]>
->[number];
+type TraceLogRecordReadRow = Awaited<ReturnType<TraceLogRecordReader["getLogsByTraceId"]>>[number];
 
 /**
  * The trace-origin value Claude Code (and other coding assistants) carry. Only

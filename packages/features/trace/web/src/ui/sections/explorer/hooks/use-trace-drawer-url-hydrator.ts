@@ -43,8 +43,7 @@ export function useTraceDrawerUrlHydrator(): void {
     const store = useDrawerStore.getState();
 
     if (wantsOpen && traceId) {
-      const alreadyOnTrace =
-        store.traceId === traceId && store.occurredAtMs === validTimestamp;
+      const alreadyOnTrace = store.traceId === traceId && store.occurredAtMs === validTimestamp;
       if (!alreadyOnTrace) store.openTrace(traceId, validTimestamp);
       syncEditMode({
         traceId,

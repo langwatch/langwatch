@@ -28,9 +28,7 @@ import type {
  * table, and this row holds lifecycle plus the POSITIONS of codes already
  * spent.
  */
-export class PrismaMfaEnrollmentProjectionRepository
-  implements StateProjectionStore<MfaFoldState>
-{
+export class PrismaMfaEnrollmentProjectionRepository implements StateProjectionStore<MfaFoldState> {
   constructor(private readonly prisma: PrismaClient) {}
 
   async tryLoad(

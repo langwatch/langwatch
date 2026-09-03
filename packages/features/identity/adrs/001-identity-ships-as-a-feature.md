@@ -31,10 +31,10 @@ does not look.
 
 Identity is a feature.
 
-| Was                          | Is now                                |
-| ---------------------------- | ------------------------------------- |
-| `packages/identity`          | `packages/features/identity/contract` |
-| `packages/identity-server`   | `packages/features/identity/server`   |
+| Was                        | Is now                                |
+| -------------------------- | ------------------------------------- |
+| `packages/identity`        | `packages/features/identity/contract` |
+| `packages/identity-server` | `packages/features/identity/server`   |
 
 `@langwatch/identity` is renamed `@langwatch/identity-contract`, because the
 feature layout derives a package's name from its role: a package at

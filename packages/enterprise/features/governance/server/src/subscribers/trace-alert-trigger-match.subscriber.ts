@@ -31,10 +31,7 @@ export class TraceAlertTriggerMatchSubscriber {
     );
   }
 
-  async handle(
-    event: GovernanceTraceEvent,
-    context: GovernanceTraceContext,
-  ): Promise<void> {
+  async handle(event: GovernanceTraceEvent, context: GovernanceTraceContext): Promise<void> {
     if (!this.originGuard.passes({ event, state: context.state })) return;
     if (!context.aggregateId) return;
 

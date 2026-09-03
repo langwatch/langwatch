@@ -59,28 +59,19 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
   }
 
   if ("contexts" in span && span.contexts) {
-    attrs.push(
-      stringAttr(ATTR_KEYS.LANGWATCH_RAG_CONTEXTS, JSON.stringify(span.contexts)),
-    );
+    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_RAG_CONTEXTS, JSON.stringify(span.contexts)));
   }
 
   if (span.metrics) {
     if (span.metrics.prompt_tokens != null) {
-      attrs.push(
-        doubleAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, span.metrics.prompt_tokens),
-      );
+      attrs.push(doubleAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, span.metrics.prompt_tokens));
     }
     if (span.metrics.completion_tokens != null) {
-      attrs.push(
-        doubleAttr(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, span.metrics.completion_tokens),
-      );
+      attrs.push(doubleAttr(ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, span.metrics.completion_tokens));
     }
     if (span.metrics.reasoning_tokens != null) {
       attrs.push(
-        doubleAttr(
-          ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
-          span.metrics.reasoning_tokens,
-        ),
+        doubleAttr(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS, span.metrics.reasoning_tokens),
       );
     }
     if (span.metrics.cache_read_input_tokens != null) {
@@ -100,9 +91,7 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
       );
     }
     if (span.metrics.tokens_estimated != null) {
-      attrs.push(
-        boolAttr(ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED, span.metrics.tokens_estimated),
-      );
+      attrs.push(boolAttr(ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED, span.metrics.tokens_estimated));
     }
     if (span.metrics.cost != null) {
       attrs.push(doubleAttr(ATTR_KEYS.LANGWATCH_SPAN_COST, span.metrics.cost));
@@ -133,24 +122,17 @@ function buildResource({
   const attrs: OtlpKeyValue[] = [];
 
   if (reservedTraceMetadata.thread_id) {
-    attrs.push(
-      stringAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, reservedTraceMetadata.thread_id),
-    );
+    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, reservedTraceMetadata.thread_id));
   }
   if (reservedTraceMetadata.user_id) {
     attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_USER_ID, reservedTraceMetadata.user_id));
   }
   if (reservedTraceMetadata.customer_id) {
-    attrs.push(
-      stringAttr(ATTR_KEYS.LANGWATCH_CUSTOMER_ID, reservedTraceMetadata.customer_id),
-    );
+    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_CUSTOMER_ID, reservedTraceMetadata.customer_id));
   }
   if (reservedTraceMetadata.labels && reservedTraceMetadata.labels.length > 0) {
     attrs.push(
-      stringAttr(
-        ATTR_KEYS.LANGWATCH_LABELS,
-        JSON.stringify(reservedTraceMetadata.labels),
-      ),
+      stringAttr(ATTR_KEYS.LANGWATCH_LABELS, JSON.stringify(reservedTraceMetadata.labels)),
     );
   }
   if (reservedTraceMetadata.sdk_version) {

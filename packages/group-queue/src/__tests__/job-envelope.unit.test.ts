@@ -41,9 +41,7 @@ describe("jobEnvelope", () => {
     describe("when encoded and decoded", () => {
       it("round-trips the payload deep-equal", async () => {
         const encoded = await encodeJobEnvelope({ jobData: largePayload });
-        expect(await decodeJobEnvelope({ value: encoded })).toEqual(
-          largePayload,
-        );
+        expect(await decodeJobEnvelope({ value: encoded })).toEqual(largePayload);
       });
 
       it("stores the body gzip-compressed and smaller than the raw JSON", async () => {
@@ -52,9 +50,7 @@ describe("jobEnvelope", () => {
         // env-flagged legacy format is retired — see the note above).
         expect(encoded.startsWith("GQ2|")).toBe(true);
         expect(encoded).toContain('"e":"gz"');
-        expect(encoded.length).toBeLessThan(
-          JSON.stringify(largePayload).length,
-        );
+        expect(encoded.length).toBeLessThan(JSON.stringify(largePayload).length);
       });
 
       it("exposes routing fields from the header without decoding the body", async () => {
@@ -80,9 +76,7 @@ describe("jobEnvelope", () => {
 
       it("round-trips the payload deep-equal", async () => {
         const encoded = await encodeJobEnvelope({ jobData: smallPayload });
-        expect(await decodeJobEnvelope({ value: encoded })).toEqual(
-          smallPayload,
-        );
+        expect(await decodeJobEnvelope({ value: encoded })).toEqual(smallPayload);
       });
     });
   });
@@ -96,17 +90,13 @@ describe("jobEnvelope", () => {
     it("keeps a payload of exactly 1024 JSON bytes raw", async () => {
       const payload = payloadOfJsonByteLength(1024);
       expect(Buffer.byteLength(JSON.stringify(payload))).toBe(1024);
-      expect(await encodeJobEnvelope({ jobData: payload })).toContain(
-        '"e":"j"',
-      );
+      expect(await encodeJobEnvelope({ jobData: payload })).toContain('"e":"j"');
     });
 
     it("compresses a payload of 1025 JSON bytes", async () => {
       const payload = payloadOfJsonByteLength(1025);
       expect(Buffer.byteLength(JSON.stringify(payload))).toBe(1025);
-      expect(await encodeJobEnvelope({ jobData: payload })).toContain(
-        '"e":"gz"',
-      );
+      expect(await encodeJobEnvelope({ jobData: payload })).toContain('"e":"gz"');
     });
   });
 
@@ -180,15 +170,11 @@ describe("jobEnvelope", () => {
 
   describe("given a corrupt value", () => {
     it("decodeJobEnvelope rejects", async () => {
-      await expect(
-        decodeJobEnvelope({ value: "GQ1|nonsense" }),
-      ).rejects.toThrow();
+      await expect(decodeJobEnvelope({ value: "GQ1|nonsense" })).rejects.toThrow();
       await expect(decodeJobEnvelope({ value: "not json" })).rejects.toThrow();
       await expect(decodeJobEnvelope({ value: "GQ1|5" })).rejects.toThrow();
       await expect(decodeJobEnvelope({ value: "GQ1|0|{}" })).rejects.toThrow();
-      await expect(
-        decodeJobEnvelope({ value: "GQ1|8|{not:js}body" }),
-      ).rejects.toThrow();
+      await expect(decodeJobEnvelope({ value: "GQ1|8|{not:js}body" })).rejects.toThrow();
     });
 
     it("readJobRoutingMeta returns nulls instead of throwing", () => {
@@ -223,9 +209,7 @@ describe("jobEnvelope", () => {
         tieredBlobs,
         projectId: createTenantId("project-abc"),
       });
-      expect(
-        await decodeJobEnvelope({ value: encoded, tieredBlobs }),
-      ).toEqual(payload);
+      expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(payload);
     });
   });
 
@@ -238,9 +222,7 @@ describe("jobEnvelope", () => {
 
     describe("when the payload is over the ceiling", () => {
       it("rejects it with PayloadTooLargeError", () => {
-        expect(() => assertPayloadWithinCap(MAX_BLOB_BYTES + 1)).toThrow(
-          PayloadTooLargeError,
-        );
+        expect(() => assertPayloadWithinCap(MAX_BLOB_BYTES + 1)).toThrow(PayloadTooLargeError);
       });
     });
   });
@@ -316,9 +298,7 @@ describe("jobEnvelope", () => {
           projectId: PROJECT,
         });
 
-        expect(readJobPayloadBytes(encoded)).toBeGreaterThan(
-          Buffer.byteLength(encoded),
-        );
+        expect(readJobPayloadBytes(encoded)).toBeGreaterThan(Buffer.byteLength(encoded));
         expect(readJobPayloadBytes(encoded)).toBeGreaterThan(3 * 1024);
       });
 
@@ -383,18 +363,9 @@ describe("jobEnvelope", () => {
         // budget down. `1e999` is the one that matters: it is valid JSON, parses
         // to Infinity, and would reach the Lua drain as an unparseable ARGV.
         // Written as raw header text because JSON.stringify cannot emit these.
-        const SIZES = [
-          "1e999",
-          "9007199254740992",
-          "0.1",
-          "-1",
-          '"4096"',
-          "null",
-        ];
+        const SIZES = ["1e999", "9007199254740992", "0.1", "-1", '"4096"', "null"];
 
-        it.each(
-          SIZES,
-        )("ignores a recorded size of %s, costing the cap", (s) => {
+        it.each(SIZES)("ignores a recorded size of %s, costing the cap", (s) => {
           const header = `{"v":2,"e":"redis","s":${s}}`;
           const value = `GQ2|${Buffer.byteLength(header)}|${header}`;
 
@@ -429,9 +400,7 @@ describe("jobEnvelope", () => {
 
         expect(encoded.startsWith("GQ2|")).toBe(true);
         expect(readEnvelopeLease(encoded)).toBeNull();
-        expect(
-          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
-        ).toEqual(payload);
+        expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(payload);
       });
     });
 
@@ -458,9 +427,7 @@ describe("jobEnvelope", () => {
           projectId: PROJECT,
         });
         expect(redisBlobs.store.size).toBe(1);
-        expect(
-          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
-        ).toEqual(big);
+        expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(big);
       });
 
       it("offloads to the s3 tier when the stored bytes exceed the s3 threshold", async () => {
@@ -475,9 +442,7 @@ describe("jobEnvelope", () => {
         expect(encoded).toContain('"e":"s3"');
         expect(readEnvelopeLease(encoded)?.ref.tier).toBe("s3");
         expect(objectStore.store.size).toBe(1);
-        expect(
-          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
-        ).toEqual(big);
+        expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(big);
       });
 
       /** @scenario "Provider migration does not change the durable queue reference format" */
@@ -497,9 +462,7 @@ describe("jobEnvelope", () => {
           projectId: PROJECT,
           hash: expect.any(String),
         });
-        expect(
-          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
-        ).toEqual(big);
+        expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(big);
       });
 
       it("exposes routing meta from the header without resolving the blob", async () => {
@@ -533,9 +496,7 @@ describe("jobEnvelope", () => {
         expect(redisBlobs.store.size).toBe(1);
         // One shared blob ref, but a distinct per-stage lease identity each time.
         expect(readEnvelopeLease(e1)?.ref).toEqual(readEnvelopeLease(e2)?.ref);
-        expect(readEnvelopeLease(e1)?.holderId).not.toBe(
-          readEnvelopeLease(e2)?.holderId,
-        );
+        expect(readEnvelopeLease(e1)?.holderId).not.toBe(readEnvelopeLease(e2)?.holderId);
       });
 
       it("rejects decode when the tiered blob is missing or no store is given", async () => {
@@ -546,13 +507,9 @@ describe("jobEnvelope", () => {
           projectId: PROJECT,
         });
 
-        await expect(decodeJobEnvelope({ value: encoded })).rejects.toThrow(
-          /tiered/,
-        );
+        await expect(decodeJobEnvelope({ value: encoded })).rejects.toThrow(/tiered/);
         redisBlobs.store.clear();
-        await expect(
-          decodeJobEnvelope({ value: encoded, tieredBlobs }),
-        ).rejects.toThrow(/missing/);
+        await expect(decodeJobEnvelope({ value: encoded, tieredBlobs })).rejects.toThrow(/missing/);
       });
     });
 

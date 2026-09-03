@@ -23,12 +23,8 @@ export const updateOrganizationCommand = async (
 ): Promise<CommandResult | void> => {
   const input: UpdateOrganizationInput = {
     ...(options.name !== undefined ? { name: options.name } : {}),
-    ...(options.supportContact !== undefined
-      ? { supportContact: options.supportContact }
-      : {}),
-    ...(options.presenceEnabled !== undefined
-      ? { presenceEnabled: options.presenceEnabled }
-      : {}),
+    ...(options.supportContact !== undefined ? { supportContact: options.supportContact } : {}),
+    ...(options.presenceEnabled !== undefined ? { presenceEnabled: options.presenceEnabled } : {}),
     ...(options.traceSharingEnabled !== undefined
       ? { traceSharingEnabled: options.traceSharingEnabled }
       : {}),

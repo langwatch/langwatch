@@ -53,9 +53,7 @@ describe("<ScenarioWelcomeScreen/>", () => {
   it("displays a primary call-to-action button", () => {
     render(<ScenarioWelcomeScreen onProceed={vi.fn()} />, { wrapper: Wrapper });
 
-    expect(
-      screen.getByRole("button", { name: /create your first scenario/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create your first scenario/i })).toBeInTheDocument();
   });
 
   describe("when user clicks the proceed button", () => {
@@ -66,9 +64,7 @@ describe("<ScenarioWelcomeScreen/>", () => {
         wrapper: Wrapper,
       });
 
-      fireEvent.click(
-        screen.getByRole("button", { name: /create your first scenario/i }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: /create your first scenario/i }));
 
       expect(onProceed).toHaveBeenCalledOnce();
     });
@@ -83,19 +79,17 @@ describe("<ScenarioWelcomeModal/>", () => {
 
   describe("when open", () => {
     it("displays a title mentioning scenarios", () => {
-      render(
-        <ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={vi.fn()} />,
-        { wrapper: Wrapper },
-      );
+      render(<ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByRole("heading")).toHaveTextContent(/scenario/i);
     });
 
     it("displays a primary call-to-action button", () => {
-      render(
-        <ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={vi.fn()} />,
-        { wrapper: Wrapper },
-      );
+      render(<ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       expect(
         screen.getByRole("button", { name: /create your first scenario/i }),
@@ -106,18 +100,11 @@ describe("<ScenarioWelcomeModal/>", () => {
       it("calls onProceed callback", () => {
         const onProceed = vi.fn();
 
-        render(
-          <ScenarioWelcomeModal
-            open={true}
-            onOpenChange={vi.fn()}
-            onProceed={onProceed}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={onProceed} />, {
+          wrapper: Wrapper,
+        });
 
-        fireEvent.click(
-          screen.getByRole("button", { name: /create your first scenario/i }),
-        );
+        fireEvent.click(screen.getByRole("button", { name: /create your first scenario/i }));
 
         expect(onProceed).toHaveBeenCalledOnce();
       });
@@ -131,9 +118,7 @@ describe("<ScenarioWelcomeModal/>", () => {
         { wrapper: Wrapper },
       );
 
-      const openDialogs = container.querySelectorAll(
-        '[data-state="open"][role="dialog"]',
-      );
+      const openDialogs = container.querySelectorAll('[data-state="open"][role="dialog"]');
       expect(openDialogs).toHaveLength(0);
     });
   });

@@ -14,9 +14,7 @@ export const createWebhookEndpointCommandSchema = z
     enabledEvents: z.array(z.string()).min(1),
   })
   .and(webhookDeliveryControlsSchema.partial());
-export type CreateWebhookEndpointCommand = z.infer<
-  typeof createWebhookEndpointCommandSchema
->;
+export type CreateWebhookEndpointCommand = z.infer<typeof createWebhookEndpointCommandSchema>;
 
 export const updateWebhookEndpointCommandSchema = z
   .object({
@@ -28,6 +26,4 @@ export const updateWebhookEndpointCommandSchema = z
     enabledEvents: z.array(z.string()).min(1).optional(),
   })
   .and(webhookDeliveryControlsSchema.partial());
-export type UpdateWebhookEndpointCommand = z.infer<
-  typeof updateWebhookEndpointCommandSchema
->;
+export type UpdateWebhookEndpointCommand = z.infer<typeof updateWebhookEndpointCommandSchema>;

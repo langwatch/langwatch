@@ -36,15 +36,11 @@ export function LearningResources({ trailing }: { trailing?: ReactNode }) {
           TypeScript SDK
         </ColophonLink>
         <ColophonDot />
-        <ColophonLink href="https://docs.langwatch.ai/integration/go/guide">
-          Go SDK
-        </ColophonLink>
+        <ColophonLink href="https://docs.langwatch.ai/integration/go/guide">Go SDK</ColophonLink>
         <ColophonDot />
         <ColophonLink href="https://scenario.langwatch.ai">Scenario</ColophonLink>
         <ColophonDot />
-        <ColophonLink href="https://docs.langwatch.ai/integration/rest-api">
-          REST API
-        </ColophonLink>
+        <ColophonLink href="https://docs.langwatch.ai/integration/rest-api">REST API</ColophonLink>
         <ColophonDot />
         <ColophonLink href="https://github.com/langwatch/langwatch">GitHub</ColophonLink>
         <ColophonDot />
@@ -52,13 +48,9 @@ export function LearningResources({ trailing }: { trailing?: ReactNode }) {
         <ColophonDot />
         {/* The two documents by name, rather than the index that holds them:
             "Legal" is a category, and nobody is looking for a category. */}
-        <ColophonLink href={LEGAL_LINKS.terms.href}>
-          {LEGAL_LINKS.terms.label}
-        </ColophonLink>
+        <ColophonLink href={LEGAL_LINKS.terms.href}>{LEGAL_LINKS.terms.label}</ColophonLink>
         <ColophonDot />
-        <ColophonLink href={LEGAL_LINKS.privacy.href}>
-          {LEGAL_LINKS.privacy.label}
-        </ColophonLink>
+        <ColophonLink href={LEGAL_LINKS.privacy.href}>{LEGAL_LINKS.privacy.label}</ColophonLink>
         <Spacer />
         {trailing}
       </HStack>

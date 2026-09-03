@@ -11,12 +11,7 @@ import {
 import { PromptCompilationError, PromptValidationError } from "./errors";
 
 // Re-export types and errors for convenience
-export type {
-  TemplateVariables,
-  PromptData,
-  CorePromptData,
-  PromptMetadata,
-} from "./types";
+export type { TemplateVariables, PromptData, CorePromptData, PromptMetadata } from "./types";
 export { PromptCompilationError, PromptValidationError } from "./errors";
 
 // Global Liquid instance - shared across all prompts for efficiency
@@ -58,10 +53,7 @@ export class Prompt {
     const validationResult = promptDataSchema.strip().safeParse(data);
 
     if (!validationResult.success) {
-      throw new PromptValidationError(
-        "Invalid prompt data provided",
-        validationResult.error,
-      );
+      throw new PromptValidationError("Invalid prompt data provided", validationResult.error);
     }
 
     // Assign validated data

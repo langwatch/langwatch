@@ -88,9 +88,7 @@ const temp = installTempHomeAndCwd();
 let cwdSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
-  cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(temp.cwd) as ReturnType<
-    typeof vi.spyOn
-  >;
+  cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(temp.cwd) as ReturnType<typeof vi.spyOn>;
 });
 
 afterEach(() => {
@@ -350,9 +348,7 @@ describe("runUnifiedLoginFlow", () => {
 
         // The live codex entry must be present in every save that touches
         // default_personal_ingest_keys
-        const keySaves = savedCfgs.filter(
-          (c) => c.default_personal_ingest_keys !== undefined,
-        );
+        const keySaves = savedCfgs.filter((c) => c.default_personal_ingest_keys !== undefined);
         for (const saved of keySaves) {
           expect(saved.default_personal_ingest_keys!.codex).toBeDefined();
         }
@@ -399,9 +395,7 @@ describe("runUnifiedLoginFlow", () => {
         vi.spyOn(console, "log").mockImplementation(() => undefined);
 
         // Must not throw even when listIngestionKeys fails
-        await expect(
-          runUnifiedLoginFlow({ kind: "device_session", cfg }),
-        ).resolves.toBeDefined();
+        await expect(runUnifiedLoginFlow({ kind: "device_session", cfg })).resolves.toBeDefined();
       });
     });
   });
@@ -462,14 +456,9 @@ describe("runUnifiedLoginFlow", () => {
         const written = JSON.parse(
           fs.readFileSync(appSettingsTargetFor("claude")!.path, "utf8"),
         ) as { env: Record<string, string> };
-        expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-          "http://localhost:5580/api/otel",
-        );
+        expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://localhost:5580/api/otel");
         expect(written.env.OTEL_EXPORTER_OTLP_HEADERS).toContain("newinstance00000");
-        expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(
-          expect.any(Object),
-          "claude_code",
-        );
+        expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(expect.any(Object), "claude_code");
       });
     });
   });

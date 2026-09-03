@@ -38,11 +38,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       await service.storeEvents(events, context);
@@ -80,11 +76,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -113,11 +105,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       await service.storeEvents(events, context);
@@ -141,11 +129,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       await service.storeEvents(events, context);
@@ -195,11 +179,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
@@ -261,11 +241,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       await service.storeEvents([event1, event2], context);
 
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
-      expect(eventStore.storeEvents).toHaveBeenCalledWith(
-        [event1, event2],
-        context,
-        aggregateType,
-      );
+      expect(eventStore.storeEvents).toHaveBeenCalledWith([event1, event2], context, aggregateType);
     });
   });
 
@@ -288,11 +264,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       eventStore.getEvents = vi
         .fn()
         .mockResolvedValue([
-          createTestEvent(
-            TEST_CONSTANTS.AGGREGATE_ID,
-            TEST_CONSTANTS.AGGREGATE_TYPE,
-            tenantId,
-          ),
+          createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
         ]);
       (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation((_state: any) => {
         callOrder.push("projection");
@@ -319,11 +291,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       // Mock getEvents to return the same events that are being stored
@@ -348,11 +316,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       eventStore.getEvents = vi
         .fn()
         .mockResolvedValue([
-          createTestEvent(
-            TEST_CONSTANTS.AGGREGATE_ID,
-            TEST_CONSTANTS.AGGREGATE_TYPE,
-            tenantId,
-          ),
+          createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
         ]);
       (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation((_state: any) => ({
         id: "proj-id",
@@ -372,11 +336,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       // Mock getEvents to return the same events that are being stored

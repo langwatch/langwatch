@@ -3,10 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { BTLeaderboard, BTLeaderboardEntry } from "@langwatch/experiment-web";
 import type { JudgeIndependence, VerbosityProfile } from "@langwatch/experiment-web";
 import type { SampleAdequacy } from "@langwatch/experiment-web";
-import {
-  buildTrustChecks,
-  type LeaderboardTrustPanelProps,
-} from "../leaderboard-trust-panel";
+import { buildTrustChecks, type LeaderboardTrustPanelProps } from "../leaderboard-trust-panel";
 import { DEFAULT_WARN_THRESHOLD } from "../pairwise-leaderboard";
 
 const leaderboard = (overrides: Partial<BTLeaderboard> = {}): BTLeaderboard => ({
@@ -366,9 +363,7 @@ describe("buildTrustChecks — margins of error built from unsettled fits", () =
         leaderboard: leaderboard({ bootstrapNonConvergence: 0.01 }),
       });
 
-      expect(checks.some((c) => c.label === "Margins of error are approximate")).toBe(
-        false,
-      );
+      expect(checks.some((c) => c.label === "Margins of error are approximate")).toBe(false);
     });
   });
 
@@ -378,9 +373,7 @@ describe("buildTrustChecks — margins of error built from unsettled fits", () =
         leaderboard: leaderboard({ bootstrapNonConvergence: null }),
       });
 
-      expect(checks.some((c) => c.label === "Margins of error are approximate")).toBe(
-        false,
-      );
+      expect(checks.some((c) => c.label === "Margins of error are approximate")).toBe(false);
     });
   });
 });

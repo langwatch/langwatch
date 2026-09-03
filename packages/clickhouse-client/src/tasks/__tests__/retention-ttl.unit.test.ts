@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { RETENTION_MANAGED_TABLES } from "@langwatch/data-retention-contract/retention-tables";
-import {
-  buildRetentionTTLExpression,
-  hasRetentionTTL,
-  TABLE_TTL_CONFIG,
-} from "../ttl.reconciler";
+import { buildRetentionTTLExpression, hasRetentionTTL, TABLE_TTL_CONFIG } from "../ttl.reconciler";
 
 describe("buildRetentionTTLExpression", () => {
   // The IF(_retention_days > 0, ...) guard is a safety net, not a normal path:
@@ -44,9 +40,7 @@ describe("buildRetentionTTLExpression", () => {
     });
 
     it("Langy analytics anchors retention on its immutable event time", () => {
-      const config = TABLE_TTL_CONFIG.find(
-        (entry) => entry.table === "langy_analytics_events",
-      )!;
+      const config = TABLE_TTL_CONFIG.find((entry) => entry.table === "langy_analytics_events")!;
       expect(config.retentionTTLColumn).toBe("OccurredAt");
       expect(buildRetentionTTLExpression(config)).toBe(
         "IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
@@ -112,10 +106,7 @@ describe("RETENTION_MANAGED_TABLES", () => {
     for (const table of RETENTION_MANAGED_TABLES) {
       const config = TABLE_TTL_CONFIG.find((c) => c.table === table);
       expect(config, `${table} missing from TABLE_TTL_CONFIG`).toBeDefined();
-      expect(
-        config!.retentionTTLColumn,
-        `${table} missing retentionTTLColumn`,
-      ).toBeDefined();
+      expect(config!.retentionTTLColumn, `${table} missing retentionTTLColumn`).toBeDefined();
     }
   });
 });

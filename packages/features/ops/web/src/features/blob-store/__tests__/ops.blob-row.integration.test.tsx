@@ -99,9 +99,7 @@ describe("BlobRow", () => {
       it("offers the actions menu for that payload", () => {
         const summary = blob();
         renderRow({ summary, canManage: true });
-        expect(
-          screen.getByLabelText(`Actions for payload ${summary.hash}`),
-        ).toBeDefined();
+        expect(screen.getByLabelText(`Actions for payload ${summary.hash}`)).toBeDefined();
       });
     });
   });

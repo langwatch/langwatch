@@ -97,9 +97,7 @@ describe("CriteriaInput", () => {
 
   describe("when criteria exist", () => {
     it("displays criteria as numbered plain text", async () => {
-      renderWithChakra(
-        <CriteriaInput value={["first", "second", "third"]} onChange={vi.fn()} />,
-      );
+      renderWithChakra(<CriteriaInput value={["first", "second", "third"]} onChange={vi.fn()} />);
 
       await waitFor(() => {
         expect(screen.getByText("first")).toBeInTheDocument();
@@ -121,9 +119,7 @@ describe("CriteriaInput", () => {
 
     it("removes criterion via trash button in edit mode", async () => {
       const onChange = vi.fn();
-      renderWithChakra(
-        <CriteriaInput value={["first", "second", "third"]} onChange={onChange} />,
-      );
+      renderWithChakra(<CriteriaInput value={["first", "second", "third"]} onChange={onChange} />);
 
       await waitFor(() => {
         expect(screen.getByText("second")).toBeInTheDocument();
@@ -143,9 +139,7 @@ describe("CriteriaInput", () => {
 
     it("removes criterion when text is cleared and saved", async () => {
       const onChange = vi.fn();
-      renderWithChakra(
-        <CriteriaInput value={["first", "second", "third"]} onChange={onChange} />,
-      );
+      renderWithChakra(<CriteriaInput value={["first", "second", "third"]} onChange={onChange} />);
 
       await waitFor(() => {
         expect(screen.getByText("second")).toBeInTheDocument();
@@ -168,9 +162,7 @@ describe("CriteriaInput", () => {
 
     it("saves edited criterion on blur (regression: editing and clicking away must persist)", async () => {
       const onChange = vi.fn();
-      renderWithChakra(
-        <CriteriaInput value={["first", "second", "third"]} onChange={onChange} />,
-      );
+      renderWithChakra(<CriteriaInput value={["first", "second", "third"]} onChange={onChange} />);
 
       await waitFor(() => {
         expect(screen.getByText("second")).toBeInTheDocument();

@@ -28,12 +28,7 @@ export function transcriptNoteEntry({
       );
     case "session_error":
     case "internal_error":
-      return note(
-        atMs,
-        "error",
-        event,
-        readString(attrs, "error") ?? "The session hit an error.",
-      );
+      return note(atMs, "error", event, readString(attrs, "error") ?? "The session hit an error.");
     case "api_refusal":
       return note(atMs, "error", event, "The model refused to answer.");
     case "subtask_invoked":
@@ -47,12 +42,7 @@ export function transcriptNoteEntry({
   }
 }
 
-function note(
-  atMs: number,
-  level: NoteEntry["level"],
-  event: string,
-  text: string,
-): NoteEntry {
+function note(atMs: number, level: NoteEntry["level"], event: string, text: string): NoteEntry {
   return { kind: "note", atMs, level, event, text };
 }
 

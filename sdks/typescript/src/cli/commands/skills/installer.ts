@@ -105,13 +105,7 @@ const assertPathSafeSlug = (slug: string): void => {
   }
 };
 
-export const skillFilePath = ({
-  root,
-  skill,
-}: {
-  root: string;
-  skill: BundledSkill;
-}): string => {
+export const skillFilePath = ({ root, skill }: { root: string; skill: BundledSkill }): string => {
   assertPathSafeSlug(skill.slug);
   return path.join(
     root,
@@ -126,8 +120,7 @@ export const renderSkillFile = (skill: BundledSkill): string =>
   `${skill.body.trimEnd()}\n\n${MANAGED_MARKER}\n`;
 
 /** Whether this file's LAST bytes are our marker — i.e. we wrote it. */
-export const isManagedContent = (content: string): boolean =>
-  MANAGED_MARKER_RE.test(content);
+export const isManagedContent = (content: string): boolean => MANAGED_MARKER_RE.test(content);
 
 /** The bundle version a managed file was installed from, if the marker says. */
 const managedVersion = (content: string): string | undefined =>
@@ -147,9 +140,7 @@ export const findSkill = (name: string): BundledSkill | undefined => {
 };
 
 /** Resolve names to bundle skills, collecting the ones that don't exist. */
-export const resolveSkills = (
-  names: string[],
-): { skills: BundledSkill[]; unknown: string[] } => {
+export const resolveSkills = (names: string[]): { skills: BundledSkill[]; unknown: string[] } => {
   const skills: BundledSkill[] = [];
   const unknown: string[] = [];
   for (const name of names) {
@@ -357,10 +348,7 @@ export interface ForcedClobber {
  * A file we cannot even read counts as a clobber: unreadable is not the same
  * as ours.
  */
-export const planForcedClobbers = (
-  skills: BundledSkill[],
-  root: string,
-): ForcedClobber[] => {
+export const planForcedClobbers = (skills: BundledSkill[], root: string): ForcedClobber[] => {
   const clobbers: ForcedClobber[] = [];
   for (const skill of skills) {
     const filePath = skillFilePath({ root, skill });

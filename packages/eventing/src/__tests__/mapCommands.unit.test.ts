@@ -2,9 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mapCommands } from "../mapCommands";
 import type { EventSourcedQueueProcessor } from "../queues";
 
-function createMockProcessor<
-  P extends Record<string, unknown>,
->(): EventSourcedQueueProcessor<P> {
+function createMockProcessor<P extends Record<string, unknown>>(): EventSourcedQueueProcessor<P> {
   return {
     send: vi.fn().mockResolvedValue(undefined),
     sendBatch: vi.fn().mockResolvedValue(undefined),

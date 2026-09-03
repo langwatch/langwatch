@@ -74,10 +74,7 @@ export function VirtualKeyUsageSnippet({
   const { colorMode } = useColorMode();
   const deployment = useGatewayDeployment();
   const credential = secret ?? "$LANGWATCH_VK_SECRET";
-  const resolvedBaseUrl = resolveSnippetGatewayBaseUrl(
-    gatewayBaseUrl,
-    deployment.gatewayBaseUrl,
-  );
+  const resolvedBaseUrl = resolveSnippetGatewayBaseUrl(gatewayBaseUrl, deployment.gatewayBaseUrl);
   const showRetrievalHint = !secret;
 
   const tabItems: TabItem[] = useMemo(() => {
@@ -205,8 +202,8 @@ func main() {
     <VStack align="stretch" gap={2}>
       <Text fontWeight="medium">{title}</Text>
       <Text textStyle="xs" color="fg.muted">
-        Works with any OpenAI-compatible SDK or coding assistant (Claude Code, Codex,
-        Cursor, Aider).{" "}
+        Works with any OpenAI-compatible SDK or coding assistant (Claude Code, Codex, Cursor,
+        Aider).{" "}
         <Link
           href="https://langwatch.ai/docs/ai-gateway/quickstart"
           color="orange.600"

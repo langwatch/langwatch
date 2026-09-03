@@ -135,8 +135,7 @@ function captureError(error: unknown): EvaluationErrorCapture {
  */
 export function emitEvaluationEvent(span: Span, params: AddEvaluationParams): void {
   const spanContext = span.spanContext();
-  const spanId =
-    spanContext && isSpanContextValid(spanContext) ? spanContext.spanId : null;
+  const spanId = spanContext && isSpanContextValid(spanContext) ? spanContext.spanId : null;
 
   const payload: EvaluationEventPayload = {
     evaluation_id: params.evaluationId ?? `eval_${generateKsuid()}`,

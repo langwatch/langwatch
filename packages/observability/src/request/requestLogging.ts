@@ -54,18 +54,14 @@ export function getLogLevelFromStatusCode(statusCode: number): "info" | "warn" |
  * + `fault`) so this package doesn't import the HandledError class. Returns
  * undefined for unhandled errors.
  */
-export function handledFaultOf(
-  error: unknown,
-): "customer" | "platform" | "provider" | undefined {
+export function handledFaultOf(error: unknown): "customer" | "platform" | "provider" | undefined {
   if (!error || typeof error !== "object") return undefined;
   const e = error as Record<string, unknown>;
   if (typeof e.code !== "string" || typeof e.httpStatus !== "number") {
     return undefined;
   }
   const fault = e.fault;
-  return fault === "customer" || fault === "platform" || fault === "provider"
-    ? fault
-    : undefined;
+  return fault === "customer" || fault === "platform" || fault === "provider" ? fault : undefined;
 }
 
 /**
@@ -139,9 +135,7 @@ function requestLogMessage({
   level: "info" | "warn" | "error";
 }): string {
   if (error) return "error handling request";
-  return level === "error"
-    ? "request failed without a cause attached"
-    : "request handled";
+  return level === "error" ? "request failed without a cause attached" : "request handled";
 }
 
 /**

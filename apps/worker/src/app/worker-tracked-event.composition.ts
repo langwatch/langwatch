@@ -1,6 +1,9 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { RecordSpanCommandData, TrackEventRESTParamsValidator } from "@langwatch/trace-contract";
+import type {
+  RecordSpanCommandData,
+  TrackEventRESTParamsValidator,
+} from "@langwatch/trace-contract";
 import {
   TraceIngressCommandPort,
   TraceSpanCollectionService,

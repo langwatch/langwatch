@@ -200,9 +200,7 @@ async function runBackfillMode(options: IngestCodexOptions): Promise<void> {
     return;
   }
   console.log(
-    chalk.green(
-      `✓ Recovered ${turns} codex turn${turns === 1 ? "" : "s"} onto their traces.`,
-    ),
+    chalk.green(`✓ Recovered ${turns} codex turn${turns === 1 ? "" : "s"} onto their traces.`),
   );
 }
 

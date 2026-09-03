@@ -41,9 +41,7 @@ export function sqsSecretFromEnv(): string | undefined {
  * kind flag to keep in agreement with the address, so the two can never
  * disagree.
  */
-export function destinationFromOptions(
-  options: CreateWebhookOptions,
-): WebhookDestinationInput {
+export function destinationFromOptions(options: CreateWebhookOptions): WebhookDestinationInput {
   if (options.queueUrl) {
     if (options.url) {
       throw new Error(
@@ -76,9 +74,7 @@ export function destinationFromOptions(
     );
   }
   if (!options.url) {
-    throw new Error(
-      "Pass --url for an HTTPS endpoint, or --queue-url for an Amazon SQS queue.",
-    );
+    throw new Error("Pass --url for an HTTPS endpoint, or --queue-url for an Amazon SQS queue.");
   }
   return { destination_kind: "http", url: options.url };
 }

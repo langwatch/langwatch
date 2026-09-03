@@ -7,10 +7,7 @@ import type {
   SuiteRunItemStartedEvent,
   SuiteRunStartedEvent,
 } from "@langwatch/suite-contract";
-import {
-  type SuiteRunStateData,
-  SuiteRunStateFoldProjection,
-} from "../suite-run-state.projection";
+import { type SuiteRunStateData, SuiteRunStateFoldProjection } from "../suite-run-state.projection";
 
 const noopStore: FoldProjectionStore<SuiteRunStateData> = {
   store: async () => {},

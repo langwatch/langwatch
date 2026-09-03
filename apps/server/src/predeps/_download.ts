@@ -40,11 +40,7 @@ export async function downloadWithProgress(
     },
   });
 
-  await pipeline(
-    res.body as unknown as NodeJS.ReadableStream,
-    reporter,
-    createWriteStream(tmp),
-  );
+  await pipeline(res.body as unknown as NodeJS.ReadableStream, reporter, createWriteStream(tmp));
   // Final 100% update so the spinner doesn't get stuck mid-progress.
   task.output = `${prefix} ${formatMB(downloaded)}${total ? ` / ${totalLabel}` : ""}`;
 }

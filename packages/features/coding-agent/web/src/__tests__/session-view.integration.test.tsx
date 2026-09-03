@@ -138,10 +138,7 @@ const REAL_SESSION: CodingAgentSessionDisplay & Record<string, unknown> = {
   lastEventOccurredAt: 0,
 };
 
-function renderSession(
-  over: Partial<CodingAgentSessionDisplay> = {},
-  entries?: TranscriptEntry[],
-) {
+function renderSession(over: Partial<CodingAgentSessionDisplay> = {}, entries?: TranscriptEntry[]) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <SessionView session={{ ...REAL_SESSION, ...over }} entries={entries} />
@@ -304,9 +301,7 @@ describe("SessionView", () => {
       expect(screen.getByText("Where the tokens went")).toBeTruthy();
       // The annotation names the call so it can be found in the chart, whose
       // bars are numbered in call order.
-      expect(
-        screen.getByText(/Call 2 rebuilt 90k tokens instead of reusing 100k/),
-      ).toBeTruthy();
+      expect(screen.getByText(/Call 2 rebuilt 90k tokens instead of reusing 100k/)).toBeTruthy();
       expect(screen.getByText(/after "start over on this"/)).toBeTruthy();
     });
   });

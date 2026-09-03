@@ -4,23 +4,10 @@
  * Shows a card with a table of recent invoices including invoice number,
  * date, amount, status badge, and PDF download link.
  */
-import {
-  Badge,
-  Card,
-  Flex,
-  HStack,
-  Skeleton,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Card, Flex, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import { Download, ExternalLink } from "lucide-react";
 import { billingApi } from "../../behavior/billing-api";
-import {
-  formatInvoiceAmount,
-  formatInvoiceDate,
-  getInvoiceStatusColor,
-} from "../../invoice-utils";
+import { formatInvoiceAmount, formatInvoiceDate, getInvoiceStatusColor } from "../../invoice-utils";
 import { Link } from "../../ui/elements/link";
 
 export function InvoicesBlock({

@@ -13,10 +13,7 @@
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
-import {
-  parseGitRemoteUrl,
-  type SessionContext,
-} from "@/cli/utils/governance/session-context";
+import { parseGitRemoteUrl, type SessionContext } from "@/cli/utils/governance/session-context";
 
 /** How long a single git invocation may take. */
 const GIT_TIMEOUT_MS = 2_000;
@@ -51,13 +48,7 @@ export function readSessionContext({
 }
 
 /** Runs git in `cwd`, bounded, and reports failure as null rather than throwing. */
-export function runGitCommand({
-  args,
-  cwd,
-}: {
-  args: string[];
-  cwd: string;
-}): string | null {
+export function runGitCommand({ args, cwd }: { args: string[]; cwd: string }): string | null {
   try {
     const result = spawnSync("git", ["-C", cwd, ...args], {
       encoding: "utf8",

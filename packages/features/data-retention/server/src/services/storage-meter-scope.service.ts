@@ -27,10 +27,7 @@ export type StorageScopeUsage = Readonly<{
 }>;
 
 export type StorageMeterScopeServiceOptions = Readonly<{
-  retention: Pick<
-    DataRetentionService,
-    "getTotalStorageBytes" | "getTotalStorageBytesForTenants"
-  >;
+  retention: Pick<DataRetentionService, "getTotalStorageBytes" | "getTotalStorageBytesForTenants">;
   directory: DataRetentionDirectoryPort;
   permissions: DataRetentionPermissionsPort;
 }>;

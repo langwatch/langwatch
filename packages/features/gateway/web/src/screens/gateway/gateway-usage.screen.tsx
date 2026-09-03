@@ -27,7 +27,10 @@ import {
 } from "recharts";
 
 import AiGatewayLayout from "../../ui/sections/gateway-layout";
-import { resolveTracesHrefForKey, type TracesWindow } from "../../features/virtual-keys/model/traces-href-for-key";
+import {
+  resolveTracesHrefForKey,
+  type TracesWindow,
+} from "../../features/virtual-keys/model/traces-href-for-key";
 import { formatBudgetUsd } from "../../model/format-budget-usd";
 import { GatewayErrorPanel } from "../../ui/elements/gateway-error-panel";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -95,9 +98,7 @@ function GatewayUsagePage() {
   // virtual-keys table ("Spent this month" click-through) survives a
   // refresh and can be shared as-is.
   const days = ((): number | "mtd" => {
-    const raw = Array.isArray(router.query.days)
-      ? router.query.days[0]
-      : router.query.days;
+    const raw = Array.isArray(router.query.days) ? router.query.days[0] : router.query.days;
     if (raw === "mtd") return "mtd";
     const parsed = raw ? Number.parseInt(raw, 10) : NaN;
     return PRESETS.some((p) => p.days === parsed) ? parsed : 30;
@@ -293,9 +294,8 @@ function GatewayUsagePage() {
                 </EmptyState.Indicator>
                 <EmptyState.Title>No usage in this window</EmptyState.Title>
                 <EmptyState.Description>
-                  Spend shows up here once the gateway has traced its first completed
-                  request. Send a few requests against a virtual key, then check back in a
-                  couple of minutes.
+                  Spend shows up here once the gateway has traced its first completed request. Send
+                  a few requests against a virtual key, then check back in a couple of minutes.
                 </EmptyState.Description>
               </EmptyState.Content>
             </EmptyState.Root>
@@ -308,10 +308,7 @@ function GatewayUsagePage() {
                   value={data.totalRequests.toLocaleString()}
                   help="Every dispatch attempt is counted, including upstream 4xx/5xx responses. Failed-auth requests don't bill tokens but do ledger as 0-cost entries so blip-driven spikes stay visible in ops review."
                 />
-                <StatTile
-                  label="Avg $/request"
-                  value={formatAvgCost(data.avgUsdPerRequest)}
-                />
+                <StatTile label="Avg $/request" value={formatAvgCost(data.avgUsdPerRequest)} />
                 <StatTile
                   label="Blocked by guardrail"
                   value={data.blockedRequests.toLocaleString()}
@@ -361,11 +358,7 @@ function GatewayUsagePage() {
                   <Spacer />
                   {viewTracesHref && (
                     <Link href={viewTracesHref}>
-                      <Button
-                        variant="outline"
-                        size="xs"
-                        data-testid="usage-view-all-traces"
-                      >
+                      <Button variant="outline" size="xs" data-testid="usage-view-all-traces">
                         <Bird size={14} /> View all traces
                       </Button>
                     </Link>
@@ -454,9 +447,7 @@ function SpendSparkline({
             />
             <Tooltip
               formatter={(value, name) =>
-                name === "spendUsd"
-                  ? [`$${Number(value).toFixed(4)}`, "Spend"]
-                  : [value, name]
+                name === "spendUsd" ? [`$${Number(value).toFixed(4)}`, "Spend"] : [value, name]
               }
               labelFormatter={(label) => String(label ?? "")}
               contentStyle={{ fontSize: 12 }}
@@ -507,19 +498,11 @@ function StatTile({
   const body = (
     <Stat.Root>
       <Stat.Label>{label}</Stat.Label>
-      <Stat.ValueText color={tone === "red" ? "red.600" : undefined}>
-        {value}
-      </Stat.ValueText>
+      <Stat.ValueText color={tone === "red" ? "red.600" : undefined}>{value}</Stat.ValueText>
     </Stat.Root>
   );
   return (
-    <Box
-      flex={1}
-      borderWidth="1px"
-      borderColor="border.subtle"
-      borderRadius="lg"
-      padding={4}
-    >
+    <Box flex={1} borderWidth="1px" borderColor="border.subtle" borderRadius="lg" padding={4}>
       {help ? <UITooltip content={help}>{body}</UITooltip> : body}
     </Box>
   );

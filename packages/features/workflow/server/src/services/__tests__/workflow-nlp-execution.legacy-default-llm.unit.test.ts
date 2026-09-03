@@ -134,12 +134,8 @@ describe("WorkflowNlpExecutionService with a migrated legacy version", () => {
       throw new Error("Expected an execute_flow event.");
     }
 
-    const signature = event.payload.workflow.nodes.find(
-      (node) => node.type === "signature",
-    );
-    const llm = signature?.data.parameters?.find(
-      (parameter) => parameter.type === "llm",
-    )?.value;
+    const signature = event.payload.workflow.nodes.find((node) => node.type === "signature");
+    const llm = signature?.data.parameters?.find((parameter) => parameter.type === "llm")?.value;
 
     expect(llm).toEqual({ model: "openai/gpt-5-mini", max_tokens: 256 });
   });

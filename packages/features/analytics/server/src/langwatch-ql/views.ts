@@ -132,18 +132,14 @@ const SAFE_COLUMN = /^[A-Za-z_][A-Za-z0-9_.]*$/;
 
 function assertIdentifier(value: string, role: string): string {
   if (!SAFE_IDENTIFIER.test(value)) {
-    throw new Error(
-      `lwql views: ${role} must match ${String(SAFE_IDENTIFIER)}, got "${value}"`,
-    );
+    throw new Error(`lwql views: ${role} must match ${String(SAFE_IDENTIFIER)}, got "${value}"`);
   }
   return value;
 }
 
 function assertColumn(value: string): string {
   if (!SAFE_COLUMN.test(value)) {
-    throw new Error(
-      `lwql views: column must match ${String(SAFE_COLUMN)}, got "${value}"`,
-    );
+    throw new Error(`lwql views: column must match ${String(SAFE_COLUMN)}, got "${value}"`);
   }
   return value;
 }
@@ -197,9 +193,7 @@ const TENANT_COLUMN = "TenantId";
  * exposed columns already, so the grant is those — the narrowing that matters
  * happened one layer down, in the approved view.
  */
-export function lwqlGrantedSourceColumns(
-  view: LangWatchQLViewDefinition,
-): readonly string[] {
+export function lwqlGrantedSourceColumns(view: LangWatchQLViewDefinition): readonly string[] {
   if (isPostgresResident(view)) {
     return view.columns.map((column) => column.name);
   }
@@ -455,8 +449,7 @@ export function lwqlViewStatement({
     })
     .join(",\n");
   const aliased = `${relation} AS ${SOURCE_ALIAS}`;
-  const from =
-    strategy === "final" && !postgres && !grouped ? `${aliased} FINAL` : aliased;
+  const from = strategy === "final" && !postgres && !grouped ? `${aliased} FINAL` : aliased;
   const where = postgres
     ? `\n${postgresTenantPredicate({ names })}`
     : strategy === "in-tuple"
@@ -626,9 +619,7 @@ export function lwqlPostgresReaderConnectionLimit({
   concurrentCatalogs?: number;
   headroom?: number;
 } = {}): number {
-  return (
-    lwqlPostgresViews(views).length * connectionPoolSize * concurrentCatalogs + headroom
-  );
+  return lwqlPostgresViews(views).length * connectionPoolSize * concurrentCatalogs + headroom;
 }
 
 /**

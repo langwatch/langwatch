@@ -218,9 +218,7 @@ describe("transient process commits", () => {
       const messages = await store.findMessagesByRef({
         ref: refFor("endpoint-3"),
       });
-      expect(messages.map((m) => m.messageKey)).toEqual([
-        "process:endpoint-3:act:endpoint-3",
-      ]);
+      expect(messages.map((m) => m.messageKey)).toEqual(["process:endpoint-3:act:endpoint-3"]);
     });
   });
 

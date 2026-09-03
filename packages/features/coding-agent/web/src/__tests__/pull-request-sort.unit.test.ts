@@ -50,8 +50,7 @@ function branchRow(
   });
 }
 
-const orderOf = (rows: readonly SortablePullRequestRow[]) =>
-  rows.map((each) => each.headBranch);
+const orderOf = (rows: readonly SortablePullRequestRow[]) => rows.map((each) => each.headBranch);
 
 /** The state a column lands in after `clicks` clicks, starting from default. */
 function afterClicks({
@@ -78,9 +77,11 @@ describe("the Pull Requests table order", () => {
         row({ headBranch: "newest-pull-request", lastActivityAtMs: 3_000 }),
       ];
 
-      expect(
-        orderOf(sortPullRequestRows({ rows, sort: DEFAULT_PULL_REQUEST_SORT })),
-      ).toEqual(["newest-pull-request", "middle-branch", "oldest-pull-request"]);
+      expect(orderOf(sortPullRequestRows({ rows, sort: DEFAULT_PULL_REQUEST_SORT }))).toEqual([
+        "newest-pull-request",
+        "middle-branch",
+        "oldest-pull-request",
+      ]);
     });
 
     it("opens on the last update, read newest first", () => {
@@ -102,11 +103,7 @@ describe("the Pull Requests table order", () => {
       const sort = afterClicks({ column: "tokens", clicks: 1 });
 
       expect(sort).toEqual({ column: "tokens", direction: "desc" });
-      expect(orderOf(sortPullRequestRows({ rows, sort }))).toEqual([
-        "large",
-        "medium",
-        "small",
-      ]);
+      expect(orderOf(sortPullRequestRows({ rows, sort }))).toEqual(["large", "medium", "small"]);
     });
 
     it("leads with the largest number for the pull request column too", () => {
@@ -140,11 +137,7 @@ describe("the Pull Requests table order", () => {
       const sort = afterClicks({ column: "title", clicks: 1 });
 
       expect(sort).toEqual({ column: "title", direction: "asc" });
-      expect(orderOf(sortPullRequestRows({ rows, sort }))).toEqual([
-        "apple",
-        "middle",
-        "zebra",
-      ]);
+      expect(orderOf(sortPullRequestRows({ rows, sort }))).toEqual(["apple", "middle", "zebra"]);
     });
 
     it("falls back to the branch name for a row with no pull request", () => {
@@ -176,9 +169,7 @@ describe("the Pull Requests table order", () => {
           lastActivityAtMs: 1_000,
         }),
       ];
-      const opening = orderOf(
-        sortPullRequestRows({ rows, sort: DEFAULT_PULL_REQUEST_SORT }),
-      );
+      const opening = orderOf(sortPullRequestRows({ rows, sort: DEFAULT_PULL_REQUEST_SORT }));
 
       const first = afterClicks({ column: "tokens", clicks: 1 });
       expect(orderOf(sortPullRequestRows({ rows, sort: first }))).toEqual([
@@ -203,9 +194,7 @@ describe("the Pull Requests table order", () => {
         column: "lastActivity",
         direction: "asc",
       });
-      expect(afterClicks({ column: "lastActivity", clicks: 2 })).toEqual(
-        DEFAULT_PULL_REQUEST_SORT,
-      );
+      expect(afterClicks({ column: "lastActivity", clicks: 2 })).toEqual(DEFAULT_PULL_REQUEST_SORT);
     });
 
     it("starts a different column from its own reading direction", () => {

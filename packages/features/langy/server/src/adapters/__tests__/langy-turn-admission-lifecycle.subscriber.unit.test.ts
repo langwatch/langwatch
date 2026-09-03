@@ -9,10 +9,7 @@ const context: EventSubscriberContext = {
   aggregateId: "ignored-conversation",
 };
 
-function event(
-  type: string,
-  data: Record<string, unknown>,
-): LangyConversationProcessingEvent {
+function event(type: string, data: Record<string, unknown>): LangyConversationProcessingEvent {
   return {
     id: `event-${type}`,
     aggregateId: "conversation-1",

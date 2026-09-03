@@ -56,9 +56,9 @@ describe("buildModelsJson", () => {
       expect(() => buildModelsJson({ model, env: { OPENAI_API_KEY: "k" } })).toThrow(
         /OPENAI_BASE_URL/,
       );
-      expect(() =>
-        buildModelsJson({ model, env: { OPENAI_BASE_URL: "http://x" } }),
-      ).toThrow(/OPENAI_API_KEY/);
+      expect(() => buildModelsJson({ model, env: { OPENAI_BASE_URL: "http://x" } })).toThrow(
+        /OPENAI_API_KEY/,
+      );
     });
   });
 

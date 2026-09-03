@@ -24,21 +24,16 @@
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
-import {
-  GitMerge,
-  GitPullRequest,
-  GitPullRequestClosed,
-  type LucideIcon,
-} from "lucide-react";
-import type { GithubPrCardData, GithubPrState } from "../../../../../model/shared/langy/github-pr-card";
+import { GitMerge, GitPullRequest, GitPullRequestClosed, type LucideIcon } from "lucide-react";
+import type {
+  GithubPrCardData,
+  GithubPrState,
+} from "../../../../../model/shared/langy/github-pr-card";
 
 export type LangyGitHubPrCardProps = GithubPrCardData;
 
 /** GitHub's own semantics, in semantic tokens: open is green, merged purple. */
-const STATE_STYLE: Record<
-  GithubPrState,
-  { label: string; color: string; Icon: LucideIcon }
-> = {
+const STATE_STYLE: Record<GithubPrState, { label: string; color: string; Icon: LucideIcon }> = {
   draft: { label: "Draft", color: "fg.muted", Icon: GitPullRequest },
   open: { label: "Open", color: "green.fg", Icon: GitPullRequest },
   merged: { label: "Merged", color: "purple.fg", Icon: GitMerge },
@@ -60,17 +55,11 @@ export function LangyGitHubPrCard({
   changedFiles,
 }: LangyGitHubPrCardProps) {
   const { label, color, Icon } = STATE_STYLE[state] ?? STATE_STYLE.open;
-  const hasDiff =
-    additions !== undefined || deletions !== undefined || changedFiles !== undefined;
+  const hasDiff = additions !== undefined || deletions !== undefined || changedFiles !== undefined;
   const hasBranches = !!headRef && !!baseRef;
 
   return (
-    <Link
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      _hover={{ textDecoration: "none" }}
-    >
+    <Link href={url} target="_blank" rel="noopener noreferrer" _hover={{ textDecoration: "none" }}>
       <Box
         borderWidth="1px"
         borderColor="border.muted"
@@ -93,13 +82,7 @@ export function LangyGitHubPrCard({
                   identity leads instead and the card simply says less, rather
                   than pretending to know more. */}
               {title ? (
-                <Text
-                  textStyle="sm"
-                  fontWeight="640"
-                  color="fg"
-                  lineHeight="1.35"
-                  lineClamp={2}
-                >
+                <Text textStyle="sm" fontWeight="640" color="fg" lineHeight="1.35" lineClamp={2}>
                   {title}
                 </Text>
               ) : (
@@ -127,13 +110,7 @@ export function LangyGitHubPrCard({
           </HStack>
 
           {hasBranches || hasDiff ? (
-            <HStack
-              gap={2.5}
-              textStyle="2xs"
-              color="fg.subtle"
-              fontFamily="mono"
-              flexWrap="wrap"
-            >
+            <HStack gap={2.5} textStyle="2xs" color="fg.subtle" fontFamily="mono" flexWrap="wrap">
               {hasBranches ? (
                 <Text as="span" truncate maxWidth="220px">
                   {headRef} → {baseRef}

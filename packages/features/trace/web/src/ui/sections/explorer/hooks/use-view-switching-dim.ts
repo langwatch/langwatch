@@ -23,11 +23,7 @@ interface DimInputs {
  * Primitive comparison instead of JSON.stringify keeps this allocation-free
  * on the hot path.
  */
-export function useViewSwitchingDim({
-  isFetching,
-  isFetched,
-  isPlaceholderData,
-}: DimInputs): void {
+export function useViewSwitchingDim({ isFetching, isFetched, isPlaceholderData }: DimInputs): void {
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const timeRangeFrom = useFilterStore((s) => s.debouncedTimeRange.from);
   const timeRangeTo = useFilterStore((s) => s.debouncedTimeRange.to);

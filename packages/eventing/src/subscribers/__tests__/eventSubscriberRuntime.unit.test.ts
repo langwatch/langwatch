@@ -219,9 +219,7 @@ describe("event-subscriber runtime boundary", () => {
 
       // At-least-once redelivery of ONLY the subscriber job — exactly what the
       // queue does on retry: re-run the subscriber's registry entry.
-      const subscriberEntry = registry.get(
-        "test-pipeline:subscriber:conversationProcess",
-      );
+      const subscriberEntry = registry.get("test-pipeline:subscriber:conversationProcess");
       expect(subscriberEntry).toBeDefined();
       await subscriberEntry!.process(event as unknown as Record<string, unknown>);
 
@@ -295,19 +293,15 @@ describe("event-subscriber runtime boundary", () => {
       });
 
       const tracer = trace.getTracer("test-publisher");
-      const publishTraceId = await tracer.startActiveSpan(
-        "event.publish",
-        async (publishSpan) => {
-          const traceId = publishSpan.spanContext().traceId;
-          await service.storeEvents([makeEvent("evt-otel")], context_);
-          publishSpan.end();
-          return traceId;
-        },
-      );
+      const publishTraceId = await tracer.startActiveSpan("event.publish", async (publishSpan) => {
+        const traceId = publishSpan.spanContext().traceId;
+        await service.storeEvents([makeEvent("evt-otel")], context_);
+        publishSpan.end();
+        return traceId;
+      });
 
       const spans = exporter.getFinishedSpans();
-      const byName = (name: string): ReadableSpan | undefined =>
-        spans.find((s) => s.name === name);
+      const byName = (name: string): ReadableSpan | undefined => spans.find((s) => s.name === name);
 
       const subscriberSpan = byName("EventSubscriber.handle");
       const queueSpan = byName("pipeline.process");
@@ -321,9 +315,7 @@ describe("event-subscriber runtime boundary", () => {
 
       // The subscriber span is a child of the queue-processing span, proving
       // the queue-processing context is active inside the handler.
-      expect(subscriberSpan!.parentSpanContext?.spanId).toBe(
-        queueSpan!.spanContext().spanId,
-      );
+      expect(subscriberSpan!.parentSpanContext?.spanId).toBe(queueSpan!.spanContext().spanId);
       expect(subscriberSpan!.kind).toBe(SpanKind.INTERNAL);
 
       // Subscriber-specific span carries tenant / pipeline / subscriber ids.

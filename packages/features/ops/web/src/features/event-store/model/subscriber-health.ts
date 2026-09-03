@@ -24,10 +24,7 @@ export interface SubscriberHealthRow extends SubscriberMeta {
  * files them under `<pipeline>/subscriber/<name>`, so this exact shape is
  * what the pause set matches against.
  */
-export function subscriberPauseKey(meta: {
-  pipelineName: string;
-  subscriberName: string;
-}): string {
+export function subscriberPauseKey(meta: { pipelineName: string; subscriberName: string }): string {
   return `${meta.pipelineName}/subscriber/${meta.subscriberName}`;
 }
 

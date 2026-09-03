@@ -69,15 +69,10 @@ vi.mock("@langwatch/ui-drawer", () => ({
 // ---------------------------------------------------------------------------
 
 vi.mock("../../../elements/suites/scenario-input-mapping-section", () => ({
-  ScenarioInputMappingSection: ({
-    inputs,
-  }: ScenarioInputMappingSectionProps) => (
+  ScenarioInputMappingSection: ({ inputs }: ScenarioInputMappingSectionProps) => (
     <div data-testid="scenario-mapping-section">
       {inputs.map((i) => (
-        <div
-          key={i.identifier}
-          data-testid={`scenario-mapping-input-${i.identifier}`}
-        >
+        <div key={i.identifier} data-testid={`scenario-mapping-input-${i.identifier}`}>
           {i.identifier}
         </div>
       ))}
@@ -216,13 +211,10 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function renderDrawer(
-  props: Partial<Parameters<typeof AgentWorkflowEditorDrawer>[0]> = {},
-) {
-  return render(
-    <AgentWorkflowEditorDrawer open={true} agentId="agent-1" {...props} />,
-    { wrapper: Wrapper },
-  );
+function renderDrawer(props: Partial<Parameters<typeof AgentWorkflowEditorDrawer>[0]> = {}) {
+  return render(<AgentWorkflowEditorDrawer open={true} agentId="agent-1" {...props} />, {
+    wrapper: Wrapper,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -250,9 +242,7 @@ describe("AgentWorkflowEditorDrawer", () => {
       // no edge covers it, so workflowInputs = [{identifier:"unwired_field"}],
       // and the section receives and renders it.
       await waitFor(() => {
-        expect(
-          screen.getByTestId("scenario-mapping-input-unwired_field"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("scenario-mapping-input-unwired_field")).toBeInTheDocument();
       });
     });
   });

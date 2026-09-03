@@ -23,8 +23,7 @@ export async function handleGetTrace(params: {
 
   if (result.timestamps) {
     lines.push(`**Started**: ${result.timestamps.started_at}`);
-    if (result.timestamps.updated_at)
-      lines.push(`**Updated**: ${result.timestamps.updated_at}`);
+    if (result.timestamps.updated_at) lines.push(`**Updated**: ${result.timestamps.updated_at}`);
   }
 
   if (result.metadata) {
@@ -43,9 +42,7 @@ export async function handleGetTrace(params: {
     lines.push(`\n## Trace Details\n${result.formatted_trace}`);
   }
 
-  lines.push(
-    '\n> Tip: Use `get_trace` with `format: "json"` to get the full raw trace data.',
-  );
+  lines.push('\n> Tip: Use `get_trace` with `format: "json"` to get the full raw trace data.');
 
   return lines.join("\n");
 }

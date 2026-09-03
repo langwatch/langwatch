@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Collapsible,
-  chakra,
-  HStack,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Collapsible, chakra, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import {
   ChevronDown,
   ChevronUp,
@@ -278,9 +269,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
               <chakra.button
                 type="button"
                 aria-label={
-                  searchToggleProps.open
-                    ? `Hide ${title} value search`
-                    : `Search ${title} values`
+                  searchToggleProps.open ? `Hide ${title} value search` : `Search ${title} values`
                 }
                 aria-pressed={searchToggleProps.open}
                 width="16px"

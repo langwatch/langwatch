@@ -24,11 +24,7 @@ import { MessageCommentScope } from "./transcript/message-comments";
 import { TraceMediaPart } from "../../traces/trace-media-part";
 import { TerminalOutput } from "@langwatch/coding-agent-web";
 import { TranscriptRenderProvider } from "../../../../index";
-import {
-  type MarkdownSubmode,
-  useIOViewerState,
-  type ViewFormat,
-} from "./use-io-viewer-state";
+import { type MarkdownSubmode, useIOViewerState, type ViewFormat } from "./use-io-viewer-state";
 
 /**
  * How much of a captured value this viewer renders before offering an
@@ -152,9 +148,7 @@ export const IOViewer = memo(function IOViewer({
   const content = useMemo(() => {
     if (!translation.isActive) return originalContent;
     if (originalChatMessages && chatLeaves) {
-      return JSON.stringify(
-        applyChatTextLeaves(originalChatMessages, translation.displayTexts),
-      );
+      return JSON.stringify(applyChatTextLeaves(originalChatMessages, translation.displayTexts));
     }
     return translation.displayTexts.content ?? originalContent;
   }, [
@@ -168,10 +162,7 @@ export const IOViewer = memo(function IOViewer({
   // Which part of the trace a comment left on this panel is about: the span's
   // field when the viewer is rendering a span, the trace's own field otherwise.
   const fieldAnchor = useMemo<TraceAnchor | null>(
-    () =>
-      traceId
-        ? { anchorKind: "field", anchorId: spanId ?? traceId, anchorPath: mode }
-        : null,
+    () => (traceId ? { anchorKind: "field", anchorId: spanId ?? traceId, anchorPath: mode } : null),
     [traceId, spanId, mode],
   );
   const parsed = useMemo(() => tryParseJSON(content), [content]);
@@ -251,12 +242,8 @@ export const IOViewer = memo(function IOViewer({
       : `${content.length.toLocaleString()} chars`;
 
   const isLong = content.length - TRUNCATE_AT > TRUNCATE_TAIL_MIN;
-  const displayContent =
-    !isLong || expanded ? content : content.slice(0, TRUNCATE_AT) + "...";
-  const prettyJsonContent = useMemo(
-    () => safePrettyJson(displayContent),
-    [displayContent],
-  );
+  const displayContent = !isLong || expanded ? content : content.slice(0, TRUNCATE_AT) + "...";
+  const prettyJsonContent = useMemo(() => safePrettyJson(displayContent), [displayContent]);
 
   const markdownBody = useMemo(() => asMarkdownBody(displayContent), [displayContent]);
 
@@ -273,8 +260,7 @@ export const IOViewer = memo(function IOViewer({
   );
 
   const formatOptions = useMemo<ViewFormat[]>(
-    () =>
-      canJson ? ["pretty", "text", "json", "markdown"] : ["pretty", "text", "markdown"],
+    () => (canJson ? ["pretty", "text", "json", "markdown"] : ["pretty", "text", "markdown"]),
     [canJson],
   );
 
@@ -314,15 +300,7 @@ export const IOViewer = memo(function IOViewer({
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [
-    displayContent,
-    format,
-    isVirtualizingChat,
-    engaged,
-    expanded,
-    chatLayout,
-    markdownSubmode,
-  ]);
+  }, [displayContent, format, isVirtualizingChat, engaged, expanded, chatLayout, markdownSubmode]);
 
   return (
     <Box>
@@ -336,11 +314,7 @@ export const IOViewer = memo(function IOViewer({
           minWidth="auto"
           height="auto"
         >
-          <Icon
-            as={collapsed ? LuChevronRight : LuChevronDown}
-            boxSize={3}
-            color="fg.muted"
-          />
+          <Icon as={collapsed ? LuChevronRight : LuChevronDown} boxSize={3} color="fg.muted" />
         </Button>
         <HStack
           gap={2}

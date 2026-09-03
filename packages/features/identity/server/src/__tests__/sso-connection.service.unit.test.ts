@@ -1,7 +1,4 @@
-import type {
-  SsoConnectionCommand,
-  SsoConnectionFactInput,
-} from "@langwatch/identity-contract";
+import type { SsoConnectionCommand, SsoConnectionFactInput } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { SsoConnectionGuards } from "../sso-connection-guards";
 import type { SsoConnectionLedger } from "../sso-connection-ledger";
@@ -133,9 +130,9 @@ describe("the sso connection write surface", () => {
           expect(fact.data.actor).toEqual(OPS);
         }
       }
-      expect(
-        (await connections.findConnection({ connectionId: CONNECTION }))?.state,
-      ).toBe("ACTIVE");
+      expect((await connections.findConnection({ connectionId: CONNECTION }))?.state).toBe(
+        "ACTIVE",
+      );
     });
 
     /** @scenario "Backoffice edits go through commands like everyone else's" */

@@ -18,11 +18,7 @@ import type {
   CodingAgentUsageTotalsInput,
 } from "./coding-agent";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import {
-  contentAttrKeys,
-  logContentKeys,
-  type LogContentKey,
-} from "./coding-agent-log-content";
+import { contentAttrKeys, logContentKeys, type LogContentKey } from "./coding-agent-log-content";
 import {
   buildCodingAgentTranscript,
   type CodingAgentTranscript,
@@ -74,17 +70,13 @@ export abstract class CodingAgentService {
     input: CodingAgentTraceSessionLookupInput,
   ): Promise<CodingAgentSession | null>;
 
-  abstract listRecent(
-    input: CodingAgentRecentSessionsInput,
-  ): Promise<CodingAgentSession[]>;
+  abstract listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
 
   abstract backfillPullRequestMappings(
     input: CodingAgentPullRequestMappingBackfillInput,
   ): Promise<void>;
 
-  abstract getUsageTotals(
-    input: CodingAgentUsageTotalsInput,
-  ): Promise<CodingAgentUsageTotals>;
+  abstract getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
 
   abstract listForProject(
     input: CodingAgentSessionsListInput,

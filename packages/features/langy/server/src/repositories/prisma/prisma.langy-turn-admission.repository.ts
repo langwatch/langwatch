@@ -28,9 +28,7 @@ const COMMITTED_ABANDON_MS = 10 * 60 * 1000;
 
 function isRetryableTransactionError(error: unknown): boolean {
   return (
-    error instanceof Error &&
-    "code" in error &&
-    (error.code === "P2002" || error.code === "P2034")
+    error instanceof Error && "code" in error && (error.code === "P2002" || error.code === "P2034")
   );
 }
 
@@ -204,10 +202,7 @@ export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionReposi
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         );
       } catch (error) {
-        if (
-          attempt + 1 < MAX_SERIALIZATION_ATTEMPTS &&
-          isRetryableTransactionError(error)
-        ) {
+        if (attempt + 1 < MAX_SERIALIZATION_ATTEMPTS && isRetryableTransactionError(error)) {
           continue;
         }
         throw error;
@@ -253,9 +248,7 @@ export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionReposi
           receipt.turnId !== input.turnId ||
           receipt.status !== COMMITTED
         ) {
-          throw new Error(
-            `Langy turn admission receipt commit lost its claim for ${input.turnId}`,
-          );
+          throw new Error(`Langy turn admission receipt commit lost its claim for ${input.turnId}`);
         }
       }
 

@@ -50,9 +50,7 @@ export const promptGetCommand = async (
         }
 
         console.log(
-          chalk.gray(
-            `  Tip: See every version with: langwatch prompt versions ${handle}`,
-          ),
+          chalk.gray(`  Tip: See every version with: langwatch prompt versions ${handle}`),
         );
         console.log();
       },

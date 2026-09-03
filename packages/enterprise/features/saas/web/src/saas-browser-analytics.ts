@@ -1,14 +1,8 @@
-import type {
-  SaasBrowserScope,
-  SaasBrowserUser,
-} from "@langwatch/enterprise-saas-contract";
+import type { SaasBrowserScope, SaasBrowserUser } from "@langwatch/enterprise-saas-contract";
 
 type PollCancel = () => void;
 
-export type PostHogIdentify = (
-  distinctId: string,
-  properties: Record<string, unknown>,
-) => void;
+export type PostHogIdentify = (distinctId: string, properties: Record<string, unknown>) => void;
 
 export class SaasBrowserAnalytics {
   private constructor(

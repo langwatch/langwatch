@@ -85,9 +85,9 @@ export function createProjectTrpcRouter<
       policy: service.policy,
       createPolicy: service.custom(mount.checks.create),
       updatePolicy: <TProcedure>(procedure: TProcedure): TProcedure =>
-        (
-          service.policy("project:update")(procedure) as unknown as ChainableProcedure
-        ).use(mount.checks.traceSharing) as unknown as TProcedure,
+        (service.policy("project:update")(procedure) as unknown as ChainableProcedure).use(
+          mount.checks.traceSharing,
+        ) as unknown as TProcedure,
     },
     mount.ports,
   );

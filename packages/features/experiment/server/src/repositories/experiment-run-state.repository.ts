@@ -13,8 +13,5 @@ export interface ExperimentRunStateRepository<
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null>;
 
-  storeProjection(
-    projection: ProjectionType,
-    context: ProjectionStoreWriteContext,
-  ): Promise<void>;
+  storeProjection(projection: ProjectionType, context: ProjectionStoreWriteContext): Promise<void>;
 }

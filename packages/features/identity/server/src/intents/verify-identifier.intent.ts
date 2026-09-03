@@ -4,18 +4,15 @@ import {
   verifyIdentifierCommandDataSchema,
 } from "@langwatch/identity-contract";
 import type { IdentityGuards } from "../guards";
-import {
-  type Command,
-  type CommandHandler,
-  defineCommandSchema,
-} from "@langwatch/eventing";
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { identityEventsFor } from "../projections/identity-state.projection";
 import type { IdentityEvent } from "../projections/identity-state.projection";
 
 /** The staged re-run: the calling path's guard, the calling path's envelope. */
-export class VerifyIdentifierCommand
-  implements CommandHandler<Command<VerifyIdentifierCommandData>, IdentityEvent>
-{
+export class VerifyIdentifierCommand implements CommandHandler<
+  Command<VerifyIdentifierCommandData>,
+  IdentityEvent
+> {
   static readonly schema = defineCommandSchema(
     VERIFY_IDENTIFIER_COMMAND_TYPE,
     verifyIdentifierCommandDataSchema,
@@ -28,9 +25,7 @@ export class VerifyIdentifierCommand
 
   constructor(private readonly guards: IdentityGuards) {}
 
-  async handle(
-    command: Command<VerifyIdentifierCommandData>,
-  ): Promise<IdentityEvent[]> {
+  async handle(command: Command<VerifyIdentifierCommandData>): Promise<IdentityEvent[]> {
     const facts = await this.guards.verifyIdentifier(command.data);
     return identityEventsFor({
       command: { type: VERIFY_IDENTIFIER_COMMAND_TYPE, data: command.data },

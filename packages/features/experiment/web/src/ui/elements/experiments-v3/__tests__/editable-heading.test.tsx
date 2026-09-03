@@ -21,20 +21,14 @@ describe("EditableHeading", () => {
 
   describe("when loading", () => {
     it("does not show the value when isLoading is true", () => {
-      renderWithProviders(
-        <EditableHeading value="My Evaluation" onSave={mockOnSave} isLoading />,
-      );
+      renderWithProviders(<EditableHeading value="My Evaluation" onSave={mockOnSave} isLoading />);
 
       expect(screen.queryByText("My Evaluation")).not.toBeInTheDocument();
     });
 
     it("shows the value when isLoading is false", () => {
       renderWithProviders(
-        <EditableHeading
-          value="My Evaluation"
-          onSave={mockOnSave}
-          isLoading={false}
-        />,
+        <EditableHeading value="My Evaluation" onSave={mockOnSave} isLoading={false} />,
       );
 
       expect(screen.getByText("My Evaluation")).toBeInTheDocument();
@@ -43,18 +37,14 @@ describe("EditableHeading", () => {
 
   describe("when displaying", () => {
     it("shows the value when provided", () => {
-      renderWithProviders(
-        <EditableHeading value="My Evaluation" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="My Evaluation" onSave={mockOnSave} />);
 
       expect(screen.getByText("My Evaluation")).toBeInTheDocument();
     });
 
     it("shows pencil icon on hover", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="My Evaluation" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="My Evaluation" onSave={mockOnSave} />);
 
       const heading = screen.getByText("My Evaluation").parentElement!;
       await user.hover(heading);
@@ -67,9 +57,7 @@ describe("EditableHeading", () => {
   describe("when clicking to edit", () => {
     it("shows input field after clicking", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="My Evaluation" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="My Evaluation" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("My Evaluation"));
 
@@ -79,9 +67,7 @@ describe("EditableHeading", () => {
 
     it("focuses and selects the input text", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="My Evaluation" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="My Evaluation" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("My Evaluation"));
 
@@ -93,9 +79,7 @@ describe("EditableHeading", () => {
   describe("when saving changes", () => {
     it("calls onSave when pressing Enter with new value", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="Old Name" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("Old Name"));
       const input = screen.getByRole("textbox");
@@ -108,9 +92,7 @@ describe("EditableHeading", () => {
 
     it("calls onSave when blurring with new value", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="Old Name" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("Old Name"));
       const input = screen.getByRole("textbox");
@@ -123,9 +105,7 @@ describe("EditableHeading", () => {
 
     it("does not call onSave when value is unchanged", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="Same Name" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="Same Name" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("Same Name"));
       await user.keyboard("{Enter}");
@@ -135,9 +115,7 @@ describe("EditableHeading", () => {
 
     it("does not call onSave when value is only whitespace", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="Old Name" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("Old Name"));
       const input = screen.getByRole("textbox");
@@ -150,9 +128,7 @@ describe("EditableHeading", () => {
 
     it("trims whitespace from saved value", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="Old Name" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("Old Name"));
       const input = screen.getByRole("textbox");
@@ -165,9 +141,7 @@ describe("EditableHeading", () => {
 
     it("returns to display mode after saving", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="Old Name" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("Old Name"));
       const input = screen.getByRole("textbox");
@@ -182,9 +156,7 @@ describe("EditableHeading", () => {
   describe("when cancelling edit", () => {
     it("does not call onSave when pressing Escape", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="Old Name" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("Old Name"));
       const input = screen.getByRole("textbox");
@@ -197,9 +169,7 @@ describe("EditableHeading", () => {
 
     it("returns to display mode when pressing Escape", async () => {
       const user = userEvent.setup();
-      renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />,
-      );
+      renderWithProviders(<EditableHeading value="Old Name" onSave={mockOnSave} />);
 
       await user.click(screen.getByText("Old Name"));
       await user.keyboard("{Escape}");

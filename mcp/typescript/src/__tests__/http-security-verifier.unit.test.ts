@@ -14,9 +14,7 @@ describe("apiKeysMatch", () => {
 
   it("rejects different keys, including different lengths", () => {
     expect(apiKeysMatch({ presentedKey: "sk-abc", expectedKey: "sk-abd" })).toBe(false);
-    expect(apiKeysMatch({ presentedKey: "sk-abc", expectedKey: "sk-abc-longer" })).toBe(
-      false,
-    );
+    expect(apiKeysMatch({ presentedKey: "sk-abc", expectedKey: "sk-abc-longer" })).toBe(false);
     expect(apiKeysMatch({ presentedKey: "", expectedKey: "sk-abc" })).toBe(false);
   });
 });
@@ -173,9 +171,7 @@ describe("createApiKeyVerifier", () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
-    const results = await Promise.all(
-      Array.from({ length: 25 }, () => verifier.verify("sk-real")),
-    );
+    const results = await Promise.all(Array.from({ length: 25 }, () => verifier.verify("sk-real")));
 
     expect(results.every((result) => result === true)).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(1);

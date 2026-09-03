@@ -39,10 +39,7 @@ interface TokenValuePickerProps {
  * as the same affordance — same shadow, glow ring, fade-in, mono row
  * layout, and footer with shortcut hints + syntax-docs button.
  */
-export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
-  anchor,
-  onClose,
-}) => {
+export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onClose }) => {
   const setFacetValueAt = useFilterStore((s) => s.setFacetValueAt);
   const setSyntaxHelpOpen = useUIStore((s) => s.setSyntaxHelpOpen);
   const { data: facets = [] } = useTraceFacets();
@@ -64,9 +61,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   useEffect(() => {
     setFilter(anchor?.currentValue ?? "");
     setActiveIndex(0);
-    filterSeededAnchorKey.current = anchor
-      ? `${anchor.field}:${anchor.location.start}`
-      : null;
+    filterSeededAnchorKey.current = anchor ? `${anchor.field}:${anchor.location.start}` : null;
   }, [anchor?.field, anchor?.location.start, anchor?.currentValue]);
 
   // Focus the search input when the picker OPENS — deferred to the next
@@ -159,9 +154,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
     return source
       .filter(
         (v) =>
-          !q ||
-          v.value.toLowerCase().includes(q) ||
-          (v.label?.toLowerCase().includes(q) ?? false),
+          !q || v.value.toLowerCase().includes(q) || (v.label?.toLowerCase().includes(q) ?? false),
       )
       .map((v) => ({ value: v.value, label: v.label, count: v.count }))
       .slice(0, MAX_VALUES_PER_PAGE);
@@ -290,10 +283,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   // Anchor below the chip with a small gap; clamp to viewport edges so
   // a chip near the right or bottom doesn't push the popover offscreen.
   const top = Math.min(window.innerHeight - 280, anchor.rect.bottom + 6);
-  const left = Math.min(
-    window.innerWidth - POPOVER_WIDTH - 8,
-    Math.max(8, anchor.rect.left),
-  );
+  const left = Math.min(window.innerWidth - POPOVER_WIDTH - 8, Math.max(8, anchor.rect.left));
 
   return createPortal(
     <Box
@@ -386,11 +376,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
                     _hover={{ bg: "blue.solid/8" }}
                     onMouseEnter={() => setActiveIndex(i)}
                     onClick={() => {
-                      setFacetValueAt(
-                        anchor.location.start,
-                        anchor.location.end,
-                        v.value,
-                      );
+                      setFacetValueAt(anchor.location.start, anchor.location.end, v.value);
                       onClose();
                     }}
                   >
@@ -422,9 +408,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
                           {v.value}
                         </Text>
                       )}
-                      {isCurrent && (
-                        <Check size={12} color="var(--chakra-colors-blue-fg)" />
-                      )}
+                      {isCurrent && <Check size={12} color="var(--chakra-colors-blue-fg)" />}
                     </HStack>
                     <Text textStyle="2xs" color="fg.subtle" marginLeft={2}>
                       {v.count.toLocaleString()}
@@ -457,11 +441,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
                   _hover={{ bg: "blue.solid/8" }}
                   onMouseEnter={() => setActiveIndex(values.length)}
                   onClick={() => {
-                    setFacetValueAt(
-                      anchor.location.start,
-                      anchor.location.end,
-                      customValue,
-                    );
+                    setFacetValueAt(anchor.location.start, anchor.location.end, customValue);
                     onClose();
                   }}
                 >

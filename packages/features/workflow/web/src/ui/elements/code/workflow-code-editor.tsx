@@ -4,15 +4,7 @@ import type { Monaco } from "@monaco-editor/react";
 import { LuFileCode, LuX } from "react-icons/lu";
 import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";
-import {
-  lazy,
-  type ReactNode,
-  Suspense,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { lazy, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import type { PythonField, PythonProviderHandle } from "../../../model/code/python-provider.shared";
 import { registerPythonProviders } from "../../../model/code/python-providers";
@@ -69,9 +61,7 @@ export function WorkflowCodeEditorModal({
   viewStateKey?: string;
   projectId?: string;
   secretNames: readonly string[];
-  renderSecretControls?: (input: {
-    onInsertSecret: (secretName: string) => void;
-  }) => ReactNode;
+  renderSecretControls?: (input: { onInsertSecret: (secretName: string) => void }) => ReactNode;
   renderModal: WorkflowCodeEditorModalHost;
 } & WorkflowCodeEditorContractProps) {
   const [localCode, setLocalCode] = useState(code);
@@ -354,9 +344,7 @@ export function WorkflowCodeEditor({
           // the modal for the same node drops the user back where they were.
           if (viewStateKey) {
             try {
-              const raw = localStorage.getItem(
-                `langwatch.monaco.viewstate:${viewStateKey}`,
-              );
+              const raw = localStorage.getItem(`langwatch.monaco.viewstate:${viewStateKey}`);
               if (raw) editor.restoreViewState(JSON.parse(raw));
             } catch {
               // ignore corrupted state
@@ -479,10 +467,7 @@ export function WorkflowCodeEditor({
             }
             // Cmd/Ctrl+Enter → Save & Close. Mirrors the Notebook "run cell"
             // muscle memory.
-            if (
-              (e.metaKey || e.ctrlKey) &&
-              (e.code === "Enter" || e.code === "NumpadEnter")
-            ) {
+            if ((e.metaKey || e.ctrlKey) && (e.code === "Enter" || e.code === "NumpadEnter")) {
               e.preventDefault();
               e.stopPropagation();
               onSaveAndClose.fn();

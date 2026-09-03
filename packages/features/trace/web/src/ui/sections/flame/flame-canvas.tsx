@@ -5,7 +5,12 @@ import { formatDuration } from "../../../model/display-formatters";
 import { FlameAxis } from "./flame-axis";
 import { FlameRow } from "./flame-row";
 import { Minimap } from "./minimap";
-import type { FlameNode, FlameRelatedSpanIds, FlameTick, Viewport } from "../../../behavior/flame/types";
+import type {
+  FlameNode,
+  FlameRelatedSpanIds,
+  FlameTick,
+  Viewport,
+} from "../../../behavior/flame/types";
 
 export interface FlameCanvasProps {
   flameAreaRef: RefObject<HTMLDivElement | null>;

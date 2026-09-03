@@ -51,10 +51,9 @@ describe("useRetainedTraceHeader", () => {
           conversationId: "conv-1",
           userId: "user-1",
         });
-        const { result, rerender } = renderHook(
-          ({ trace }) => useRetainedTraceHeader(trace),
-          { initialProps: { trace: full } },
-        );
+        const { result, rerender } = renderHook(({ trace }) => useRetainedTraceHeader(trace), {
+          initialProps: { trace: full },
+        });
         expect(result.current.attributes["metadata.tenant"]).toBe("org-acme");
 
         // Seed-shaped payload: same trace, empty attributes, null ids.
@@ -66,14 +65,11 @@ describe("useRetainedTraceHeader", () => {
       });
 
       it("still adopts fresher non-empty attributes", () => {
-        const { result, rerender } = renderHook(
-          ({ trace }) => useRetainedTraceHeader(trace),
-          {
-            initialProps: {
-              trace: makeTrace({ attributes: { "metadata.a": "1" } }),
-            },
+        const { result, rerender } = renderHook(({ trace }) => useRetainedTraceHeader(trace), {
+          initialProps: {
+            trace: makeTrace({ attributes: { "metadata.a": "1" } }),
           },
-        );
+        });
         rerender({
           trace: makeTrace({ attributes: { "metadata.a": "2" } }),
         });
@@ -83,17 +79,14 @@ describe("useRetainedTraceHeader", () => {
 
     describe("when the traceId changes", () => {
       it("resets retention so chips from the old trace never leak", () => {
-        const { result, rerender } = renderHook(
-          ({ trace }) => useRetainedTraceHeader(trace),
-          {
-            initialProps: {
-              trace: makeTrace({
-                attributes: { "metadata.tenant": "org-acme" },
-                conversationId: "conv-1",
-              }),
-            },
+        const { result, rerender } = renderHook(({ trace }) => useRetainedTraceHeader(trace), {
+          initialProps: {
+            trace: makeTrace({
+              attributes: { "metadata.tenant": "org-acme" },
+              conversationId: "conv-1",
+            }),
           },
-        );
+        });
         rerender({ trace: makeTrace({ traceId: "trace-b" }) });
         expect(result.current.attributes).toEqual({});
         expect(result.current.conversationId).toBeNull();

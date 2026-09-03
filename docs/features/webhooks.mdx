@@ -10,9 +10,9 @@ Webhook endpoints stream LangWatch events to your systems as they happen. You re
 The first consumers are billing integrations: platforms that rebill their own customers ingest [spend events](/ai-gateway/billing-events) through a webhook endpoint. The platform itself is general: every event family delivers through the same endpoints, envelopes, signatures, and retries.
 
 <Note>
-  Webhook endpoints are an **Enterprise** feature (the `webhookEndpointsEnabled` plan
-  flag). On other plans the API answers `403` and the settings page shows an upgrade
-  state. Self-hosted enterprise licenses include it.
+  Webhook endpoints are an **Enterprise** feature (the `webhookEndpointsEnabled` plan flag). On
+  other plans the API answers `403` and the settings page shows an upgrade state. Self-hosted
+  enterprise licenses include it.
 </Note>
 
 ## The model
@@ -84,19 +84,19 @@ Anything else is refused at create and update time with `400` and `error.code = 
 ```
 
 <Warning>
-  The port and credential rules apply to endpoints you already have. If an existing
-  endpoint uses a non-default port or embeds credentials in its URL, deliveries keep
-  flowing, but the next update to that endpoint is refused until the URL is fixed. Move
-  the port behind a proxy on 443, and move credentials into a custom header.
+  The port and credential rules apply to endpoints you already have. If an existing endpoint uses a
+  non-default port or embeds credentials in its URL, deliveries keep flowing, but the next update to
+  that endpoint is refused until the URL is fixed. Move the port behind a proxy on 443, and move
+  credentials into a custom header.
 </Warning>
 
 Self-hosted installs whose receivers live on internal hosts can relax the scheme, port, and private-address rules with a single operator setting; see [self-hosted egress](/self-hosting/webhooks). Nothing relaxes the credential rule, and redirects are never followed on any deployment.
 
 <Warning>
-  The `webhookEndpoints` and `gatewaySpend` permissions are **organization-exclusive**:
-  only an ORGANIZATION-scoped role binding can grant them, never a team- or project-scoped
-  one. Endpoints carry signing secrets and stream org-wide events out of the platform, so
-  by default only org admins hold them. See [RBAC](/ai-gateway/rbac).
+  The `webhookEndpoints` and `gatewaySpend` permissions are **organization-exclusive**: only an
+  ORGANIZATION-scoped role binding can grant them, never a team- or project-scoped one. Endpoints
+  carry signing secrets and stream org-wide events out of the platform, so by default only org
+  admins hold them. See [RBAC](/ai-gateway/rbac).
 </Warning>
 
 ## The envelope
@@ -166,8 +166,8 @@ The envelope id embeds the budget, the bucket, the kind, and the period start, w
 `virtual_key_id` and `anchor_project_id` name the key and the project the budget targets, as their own fields. `virtual_key_id` is set for a virtual-key budget and for an attributed-user template (where it is the anchor); `anchor_project_id` is set for a project-scoped budget. Read those rather than splitting `bucket_scope_id`, which you cannot split reliably when an end-user id contains a colon.
 
 <Note>
-  Every enum on these payloads is `lower_snake_case` (`scope_type`, `window`,
-  `on_breach`), matching the rest of the wire.
+  Every enum on these payloads is `lower_snake_case` (`scope_type`, `window`, `on_breach`), matching
+  the rest of the wire.
 </Note>
 
 **`gateway.virtual_key.*`** (`data`):
@@ -269,11 +269,10 @@ def handle_delivery(raw_body: bytes, signature_header: str):
 The verifier throws (Python raises) rather than returning a boolean, so a receiver cannot accept a delivery by ignoring a return value. Branch on `.code` when you want to tell a clock-skew problem from a wrong secret. Timestamps outside a 5-minute tolerance are rejected; pass `toleranceSeconds` / `tolerance_seconds` if your receiver needs a different window.
 
 <Warning>
-  `X-LangWatch-Delivery-Id` identifies one **delivery**, which carries a batch of many
-  events. It is not an event id and must not be used for deduplication: every event in the
-  batch shares it, so deduping on it drops all but one of them. **Deduplicate on the
-  envelope `id` inside the body**, which is stable across retries and replays and unique
-  per event.
+  `X-LangWatch-Delivery-Id` identifies one **delivery**, which carries a batch of many events. It is
+  not an event id and must not be used for deduplication: every event in the batch shares it, so
+  deduping on it drops all but one of them. **Deduplicate on the envelope `id` inside the body**,
+  which is stable across retries and replays and unique per event.
 </Warning>
 
 Working receivers built on both snippets live in the [agent-billing-demo](https://github.com/langwatch/agent-billing-demo) reference repo.
@@ -332,9 +331,9 @@ An endpoint can put each batch on your own Amazon SQS queue instead of POSTing i
 
 <Warning>
   **`ReceiveMessage` returns no message attributes unless you ask for them by name.** Pass
-  `MessageAttributeNames: ["All"]`. Without it your consumer sees a body with no signature
-  beside it and rejects every delivery, even though the body itself is correct. Check this
-  first when a receiver that worked over HTTPS rejects everything on the queue.
+  `MessageAttributeNames: ["All"]`. Without it your consumer sees a body with no signature beside it
+  and rejects every delivery, even though the body itself is correct. Check this first when a
+  receiver that worked over HTTPS rejects everything on the queue.
 </Warning>
 
 **The body is byte-identical to the HTTP body.** `MessageBody` is the exact same `{"batch": [...]}` JSON an HTTPS receiver would be POSTed. There is no outer wrapper. The signature, the delivery id and the attempt ride as **message attributes** under the same names they use as HTTP headers:
@@ -389,9 +388,8 @@ The trust policy on your role, with the `external_id` the create response return
 ```
 
 <Note>
-  On LangWatch Cloud, ask support for the principal to trust; it is a property of the
-  deployment, not of your endpoint. On a self-hosted install it is whatever identity your
-  workers run as.
+  On LangWatch Cloud, ask support for the principal to trust; it is a property of the deployment,
+  not of your endpoint. On a self-hosted install it is whatever identity your workers run as.
 </Note>
 
 **Rules the queue itself must satisfy:**
@@ -454,11 +452,11 @@ Endpoint deliveries and the [webhooks fired by your automation triggers](#signin
 ## The events log
 
 <Warning>
-  **Do not reconcile billing against this log.** It holds only the request families, it is
-  a delivery-recovery aid rather than the money record, and it carries no retention
-  contract. Reconcile against the spend ledger: [`spend-summaries` and
-  `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger), which
-  include settled rows and keep 13 months.
+  **Do not reconcile billing against this log.** It holds only the request families, it is a
+  delivery-recovery aid rather than the money record, and it carries no retention contract.
+  Reconcile against the spend ledger: [`spend-summaries` and
+  `spend-events`](/ai-gateway/billing-events#reconciliation-two-grains-one-ledger), which include
+  settled rows and keep 13 months.
 </Warning>
 
 `GET /api/webhooks/v1/events?from=&to=&type=&cursor=&limit=` is the organization's emitted-events log: cursor-paged, newest first, filterable by type. Webhooks are push over this log, never the only copy of it, so a consumer that missed deliveries can list what was emitted and recover.

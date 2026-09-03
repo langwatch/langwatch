@@ -143,10 +143,7 @@ export class JoinRequestStateFoldProjection
     return emptyJoinRequest({ joinRequestId: "" });
   }
 
-  private fold(
-    event: JoinRequestEvent,
-    state: JoinRequestFoldState,
-  ): JoinRequestFoldState {
+  private fold(event: JoinRequestEvent, state: JoinRequestFoldState): JoinRequestFoldState {
     const parsed = joinRequestEventSchema.parse(event);
     const next = reduceJoinRequest({
       state,
@@ -156,8 +153,7 @@ export class JoinRequestStateFoldProjection
       ...state,
       ...next,
       // init() cannot know the request; the first applied event does.
-      joinRequestId:
-        next.joinRequestId === "" ? parsed.aggregateId : next.joinRequestId,
+      joinRequestId: next.joinRequestId === "" ? parsed.aggregateId : next.joinRequestId,
     };
   }
 

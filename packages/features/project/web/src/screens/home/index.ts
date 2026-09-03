@@ -40,7 +40,12 @@ export const projectHomeScreens = {
 
 export type ProjectHomeScreenName = keyof typeof projectHomeScreens;
 
-export { homeApi, type HomeApiMap, type RecentItem, type RecentItemType } from "../../behavior/home-api";
+export {
+  homeApi,
+  type HomeApiMap,
+  type RecentItem,
+  type RecentItemType,
+} from "../../behavior/home-api";
 export {
   ProjectHomeHostPort,
   ProjectHomeHostProvider,

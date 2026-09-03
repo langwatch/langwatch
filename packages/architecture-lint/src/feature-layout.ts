@@ -292,7 +292,9 @@ function isRulesFrameworkFree({
         if (!target) return void 0;
         const owner = resolver.owningPackage({ file: target });
         if (!owner) return void 0;
-        const kind = rulesImplementationKind(relative(owner.directory, target).split(sep).join("/"));
+        const kind = rulesImplementationKind(
+          relative(owner.directory, target).split(sep).join("/"),
+        );
         return kind ? withArticle(kind) : void 0;
       },
     }).seeds.size === 0
@@ -329,7 +331,11 @@ function lintRulesImports(
     const named = namedForbiddenSpecifier(specifier);
     if (named) {
       violations.push(
-        violation(file, `Rules module cannot import ${JSON.stringify(specifier)} (${named}).`, allowed),
+        violation(
+          file,
+          `Rules module cannot import ${JSON.stringify(specifier)} (${named}).`,
+          allowed,
+        ),
       );
       continue;
     }
@@ -607,10 +613,7 @@ function resolveBindingOrigin(
     if (!clause) continue;
     if (clause.name?.text === name) {
       const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
-      if (
-        target &&
-        resolveBindingOrigin(target, "default", pkg, visited, allowTestingDoubles)
-      )
+      if (target && resolveBindingOrigin(target, "default", pkg, visited, allowTestingDoubles))
         return true;
     }
     if (clause.namedBindings && !ts.isNamespaceImport(clause.namedBindings)) {
@@ -618,10 +621,7 @@ function resolveBindingOrigin(
         if (element.isTypeOnly || element.name.text !== name) continue;
         const target = resolveSpecifier(file, statement.moduleSpecifier.text, pkg);
         const imported = element.propertyName?.text ?? element.name.text;
-        if (
-          target &&
-          resolveBindingOrigin(target, imported, pkg, visited, allowTestingDoubles)
-        )
+        if (target && resolveBindingOrigin(target, imported, pkg, visited, allowTestingDoubles))
           return true;
       }
     }
@@ -635,15 +635,7 @@ function resolveBindingOrigin(
     if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
       for (const element of statement.exportClause.elements) {
         if (element.isTypeOnly || element.name.text !== name) continue;
-        if (
-          resolveBindingOrigin(
-            target,
-            exportName(element),
-            pkg,
-            visited,
-            allowTestingDoubles,
-          )
-        )
+        if (resolveBindingOrigin(target, exportName(element), pkg, visited, allowTestingDoubles))
           return true;
       }
     } else if (!statement.exportClause) {
@@ -683,13 +675,7 @@ function fileExposesPrivateValue(
           for (const element of statement.exportClause.elements) {
             if (element.isTypeOnly) continue;
             if (
-              resolveBindingOrigin(
-                target,
-                exportName(element),
-                pkg,
-                new Set(),
-                allowTestingDoubles,
-              )
+              resolveBindingOrigin(target, exportName(element), pkg, new Set(), allowTestingDoubles)
             )
               return true;
           }
@@ -697,9 +683,7 @@ function fileExposesPrivateValue(
       } else if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
         for (const element of statement.exportClause.elements) {
           if (element.isTypeOnly) continue;
-          if (
-            resolveBindingOrigin(file, exportName(element), pkg, new Set(), allowTestingDoubles)
-          )
+          if (resolveBindingOrigin(file, exportName(element), pkg, new Set(), allowTestingDoubles))
             return true;
         }
       }
@@ -766,13 +750,7 @@ function lintPrivateServerExportsForEntry(
         for (const element of statement.exportClause.elements) {
           if (element.isTypeOnly) continue;
           if (
-            resolveBindingOrigin(
-              target,
-              exportName(element),
-              pkg,
-              new Set(),
-              allowTestingDoubles,
-            )
+            resolveBindingOrigin(target, exportName(element), pkg, new Set(), allowTestingDoubles)
           ) {
             add(element, specifierText);
           }
@@ -784,9 +762,7 @@ function lintPrivateServerExportsForEntry(
     if (statement.exportClause && ts.isNamedExports(statement.exportClause)) {
       for (const element of statement.exportClause.elements) {
         if (element.isTypeOnly) continue;
-        if (
-          resolveBindingOrigin(file, exportName(element), pkg, new Set(), allowTestingDoubles)
-        )
+        if (resolveBindingOrigin(file, exportName(element), pkg, new Set(), allowTestingDoubles))
           add(element);
       }
     }

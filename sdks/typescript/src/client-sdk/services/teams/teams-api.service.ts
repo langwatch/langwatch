@@ -63,14 +63,11 @@ export class TeamsApiService {
     this.#request = createManagementRequest({
       endpoint: resolveEndpoint(config?.endpoint),
       token: resolveManagementToken({ apiKey: config?.apiKey }),
-      errorFactory: ({ message, operation, body }) =>
-        new TeamsApiError(message, operation, body),
+      errorFactory: ({ message, operation, body }) => new TeamsApiError(message, operation, body),
     });
   }
 
-  async list(
-    options: { page?: number; limit?: number } = {},
-  ): Promise<ListTeamsResponse> {
+  async list(options: { page?: number; limit?: number } = {}): Promise<ListTeamsResponse> {
     return this.#request({
       operation: "list teams",
       path: "/api/teams",

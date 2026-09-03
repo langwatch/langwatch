@@ -100,9 +100,7 @@ describe("given the shikiAdapter split helpers", () => {
     it("sets the __lwDisposeNeutered marker on the instance", async () => {
       const h = await getSharedHighlighter();
       ensureDisposeNeutered(h);
-      expect(
-        (h as unknown as { __lwDisposeNeutered?: boolean }).__lwDisposeNeutered,
-      ).toBe(true);
+      expect((h as unknown as { __lwDisposeNeutered?: boolean }).__lwDisposeNeutered).toBe(true);
     });
   });
 
@@ -128,9 +126,7 @@ describe("given the shikiAdapter split helpers", () => {
       const h = await getSharedHighlighter();
       ensureDisposeNeutered(h);
       ensureDisposeNeutered(h);
-      expect(
-        (h as unknown as { __lwDisposeNeutered?: boolean }).__lwDisposeNeutered,
-      ).toBe(true);
+      expect((h as unknown as { __lwDisposeNeutered?: boolean }).__lwDisposeNeutered).toBe(true);
     });
   });
 });

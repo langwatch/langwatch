@@ -46,10 +46,7 @@ describe("redactSecretsInText", () => {
     const cases: Array<[string, string]> = [
       ["an AWS access key id", "creds AKIAIOSFODNN7EXAMPLE here"],
       ["a GitHub token", `token ghp_${"a".repeat(36)} here`],
-      [
-        "an OpenAI project key",
-        "key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY here",
-      ],
+      ["an OpenAI project key", "key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY here"],
       ["an Anthropic key", "key sk-ant-api03-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789 here"],
       ["a LangWatch key", "key sk-lw-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789 here"],
       ["a Slack token", `xoxb-${"1".repeat(20)} here`],
@@ -86,10 +83,7 @@ describe("redactSecretsInText", () => {
     /** @scenario "A connection URL keeps its scheme whatever shape the scheme has" */
     it("keeps every shape of scheme and redacts only the password", () => {
       const cases: Array<[string, string]> = [
-        [
-          "redis://default:Ab3xY9zQ@cache-01:6379",
-          "redis://default:[SECRET]@cache-01:6379",
-        ],
+        ["redis://default:Ab3xY9zQ@cache-01:6379", "redis://default:[SECRET]@cache-01:6379"],
         [
           "mongodb+srv://admin:p%40ss@cluster0.mongodb.net",
           "mongodb+srv://admin:[SECRET]@cluster0.mongodb.net",
@@ -152,9 +146,7 @@ describe("redactSecretsInText", () => {
       const { text, redactedCount } = redact(input);
       expect(text).not.toContain("AKIAIOSFODNN7EXAMPLE");
       expect(redactedCount).toBe(1);
-      expect(text).toHaveLength(
-        input.length - "AKIAIOSFODNN7EXAMPLE".length + "[SECRET]".length,
-      );
+      expect(text).toHaveLength(input.length - "AKIAIOSFODNN7EXAMPLE".length + "[SECRET]".length);
     });
 
     it("finds a key that sits past the first slice boundary", () => {
@@ -341,15 +333,9 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
       ["an OAuth header", `Authorization: OAuth ${BODY.slice(0, 32)}`],
       ["an encrypted PEM block", pemBlock("ENCRYPTED PRIVATE KEY", "MIIabc")],
       ["a PGP private key block", pemBlock("PGP PRIVATE KEY BLOCK", "lQOYBF")],
-      [
-        "a PuTTY private key",
-        "PuTTY-User-Key-File-3: ssh-rsa\nPrivate-Lines: 8\nAAAABBBB\n\ntail",
-      ],
+      ["a PuTTY private key", "PuTTY-User-Key-File-3: ssh-rsa\nPrivate-Lines: 8\nAAAABBBB\n\ntail"],
       ["an embedded kubeconfig key", `client-key-data: ${BODY.slice(0, 44)}`],
-      [
-        "an embedded kubeconfig certificate",
-        `client-certificate-data: ${BODY.slice(0, 44)}`,
-      ],
+      ["an embedded kubeconfig certificate", `client-certificate-data: ${BODY.slice(0, 44)}`],
     ];
 
     /** @scenario "Credentials the vendor list had missed are redacted" */
@@ -440,10 +426,7 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     ["short commit hashes", "reverted 5ebf89d6f4 and f05d495818"],
     ["a UUID", "id 550e8400-e29b-41d4-a716-446655440000 done"],
     ["an uppercase UUID", "ID 550E8400-E29B-41D4-A716-446655440000 done"],
-    [
-      "trace and span ids",
-      "traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
-    ],
+    ["trace and span ids", "traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"],
     ["ISO timestamps", "started 2026-08-10T14:32:11.482Z ended 14:32:19.005Z"],
     [
       "a source path",
@@ -458,10 +441,7 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
       "a base64 data URI",
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
     ],
-    [
-      "model names",
-      "compared claude-opus-5 with gpt-5-mini and claude-3-5-sonnet-20241022",
-    ],
+    ["model names", "compared claude-opus-5 with gpt-5-mini and claude-3-5-sonnet-20241022"],
     ["a bedrock model id", "us.anthropic.claude-opus-4-20250514-v1:0"],
     ["semver bumps", "bumped langwatch from 1.2.1 to 2.6.0 and web to 3.9.0"],
     [
@@ -489,17 +469,11 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     ["a documented header", "Send the Authorization: Basic <base64-credentials> header."],
     ["a sentence about basic auth", "This uses Basic authentication over TLS."],
     ["a documented bearer header", "Send the Authorization: Bearer <your-token> header."],
-    [
-      "prose using the word key",
-      "The key insight is that the token budget was the bottleneck.",
-    ],
+    ["prose using the word key", "The key insight is that the token budget was the bottleneck."],
     ["advice about a key", "Set the api key in your .env file before running the tests"],
     ["an API version field", '{"api_version": "2024-10-21", "model": "claude-opus-5"}'],
     ["a request id header", "X-Request-Id: 7f3a9b2c-1d4e-5f6a-8b9c-0d1e2f3a4b5c"],
-    [
-      "usage attributes",
-      "gen_ai.usage.input_tokens=15234 gen_ai.usage.output_tokens=892",
-    ],
+    ["usage attributes", "gen_ai.usage.input_tokens=15234 gen_ai.usage.output_tokens=892"],
     ["a branch name", "feat/coding-agent-session-events and issue6124/red-team-native"],
     ["already-redacted text", "key now: [SECRET] and token: [SECRET]"],
     [
@@ -641,10 +615,7 @@ describe("redactSecretsInText, given a payload the size of the scan budget", () 
       // Lowercase prose is the worst case for the connection-URL rule, whose
       // scheme is a run of letters. With the scheme leading the match every
       // letter in the text started a scan for a "://" that is not there.
-      [
-        "lowercase prose with no URL in it",
-        "the dashboard stopped loading ".repeat(8_000),
-      ],
+      ["lowercase prose with no URL in it", "the dashboard stopped loading ".repeat(8_000)],
       ["one URL per line", "postgres://svc:pw@10.0.0.4:5432/app\n".repeat(6_000)],
       ["a scheme-shaped run with no separator", `${"a".repeat(100_000)}://`],
     ];
@@ -781,8 +752,7 @@ describe("overBroadSecretPatternProbe", () => {
     it("guards it like any other unanchored pattern", () => {
       expect(overBroadSecretPatternProbe("(?<key>sk-.*)")).toBeNull();
       expect(
-        redact("a <task-notification> here", compileSecretPatterns(["(?<key>sk-.*)"]))
-          .text,
+        redact("a <task-notification> here", compileSecretPatterns(["(?<key>sk-.*)"])).text,
       ).toBe("a <task-notification> here");
     });
 
@@ -1017,17 +987,13 @@ describe("detectSecretsInText", () => {
       const matches = detectSecretsInText({ text: input });
       expect(matches).toHaveLength(1);
       expect(matches[0]!.ruleId).toBe("url_credentials");
-      expect(input.slice(matches[0]!.start, matches[0]!.end)).toBe(
-        "postgres://user:hunter2@",
-      );
+      expect(input.slice(matches[0]!.start, matches[0]!.end)).toBe("postgres://user:hunter2@");
     });
 
     it("starts the span at the scheme that introduces the URL", () => {
       const input = "jdbc:postgresql://svc:9f8e7d6c@10.0.0.4:5432/app";
       const matches = detectSecretsInText({ text: input });
-      expect(input.slice(matches[0]!.start, matches[0]!.end)).toBe(
-        "postgresql://svc:9f8e7d6c@",
-      );
+      expect(input.slice(matches[0]!.start, matches[0]!.end)).toBe("postgresql://svc:9f8e7d6c@");
     });
   });
 

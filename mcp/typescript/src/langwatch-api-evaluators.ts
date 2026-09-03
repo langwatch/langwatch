@@ -25,12 +25,8 @@ export interface EvaluatorSummary {
  * Extracts the evaluatorType from an evaluator's config.
  * Centralises the cast so callers don't repeat it.
  */
-export function getEvaluatorType(
-  evaluator: Pick<EvaluatorSummary, "config">,
-): string | undefined {
-  return (evaluator.config as Record<string, unknown> | null)?.evaluatorType as
-    | string
-    | undefined;
+export function getEvaluatorType(evaluator: Pick<EvaluatorSummary, "config">): string | undefined {
+  return (evaluator.config as Record<string, unknown> | null)?.evaluatorType as string | undefined;
 }
 
 // --- Evaluator API functions ---
@@ -74,8 +70,8 @@ export async function updateEvaluator(params: {
 export async function deleteEvaluator(
   idOrSlug: string,
 ): Promise<{ id: string; archived: boolean }> {
-  return makeRequest(
-    "DELETE",
-    `/api/evaluators/${encodeURIComponent(idOrSlug)}`,
-  ) as Promise<{ id: string; archived: boolean }>;
+  return makeRequest("DELETE", `/api/evaluators/${encodeURIComponent(idOrSlug)}`) as Promise<{
+    id: string;
+    archived: boolean;
+  }>;
 }

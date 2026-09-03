@@ -1,7 +1,6 @@
 import type { EmailAttachment } from "./types";
 
-export const sanitizeHeaderValue = (value: string): string =>
-  value.replace(/[\r\n]+/g, " ").trim();
+export const sanitizeHeaderValue = (value: string): string => value.replace(/[\r\n]+/g, " ").trim();
 
 export const sanitizeHeaderParam = (value: string): string =>
   sanitizeHeaderValue(value).replace(/(["\\])/g, "\\$1");
@@ -47,9 +46,7 @@ export const sanitizeHeaders = (
 ): Record<string, string> | undefined => {
   if (!headers) return undefined;
   const entries = Object.entries(headers)
-    .map(
-      ([name, value]) => [sanitizeHeaderName(name), sanitizeHeaderValue(value)] as const,
-    )
+    .map(([name, value]) => [sanitizeHeaderName(name), sanitizeHeaderValue(value)] as const)
     .filter(([name]) => name !== "");
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 };
@@ -139,9 +136,7 @@ export const buildRawMimeMessage = ({
     // Custom headers come before Subject so they're unambiguously in the header
     // block. Routed through the same helper the other gateways use, so a name
     // carrying a colon or leading space cannot misparse or fold this header.
-    ...Object.entries(sanitizeHeaders(headers) ?? {}).map(
-      ([name, value]) => `${name}: ${value}`,
-    ),
+    ...Object.entries(sanitizeHeaders(headers) ?? {}).map(([name, value]) => `${name}: ${value}`),
     `Subject: ${rfc2047EncodeHeader(subject)}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/mixed; boundary="${boundary}"`,

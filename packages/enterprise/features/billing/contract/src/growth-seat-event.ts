@@ -43,10 +43,8 @@ const ANNUAL_GROWTH_EVENTS_PRICE_NAMES = [
 ] as const satisfies readonly StripePriceName[];
 
 /** Checks whether a given price ID is an annually-billed Growth events price. */
-export const isAnnualGrowthEventsPrice = (
-  priceId: string,
-  prices: StripePriceMap,
-): boolean => priceIds(prices, ANNUAL_GROWTH_EVENTS_PRICE_NAMES).has(priceId);
+export const isAnnualGrowthEventsPrice = (priceId: string, prices: StripePriceMap): boolean =>
+  priceIds(prices, ANNUAL_GROWTH_EVENTS_PRICE_NAMES).has(priceId);
 
 export type BillingInterval = "monthly" | "annual";
 
@@ -63,8 +61,7 @@ export const resolveGrowthSeatPlanType = ({
 }: {
   currency: Currency;
   interval: BillingInterval;
-}): GrowthSeatPlanType =>
-  `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as GrowthSeatPlanType;
+}): GrowthSeatPlanType => `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as GrowthSeatPlanType;
 
 /** Extracts currency and billing interval from a GROWTH_SEAT plan type. */
 export const parseGrowthSeatPlanType = (

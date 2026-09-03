@@ -221,7 +221,9 @@ export class AgentClient {
   addAgent(runtime: AgentRuntime): void {
     this.agents.push(runtime);
     if (this.gaveUp) {
-      this.logger.debug(`agent "${runtime.name}" ${NOT_CONNECTED}: the connection gave up earlier in this process`);
+      this.logger.debug(
+        `agent "${runtime.name}" ${NOT_CONNECTED}: the connection gave up earlier in this process`,
+      );
       return;
     }
     this.stopped = false;
@@ -409,7 +411,13 @@ export class AgentClient {
    * connection is lost, and silence while the retries run: the same notice
    * repeats only after the notice interval, and a reconnect resets it.
    */
-  private noteDisconnected({ wasRegistered, code }: { wasRegistered: boolean; code?: number }): void {
+  private noteDisconnected({
+    wasRegistered,
+    code,
+  }: {
+    wasRegistered: boolean;
+    code?: number;
+  }): void {
     const now = Date.now();
     if (wasRegistered) {
       this.logger.warn(
@@ -432,15 +440,18 @@ export class AgentClient {
     if (this.watchdog) clearTimeout(this.watchdog);
     const socket = this.socket;
     if (!socket) return;
-    this.watchdog = setTimeout(() => {
-      this.watchdog = null;
-      this.logger.warn("no heartbeat from LangWatch, reconnecting");
-      try {
-        socket.terminate();
-      } catch {
-        // The close event follows either way.
-      }
-    }, Math.max(15_000, this.heartbeatIntervalMs * 3));
+    this.watchdog = setTimeout(
+      () => {
+        this.watchdog = null;
+        this.logger.warn("no heartbeat from LangWatch, reconnecting");
+        try {
+          socket.terminate();
+        } catch {
+          // The close event follows either way.
+        }
+      },
+      Math.max(15_000, this.heartbeatIntervalMs * 3),
+    );
   }
 
   private registerFrame(): ClientFrame {
@@ -513,7 +524,8 @@ export class AgentClient {
       this.logger.info(`connected to LangWatch over HTTP long polling at ${this.httpUrl}`);
     }
     this.heartbeatIntervalMs = frame.heartbeatIntervalMs;
-    if (frame.instanceId && frame.instanceId !== this.instance.id) this.instance.id = frame.instanceId;
+    if (frame.instanceId && frame.instanceId !== this.instance.id)
+      this.instance.id = frame.instanceId;
     this.byId.clear();
     for (const entry of frame.agents) {
       const runtime = this.agents.find(
@@ -641,8 +653,7 @@ export class AgentClient {
    */
   private async flushSpans(): Promise<void> {
     const provider = trace.getTracerProvider() as { getDelegate?: () => unknown };
-    const delegate =
-      typeof provider.getDelegate === "function" ? provider.getDelegate() : provider;
+    const delegate = typeof provider.getDelegate === "function" ? provider.getDelegate() : provider;
     const flush = (delegate as { forceFlush?: () => Promise<void> } | null)?.forceFlush;
     if (typeof flush !== "function") return;
     try {
@@ -678,27 +689,38 @@ export class AgentClient {
     const fromDeadline = frame.deadlineAt === null ? Infinity : frame.deadlineAt - Date.now();
     const limit = Math.min(fromDeadline, runtime.timeoutMs);
     if (!Number.isFinite(limit)) return;
-    const timer = setTimeout(() => {
-      entry.timer = null;
-      if (entry.cancelled) return;
-      // The handler keeps running: a function cannot be stopped from here.
-      // Its late result is dropped, because the platform has an answer.
-      entry.cancelled = true;
-      this.releaseCall({ callId: frame.callId, entry });
-      this.logger.warn(
-        `agent "${runtime.name}" call ${frame.callId} passed its ${limit} ms limit`,
-      );
-      this.sendError({
-        callId: frame.callId,
-        code: "agent_call_timeout",
-        message: `the call passed the ${limit} ms limit of agent "${runtime.name}"`,
-      });
-    }, Math.max(0, limit));
+    const timer = setTimeout(
+      () => {
+        entry.timer = null;
+        if (entry.cancelled) return;
+        // The handler keeps running: a function cannot be stopped from here.
+        // Its late result is dropped, because the platform has an answer.
+        entry.cancelled = true;
+        this.releaseCall({ callId: frame.callId, entry });
+        this.logger.warn(
+          `agent "${runtime.name}" call ${frame.callId} passed its ${limit} ms limit`,
+        );
+        this.sendError({
+          callId: frame.callId,
+          code: "agent_call_timeout",
+          message: `the call passed the ${limit} ms limit of agent "${runtime.name}"`,
+        });
+      },
+      Math.max(0, limit),
+    );
     timer.unref();
     entry.timer = timer;
   }
 
-  private sendError({ callId, code, message }: { callId: string; code: string; message: string }): void {
+  private sendError({
+    callId,
+    code,
+    message,
+  }: {
+    callId: string;
+    code: string;
+    message: string;
+  }): void {
     this.send({ type: "result", protocol: PROTOCOL_VERSION, callId, error: { code, message } });
   }
 
@@ -757,7 +779,15 @@ const removeShutdownHooks = (): void => {
 };
 
 /** One warning per process for a condition every agent definition would repeat. */
-export function warnOnce({ logger, key, message }: { logger: Logger; key: string; message: string }): void {
+export function warnOnce({
+  logger,
+  key,
+  message,
+}: {
+  logger: Logger;
+  key: string;
+  message: string;
+}): void {
   if (noticesGiven.has(key)) {
     logger.debug(message);
     return;

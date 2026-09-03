@@ -1,10 +1,7 @@
 import { stripGithubCredentials } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service";
-import {
-  buildWorkerProbeArgs,
-  type LangyTurnServiceDependencies,
-} from "./langy-turn.shared";
+import { buildWorkerProbeArgs, type LangyTurnServiceDependencies } from "./langy-turn.shared";
 import { LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port";
 
 const logger = createLogger("langwatch:langy:turn-warm");
@@ -71,7 +68,9 @@ export class LangyTurnWarmService {
     const conversationId = speculativeConversation.id;
     progress.conversationId = conversationId;
     const warmModel = modelOverride ?? resolvedModel;
-    if (!worker || !warmModel) {return { conversationId, warmed: false };}
+    if (!worker || !warmModel) {
+      return { conversationId, warmed: false };
+    }
 
     const modelsAllowed = await this.deps.credentials.tryGetModelsAllowed({
       projectId,
@@ -82,7 +81,9 @@ export class LangyTurnWarmService {
     }
     if (credentials.githubToken) {
       const { allowed } = await this.deps.permits.check({ userId });
-      if (!allowed) {stripGithubCredentials(credentials);}
+      if (!allowed) {
+        stripGithubCredentials(credentials);
+      }
     }
     const alive = await worker.probe(
       buildWorkerProbeArgs({
@@ -93,7 +94,9 @@ export class LangyTurnWarmService {
         credentials,
       }),
     );
-    if (alive) {return { conversationId, warmed: true };}
+    if (alive) {
+      return { conversationId, warmed: true };
+    }
 
     const minted = await this.deps.sessionKeys.mint({
       session,

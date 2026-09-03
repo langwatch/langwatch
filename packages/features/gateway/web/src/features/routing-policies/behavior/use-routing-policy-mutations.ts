@@ -77,13 +77,7 @@ export function useRoutingPolicyMutations({
   const { setDefault, remove } = useListMutations(refetch);
 
   const save = useCallback(
-    ({
-      policyId,
-      values,
-    }: {
-      policyId: string | null;
-      values: RoutingPolicyFormValues;
-    }) => {
+    ({ policyId, values }: { policyId: string | null; values: RoutingPolicyFormValues }) => {
       setSaveError(null);
       const shared = sharedSaveFields({ organizationId, values });
       if (policyId) {

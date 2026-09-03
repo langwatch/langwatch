@@ -28,7 +28,10 @@ import {
   type SharedDef,
   type SlackActionParams,
 } from "@langwatch/automation-contract";
-import { SlackProviderAdapter, type AutomationSecretCrypto } from "#adapters/slack-provider.adapter";
+import {
+  SlackProviderAdapter,
+  type AutomationSecretCrypto,
+} from "#adapters/slack-provider.adapter";
 import { WebhookProviderAdapter } from "#adapters/webhook-provider.adapter";
 import type {
   AutomationWebhookProviderPort,

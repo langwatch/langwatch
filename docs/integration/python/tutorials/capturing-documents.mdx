@@ -160,11 +160,10 @@ ask("What is the invoice number and the total due?", "invoice.pdf")
 ```
 
 <Note>
-  The instrumentor makes the trace for this call, so no `@langwatch.trace()` wrapper is
-  needed. If you add one to attach metadata, switch the run to `Runner.run_async`: the
-  synchronous `Runner.run` starts its own thread, which begins with an empty OpenTelemetry
-  context, and the agent spans open a second trace. See the [Google ADK
-  integration](/integration/python/integrations/google-ai).
+  The instrumentor makes the trace for this call, so no `@langwatch.trace()` wrapper is needed. If
+  you add one to attach metadata, switch the run to `Runner.run_async`: the synchronous `Runner.run`
+  starts its own thread, which begins with an empty OpenTelemetry context, and the agent spans open
+  a second trace. See the [Google ADK integration](/integration/python/integrations/google-ai).
 </Note>
 
 ## Document shapes LangWatch understands

@@ -181,8 +181,7 @@ export function getParameterConfigWithModelOverrides(
     paramName === "reasoning"
   ) {
     // Determine the display label based on provider's parameter name
-    const dynamicLabel =
-      REASONING_PARAMETER_LABELS[reasoningConfig.parameterName] ?? "Reasoning";
+    const dynamicLabel = REASONING_PARAMETER_LABELS[reasoningConfig.parameterName] ?? "Reasoning";
 
     return {
       ...baseConfig,

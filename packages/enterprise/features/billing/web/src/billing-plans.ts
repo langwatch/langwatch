@@ -21,12 +21,7 @@ import { BillingPricingService } from "./billing-pricing.service";
 
 const formatNumber = (value: number): string => numeral(value).format("0,0");
 
-export {
-  formatPrice,
-  isAnnualTieredPlan,
-  parseGrowthSeatPlanType,
-  resolveGrowthSeatPlanType,
-};
+export { formatPrice, isAnnualTieredPlan, parseGrowthSeatPlanType, resolveGrowthSeatPlanType };
 export type { BillingInterval, CurrencyType as Currency };
 
 /**
@@ -41,9 +36,7 @@ export type { BillingInterval, CurrencyType as Currency };
  */
 const buildMode = (import.meta as unknown as { env?: { MODE?: string } }).env?.MODE;
 
-const pricingService = BillingPricingService.create(
-  buildMode === "production" ? "live" : "test",
-);
+const pricingService = BillingPricingService.create(buildMode === "production" ? "live" : "test");
 
 export const getGrowthSeatPriceCents = () => pricingService.getGrowthSeatPriceCents();
 
@@ -135,9 +128,7 @@ const ENTERPRISE_PLAN_FEATURE_ENTRIES: ReadonlyArray<{
  * The Enterprise tier as it is SOLD: everything the tier offers, whatever any
  * one contract settled on. This is the list for the pages that are selling it.
  */
-export const ENTERPRISE_PLAN_FEATURES = ENTERPRISE_PLAN_FEATURE_ENTRIES.map(
-  (entry) => entry.label,
-);
+export const ENTERPRISE_PLAN_FEATURES = ENTERPRISE_PLAN_FEATURE_ENTRIES.map((entry) => entry.label);
 
 /**
  * The Enterprise tier as one customer HOLDS it: the same list, minus anything
@@ -166,9 +157,7 @@ export function buildPlanCapabilities({
   maxMembersLite: number;
 }) {
   const coreUsersText =
-    maxMembers > 0
-      ? `Up to ${formatNumber(maxMembers)} core users`
-      : "Custom core user limits";
+    maxMembers > 0 ? `Up to ${formatNumber(maxMembers)} core users` : "Custom core user limits";
   const eventsText =
     maxMessagesPerMonth >= UNLIMITED_MESSAGES
       ? "Unlimited events"

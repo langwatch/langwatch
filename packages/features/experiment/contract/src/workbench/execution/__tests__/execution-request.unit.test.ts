@@ -134,34 +134,27 @@ describe("executionRequestSchema", () => {
     };
 
     // Valid concurrency
-    expect(
-      executionRequestSchema.safeParse({ ...baseRequest, concurrency: 10 })
-        .success,
-    ).toBe(true);
+    expect(executionRequestSchema.safeParse({ ...baseRequest, concurrency: 10 }).success).toBe(
+      true,
+    );
 
     // Min boundary
-    expect(
-      executionRequestSchema.safeParse({ ...baseRequest, concurrency: 1 })
-        .success,
-    ).toBe(true);
+    expect(executionRequestSchema.safeParse({ ...baseRequest, concurrency: 1 }).success).toBe(true);
 
     // Max boundary
-    expect(
-      executionRequestSchema.safeParse({ ...baseRequest, concurrency: 24 })
-        .success,
-    ).toBe(true);
+    expect(executionRequestSchema.safeParse({ ...baseRequest, concurrency: 24 }).success).toBe(
+      true,
+    );
 
     // Below min
-    expect(
-      executionRequestSchema.safeParse({ ...baseRequest, concurrency: 0 })
-        .success,
-    ).toBe(false);
+    expect(executionRequestSchema.safeParse({ ...baseRequest, concurrency: 0 }).success).toBe(
+      false,
+    );
 
     // Above max
-    expect(
-      executionRequestSchema.safeParse({ ...baseRequest, concurrency: 25 })
-        .success,
-    ).toBe(false);
+    expect(executionRequestSchema.safeParse({ ...baseRequest, concurrency: 25 }).success).toBe(
+      false,
+    );
   });
 
   it("accepts all scope types", () => {

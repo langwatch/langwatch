@@ -80,7 +80,5 @@ export const localStagingUploadPath = (projectId: string, uploadId: string): str
 };
 
 /** True when a staged object exceeds the hard cap (checked at finalize). */
-export const exceedsUploadCap = (
-  sizeBytes: number,
-  maxBytes: number = UPLOAD_MAX_BYTES,
-): boolean => sizeBytes > maxBytes;
+export const exceedsUploadCap = (sizeBytes: number, maxBytes: number = UPLOAD_MAX_BYTES): boolean =>
+  sizeBytes > maxBytes;

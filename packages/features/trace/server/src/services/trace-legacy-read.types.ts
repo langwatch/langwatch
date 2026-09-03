@@ -18,10 +18,7 @@ export type TraceSharedFiltersInput = {
   query?: string;
   filters: Record<
     string,
-    | string[]
-    | Record<string, string[]>
-    | Record<string, Record<string, string[]>>
-    | undefined
+    string[] | Record<string, string[]> | Record<string, Record<string, string[]>> | undefined
   >;
   traceIds?: string[];
   negateFilters?: boolean;

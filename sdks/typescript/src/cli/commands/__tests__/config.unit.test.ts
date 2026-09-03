@@ -51,9 +51,7 @@ describe("config commands", () => {
     });
 
     it("rejects anything but on/off, writing nothing", async () => {
-      await expect(configSetCommand("daemon", "maybe")).rejects.toThrow(
-        "process.exit called",
-      );
+      await expect(configSetCommand("daemon", "maybe")).rejects.toThrow("process.exit called");
 
       expect(exitSpy).toHaveBeenCalledWith(1);
       expect(fs.existsSync(configFile)).toBe(false);

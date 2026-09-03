@@ -142,8 +142,8 @@ export class LicenseTrpcApi {
        * visible on the sign-in page, and an operator who cannot see them may
        * believe federation is being enforced when it is not.
        */
-      getSsoGateStatus: unscopedPolicy(procedure.input(z.object({}))).query(
-        async ({ ctx }) => ctx.app.licensing.getSsoGateStatus(),
+      getSsoGateStatus: unscopedPolicy(procedure.input(z.object({}))).query(async ({ ctx }) =>
+        ctx.app.licensing.getSsoGateStatus(),
       ),
 
       /** Uploads and validates a new license for an organization. */

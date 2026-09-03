@@ -19,12 +19,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  createSystem,
-  defaultConfig,
-  defineConfig,
-  mergeConfigs,
-} from "@chakra-ui/react";
+import { createSystem, defaultConfig, defineConfig, mergeConfigs } from "@chakra-ui/react";
 import { describe, expect, it } from "vitest";
 import { langyThemeConfig } from "@langwatch/ui/langy-theme";
 
@@ -43,9 +38,9 @@ const appConfig = defineConfig({
 const system = createSystem(defaultConfig, mergeConfigs(appConfig, langyThemeConfig));
 
 // getTokenCss() emits `{"@layer tokens": {"<selector> &": {--var: value}}}`.
-const tokenLayer = (
-  system.getTokenCss() as Record<string, Record<string, Record<string, string>>>
-)["@layer tokens"]!;
+const tokenLayer = (system.getTokenCss() as Record<string, Record<string, Record<string, string>>>)[
+  "@layer tokens"
+]!;
 const langyLight = tokenLayer[".langy-root &"] ?? {};
 const langyDark = tokenLayer[".dark .langy-root &"] ?? {};
 
@@ -81,12 +76,8 @@ describe("langyTheme token emission", () => {
     it("resolves the langy.* identity namespace on both grounds", () => {
       expect(langyLight["--chakra-colors-langy-ai-blue"]).toBe("#5b8def");
       expect(langyDark["--chakra-colors-langy-ai-blue"]).toBe("#5fa3ff");
-      expect(langyLight["--chakra-colors-langy-bar-fill"]).toBe(
-        "rgba(245, 107, 26, 0.75)",
-      );
-      expect(langyDark["--chakra-colors-langy-bar-fill"]).toBe(
-        "rgba(255, 179, 128, 0.7)",
-      );
+      expect(langyLight["--chakra-colors-langy-bar-fill"]).toBe("rgba(245, 107, 26, 0.75)");
+      expect(langyDark["--chakra-colors-langy-bar-fill"]).toBe("rgba(255, 179, 128, 0.7)");
     });
 
     it("keeps the panel's type scale on both grounds", () => {

@@ -9,9 +9,7 @@ import type { CommandResult } from "../../utils/output";
  * Returns the deletion outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteDashboardCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const deleteDashboardCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new DashboardsApiService();

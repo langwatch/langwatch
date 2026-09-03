@@ -36,9 +36,7 @@ const { policies, organization } = vi.hoisted(() => ({
       {
         id: "team-1",
         name: "Platform",
-        projects: [
-          { id: "proj-1", name: "Web App", slug: "web-app", teamId: "team-1" },
-        ],
+        projects: [{ id: "proj-1", name: "Web App", slug: "web-app", teamId: "team-1" }],
       },
     ],
   },
@@ -147,10 +145,9 @@ const renderPage = (query?: Readonly<Record<string, string>>) => {
 
 /** The editor on its own, for the cases about what a policy's form rebuilds to. */
 const renderEditor = () =>
-  renderWithGatewayHost(
-    <RoutingPolicyDrawer policyId="rp-1" onClose={vi.fn()} />,
-    { host: adminHost() },
-  );
+  renderWithGatewayHost(<RoutingPolicyDrawer policyId="rp-1" onClose={vi.fn()} />, {
+    host: adminHost(),
+  });
 
 /** The Restrictions accordion trigger, whose aria-expanded is the real state. */
 const restrictionsTrigger = () => screen.getByText("Restrictions").closest("button");
@@ -165,9 +162,7 @@ describe("given the routing policies page", () => {
       const user = userEvent.setup();
       const host = renderPage();
 
-      await user.click(
-        screen.getByRole("button", { name: "Actions for Developer default" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Actions for Developer default" }));
       await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
 
       expect(host.recording.drawerOpens.at(-1)).toEqual({

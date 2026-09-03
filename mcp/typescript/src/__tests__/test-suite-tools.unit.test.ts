@@ -68,8 +68,7 @@ const sampleSuite: TestSuite = {
   archivedAt: null,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-02T00:00:00Z",
-  platformUrl:
-    "https://app.langwatch.ai/proj/agent-testing/suites/checkout",
+  platformUrl: "https://app.langwatch.ai/proj/agent-testing/suites/checkout",
 };
 
 const sampleScenario: ScenarioSummary = {
@@ -225,9 +224,7 @@ describe("handleRenameTestSuite()", () => {
         name: "Checkout v2",
       });
 
-      expect(result).toContain(
-        'Test suite suite_abc123 is now named "Checkout v2".',
-      );
+      expect(result).toContain('Test suite suite_abc123 is now named "Checkout v2".');
     });
   });
 });
@@ -250,9 +247,7 @@ describe("handleArchiveTestSuite()", () => {
     });
 
     it("says the scenarios filed in it are archived with it", () => {
-      expect(result).toContain(
-        "the scenarios filed in it are archived with it",
-      );
+      expect(result).toContain("the scenarios filed in it are archived with it");
     });
   });
 });
@@ -269,8 +264,7 @@ describe("handleRunTestSuite()", () => {
       runPlanId: "plan_abc123",
       planName: "Checkout Support Bot",
       created: true,
-      platformUrl:
-        "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
+      platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
     };
 
     let result: string;
@@ -285,9 +279,7 @@ describe("handleRunTestSuite()", () => {
 
     /** @scenario "Agent runs a test suite against a target" */
     it("names the run plan the run created or joined", () => {
-      expect(result).toContain(
-        'Run plan "Checkout Support Bot" created and started.',
-      );
+      expect(result).toContain('Run plan "Checkout Support Bot" created and started.');
     });
 
     it("includes the batch run id and the job count", () => {
@@ -409,9 +401,7 @@ describe("handleListScenarios() with a testSuiteId", () => {
 
       const result = await handleListScenarios({ testSuiteId: "suite_abc123" });
 
-      expect(result).toContain(
-        "No scenarios found in test suite suite_abc123.",
-      );
+      expect(result).toContain("No scenarios found in test suite suite_abc123.");
     });
   });
 

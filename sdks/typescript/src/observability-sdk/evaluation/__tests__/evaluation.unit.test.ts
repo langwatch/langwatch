@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  context,
-  trace,
-  INVALID_SPAN_CONTEXT,
-  type ContextManager,
-} from "@opentelemetry/api";
+import { context, trace, INVALID_SPAN_CONTEXT, type ContextManager } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { MockSpan, MockTracerProvider } from "../../__tests__/test-utils";
 import { createLangWatchSpan } from "../../span";
@@ -253,10 +248,7 @@ describe("addEvaluation", () => {
   describe("tracer.addEvaluation (trace-level)", () => {
     it("emits the evaluation event onto the currently active span", () => {
       const mockProvider = new MockTracerProvider();
-      const tracer = getLangWatchTracerFromProvider(
-        mockProvider,
-        "evaluation-test-tracer",
-      );
+      const tracer = getLangWatchTracerFromProvider(mockProvider, "evaluation-test-tracer");
 
       const mockSpan = new MockSpan("root-span");
 
@@ -285,15 +277,10 @@ describe("addEvaluation", () => {
 
     it("is a no-op when there is no active span", () => {
       const mockProvider = new MockTracerProvider();
-      const tracer = getLangWatchTracerFromProvider(
-        mockProvider,
-        "evaluation-test-tracer-noop",
-      );
+      const tracer = getLangWatchTracerFromProvider(mockProvider, "evaluation-test-tracer-noop");
 
       // No active span in context -> must not throw.
-      expect(() =>
-        tracer.addEvaluation({ name: "orphan_eval", passed: true }),
-      ).not.toThrow();
+      expect(() => tracer.addEvaluation({ name: "orphan_eval", passed: true })).not.toThrow();
     });
   });
 });

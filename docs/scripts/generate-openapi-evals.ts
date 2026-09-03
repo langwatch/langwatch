@@ -47,10 +47,8 @@ const generatePythonExperimentSample = (
       if (field === "output") return `            "${field}": output,`;
       if (field === "input") return `            "${field}": row["input"],`;
       if (field === "contexts") return `            "${field}": row["contexts"],`;
-      if (field === "expected_output")
-        return `            "${field}": row["expected_output"],`;
-      if (field === "expected_contexts")
-        return `            "${field}": row["expected_contexts"],`;
+      if (field === "expected_output") return `            "${field}": row["expected_output"],`;
+      if (field === "expected_contexts") return `            "${field}": row["expected_contexts"],`;
       if (field === "conversation") return `            "${field}": row["conversation"],`;
       return `            "${field}": "",`;
     })

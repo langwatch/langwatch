@@ -7,13 +7,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -120,9 +114,7 @@ const mockDrawerParams = vi.hoisted(() => ({
   current: {} as Record<string, string>,
 }));
 const mockDrawerOpenFor = vi.hoisted(() => ({ current: "" }));
-const flowCallbacksStore = vi.hoisted(
-  () => ({}) as Record<string, Record<string, unknown>>,
-);
+const flowCallbacksStore = vi.hoisted(() => ({}) as Record<string, Record<string, unknown>>);
 
 vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({
@@ -200,11 +192,7 @@ function storedCase(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function openDrawerAs(params: {
-  scenarioId?: string;
-  testSuiteId?: string;
-  showHistory?: string;
-}) {
+function openDrawerAs(params: { scenarioId?: string; testSuiteId?: string; showHistory?: string }) {
   mockDrawerParams.current = { ...params } as Record<string, string>;
   mockDrawerOpenFor.current = "agentTestingCaseEditor";
 }
@@ -266,12 +254,9 @@ describe("the scenario dialog", () => {
       // The block belongs to the scenario, so it reads where the reader was
       // looking, and the chip row is what stays at the foot of the body.
       expect(
-        criteria.compareDocumentPosition(block) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        criteria.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
-      expect(
-        block.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+      expect(block.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
       // Only the chip row is held at the foot. While the block shared that
       // wrapper it was pushed down with the chips, which left the hole under a
@@ -294,8 +279,7 @@ describe("the scenario dialog", () => {
       const models = await screen.findByTestId("case-models-block");
 
       expect(
-        parameters.compareDocumentPosition(models) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        parameters.compareDocumentPosition(models) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 
@@ -329,9 +313,7 @@ describe("the scenario dialog", () => {
 
       expect(screen.getByText("Labels")).toBeInTheDocument();
       expect(screen.getByTestId("case-modal-save")).toHaveTextContent("Save");
-      expect(screen.getByTestId("case-modal-save-and-run")).toHaveTextContent(
-        "Save & Run",
-      );
+      expect(screen.getByTestId("case-modal-save-and-run")).toHaveTextContent("Save & Run");
     });
 
     /** @scenario "The parameters, the turn limits and the models wait behind chips" */
@@ -346,15 +328,15 @@ describe("the scenario dialog", () => {
 
       const chips = screen.getByTestId("customize-case-chips");
       expect(chips).toHaveTextContent("Customize scenario");
-      expect(
-        within(chips).getByTestId("customize-chip-case-parameters"),
-      ).toHaveTextContent("Add parameters");
-      expect(
-        within(chips).getByTestId("customize-chip-case-turns"),
-      ).toHaveTextContent("Define min and max turns");
-      expect(
-        within(chips).getByTestId("customize-chip-case-models"),
-      ).toHaveTextContent("Override models");
+      expect(within(chips).getByTestId("customize-chip-case-parameters")).toHaveTextContent(
+        "Add parameters",
+      );
+      expect(within(chips).getByTestId("customize-chip-case-turns")).toHaveTextContent(
+        "Define min and max turns",
+      );
+      expect(within(chips).getByTestId("customize-chip-case-models")).toHaveTextContent(
+        "Override models",
+      );
     });
 
     /** @scenario "A chip opens its block and the block can be removed again" */
@@ -367,20 +349,12 @@ describe("the scenario dialog", () => {
 
       expect(await screen.findByLabelText("Max turns")).toBeVisible();
       expect(screen.getByLabelText("Min turns")).toBeVisible();
-      expect(
-        screen.queryByTestId("customize-chip-case-turns"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("customize-chip-case-turns")).not.toBeInTheDocument();
 
-      await user.click(
-        screen.getByRole("button", { name: "Remove the turn limits" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Remove the turn limits" }));
 
-      await waitFor(() =>
-        expect(screen.queryByLabelText("Max turns")).not.toBeInTheDocument(),
-      );
-      expect(
-        screen.getByTestId("customize-chip-case-turns"),
-      ).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByLabelText("Max turns")).not.toBeInTheDocument());
+      expect(screen.getByTestId("customize-chip-case-turns")).toBeInTheDocument();
     });
 
     /** @scenario "Save and Run saves the scenario and then asks what to run it against" */
@@ -400,9 +374,7 @@ describe("the scenario dialog", () => {
           testSuiteId: REFUNDS.id,
         }),
       );
-      await waitFor(() =>
-        expect(screen.getByTestId("run-case-dialog")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByTestId("run-case-dialog")).toBeInTheDocument());
     });
   });
 
@@ -426,15 +398,11 @@ describe("the scenario dialog", () => {
         { wrapper: Wrapper },
       );
 
-      expect(await screen.findByLabelText("Parameters")).toHaveValue(
-        "customer_plan=free",
-      );
+      expect(await screen.findByLabelText("Parameters")).toHaveValue("customer_plan=free");
       expect(screen.getByTestId("case-models-block")).toBeInTheDocument();
       // Nothing the scenario does not use is opened: the turns stay on their chip.
       expect(screen.queryByLabelText("Max turns")).not.toBeInTheDocument();
-      expect(
-        screen.getByTestId("customize-chip-case-turns"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("customize-chip-case-turns")).toBeInTheDocument();
     });
 
     /** @scenario "The case editor offers the parameters the agents declare" */
@@ -479,12 +447,10 @@ describe("the scenario dialog", () => {
       const line = await screen.findByLabelText("Parameters");
       await user.click(line);
       await user.type(line, ", mo");
-      const list = await screen.findByTestId(
-        "case-parameters-line-suggestions",
+      const list = await screen.findByTestId("case-parameters-line-suggestions");
+      expect(within(list).getByTestId("parameter-suggestion-key-model")).toHaveTextContent(
+        "support-agent · production",
       );
-      expect(
-        within(list).getByTestId("parameter-suggestion-key-model"),
-      ).toHaveTextContent("support-agent · production");
 
       await user.keyboard("{Enter}");
       expect(line).toHaveValue("customer_plan=free, model=");
@@ -548,9 +514,7 @@ describe("the scenario dialog", () => {
       // It sits beside the version, which is the other thing the header says
       // about the scenario being edited.
       expect(
-        trigger.parentElement?.parentElement?.querySelector(
-          "[data-testid='case-modal-history']",
-        ),
+        trigger.parentElement?.parentElement?.querySelector("[data-testid='case-modal-history']"),
       ).not.toBeNull();
 
       await user.click(trigger);
@@ -597,9 +561,7 @@ describe("the scenario dialog", () => {
       await user.click(history);
 
       // The history reads in place, and the scenario dialog stays open under it.
-      expect(
-        await screen.findByTestId("scenario-version-history"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("scenario-version-history")).toBeInTheDocument();
       expect(screen.getByTestId("version-row-4")).toBeInTheDocument();
       expect(screen.getByTestId("case-modal")).toBeInTheDocument();
       expect(mockOpenDrawer).not.toHaveBeenCalled();

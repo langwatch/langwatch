@@ -100,9 +100,7 @@ describe("signLicense, given a key the operator pasted", () => {
   describe("when the pasted private key carries stray whitespace", () => {
     const canonicalKey = canonicalPemKey(TEST_PRIVATE_KEY);
 
-    for (const [description, pastedKey] of Object.entries(
-      mangledPemPastes(canonicalKey),
-    )) {
+    for (const [description, pastedKey] of Object.entries(mangledPemPastes(canonicalKey))) {
       it(`signs a license with a key that has ${description}`, () => {
         const signedLicense = signLicense(createTestLicenseData(), pastedKey);
 

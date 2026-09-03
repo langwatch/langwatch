@@ -13,16 +13,11 @@ interface TraceLensKeyboard {
   handleKeyDown: (e: React.KeyboardEvent) => void;
 }
 
-export function useTraceLensKeyboard({
-  traces,
-}: {
-  traces: TraceListItem[];
-}): TraceLensKeyboard {
+export function useTraceLensKeyboard({ traces }: { traces: TraceListItem[] }): TraceLensKeyboard {
   const { closeDrawer, currentDrawer } = useDrawer();
   const params = useDrawerParams();
   const openTraceDrawer = useOpenTraceDrawer();
-  const selectedTraceId =
-    currentDrawer === "traceV2Details" ? (params.traceId ?? null) : null;
+  const selectedTraceId = currentDrawer === "traceV2Details" ? (params.traceId ?? null) : null;
 
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [expandedTraceId, setExpandedTraceId] = useState<string | null>(null);
@@ -39,8 +34,7 @@ export function useTraceLensKeyboard({
   );
 
   const togglePeek = useCallback(
-    (traceId: string) =>
-      setExpandedTraceId((prev) => (prev === traceId ? null : traceId)),
+    (traceId: string) => setExpandedTraceId((prev) => (prev === traceId ? null : traceId)),
     [],
   );
 

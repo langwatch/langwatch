@@ -16,8 +16,8 @@ export function ScenarioTabConnectedBadge({ visible }: { visible: boolean }) {
         <Box maxWidth="280px" data-testid="scenario-tab-connected-popover">
           <Text fontWeight="medium">Connected to your local runs</Text>
           <Text marginTop={1}>
-            Scenario runs started on this machine reuse this tab: when a new run starts,
-            this view moves to it instead of opening another browser tab.
+            Scenario runs started on this machine reuse this tab: when a new run starts, this view
+            moves to it instead of opening another browser tab.
           </Text>
         </Box>
       }

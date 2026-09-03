@@ -17,10 +17,10 @@ The agent-side variables (`LANGY_*`, and `OPENCODE_*` apart from the one below) 
 </Info>
 
 <Note>
-  Many `LANGY_*` names in the `packages/langy` and frontend code are exported TypeScript
-  constants, Zod discriminators, and event-type identifiers, not deploy knobs. The
-  variables below are the runtime configuration. The GitHub PR rate limit
-  `LANGY_GITHUB_PRS_PER_DAY` is 20, hardcoded, not configurable.
+  Many `LANGY_*` names in the `packages/langy` and frontend code are exported TypeScript constants,
+  Zod discriminators, and event-type identifiers, not deploy knobs. The variables below are the
+  runtime configuration. The GitHub PR rate limit `LANGY_GITHUB_PRS_PER_DAY` is 20, hardcoded, not
+  configurable.
 </Note>
 
 ## Core
@@ -32,8 +32,8 @@ The agent-side variables (`LANGY_*`, and `OPENCODE_*` apart from the one below) 
 | `ENVIRONMENT`           | Deployment environment. Gates the dev-only isolation bypass, so keep it production-like.                                                                                                                                                                         | No            | `production`      |
 
 <Warning>
-  `LANGY_INTERNAL_SECRET` is a shared credential between the app and the agent. Store it
-  in a secrets manager and never commit it or log it.
+  `LANGY_INTERNAL_SECRET` is a shared credential between the app and the agent. Store it in a
+  secrets manager and never commit it or log it.
 </Warning>
 
 ## Workers
@@ -67,8 +67,8 @@ The mirror lane copies each turn's trace into a LangWatch project you designate,
 | `LANGY_MIRROR_PROJECT_ID`     | The mirror project id referenced in the mirror config.                                                                        | No       | unset                 |
 
 <Warning>
-  `LANGY_MIRROR_TRACE_KEY` is a project API key. Store it in a Secret
-  (`mirror.existingSecretName`), not inline in `values.yaml`.
+  `LANGY_MIRROR_TRACE_KEY` is a project API key. Store it in a Secret (`mirror.existingSecretName`),
+  not inline in `values.yaml`.
 </Warning>
 
 ## GitHub
@@ -85,6 +85,6 @@ Set these on the control plane to enable bot-authored pull requests and coding-a
 | `CREDENTIALS_SECRET`          | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so nothing new is needed for GitHub.                                                                                                                                                                                                            | Yes (prod) | none                |
 
 <Warning>
-  `GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a
-  secrets manager and never let it reach a worker.
+  `GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a secrets
+  manager and never let it reach a worker.
 </Warning>

@@ -1,10 +1,7 @@
 import { SimpleGrid } from "@chakra-ui/react";
 
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import {
-  LIMIT_TYPE_DISPLAY_LABELS,
-  ResourceLimitRow,
-} from "@langwatch/enterprise-licensing-web";
+import { LIMIT_TYPE_DISPLAY_LABELS, ResourceLimitRow } from "@langwatch/enterprise-licensing-web";
 import { api } from "../../behavior/organization-api";
 
 /**
@@ -27,10 +24,7 @@ export function MemberSeatUsage({
   organizationId: string;
   activePlan: PlanInfo;
 }) {
-  const usage = api.limits.getUsage.useQuery(
-    { organizationId },
-    { refetchOnWindowFocus: false },
-  );
+  const usage = api.limits.getUsage.useQuery({ organizationId }, { refetchOnWindowFocus: false });
 
   if (!usage.data) return null;
 

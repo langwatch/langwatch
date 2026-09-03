@@ -10,11 +10,7 @@
  * wrote from `gh pr create`'s own stdout.
  */
 import { describe, expect, it } from "vitest";
-import {
-  githubPrsFromToolParts,
-  LANGY_OPEN_PR_TOOL,
-  parseGithubPrCard,
-} from "../github-pr-card";
+import { githubPrsFromToolParts, LANGY_OPEN_PR_TOOL, parseGithubPrCard } from "../github-pr-card";
 
 const RICH = {
   owner: "acme",
@@ -70,9 +66,7 @@ describe("parseGithubPrCard", () => {
 
   describe("given an unrecognised state", () => {
     it("falls back to open rather than rendering a state we invented", () => {
-      expect(
-        parseGithubPrCard(JSON.stringify({ ...RICH, state: "exploded" }))?.state,
-      ).toBe("open");
+      expect(parseGithubPrCard(JSON.stringify({ ...RICH, state: "exploded" }))?.state).toBe("open");
     });
   });
 });
@@ -96,9 +90,7 @@ describe("githubPrsFromToolParts", () => {
 
   describe("given a gh pr create that FAILED", () => {
     it("renders no card — a PR that did not open must not look like one that did", () => {
-      const prs = githubPrsFromToolParts([
-        toolPart(JSON.stringify(RICH), "output-error"),
-      ]);
+      const prs = githubPrsFromToolParts([toolPart(JSON.stringify(RICH), "output-error")]);
       expect(prs).toEqual([]);
     });
   });

@@ -418,9 +418,7 @@ export function columnExpression({
   // failure to look for a missing expression that is not the problem.
   const [only] = column.sourceColumns;
   if (!only) {
-    throw new Error(
-      `lwql catalog: column "${column.name}" declares an empty source column name`,
-    );
+    throw new Error(`lwql catalog: column "${column.name}" declares an empty source column name`);
   }
   if (!column.summed) return source(only);
   if (!SUMMED_COLUMN_TYPE.test(column.type)) {
@@ -446,9 +444,7 @@ export function columnExpression({
  * missing grant. The grain columns need no clause of their own because they are
  * a subset of the key columns, which the unit suite pins.
  */
-export function lwqlViewSourceColumns(
-  view: LangWatchQLViewDefinition,
-): readonly string[] {
+export function lwqlViewSourceColumns(view: LangWatchQLViewDefinition): readonly string[] {
   return [
     ...new Set([
       ...view.columns.flatMap((column) => column.sourceColumns),
@@ -517,9 +513,7 @@ export function lwqlGatedColumns({
   const held = heldPermissions(protections);
   const withheld = views.flatMap((view) =>
     view.columns
-      .filter((column) =>
-        lwqlColumnGates({ view, column }).some((gate) => !held.has(gate)),
-      )
+      .filter((column) => lwqlColumnGates({ view, column }).some((gate) => !held.has(gate)))
       .map((column) => column.name),
   );
   return [...new Set(withheld)].sort();
@@ -574,9 +568,7 @@ export function lwqlContentGatedColumns(
 ): readonly string[] {
   return [
     ...new Set(
-      views.flatMap((view) =>
-        view.columns.filter(isContentGated).map((column) => column.name),
-      ),
+      views.flatMap((view) => view.columns.filter(isContentGated).map((column) => column.name)),
     ),
   ].sort();
 }

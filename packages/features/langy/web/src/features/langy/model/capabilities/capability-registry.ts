@@ -47,9 +47,4 @@ export {
   withDecidedCard,
 };
 
-export type {
-  CapabilityCardInput,
-  CapabilityDescriptor,
-  CapabilityProgress,
-  CliCapability,
-};
+export type { CapabilityCardInput, CapabilityDescriptor, CapabilityProgress, CliCapability };

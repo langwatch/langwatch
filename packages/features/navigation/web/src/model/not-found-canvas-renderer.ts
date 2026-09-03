@@ -73,13 +73,7 @@ export function createNotFoundRenderer() {
     colors: CanvasColors;
     smoothMouse: { x: number; y: number };
   }) {
-    const {
-      gridBaseColor,
-      particleBaseColor,
-      aberrationRed,
-      aberrationBlue,
-      alphaScale,
-    } = colors;
+    const { gridBaseColor, particleBaseColor, aberrationRed, aberrationBlue, alphaScale } = colors;
     const [particleR, particleG, particleB] = particleBaseColor;
 
     ctx.clearRect(0, 0, w, h);
@@ -154,18 +148,12 @@ export function createNotFoundRenderer() {
 
     const getDepthFade = (y1: number, y2: number) => {
       const avgY = (y1 + y2) * 0.5;
-      const depthProgress = Math.max(
-        0,
-        Math.min(1, (avgY - horizonY) / Math.max(1, h - horizonY)),
-      );
+      const depthProgress = Math.max(0, Math.min(1, (avgY - horizonY) / Math.max(1, h - horizonY)));
       return Math.pow(depthProgress, 1.8);
     };
 
     const getAtmosphereFade = (y: number) => {
-      const depthProgress = Math.max(
-        0,
-        Math.min(1, (y - horizonY) / Math.max(1, h - horizonY)),
-      );
+      const depthProgress = Math.max(0, Math.min(1, (y - horizonY) / Math.max(1, h - horizonY)));
       const fadeStart = 0.18;
       const delayedDepth = Math.max(0, (depthProgress - fadeStart) / (1 - fadeStart));
       return Math.pow(delayedDepth, 2.2);
@@ -255,12 +243,7 @@ export function createNotFoundRenderer() {
         backgroundCtx.fill();
       }
 
-      const horizonLineGlow = backgroundCtx.createLinearGradient(
-        0,
-        horizonY - 4,
-        0,
-        horizonY + 6,
-      );
+      const horizonLineGlow = backgroundCtx.createLinearGradient(0, horizonY - 4, 0, horizonY + 6);
       horizonLineGlow.addColorStop(0, "rgba(0, 0, 0, 0)");
       horizonLineGlow.addColorStop(
         0.5,
@@ -333,9 +316,7 @@ export function createNotFoundRenderer() {
         ? p.gridExtent
         : defaultGridParams.gridExtent;
     const step =
-      Number.isFinite(p.gridStep) && p.gridStep > 0
-        ? p.gridStep
-        : defaultGridParams.gridStep;
+      Number.isFinite(p.gridStep) && p.gridStep > 0 ? p.gridStep : defaultGridParams.gridStep;
 
     const edgeFade = (dist: number) => {
       if (dist < 0.6) return 1;
@@ -390,10 +371,7 @@ export function createNotFoundRenderer() {
         0,
         `rgba(${abRedR}, ${abRedG}, ${abRedB}, ${line.startAlpha * 0.42})`,
       );
-      redGradient.addColorStop(
-        1,
-        `rgba(${abRedR}, ${abRedG}, ${abRedB}, ${line.endAlpha * 0.42})`,
-      );
+      redGradient.addColorStop(1, `rgba(${abRedR}, ${abRedG}, ${abRedB}, ${line.endAlpha * 0.42})`);
 
       ctx.strokeStyle = redGradient;
       ctx.beginPath();

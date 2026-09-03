@@ -20,10 +20,7 @@ export { PresenceStreamService } from "./services/presence-stream.service";
  * any process outside that application could reach. It moved whole; the Redis
  * fan-out, the per-tenant rate limiter and the emitter reaping are unchanged.
  */
-export {
-  BroadcastService,
-  type BroadcastEventType,
-} from "./adapters/broadcast.adapter";
+export { BroadcastService, type BroadcastEventType } from "./adapters/broadcast.adapter";
 export { BroadcasterNotActiveError } from "./adapters/broadcast.errors";
 export {
   TenantRateLimiter,

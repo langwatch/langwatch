@@ -19,9 +19,7 @@ type NextLinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
   prefetch?: boolean;
 };
 
-function toHref(
-  href: NextLinkProps["href"],
-): string {
+function toHref(href: NextLinkProps["href"]): string {
   if (typeof href === "string") return href;
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(href.query ?? {})) {

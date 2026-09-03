@@ -60,9 +60,7 @@ export interface PermissionCategory {
  */
 function allActionsOf(...resources: AuthzResource[]): AuthzPermission[] {
   return resources.flatMap((resource) =>
-    AUTHZ_RESOURCES[resource].actions.map(
-      (action) => `${resource}:${action}` as AuthzPermission,
-    ),
+    AUTHZ_RESOURCES[resource].actions.map((action) => `${resource}:${action}` as AuthzPermission),
   );
 }
 
@@ -327,9 +325,7 @@ export function computePermissionsFromSelections(
   return [...permSet].sort();
 }
 
-export function selectionsFromPermissions(
-  permissions: string[],
-): Record<string, AccessLevel> {
+export function selectionsFromPermissions(permissions: string[]): Record<string, AccessLevel> {
   const granted = new Set(permissions);
 
   // Hierarchy-aware so a stored list carrying `datasets:manage` still
@@ -337,10 +333,7 @@ export function selectionsFromPermissions(
   // expanded keep reading as "write"). The implication rides only on a manage
   // grant the category itself carries, so one category's manage can never
   // mark another category granted.
-  const heldWithinCategory = (
-    category: PermissionCategory,
-    permission: AuthzPermission,
-  ) =>
+  const heldWithinCategory = (category: PermissionCategory, permission: AuthzPermission) =>
     granted.has(permission) ||
     category.writePermissions.some(
       (writePermission) =>

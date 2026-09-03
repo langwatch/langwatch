@@ -134,11 +134,8 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
     });
   };
 
-  const [apiDialogEvaluator, setApiDialogEvaluator] =
-    useState<EvaluatorListRow | null>(null);
-  const [evaluatorToDelete, setEvaluatorToDelete] = useState<EvaluatorListRow | null>(
-    null,
-  );
+  const [apiDialogEvaluator, setApiDialogEvaluator] = useState<EvaluatorListRow | null>(null);
+  const [evaluatorToDelete, setEvaluatorToDelete] = useState<EvaluatorListRow | null>(null);
 
   return (
     <Drawer.Root

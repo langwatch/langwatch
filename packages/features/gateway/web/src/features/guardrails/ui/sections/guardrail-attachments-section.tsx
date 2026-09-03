@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Separator,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Checkbox } from "@langwatch/design-system/checkbox";
@@ -115,8 +106,8 @@ export function GuardrailAttachmentsSection({
     return (
       <SectionShell>
         <Text fontSize="sm" color="fg.muted">
-          Guardrails are project-scoped. Scope this key to a single project to attach the
-          project's guardrails.
+          Guardrails are project-scoped. Scope this key to a single project to attach the project's
+          guardrails.
         </Text>
       </SectionShell>
     );
@@ -229,8 +220,7 @@ export function GuardrailAttachmentsSection({
         ))}
         {!canAttach && (
           <Text fontSize="xs" color="fg.subtle">
-            You need the gatewayGuardrails:attach permission in this project to change
-            attachments.
+            You need the gatewayGuardrails:attach permission in this project to change attachments.
           </Text>
         )}
         <HStack justifyContent="flex-end">

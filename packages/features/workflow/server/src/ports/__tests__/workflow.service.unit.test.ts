@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type {
-  Workflow,
-  WorkflowVersion,
-  WorkflowWithVersion,
-} from "@langwatch/workflow-contract";
+import type { Workflow, WorkflowVersion, WorkflowWithVersion } from "@langwatch/workflow-contract";
 import {
   WorkflowNotPublishedError,
   studioClientEventSchema,
@@ -67,14 +63,10 @@ class FakeWorkflowRepository extends WorkflowRepository {
       (!input.includeArchived && value.archivedAt)
     )
       return null;
-    const current = value.currentVersionId
-      ? this.versions.get(value.currentVersionId)
-      : null;
+    const current = value.currentVersionId ? this.versions.get(value.currentVersionId) : null;
     return {
       ...value,
-      ...(input.includeVersion
-        ? { currentVersion: current, latestVersion: current }
-        : {}),
+      ...(input.includeVersion ? { currentVersion: current, latestVersion: current } : {}),
     };
   }
   async findAll(input: { projectId: string }): Promise<Workflow[]> {
@@ -82,13 +74,9 @@ class FakeWorkflowRepository extends WorkflowRepository {
       (item) => item.projectId === input.projectId && !item.archivedAt,
     );
   }
-  async findVersions(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<WorkflowVersion[]> {
+  async findVersions(input: { workflowId: string; projectId: string }): Promise<WorkflowVersion[]> {
     return [...this.versions.values()].filter(
-      (item) =>
-        item.workflowId === input.workflowId && item.projectId === input.projectId,
+      (item) => item.workflowId === input.workflowId && item.projectId === input.projectId,
     );
   }
   async findVersionHistory(input: {

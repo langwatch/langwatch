@@ -119,10 +119,7 @@ export function WinRateChart({ column, chartHeight, targetColors }: WinRateChart
       ties += 1;
       continue;
     }
-    winsByVariantId.set(
-      verdict.winnerId,
-      (winsByVariantId.get(verdict.winnerId) ?? 0) + 1,
-    );
+    winsByVariantId.set(verdict.winnerId, (winsByVariantId.get(verdict.winnerId) ?? 0) + 1);
   }
 
   // Two variants can share a display name (e.g. the same prompt handle run
@@ -195,10 +192,7 @@ export function WinRateChart({ column, chartHeight, targetColors }: WinRateChart
         {column.name} win rate
       </Text>
       <ResponsiveContainer width="100%" height={chartHeight}>
-        <BarChart
-          data={chartData}
-          margin={{ top: COUNT_LABEL_HEADROOM, left: 10, right: 10 }}
-        >
+        <BarChart data={chartData} margin={{ top: COUNT_LABEL_HEADROOM, left: 10, right: 10 }}>
           <CartesianGrid
             horizontal={true}
             vertical={false}
@@ -240,8 +234,7 @@ export function WinRateChart({ column, chartHeight, targetColors }: WinRateChart
             // name lives, so hovering a bar always tells you exactly which
             // variant it is.
             labelFormatter={(label, payload) =>
-              (payload?.[0]?.payload as { fullName?: string } | undefined)?.fullName ??
-              label
+              (payload?.[0]?.payload as { fullName?: string } | undefined)?.fullName ?? label
             }
           />
           <Bar dataKey="wins" name="Wins" radius={[4, 4, 0, 0]}>

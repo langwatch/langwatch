@@ -92,9 +92,7 @@ describe("ingest codex", () => {
         const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
         const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
         const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-        const exit = vi
-          .spyOn(process, "exit")
-          .mockImplementation((() => undefined) as never);
+        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
 
         await expect(
           ingestCodexCommand({
@@ -118,9 +116,7 @@ describe("ingest codex", () => {
       it("stays quiet rather than complaining on every turn", async () => {
         writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
         const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-        const exit = vi
-          .spyOn(process, "exit")
-          .mockImplementation((() => undefined) as never);
+        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
 
         await ingestCodexCommand({ notify: '{"thread-id":"thread-a"}' });
 
@@ -135,10 +131,7 @@ describe("ingest codex", () => {
       /** @scenario "A turn-completion payload that cannot be read falls back to recent sessions" */
       it("sweeps the recently-written sessions so the finished turn is still captured", async () => {
         const posted: any[] = [];
-        vi.spyOn(globalThis, "fetch").mockImplementation((async (
-          _url: string,
-          init: any,
-        ) => {
+        vi.spyOn(globalThis, "fetch").mockImplementation((async (_url: string, init: any) => {
           posted.push(JSON.parse(init.body));
           return { ok: true, status: 200 } as any;
         }) as any);
@@ -149,9 +142,7 @@ describe("ingest codex", () => {
 
         const traceIds = posted
           .flatMap((b) =>
-            b.resourceSpans.flatMap((rs: any) =>
-              rs.scopeSpans.flatMap((ss: any) => ss.spans),
-            ),
+            b.resourceSpans.flatMap((rs: any) => rs.scopeSpans.flatMap((ss: any) => ss.spans)),
           )
           .map((s: any) => s.traceId);
         expect(traceIds).toContain("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
@@ -181,9 +172,7 @@ describe("ingest codex", () => {
         expect(server).toHaveBeenCalled();
         const traceIds = posted
           .flatMap((b) =>
-            b.resourceSpans.flatMap((rs: any) =>
-              rs.scopeSpans.flatMap((ss: any) => ss.spans),
-            ),
+            b.resourceSpans.flatMap((rs: any) => rs.scopeSpans.flatMap((ss: any) => ss.spans)),
           )
           .map((s: any) => s.traceId);
         expect(traceIds).toEqual(
@@ -213,9 +202,7 @@ describe("ingest codex", () => {
         writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
         const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
         const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-        const exit = vi
-          .spyOn(process, "exit")
-          .mockImplementation((() => undefined) as never);
+        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
 
         await ingestCodexCommand({ all: true });
 
@@ -250,9 +237,7 @@ describe("ingest codex", () => {
         const stdout = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
         const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
         const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-        const exit = vi
-          .spyOn(process, "exit")
-          .mockImplementation((() => undefined) as never);
+        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
 
         await expect(
           ingestCodexCommand({
@@ -277,9 +262,7 @@ describe("ingest codex", () => {
         enableCapture(UNREACHABLE);
         writeRollout("thread-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mango");
         const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-        const exit = vi
-          .spyOn(process, "exit")
-          .mockImplementation((() => undefined) as never);
+        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
 
         await ingestCodexCommand({ all: true });
 

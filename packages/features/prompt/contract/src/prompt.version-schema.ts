@@ -172,8 +172,7 @@ export function diffRuntimeParameters({
     const hasB = key in paramsB;
     const equal =
       hasA === hasB &&
-      JSON.stringify(sortKeysDeep(paramsA[key])) ===
-        JSON.stringify(sortKeysDeep(paramsB[key]));
+      JSON.stringify(sortKeysDeep(paramsA[key])) === JSON.stringify(sortKeysDeep(paramsB[key]));
 
     if (!equal) {
       differences.push(

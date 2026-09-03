@@ -15,9 +15,7 @@ import type {
 
 /** The folded head of one request — the `JoinRequest` projection row. */
 export interface JoinRequestReadRepository {
-  findRequest(args: {
-    joinRequestId: string;
-  }): Promise<JoinRequestAggregateState | null>;
+  findRequest(args: { joinRequestId: string }): Promise<JoinRequestAggregateState | null>;
 
   /** The one-open-request-per-person-per-organization check. */
   findPendingRequest(args: {
@@ -34,9 +32,7 @@ export interface JoinRequestReadRepository {
  * anybody make any organization look like theirs by typing an address at it.
  */
 export interface JoinCandidateRepository {
-  findCandidateOrganizations(args: {
-    domain: string;
-  }): Promise<JoinCandidateOrganization[]>;
+  findCandidateOrganizations(args: { domain: string }): Promise<JoinCandidateOrganization[]>;
 
   /** One organization's own candidacy, for the "you named it directly" path.
    *  Null when it does not exist — which the boundary answers exactly as it

@@ -24,9 +24,7 @@ describe("defaultCliKeyScopes()", () => {
         sharedTeamIds,
         personalProject,
       });
-      expect(scopes).toEqual([
-        { scopeType: "ORGANIZATION", scopeId: organizationId },
-      ]);
+      expect(scopes).toEqual([{ scopeType: "ORGANIZATION", scopeId: organizationId }]);
     });
   });
 
@@ -44,9 +42,7 @@ describe("defaultCliKeyScopes()", () => {
         sharedTeamIds,
         personalProject: null,
       });
-      expect(scopes).toEqual([
-        { scopeType: "ORGANIZATION", scopeId: organizationId },
-      ]);
+      expect(scopes).toEqual([{ scopeType: "ORGANIZATION", scopeId: organizationId }]);
     });
   });
 
@@ -90,9 +86,7 @@ describe("defaultCliKeyScopes()", () => {
         sharedTeamIds,
         personalProject,
       });
-      expect(scopes).toEqual([
-        { scopeType: "PROJECT", scopeId: "proj-personal" },
-      ]);
+      expect(scopes).toEqual([{ scopeType: "PROJECT", scopeId: "proj-personal" }]);
     });
 
     it("skips a personal project whose team binding is missing and offers the organization instead", () => {
@@ -115,9 +109,7 @@ describe("defaultCliKeyScopes()", () => {
         sharedTeamIds,
         personalProject,
       });
-      expect(scopes).toEqual([
-        { scopeType: "ORGANIZATION", scopeId: organizationId },
-      ]);
+      expect(scopes).toEqual([{ scopeType: "ORGANIZATION", scopeId: organizationId }]);
     });
 
     it("offers the organization when there is nothing else to offer", () => {
@@ -133,9 +125,7 @@ describe("defaultCliKeyScopes()", () => {
         sharedTeamIds,
         personalProject: null,
       });
-      expect(scopes).toEqual([
-        { scopeType: "ORGANIZATION", scopeId: organizationId },
-      ]);
+      expect(scopes).toEqual([{ scopeType: "ORGANIZATION", scopeId: organizationId }]);
     });
   });
 
@@ -170,9 +160,7 @@ describe("defaultCliKeyScopes()", () => {
         sharedTeamIds,
         personalProject: null,
       });
-      expect(scopes).toEqual([
-        { scopeType: "ORGANIZATION", scopeId: organizationId },
-      ]);
+      expect(scopes).toEqual([{ scopeType: "ORGANIZATION", scopeId: organizationId }]);
     });
   });
 

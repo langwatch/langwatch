@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import {
-  PrismaMcpProjectLookupAdapter,
-  tryCreateHostedMcpSurface,
-} from "../hosted-mcp.mount";
+import { PrismaMcpProjectLookupAdapter, tryCreateHostedMcpSurface } from "../hosted-mcp.mount";
 
 const cipher = {
   encrypt: (value: string) => `encrypted:${value}`,

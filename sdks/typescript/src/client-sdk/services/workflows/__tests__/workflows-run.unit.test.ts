@@ -112,9 +112,7 @@ describe("WorkflowsApiService.run", () => {
         expect(requestAt(1).url).toBe(`${ENDPOINT}/api/evaluations/v3/runs/run_42`);
 
         // 3) results
-        expect(requestAt(2).url).toBe(
-          `${ENDPOINT}/api/evaluations/v3/runs/run_42/results`,
-        );
+        expect(requestAt(2).url).toBe(`${ENDPOINT}/api/evaluations/v3/runs/run_42/results`);
 
         expect(result.runId).toBe("run_42");
         expect(result.status).toBe("completed");
@@ -185,9 +183,7 @@ describe("WorkflowsApiService.run", () => {
         );
 
         const service = makeService();
-        const err = await service
-          .run("workflow_123", { pollInterval: 0 })
-          .catch((e) => e);
+        const err = await service.run("workflow_123", { pollInterval: 0 }).catch((e) => e);
 
         expect(err).toBeInstanceOf(WorkflowsApiError);
       });
@@ -225,9 +221,7 @@ describe("WorkflowsApiService.run", () => {
         mockFetch
           .mockResolvedValueOnce(jsonResponse(evaluateResponse))
           .mockResolvedValueOnce(jsonResponse(completedStatus))
-          .mockResolvedValueOnce(
-            jsonResponse({ error: "not yet available" }, { status: 404 }),
-          )
+          .mockResolvedValueOnce(jsonResponse({ error: "not yet available" }, { status: 404 }))
           .mockResolvedValueOnce(jsonResponse(resultsResponse));
 
         const service = makeService();

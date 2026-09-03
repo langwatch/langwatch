@@ -8,15 +8,7 @@ import {
   VStack,
   Wrap,
 } from "@chakra-ui/react";
-import {
-  Boxes,
-  Building2,
-  CheckCheck,
-  Folder,
-  Search,
-  UserLock,
-  Users,
-} from "lucide-react";
+import { Boxes, Building2, CheckCheck, Folder, Search, UserLock, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Select } from "@langwatch/design-system/select";
@@ -120,12 +112,9 @@ function summariseSelection(scopes: ScopeChipPickerEntry[]): string {
   const parts: string[] = [];
   if (counts.ORGANIZATION) parts.push("the organization");
   if (counts.DEPARTMENT)
-    parts.push(
-      counts.DEPARTMENT === 1 ? "1 department" : `${counts.DEPARTMENT} departments`,
-    );
+    parts.push(counts.DEPARTMENT === 1 ? "1 department" : `${counts.DEPARTMENT} departments`);
   if (counts.TEAM) parts.push(counts.TEAM === 1 ? "1 team" : `${counts.TEAM} teams`);
-  if (counts.PROJECT)
-    parts.push(counts.PROJECT === 1 ? "1 project" : `${counts.PROJECT} projects`);
+  if (counts.PROJECT) parts.push(counts.PROJECT === 1 ? "1 project" : `${counts.PROJECT} projects`);
   if (personal.some((s) => s.scopeType === "ORGANIZATION")) {
     parts.push("all personal projects");
   }
@@ -222,9 +211,7 @@ function groupProjectOptions({
   }>;
   orphanProjects: ScopeOption[];
 } {
-  const teamNameById = new Map(
-    (availableTeams ?? []).map((t) => [t.id, t.name] as const),
-  );
+  const teamNameById = new Map((availableTeams ?? []).map((t) => [t.id, t.name] as const));
   const teamIdByProjectId = new Map(
     (availableProjects ?? []).map((p) => [p.id, p.teamId] as const),
   );
@@ -315,9 +302,7 @@ export function collapseRedundantScopes(
     } else if (picked.scopeType === "DEPARTMENT" && picked.personalOnly) {
       // A department's personal projects narrow from "all personal
       // projects", so the org-personal pick goes; siblings coexist.
-      cleaned = cleaned.filter(
-        (s) => !(s.personalOnly && s.scopeType === "ORGANIZATION"),
-      );
+      cleaned = cleaned.filter((s) => !(s.personalOnly && s.scopeType === "ORGANIZATION"));
     } else if (picked.scopeType === "DEPARTMENT") {
       // A department narrows from org-wide, so it clears the org pick.
       // Sibling departments are mutually compatible and left untouched.
@@ -361,11 +346,7 @@ export function collapseRedundantScopes(
         ) {
           return false;
         }
-        if (
-          s.scopeType === "TEAM" &&
-          parentTeamId !== undefined &&
-          s.scopeId === parentTeamId
-        ) {
+        if (s.scopeType === "TEAM" && parentTeamId !== undefined && s.scopeId === parentTeamId) {
           return false;
         }
         return true;
@@ -415,9 +396,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
    *  type back from `onChange` - DEPARTMENT only flows where a caller opts
    *  in by passing wider entries + `allowedScopeTypes`. */
   value: Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>;
-  onChange: (
-    next: Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>,
-  ) => void;
+  onChange: (next: Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>) => void;
   organizationId: string | undefined;
   organizationName?: string;
   teamId?: string | undefined;
@@ -490,13 +469,10 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   // which kinds can ever be emitted, so the cast back to T on emit is sound.
   const value = inputValue as ScopeChipPickerEntry[];
   const onChange = (next: ScopeChipPickerEntry[]) =>
-    inputOnChange(
-      next as Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>,
-    );
+    inputOnChange(next as Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>);
 
   const allowed = useMemo<Set<ScopeChipPickerScopeType>>(
-    () =>
-      new Set((allowedScopeTypes ?? DEFAULT_SCOPE_TYPES) as ScopeChipPickerScopeType[]),
+    () => new Set((allowedScopeTypes ?? DEFAULT_SCOPE_TYPES) as ScopeChipPickerScopeType[]),
     [allowedScopeTypes],
   );
 
@@ -597,9 +573,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   const visibleOptions = useMemo(() => {
     const needle = scopeSearch.trim().toLowerCase();
     if (!showSearch || !needle) return options;
-    const teamNameById = new Map(
-      (availableTeams ?? []).map((t) => [t.id, t.name] as const),
-    );
+    const teamNameById = new Map((availableTeams ?? []).map((t) => [t.id, t.name] as const));
     const teamIdByProjectId = new Map(
       (availableProjects ?? []).map((p) => [p.id, p.teamId] as const),
     );
@@ -689,12 +663,11 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
 
   // The chips-variant dropdown lists projects under their team's name;
   // computed here so the early single-select return keeps its own copy.
-  const { teamGroups: chipTeamGroups, orphanProjects: chipOrphanProjects } =
-    groupProjectOptions({
-      projectOptions: visibleOptions.filter((o) => o.scopeType === "PROJECT"),
-      availableTeams,
-      availableProjects,
-    });
+  const { teamGroups: chipTeamGroups, orphanProjects: chipOrphanProjects } = groupProjectOptions({
+    projectOptions: visibleOptions.filter((o) => o.scopeType === "PROJECT"),
+    availableTeams,
+    availableProjects,
+  });
 
   if (variant === "single-select") {
     const selected = scopes[0] ?? null;
@@ -726,9 +699,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
           }}
           onValueChange={(details) => {
             const pickedValue = details.value[0];
-            const option = pickedValue
-              ? options.find((o) => o.value === pickedValue)
-              : undefined;
+            const option = pickedValue ? options.find((o) => o.value === pickedValue) : undefined;
             onChange(
               option
                 ? [
@@ -757,9 +728,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
             </Select.ValueText>
           </Select.Trigger>
           <Select.Content>
-            {showSearch && (
-              <ScopeSearchField value={scopeSearch} onChange={setScopeSearch} />
-            )}
+            {showSearch && <ScopeSearchField value={scopeSearch} onChange={setScopeSearch} />}
             {visibleOptions.length === 0 && (
               <Text paddingX={3} paddingY={2} fontSize="sm" color="fg.muted">
                 No scopes match your search.
@@ -944,17 +913,13 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
             </Select.ValueText>
           </Select.Trigger>
           <Select.Content>
-            {showSearch && (
-              <ScopeSearchField value={scopeSearch} onChange={setScopeSearch} />
-            )}
+            {showSearch && <ScopeSearchField value={scopeSearch} onChange={setScopeSearch} />}
             {visibleOptions.length === 0 && (
               <Text paddingX={3} paddingY={2} fontSize="sm" color="fg.muted">
                 No scopes match your search.
               </Text>
             )}
-            {visibleOptions.some(
-              (o) => o.scopeType === "ORGANIZATION" && !o.personalOnly,
-            ) && (
+            {visibleOptions.some((o) => o.scopeType === "ORGANIZATION" && !o.personalOnly) && (
               <Select.ItemGroup label="Organization">
                 {visibleOptions
                   .filter((o) => o.scopeType === "ORGANIZATION" && !o.personalOnly)
@@ -968,9 +933,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
                   ))}
               </Select.ItemGroup>
             )}
-            {visibleOptions.some(
-              (o) => o.scopeType === "DEPARTMENT" && !o.personalOnly,
-            ) && (
+            {visibleOptions.some((o) => o.scopeType === "DEPARTMENT" && !o.personalOnly) && (
               <Select.ItemGroup label="Departments">
                 {visibleOptions
                   .filter((o) => o.scopeType === "DEPARTMENT" && !o.personalOnly)

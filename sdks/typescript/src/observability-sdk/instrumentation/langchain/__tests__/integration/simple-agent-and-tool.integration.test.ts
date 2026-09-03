@@ -51,53 +51,42 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     spanExporter.reset();
   });
 
-  it(
-    "traces a simple LLM question/response interaction",
-    { timeout: 30_000 },
-    async () => {
-      const tracer = getLangWatchTracer("langchain-integration-test");
+  it("traces a simple LLM question/response interaction", { timeout: 30_000 }, async () => {
+    const tracer = getLangWatchTracer("langchain-integration-test");
 
-      await tracer.withActiveSpan(
-        "simple question/response",
-        { root: true },
-        async () => {
-          const llm = new ChatOpenAI({
-            model: "gpt-5-mini",
-            reasoning: { effort: "low" },
-            temperature: 1,
-          });
+    await tracer.withActiveSpan("simple question/response", { root: true }, async () => {
+      const llm = new ChatOpenAI({
+        model: "gpt-5-mini",
+        reasoning: { effort: "low" },
+        temperature: 1,
+      });
 
-          const result = await llm.invoke(
-            [{ role: "user", content: "Say hello to Bob" }],
-            { callbacks: [new LangWatchCallbackHandler()] },
-          );
+      const result = await llm.invoke([{ role: "user", content: "Say hello to Bob" }], {
+        callbacks: [new LangWatchCallbackHandler()],
+      });
 
-          expect(result.content).toContain("Bob");
-        },
-      );
+      expect(result.content).toContain("Bob");
+    });
 
-      await spanProcessor.forceFlush();
-      const finishedSpans = spanExporter.getFinishedSpans();
+    await spanProcessor.forceFlush();
+    const finishedSpans = spanExporter.getFinishedSpans();
 
-      // Verify span structure
-      expect(finishedSpans.length).toBeGreaterThan(0);
+    // Verify span structure
+    expect(finishedSpans.length).toBeGreaterThan(0);
 
-      // Find the LLM span
-      const llmSpan = finishedSpans.find(
-        (span) => span.attributes["langwatch.span.type"] === "llm",
-      );
-      expect(llmSpan).toBeDefined();
-      expect(llmSpan?.attributes["langwatch.span.type"]).toBe("llm");
-      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5-mini");
+    // Find the LLM span
+    const llmSpan = finishedSpans.find((span) => span.attributes["langwatch.span.type"] === "llm");
+    expect(llmSpan).toBeDefined();
+    expect(llmSpan?.attributes["langwatch.span.type"]).toBe("llm");
+    expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5-mini");
 
-      // New naming: should not be prefixed with "LLM:" anymore
-      expect(llmSpan?.name.startsWith("LLM:")).toBe(false);
+    // New naming: should not be prefixed with "LLM:" anymore
+    expect(llmSpan?.name.startsWith("LLM:")).toBe(false);
 
-      // Ensure no deprecated llm.* attributes are present
-      const llmAttrKeys = Object.keys(llmSpan!.attributes as any);
-      expect(llmAttrKeys.some((k) => k.startsWith("llm."))).toBe(false);
-    },
-  );
+    // Ensure no deprecated llm.* attributes are present
+    const llmAttrKeys = Object.keys(llmSpan!.attributes as any);
+    expect(llmAttrKeys.some((k) => k.startsWith("llm."))).toBe(false);
+  });
 
   it("traces tool calling and agent execution", { timeout: 30_000 }, async () => {
     const date = new Date().toISOString();
@@ -177,15 +166,13 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
 
         const tracingCallback = new LangWatchCallbackHandler();
 
-        const result1 = await llm.invoke(
-          [{ role: "user", content: "Say hello to Alice" }],
-          { callbacks: [tracingCallback] },
-        );
+        const result1 = await llm.invoke([{ role: "user", content: "Say hello to Alice" }], {
+          callbacks: [tracingCallback],
+        });
 
-        const result2 = await llm.invoke(
-          [{ role: "user", content: "Say hello to Bob" }],
-          { callbacks: [tracingCallback] },
-        );
+        const result2 = await llm.invoke([{ role: "user", content: "Say hello to Bob" }], {
+          callbacks: [tracingCallback],
+        });
 
         expect(result1.content).toContain("Alice");
         expect(result2.content).toContain("Bob");
@@ -229,9 +216,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     const finishedSpans = spanExporter.getFinishedSpans();
 
     // Verify error span was created
-    const errorSpans = finishedSpans.filter(
-      (span) => span.status.code === SpanStatusCode.ERROR,
-    );
+    const errorSpans = finishedSpans.filter((span) => span.status.code === SpanStatusCode.ERROR);
     expect(errorSpans.length).toBeGreaterThan(0);
   });
 
@@ -267,71 +252,67 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
       expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(1);
     });
 
-    it(
-      "names tool spans with tool name and input preview",
-      { timeout: 30_000 },
-      async () => {
-        const date = new Date().toISOString();
-        const tools = [
-          new DynamicStructuredTool({
-            name: "get_current_time",
-            description: "get the current time",
-            schema: z.object({}),
-            func: async () => {
-              return `Result: ${date}`;
-            },
-          }),
-        ];
+    it("names tool spans with tool name and input preview", { timeout: 30_000 }, async () => {
+      const date = new Date().toISOString();
+      const tools = [
+        new DynamicStructuredTool({
+          name: "get_current_time",
+          description: "get the current time",
+          schema: z.object({}),
+          func: async () => {
+            return `Result: ${date}`;
+          },
+        }),
+      ];
 
-        const tracer = getLangWatchTracer("langchain-integration-test");
+      const tracer = getLangWatchTracer("langchain-integration-test");
 
-        await tracer.withActiveSpan("tool naming test", { root: true }, async () => {
-          const llm = new ChatOpenAI({
-            model: "gpt-5-mini",
-            reasoning: { effort: "low" },
-            temperature: 1,
-          });
-
-          const prompt = ChatPromptTemplate.fromMessages([
-            ["system", "You are a helpful assistant"],
-            ["human", "{input}"],
-            ["placeholder", "{agent_scratchpad}"],
-          ]);
-
-          const agent = createToolCallingAgent({
-            llm,
-            tools,
-            prompt,
-          });
-
-          const agentExecutor = new AgentExecutor({
-            agent,
-            tools,
-          });
-
-          const tracingCallback = new LangWatchCallbackHandler();
-          const result = await agentExecutor.invoke(
-            { input: "What is the current time?" },
-            { callbacks: [tracingCallback] },
-          );
-
-          expect(result.output).toBeDefined();
+      await tracer.withActiveSpan("tool naming test", { root: true }, async () => {
+        const llm = new ChatOpenAI({
+          model: "gpt-5-mini",
+          reasoning: { effort: "low" },
+          temperature: 1,
         });
 
-        await spanProcessor.forceFlush();
-        const finishedSpans = spanExporter.getFinishedSpans();
+        const prompt = ChatPromptTemplate.fromMessages([
+          ["system", "You are a helpful assistant"],
+          ["human", "{input}"],
+          ["placeholder", "{agent_scratchpad}"],
+        ]);
 
-        const toolSpans = finishedSpans.filter(
-          (span) => span.attributes["langwatch.span.type"] === "tool",
+        const agent = createToolCallingAgent({
+          llm,
+          tools,
+          prompt,
+        });
+
+        const agentExecutor = new AgentExecutor({
+          agent,
+          tools,
+        });
+
+        const tracingCallback = new LangWatchCallbackHandler();
+        const result = await agentExecutor.invoke(
+          { input: "What is the current time?" },
+          { callbacks: [tracingCallback] },
         );
-        expect(toolSpans.length).toBeGreaterThan(0);
 
-        // Verify tool naming pattern: "calculator" (without Tool: prefix)
-        const toolSpan = toolSpans[0];
-        expect(toolSpan?.name).toBe("get_current_time");
-        expect(toolSpan?.attributes["langwatch.span.type"]).toBe("tool");
-      },
-    );
+        expect(result.output).toBeDefined();
+      });
+
+      await spanProcessor.forceFlush();
+      const finishedSpans = spanExporter.getFinishedSpans();
+
+      const toolSpans = finishedSpans.filter(
+        (span) => span.attributes["langwatch.span.type"] === "tool",
+      );
+      expect(toolSpans.length).toBeGreaterThan(0);
+
+      // Verify tool naming pattern: "calculator" (without Tool: prefix)
+      const toolSpan = toolSpans[0];
+      expect(toolSpan?.name).toBe("get_current_time");
+      expect(toolSpan?.attributes["langwatch.span.type"]).toBe("tool");
+    });
 
     it("names agent spans as components", { timeout: 30_000 }, async () => {
       const tools = [
@@ -386,9 +367,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
       expect(agentSpan).toBeDefined();
 
       // Verify the span has appropriate type (component for AgentExecutor, or chain)
-      expect(["component", "chain"]).toContain(
-        agentSpan?.attributes["langwatch.span.type"],
-      );
+      expect(["component", "chain"]).toContain(agentSpan?.attributes["langwatch.span.type"]);
     });
 
     it("names chain spans with proper fallback naming", async () => {
@@ -410,10 +389,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
         const chain = prompt.pipe(llm);
 
         const tracingCallback = new LangWatchCallbackHandler();
-        const result = await chain.invoke(
-          { input: "Hello" },
-          { callbacks: [tracingCallback] },
-        );
+        const result = await chain.invoke({ input: "Hello" }, { callbacks: [tracingCallback] });
 
         expect(result.content).toBeDefined();
       });

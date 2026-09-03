@@ -54,8 +54,7 @@ async function resolveVersion(bin: string): Promise<string | null> {
 async function detectOpencode(
   binDir: string,
 ): Promise<
-  | { installed: true; version: string; resolvedPath: string }
-  | { installed: false; reason: string }
+  { installed: true; version: string; resolvedPath: string } | { installed: false; reason: string }
 > {
   const bundled = join(binDir, "opencode");
   if (!existsSync(bundled)) {

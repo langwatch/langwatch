@@ -221,31 +221,31 @@ export class FrontDoorTrpcApi {
        * the only address anybody can send to is the one they are already
        * signed in as.
        */
-      sendMyAddressConfirmation: policy(OWN_ADDRESS)(
-        procedure.input(emptyInputSchema),
-      ).mutation(async ({ ctx }) => {
-        const user = ctx.session?.user;
-        if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
-        const email = user.email;
-        if (!email) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "This account has no email address to confirm.",
+      sendMyAddressConfirmation: policy(OWN_ADDRESS)(procedure.input(emptyInputSchema)).mutation(
+        async ({ ctx }) => {
+          const user = ctx.session?.user;
+          if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+          const email = user.email;
+          if (!email) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "This account has no email address to confirm.",
+            });
+          }
+
+          const withinBudget = await app.isWithinBudget({
+            key: `frontDoor.sendMyAddressConfirmation:${user.id}`,
+            windowSeconds: 60 * 60,
+            max: 10,
           });
-        }
+          if (!withinBudget) {
+            throw throttled("Too many attempts. Please try again later.");
+          }
 
-        const withinBudget = await app.isWithinBudget({
-          key: `frontDoor.sendMyAddressConfirmation:${user.id}`,
-          windowSeconds: 60 * 60,
-          max: 10,
-        });
-        if (!withinBudget) {
-          throw throttled("Too many attempts. Please try again later.");
-        }
-
-        await app.requestSignUpVerification(ctx, { email });
-        return { sent: true as const };
-      }),
+          await app.requestSignUpVerification(ctx, { email });
+          return { sent: true as const };
+        },
+      ),
 
       /**
        * Spends a confirmation link and answers the address it confirmed, so

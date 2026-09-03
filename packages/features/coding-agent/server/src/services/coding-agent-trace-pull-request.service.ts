@@ -28,9 +28,7 @@ export class CodingAgentTracePullRequestService {
     },
   ) {}
 
-  async link(
-    input: CodingAgentTracePullRequestInput,
-  ): Promise<CodingAgentTracePullRequestLink[]> {
+  async link(input: CodingAgentTracePullRequestInput): Promise<CodingAgentTracePullRequestLink[]> {
     const sessions = input.sessions.filter(
       (session): session is LinkableSession =>
         session.repositoryOwner !== null &&
@@ -90,9 +88,7 @@ export class CodingAgentTracePullRequestService {
 
       for (const session of bucketSessions) {
         const prNumber = assignments.get(session.sessionId);
-        const pullRequest = candidates.find(
-          (candidate) => candidate.prNumber === prNumber,
-        );
+        const pullRequest = candidates.find((candidate) => candidate.prNumber === prNumber);
         if (!pullRequest) {
           continue;
         }
@@ -129,16 +125,12 @@ export class CodingAgentTracePullRequestService {
       repositoryHost: this.dependencies.github.normalizeRepositoryHost(
         session.repositoryHost ?? "",
       ),
-      repositoryFullName:
-        `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase(),
+      repositoryFullName: `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase(),
       headBranch: session.gitBranch,
     };
   }
 
-  private repositoryBucket(input: {
-    repositoryHost: string;
-    repositoryFullName: string;
-  }): string {
+  private repositoryBucket(input: { repositoryHost: string; repositoryFullName: string }): string {
     return `${input.repositoryHost.toLowerCase()} ${input.repositoryFullName.toLowerCase()}`;
   }
 }

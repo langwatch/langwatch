@@ -16,10 +16,7 @@ import { AttributeTable } from "../attribute-table";
 function renderTable() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <AttributeTable
-        spanId="span-abc123"
-        attributes={{ "gen_ai.operation.name": "chat" }}
-      />
+      <AttributeTable spanId="span-abc123" attributes={{ "gen_ai.operation.name": "chat" }} />
     </ChakraProvider>,
   );
 }
@@ -42,9 +39,7 @@ describe("AttributeTable", () => {
       it("still renders a real pin toggle for an actual attribute", () => {
         const { getByRole } = renderTable();
 
-        expect(
-          getByRole("button", { name: /pin gen_ai\.operation\.name/i }),
-        ).toBeInTheDocument();
+        expect(getByRole("button", { name: /pin gen_ai\.operation\.name/i })).toBeInTheDocument();
       });
     });
   });
@@ -74,9 +69,7 @@ describe("AttributeTable", () => {
         <ChakraProvider value={defaultSystem}>
           <AttributeTable
             attributes={{ "app.billing.plan": "pro", "service.name": "api" }}
-            restrictedAttributes={[
-              { pattern: "app.billing.*", visibleTo: "Admins", canSee },
-            ]}
+            restrictedAttributes={[{ pattern: "app.billing.*", visibleTo: "Admins", canSee }]}
           />
         </ChakraProvider>,
       );
@@ -86,9 +79,7 @@ describe("AttributeTable", () => {
       it("marks the matching row as visible to that audience", () => {
         const { getByLabelText } = renderWithRestriction(true);
 
-        expect(
-          getByLabelText("Restricted attribute, visible to Admins"),
-        ).toBeInTheDocument();
+        expect(getByLabelText("Restricted attribute, visible to Admins")).toBeInTheDocument();
       });
     });
 

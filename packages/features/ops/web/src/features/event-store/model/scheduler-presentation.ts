@@ -18,12 +18,7 @@ export interface SchedulerJobLike {
   active: boolean;
 }
 
-export type SchedulerJobStatus =
-  | "paused"
-  | "retrying"
-  | "running"
-  | "overdue"
-  | "scheduled";
+export type SchedulerJobStatus = "paused" | "retrying" | "running" | "overdue" | "scheduled";
 
 /**
  * How late a schedule may be before it counts as overdue.
@@ -199,13 +194,10 @@ function tally({
  * due, the loop is the suspect rather than any individual row. With nothing
  * due, silence is expected and says nothing either way.
  */
-export function deriveLoopHealth({
-  jobs,
-  now,
-}: {
-  jobs: SchedulerJobLike[];
-  now: number;
-}): { healthy: boolean; lastFiredAt: number | null } {
+export function deriveLoopHealth({ jobs, now }: { jobs: SchedulerJobLike[]; now: number }): {
+  healthy: boolean;
+  lastFiredAt: number | null;
+} {
   const active = jobs.filter((job) => job.active);
 
   const firedAts = active
@@ -213,9 +205,7 @@ export function deriveLoopHealth({
     .filter((fired): fired is number => fired !== null);
   const lastFiredAt = firedAts.length > 0 ? Math.max(...firedAts) : null;
 
-  const anythingOverdue = active.some(
-    (job) => latenessMs({ job, now }) > OVERDUE_GRACE_MS,
-  );
+  const anythingOverdue = active.some((job) => latenessMs({ job, now }) > OVERDUE_GRACE_MS);
   if (!anythingOverdue) return { healthy: true, lastFiredAt };
   const quietFor = lastFiredAt === null ? Infinity : now - lastFiredAt;
   return { healthy: quietFor < LOOP_STALE_MS, lastFiredAt };

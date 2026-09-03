@@ -42,9 +42,7 @@ vi.mock("../save-and-run-menu", () => ({
     <div data-testid="save-and-run-menu">
       <button
         data-testid="save-and-run-button"
-        onClick={() =>
-          onSaveAndRun?.(selectedTarget ?? { type: "http", id: "agent-1" })
-        }
+        onClick={() => onSaveAndRun?.(selectedTarget ?? { type: "http", id: "agent-1" })}
       >
         Save and Run
       </button>
@@ -325,9 +323,7 @@ describe("<ScenarioFormDrawer /> save-and-run data-loss regression", () => {
 
     describe("when save fails (update mutation rejects)", () => {
       beforeEach(() => {
-        mocks.mockUpdateMutateAsync.mockRejectedValue(
-          new Error("Network error"),
-        );
+        mocks.mockUpdateMutateAsync.mockRejectedValue(new Error("Network error"));
       });
 
       it("does NOT show 'Failed to run scenario' — save error must not be misreported as run failure", async () => {

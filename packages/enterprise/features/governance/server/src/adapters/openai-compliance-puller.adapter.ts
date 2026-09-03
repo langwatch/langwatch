@@ -24,14 +24,8 @@
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
 
-import type {
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
-import {
-  type S3PollingConfig,
-  S3PollingPullerAdapter,
-} from "./s3-puller.adapter";
+import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
+import { type S3PollingConfig, S3PollingPullerAdapter } from "./s3-puller.adapter";
 import type { GovernanceObjectStoragePort } from "../ports/governance-object-storage.port";
 import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port";
 
@@ -46,28 +40,26 @@ import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worke
  * IngestionSource.parserConfig with `_overrides_` semantics that the
  * puller respects via the override below.
  */
-export const OPENAI_COMPLIANCE_PULL_CONFIG: Omit<
-  S3PollingConfig,
-  "bucket" | "prefix" | "region"
-> = {
-  adapter: "s3_polling",
-  parser: "ndjson",
-  schedule: "*/15 * * * *",
-  eventMapping: {
-    source_event_id: "$.id",
-    event_timestamp: "$.created_at",
-    actor: "$.user.email",
-    action: "$.type",
-    target: "$.model",
-    cost_usd: "$.cost.usd",
-    tokens_input: "$.tokens.input",
-    tokens_output: "$.tokens.output",
-    extra: {
-      user_id: "$.user.id",
-      object: "$.object",
+export const OPENAI_COMPLIANCE_PULL_CONFIG: Omit<S3PollingConfig, "bucket" | "prefix" | "region"> =
+  {
+    adapter: "s3_polling",
+    parser: "ndjson",
+    schedule: "*/15 * * * *",
+    eventMapping: {
+      source_event_id: "$.id",
+      event_timestamp: "$.created_at",
+      actor: "$.user.email",
+      action: "$.type",
+      target: "$.model",
+      cost_usd: "$.cost.usd",
+      tokens_input: "$.tokens.input",
+      tokens_output: "$.tokens.output",
+      extra: {
+        user_id: "$.user.id",
+        object: "$.object",
+      },
     },
-  },
-};
+  };
 
 interface OpenAiAdminInput {
   bucket: string;
@@ -115,10 +107,7 @@ export class OpenAiComplianceReferencePuller extends S3PollingPullerAdapter {
     });
   }
 
-  override async runOnce(
-    options: PullRunOptions,
-    config: S3PollingConfig,
-  ): Promise<PullResult> {
+  override async runOnce(options: PullRunOptions, config: S3PollingConfig): Promise<PullResult> {
     return super.runOnce(options, config);
   }
 }

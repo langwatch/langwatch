@@ -137,9 +137,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       };
 
       const groupKey = entry?.groupKeyFn({ event, foldState: {} });
-      expect(groupKey).toBe(
-        `${tenantId}/fold/traceSummary/reactor/customSubscriber/custom:run-42`,
-      );
+      expect(groupKey).toBe(`${tenantId}/fold/traceSummary/reactor/customSubscriber/custom:run-42`);
     });
   });
 
@@ -176,12 +174,8 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
       const payload = { event, foldState: {} };
 
-      const evalTriggerEntry = globalJobRegistry.get(
-        "test-pipeline:reactor:evaluationTrigger",
-      );
-      const customSyncEntry = globalJobRegistry.get(
-        "test-pipeline:reactor:customEvalSync",
-      );
+      const evalTriggerEntry = globalJobRegistry.get("test-pipeline:reactor:evaluationTrigger");
+      const customSyncEntry = globalJobRegistry.get("test-pipeline:reactor:customEvalSync");
 
       const evalKey = evalTriggerEntry?.groupKeyFn(payload);
       const syncKey = customSyncEntry?.groupKeyFn(payload);

@@ -6,10 +6,10 @@ cleanup.
 
 ## The two
 
-| | file | fields | reached from |
-| --- | --- | ---: | --- |
-| preview | `platform/app/src/server/filters/precondition-matchers.ts` (273 lines) | 30 | `traces.api.ts:494`, the monitor **sample preview** |
-| execution | `packages/features/evaluation/server/src/services/evaluation-precondition.service.ts` (210) | 17 | `evaluation-execution-preparation.service.ts:102`, the monitor **running** |
+|           | file                                                                                        | fields | reached from                                                               |
+| --------- | ------------------------------------------------------------------------------------------- | -----: | -------------------------------------------------------------------------- |
+| preview   | `platform/app/src/server/filters/precondition-matchers.ts` (273 lines)                      |     30 | `traces.api.ts:494`, the monitor **sample preview**                        |
+| execution | `packages/features/evaluation/server/src/services/evaluation-precondition.service.ts` (210) |     17 | `evaluation-execution-preparation.service.ts:102`, the monitor **running** |
 
 The preview is injected as a port at `platform/app/src/server/api/root.ts:653`
 and answers "which traces would this monitor match" while a person is

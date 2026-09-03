@@ -43,10 +43,7 @@ export {
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
 } from "./services/member-role-constraints";
-export {
-  assertNoPersonalTeamScope,
-  findSharedTeamIds,
-} from "./services/personal-team-scope";
+export { assertNoPersonalTeamScope, findSharedTeamIds } from "./services/personal-team-scope";
 export type {
   AuditLogFilters,
   CreateAndAssignInput,
@@ -126,14 +123,8 @@ export {
 } from "./transport/api-rest/organization-provisioning.api";
 export { ORGANIZATIONS_SPEC_OPTIONS } from "./transport/api-rest/organization-provisioning.openapi";
 export { createTeamsRestApp } from "./transport/api-rest/team.api";
-export {
-  buildInviteAcceptUrl,
-  buildMembersSettingsUrl,
-} from "./services/invite-link";
-export {
-  resolveInviteDisplayStatus,
-  type InviteDisplayStatus,
-} from "./services/invite-rules";
+export { buildInviteAcceptUrl, buildMembersSettingsUrl } from "./services/invite-link";
+export { resolveInviteDisplayStatus, type InviteDisplayStatus } from "./services/invite-rules";
 export {
   AlreadyOrganizationMemberError,
   DuplicateInviteError,

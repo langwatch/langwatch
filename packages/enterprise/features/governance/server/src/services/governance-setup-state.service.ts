@@ -1,6 +1,4 @@
-import {
-  type GovernanceSetupState,
-} from "@langwatch/enterprise-governance-contract";
+import { type GovernanceSetupState } from "@langwatch/enterprise-governance-contract";
 import type {
   GovernanceSetupActivityPort,
   GovernanceSetupStateRepository,
@@ -13,8 +11,7 @@ export class DefaultGovernanceSetupStateService {
     private readonly repository: GovernanceSetupStateRepository,
     private readonly activity: GovernanceSetupActivityPort | undefined,
     private readonly now: () => number,
-  ) {
-  }
+  ) {}
 
   static create(options: {
     repository: GovernanceSetupStateRepository;

@@ -17,10 +17,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { api } from "../../../../behavior/studio-host/api";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
-} from "../../../../model/constants";
+import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "../../../../model/constants";
 import { useRegisterDrawerFooter, useWorkflowStore } from "@langwatch/workflow-web";
 import type { Evaluator, Field } from "@langwatch/workflow-contract";
 import {
@@ -65,26 +62,19 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
 // New format: DB-backed evaluator panel
 // ---------------------------------------------------------------------------
 
-function DbEvaluatorPanel({
-  node,
-  evaluatorRef,
-}: {
-  node: Node<Evaluator>;
-  evaluatorRef: string;
-}) {
+function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evaluatorRef: string }) {
   const { project } = useOrganizationTeamProject();
   const updateNodeInternals = useUpdateNodeInternals();
-  const { nodes, edges, setNode, setEdges, getWorkflow, deselectAllNodes } =
-    useWorkflowStore(
-      useShallow(({ setNode, setEdges, getWorkflow, deselectAllNodes }) => ({
-        nodes: getWorkflow().nodes,
-        edges: getWorkflow().edges,
-        setNode,
-        setEdges,
-        getWorkflow,
-        deselectAllNodes,
-      })),
-    );
+  const { nodes, edges, setNode, setEdges, getWorkflow, deselectAllNodes } = useWorkflowStore(
+    useShallow(({ setNode, setEdges, getWorkflow, deselectAllNodes }) => ({
+      nodes: getWorkflow().nodes,
+      edges: getWorkflow().edges,
+      setNode,
+      setEdges,
+      getWorkflow,
+      deselectAllNodes,
+    })),
+  );
   const evaluatorId = extractEvaluatorId(evaluatorRef);
 
   const evaluatorQuery = api.evaluators.getById.useQuery(
@@ -170,8 +160,7 @@ function DbEvaluatorPanel({
   const debouncedSetLocalConfig = useDebouncedCallback(
     (formValues: { name?: string; settings?: Record<string, unknown> }) => {
       const nameChanged = formValues.name !== dbName;
-      const settingsChanged =
-        JSON.stringify(formValues.settings) !== JSON.stringify(dbSettings);
+      const settingsChanged = JSON.stringify(formValues.settings) !== JSON.stringify(dbSettings);
       if (nameChanged || settingsChanged) {
         setNode({
           id: node.id,
@@ -219,8 +208,7 @@ function DbEvaluatorPanel({
   const handleInputMappingChange = useCallback(
     (identifier: string, mapping: any) => {
       const workflow = getWorkflow();
-      const currentInputs =
-        workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+      const currentInputs = workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
       const result = applyMappingChange({
         nodeId: node.id,
         identifier,
@@ -413,11 +401,7 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
       "settings",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    evaluator,
-    resolvedDefaultModel.data?.model,
-    resolvedDefaultEmbeddings.data?.model,
-  ]);
+  }, [evaluator, resolvedDefaultModel.data?.model, resolvedDefaultEmbeddings.data?.model]);
 
   const onSubmit = useCallback(
     (data: { settings: Record<string, any> }) => {
@@ -509,12 +493,7 @@ export function EvaluatorDrawerFooter({
         Discard
       </Button>
       <Spacer />
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onApply}
-        data-testid="evaluator-apply-button"
-      >
+      <Button variant="outline" size="sm" onClick={onApply} data-testid="evaluator-apply-button">
         Apply
       </Button>
       <Button

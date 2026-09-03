@@ -1,10 +1,6 @@
 import type { DatasetColumn } from "../../types";
 import { type AddColumnPayload, addColumnPayloadSchema } from "../schemas";
-import {
-  inlineRowCount,
-  replaceDataset,
-  requireInlineDataset,
-} from "./helpers";
+import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers";
 import { type Transform, TransformError } from "./types";
 
 /**
@@ -14,10 +10,10 @@ import { type Transform, TransformError } from "./types";
  * table reads the first, execution reads the second), pre-filled with empty
  * values for every existing row so the column is never shorter than the others.
  */
-export const addColumn: Transform<
-  AddColumnPayload,
-  { datasetId: string; columnId: string }
-> = ({ state, payload }) => {
+export const addColumn: Transform<AddColumnPayload, { datasetId: string; columnId: string }> = ({
+  state,
+  payload,
+}) => {
   const { datasetId, column } = addColumnPayloadSchema.parse(payload);
   const dataset = requireInlineDataset({ state, datasetId });
 
@@ -40,9 +36,7 @@ export const addColumn: Transform<
     });
   }
 
-  const emptyValues = Array(inlineRowCount(dataset.inline)).fill(
-    "",
-  ) as string[];
+  const emptyValues = Array(inlineRowCount(dataset.inline)).fill("") as string[];
 
   return {
     state: replaceDataset({

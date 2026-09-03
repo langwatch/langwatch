@@ -17,11 +17,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { MfaGuards } from "../mfa-guards";
 import type { ZodTypeAny, z } from "zod";
-import {
-  type Command,
-  type CommandHandler,
-  defineCommandSchema,
-} from "@langwatch/eventing";
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { mfaEventsFor } from "../projections/mfa-enrollment-state.projection";
 import type { MfaEvent } from "../projections/mfa-enrollment-state.projection";
 
@@ -41,9 +37,7 @@ import type { MfaEvent } from "../projections/mfa-enrollment-state.projection";
  */
 
 type GuardVerb = {
-  [K in keyof MfaGuards]: MfaGuards[K] extends (data: never) => Promise<unknown>
-    ? K
-    : never;
+  [K in keyof MfaGuards]: MfaGuards[K] extends (data: never) => Promise<unknown> ? K : never;
 }[keyof MfaGuards];
 
 function mfaCommand<Schema extends ZodTypeAny>({
@@ -58,9 +52,7 @@ function mfaCommand<Schema extends ZodTypeAny>({
   verb: GuardVerb;
 }) {
   type Data = z.infer<Schema>;
-  return class MfaCommandHandler
-    implements CommandHandler<Command<Data>, MfaEvent>
-  {
+  return class MfaCommandHandler implements CommandHandler<Command<Data>, MfaEvent> {
     static readonly schema = defineCommandSchema(type, schema, description);
 
     /** The PERSON is the aggregate. One person's two-step commands share a
@@ -74,9 +66,7 @@ function mfaCommand<Schema extends ZodTypeAny>({
 
     async handle(command: Command<Data>): Promise<MfaEvent[]> {
       const data = command.data as never;
-      const facts = await (
-        this.guards[verb] as (input: never) => Promise<never[]>
-      )(data);
+      const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
       return mfaEventsFor({ command: { type, data } as MfaCommand, facts });
     }
   };

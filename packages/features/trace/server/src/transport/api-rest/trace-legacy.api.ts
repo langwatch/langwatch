@@ -132,12 +132,13 @@ export type TraceLegacySearchFields = Readonly<{
  * links — exactly the sort of thing that must be legible in the route-policy
  * registry rather than buried in a handler.
  */
-export function createTraceLegacyRestApp<TSearchBody extends TraceLegacySearchFields, TSearchBodyRaw>(
-  options: {
-    security: AppRestSecurity;
-    ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>;
-  },
-): SecuredApp<Env> {
+export function createTraceLegacyRestApp<
+  TSearchBody extends TraceLegacySearchFields,
+  TSearchBodyRaw,
+>(options: {
+  security: AppRestSecurity;
+  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>;
+}): SecuredApp<Env> {
   const { security, ports } = options;
 
   const tracesViewAuth = handlerManagedAuth({
@@ -168,10 +169,7 @@ export function createTraceLegacyRestApp<TSearchBody extends TraceLegacySearchFi
       const format = formatParam ?? (llmMode ? "digest" : "json");
 
       c.header("Deprecation", "true");
-      c.header(
-        "Link",
-        `</api/traces/${traceId}?format=${format}>; rel="successor-version"`,
-      );
+      c.header("Link", `</api/traces/${traceId}?format=${format}>; rel="successor-version"`);
 
       const protections = await ports.getProtections({ projectId: project.id });
       // `readTrace` resolves offloaded values in full (#4991) — the same
@@ -300,11 +298,8 @@ export function createTraceLegacyRestApp<TSearchBody extends TraceLegacySearchFi
         ...params,
         projectId: project.id,
         startDate:
-          typeof params.startDate === "string"
-            ? Date.parse(params.startDate)
-            : params.startDate,
-        endDate:
-          typeof params.endDate === "string" ? Date.parse(params.endDate) : params.endDate,
+          typeof params.startDate === "string" ? Date.parse(params.startDate) : params.startDate,
+        endDate: typeof params.endDate === "string" ? Date.parse(params.endDate) : params.endDate,
         pageSize,
       } as unknown as TraceLegacyListInput,
       protections,

@@ -270,9 +270,7 @@ describe("computeBatchTargetAggregates", () => {
       // Claude should have low score
       expect(claudeResult.overallAverageScore).toBeCloseTo(0.5, 3);
       // They should be DIFFERENT
-      expect(gpt4Result.overallAverageScore).not.toEqual(
-        claudeResult.overallAverageScore,
-      );
+      expect(gpt4Result.overallAverageScore).not.toEqual(claudeResult.overallAverageScore);
     });
   });
 
@@ -414,9 +412,7 @@ describe("computeBatchTargetAggregates", () => {
       expect(exactMatch?.passRate).toBe(50);
 
       // response_length should have null pass rate
-      const responseLength = result.evaluators.find(
-        (e) => e.evaluatorId === "response_length",
-      );
+      const responseLength = result.evaluators.find((e) => e.evaluatorId === "response_length");
       expect(responseLength?.passRate).toBeNull();
 
       // Overall pass rate should only count exact_match (1 pass, 1 fail = 50%)

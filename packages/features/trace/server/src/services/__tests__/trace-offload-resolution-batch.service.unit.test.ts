@@ -172,8 +172,7 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
 
     describe("when resolved as a batch", () => {
       it("never exceeds the configured event_log read concurrency", async () => {
-        const { blobStore, peakConcurrency } =
-          makeConcurrencyTrackingBlobStore(fullValue);
+        const { blobStore, peakConcurrency } = makeConcurrencyTrackingBlobStore(fullValue);
 
         await resolveOffloadedTracesBatch({
           projectId: "proj-1",
@@ -214,9 +213,7 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
 
         expect(results).toHaveLength(TRACE_COUNT);
         expect(results.every((r) => r.anyResolved)).toBe(true);
-        expect(results[0]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
-          fullValue,
-        );
+        expect(results[0]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(fullValue);
       });
     });
   });
@@ -243,12 +240,8 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
 
         expect(getCalls()).toBe(1);
         // Both output traces still receive the full value.
-        expect(results[0]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
-          fullValue,
-        );
-        expect(results[1]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
-          fullValue,
-        );
+        expect(results[0]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(fullValue);
+        expect(results[1]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(fullValue);
       });
     });
   });
@@ -279,9 +272,7 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
           "langwatch.output": "full batch output",
         });
         expect(
-          results[0]!.resolvedSpans[0]!.spanAttributes[
-            `${EVENTREF_ATTR_PREFIX}langwatch.output`
-          ],
+          results[0]!.resolvedSpans[0]!.spanAttributes[`${EVENTREF_ATTR_PREFIX}langwatch.output`],
         ).toBeUndefined();
       });
     });
@@ -405,14 +396,12 @@ describe("resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
   describe("given a result set where one trace fails and others succeed", () => {
     function makeSelectiveBlobStore(goodValue: string): BlobStore {
       return {
-        getFromEventLog: vi.fn(
-          async ({ eventId, field }: { eventId: string; field: string }) => {
-            if (eventId === "evt-bad") {
-              throw new BlobNotFoundError(eventId, field, "proj-1");
-            }
-            return goodValue;
-          },
-        ),
+        getFromEventLog: vi.fn(async ({ eventId, field }: { eventId: string; field: string }) => {
+          if (eventId === "evt-bad") {
+            throw new BlobNotFoundError(eventId, field, "proj-1");
+          }
+          return goodValue;
+        }),
         putSpool: vi.fn(),
         getSpool: vi.fn(),
         deleteSpool: vi.fn(),
@@ -447,9 +436,7 @@ describe("resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
         });
 
         expect(results[0]!.anyResolved).toBe(true);
-        expect(results[0]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
-          goodValue,
-        );
+        expect(results[0]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(goodValue);
         expect(results[1]!.anyResolved).toBe(false);
         expect(results[1]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
           "bad-preview",

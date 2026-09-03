@@ -91,8 +91,7 @@ describe("GatewayRealtimeSessionReconciliationWorker", () => {
     expect(repository.releaseMissingVendorConversation).toHaveBeenCalledWith({
       sessionId: "session-1",
       projectId: "project-1",
-      reason:
-        "the vendor has no conversation for this session, so the credential was never used",
+      reason: "the vendor has no conversation for this session, so the credential was never used",
     });
   });
 

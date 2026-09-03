@@ -127,9 +127,7 @@ describe.skipIf(!DB_URL)("cleanupTestRows (real DB)", () => {
           where: { id: bystanderOrgId },
         }),
       ).not.toBeNull();
-      expect(
-        await prisma!.team.findUnique({ where: { id: bystanderTeamId } }),
-      ).not.toBeNull();
+      expect(await prisma!.team.findUnique({ where: { id: bystanderTeamId } })).not.toBeNull();
     });
 
     /** @scenario "Rows the suite did not create survive a broken setup" */
@@ -170,13 +168,9 @@ describe.skipIf(!DB_URL)("cleanupTestRows (real DB)", () => {
       ).rejects.toThrow(/team\[1\]\.where\.id is undefined/);
 
       // The identified entry was cleaned...
-      expect(
-        await prisma!.organization.findUnique({ where: { id: doomedId } }),
-      ).toBeNull();
+      expect(await prisma!.organization.findUnique({ where: { id: doomedId } })).toBeNull();
       // ...and the unidentified one deleted nothing.
-      expect(
-        await prisma!.team.findUnique({ where: { id: bystanderTeamId } }),
-      ).not.toBeNull();
+      expect(await prisma!.team.findUnique({ where: { id: bystanderTeamId } })).not.toBeNull();
     });
   });
 
@@ -196,9 +190,7 @@ describe.skipIf(!DB_URL)("cleanupTestRows (real DB)", () => {
         cleanupTestRows(prisma!, [["organization", { id: ownId }]]),
       ).resolves.toBeUndefined();
 
-      expect(
-        await prisma!.organization.findUnique({ where: { id: ownId } }),
-      ).toBeNull();
+      expect(await prisma!.organization.findUnique({ where: { id: ownId } })).toBeNull();
       expect(
         await prisma!.organization.findUnique({
           where: { id: bystanderOrgId },
@@ -229,9 +221,7 @@ describe.skipIf(!DB_URL)("cleanupTestRows (real DB)", () => {
       ).rejects.toThrow(/organization\.deleteMany failed/);
 
       // The failure did not stop the rest of the cleanup.
-      expect(
-        await prisma!.organization.findUnique({ where: { id: survivorId } }),
-      ).toBeNull();
+      expect(await prisma!.organization.findUnique({ where: { id: survivorId } })).toBeNull();
       // And the FK held: the bystander is still there.
       expect(
         await prisma!.organization.findUnique({

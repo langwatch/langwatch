@@ -194,9 +194,7 @@ export async function waitForAllActiveJobs({
       const results = await pipeline.exec();
       if (!results) {
         const names = projections.map((p) => p.projectionName).join(", ");
-        throw new Error(
-          `Failed to inspect active jobs while draining projections [${names}]`,
-        );
+        throw new Error(`Failed to inspect active jobs while draining projections [${names}]`);
       }
 
       const commandErrors = results.filter(([err]) => err != null);

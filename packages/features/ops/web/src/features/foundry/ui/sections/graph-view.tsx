@@ -26,8 +26,7 @@ interface SpanNodeData {
 }
 
 function SpanNode({ data }: { data: SpanNodeData }) {
-  const color =
-    SPAN_TYPE_COLORS[data.type as keyof typeof SPAN_TYPE_COLORS] ?? "gray.400";
+  const color = SPAN_TYPE_COLORS[data.type as keyof typeof SPAN_TYPE_COLORS] ?? "gray.400";
 
   return (
     <>
@@ -47,13 +46,7 @@ function SpanNode({ data }: { data: SpanNodeData }) {
         borderColor={
           data.isSelected ? "orange.400" : data.status === "error" ? "red.600" : "border"
         }
-        bg={
-          data.isSelected
-            ? "orange.subtle"
-            : data.status === "error"
-              ? "red.subtle"
-              : "bg.panel"
-        }
+        bg={data.isSelected ? "orange.subtle" : data.status === "error" ? "red.subtle" : "bg.panel"}
         paddingX={3}
         paddingY={2}
         minWidth="140px"

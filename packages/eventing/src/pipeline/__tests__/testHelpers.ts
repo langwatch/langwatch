@@ -13,10 +13,7 @@ import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
 } from "../../projections/foldProjection.types";
-import type {
-  AppendStore,
-  MapProjectionDefinition,
-} from "../../projections/mapProjection.types";
+import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types";
 import type { EventSourcedQueueProcessor } from "../../queues";
 import {
   createTestEvent,
@@ -138,10 +135,10 @@ export function createTestCommandHandlerClass<
   class TestCommandHandler {
     static readonly schema: CommandSchema<Payload, CommandType> =
       config?.schema ??
-      (defineCommandSchema(
-        TEST_COMMAND_TYPES[0],
-        testCommandPayloadSchema,
-      ) as CommandSchema<Payload, CommandType>);
+      (defineCommandSchema(TEST_COMMAND_TYPES[0], testCommandPayloadSchema) as CommandSchema<
+        Payload,
+        CommandType
+      >);
 
     static readonly dispatcherName = config?.dispatcherName as string | undefined;
 
@@ -164,10 +161,7 @@ export function createTestCommandHandlerClass<
 /**
  * Creates a mock FoldProjectionDefinition for testing.
  */
-export function createMockFoldProjection<
-  State = unknown,
-  E extends Event = Event,
->(config?: {
+export function createMockFoldProjection<State = unknown, E extends Event = Event>(config?: {
   name?: string;
   eventTypes?: readonly string[];
   init?: () => State;
@@ -191,10 +185,7 @@ export function createMockFoldProjection<
 /**
  * Creates a mock MapProjectionDefinition for testing.
  */
-export function createMockMapProjection<
-  Record = unknown,
-  E extends Event = Event,
->(config?: {
+export function createMockMapProjection<Record = unknown, E extends Event = Event>(config?: {
   name?: string;
   eventTypes?: readonly string[];
   map?: (event: E) => Record | null;

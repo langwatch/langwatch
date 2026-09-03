@@ -1169,9 +1169,7 @@ describe("SystemMigrationsService and a migration enrolled automatically", () =>
           actorUserId: "user_ops",
         }),
       ).rejects.toMatchObject({ code: "migration_enrolled_automatically" });
-      expect(
-        enrollments.findCohortEligibleOrganizations,
-      ).not.toHaveBeenCalled();
+      expect(enrollments.findCohortEligibleOrganizations).not.toHaveBeenCalled();
       expect(enrollments.createMany).not.toHaveBeenCalled();
     });
   });

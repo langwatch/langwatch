@@ -92,9 +92,7 @@ describe("given the identity provider has to be pointed somewhere", () => {
       new FakeScimHost({ scimBaseUrl: "https://acme.langwatch.test/api/scim/v2" }),
     );
 
-    expect(
-      screen.getByDisplayValue("https://acme.langwatch.test/api/scim/v2"),
-    ).toBeTruthy();
+    expect(screen.getByDisplayValue("https://acme.langwatch.test/api/scim/v2")).toBeTruthy();
   });
 });
 

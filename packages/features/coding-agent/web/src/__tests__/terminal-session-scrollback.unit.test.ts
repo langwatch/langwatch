@@ -78,12 +78,7 @@ describe("mergeSessionTurns", () => {
             ? entry.text
             : entry.kind,
         ),
-      ).toEqual([
-        "check git status",
-        "On branch main.",
-        "bump the version",
-        "Bumped to 2.",
-      ]);
+      ).toEqual(["check git status", "On branch main.", "bump the version", "Bumped to 2."]);
     });
 
     it("names every row by its own turn and position, not by where it landed", () => {

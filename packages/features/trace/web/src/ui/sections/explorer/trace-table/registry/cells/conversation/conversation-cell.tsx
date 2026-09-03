@@ -118,16 +118,8 @@ export const ConversationCell: CellDef<ConversationGroup> = {
     const io = conversationIO(row);
     return (
       <HStack gap={2} align="start" width="full" minWidth={0}>
-        <ExpandToggle
-          isExpanded={isExpanded}
-          actions={actions}
-          boxSize="14px"
-          marginTop="2px"
-        />
-        <ConversationIdLabel
-          conversationId={row.conversationId}
-          label={sessionLabelOf(row)}
-        />
+        <ExpandToggle isExpanded={isExpanded} actions={actions} boxSize="14px" marginTop="2px" />
+        <ConversationIdLabel conversationId={row.conversationId} label={sessionLabelOf(row)} />
         <Box flex={1} minWidth={0}>
           {io.hasContent ? (
             <IOPreview input={io.input} output={io.output} />
@@ -145,12 +137,7 @@ export const ConversationCell: CellDef<ConversationGroup> = {
     const io = conversationIO(row);
     return (
       <HStack gap={3} align="start" width="full" minWidth={0}>
-        <ExpandToggle
-          isExpanded={isExpanded}
-          actions={actions}
-          boxSize="16px"
-          marginTop="3px"
-        />
+        <ExpandToggle isExpanded={isExpanded} actions={actions} boxSize="16px" marginTop="3px" />
         <ConversationIdLabel
           conversationId={row.conversationId}
           label={sessionLabelOf(row)}
@@ -191,10 +178,7 @@ const ConversationSummaryChips: React.FC<{ group: ConversationGroup }> = ({ grou
     )}
     {group.totalEvals > 0 && (
       <HStack gap={0.5}>
-        <Circle
-          size="6px"
-          bg={group.evalsFailedCount > 0 ? "red.solid" : "green.solid"}
-        />
+        <Circle size="6px" bg={group.evalsFailedCount > 0 ? "red.solid" : "green.solid"} />
         <Text>
           {group.evalsPassedCount}/{group.totalEvals}
         </Text>

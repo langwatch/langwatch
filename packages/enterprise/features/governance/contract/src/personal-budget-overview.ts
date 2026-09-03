@@ -19,14 +19,7 @@ export type GovernanceBudgetOverviewItem = {
   providerLabel: string | null;
   isPerMember: boolean;
   managedByVirtualKeyId: string | null;
-  scopeClass:
-    | "organization"
-    | "team"
-    | "project"
-    | "personal"
-    | "key"
-    | "department"
-    | "other";
+  scopeClass: "organization" | "team" | "project" | "personal" | "key" | "department" | "other";
   scopePhrase: string;
   resetsAt: string | null;
   topModels?: Array<{ model: string; spentUsd: number }>;

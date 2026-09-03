@@ -18,9 +18,7 @@ import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repositor
 import type { AnalyticsTimeseriesQuery } from "../../analytics.repository";
 
 vi.mock("../../../clickhouse/aggregation-builder", () => ({
-  buildTimeseriesQuery: vi
-    .fn()
-    .mockReturnValue({ sql: "SELECT 1", params: {} }),
+  buildTimeseriesQuery: vi.fn().mockReturnValue({ sql: "SELECT 1", params: {} }),
   buildFeedbacksQuery: vi.fn(),
   buildTopDocumentsQuery: vi.fn(),
 }));
@@ -31,9 +29,7 @@ const fakeClient = {
   query: vi.fn().mockResolvedValue({ json: async () => [] }),
 };
 
-function makeQuery(
-  overrides: Partial<AnalyticsTimeseriesInput> = {},
-): AnalyticsTimeseriesQuery {
+function makeQuery(overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesQuery {
   const startDate = new Date("2026-07-01T00:00:00.000Z");
   const endDate = new Date("2026-07-16T00:00:00.000Z");
   return {
@@ -83,9 +79,7 @@ describe("ClickHouseAnalyticsRepository", () => {
   describe("when the request is scoped to explicit trace ids", () => {
     /** @scenario A graph scoped to specific traces reads only those traces */
     it("forwards traceIds to the query builder", async () => {
-      await repository.runTimeseries(
-        makeQuery({ traceIds: ["trace-1", "trace-2"] }),
-      );
+      await repository.runTimeseries(makeQuery({ traceIds: ["trace-1", "trace-2"] }));
 
       expect(buildTimeseriesQueryMock).toHaveBeenCalledWith(
         expect.objectContaining({ traceIds: ["trace-1", "trace-2"] }),

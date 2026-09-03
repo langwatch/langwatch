@@ -9,11 +9,7 @@ import {
 import type { MfaEnrollmentRepository } from "../../mfa-enrollment.repository";
 import { MfaGuards } from "../../mfa-guards";
 import { describe, expect, it } from "vitest";
-import {
-  type Command,
-  createTenantId,
-  validateEventAggregateType,
-} from "@langwatch/eventing";
+import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {
   ConfirmMfaCommand,
   ConsumeBackupCodeCommand,
@@ -125,9 +121,7 @@ describe("two-step verification event aggregate type", () => {
       },
       {
         label: "confirm",
-        handler: new ConfirmMfaCommand(
-          new MfaGuards(new EnrollmentOf(PENDING)),
-        ),
+        handler: new ConfirmMfaCommand(new MfaGuards(new EnrollmentOf(PENDING))),
         data: {
           ...base,
           commandId: "mfacmd_2",
@@ -137,9 +131,7 @@ describe("two-step verification event aggregate type", () => {
       },
       {
         label: "expire",
-        handler: new ExpireMfaEnrollmentCommand(
-          new MfaGuards(new EnrollmentOf(PENDING)),
-        ),
+        handler: new ExpireMfaEnrollmentCommand(new MfaGuards(new EnrollmentOf(PENDING))),
         data: {
           tenantId: USER,
           userId: USER,
@@ -150,9 +142,7 @@ describe("two-step verification event aggregate type", () => {
       },
       {
         label: "disable",
-        handler: new DisableMfaCommand(
-          new MfaGuards(new EnrollmentOf(ENABLED)),
-        ),
+        handler: new DisableMfaCommand(new MfaGuards(new EnrollmentOf(ENABLED))),
         data: {
           ...base,
           commandId: "mfacmd_4",
@@ -162,9 +152,7 @@ describe("two-step verification event aggregate type", () => {
       },
       {
         label: "consume backup code",
-        handler: new ConsumeBackupCodeCommand(
-          new MfaGuards(new EnrollmentOf(ENABLED)),
-        ),
+        handler: new ConsumeBackupCodeCommand(new MfaGuards(new EnrollmentOf(ENABLED))),
         data: {
           tenantId: USER,
           userId: USER,
@@ -175,16 +163,12 @@ describe("two-step verification event aggregate type", () => {
       },
       {
         label: "regenerate backup codes",
-        handler: new RegenerateBackupCodesCommand(
-          new MfaGuards(new EnrollmentOf(ENABLED)),
-        ),
+        handler: new RegenerateBackupCodesCommand(new MfaGuards(new EnrollmentOf(ENABLED))),
         data: { ...base, commandId: "mfacmd_6", backupCodeCount: 10 },
       },
       {
         label: "record failure",
-        handler: new RecordMfaVerificationFailureCommand(
-          new MfaGuards(new EnrollmentOf(ENABLED)),
-        ),
+        handler: new RecordMfaVerificationFailureCommand(new MfaGuards(new EnrollmentOf(ENABLED))),
         data: {
           tenantId: USER,
           userId: USER,
@@ -193,10 +177,7 @@ describe("two-step verification event aggregate type", () => {
           failedCount: 2,
         },
       },
-    ])("stamps $label with the pipeline's declared aggregate type", async ({
-      handler,
-      data,
-    }) => {
+    ])("stamps $label with the pipeline's declared aggregate type", async ({ handler, data }) => {
       const declared = createIdentityPipeline({
         identityProjectionStore: noopStore,
         identityGuards: null as never,
@@ -207,9 +188,7 @@ describe("two-step verification event aggregate type", () => {
       const events = await handler.handle(command(data) as never);
       expect(events.length).toBeGreaterThan(0);
       for (const [index, event] of events.entries()) {
-        expect(() =>
-          validateEventAggregateType(event as never, declared, index),
-        ).not.toThrow();
+        expect(() => validateEventAggregateType(event as never, declared, index)).not.toThrow();
       }
     });
   });
@@ -263,9 +242,7 @@ describe("two-step verification event aggregate type", () => {
         }) as never,
       );
 
-      expect((mfaEvent as { version: string }).version).toBe(
-        MFA_EVENT_VERSION_LATEST,
-      );
+      expect((mfaEvent as { version: string }).version).toBe(MFA_EVENT_VERSION_LATEST);
       expect(MFA_EVENT_VERSION_LATEST).not.toBe(IDENTITY_EVENT_VERSION_LATEST);
     });
 

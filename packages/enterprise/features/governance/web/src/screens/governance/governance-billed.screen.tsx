@@ -15,9 +15,7 @@ function BilledPage() {
     <GovernanceLayout pageTitle="Billed · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full">
         <Heading size="md">Billed</Heading>
-        <Text color="fg.muted">
-          Billed views are on their way. Nothing to see here yet.
-        </Text>
+        <Text color="fg.muted">Billed views are on their way. Nothing to see here yet.</Text>
       </VStack>
     </GovernanceLayout>
   );

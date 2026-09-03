@@ -2,10 +2,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
-import type {
-  LangyDerivedCard,
-  LangyDerivedChoicesCard,
-} from "@langwatch/langy-contract";
+import type { LangyDerivedCard, LangyDerivedChoicesCard } from "@langwatch/langy-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LangyChoicesCard } from "../langy-choices-card";
 import { LangyDerivedCardView } from "../langy-derived-card-view";
@@ -50,11 +47,7 @@ describe("Langy derived card presentation", () => {
 
     render(
       <ChakraProvider value={defaultSystem}>
-        <LangyChoicesCard
-          card={card}
-          lockState={{ status: "open" }}
-          onSelect={onSelect}
-        />
+        <LangyChoicesCard card={card} lockState={{ status: "open" }} onSelect={onSelect} />
       </ChakraProvider>,
     );
 

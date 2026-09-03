@@ -43,8 +43,7 @@ export function useDestinationContext(
     () => ({
       organizationId: orgId,
       organizationName: organization?.name,
-      availableTeams:
-        organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+      availableTeams: organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
       availableProjects:
         organization?.teams?.flatMap((t) =>
           t.projects.map((p) => ({

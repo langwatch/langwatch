@@ -173,10 +173,7 @@ export class EventSourcedQueueProcessorMemory<
     });
   }
 
-  async sendBatch(
-    payloads: Payload[],
-    options?: QueueSendOptions<Payload>,
-  ): Promise<void> {
+  async sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void> {
     await Promise.all(payloads.map((payload) => this.send(payload, options)));
   }
 
@@ -209,10 +206,7 @@ export class EventSourcedQueueProcessorMemory<
     if (job.deduplicationId) {
       this.pendingJobsByDeduplicationId.delete(job.deduplicationId);
       if (job.shouldSurviveDispatch && job.dedupExpiresAt !== undefined) {
-        this.suppressedUntilByDeduplicationId.set(
-          job.deduplicationId,
-          job.dedupExpiresAt,
-        );
+        this.suppressedUntilByDeduplicationId.set(job.deduplicationId, job.dedupExpiresAt);
       }
     }
 
@@ -366,17 +360,12 @@ export class EventSourcedQueueProcessorMemory<
 
     // Reject any remaining queued jobs
     for (const job of this.queue) {
-      job.reject(
-        new Error(`Queue ${this.queueName} was closed before job could be processed`),
-      );
+      job.reject(new Error(`Queue ${this.queueName} was closed before job could be processed`));
     }
     this.queue.length = 0;
     this.pendingJobsByDeduplicationId.clear();
     this.suppressedUntilByDeduplicationId.clear();
 
-    this.logger.debug(
-      { queueName: this.queueName },
-      "Memory queue processor closed successfully",
-    );
+    this.logger.debug({ queueName: this.queueName }, "Memory queue processor closed successfully");
   }
 }

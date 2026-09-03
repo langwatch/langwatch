@@ -139,9 +139,7 @@ describe("given the optimize handoff", () => {
     return (
       <button
         type="button"
-        onClick={() =>
-          optimize?.({ target: promptTarget, name: "Support draft" })
-        }
+        onClick={() => optimize?.({ target: promptTarget, name: "Support draft" })}
       >
         go
       </button>
@@ -166,11 +164,7 @@ describe("given the optimize handoff", () => {
       render(<Harness />);
       fireEvent.click(screen.getByText("go"));
 
-      expect(
-        useLangyStore
-          .getState()
-          .chosenChipIds.has("experiment:support-quality"),
-      ).toBe(true);
+      expect(useLangyStore.getState().chosenChipIds.has("experiment:support-quality")).toBe(true);
       const picked = useLangyContextTargetStore.getState().picked;
       expect(picked.some((chip) => chip.id === "prompt:prompt_1")).toBe(true);
     });

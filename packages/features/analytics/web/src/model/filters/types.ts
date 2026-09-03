@@ -55,8 +55,7 @@ export const triggerFiltersPermissiveSchema = z.record(z.string(), filterValueSc
 
 const validFilterFields = new Set<string>(filterFieldsEnum.options);
 
-const isTriggerFilterField = (field: string): field is FilterField =>
-  validFilterFields.has(field);
+const isTriggerFilterField = (field: string): field is FilterField => validFilterFields.has(field);
 
 export const sanitizeTriggerFilters = (filters: Record<string, TriggerFilterValue>) => {
   const sanitized: TriggerFilters = {};

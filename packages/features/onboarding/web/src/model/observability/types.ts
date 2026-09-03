@@ -1,10 +1,4 @@
-export type PlatformKey =
-  | "typescript"
-  | "python"
-  | "go"
-  | "java"
-  | "opentelemetry"
-  | "no_and_lo";
+export type PlatformKey = "typescript" | "python" | "go" | "java" | "opentelemetry" | "no_and_lo";
 
 export type FrameworkKey =
   | "vercel_ai"

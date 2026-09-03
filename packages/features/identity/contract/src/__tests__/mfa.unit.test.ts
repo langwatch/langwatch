@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  IdentityMfaCodeInvalidError,
-  IdentityMfaEnrollmentExpiredError,
-} from "../errors";
+import { IdentityMfaCodeInvalidError, IdentityMfaEnrollmentExpiredError } from "../errors";
 import {
   BACKUP_CODE_CONSUMED_EVENT_TYPE,
   BACKUP_CODES_REGENERATED_EVENT_TYPE,
@@ -30,10 +27,7 @@ const ENROLLMENT = "mfaenr_01";
 const T0 = 1_690_000_000_000;
 const MINUTE = 60_000;
 
-function enrolled(overrides?: {
-  enrollmentId?: string;
-  occurredAt?: number;
-}): MfaFact {
+function enrolled(overrides?: { enrollmentId?: string; occurredAt?: number }): MfaFact {
   return {
     type: MFA_ENROLLED_EVENT_TYPE,
     occurredAt: overrides?.occurredAt ?? T0,
@@ -46,10 +40,7 @@ function enrolled(overrides?: {
   };
 }
 
-function confirmed(overrides?: {
-  backupCodeCount?: number;
-  occurredAt?: number;
-}): MfaFact {
+function confirmed(overrides?: { backupCodeCount?: number; occurredAt?: number }): MfaFact {
   return {
     type: MFA_CONFIRMED_EVENT_TYPE,
     occurredAt: overrides?.occurredAt ?? T0 + MINUTE,
@@ -98,12 +89,7 @@ describe("the two-step verification aggregate", () => {
         otpauthUrl: "otpauth://totp/LangWatch:sam?secret=JBSWY3DPEHPK3PXP",
       });
 
-      expect(Object.keys(parsed).sort()).toEqual([
-        "actor",
-        "enrollmentId",
-        "method",
-        "userId",
-      ]);
+      expect(Object.keys(parsed).sort()).toEqual(["actor", "enrollmentId", "method", "userId"]);
       expect(JSON.stringify(parsed)).not.toContain("JBSWY3DPEHPK3PXP");
     });
 
@@ -201,11 +187,7 @@ describe("the two-step verification aggregate", () => {
         codes: ["11111111", "22222222"],
       });
 
-      expect(Object.keys(parsed).sort()).toEqual([
-        "actor",
-        "backupCodeCount",
-        "enrollmentId",
-      ]);
+      expect(Object.keys(parsed).sort()).toEqual(["actor", "backupCodeCount", "enrollmentId"]);
       expect(JSON.stringify(parsed)).not.toContain("11111111");
       expect(fold([enrolled(), confirmed()]).backupCodeCount).toBe(10);
     });
@@ -215,12 +197,7 @@ describe("the two-step verification aggregate", () => {
       const once = fold([enrolled(), confirmed(), consumed(3)]);
       expect(remainingBackupCodes(once)).toBe(9);
 
-      const twice = fold([
-        enrolled(),
-        confirmed(),
-        consumed(3),
-        consumed(3, T0 + 5 * MINUTE),
-      ]);
+      const twice = fold([enrolled(), confirmed(), consumed(3), consumed(3, T0 + 5 * MINUTE)]);
       expect(twice.consumedBackupCodeIndexes).toEqual([3]);
       expect(remainingBackupCodes(twice)).toBe(9);
     });
@@ -282,31 +259,22 @@ describe("the two-step verification aggregate", () => {
         attemptedCode: "000000",
       });
 
-      expect(Object.keys(parsed).sort()).toEqual([
-        "enrollmentId",
-        "failedCount",
-      ]);
+      expect(Object.keys(parsed).sort()).toEqual(["enrollmentId", "failedCount"]);
       expect(JSON.stringify(parsed)).not.toContain("000000");
       expect(fold([enrolled(), confirmed(), failed(2)]).failedCount).toBe(2);
     });
 
     /** @scenario "A wrong code and a code for a setup nobody holds answer the same way" */
     it("answers a wrong code and an unknown enrollment identically", () => {
-      const wrongCode = new IdentityMfaCodeInvalidError(
-        `totp mismatch for ${USER}`,
-      );
-      const noSuchEnrollment = new IdentityMfaCodeInvalidError(
-        `no enrollment for ${USER}`,
-      );
+      const wrongCode = new IdentityMfaCodeInvalidError(`totp mismatch for ${USER}`);
+      const noSuchEnrollment = new IdentityMfaCodeInvalidError(`no enrollment for ${USER}`);
 
       expect(noSuchEnrollment.code).toBe(wrongCode.code);
       expect(noSuchEnrollment.message).toBe(wrongCode.message);
       expect(noSuchEnrollment.httpStatus).toBe(wrongCode.httpStatus);
 
       // An expired setup IS separable — its remedy is to start again.
-      expect(new IdentityMfaEnrollmentExpiredError("expired").code).not.toBe(
-        wrongCode.code,
-      );
+      expect(new IdentityMfaEnrollmentExpiredError("expired").code).not.toBe(wrongCode.code);
     });
   });
 

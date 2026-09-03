@@ -147,9 +147,7 @@ describe("MapProjectionExecutor dedupeByIdempotencyKey", () => {
         map: () => ({ n: 1 }),
         options: { dedupeByIdempotencyKey: true },
       });
-      mapDef.eventLoaderUpTo = vi
-        .fn()
-        .mockRejectedValue(new Error("event_log unavailable"));
+      mapDef.eventLoaderUpTo = vi.fn().mockRejectedValue(new Error("event_log unavailable"));
 
       await expect(executor.execute(mapDef, event, context)).rejects.toThrow(
         "event_log unavailable",

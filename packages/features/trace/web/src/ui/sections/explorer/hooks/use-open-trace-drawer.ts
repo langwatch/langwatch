@@ -180,10 +180,7 @@ export function useOpenTraceDrawer() {
             [],
           );
 
-          utils.tracesV2.traceEvents.setData(
-            { projectId: project.id, traceId: trace.traceId },
-            [],
-          );
+          utils.tracesV2.traceEvents.setData({ projectId: project.id, traceId: trace.traceId }, []);
           utils.tracesV2.traceEvents.setData(
             {
               projectId: project.id,

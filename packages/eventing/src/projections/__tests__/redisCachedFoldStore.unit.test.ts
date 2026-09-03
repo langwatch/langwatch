@@ -92,8 +92,7 @@ async function redisErrorCount(operation: string): Promise<number> {
   const metric = await register.getSingleMetric("es_fold_cache_redis_error_total")?.get();
   return (
     metric?.values.find(
-      (v) =>
-        v.labels.projection_name === "test_table" && v.labels.operation === operation,
+      (v) => v.labels.projection_name === "test_table" && v.labels.operation === operation,
     )?.value ?? 0
   );
 }
@@ -129,13 +128,8 @@ const CONTEXT: ProjectionStoreContext = {
 const CACHE_KEY = `fold:test_table:${String(TENANT)}:agg-1`;
 
 function createStore<
-  Inner extends { store: FoldProjectionStore<TestState> } = ReturnType<
-    typeof createInnerStore
-  >,
->(
-  redis: ReturnType<typeof createRedis>,
-  inner: Inner = createInnerStore() as unknown as Inner,
-) {
+  Inner extends { store: FoldProjectionStore<TestState> } = ReturnType<typeof createInnerStore>,
+>(redis: ReturnType<typeof createRedis>, inner: Inner = createInnerStore() as unknown as Inner) {
   return {
     inner,
     store: new RedisCachedFoldStore<TestState>(inner.store, redis as never, {
@@ -261,9 +255,7 @@ describe("RedisCachedFoldStore", () => {
         redis.set.mockRejectedValueOnce(new Error("OOM"));
         const { store, inner } = createStore(redis);
 
-        await expect(
-          store.store({ count: 5, UpdatedAt: 200 }, CONTEXT),
-        ).resolves.toBeUndefined();
+        await expect(store.store({ count: 5, UpdatedAt: 200 }, CONTEXT)).resolves.toBeUndefined();
         expect(inner.calls.store).toHaveLength(1);
       });
     });

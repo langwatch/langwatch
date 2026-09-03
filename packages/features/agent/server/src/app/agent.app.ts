@@ -18,7 +18,11 @@
  */
 import type { AgentService, AgentWithFields } from "@langwatch/agent-contract";
 import { nanoid } from "nanoid";
-import type { AgentTestPort, AgentTestRunResult, AgentTestTurnResult } from "../ports/agent-test.port";
+import type {
+  AgentTestPort,
+  AgentTestRunResult,
+  AgentTestTurnResult,
+} from "../ports/agent-test.port";
 import { declaredAgentParameters } from "../services/agent.service";
 import {
   agentPresenceView,
@@ -26,9 +30,7 @@ import {
 } from "../services/connected-agent-presence.service";
 
 /** `AgentWithFields.ownerUserId` is optional; the presence view needs it settled. */
-function withOwnerUserId<T extends AgentWithFields>(
-  agent: T,
-): T & { ownerUserId: string | null } {
+function withOwnerUserId<T extends AgentWithFields>(agent: T): T & { ownerUserId: string | null } {
   return { ...agent, ownerUserId: agent.ownerUserId ?? null };
 }
 

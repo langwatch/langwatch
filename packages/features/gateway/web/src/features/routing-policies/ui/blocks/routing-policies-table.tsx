@@ -124,8 +124,8 @@ export function RoutingPoliciesTable({
               Elsewhere
             </Text>
             <Text fontSize="xs" color="fg.muted">
-              These policies apply somewhere this page does not have a section for. They
-              still route traffic, so they are listed here rather than hidden.
+              These policies apply somewhere this page does not have a section for. They still route
+              traffic, so they are listed here rather than hidden.
             </Text>
           </VStack>
           <VStack align="stretch" gap={2}>
@@ -190,9 +190,7 @@ function PolicyRow({
   onDelete: () => void;
   canManage: boolean;
 }) {
-  const providerCount = Array.isArray(policy.modelProviderIds)
-    ? policy.modelProviderIds.length
-    : 0;
+  const providerCount = Array.isArray(policy.modelProviderIds) ? policy.modelProviderIds.length : 0;
   const { tierCount, mappingCount } = countAliases(policy.modelAliases);
   const answeredTiers = policy.defaultModel ? "every tier" : describeTiers(tierCount);
 
@@ -230,8 +228,7 @@ function PolicyRow({
           </Text>
         )}
         <Text fontSize="xs" color="fg.muted">
-          {providerCount} {providerCount === 1 ? "provider" : "providers"} ·{" "}
-          {answeredTiers}
+          {providerCount} {providerCount === 1 ? "provider" : "providers"} · {answeredTiers}
           {mappingCount > 0 &&
             ` · ${mappingCount} ${mappingCount === 1 ? "name mapping" : "name mappings"}`}
         </Text>

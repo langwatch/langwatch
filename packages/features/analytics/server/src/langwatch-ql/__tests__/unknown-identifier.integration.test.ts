@@ -92,23 +92,15 @@ describe("given SQL that names a column no dataset has", () => {
   describe("when the query names a column that does not exist", () => {
     /** @scenario "A query naming a column that does not exist is refused with the column named" */
     it("refuses it as a member-actionable error rather than an unknown", async () => {
-      const failure = await failureOf(
-        `SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`,
-      );
+      const failure = await failureOf(`SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`);
 
-      expect((failure as { code?: unknown }).code).toBe(
-        "lwql_unknown_identifier",
-      );
+      expect((failure as { code?: unknown }).code).toBe("lwql_unknown_identifier");
     });
 
     /** @scenario "A query naming a column that does not exist is refused with the column named" */
     it("blames the member rather than the platform", async () => {
-      const failure = await failureOf(
-        `SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`,
-      );
-      const serialised = (
-        failure as { serialize: () => Record<string, unknown> }
-      ).serialize();
+      const failure = await failureOf(`SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`);
+      const serialised = (failure as { serialize: () => Record<string, unknown> }).serialize();
 
       // `fault` is what decides whether this pages someone. A typo must not.
       expect(serialised.fault).toBe("customer");
@@ -123,24 +115,16 @@ describe("given SQL that names a column no dataset has", () => {
      * @scenario "A query naming a column that does not exist is refused with the column named"
      */
     it("names the offending column, read from what the server actually said", async () => {
-      const failure = await failureOf(
-        `SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`,
-      );
-      const serialised = (
-        failure as { serialize: () => Record<string, unknown> }
-      ).serialize();
+      const failure = await failureOf(`SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`);
+      const serialised = (failure as { serialize: () => Record<string, unknown> }).serialize();
 
       expect(serialised.meta).toMatchObject({ identifier: MISSING_COLUMN });
     });
 
     /** @scenario "A query naming a column that does not exist is refused with the column named" */
     it("relays no part of the server's message, which echoes the query", async () => {
-      const failure = await failureOf(
-        `SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`,
-      );
-      const serialised = (
-        failure as { serialize: () => Record<string, unknown> }
-      ).serialize();
+      const failure = await failureOf(`SELECT ${MISSING_COLUMN} FROM ${database}.traces LIMIT 1`);
+      const serialised = (failure as { serialize: () => Record<string, unknown> }).serialize();
 
       // The raw refusal rides in `reasons` for the operator's logs. What a
       // caller receives is the code, the copy, and the one identifier.

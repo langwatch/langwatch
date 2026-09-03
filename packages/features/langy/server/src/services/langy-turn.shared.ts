@@ -151,9 +151,7 @@ export function buildWorkerProbeArgs({
     ...(credentials.githubRepoScopeKey
       ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
       : {}),
-    ...(credentials.egressAllowlist
-      ? { egressAllowlist: credentials.egressAllowlist }
-      : {}),
+    ...(credentials.egressAllowlist ? { egressAllowlist: credentials.egressAllowlist } : {}),
     ...(credentials.mirrorTier ? { mirrorTier: credentials.mirrorTier } : {}),
     ...(credentials.harness ? { harness: credentials.harness } : {}),
   };

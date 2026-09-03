@@ -87,13 +87,10 @@ export type LangySessionHandle = {
  * prefix provider caching reads). A failed listing or a corrupt file degrades
  * to a fresh session rather than failing the spawn.
  */
-export function openSessionManager({
-  home,
-  sessionDir,
-}: {
-  home: string;
-  sessionDir: string;
-}): { sessionManager: SessionManager; resumed: boolean } {
+export function openSessionManager({ home, sessionDir }: { home: string; sessionDir: string }): {
+  sessionManager: SessionManager;
+  resumed: boolean;
+} {
   try {
     const sessionManager = SessionManager.continueRecent(home, sessionDir);
     return { sessionManager, resumed: sessionManager.getEntries().length > 0 };

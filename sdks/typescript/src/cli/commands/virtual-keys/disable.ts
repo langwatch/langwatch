@@ -35,9 +35,7 @@ export const disableVirtualKeyCommand = async (
   }
 };
 
-export const enableVirtualKeyCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const enableVirtualKeyCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new VirtualKeysApiService();

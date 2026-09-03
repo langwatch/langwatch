@@ -28,9 +28,7 @@ function runHelper(env: Record<string, string | undefined>): {
   exitCode: number;
 } {
   const exports = Object.entries(env)
-    .map(([k, v]) =>
-      v === undefined ? `unset ${k}` : `export ${k}='${v.replace(/'/g, "'\\''")}'`,
-    )
+    .map(([k, v]) => (v === undefined ? `unset ${k}` : `export ${k}='${v.replace(/'/g, "'\\''")}'`))
     .join("\n");
   const script = `
 set -e

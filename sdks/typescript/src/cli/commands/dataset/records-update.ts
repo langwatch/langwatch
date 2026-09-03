@@ -25,17 +25,13 @@ export const recordsUpdateCommand = async (
     entry = parsed as Record<string, unknown>;
   } catch (error) {
     reportCommandError({
-      error: commandValidationError(
-        error instanceof Error ? error.message : "Invalid JSON input",
-      ),
+      error: commandValidationError(error instanceof Error ? error.message : "Invalid JSON input"),
     });
     process.exit(1);
   }
 
   const service = createDatasetService();
-  const spinner = createSpinner(
-    `Updating record "${recordId}" in "${slugOrId}"...`,
-  ).start();
+  const spinner = createSpinner(`Updating record "${recordId}" in "${slugOrId}"...`).start();
 
   try {
     const record = await service.updateRecord(slugOrId, recordId, entry);

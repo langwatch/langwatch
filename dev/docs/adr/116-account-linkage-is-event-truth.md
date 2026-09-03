@@ -25,7 +25,7 @@ ADR-101 drew a truth split: `Account`, `Session` and `Verification` are
 `Account` and `Identifier` both record that a user holds a sign-in method,
 overlapping on exactly `(userId, provider, providerAccountId)` plus
 existence. Two tables, one fact. That is why the backfill's parity check is
-**bidirectional** and why a user whose rows disagree is *held* — the proof
+**bidirectional** and why a user whose rows disagree is _held_ — the proof
 exists because the duplication does.
 
 Closing the duplication means better-auth's `account` model has to be
@@ -37,7 +37,7 @@ establishes two facts that constrain where an adapter can sit:
 - better-auth's `findUserByEmail(email, { includeAccounts: true })` asks for
   the user with `join: { account: true }`. Joins are off by default
   (`advanced.database.joins`), and when they are off `createAdapterFactory`
-  satisfies the join *itself*, with a second query issued through the adapter
+  satisfies the join _itself_, with a second query issued through the adapter
   instance **the factory was built around** (`handleFallbackJoin` calls
   `adapterInstance.findOne` / `findMany` directly).
 - Sign-up runs inside `adapter.transaction`, and for that request
@@ -45,7 +45,7 @@ establishes two facts that constrain where an adapter can sit:
 
 One rule behind both: **a wrapper over a built adapter cannot intercept a
 model, because the factory's own traffic is below the wrapper.** Serving a
-model from other storage has to happen *at* the factory — by being the base
+model from other storage has to happen _at_ the factory — by being the base
 implementation `createAdapterFactory` is built around, which is
 better-auth's documented seam for exactly this.
 
@@ -86,13 +86,13 @@ storage (latched users). The end state serves the `account` model from
 
 Every table is single-truth again:
 
-| Table | Truth | Writer | Fate |
-|---|---|---|---|
-| `Identifier` | event | the fold | end state; linkage, emails, primary flag, `providerAccountId` |
-| `AccountCredential` | row | the adapter's identity branch | end state; secrets only (`password`, `access_token`, `refresh_token`, `id_token`, `expires_at`, `scope`, …) — barred from events by ADR-101's payload rule |
-| `Session`, `Verification`, rate limits | row | stock branch, both populations | untouched forever (ADR-101 R12) |
-| `User` | row (profile) + polyfill (`email` from PRIMARY identifier, via the fold) | mixed writers today; the identity branch makes `email` fold-only for latched users | stays — the whole application FKs it |
-| `Account` | row (legacy users) / projection (latched users, bridge) | stock branch / the fold | **dropped** when the last tenant finalizes |
+| Table                                  | Truth                                                                    | Writer                                                                             | Fate                                                                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Identifier`                           | event                                                                    | the fold                                                                           | end state; linkage, emails, primary flag, `providerAccountId`                                                                                              |
+| `AccountCredential`                    | row                                                                      | the adapter's identity branch                                                      | end state; secrets only (`password`, `access_token`, `refresh_token`, `id_token`, `expires_at`, `scope`, …) — barred from events by ADR-101's payload rule |
+| `Session`, `Verification`, rate limits | row                                                                      | stock branch, both populations                                                     | untouched forever (ADR-101 R12)                                                                                                                            |
+| `User`                                 | row (profile) + polyfill (`email` from PRIMARY identifier, via the fold) | mixed writers today; the identity branch makes `email` fold-only for latched users | stays — the whole application FKs it                                                                                                                       |
+| `Account`                              | row (legacy users) / projection (latched users, bridge)                  | stock branch / the fold                                                            | **dropped** when the last tenant finalizes                                                                                                                 |
 
 ### 1. The adapter is the factory's base, not a wrapper
 
@@ -132,7 +132,7 @@ branch unconditionally, for both populations, forever. Inside those two
 models, the fork is narrower than the shape suggests.
 
 **Reads of the `user` model are never routed.** They always serve from the
-`User` table, which is complete for *both* populations: the fold polyfills
+`User` table, which is complete for _both_ populations: the fold polyfills
 `email` from the PRIMARY identifier, so a latched user's row still answers
 every question it answered before. Population-wide queries — the admin
 plugin's `contains` / `starts_with` searches, counts, `OR` connectors — work
@@ -147,7 +147,7 @@ A resolution read carries no `userId`, so the identity branch is consulted
 **first**, and two conditions must both hold to serve from it: the
 identifier **resolves**, and the resolved user's gate is **finalized**. A
 miss falls through to the legacy branch; so does a resolution whose user is
-*held* (`migrated` — rows exist but the parity proof found them behind or
+_held_ (`migrated` — rows exist but the parity proof found them behind or
 disagreeing, so `Account` stays authoritative for them until the next pass
 heals it).
 
@@ -218,7 +218,7 @@ legs, in order:
    happens before any row exists on either branch;
 2. **one Postgres transaction** over the row writes the entrance itself
    performs — the user row and the `finalized` migration-state row. These
-   *can* share a transaction: they are one store;
+   _can_ share a transaction: they are one store;
 3. the **bounded wait** on the fold. The fold skips harmlessly and retries
    while the user row is not yet visible.
 
@@ -292,13 +292,13 @@ from quietly contradicting itself.
 
 While the `Account` bridge table exists, secrets are mirrored **both ways**.
 
-*Forward:* the identity branch mirrors its secret writes onto the `Account`
+_Forward:_ the identity branch mirrors its secret writes onto the `Account`
 row. This is what keeps the gate's fail-closed direction safe — without it,
 a finalized user's fresh password would live only in `AccountCredential`,
 and a gate outage falling them back to the legacy branch would verify
 against a stale `Account` row and wrongly reject their sign-in.
 
-*Reverse:* a finalized user's secret write can land on the legacy branch
+_Reverse:_ a finalized user's secret write can land on the legacy branch
 anyway — deterministically for up to `IDENTITY_WRITE_GATE_TTL_MS` per pod
 immediately after their latch, and during any gate-cache failure. So a
 **secrets leg** runs: where an `Account` row's secret columns are newer than
@@ -354,19 +354,19 @@ is what connects them:
 - **Sign-in by any verified email**: `findUserByEmail` becomes "find the
   user holding this identifier" on the identity branch. This is the storage
   half of D03's identifier-first resolution; D03's router keeps the
-  *decision* logic (domain routing, method picker) and stops needing its own
+  _decision_ logic (domain routing, method picker) and stops needing its own
   read fork.
 - **`User.email` gets one writer.** The polyfill from the PRIMARY identifier
   (ADR-101 §2) is written by the fold; better-auth's `changeEmail` /
   `update user` on the identity branch becomes a command the guard can
   refuse, closing the second-writer hole.
-- The `User.email @unique` collision on a primary switch is a *guard*
+- The `User.email @unique` collision on a primary switch is a _guard_
   refusal (a named, handled error) instead of a write failure.
 
 **Collisions are guarded across both populations, in both directions, at
 verify time.** Verifying an identifier is refused with
 `identity_email_in_use` when the normalized address equals any legacy
-user's `User.email` or another user's *verified* identifier. In the other
+user's `User.email` or another user's _verified_ identifier. In the other
 direction, a legacy sign-up's duplicate check already sees latched users'
 verified identifiers through the resolution read, so it cannot claim one.
 Unverified (`ATTACHED`) identifiers block nobody — verify is the choke
@@ -411,7 +411,7 @@ token.
 The IdP callback's lookup keys on better-auth's own `providerId`, verbatim,
 paired with the provider's subject — never on `Identifier.provider`, which is
 the FOLDED vocabulary that collapses auth0, okta and every custom OIDC
-connection into `oidc`. An OIDC `sub` is unique only *within* an issuer, so
+connection into `oidc`. An OIDC `sub` is unique only _within_ an issuer, so
 matching the fold let one enterprise IdP's subject resolve another IdP's
 user: a cross-tenant sign-in, and a regression against legacy, where
 `Account` has always been unique on the verbatim pair. A partial unique index
@@ -420,9 +420,9 @@ same guarantee on `Identifier`.
 
 It is unique where `value` is not, and the asymmetry is not an oversight. One
 user legitimately holds several proven identifiers carrying the same
-*address* — a password sign-in and a Google sign-in are two rows with one
+_address_ — a password sign-in and a Google sign-in are two rows with one
 email — which is why address uniqueness lives in `IdentifierReservation`
-rather than in a column constraint. A provider *subject* names exactly one
+rather than in a column constraint. A provider _subject_ names exactly one
 account at exactly one IdP, so two live identifiers sharing one are always
 either a duplicate or a takeover.
 
@@ -529,7 +529,7 @@ ClickHouse mutation, the `userHashKey` shred, the value wipes.
 **Keep `Account` shared forever, as a fold-written projection with no
 adapter.** The stock `prismaAdapter` stays in `database:`, and `Account` is
 demoted to a projection of the event log for latched users. It works, and
-it is what Phase 1 does. Rejected *as an end state*: it concedes a
+it is what Phase 1 does. Rejected _as an end state_: it concedes a
 permanently **mixed-truth table** — linkage columns event-truth, secret
 columns row-truth — a permanent restricted-column-set guard policing that
 boundary for the life of the system, and a replay that restores half a row.

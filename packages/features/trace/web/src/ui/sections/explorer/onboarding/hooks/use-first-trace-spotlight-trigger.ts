@@ -32,11 +32,7 @@ export function useFirstTraceSpotlightTrigger({
   projectId,
   hasAnyTraces,
 }: UseFirstTraceSpotlightTriggerArgs): void {
-  const {
-    dismiss: persistDismissal,
-    isDismissed,
-    isResolved,
-  } = useTraceExplorerTourPreference();
+  const { dismiss: persistDismissal, isDismissed, isResolved } = useTraceExplorerTourPreference();
   const firstTraceSpotlightFired = useOnboardingStore((s) => s.firstTraceSpotlightFired);
   const seenDrawerSpotlights = useOnboardingStore((s) => s.seenDrawerSpotlights);
   const markFired = useOnboardingStore((s) => s.markFirstTraceSpotlightFired);

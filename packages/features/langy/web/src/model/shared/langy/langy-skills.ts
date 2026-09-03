@@ -81,17 +81,15 @@ interface GeneratedSkill {
  * standing capability, so it carries its own source and the palette can group it
  * apart — but both are real, loadable, and offerable.
  */
-const AGENT_SKILLS: LangySkill[] = (GENERATED_SKILLS as GeneratedSkill[]).map(
-  (skill) => ({
-    id: skill.id,
-    label: skill.label,
-    source: skill.category === "recipe" ? ("recipe" as const) : ("agent-skill" as const),
-    summary: skill.description,
-    prompt: skill.userPrompt,
-    searchText:
-      `${skill.label} ${skill.id} ${skill.description} ${skill.userPrompt ?? ""}`.toLowerCase(),
-  }),
-);
+const AGENT_SKILLS: LangySkill[] = (GENERATED_SKILLS as GeneratedSkill[]).map((skill) => ({
+  id: skill.id,
+  label: skill.label,
+  source: skill.category === "recipe" ? ("recipe" as const) : ("agent-skill" as const),
+  summary: skill.description,
+  prompt: skill.userPrompt,
+  searchText:
+    `${skill.label} ${skill.id} ${skill.description} ${skill.userPrompt ?? ""}`.toLowerCase(),
+}));
 
 /** `trace search` / `dataset upload` → the bare verbs a feature really exposes. */
 function verbsOf(cli: string[]): string[] {

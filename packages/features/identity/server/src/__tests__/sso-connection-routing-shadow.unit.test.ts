@@ -44,8 +44,7 @@ function recorderOf() {
   return {
     records,
     recorder: {
-      compared: (record: SsoConnectionRoutingShadowRecord) =>
-        void records.push(record),
+      compared: (record: SsoConnectionRoutingShadowRecord) => void records.push(record),
     },
   };
 }
@@ -85,9 +84,7 @@ describe("sso connection routing shadow mode", () => {
         deciding: new StubRouting(strings),
         // The projection has the connection paused; the strings carry no
         // lifecycle at all, so they say it is serving traffic.
-        shadow: new StubRouting(
-          routable({ connectionId: "ssoc_1", state: "SUSPENDED" }),
-        ),
+        shadow: new StubRouting(routable({ connectionId: "ssoc_1", state: "SUSPENDED" })),
         recorder,
       });
 

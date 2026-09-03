@@ -5,11 +5,7 @@ import type {
   WorkerTransportPort,
 } from "./worker-runtime.port";
 
-export {
-  WorkerHandlePort,
-  WorkerLifecyclePort,
-  WorkerTransportPort,
-} from "./worker-runtime.port";
+export { WorkerHandlePort, WorkerLifecyclePort, WorkerTransportPort } from "./worker-runtime.port";
 
 export type WorkerRuntimeOptions = {
   lifecycle: WorkerLifecyclePort;

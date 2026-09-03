@@ -46,7 +46,12 @@ Also create `packages/features/<name>/feature.json` with `{ "layoutVersion": 0 }
 the feature to `packages/features/catalogue.json`:
 
 ```json
-{ "id": "<name>", "root": "packages/features/<name>", "classification": "core", "subjects": ["<name>"] }
+{
+  "id": "<name>",
+  "root": "packages/features/<name>",
+  "classification": "core",
+  "subjects": ["<name>"]
+}
 ```
 
 ## 2. Contract package

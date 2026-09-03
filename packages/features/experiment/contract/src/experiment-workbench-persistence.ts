@@ -59,9 +59,7 @@ export type PersistedResults = z.infer<typeof persistedResultsSchema>;
  * The state that gets persisted to the database.
  * Excludes transient UI state and execution-only result fields.
  */
-export type PersistedEvaluationsV3State = z.infer<
-  typeof persistedEvaluationsV3StateSchema
->;
+export type PersistedEvaluationsV3State = z.infer<typeof persistedEvaluationsV3StateSchema>;
 
 /**
  * Validated persisted state type - derived from schema.
@@ -76,9 +74,7 @@ export type ValidatedPersistedState = PersistedEvaluationsV3State;
  * Extracts the persistable results from the full results state.
  * Excludes transient fields like status, progress, and executingCells.
  */
-const extractPersistedResults = (
-  results: EvaluationResults,
-): PersistedResults | undefined => {
+const extractPersistedResults = (results: EvaluationResults): PersistedResults | undefined => {
   // Only persist if there are actual results
   const hasResults =
     Object.keys(results.targetOutputs).length > 0 ||
@@ -105,9 +101,7 @@ const extractPersistedResults = (
  * Strips savedRecords from datasets - they're loaded on demand from DB,
  * not stored in the experiment's workbenchState.
  */
-export const extractPersistedState = (
-  state: EvaluationsV3State,
-): PersistedEvaluationsV3State => {
+export const extractPersistedState = (state: EvaluationsV3State): PersistedEvaluationsV3State => {
   const { ui, results, datasets } = state;
   const persistedResults = extractPersistedResults(results);
 

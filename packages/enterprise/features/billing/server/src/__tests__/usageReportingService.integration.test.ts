@@ -6,9 +6,7 @@ import { StripeUsageReportingService } from "../index";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
 if (!STRIPE_SECRET_KEY) {
-  console.warn(
-    "Skipping usage reporting integration tests because STRIPE_SECRET_KEY is not set",
-  );
+  console.warn("Skipping usage reporting integration tests because STRIPE_SECRET_KEY is not set");
 }
 
 if (STRIPE_SECRET_KEY && !STRIPE_SECRET_KEY.startsWith("sk_test_")) {

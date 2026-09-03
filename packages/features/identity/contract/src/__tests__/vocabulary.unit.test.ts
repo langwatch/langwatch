@@ -9,9 +9,7 @@ import {
 describe("identifier normalization", () => {
   describe("when a raw email value arrives from a ceremony", () => {
     it("folds case and trims, and keeps the plus tag it was given", () => {
-      expect(normalizeIdentifierValue("  Sam.J+work@Acme.COM ")).toBe(
-        "sam.j+work@acme.com",
-      );
+      expect(normalizeIdentifierValue("  Sam.J+work@Acme.COM ")).toBe("sam.j+work@acme.com");
     });
 
     it("holds a tagged address apart from the one it is tagged from", () => {

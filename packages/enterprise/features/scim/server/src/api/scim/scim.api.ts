@@ -183,8 +183,7 @@ const RESOURCE_SCHEMA = {
     description: { type: "string" as const },
     attributes: {
       type: "array" as const,
-      description:
-        "The attribute definitions, in the shape RFC 7643 section 7 gives them.",
+      description: "The attribute definitions, in the shape RFC 7643 section 7 gives them.",
       items: { type: "object" as const },
     },
     meta: DISCOVERY_META,
@@ -435,9 +434,7 @@ export const CREATE_USER: DescribeRouteOptions = {
     "400": INVALID_BODY,
     "401": UNAUTHORIZED,
     "403": PLAN_NOT_ENTITLED,
-    "409": scimErrorResponse(
-      "A member with this userName already exists in the organization.",
-    ),
+    "409": scimErrorResponse("A member with this userName already exists in the organization."),
   },
 };
 

@@ -12,8 +12,7 @@ export class DefaultGovernanceOcsfExportService {
   private constructor(
     private readonly repository: GovernanceOcsfExportRepository,
     private readonly events: GovernanceOcsfEventsReaderPort | undefined,
-  ) {
-  }
+  ) {}
 
   static create(options: {
     repository: GovernanceOcsfExportRepository;
@@ -24,9 +23,7 @@ export class DefaultGovernanceOcsfExportService {
 
   async list(input: GovernanceOcsfExportInput): Promise<GovernanceOcsfExportPage> {
     const parsed = governanceOcsfExportInputSchema.parse(input);
-    const tenantId = await this.repository.tryResolveGovernanceTenantId(
-      parsed.organizationId,
-    );
+    const tenantId = await this.repository.tryResolveGovernanceTenantId(parsed.organizationId);
     if (!tenantId) {
       return { events: [], nextCursor: null, nextCursorCompound: null };
     }

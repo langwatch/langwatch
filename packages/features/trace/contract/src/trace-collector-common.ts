@@ -17,10 +17,7 @@ export const getFirstInputAsText = (spans: Span[]): string => {
       span.type !== "guardrail" &&
       (span.input.type !== "json" || !isEmptyJson(span.input.value)) &&
       // Agent inputs captured by openinference from agno are not really human redable, skip it
-      !(
-        span.params?.scope?.name == "openinference.instrumentation.agno" &&
-        span.type == "agent"
-      ),
+      !(span.params?.scope?.name == "openinference.instrumentation.agno" && span.type == "agent"),
   );
 
   let input = topmostInputs[0]?.input;
@@ -43,11 +40,7 @@ export const getFirstInputAsText = (spans: Span[]): string => {
     return topmostSpan?.name ?? "";
   }
   const text = typedValueToText(input, true, "user");
-  if (
-    !text &&
-    topmostInputs[0]?.name?.startsWith("RunnableSequence") &&
-    topmostInputs[1]?.input
-  ) {
+  if (!text && topmostInputs[0]?.name?.startsWith("RunnableSequence") && topmostInputs[1]?.input) {
     return typedValueToText(topmostInputs[1].input, true, "user");
   }
   return text;
@@ -187,10 +180,7 @@ export const typedValueToText = (
     // key (e.g. `answer`). Without recursion, any object with keys short-
     // circuited specialKeysMapping and the real payload on the next key was
     // never seen. `seen` guards against circular references.
-    const hasNonEmptyValue = (
-      value: unknown,
-      seen: WeakSet<object> = new WeakSet(),
-    ): boolean => {
+    const hasNonEmptyValue = (value: unknown, seen: WeakSet<object> = new WeakSet()): boolean => {
       if (value === undefined || value === null) return false;
       if (typeof value === "string") return value.length > 0;
       if (typeof value === "object") {
@@ -306,14 +296,9 @@ export const typedValueToText = (
     };
 
     const firstAndOnlyKey = (json: any) => {
-      if (
-        typeof json === "object" &&
-        !Array.isArray(json) &&
-        Object.keys(json).length === 1
-      ) {
+      if (typeof json === "object" && !Array.isArray(json) && Object.keys(json).length === 1) {
         const firstItem = json[Object.keys(json)[0]!];
-        const mapped =
-          typeof firstItem === "object" ? specialKeysMapping(firstItem) : undefined;
+        const mapped = typeof firstItem === "object" ? specialKeysMapping(firstItem) : undefined;
         if (mapped !== undefined) {
           return stringified(mapped);
         }
@@ -403,18 +388,13 @@ interface LLMSpanWithChildren extends LLMSpan {
 interface RAGSpanWithChildren extends RAGSpan {
   children: SpanWithChildren[];
 }
-export type SpanWithChildren =
-  | BaseSpanWithChildren
-  | LLMSpanWithChildren
-  | RAGSpanWithChildren;
+export type SpanWithChildren = BaseSpanWithChildren | LLMSpanWithChildren | RAGSpanWithChildren;
 
 export const organizeSpansIntoTree = (spans: Span[]): SpanWithChildren[] => {
   const spanMap = new Map<string, SpanWithChildren>();
 
   // Sort based on started_at timestamp, so that all siblings are in started_at order
-  const sortedSpans = [...spans].sort(
-    (a, b) => a.timestamps.started_at - b.timestamps.started_at,
-  );
+  const sortedSpans = [...spans].sort((a, b) => a.timestamps.started_at - b.timestamps.started_at);
 
   // Initialize each span with an empty children array
   sortedSpans.forEach((span) => {

@@ -108,7 +108,11 @@ fleetGauge(
   "Instances whose next wake is past due beyond the ops threshold.",
   (r) => r.overdueWakes,
 );
-fleetGauge("pm_outbox_pending", "Pending outbox messages per process name.", (r) => r.pendingMessages);
+fleetGauge(
+  "pm_outbox_pending",
+  "Pending outbox messages per process name.",
+  (r) => r.pendingMessages,
+);
 fleetGauge(
   "pm_outbox_overdue_pending",
   "Pending outbox messages long past their next attempt with no live lease.",

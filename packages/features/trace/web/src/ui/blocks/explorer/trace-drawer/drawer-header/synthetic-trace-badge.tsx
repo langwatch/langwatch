@@ -24,11 +24,7 @@ const DERIVED_FROM_ATTR = "langwatch.trace.derived_from";
  *
  * Renders nothing for ordinary traces.
  */
-export function SyntheticTraceBadge({
-  attributes,
-}: {
-  attributes: Record<string, string>;
-}) {
+export function SyntheticTraceBadge({ attributes }: { attributes: Record<string, string> }) {
   if (attributes[SYNTHETIC_TRACE_ATTR] !== "true") return null;
 
   const derivedFrom = attributes[DERIVED_FROM_ATTR]?.trim();

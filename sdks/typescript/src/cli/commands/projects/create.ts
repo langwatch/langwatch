@@ -71,9 +71,7 @@ export const createProjectCommand = async (
       table: () => {
         console.log();
         console.log(
-          chalk.bold.yellow(
-            "⚠  Save the service API key below NOW. It will not be shown again.",
-          ),
+          chalk.bold.yellow("⚠  Save the service API key below NOW. It will not be shown again."),
         );
         console.log();
         console.log(`  ${chalk.green(project.serviceApiKey)}`);

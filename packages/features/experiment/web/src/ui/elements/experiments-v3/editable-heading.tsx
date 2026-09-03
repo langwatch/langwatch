@@ -16,11 +16,7 @@ type EditableHeadingProps = {
  * Saves on blur or Enter, cancels on Escape.
  * Shows a skeleton when loading an existing evaluation.
  */
-export function EditableHeading({
-  value,
-  onSave,
-  isLoading = false,
-}: EditableHeadingProps) {
+export function EditableHeading({ value, onSave, isLoading = false }: EditableHeadingProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editingValue, setEditingValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -82,18 +78,9 @@ export function EditableHeading({
   }
 
   return (
-    <HStack
-      cursor="pointer"
-      onClick={handleStartEdit}
-      _hover={{ "& .edit-icon": { opacity: 1 } }}
-    >
+    <HStack cursor="pointer" onClick={handleStartEdit} _hover={{ "& .edit-icon": { opacity: 1 } }}>
       <Heading size="md">{value || ""}</Heading>
-      <Box
-        className="edit-icon"
-        opacity={0}
-        transition="opacity 0.2s"
-        color="fg.subtle"
-      >
+      <Box className="edit-icon" opacity={0} transition="opacity 0.2s" color="fg.subtle">
         <Edit2 size={14} />
       </Box>
     </HStack>

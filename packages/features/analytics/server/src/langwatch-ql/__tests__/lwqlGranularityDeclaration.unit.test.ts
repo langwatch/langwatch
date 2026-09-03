@@ -74,9 +74,7 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
   });
 
   it("accepts a statement that does not declare granularity at all", () => {
-    expect(() =>
-      assertLangWatchQLGranularityDeclaration(BOTH_PERIODS),
-    ).not.toThrow();
+    expect(() => assertLangWatchQLGranularityDeclaration(BOTH_PERIODS)).not.toThrow();
     expect(() => assertLangWatchQLGranularityDeclaration([])).not.toThrow();
   });
 

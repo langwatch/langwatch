@@ -121,9 +121,7 @@ describe("startNavigationSpan", () => {
         outer.end();
         navigation.end();
 
-        expect(exported("inner")?.parentSpanContext?.spanId).toBe(
-          outer.spanContext().spanId,
-        );
+        expect(exported("inner")?.parentSpanContext?.spanId).toBe(outer.spanContext().spanId);
       });
     });
   });
@@ -139,9 +137,9 @@ describe("startNavigationSpan", () => {
         // withdraw the successor that replaced it.
         first.end();
 
-        expect(
-          exported("navigation /acme/traces")?.attributes[ATTR_NAVIGATION_SUPERSEDED],
-        ).toBe(true);
+        expect(exported("navigation /acme/traces")?.attributes[ATTR_NAVIGATION_SUPERSEDED]).toBe(
+          true,
+        );
         expect(exported("navigation /:project/datasets")).toBeDefined();
       });
     });

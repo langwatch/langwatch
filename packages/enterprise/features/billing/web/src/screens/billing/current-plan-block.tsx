@@ -1,17 +1,7 @@
 /**
  * Current Plan Block - displays the active subscription
  */
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  Flex,
-  HStack,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Card, Flex, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import { Link } from "../../ui/elements/link";
 import { PricingSummary } from "../../index";
@@ -103,12 +93,7 @@ export function CurrentPlanBlock({
                   </Text>
                 </Box>
               ) : (
-                <Text
-                  fontWeight="semibold"
-                  fontSize="lg"
-                  color="fg"
-                  data-testid="user-count-link"
-                >
+                <Text fontWeight="semibold" fontSize="lg" color="fg" data-testid="user-count-link">
                   {maxSeats != null ? `${userCount}/${maxSeats}` : userCount}
                 </Text>
               )}

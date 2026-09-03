@@ -57,14 +57,7 @@ export function vscodeUserSettingsPath(
 ): string | null {
   switch (platform) {
     case "darwin":
-      return path.join(
-        home,
-        "Library",
-        "Application Support",
-        "Code",
-        "User",
-        "settings.json",
-      );
+      return path.join(home, "Library", "Application Support", "Code", "User", "settings.json");
     case "linux":
       return path.join(home, ".config", "Code", "User", "settings.json");
     case "win32":

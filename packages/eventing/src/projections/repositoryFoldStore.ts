@@ -52,9 +52,7 @@ export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
 
     await this.repo.storeProjection(projection, {
       tenantId: context.tenantId,
-      metadata: context.retentionPolicy
-        ? { retentionPolicy: context.retentionPolicy }
-        : undefined,
+      metadata: context.retentionPolicy ? { retentionPolicy: context.retentionPolicy } : undefined,
     });
   }
 

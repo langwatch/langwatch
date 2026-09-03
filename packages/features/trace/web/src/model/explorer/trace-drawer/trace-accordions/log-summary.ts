@@ -1,8 +1,5 @@
 import type { TraceLogRecordDto } from "@langwatch/trace-contract";
-import {
-  type CodingAgentEvent,
-  normalizeEventName,
-} from "@langwatch/coding-agent-contract";
+import { type CodingAgentEvent, normalizeEventName } from "@langwatch/coding-agent-contract";
 
 /**
  * A one-line, human summary for a log record whose `event.name` is one of the
@@ -60,9 +57,7 @@ function describe(event: CodingAgentEvent, attrs: Record<string, string>): strin
     case "at_mention":
       return `@-mentioned${attrs.target ? ` ${attrs.target}` : " a file"}`;
     case "internal_error":
-      return attrs.error
-        ? `Internal error: ${attrs.error}`
-        : "The session hit an internal error";
+      return attrs.error ? `Internal error: ${attrs.error}` : "The session hit an internal error";
     case "session_created":
     case "session_context":
     case "session_idle":
@@ -172,9 +167,7 @@ export function logEventTone(log: TraceLogRecordDto): LogEventTone {
     case "tool_decision":
       return log.attributes.decision === "accept" ? "neutral" : "danger";
     case "tool_result":
-      return log.attributes.error_type || log.attributes.success === "false"
-        ? "danger"
-        : "neutral";
+      return log.attributes.error_type || log.attributes.success === "false" ? "danger" : "neutral";
     case "api_error":
     case "session_error":
     case "internal_error":

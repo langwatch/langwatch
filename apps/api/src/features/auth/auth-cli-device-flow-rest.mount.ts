@@ -60,20 +60,10 @@ export class ApiCliDeviceSessionStore extends CliDeviceSessionStorePort {
     await this.redis.set(input.key, input.value, "EX", input.ttlSeconds);
   }
 
-  async setIfAbsent(input: {
-    key: string;
-    value: string;
-    ttlSeconds: number;
-  }): Promise<boolean> {
+  async setIfAbsent(input: { key: string; value: string; ttlSeconds: number }): Promise<boolean> {
     // SET NX EX in one round trip: two concurrent polls cannot both see the
     // key missing, which is what a get-then-set would allow.
-    const result = await this.redis.set(
-      input.key,
-      input.value,
-      "EX",
-      input.ttlSeconds,
-      "NX",
-    );
+    const result = await this.redis.set(input.key, input.value, "EX", input.ttlSeconds, "NX");
     return result === "OK";
   }
 

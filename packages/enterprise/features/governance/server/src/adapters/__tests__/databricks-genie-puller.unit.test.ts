@@ -6,10 +6,7 @@ import {
   DatabricksGeniePuller,
   WAREHOUSE_COST_ROW_LIMIT,
 } from "../databricks-genie-puller.adapter";
-import {
-  GovernanceHttpPort,
-  type GovernanceHttpResponse,
-} from "../../ports/governance-http.port";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
 
 const workspaceUrl = "https://workspace.example.test";
 const warehouseId = "warehouse-1";
@@ -51,8 +48,7 @@ function hour(ms: number): string {
 }
 
 class GenieWorkspace extends GovernanceHttpPort {
-  readonly calls: Array<{ url: URL; init: Parameters<GovernanceHttpPort["fetch"]>[1] }> =
-    [];
+  readonly calls: Array<{ url: URL; init: Parameters<GovernanceHttpPort["fetch"]>[1] }> = [];
   readonly costRequests: Array<Record<string, unknown>> = [];
   readonly costReplies: CostReply[] = [];
   messageCreatedAt = Date.now() - 60_000;
@@ -78,8 +74,7 @@ class GenieWorkspace extends GovernanceHttpPort {
       });
     }
     if (
-      url.pathname ===
-      `/api/2.0/genie/spaces/${spaceId}/conversations/${conversationId}/messages`
+      url.pathname === `/api/2.0/genie/spaces/${spaceId}/conversations/${conversationId}/messages`
     ) {
       return response({
         messages: [
@@ -113,9 +108,7 @@ class GenieWorkspace extends GovernanceHttpPort {
       });
     }
     if (url.pathname === "/api/2.0/sql/statements") {
-      const parsed = z
-        .record(z.string(), z.unknown())
-        .parse(JSON.parse(init.body ?? "{}"));
+      const parsed = z.record(z.string(), z.unknown()).parse(JSON.parse(init.body ?? "{}"));
       this.costRequests.push(parsed);
       const plan = this.costReplies.shift() ?? {};
       if (plan.status) return response({ message: "denied" }, plan.status);
@@ -123,15 +116,11 @@ class GenieWorkspace extends GovernanceHttpPort {
         status: { state: plan.state ?? "SUCCEEDED" },
         manifest: {
           schema: { columns: (plan.columns ?? columns).map((name) => ({ name })) },
-          ...(plan.totalRowCount === undefined
-            ? {}
-            : { total_row_count: plan.totalRowCount }),
+          ...(plan.totalRowCount === undefined ? {} : { total_row_count: plan.totalRowCount }),
         },
         result: {
           data_array: plan.rows ?? [],
-          ...(plan.nextChunkIndex === undefined
-            ? {}
-            : { next_chunk_index: plan.nextChunkIndex }),
+          ...(plan.nextChunkIndex === undefined ? {} : { next_chunk_index: plan.nextChunkIndex }),
         },
       });
     }
@@ -156,10 +145,7 @@ function run(
   credentials: Record<string, string> = { token: "dapi-token" },
 ) {
   const adapter = DatabricksGeniePuller.create(workspace);
-  return adapter.runOnce(
-    { cursor, credentials },
-    adapter.validateConfig(config(overrides)),
-  );
+  return adapter.runOnce({ cursor, credentials }, adapter.validateConfig(config(overrides)));
 }
 
 function hint(result: { events: Array<{ extra?: Record<string, unknown> }> }) {
@@ -194,12 +180,8 @@ describe("Databricks Genie puller", () => {
 
     await run(workspace, {}, null, { clientId: "client", clientSecret: "secret" });
 
-    const tokenCall = workspace.calls.find(
-      (call) => call.url.pathname === "/oidc/v1/token",
-    );
-    const spaceCall = workspace.calls.find((call) =>
-      call.url.pathname.endsWith("/conversations"),
-    );
+    const tokenCall = workspace.calls.find((call) => call.url.pathname === "/oidc/v1/token");
+    const spaceCall = workspace.calls.find((call) => call.url.pathname.endsWith("/conversations"));
     expect(tokenCall?.init).toMatchObject({
       method: "POST",
       headers: { authorization: "Basic Y2xpZW50OnNlY3JldA==" },

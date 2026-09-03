@@ -73,10 +73,7 @@ const printedDocuments = (): string[] =>
   vi
     .mocked(console.log)
     .mock.calls.map((call) => call[0] as unknown)
-    .filter(
-      (line): line is string =>
-        typeof line === "string" && line.trimStart().startsWith("{"),
-    );
+    .filter((line): line is string => typeof line === "string" && line.trimStart().startsWith("{"));
 
 describe("runScenarioCommand()", () => {
   beforeEach(() => {
@@ -162,10 +159,7 @@ describe("runScenarioCommand()", () => {
     /** @scenario "Run a scenario against one agent on two models" */
     it("sends two targets, each with its own values", async () => {
       await runScenarioCommand("scenario_1", {
-        target: [
-          "http:agent_abc123?model=gpt-5",
-          "http:agent_abc123?model=gpt-5-mini",
-        ],
+        target: ["http:agent_abc123?model=gpt-5", "http:agent_abc123?model=gpt-5-mini"],
       });
 
       expect(runSpy).toHaveBeenCalledWith(
@@ -197,9 +191,7 @@ describe("runScenarioCommand()", () => {
         name: "Login checks",
       });
 
-      expect(runSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "Login checks" }),
-      );
+      expect(runSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "Login checks" }));
     });
   });
 
@@ -222,9 +214,7 @@ describe("runScenarioCommand()", () => {
   describe("when no target is given", () => {
     /** @scenario "Run a scenario with no target" */
     it("refuses before anything is scheduled", async () => {
-      await expect(runScenarioCommand("scenario_1", {})).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(runScenarioCommand("scenario_1", {})).rejects.toThrow(ProcessExitError);
 
       expect(runSpy).not.toHaveBeenCalled();
     });

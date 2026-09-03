@@ -49,9 +49,7 @@ const addLocalFile = async (name: string, localFilePath: string): Promise<void> 
     FileManager.savePromptsLock(lock);
 
     console.log(
-      chalk.green(
-        `✓ Added local prompt: ${chalk.cyan(name)} → ${chalk.gray(localFilePath)}`,
-      ),
+      chalk.green(`✓ Added local prompt: ${chalk.cyan(name)} → ${chalk.gray(localFilePath)}`),
     );
   } catch (error) {
     console.error(chalk.red("Error loading local prompt file:"));
@@ -81,9 +79,7 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
     const version = options.version ?? "latest";
 
     // Fetch and materialize the prompt (like sync does for individual prompts)
-    const spinner = createSpinner(
-      `Adding ${chalk.cyan(`${name}@${version}`)}...`,
-    ).start();
+    const spinner = createSpinner(`Adding ${chalk.cyan(`${name}@${version}`)}...`).start();
 
     try {
       // Fetch the prompt from the API
@@ -126,9 +122,7 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
       spinner.succeed();
 
       // Show what was done (add ./ prefix for consistency)
-      const displayPath = relativePath.startsWith("./")
-        ? relativePath
-        : `./${relativePath}`;
+      const displayPath = relativePath.startsWith("./") ? relativePath : `./${relativePath}`;
       console.log(
         chalk.green(
           `✓ Pulled ${chalk.cyan(`${name}@${version}`)} ${chalk.gray(

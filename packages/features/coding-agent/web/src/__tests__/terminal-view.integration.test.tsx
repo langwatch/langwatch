@@ -7,11 +7,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import {
-  statusLineCostLabel,
-  TerminalView,
-  type TurnDivider,
-} from "@langwatch/coding-agent-web";
+import { statusLineCostLabel, TerminalView, type TurnDivider } from "@langwatch/coding-agent-web";
 
 /** How tall a laid-out row is, so a test can say what moved in whole rows. */
 const ROW_HEIGHT = 150;
@@ -107,9 +103,7 @@ describe("TerminalView", () => {
   describe("given a Claude Code session with a prompt and tool calls", () => {
     it("shows the user's prompt", () => {
       renderView();
-      expect(
-        screen.getByText("check git status and bump the version"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("check git status and bump the version")).toBeInTheDocument();
     });
 
     it("shows the assistant prose", () => {
@@ -158,9 +152,7 @@ describe("TerminalView", () => {
       renderView({ entries: noTrailingText });
       expect(screen.getByText("Bash")).toBeInTheDocument();
       expect(screen.getByText("Edit")).toBeInTheDocument();
-      expect(
-        screen.getByText("check git status and bump the version"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("check git status and bump the version")).toBeInTheDocument();
     });
   });
 
@@ -627,9 +619,7 @@ describe("TerminalView", () => {
         },
       });
 
-      expect(
-        screen.getByText(/longer than the 200 turns the view can walk/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/longer than the 200 turns the view can walk/)).toBeInTheDocument();
     });
 
     /** @scenario "Reaching the first turn shows the session start" */
@@ -853,9 +843,7 @@ describe("TerminalView", () => {
         });
 
         expect(screen.getByText("Context growing: 52.0K tokens")).toBeInTheDocument();
-        expect(
-          screen.queryByText("Context growing: 60.0K tokens"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Context growing: 60.0K tokens")).not.toBeInTheDocument();
       });
     });
 
@@ -885,10 +873,7 @@ describe("TerminalView", () => {
             entries: [...TEXT_ONLY_EARLIER_TURN, ...GROWN_LATE_OPENED_TURN],
             rowKeys: [...TEXT_ONLY_EARLIER_KEYS, ...GROWN_LATE_OPENED_KEYS],
             turnDividers: new Map([
-              [
-                TEXT_ONLY_EARLIER_TURN.length,
-                { turnNumber: 5, turnCount: 5, atMs: 5000 },
-              ],
+              [TEXT_ONLY_EARLIER_TURN.length, { turnNumber: 5, turnCount: 5, atMs: 5000 }],
             ]),
             scrollback: {
               status: "start",
@@ -1172,10 +1157,7 @@ const GROWN_EARLIER_TURN: TranscriptEntry[] = [
  */
 function fakeBox(
   el: HTMLElement,
-  {
-    scrollHeight,
-    clientHeight = VIEWPORT_HEIGHT,
-  }: { scrollHeight: number; clientHeight?: number },
+  { scrollHeight, clientHeight = VIEWPORT_HEIGHT }: { scrollHeight: number; clientHeight?: number },
 ) {
   Object.defineProperty(el, "clientHeight", {
     configurable: true,
@@ -1211,10 +1193,7 @@ function renderScrollback(props: ViewProps = {}) {
 }
 
 /** Lay the screen out for this test, and report its height from the rows. */
-function layOutRows(
-  screenEl: HTMLElement,
-  { clientHeight }: { clientHeight?: number } = {},
-) {
+function layOutRows(screenEl: HTMLElement, { clientHeight }: { clientHeight?: number } = {}) {
   rowsAreLaidOut = true;
   const rowCount = screenEl.firstElementChild?.children.length ?? 0;
   fakeBox(screenEl, { scrollHeight: rowCount * ROW_HEIGHT, clientHeight });
@@ -1257,17 +1236,13 @@ describe("the bottom bar's cost stat", () => {
 
   describe("given the reader has the whole session on screen", () => {
     it("drops the suffix rather than stating a figure of itself", () => {
-      expect(statusLineCostLabel({ costUsd: 210.001, sessionCostUsd: 210 })).toBe(
-        "$210.00",
-      );
+      expect(statusLineCostLabel({ costUsd: 210.001, sessionCostUsd: 210 })).toBe("$210.00");
     });
   });
 
   describe("given no session row exists for the trace", () => {
     it("keeps the running figure alone, as before", () => {
-      expect(statusLineCostLabel({ costUsd: 12.34, sessionCostUsd: null })).toBe(
-        "$12.34",
-      );
+      expect(statusLineCostLabel({ costUsd: 12.34, sessionCostUsd: null })).toBe("$12.34");
     });
   });
 

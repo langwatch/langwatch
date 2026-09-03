@@ -11,9 +11,7 @@ export type StorageMeterIntegrationBreakdown = {
 };
 
 export interface StorageMeterIntegrationHarness {
-  getStorageBreakdown(input: {
-    tenantId: string;
-  }): Promise<StorageMeterIntegrationBreakdown>;
+  getStorageBreakdown(input: { tenantId: string }): Promise<StorageMeterIntegrationBreakdown>;
 }
 
 export function createStorageMeterIntegrationHarness(options: {

@@ -20,12 +20,10 @@ import {
 } from "../support/test-scenario-http.port";
 
 vi.mock("@langwatch/observability/tracing", () => ({
-  injectTraceContextHeaders: vi.fn(
-    ({ headers }: { headers: Record<string, string> }) => ({
-      headers,
-      traceId: undefined,
-    }),
-  ),
+  injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
+    headers,
+    traceId: undefined,
+  })),
 }));
 
 const mockSsrfSafeFetch = mockScenarioHttpFetch;

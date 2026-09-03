@@ -64,7 +64,7 @@ shapes do not overlap: eleven `TS2352`s, all one assertion repeated.
   decision, and widening it broke no registration site.
 - **But one type parameter types four hooks that sit on opposite sides of
   staging.** `enqueue.filter` and `enqueue.stage` run at INGRESS and can only
-  ever see a `span_received` event — `stage` is what *produces* the reference
+  ever see a `span_received` event — `stage` is what _produces_ the reference
   payload. `deduplication.makeId` and `handle` run on DELIVERY and see whatever
   `stage` returned. Declaring the subscriber over the union therefore mistypes
   the two ingress hooks: three fresh errors inside the subscriber, each

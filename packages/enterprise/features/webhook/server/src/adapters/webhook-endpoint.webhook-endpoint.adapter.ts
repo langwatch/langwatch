@@ -37,24 +37,15 @@ export interface WebhookEndpointRuntime {
     input: CreateWebhookEndpointCommand,
   ): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
   getAll(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
-  getById(input: {
-    organizationId: string;
-    endpointId: string;
-  }): Promise<WebhookEndpointView>;
+  getById(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
   update(input: UpdateWebhookEndpointCommand): Promise<WebhookEndpointView>;
   rollSecret(input: {
     organizationId: string;
     endpointId: string;
     now?: Date;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
-  enable(input: {
-    organizationId: string;
-    endpointId: string;
-  }): Promise<WebhookEndpointView>;
-  disable(input: {
-    organizationId: string;
-    endpointId: string;
-  }): Promise<WebhookEndpointView>;
+  enable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
+  disable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
   archive(input: { organizationId: string; endpointId: string }): Promise<void>;
   tryGetDeliverable(input: {
     organizationId: string;
@@ -64,10 +55,7 @@ export interface WebhookEndpointRuntime {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookDestinationConfig>;
-  getSigningSecret(input: {
-    organizationId: string;
-    endpointId: string;
-  }): Promise<string>;
+  getSigningSecret(input: { organizationId: string; endpointId: string }): Promise<string>;
   getSigningSecrets(input: {
     organizationId: string;
     endpointId: string;
@@ -83,9 +71,7 @@ export interface WebhookEndpointRuntime {
     since: Date;
     sampleLimit: number;
   }): Promise<{ attempted: number; delivered: number; latencies: number[] }>;
-  getActiveByOrganization(input: {
-    organizationId: string;
-  }): Promise<WebhookEndpointView[]>;
+  getActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
   organizationIdsWithActiveEndpoints(): Promise<string[]>;
   recordDeliveryAttempt(input: {
     organizationId: string;

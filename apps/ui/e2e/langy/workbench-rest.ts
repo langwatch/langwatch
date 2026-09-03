@@ -71,9 +71,7 @@ export async function api({
 }): Promise<any> {
   const res = await request({ method, path, body });
   if (!res.ok) {
-    throw new Error(
-      `${method} ${path} -> ${res.status}: ${(await res.text()).slice(0, 300)}`,
-    );
+    throw new Error(`${method} ${path} -> ${res.status}: ${(await res.text()).slice(0, 300)}`);
   }
   return res.json();
 }
@@ -104,9 +102,7 @@ export async function ensurePromptId({
   }
   if (created.status !== 409) {
     throw new Error(
-      `POST /api/prompts (${handle}) -> ${created.status}: ${(
-        await created.text()
-      ).slice(0, 300)}`,
+      `POST /api/prompts (${handle}) -> ${created.status}: ${(await created.text()).slice(0, 300)}`,
     );
   }
   const existing = (await api({

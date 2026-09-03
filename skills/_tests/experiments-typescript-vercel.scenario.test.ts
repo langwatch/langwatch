@@ -31,8 +31,7 @@ describe("Experiments Skill for a TypeScript Vercel AI bot", () => {
           const result = await scenario.run({
             setId: SKILL_TESTS_SET_ID,
             name: "TypeScript Vercel AI evaluation experiment",
-            description:
-              "Creating an evaluation experiment for a TypeScript Vercel AI chatbot.",
+            description: "Creating an evaluation experiment for a TypeScript Vercel AI chatbot.",
             agents: [
               createClaudeCodeAgent({
                 workingDirectory,

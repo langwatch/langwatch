@@ -38,9 +38,7 @@ describe("given the public issue-report intake", () => {
 
       expect(response.status).toBe(201);
       await expect(response.json()).resolves.toEqual({ id: "bugreport_1" });
-      expect(written).toEqual([
-        { linkedProjectId: null, title: "the run stopped answering" },
-      ]);
+      expect(written).toEqual([{ linkedProjectId: null, title: "the run stopped answering" }]);
     });
   });
 

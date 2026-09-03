@@ -47,11 +47,11 @@ export class EvaluatorWorkflowVersionRequiredError extends HandledError {
   declare readonly code: "evaluator_workflow_version_required";
 
   constructor(evaluatorId: string) {
-    super(
-      "evaluator_workflow_version_required",
-      "This evaluator's workflow has no saved version",
-      { httpStatus: 400, fault: "customer", meta: { evaluatorId } },
-    );
+    super("evaluator_workflow_version_required", "This evaluator's workflow has no saved version", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { evaluatorId },
+    });
     this.name = "EvaluatorWorkflowVersionRequiredError";
   }
 }
@@ -152,10 +152,7 @@ export class EvaluatorApp {
   }
 
   /** The evaluator already assigned to this workflow, if there is one. */
-  tryGetByWorkflow(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<Evaluator | null> {
+  tryGetByWorkflow(input: { workflowId: string; projectId: string }): Promise<Evaluator | null> {
     return this.dependencies.evaluators.tryGetByWorkflow(input);
   }
 
@@ -186,10 +183,7 @@ export class EvaluatorApp {
   }
 
   /** Recent audit-log history for one evaluator. */
-  getHistory(input: {
-    evaluatorId: string;
-    projectId: string;
-  }): Promise<EvaluatorHistoryEntry[]> {
+  getHistory(input: { evaluatorId: string; projectId: string }): Promise<EvaluatorHistoryEntry[]> {
     return this.dependencies.evaluators.getHistory(input);
   }
 

@@ -53,25 +53,19 @@ export const identifierAttachedEventSchema = EventSchema.extend({
   type: z.literal(IDENTIFIER_ATTACHED_EVENT_TYPE),
   data: identifierAttachedPayloadSchema,
 });
-export type IdentifierAttachedEvent = z.infer<
-  typeof identifierAttachedEventSchema
->;
+export type IdentifierAttachedEvent = z.infer<typeof identifierAttachedEventSchema>;
 
 export const identifierVerifiedEventSchema = EventSchema.extend({
   type: z.literal(IDENTIFIER_VERIFIED_EVENT_TYPE),
   data: identifierVerifiedPayloadSchema,
 });
-export type IdentifierVerifiedEvent = z.infer<
-  typeof identifierVerifiedEventSchema
->;
+export type IdentifierVerifiedEvent = z.infer<typeof identifierVerifiedEventSchema>;
 
 export const identifierDeadEndedEventSchema = EventSchema.extend({
   type: z.literal(IDENTIFIER_DEAD_ENDED_EVENT_TYPE),
   data: identifierDeadEndedPayloadSchema,
 });
-export type IdentifierDeadEndedEvent = z.infer<
-  typeof identifierDeadEndedEventSchema
->;
+export type IdentifierDeadEndedEvent = z.infer<typeof identifierDeadEndedEventSchema>;
 
 export const primaryChangedEventSchema = EventSchema.extend({
   type: z.literal(PRIMARY_CHANGED_EVENT_TYPE),
@@ -83,9 +77,7 @@ export const identifierDetachedEventSchema = EventSchema.extend({
   type: z.literal(IDENTIFIER_DETACHED_EVENT_TYPE),
   data: identifierDetachedPayloadSchema,
 });
-export type IdentifierDetachedEvent = z.infer<
-  typeof identifierDetachedEventSchema
->;
+export type IdentifierDetachedEvent = z.infer<typeof identifierDetachedEventSchema>;
 
 export const userErasedEventSchema = EventSchema.extend({
   type: z.literal(USER_ERASED_EVENT_TYPE),
@@ -167,10 +159,7 @@ export class IdentityStateFoldProjection
     return emptyIdentityHeads({ userId: "" });
   }
 
-  private fold(
-    event: IdentityEvent,
-    state: IdentityFoldState,
-  ): IdentityFoldState {
+  private fold(event: IdentityEvent, state: IdentityFoldState): IdentityFoldState {
     const parsed = identityEventSchema.parse(event);
     const next = reduceIdentity({ heads: state, fact: parsed });
     return {
@@ -216,10 +205,7 @@ export class IdentityStateFoldProjection
     return this.fold(event, state);
   }
 
-  handleIdentityUserErased(
-    event: UserErasedEvent,
-    state: IdentityFoldState,
-  ): IdentityFoldState {
+  handleIdentityUserErased(event: UserErasedEvent, state: IdentityFoldState): IdentityFoldState {
     return this.fold(event, state);
   }
 

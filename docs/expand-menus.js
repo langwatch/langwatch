@@ -7,8 +7,7 @@ const expandAllGroups = () => {
   // biome-ignore lint/complexity/noForEach: <explanation>
   groups.forEach((group) => {
     const isExpandable = group.tagName === "DIV";
-    const text =
-      group.querySelector("div")?.textContent?.trim() || group.textContent.trim();
+    const text = group.querySelector("div")?.textContent?.trim() || group.textContent.trim();
 
     if (isExpandable && expandables.includes(text) && !expanded.includes(group)) {
       console.log(`Expanding: ${text}`);

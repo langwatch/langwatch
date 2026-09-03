@@ -4,7 +4,12 @@
   "private": true,
   "description": "The server-side runtime of the identity platform (ADR-101, ADR-115, ADR-116, ADR-117): IdentityGuards, IdentityService, the verification ceremony, the backfill pass, the better-auth ceremonies, and the folded-in event-sourcing layer - the envelope, the command handlers, the folds, the two process managers and the four pipeline definitions the worker registers, behind postgres.*.adapter seams.",
   "license": "MIT",
+  "files": [
+    "src"
+  ],
   "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -19,11 +24,6 @@
       "default": "./src/testing.ts"
     }
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "files": [
-    "src"
-  ],
   "scripts": {
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run"
@@ -43,13 +43,13 @@
     "prom-client": "^15.1.3",
     "zod": "^4.4.3"
   },
-  "peerDependencies": {
-    "better-auth": "^1.7.1"
-  },
   "devDependencies": {
     "@types/node": "^26",
     "better-auth": "^1.7.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
+  },
+  "peerDependencies": {
+    "better-auth": "^1.7.1"
   }
 }

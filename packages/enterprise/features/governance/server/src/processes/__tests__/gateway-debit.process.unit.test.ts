@@ -133,7 +133,11 @@ function admitThenOutcome(
   const admitted = def.evolve({
     previousState: def.initialState,
     ref,
-    input: { kind: "event", now: 1_000, event: processEvent(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, admission(admitOverrides)) },
+    input: {
+      kind: "event",
+      now: 1_000,
+      event: processEvent(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, admission(admitOverrides)),
+    },
   });
   return def.evolve({
     previousState: admitted.state,

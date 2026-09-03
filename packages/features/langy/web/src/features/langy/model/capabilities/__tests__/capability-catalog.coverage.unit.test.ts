@@ -13,10 +13,7 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import { CAPABILITY_CATALOG, CAPABILITY_SURFACES } from "../../../../../index";
-import {
-  SURFACE_LABEL,
-  SURFACE_PATH,
-} from "../capability-registry";
+import { SURFACE_LABEL, SURFACE_PATH } from "../capability-registry";
 
 const CLI_PROGRAM_PATH = fileURLToPath(
   new URL("../../../../../../../../../../sdks/typescript/src/cli/program.ts", import.meta.url),
@@ -92,8 +89,7 @@ const EXCLUDED_COMMANDS = new Set([
  */
 function cliTopLevelCommands(): Set<string> {
   const source = readFileSync(CLI_PROGRAM_PATH, "utf-8");
-  const pattern =
-    /(?:const\s+\w+\s*=\s*)?\bprogram\s*(?:[\r\n]+\s*)?\.command\(\s*"([^"\s]+)/g;
+  const pattern = /(?:const\s+\w+\s*=\s*)?\bprogram\s*(?:[\r\n]+\s*)?\.command\(\s*"([^"\s]+)/g;
   const commands = new Set<string>();
   for (const match of source.matchAll(pattern)) {
     commands.add(match[1]!);
@@ -103,9 +99,7 @@ function cliTopLevelCommands(): Set<string> {
 
 describe("the capability catalog, given the CLI's real command tree", () => {
   const cliCommands = cliTopLevelCommands();
-  const cliResources = [...cliCommands].filter(
-    (command) => !EXCLUDED_COMMANDS.has(command),
-  );
+  const cliResources = [...cliCommands].filter((command) => !EXCLUDED_COMMANDS.has(command));
   const catalogResources = Object.keys(CAPABILITY_CATALOG);
 
   describe("when the CLI source is parsed", () => {
@@ -119,9 +113,7 @@ describe("the capability catalog, given the CLI's real command tree", () => {
     });
 
     it("excludes only commands the CLI actually has", () => {
-      const staleExclusions = [...EXCLUDED_COMMANDS].filter(
-        (command) => !cliCommands.has(command),
-      );
+      const staleExclusions = [...EXCLUDED_COMMANDS].filter((command) => !cliCommands.has(command));
       expect(
         staleExclusions,
         `Excluded commands the CLI no longer registers — remove them from EXCLUDED_COMMANDS:\n  ${staleExclusions.join("\n  ")}`,
@@ -131,9 +123,7 @@ describe("the capability catalog, given the CLI's real command tree", () => {
 
   describe("when the catalog is compared against the CLI", () => {
     it("has a catalog entry for every CLI resource", () => {
-      const missing = cliResources.filter(
-        (resource) => !catalogResources.includes(resource),
-      );
+      const missing = cliResources.filter((resource) => !catalogResources.includes(resource));
       expect(
         missing,
         [
@@ -145,9 +135,7 @@ describe("the capability catalog, given the CLI's real command tree", () => {
     });
 
     it("has no catalog entry for a resource the CLI no longer ships", () => {
-      const stale = catalogResources.filter(
-        (resource) => !cliResources.includes(resource),
-      );
+      const stale = catalogResources.filter((resource) => !cliResources.includes(resource));
       expect(
         stale,
         [
@@ -166,8 +154,7 @@ describe("the capability catalog, given the CLI's real command tree", () => {
       // rows named rather than a type-error page.
       const strategies = new Set<string>(DIGEST_STRATEGIES);
       const undeclared = Object.entries(CAPABILITY_CATALOG).filter(
-        ([, entry]) =>
-          !strategies.has((entry as { digestStrategy?: string }).digestStrategy ?? ""),
+        ([, entry]) => !strategies.has((entry as { digestStrategy?: string }).digestStrategy ?? ""),
       );
       expect(
         undeclared.map(([resource]) => resource),

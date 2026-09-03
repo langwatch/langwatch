@@ -91,9 +91,7 @@ export class GatewaySpendEventTrpcApi {
             limit: input.limit ?? 50,
           });
 
-          const vkIds = [...new Set(rows.map((r) => r.virtualKeyId))].filter(
-            (id) => id.length > 0,
-          );
+          const vkIds = [...new Set(rows.map((r) => r.virtualKeyId))].filter((id) => id.length > 0);
           // The ids come from this project's own tenant-filtered spend rows,
           // and the Project service resolves the owning-organization fence
           // without exposing Project persistence to this transport.

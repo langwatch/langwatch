@@ -21,10 +21,7 @@ export {
 } from "./transport/api-trpc/bug-report.api";
 export { BugReportRepository } from "./ports/bug-report.repository";
 export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-report.repository";
-export {
-  BugReportInboxService,
-  type BugReportListing,
-} from "./services/bug-report-inbox.service";
+export { BugReportInboxService, type BugReportListing } from "./services/bug-report-inbox.service";
 export {
   OpsTrpcApi,
   type OpsScope,
@@ -49,10 +46,7 @@ export {
   type SchedulerOpsRepository,
   type ScheduledJobRecord,
 } from "./ports/scheduler-ops.repository";
-export {
-  NoopSchedulerWakeService,
-  SchedulerWakeService,
-} from "./ports/scheduler-wake.service";
+export { NoopSchedulerWakeService, SchedulerWakeService } from "./ports/scheduler-wake.service";
 export {
   type AdminAccess,
   AdminAccessService,
@@ -61,10 +55,7 @@ export {
 export { AdminAuditSink } from "./services/impersonation.service";
 export * from "./ops.error-normalizer";
 export * from "./ops.redis-engine-cpu";
-export {
-  OpsWorkerAdapter,
-  type OpsWorkerAdapterOptions,
-} from "./adapters/ops-worker.adapter";
+export { OpsWorkerAdapter, type OpsWorkerAdapterOptions } from "./adapters/ops-worker.adapter";
 export { AnomalyHardTierAlertPort } from "./ports/anomaly-hard-tier-alert.port";
 export { QueuePayloadDecoderPort } from "./ports/queue-payload-decoder.port";
 export {

@@ -72,9 +72,7 @@ const buildPersistedState = ({
     },
   });
 
-const stringifiedInitialState = JSON.stringify(
-  buildPersistedState(createInitialState()),
-);
+const stringifiedInitialState = JSON.stringify(buildPersistedState(createInitialState()));
 
 /**
  * The persisted projection of the store as it is RIGHT NOW, read outside the
@@ -125,11 +123,8 @@ function refusedSaveStaleness({
   knownVersion?: number;
 }): { serverVersion: number; actorLabel?: string; runId?: string } {
   const serverVersion =
-    typeof meta?.currentVersion === "number"
-      ? meta.currentVersion
-      : (knownVersion ?? 0) + 1;
-  const actorLabel =
-    typeof meta?.actorLabel === "string" ? meta.actorLabel : undefined;
+    typeof meta?.currentVersion === "number" ? meta.currentVersion : (knownVersion ?? 0) + 1;
+  const actorLabel = typeof meta?.actorLabel === "string" ? meta.actorLabel : undefined;
   const runId = typeof meta?.runId === "string" ? meta.runId : undefined;
   return { serverVersion, actorLabel, runId };
 }
@@ -245,11 +240,9 @@ export const useAutosaveEvaluationsV3 = () => {
   // Update URL when experiment slug changes (for URL sync after save)
   useEffect(() => {
     if (project && experimentSlug && routerSlug !== experimentSlug) {
-      void router.replace(
-        `/${project.slug}/experiments/workbench/${experimentSlug}`,
-        undefined,
-        { shallow: true },
-      );
+      void router.replace(`/${project.slug}/experiments/workbench/${experimentSlug}`, undefined, {
+        shallow: true,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [experimentSlug, project?.slug]);
@@ -332,9 +325,7 @@ export const useAutosaveEvaluationsV3 = () => {
             if (!Array.isArray(key) || key.length < 2) return false;
             const [path] = key;
             if (!Array.isArray(path)) return false;
-            return (
-              path[0] === "experiments" && path[1] === "getEvaluationsV3BySlug"
-            );
+            return path[0] === "experiments" && path[1] === "getEvaluationsV3BySlug";
           },
         });
       }
@@ -436,9 +427,7 @@ export const useAutosaveEvaluationsV3 = () => {
    * permanently rejected and the page would never send another one, silently,
    * for the rest of its life.
    */
-  const inFlightRef = useRef<Promise<AutosaveOutcome>>(
-    Promise.resolve("unchanged"),
-  );
+  const inFlightRef = useRef<Promise<AutosaveOutcome>>(Promise.resolve("unchanged"));
   const saveNow = useCallback((): Promise<AutosaveOutcome> => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -645,9 +634,7 @@ export const useAutosaveEvaluationsV3 = () => {
     error: existingExperiment.error,
     reset: reset,
     /** True when the store differs from the last state the server acknowledged. */
-    isDirty:
-      lastSavedRef.current !== null &&
-      stringifiedState !== lastSavedRef.current,
+    isDirty: lastSavedRef.current !== null && stringifiedState !== lastSavedRef.current,
     reloadFromServer,
     /**
      * Persist the current store immediately instead of waiting out the

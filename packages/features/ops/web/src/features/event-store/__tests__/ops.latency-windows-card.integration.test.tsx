@@ -31,9 +31,7 @@ describe("LatencyWindowsCard", () => {
     expect(container.textContent).toContain("120.0k completions all time");
 
     // P50/P99 are the metric COLUMNS (header cells); windows are the rows.
-    const headerCells = [...container.querySelectorAll("th")].map(
-      (cell) => cell.textContent,
-    );
+    const headerCells = [...container.querySelectorAll("th")].map((cell) => cell.textContent);
     expect(headerCells).toContain("P50");
     expect(headerCells).toContain("P99");
     expect(headerCells).not.toContain("Last hour");

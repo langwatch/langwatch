@@ -19,11 +19,7 @@ export abstract class EvaluatorCodeExecutionPort {
 }
 
 export abstract class EvaluatorAuditLogPort {
-  abstract history(input: {
-    evaluatorId: string;
-    projectId: string;
-    limit: number;
-  }): Promise<
+  abstract history(input: { evaluatorId: string; projectId: string; limit: number }): Promise<
     Array<{
       id: string;
       action: string;

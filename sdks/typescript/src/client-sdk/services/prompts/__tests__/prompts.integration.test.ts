@@ -72,11 +72,7 @@ const teardownCliRunner = (params: { testDir: string; originalCwd: string }) => 
   fs.rmSync(testDir, { recursive: true, force: true });
 };
 
-const createLocalPromptFile = (params: {
-  handle: string;
-  cli: CliRunner;
-  testDir: string;
-}) => {
+const createLocalPromptFile = (params: { handle: string; cli: CliRunner; testDir: string }) => {
   const { handle, cli, testDir } = params;
   const initResult = cli.run(`prompt init`);
   expect(initResult.success).toBe(true);

@@ -1,13 +1,4 @@
-import {
-  Box,
-  Container,
-  chakra,
-  Grid,
-  HStack,
-  Skeleton,
-  Spacer,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Container, chakra, Grid, HStack, Skeleton, Spacer, VStack } from "@chakra-ui/react";
 import { LuCalendarClock } from "react-icons/lu";
 // The page's serif display voice (Sentient) is declared in langy-theme.css.
 // Imported HERE, not just via Langy components, so the greeting, banner, and
@@ -252,13 +243,7 @@ function ConsideringLangWatch() {
  */
 function HomeCompositionSkeleton() {
   return (
-    <VStack
-      gap={4}
-      width="full"
-      align="stretch"
-      aria-busy="true"
-      aria-label="Loading your home"
-    >
+    <VStack gap={4} width="full" align="stretch" aria-busy="true" aria-label="Loading your home">
       <Skeleton height="180px" borderRadius="xl" />
       <Skeleton height="96px" borderRadius="lg" />
       <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={4}>
@@ -284,8 +269,7 @@ function HomeCompositionSkeleton() {
 function LangyHome() {
   const { isNewProject } = useProjectReach();
   const devState = useHomeDevState();
-  const empty =
-    devState === "empty" ? true : devState === "populated" ? false : isNewProject;
+  const empty = devState === "empty" ? true : devState === "populated" ? false : isNewProject;
 
   return (
     <>

@@ -4,11 +4,7 @@ import { computeLeaderboardVerdict } from "@langwatch/experiment-web";
 import { computeParetoDominance } from "@langwatch/experiment-web";
 import { computeSampleAdequacy } from "@langwatch/experiment-web";
 import { areDistinguishable } from "@langwatch/experiment-web";
-import type {
-  BTLeaderboard,
-  BTLeaderboardEntry,
-  VariantMetrics,
-} from "@langwatch/experiment-web";
+import type { BTLeaderboard, BTLeaderboardEntry, VariantMetrics } from "@langwatch/experiment-web";
 
 const metricStats = (avg: number, count: number) => ({
   min: avg,
@@ -60,11 +56,7 @@ const entry = (
  * where both tests agree would pass even if a panel reverted.
  */
 const leaderboard: BTLeaderboard = {
-  entries: [
-    entry("a", 120, [20, 220]),
-    entry("b", 100, [0, 200]),
-    entry("c", 10, [-90, 110]),
-  ],
+  entries: [entry("a", 120, [20, 220]), entry("b", 100, [0, 200]), entry("c", 10, [-90, 110])],
   winMatrix: {},
   comparisonCount: 60,
   minMatchups: 60,
@@ -139,9 +131,7 @@ describe("the panels agree on which pairs were separated", () => {
     });
 
     it("counts the same number in the trust panel", () => {
-      expect(computeSampleAdequacy(leaderboard).separatedPairs).toBe(
-        separatedPairs().length,
-      );
+      expect(computeSampleAdequacy(leaderboard).separatedPairs).toBe(separatedPairs().length);
     });
 
     it("builds the verdict's tie set from the same answer", () => {

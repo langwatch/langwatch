@@ -48,9 +48,7 @@ export class UnavailableCancellationPublisherAdapter extends CancellationPublish
 
   publish(message: CancellationMessage): Promise<void> {
     return Promise.reject(
-      new Error(
-        `Cancellation transport unavailable for scenarioRunId=${message.scenarioRunId}`,
-      ),
+      new Error(`Cancellation transport unavailable for scenarioRunId=${message.scenarioRunId}`),
     );
   }
 }

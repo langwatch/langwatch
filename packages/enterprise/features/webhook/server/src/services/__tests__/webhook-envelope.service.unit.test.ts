@@ -12,10 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  WebhookEnvelopeService,
-  type WebhookSpendEventRow,
-} from "../webhook-envelope.service";
+import { WebhookEnvelopeService, type WebhookSpendEventRow } from "../webhook-envelope.service";
 
 function row(overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRow {
   return {

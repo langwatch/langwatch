@@ -89,9 +89,7 @@ const loadNamedRows = async ({
 }): Promise<Map<string, { name: string }>> => {
   if (ids.length === 0) return new Map();
   const names = await find(ids);
-  return new Map(
-    Object.entries(names).map(([id, name]) => [id, { name }]),
-  );
+  return new Map(Object.entries(names).map(([id, name]) => [id, { name }]));
 };
 
 /**

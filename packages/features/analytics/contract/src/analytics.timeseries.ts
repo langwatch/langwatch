@@ -69,11 +69,7 @@ export const analyticsTimeseriesBucketSchema = z
     date: z.string(),
   })
   .catchall(
-    z.union([
-      z.number(),
-      z.string(),
-      z.record(z.string(), z.record(z.string(), z.number())),
-    ]),
+    z.union([z.number(), z.string(), z.record(z.string(), z.record(z.string(), z.number()))]),
   );
 
 export const analyticsTimeseriesResultSchema = z

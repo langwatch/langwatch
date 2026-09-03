@@ -1,7 +1,4 @@
-import {
-  type TraceAnchor,
-  useAnchoredAnnotations,
-} from "../../hooks/use-anchored-annotations";
+import { type TraceAnchor, useAnchoredAnnotations } from "../../hooks/use-anchored-annotations";
 import { AnchorCommentButton } from "./anchor-comment-button";
 
 /**
@@ -12,13 +9,7 @@ import { AnchorCommentButton } from "./anchor-comment-button";
  * read. The dense rows are the other way round and are handed their comments by
  * the surface that drew them.
  */
-export function FieldCommentButton({
-  traceId,
-  anchor,
-}: {
-  traceId: string;
-  anchor: TraceAnchor;
-}) {
+export function FieldCommentButton({ traceId, anchor }: { traceId: string; anchor: TraceAnchor }) {
   const annotations = useAnchoredAnnotations();
   return (
     <AnchorCommentButton

@@ -45,9 +45,8 @@ const transactionClient = {
 
 const prisma = {
   ...transactionClient,
-  $transaction: (
-    run: (tx: Prisma.TransactionClient) => Promise<unknown>,
-  ): Promise<unknown> => run(transactionClient),
+  $transaction: (run: (tx: Prisma.TransactionClient) => Promise<unknown>): Promise<unknown> =>
+    run(transactionClient),
 } as unknown as PrismaClient;
 
 const attachBindings = vi.fn();

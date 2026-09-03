@@ -47,11 +47,7 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
           style={{ width: "100%", overflow: "hidden" }}
         >
           <VStack gap={6} align="stretch" pt={4} w="full" minW="0">
-            <Field.Root
-              colorPalette="orange"
-              w="full"
-              invalid={phoneHasValue && !phoneIsValid}
-            >
+            <Field.Root colorPalette="orange" w="full" invalid={phoneHasValue && !phoneIsValid}>
               <Field.Label>{"What is your phone number?"}</Field.Label>
               <PhoneNumberInput
                 autoDetectDefaultCountry

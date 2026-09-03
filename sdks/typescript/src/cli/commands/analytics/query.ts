@@ -70,9 +70,7 @@ export const queryAnalyticsCommand = async (options: {
   const now = Date.now();
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
 
-  const startDate = options.startDate
-    ? new Date(options.startDate).getTime()
-    : sevenDaysAgo;
+  const startDate = options.startDate ? new Date(options.startDate).getTime() : sevenDaysAgo;
   const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
 
   const spinner = createSpinner(`Querying ${metric} (${aggregation})...`).start();
@@ -157,9 +155,7 @@ export const queryAnalyticsCommand = async (options: {
         }
 
         console.log();
-        console.log(
-          chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")),
-        );
+        console.log(chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")));
         console.log(
           chalk.gray(
             `Use ${chalk.cyan("langwatch analytics query --metric <preset> -f json")} for raw data`,

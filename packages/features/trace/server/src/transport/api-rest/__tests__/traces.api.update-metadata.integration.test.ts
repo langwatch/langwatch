@@ -81,7 +81,10 @@ const searchBodySchema = z
     endDate: z.union([z.string(), z.number()]),
     pageSize: z.number().optional(),
   })
-  .catchall(z.unknown()) as unknown as TracesRestPorts<TraceSearchBody, unknown>["searchBodySchema"];
+  .catchall(z.unknown()) as unknown as TracesRestPorts<
+  TraceSearchBody,
+  unknown
+>["searchBodySchema"];
 
 function buildApi() {
   const ports: TracesRestPorts<TraceSearchBody, unknown> = {
@@ -99,11 +102,16 @@ function buildApi() {
   const app = createTracesRestApp({ security: testSecurity(), ports });
 
   return {
-    fetch: (path: string, init?: RequestInit) => app.hono.fetch(new Request(`http://api.test${path}`, init)),
+    fetch: (path: string, init?: RequestInit) =>
+      app.hono.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
 
-function patchMetadata(api: ReturnType<typeof buildApi>, traceId: string, metadata: Record<string, unknown>) {
+function patchMetadata(
+  api: ReturnType<typeof buildApi>,
+  traceId: string,
+  metadata: Record<string, unknown>,
+) {
   return api.fetch(`/api/traces/${traceId}/metadata`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },

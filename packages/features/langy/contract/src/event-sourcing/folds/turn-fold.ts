@@ -187,10 +187,7 @@ export type LangyConversationTurnEvent =
       typeof LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED,
       LangyToolCallFailedEventData
     >
-  | TurnFoldEvent<
-      typeof LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED,
-      LangyPlanUpdatedEventData
-    >
+  | TurnFoldEvent<typeof LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED, LangyPlanUpdatedEventData>
   | TurnFoldEvent<
       typeof LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
       LangyAgentResponseFailedEventData

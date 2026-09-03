@@ -87,19 +87,14 @@ export interface RunPlanArchiveResponse {
 }
 
 /** Lists the run plans of the project. */
-export async function listRunPlans(params?: {
-  includeArchived?: boolean;
-}): Promise<RunPlan[]> {
+export async function listRunPlans(params?: { includeArchived?: boolean }): Promise<RunPlan[]> {
   const query = params?.includeArchived ? "?includeArchived=true" : "";
   return makeRequest("GET", `/api/v1/run-plans${query}`) as Promise<RunPlan[]>;
 }
 
 /** Retrieves a single run plan by id. */
 export async function getRunPlan(id: string): Promise<RunPlan> {
-  return makeRequest(
-    "GET",
-    `/api/v1/run-plans/${encodeURIComponent(id)}`,
-  ) as Promise<RunPlan>;
+  return makeRequest("GET", `/api/v1/run-plans/${encodeURIComponent(id)}`) as Promise<RunPlan>;
 }
 
 /**
@@ -114,11 +109,7 @@ export async function runRunPlan(data: {
   parameters?: RunParameters;
   note?: string;
 }): Promise<RunPlanRunResult> {
-  return makeRequest(
-    "POST",
-    "/api/v1/run-plans/run",
-    data,
-  ) as Promise<RunPlanRunResult>;
+  return makeRequest("POST", "/api/v1/run-plans/run", data) as Promise<RunPlanRunResult>;
 }
 
 /** Runs a plan again with the configuration it already holds. */
@@ -138,9 +129,7 @@ export async function rerunRunPlan(
 }
 
 /** Archives a run plan. */
-export async function archiveRunPlan(
-  id: string,
-): Promise<RunPlanArchiveResponse> {
+export async function archiveRunPlan(id: string): Promise<RunPlanArchiveResponse> {
   return makeRequest(
     "DELETE",
     `/api/v1/run-plans/${encodeURIComponent(id)}`,

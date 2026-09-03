@@ -104,14 +104,10 @@ export function buildModelsJson({
 }): { providers: Record<string, unknown> } {
   const baseUrl = env[model.baseUrlEnv];
   if (!baseUrl) {
-    throw new Error(
-      `model.baseUrlEnv names "${model.baseUrlEnv}" but that variable is not set`,
-    );
+    throw new Error(`model.baseUrlEnv names "${model.baseUrlEnv}" but that variable is not set`);
   }
   if (!env[model.apiKeyEnv]) {
-    throw new Error(
-      `model.apiKeyEnv names "${model.apiKeyEnv}" but that variable is not set`,
-    );
+    throw new Error(`model.apiKeyEnv names "${model.apiKeyEnv}" but that variable is not set`);
   }
   return {
     providers: {
@@ -133,12 +129,8 @@ export function writeModelsJson(options: {
   const { agentDir, model, env } = options;
   mkdirSync(agentDir, { recursive: true, mode: 0o700 });
   const modelsPath = join(agentDir, "models.json");
-  writeFileSync(
-    modelsPath,
-    `${JSON.stringify(buildModelsJson({ model, env }), null, 2)}\n`,
-    {
-      mode: 0o600,
-    },
-  );
+  writeFileSync(modelsPath, `${JSON.stringify(buildModelsJson({ model, env }), null, 2)}\n`, {
+    mode: 0o600,
+  });
   return { modelsPath, providerId: PROVIDER_ID, modelId: model.id };
 }

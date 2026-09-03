@@ -44,11 +44,7 @@ import {
   type LangyMessageDto,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import { AGENT_CHAT_TIMEOUT_MS } from "../../adapters/langy.turn-errors.adapter";
 import { ADOPTABLE_CONVERSATION_ID } from "../../services/langy-conversation.service";
@@ -126,10 +122,7 @@ export type LangyTrpcPorts = Readonly<{
     projectId: string;
   }): Promise<{ allowed: boolean }>;
   /** The looser per-user budget a panel-open warm spends. */
-  checkWarmRateLimit(input: {
-    userId: string;
-    projectId: string;
-  }): Promise<{ allowed: boolean }>;
+  checkWarmRateLimit(input: { userId: string; projectId: string }): Promise<{ allowed: boolean }>;
   /** The process's product-analytics sink (server-side capture, never the browser). */
   recordProductEvent(input: {
     userId: string;

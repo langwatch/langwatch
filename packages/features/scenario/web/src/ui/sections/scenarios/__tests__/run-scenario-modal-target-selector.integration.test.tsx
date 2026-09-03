@@ -14,15 +14,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPrompts = [
   {
@@ -89,9 +81,7 @@ import type { TargetValue } from "../target-selector";
 
 describe("RunScenarioModal with TargetSelector", () => {
   let onClose: ReturnType<typeof vi.fn<() => void>>;
-  let onRun: ReturnType<
-    typeof vi.fn<(target: TargetValue, remember: boolean) => void>
-  >;
+  let onRun: ReturnType<typeof vi.fn<(target: TargetValue, remember: boolean) => void>>;
   let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
@@ -116,9 +106,7 @@ describe("RunScenarioModal with TargetSelector", () => {
     const trigger = screen.getByTestId("target-selector-trigger");
     await user.click(trigger);
     await waitFor(() => {
-      expect(
-        screen.getByTestId("target-selector-dropdown"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("target-selector-dropdown")).toBeInTheDocument();
     });
   }
 
@@ -132,14 +120,10 @@ describe("RunScenarioModal with TargetSelector", () => {
       await user.click(promptItem);
 
       // Dropdown closes after selection
-      expect(
-        screen.queryByTestId("target-selector-dropdown"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("target-selector-dropdown")).not.toBeInTheDocument();
 
       // Selected prompt is shown in the trigger
-      expect(screen.getByTestId("target-selector-trigger")).toHaveTextContent(
-        "farewell-prompt",
-      );
+      expect(screen.getByTestId("target-selector-trigger")).toHaveTextContent("farewell-prompt");
 
       // Modal remains open (onClose was NOT called)
       expect(onClose).not.toHaveBeenCalled();
@@ -160,14 +144,10 @@ describe("RunScenarioModal with TargetSelector", () => {
       await user.click(agentItem);
 
       // Dropdown closes
-      expect(
-        screen.queryByTestId("target-selector-dropdown"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("target-selector-dropdown")).not.toBeInTheDocument();
 
       // Selected agent shown in trigger
-      expect(screen.getByTestId("target-selector-trigger")).toHaveTextContent(
-        "Test HTTP Agent",
-      );
+      expect(screen.getByTestId("target-selector-trigger")).toHaveTextContent("Test HTTP Agent");
 
       // Modal remains open
       expect(onClose).not.toHaveBeenCalled();
@@ -187,12 +167,8 @@ describe("RunScenarioModal with TargetSelector", () => {
       // Only the agent carrying the devTunnel marker gets the badge.
       const badges = screen.getAllByText("Local tunnel");
       expect(badges).toHaveLength(1);
-      expect(screen.getByTestId("target-option-agent-1")).toHaveTextContent(
-        "Local tunnel",
-      );
-      expect(screen.getByTestId("target-option-agent-2")).not.toHaveTextContent(
-        "Local tunnel",
-      );
+      expect(screen.getByTestId("target-option-agent-1")).toHaveTextContent("Local tunnel");
+      expect(screen.getByTestId("target-option-agent-2")).not.toHaveTextContent("Local tunnel");
     });
   });
 
@@ -208,9 +184,7 @@ describe("RunScenarioModal with TargetSelector", () => {
 
       // Dropdown closes
       await waitFor(() => {
-        expect(
-          screen.queryByTestId("target-selector-dropdown"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("target-selector-dropdown")).not.toBeInTheDocument();
       });
 
       // Modal stays open

@@ -4,9 +4,7 @@ import { checkOrgApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
-export const archiveWebhookCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const archiveWebhookCommand = async (id: string): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Archiving webhook endpoint...").start();

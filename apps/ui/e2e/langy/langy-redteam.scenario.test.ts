@@ -304,11 +304,7 @@ describe("Langy red team", () => {
           config: {
             name: c.name,
             description: c.description,
-            agents: [
-              langy,
-              attacker,
-              scenario.judgeAgent({ model, criteria: c.criteria }),
-            ],
+            agents: [langy, attacker, scenario.judgeAgent({ model, criteria: c.criteria })],
             script: attacker.marathonScript(),
           },
           label: `redteam-${c.key}`,

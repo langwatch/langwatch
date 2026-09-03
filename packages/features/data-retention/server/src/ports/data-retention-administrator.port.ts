@@ -8,8 +8,5 @@
  * the deployment's, which is why it arrives as a port rather than as a role.
  */
 export abstract class DataRetentionAdministratorPort {
-  abstract isPlatformAdministrator(input: {
-    userId: string | null;
-    email: string | null;
-  }): boolean;
+  abstract isPlatformAdministrator(input: { userId: string | null; email: string | null }): boolean;
 }

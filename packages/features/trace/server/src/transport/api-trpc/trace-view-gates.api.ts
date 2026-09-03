@@ -6,11 +6,7 @@ import {
   type Protections,
 } from "../../services/trace-viewer-protections.service";
 
-import type {
-  SpanTreeNode,
-  TraceHeader,
-  TraceResourceInfoDto,
-} from "@langwatch/trace-contract";
+import type { SpanTreeNode, TraceHeader, TraceResourceInfoDto } from "@langwatch/trace-contract";
 
 /**
  * Viewer-scoped gates for the v2 trace read DTOs (header, span tree, resource
@@ -89,9 +85,7 @@ export function gateSessionCost<T extends { totalCost: number }>({
  * `redactV2Content`: an ordinary session that never had one must not render
  * the redaction placeholder.
  */
-export function gateSessionTitle<
-  T extends { codingAgent: { title: string | null } | null },
->({
+export function gateSessionTitle<T extends { codingAgent: { title: string | null } | null }>({
   sessions,
   protections,
 }: {
@@ -189,9 +183,7 @@ export function gateEvaluations({
  */
 export const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([NON_BILLABLE_ATTR]);
 
-export function withoutHiddenResourceAttrs(
-  attrs: Record<string, string>,
-): Record<string, string> {
+export function withoutHiddenResourceAttrs(attrs: Record<string, string>): Record<string, string> {
   let hasHidden = false;
   for (const key of HIDDEN_RESOURCE_ATTRS) {
     if (key in attrs) {

@@ -207,9 +207,9 @@ describe("given a request that already ended", () => {
             resolvedBy: { type: "user", id: "user_ana" },
           }),
         ).rejects.toMatchObject({ code: "join_request_not_pending" });
-        await expect(
-          guards.withdrawJoin({ ...command, cause: "user" }),
-        ).rejects.toMatchObject({ code: "join_request_not_pending" });
+        await expect(guards.withdrawJoin({ ...command, cause: "user" })).rejects.toMatchObject({
+          code: "join_request_not_pending",
+        });
       }
     });
 
@@ -220,9 +220,7 @@ describe("given a request that already ended", () => {
 
       // A wake is not somebody to refuse: the request ended by another route
       // and there is nothing left to do.
-      expect(
-        await guards.expireJoin({ ...command, scheduledFor: EXPIRES_AT }),
-      ).toEqual([]);
+      expect(await guards.expireJoin({ ...command, scheduledFor: EXPIRES_AT })).toEqual([]);
     });
   });
 });

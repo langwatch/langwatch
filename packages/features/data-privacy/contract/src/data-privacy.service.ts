@@ -6,12 +6,8 @@ import type {
 } from "./data-privacy";
 
 export abstract class DataPrivacyService {
-  abstract getResolvedForProject(input: {
-    projectId: string;
-  }): Promise<ResolvedDataPrivacy>;
-  abstract listOrganizationRules(input: {
-    organizationId: string;
-  }): Promise<DataPrivacyPolicy[]>;
+  abstract getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy>;
+  abstract listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]>;
   abstract tryGetById(input: { id: string }): Promise<DataPrivacyPolicy | null>;
   abstract setForScope(input: {
     organizationId: string;

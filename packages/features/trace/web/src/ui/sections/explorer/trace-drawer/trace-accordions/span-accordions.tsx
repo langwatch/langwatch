@@ -1,10 +1,7 @@
 import { Box, HStack, Icon, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
-import {
-  ContentPrivacyMarkers,
-  PiiIncompleteNotice,
-} from "../../../content-privacy-markers";
+import { ContentPrivacyMarkers, PiiIncompleteNotice } from "../../../content-privacy-markers";
 import { RedactedField } from "../../../redacted-field";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useAnchoredAnnotations } from "../../hooks/use-anchored-annotations";
@@ -24,9 +21,15 @@ import { IOViewer } from "../io-viewer";
 import { hasPromptMetadata, PromptAccordion } from "../prompt-accordion";
 import { ScopeBlock } from "../../../../elements/explorer/trace-drawer/scope-chip";
 import { AccordionShell, Section } from "./accordion-shell";
-import { EmptyEventsState, EmptyHint } from "../../../../blocks/explorer/trace-drawer/trace-accordions/empty-states";
+import {
+  EmptyEventsState,
+  EmptyHint,
+} from "../../../../blocks/explorer/trace-drawer/trace-accordions/empty-states";
 import { EventCard } from "./event-card";
-import { logEventTone, summarizeLogEvent } from "../../../../../model/explorer/trace-drawer/trace-accordions/log-summary";
+import {
+  logEventTone,
+  summarizeLogEvent,
+} from "../../../../../model/explorer/trace-drawer/trace-accordions/log-summary";
 import { SectionFocusGlow } from "../../../../elements/explorer/trace-drawer/trace-accordions/section-focus-glow";
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence";
 import { UnmappedCostSuggestion } from "../../../../elements/explorer/trace-drawer/trace-accordions/unmapped-cost-suggestion";
@@ -388,13 +391,7 @@ export function SpanAccordions({
             }
             if (id === "prompt") {
               return (
-                <Section
-                  key="prompt"
-                  value="prompt"
-                  title="Prompt"
-                  isFirst={isFirst}
-                  open={isOpen}
-                >
+                <Section key="prompt" value="prompt" title="Prompt" isFirst={isFirst} open={isOpen}>
                   {detail && <PromptAccordion span={detail} />}
                 </Section>
               );
@@ -411,10 +408,7 @@ export function SpanAccordions({
                   count={attrCount}
                   commentCount={sectionComments.attributes}
                   empty={
-                    !hasAttributes &&
-                    !isEditing &&
-                    !resources.isLoading &&
-                    !detailQuery.isLoading
+                    !hasAttributes && !isEditing && !resources.isLoading && !detailQuery.isLoading
                   }
                   isFirst={isFirst}
                   open={isOpen}
@@ -434,8 +428,7 @@ export function SpanAccordions({
                       editing={attributeEditing.editing}
                       correctedFrom={
                         changedFields.includes("params")
-                          ? ((captured?.params as Record<string, unknown> | undefined) ??
-                            {})
+                          ? ((captured?.params as Record<string, unknown> | undefined) ?? {})
                           : undefined
                       }
                       comments={attributeComments}

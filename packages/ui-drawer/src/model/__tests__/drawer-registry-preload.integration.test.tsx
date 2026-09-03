@@ -68,16 +68,12 @@ describe("preloadDrawer", () => {
     describe("when the drawer is opened later", () => {
       /** @scenario "A drawer whose warm-up failed can still be opened" */
       it("fetches the code again and opens", async () => {
-        await expect(
-          preloadDrawer({ registry, drawer: "flaky" }),
-        ).resolves.toBeUndefined();
+        await expect(preloadDrawer({ registry, drawer: "flaky" })).resolves.toBeUndefined();
 
         renderDrawer(registry.flaky);
 
         expect(screen.getByTestId("spinner")).toBeInTheDocument();
-        await waitFor(() =>
-          expect(screen.getByTestId("flaky-drawer")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByTestId("flaky-drawer")).toBeInTheDocument());
       });
     });
   });

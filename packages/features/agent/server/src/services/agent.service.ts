@@ -71,9 +71,7 @@ export function toAgentListRow(agent: Agent): AgentListRow {
  */
 function isUniqueConstraintViolation(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { code?: unknown }).code === "P2002"
+    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
   );
 }
 
@@ -128,10 +126,7 @@ export class AgentService extends AgentServiceContract {
     return this.repository.findNamesByIds(input);
   }
 
-  exists(input: {
-    id: string;
-    projectId: string;
-  }): ReturnType<AgentServiceContract["exists"]> {
+  exists(input: { id: string; projectId: string }): ReturnType<AgentServiceContract["exists"]> {
     return this.repository.exists(input);
   }
 
@@ -459,19 +454,10 @@ export class AgentService extends AgentServiceContract {
     agents: readonly { ownerUserId: string | null }[],
   ): Promise<Map<string, { userId: string; name: string | null }>> {
     const userIds = [
-      ...new Set(
-        agents
-          .map((agent) => agent.ownerUserId)
-          .filter((id): id is string => !!id),
-      ),
+      ...new Set(agents.map((agent) => agent.ownerUserId).filter((id): id is string => !!id)),
     ];
     const names = await this.repository.findUserNamesByIds(userIds);
-    return new Map(
-      userIds.map((userId) => [
-        userId,
-        { userId, name: names.get(userId) ?? null },
-      ]),
-    );
+    return new Map(userIds.map((userId) => [userId, { userId, name: names.get(userId) ?? null }]));
   }
 
   getConnectedByNameAndEnvironment(input: {
@@ -513,10 +499,7 @@ export class AgentService extends AgentServiceContract {
     return this.workflows.fields({ projectId, workflowIds });
   }
 
-  private withResolvedFields(
-    agent: Agent,
-    fields: Record<string, AgentFields>,
-  ): AgentWithFields {
+  private withResolvedFields(agent: Agent, fields: Record<string, AgentFields>): AgentWithFields {
     if (agent.type !== "workflow") {
       return {
         ...agent,

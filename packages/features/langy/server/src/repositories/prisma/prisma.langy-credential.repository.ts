@@ -48,10 +48,7 @@ export class PrismaLangyCredentialRepository extends LangyCredentialRepository {
     return project?.langyEgressAllowlist ?? null;
   }
 
-  async saveEgressAllowlist(
-    projectId: string,
-    allowlist: string[] | null,
-  ): Promise<void> {
+  async saveEgressAllowlist(projectId: string, allowlist: string[] | null): Promise<void> {
     await this.prisma.project.update({
       where: { id: projectId },
       data: { langyEgressAllowlist: allowlist ?? Prisma.DbNull },

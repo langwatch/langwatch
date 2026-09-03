@@ -23,12 +23,7 @@ const OBSERVER_THRESHOLDS = [0, 0.1, 0.25, 0.5, 0.75, 1];
  * Pure UI affordance — invisible to the local user; the section attribute
  * is only ever rendered remotely on a peer's screen.
  */
-export function PresenceSection({
-  id,
-  rootRef,
-  children,
-  ...boxProps
-}: PresenceSectionProps) {
+export function PresenceSection({ id, rootRef, children, ...boxProps }: PresenceSectionProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const setVisibility = useSectionTrackerStore((s) => s.setVisibility);
   const unregister = useSectionTrackerStore((s) => s.unregister);

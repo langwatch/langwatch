@@ -41,16 +41,10 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
-      await expect(service.storeEvents(events, context)).rejects.toThrow(
-        "Storage failed",
-      );
+      await expect(service.storeEvents(events, context)).rejects.toThrow("Storage failed");
     });
 
     it("downstream operations don't execute if storage fails", async () => {
@@ -71,16 +65,10 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
-      await expect(service.storeEvents(events, context)).rejects.toThrow(
-        "Storage failed",
-      );
+      await expect(service.storeEvents(events, context)).rejects.toThrow("Storage failed");
 
       expect(mapDef.map).not.toHaveBeenCalled();
       expect(foldDef.apply).not.toHaveBeenCalled();
@@ -207,11 +195,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -222,11 +206,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const foldDef1 = createMockFoldProjectionDefinition("projection1");
       const foldDef2 = createMockFoldProjectionDefinition("projection2");
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       (foldDef1.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
@@ -252,11 +232,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
@@ -324,11 +300,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -344,11 +316,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -366,11 +334,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       await expect(
-        service.getProjectionByName(
-          "nonexistent" as any,
-          TEST_CONSTANTS.AGGREGATE_ID,
-          context,
-        ),
+        service.getProjectionByName("nonexistent" as any, TEST_CONSTANTS.AGGREGATE_ID, context),
       ).rejects.toThrow(/nonexistent/);
     });
   });

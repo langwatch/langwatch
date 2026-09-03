@@ -2,10 +2,7 @@
 import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-contract";
 
 export abstract class CodingAgentTraceSessionRepository {
-  abstract ensure(
-    records: CodingAgentTraceSessionRecord[],
-    retentionDays: number,
-  ): Promise<void>;
+  abstract ensure(records: CodingAgentTraceSessionRecord[], retentionDays: number): Promise<void>;
 
   abstract tryFindByTraceId(input: {
     tenantId: string;

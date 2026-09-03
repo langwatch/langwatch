@@ -90,13 +90,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
   const commitVersion = api.workflow.commitVersion.useMutation();
   const restoreVersion = api.workflow.restoreVersion.useMutation();
 
-  const onSubmit = ({
-    version,
-    commitMessage,
-  }: {
-    version: string;
-    commitMessage: string;
-  }) => {
+  const onSubmit = ({ version, commitMessage }: { version: string; commitMessage: string }) => {
     if (!project || !workflowId) return;
 
     commitVersion.mutate(
@@ -256,10 +250,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                   </HStack>
                 </VStack>
                 {!version.isCurrentVersion && (
-                  <Tooltip
-                    content="Restore this version"
-                    positioning={{ placement: "top" }}
-                  >
+                  <Tooltip content="Restore this version" positioning={{ placement: "top" }}>
                     <Button
                       variant="ghost"
                       onClick={() => void onRestoreSuccess(version.id)}

@@ -34,9 +34,7 @@ describe("bootstrapMeanCI", () => {
     });
 
     it("returns the same interval for the same seed", () => {
-      expect(bootstrapMeanCI({ values, seed: 7 })).toEqual(
-        bootstrapMeanCI({ values, seed: 7 }),
-      );
+      expect(bootstrapMeanCI({ values, seed: 7 })).toEqual(bootstrapMeanCI({ values, seed: 7 }));
     });
 
     it("narrows as the sample grows", () => {

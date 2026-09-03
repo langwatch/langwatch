@@ -28,10 +28,7 @@ import { classifyMemberType } from "../../model/member-classification";
 import { OrganizationUserRole, PricingModel, TeamUserRole } from "../../model/prisma-types";
 import { LabeledSwitch } from "../../ui/elements/labeled-switch";
 import { Link } from "../../ui/elements/link";
-import {
-  CONTACT_SALES_URL,
-  type MemberType,
-} from "@langwatch/enterprise-licensing-contract";
+import { CONTACT_SALES_URL, type MemberType } from "@langwatch/enterprise-licensing-contract";
 import {
   type BillingInterval,
   buildEnterprisePlanFeatures,
@@ -87,8 +84,7 @@ export function SubscriptionPage() {
     },
   );
 
-  const currency =
-    selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
+  const currency = selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
 
   useEffect(() => {
     setSelectedCurrency(null);
@@ -202,16 +198,12 @@ export function SubscriptionPage() {
         )
       : Math.max(
           existingCoreMembers,
-          (effectiveMaxSeats ?? totalFullMembers) +
-            newPlannedFullMembers -
-            deletedSeatCount,
+          (effectiveMaxSeats ?? totalFullMembers) + newPlannedFullMembers - deletedSeatCount,
         );
 
   // For tiered legacy plans upgrading to seat-based, use actual member count
   // (not the old plan's maxMembers capacity which is irrelevant for the new model)
-  const upgradeBillingSeats = isTieredLegacyPaidPlan
-    ? Math.max(1, totalFullMembers)
-    : billingSeats;
+  const upgradeBillingSeats = isTieredLegacyPaidPlan ? Math.max(1, totalFullMembers) : billingSeats;
 
   const billingPriceCents = billingSeats * seatPricePerPeriodCents;
   const billingPriceFormatted = `${formatPrice({ cents: billingPriceCents, currency: effectiveCurrency })}${periodSuffix}`;
@@ -300,9 +292,7 @@ export function SubscriptionPage() {
   if (activePlan.isError || !plan) {
     return (
       <Flex justifyContent="center" padding={8}>
-        <Text color="red.fg">
-          Failed to load subscription information. Please try again later.
-        </Text>
+        <Text color="red.fg">Failed to load subscription information. Please try again later.</Text>
       </Flex>
     );
   }
@@ -443,8 +433,8 @@ export function SubscriptionPage() {
               </HStack>
               {showUpgradeCredit && (
                 <Text fontSize="sm" color="green.fg" data-testid="credit-notice">
-                  Your previous plan has been prorated. Any unused credit has been applied
-                  to your account and will offset future invoices.
+                  Your previous plan has been prorated. Any unused credit has been applied to your
+                  account and will offset future invoices.
                 </Text>
               )}
             </VStack>
@@ -469,9 +459,7 @@ export function SubscriptionPage() {
           deprecatedNotice={isTieredLegacyPaidPlan}
           // Sales has nothing to sell a customer already holding a signed
           // enterprise contract, so they get no upgrade call to action.
-          contactSalesUrl={
-            isEnterprisePlan && !isLicenseOverride ? CONTACT_SALES_URL : undefined
-          }
+          contactSalesUrl={isEnterprisePlan && !isLicenseOverride ? CONTACT_SALES_URL : undefined}
         />
 
         {/* Invoices Block - always shown; listInvoices returns [] when no Stripe customer exists */}

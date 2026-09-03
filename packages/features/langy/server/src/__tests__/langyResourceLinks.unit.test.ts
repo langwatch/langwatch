@@ -19,9 +19,7 @@ function fakeRedis() {
       hashes.set(key, hash);
       return added;
     }),
-    hget: vi.fn(
-      async (key: string, field: string) => hashes.get(key)?.get(field) ?? null,
-    ),
+    hget: vi.fn(async (key: string, field: string) => hashes.get(key)?.get(field) ?? null),
     expire: vi.fn(async () => 1),
   } satisfies LangyLinkRedis;
   return { redis, hashes };
@@ -81,10 +79,7 @@ describe("langyResourceLinkStore", () => {
       });
 
       expect(redis.expire).toHaveBeenCalledTimes(2);
-      expect(redis.expire).toHaveBeenCalledWith(
-        "langy:navlink:conv-1",
-        expect.any(Number),
-      );
+      expect(redis.expire).toHaveBeenCalledWith("langy:navlink:conv-1", expect.any(Number));
     });
 
     it("writes nothing — and touches no TTL — for an empty link set", async () => {

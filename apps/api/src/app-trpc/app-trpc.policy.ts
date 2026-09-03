@@ -68,10 +68,7 @@ export type ApiTrpcPolicyPorts<TContext, TAuthenticatedContext extends object> =
 export function createApiTrpcPolicy<
   TContext extends TrpcPolicyContext & TrpcDeclaredAuthzContext & object,
   TAuthenticatedContext extends object,
->(
-  root: TrpcRoot<TContext>,
-  ports: ApiTrpcPolicyPorts<TContext, TAuthenticatedContext>,
-) {
+>(root: TrpcRoot<TContext>, ports: ApiTrpcPolicyPorts<TContext, TAuthenticatedContext>) {
   const runtime = createTrpcRuntimePolicy<TContext, TAuthenticatedContext>(root, {
     identity: ports.identity,
     audit: ports.audit,

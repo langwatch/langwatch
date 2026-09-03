@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  AI_TOOL_STARTER_TILES,
-  type AiToolEntry,
-} from "@langwatch/enterprise-governance-contract";
+import { AI_TOOL_STARTER_TILES, type AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import {
   AiToolCatalogRepository,
   AiToolProviderCatalogPort,

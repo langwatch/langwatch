@@ -96,12 +96,8 @@ describe("the integrate pane", () => {
       expect(
         tokenCard.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
-      expect(
-        screen.getByRole("button", { name: /setup via agent/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /see sample data/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /setup via agent/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /see sample data/i })).toBeInTheDocument();
     });
 
     /** @scenario The setup paths are not a tab strip */
@@ -109,9 +105,7 @@ describe("the integrate pane", () => {
       renderPane();
 
       expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
-      expect(
-        screen.queryByText("All four end up in the same explorer."),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("All four end up in the same explorer.")).not.toBeInTheDocument();
     });
 
     /** @scenario The SDK instructions open and close from their own button */
@@ -132,9 +126,7 @@ describe("the integrate pane", () => {
 
       await user.click(toggle);
       await waitFor(() => {
-        expect(
-          screen.queryByText("Select your platform or language"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Select your platform or language")).not.toBeInTheDocument();
       });
       expect(toggle).toHaveAttribute("aria-expanded", "false");
     });

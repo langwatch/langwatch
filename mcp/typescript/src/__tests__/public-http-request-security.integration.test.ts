@@ -53,9 +53,7 @@ describe("public HTTP request security", () => {
       "https://agent.example/run",
       () => new Promise(() => undefined),
     );
-    const rejection = expect(resolution).rejects.toThrow(
-      /destination could not be resolved/,
-    );
+    const rejection = expect(resolution).rejects.toThrow(/destination could not be resolved/);
 
     await vi.advanceTimersByTimeAsync(30_000);
 
@@ -64,9 +62,9 @@ describe("public HTTP request security", () => {
 
   /** @scenario HTTP agent redirects are revalidated */
   it("rejects private redirect targets and strips cross-origin secrets", async () => {
-    await expect(
-      resolvePublicDestination("http://127.0.0.1/redirect-target"),
-    ).rejects.toThrow(/globally routable public addresses/);
+    await expect(resolvePublicDestination("http://127.0.0.1/redirect-target")).rejects.toThrow(
+      /globally routable public addresses/,
+    );
 
     expect(
       headersForRedirect(

@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Box,
-  HStack,
-  Input,
-  NativeSelect,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, HStack, Input, NativeSelect, Spacer, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { api } from "../../../../behavior/gateway-api";
 import { SmallLabel } from "@langwatch/design-system/small-label";

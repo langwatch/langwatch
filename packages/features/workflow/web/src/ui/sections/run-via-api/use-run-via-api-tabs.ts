@@ -26,10 +26,7 @@ const LANG_TABS: LangTabSpec[] = [
 ];
 
 export function useRunViaApiTabs(
-  buildSnippet: (args: {
-    lang: RunSnippetLang;
-    dataSource: RunSnippetDataSource;
-  }) => string,
+  buildSnippet: (args: { lang: RunSnippetLang; dataSource: RunSnippetDataSource }) => string,
 ): {
   dataSource: RunSnippetDataSource;
   setDataSource: (dataSource: RunSnippetDataSource) => void;

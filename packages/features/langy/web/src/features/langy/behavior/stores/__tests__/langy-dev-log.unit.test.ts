@@ -82,12 +82,7 @@ describe("the inspector tape", () => {
       log.record({ type: "delta", text: "because" } as never, "t1");
 
       const records = useLangyDevLog.getState().records;
-      expect(records.map((r) => r.lane)).toEqual([
-        "outbound",
-        "signal",
-        "durable",
-        "stream",
-      ]);
+      expect(records.map((r) => r.lane)).toEqual(["outbound", "signal", "durable", "stream"]);
       expect(records.map((r) => r.seq)).toEqual([1, 2, 3, 4]);
     });
 

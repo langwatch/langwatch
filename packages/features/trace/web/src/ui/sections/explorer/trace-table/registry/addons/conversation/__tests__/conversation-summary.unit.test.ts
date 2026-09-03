@@ -38,10 +38,7 @@ function group(overrides: Partial<ConversationGroup> = {}): ConversationGroup {
 }
 
 const turns = (count: number): TraceListItem[] =>
-  Array.from(
-    { length: count },
-    (_, index) => ({ traceId: `t-${index}` }) as TraceListItem,
-  );
+  Array.from({ length: count }, (_, index) => ({ traceId: `t-${index}` }) as TraceListItem);
 
 describe("given an expanded session holding more traces than the turn preview loads", () => {
   describe("when the expanded summary renders", () => {
@@ -53,9 +50,7 @@ describe("given an expanded session holding more traces than the turn preview lo
     });
 
     it("reports the plain total once every turn is loaded", () => {
-      expect(traceCountLabel(group({ traceCount: 3, traces: turns(3) }))).toBe(
-        "3 traces",
-      );
+      expect(traceCountLabel(group({ traceCount: 3, traces: turns(3) }))).toBe("3 traces");
     });
 
     it("reports the plain total before any turn has loaded", () => {

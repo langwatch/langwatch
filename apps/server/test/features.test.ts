@@ -19,9 +19,7 @@ describe("optional install pieces", () => {
 
   describe("when a toggle is set", () => {
     it("honours an explicit opt-in to the PII model", () => {
-      expect(resolveFeatures({ [PRESIDIO_ENV_KEY]: "true" }).isPresidioEnabled).toBe(
-        true,
-      );
+      expect(resolveFeatures({ [PRESIDIO_ENV_KEY]: "true" }).isPresidioEnabled).toBe(true);
     });
 
     it("honours an explicit opt-out of the assistant", () => {
@@ -47,9 +45,7 @@ describe("optional install pieces", () => {
       // A typo silently stripping a feature someone asked for is the worse
       // failure: they wait for an install that quietly did not happen.
       expect(resolveFeatures({ [LANGY_ENV_KEY]: "maybe" }).isLangyEnabled).toBe(true);
-      expect(resolveFeatures({ [PRESIDIO_ENV_KEY]: "sure" }).isPresidioEnabled).toBe(
-        false,
-      );
+      expect(resolveFeatures({ [PRESIDIO_ENV_KEY]: "sure" }).isPresidioEnabled).toBe(false);
     });
 
     it("treats an empty value as unset", () => {

@@ -27,11 +27,7 @@ export function EventDetail({
               <Text textStyle="xs" color="fg.muted">
                 Type
               </Text>
-              <Badge
-                size="sm"
-                colorPalette={hashEventTypeColor(event.eventType)}
-                variant="subtle"
-              >
+              <Badge size="sm" colorPalette={hashEventTypeColor(event.eventType)} variant="subtle">
                 {event.eventType}
               </Badge>
             </VStack>

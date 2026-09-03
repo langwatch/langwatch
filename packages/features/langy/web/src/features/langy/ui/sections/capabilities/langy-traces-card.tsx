@@ -57,9 +57,7 @@ function traceIdOf(row: unknown): string | null {
  * ("nothing matched"), not a miss — which is why this returns `{ traces: [] }`
  * rather than null in that case.
  */
-function parseTracesJson(
-  output: unknown,
-): { total: number | null; traces: ParsedTrace[] } | null {
+function parseTracesJson(output: unknown): { total: number | null; traces: ParsedTrace[] } | null {
   const document = asJsonDocument(output);
   if (!document) return null;
 
@@ -133,12 +131,7 @@ function parseTraces(output: unknown): {
   return { total, traces };
 }
 
-export function LangyTracesCard({
-  descriptor,
-  input,
-  output,
-  projectSlug,
-}: CapabilityCardInput) {
+export function LangyTracesCard({ descriptor, input, output, projectSlug }: CapabilityCardInput) {
   const isSingle = descriptor.render === "trace";
   // The search Langy actually ran, offered back as somewhere to GO.
   //
@@ -221,10 +214,7 @@ export function LangyTracesCard({
       projectSlug={projectSlug}
     >
       {queryHref ? (
-        <OpenSearchButton
-          query={search.query!}
-          onOpen={() => void router.push(queryHref)}
-        />
+        <OpenSearchButton query={search.query!} onOpen={() => void router.push(queryHref)} />
       ) : null}
       {shown.length > 0 ? (
         <VStack align="stretch" gap={0}>

@@ -54,20 +54,9 @@ const LANGY_HOMEBAR_MARK_GRADIENT_ID = "langy-homebar-mark-grad";
 function LangyHomebarMark() {
   return (
     <Box display="inline-flex" alignItems="center">
-      <svg
-        width="0"
-        height="0"
-        aria-hidden
-        style={{ position: "absolute", pointerEvents: "none" }}
-      >
+      <svg width="0" height="0" aria-hidden style={{ position: "absolute", pointerEvents: "none" }}>
         <defs>
-          <linearGradient
-            id={LANGY_HOMEBAR_MARK_GRADIENT_ID}
-            x1="0%"
-            y1="100%"
-            x2="100%"
-            y2="0%"
-          >
+          <linearGradient id={LANGY_HOMEBAR_MARK_GRADIENT_ID} x1="0%" y1="100%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="var(--chakra-colors-fg-muted)" />
             <stop offset="100%" stopColor="var(--chakra-colors-fg-muted)" />
           </linearGradient>
@@ -108,8 +97,8 @@ const LANGY_SLIDE: Slide = {
   badge: "New",
   subtitle: (
     <>
-      Ask about a failing trace and Langy digs through your data, explains what broke, and
-      opens a pull request with the change.
+      Ask about a failing trace and Langy digs through your data, explains what broke, and opens a
+      pull request with the change.
     </>
   ),
   ctaLabel: "Ask Langy to investigate",
@@ -240,8 +229,8 @@ const SLIDES: Slide[] = [
     badge: "New",
     subtitle: (
       <>
-        Real voices, real audio, plain-English judges. Works with ElevenLabs, OpenAI
-        Realtime, Vapi, and more.
+        Real voices, real audio, plain-English judges. Works with ElevenLabs, OpenAI Realtime, Vapi,
+        and more.
       </>
     ),
     ctaLabel: "Try voice agent testing",
@@ -270,10 +259,7 @@ function useSlides(
   _projectId: string | undefined,
   { includeLangy }: { includeLangy: boolean },
 ): Slide[] {
-  return useMemo(
-    () => (includeLangy ? [LANGY_SLIDE, ...SLIDES] : SLIDES),
-    [includeLangy],
-  );
+  return useMemo(() => (includeLangy ? [LANGY_SLIDE, ...SLIDES] : SLIDES), [includeLangy]);
 }
 
 // ---- Colour / shape interpolation ---------------------------------------
@@ -496,8 +482,7 @@ export function HomePageBanners({
       !reduceMotionRef.current &&
       eligibleLenRef.current > 1;
     const targetSpeed = wantMoving ? 1 : 0;
-    speedRef.current +=
-      (targetSpeed - speedRef.current) * (1 - Math.exp(-dt / HOVER_TAU));
+    speedRef.current += (targetSpeed - speedRef.current) * (1 - Math.exp(-dt / HOVER_TAU));
 
     if (eligibleLenRef.current > 1) {
       const p = progress.get() + (delta / DWELL_MS) * speedRef.current;
@@ -556,8 +541,7 @@ export function HomePageBanners({
   // The lantern is lit whether or not there is anything to announce, so when
   // every slide has been dismissed it falls back to Langy's own palette rather
   // than going dark. Same canvas, different bed.
-  const lanternColors =
-    colors.length >= 3 ? colors : isDark ? LANTERN_COLORS_DARK : LANTERN_COLORS;
+  const lanternColors = colors.length >= 3 ? colors : isDark ? LANTERN_COLORS_DARK : LANTERN_COLORS;
   const multi = eligible.length > 1;
   const selectSlide = (nextIndex: number) => {
     setIndex((nextIndex + eligible.length) % eligible.length);
@@ -606,8 +590,7 @@ export function HomePageBanners({
           filter={{ base: "blur(15px)", _dark: "blur(5px)" }}
           css={{
             maskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
-            WebkitMaskImage:
-              "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
+            WebkitMaskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
           }}
         >
           {lowPerf ? (
@@ -769,13 +752,7 @@ export function HomePageBanners({
                     where it did, with more pointer either side of it. A 2px
                     target is decoration you are invited to miss. */}
                 {multi ? (
-                  <HStack
-                    gap="5px"
-                    width="full"
-                    height="16px"
-                    marginTop="-7px"
-                    marginBottom="-7px"
-                  >
+                  <HStack gap="5px" width="full" height="16px" marginTop="-7px" marginBottom="-7px">
                     {eligible.map((_, i) => (
                       <Box
                         key={i}
@@ -1191,8 +1168,7 @@ export function HomePageBanners({
                     placeItems: "center",
                   }}
                 >
-                  {s.iconNode ??
-                    (s.Icon ? <Icon as={s.Icon} boxSize={5} color="white" /> : null)}
+                  {s.iconNode ?? (s.Icon ? <Icon as={s.Icon} boxSize={5} color="white" /> : null)}
                 </motion.div>
               ))}
             </Box>

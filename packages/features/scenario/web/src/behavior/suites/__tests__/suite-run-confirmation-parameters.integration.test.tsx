@@ -121,12 +121,8 @@ describe("suite run confirmation parameters", () => {
 
         await openConfirmation();
 
-        expect(screen.getByTestId("suite-run-parameter-region")).toHaveValue(
-          "eu-central",
-        );
-        expect(
-          screen.getByTestId("suite-run-parameter-account_tier"),
-        ).toHaveValue("gold");
+        expect(screen.getByTestId("suite-run-parameter-region")).toHaveValue("eu-central");
+        expect(screen.getByTestId("suite-run-parameter-account_tier")).toHaveValue("gold");
       });
 
       it("offers one input per declared name, unioned across the scenarios", async () => {
@@ -153,21 +149,15 @@ describe("suite run confirmation parameters", () => {
         await openConfirmation();
 
         expect(screen.getAllByTestId(/^suite-run-parameter-/)).toHaveLength(1);
-        expect(screen.getByTestId("suite-run-parameter-region")).toHaveValue(
-          "eu-central",
-        );
+        expect(screen.getByTestId("suite-run-parameter-region")).toHaveValue("eu-central");
       });
 
       it("leaves a name with no declared default empty", async () => {
-        mocks.scenarios = [
-          { id: "scenario_1", parameters: [{ name: "region" }] },
-        ];
+        mocks.scenarios = [{ id: "scenario_1", parameters: [{ name: "region" }] }];
 
         await openConfirmation();
 
-        expect(screen.getByTestId("suite-run-parameter-region")).toHaveValue(
-          "",
-        );
+        expect(screen.getByTestId("suite-run-parameter-region")).toHaveValue("");
       });
 
       it("shows nothing when the scenarios declare no parameters", async () => {
@@ -197,10 +187,7 @@ describe("suite run confirmation parameters", () => {
 
         const user = await openConfirmation();
         await user.clear(screen.getByTestId("suite-run-parameter-region"));
-        await user.type(
-          screen.getByTestId("suite-run-parameter-region"),
-          "us-east",
-        );
+        await user.type(screen.getByTestId("suite-run-parameter-region"), "us-east");
         await user.click(screen.getByText("Run 1 Job"));
 
         expect(mocks.mutate).toHaveBeenCalledWith(
@@ -221,10 +208,7 @@ describe("suite run confirmation parameters", () => {
 
         const user = await openConfirmation();
         await user.type(screen.getByTestId("suite-run-parameter-seats"), "12");
-        await user.type(
-          screen.getByTestId("suite-run-parameter-trial"),
-          "false",
-        );
+        await user.type(screen.getByTestId("suite-run-parameter-trial"), "false");
         await user.click(screen.getByText("Run 1 Job"));
 
         expect(mocks.mutate).toHaveBeenCalledWith(
@@ -238,10 +222,7 @@ describe("suite run confirmation parameters", () => {
         mocks.scenarios = [
           {
             id: "scenario_1",
-            parameters: [
-              { name: "region", defaultValue: "eu-central" },
-              { name: "account_tier" },
-            ],
+            parameters: [{ name: "region", defaultValue: "eu-central" }, { name: "account_tier" }],
           },
         ];
 
@@ -285,9 +266,7 @@ describe("suite run confirmation parameters", () => {
         const secret = screen.getByTestId("suite-run-parameter-api_token");
         expect(secret).toHaveAttribute("type", "password");
         expect(secret).toHaveValue("");
-        expect(
-          screen.getByTestId("suite-run-parameter-region"),
-        ).toHaveAttribute("type", "text");
+        expect(screen.getByTestId("suite-run-parameter-region")).toHaveAttribute("type", "text");
       });
 
       /** @scenario "The run dialog requires a value for every secret parameter" */
@@ -298,19 +277,12 @@ describe("suite run confirmation parameters", () => {
 
         const runButton = screen.getByText("Run 2 Jobs").closest("button");
         expect(runButton).toBeDisabled();
-        expect(
-          screen.getByTestId("suite-run-parameter-error-api_token"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("suite-run-parameter-error-api_token")).toBeInTheDocument();
 
-        await user.type(
-          screen.getByTestId("suite-run-parameter-api_token"),
-          "tok-live-1",
-        );
+        await user.type(screen.getByTestId("suite-run-parameter-api_token"), "tok-live-1");
 
         expect(runButton).not.toBeDisabled();
-        expect(
-          screen.queryByTestId("suite-run-parameter-error-api_token"),
-        ).toBeNull();
+        expect(screen.queryByTestId("suite-run-parameter-error-api_token")).toBeNull();
       });
     });
 
@@ -320,10 +292,7 @@ describe("suite run confirmation parameters", () => {
         mocks.scenarios = scenariosDeclaringASecret;
 
         const user = await openConfirmation();
-        await user.type(
-          screen.getByTestId("suite-run-parameter-api_token"),
-          "tok-live-1",
-        );
+        await user.type(screen.getByTestId("suite-run-parameter-api_token"), "tok-live-1");
         await user.click(screen.getByText("Run 2 Jobs"));
 
         expect(mocks.mutate).toHaveBeenCalledWith(
@@ -342,10 +311,7 @@ describe("suite run confirmation parameters", () => {
         ];
 
         const user = await openConfirmation();
-        await user.type(
-          screen.getByTestId("suite-run-parameter-api_token"),
-          "12345",
-        );
+        await user.type(screen.getByTestId("suite-run-parameter-api_token"), "12345");
         await user.click(screen.getByText("Run 1 Job"));
 
         expect(mocks.mutate).toHaveBeenCalledWith(

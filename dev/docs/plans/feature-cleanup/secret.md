@@ -135,12 +135,12 @@ lower-case one.
 
 The reserved-name rule is written three times in one class and forgotten a fourth:
 
-| Line | Path | Reserved names |
-|---|---|---|
-| `services/secret.service.ts:46` | `list` | filtered out |
-| `services/secret.service.ts:73` | `create` | refused (dead — see P3) |
-| `services/secret.service.ts:106` | `get`/`update`/`delete` | 404 |
-| `services/secret.service.ts:49-64` | `getValues` | **returned** |
+| Line                               | Path                    | Reserved names          |
+| ---------------------------------- | ----------------------- | ----------------------- |
+| `services/secret.service.ts:46`    | `list`                  | filtered out            |
+| `services/secret.service.ts:73`    | `create`                | refused (dead — see P3) |
+| `services/secret.service.ts:106`   | `get`/`update`/`delete` | 404                     |
+| `services/secret.service.ts:49-64` | `getValues`             | **returned**            |
 
 `getValues` is the only method that returns plaintext. Its one caller splices the
 result straight into a scenario target's execution environment:
@@ -418,7 +418,7 @@ Deliberately unchanged, with the reason:
   deployed. Leave it until `apps/api` actually serves traffic.
 - **`apps/api/src/features/secret/secret-legacy-rest.ts`**. Its `instanceof`
   ladder at `:74-83` looks like the R6 tell, but it is not re-deriving status from
-  a name string — it is deliberately publishing the *older* contract (flat
+  a name string — it is deliberately publishing the _older_ contract (flat
   `{ error }` body, 400 and 412 both flattened to 422). ADR-001 names that the
   compatibility target. It stays until the family is retired.
 - **The four-layer stack.** Every layer holds something. There is no pass-through
@@ -431,7 +431,7 @@ Six commits, smallest risk first, each green on its own.
 1. **P2 — copy.** Add the four codes to `codes.ts` (sorted), write their
    `presentation.ts` entries, delete lines 298-301 of `UNCOPIED_CODES_BACKLOG`.
    No behaviour change; the biggest customer-visible win in the feature.
-   *Shares files with every other feature's cleanup — batch it.*
+   _Shares files with every other feature's cleanup — batch it._
 2. **P1 — the composition.** One line in
    `platform/app/src/runtime/app/features/secret.ts`, plus whatever seam
    `createProjectRestApiService` needs to narrow the app. Turns a suite that
@@ -457,11 +457,11 @@ Six commits, smallest risk first, each green on its own.
 
 **14 non-test files outside the feature import it**, plus 11 test files.
 
-| Where | Files | Symbols |
-|---|---:|---|
-| `apps/api` | 7 | `SecretApp`, `SecretTrpcApi`, `SecretTrpcContext`, `SecretPublicRestApi`, `SecretService`, `Secret`, `SecretNotFoundError`, `SecretDuplicateError`, `SecretReservedNameError`, `SecretLimitReachedError`, `secretPublicRest`, `toSecretPublic`, `secretPublicCreateInputSchema`, `secretPublicUpdateInputSchema` |
-| `platform/app` | 5 | `SecretApp`, `SecretTrpcApi`, `SecretPublicRestApi`, `PostgresSecretAdapter`, `SecretEncryptionPort`, `SecretService` |
-| `packages/features/scenario` | 2 | `SecretService` (contract only) |
+| Where                        | Files | Symbols                                                                                                                                                                                                                                                                                                          |
+| ---------------------------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api`                   |     7 | `SecretApp`, `SecretTrpcApi`, `SecretTrpcContext`, `SecretPublicRestApi`, `SecretService`, `Secret`, `SecretNotFoundError`, `SecretDuplicateError`, `SecretReservedNameError`, `SecretLimitReachedError`, `secretPublicRest`, `toSecretPublic`, `secretPublicCreateInputSchema`, `secretPublicUpdateInputSchema` |
+| `platform/app`               |     5 | `SecretApp`, `SecretTrpcApi`, `SecretPublicRestApi`, `PostgresSecretAdapter`, `SecretEncryptionPort`, `SecretService`                                                                                                                                                                                            |
+| `packages/features/scenario` |     2 | `SecretService` (contract only)                                                                                                                                                                                                                                                                                  |
 
 The named files: `apps/api/src/{api-secret-rest.feature,api.application,api.process}.ts`,
 `apps/api/src/app-rest/app-rest.features.ts`,

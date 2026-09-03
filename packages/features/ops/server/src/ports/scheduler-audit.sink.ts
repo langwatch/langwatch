@@ -1,7 +1,4 @@
-import type {
-  SchedulerAuditEntryView,
-  SchedulerControlAction,
-} from "@langwatch/ops-contract";
+import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
 
 /** Durable audit trail for Ops scheduler controls. */
 export abstract class SchedulerAuditSink {

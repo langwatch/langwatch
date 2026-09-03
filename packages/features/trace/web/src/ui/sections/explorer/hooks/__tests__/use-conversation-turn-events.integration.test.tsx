@@ -64,13 +64,7 @@ const rollup = (name: string, count: number) => ({
 const lastInput = () => harness.useQuery.mock.calls.at(-1)?.[0];
 const lastOpts = () => harness.useQuery.mock.calls.at(-1)?.[1];
 
-function resolveWith({
-  data,
-  extra = {},
-}: {
-  data: unknown;
-  extra?: Record<string, unknown>;
-}) {
+function resolveWith({ data, extra = {} }: { data: unknown; extra?: Record<string, unknown> }) {
   harness.useQuery.mockImplementation(() => ({
     data,
     isLoading: false,

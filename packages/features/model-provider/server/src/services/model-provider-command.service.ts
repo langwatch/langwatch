@@ -115,10 +115,7 @@ export class ModelProviderCommandService {
     }
 
     if (parsed.actorId) {
-      await this.options.writeAuthorization.assertCanWrite(
-        parsed.actorId,
-        existing.scopes,
-      );
+      await this.options.writeAuthorization.assertCanWrite(parsed.actorId, existing.scopes);
     }
     await this.options.repository.delete({
       id: existing.id,
@@ -157,23 +154,14 @@ export class ModelProviderCommandService {
     }
 
     if (parsed.actorId) {
-      await this.options.writeAuthorization.assertCanWrite(
-        parsed.actorId,
-        provider.scopes,
-      );
+      await this.options.writeAuthorization.assertCanWrite(parsed.actorId, provider.scopes);
     }
     await this.options.connectionRateLimiter.assertAvailable({ organizationId });
 
-    return this.options.catalog.testConnection(
-      provider.provider,
-      provider.customKeys ?? {},
-    );
+    return this.options.catalog.testConnection(provider.provider, provider.customKeys ?? {});
   }
 
-  private assertTenantAnchor(input: {
-    projectId?: string;
-    organizationId?: string;
-  }): void {
+  private assertTenantAnchor(input: { projectId?: string; organizationId?: string }): void {
     if (!input.projectId && !input.organizationId) {
       throw new ModelProviderAnchorRequiredError("project_or_organization");
     }
@@ -185,9 +173,7 @@ export class ModelProviderCommandService {
     }
   }
 
-  private normalizeRoutingHandle(
-    handle: string | null | undefined,
-  ): string | null | undefined {
+  private normalizeRoutingHandle(handle: string | null | undefined): string | null | undefined {
     if (handle === undefined) {
       return undefined;
     }
@@ -204,9 +190,7 @@ export class ModelProviderCommandService {
     return normalized;
   }
 
-  private async getExistingProvider(
-    input: ModelProviderWriteInput,
-  ): Promise<ModelProvider | null> {
+  private async getExistingProvider(input: ModelProviderWriteInput): Promise<ModelProvider | null> {
     const projectScopes = input.projectId
       ? await this.options.scopes.tryGetProjectScopes(input.projectId)
       : null;
@@ -278,17 +262,12 @@ export class ModelProviderCommandService {
         organizationId: input.organizationId,
       }));
     if (!organizationId) {
-      throw new ModelProviderInvalidError(
-        "Provider scope does not resolve to an organization",
-      );
+      throw new ModelProviderInvalidError("Provider scope does not resolve to an organization");
     }
 
-    const scopeOrganizationId =
-      await this.options.scopes.getOrganizationIdForScopes(scopes);
+    const scopeOrganizationId = await this.options.scopes.getOrganizationIdForScopes(scopes);
     if (organizationId !== scopeOrganizationId) {
-      throw new ModelProviderInvalidError(
-        "Provider scopes must belong to one organization",
-      );
+      throw new ModelProviderInvalidError("Provider scopes must belong to one organization");
     }
 
     return organizationId;
@@ -353,17 +332,11 @@ export class ModelProviderCommandService {
   ): ProviderRateLimitsForWrite {
     return {
       rateLimitRpm:
-        parsed.rateLimitRpm === undefined
-          ? (existing?.rateLimitRpm ?? null)
-          : parsed.rateLimitRpm,
+        parsed.rateLimitRpm === undefined ? (existing?.rateLimitRpm ?? null) : parsed.rateLimitRpm,
       rateLimitTpm:
-        parsed.rateLimitTpm === undefined
-          ? (existing?.rateLimitTpm ?? null)
-          : parsed.rateLimitTpm,
+        parsed.rateLimitTpm === undefined ? (existing?.rateLimitTpm ?? null) : parsed.rateLimitTpm,
       rateLimitRpd:
-        parsed.rateLimitRpd === undefined
-          ? (existing?.rateLimitRpd ?? null)
-          : parsed.rateLimitRpd,
+        parsed.rateLimitRpd === undefined ? (existing?.rateLimitRpd ?? null) : parsed.rateLimitRpd,
       fallbackPriorityGlobal:
         parsed.fallbackPriorityGlobal === undefined
           ? (existing?.fallbackPriorityGlobal ?? null)
@@ -379,10 +352,7 @@ export class ModelProviderCommandService {
       return existing?.customKeys ?? null;
     }
 
-    const normalized = this.options.credentialPolicy.tryNormalize(
-      input.provider,
-      input.customKeys,
-    );
+    const normalized = this.options.credentialPolicy.tryNormalize(input.provider, input.customKeys);
     const storedCredentialsAreUnreadable =
       existing &&
       existing.customKeys === null &&
@@ -424,10 +394,7 @@ export class ModelProviderCommandService {
         ? await this.options.repository.update(provider)
         : await this.options.repository.create(provider);
     } catch (error) {
-      if (
-        routingHandle !== undefined &&
-        this.options.repository.isRoutingHandleConflict(error)
-      ) {
+      if (routingHandle !== undefined && this.options.repository.isRoutingHandleConflict(error)) {
         throw new ModelProviderRoutingHandleTakenError({ handle: routingHandle ?? "" });
       }
 

@@ -14,10 +14,9 @@ Three properties make the feed billing-grade:
 - **Push and pull agree.** The pull surface serves the same canonical envelopes the webhooks deliver, from the same ledger, so a checksum mismatch means something real.
 
 <Note>
-  The billing surface (webhook delivery and the pull APIs) is an **Enterprise**
-  capability, gated by the same plan flag as webhook endpoints. Reads require
-  `gatewaySpend:view`; replay requires `gatewaySpend:manage`. Both are organization-tier
-  permissions carried by an organization API key.
+  The billing surface (webhook delivery and the pull APIs) is an **Enterprise** capability, gated by
+  the same plan flag as webhook endpoints. Reads require `gatewaySpend:view`; replay requires
+  `gatewaySpend:manage`. Both are organization-tier permissions carried by an organization API key.
 </Note>
 
 <Warning>

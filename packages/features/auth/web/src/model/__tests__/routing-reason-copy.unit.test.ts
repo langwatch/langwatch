@@ -1,10 +1,7 @@
 import { SIGNIN_ROUTING_REASON_CODES } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  SIGN_IN_ROUTING_REASON_COPY,
-  signInRoutingReasonCopy,
-} from "../routing-reason-copy";
+import { SIGN_IN_ROUTING_REASON_COPY, signInRoutingReasonCopy } from "../routing-reason-copy";
 
 /**
  * The reason-code copy map is what stands between a routing decision and the

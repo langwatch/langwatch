@@ -6,10 +6,7 @@ import { execCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
-export async function startRedis(
-  ctx: RuntimeContext,
-  bus: EventBus,
-): Promise<SupervisedHandle> {
+export async function startRedis(ctx: RuntimeContext, bus: EventBus): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "redis" });
   const start = Date.now();
 
@@ -37,11 +34,9 @@ export async function startRedis(
 
   const redisCli = resolvedPath.replace(/redis-server$/, "redis-cli");
   const ready = await pollUntilHealthy({
-    check: execCheck(
-      redisCli,
-      ["-h", "127.0.0.1", "-p", String(ctx.ports.redis), "ping"],
-      { expectStdoutContains: "PONG" },
-    ),
+    check: execCheck(redisCli, ["-h", "127.0.0.1", "-p", String(ctx.ports.redis), "ping"], {
+      expectStdoutContains: "PONG",
+    }),
     timeoutMs: 10_000,
     intervalMs: 200,
   });

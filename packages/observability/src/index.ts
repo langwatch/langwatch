@@ -13,11 +13,7 @@ export {
   REQUEST_CAUSE_FIELD,
   TRACER_NAMES,
 } from "./constants";
-export type {
-  JobContextMetadata,
-  JobDataWithContext,
-  RequestContext,
-} from "./context/core";
+export type { JobContextMetadata, JobDataWithContext, RequestContext } from "./context/core";
 export {
   configureLogger,
   createLoggerFactory,

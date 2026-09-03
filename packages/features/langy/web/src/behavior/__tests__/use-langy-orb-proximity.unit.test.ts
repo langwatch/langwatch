@@ -118,9 +118,7 @@ describe("useLangyOrbProximity", () => {
       // A pointermove with no frame flush leaves a rAF outstanding — the one an
       // unmounting orb used to keep alive.
       act(() => {
-        window.dispatchEvent(
-          new MouseEvent("pointermove", { clientX: 120, clientY: 120 }),
-        );
+        window.dispatchEvent(new MouseEvent("pointermove", { clientX: 120, clientY: 120 }));
       });
 
       rerender({ enabled: false });

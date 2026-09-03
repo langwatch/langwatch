@@ -14,10 +14,7 @@ function harness(options?: { onIdentity?: boolean }) {
       }),
     },
   });
-  const service = new IdentityEmailService(
-    heads,
-    async () => options?.onIdentity ?? true,
-  );
+  const service = new IdentityEmailService(heads, async () => options?.onIdentity ?? true);
   return { service, heads };
 }
 
@@ -27,9 +24,7 @@ describe("the identity email read fork", () => {
     it("answers from the identifiers", async () => {
       const { service } = harness();
 
-      expect(await service.tryResolveEmail({ userId: USER })).toBe(
-        "chosen@acme.com",
-      );
+      expect(await service.tryResolveEmail({ userId: USER })).toBe("chosen@acme.com");
     });
   });
 
@@ -48,9 +43,7 @@ describe("the identity email read fork", () => {
     /** @scenario "An unreadable projection never fails a request" */
     it("answers null rather than throwing into the session boundary", async () => {
       const { service, heads } = harness();
-      vi.spyOn(heads, "findHeads").mockRejectedValue(
-        new Error("postgres unavailable"),
-      );
+      vi.spyOn(heads, "findHeads").mockRejectedValue(new Error("postgres unavailable"));
 
       expect(await service.tryResolveEmail({ userId: USER })).toBeNull();
     });
@@ -120,9 +113,7 @@ describe("the verified emails a user can accept an invitation through", () => {
   describe("when the projection cannot be read", () => {
     it("answers null rather than failing the acceptance path", async () => {
       const { service, heads } = harness();
-      vi.spyOn(heads, "findHeads").mockRejectedValue(
-        new Error("postgres unavailable"),
-      );
+      vi.spyOn(heads, "findHeads").mockRejectedValue(new Error("postgres unavailable"));
 
       expect(await service.tryVerifiedEmailsOf({ userId: USER })).toBeNull();
     });

@@ -6,11 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  normalizeVkTags,
-  VK_TAG_MAX_LENGTH,
-  VK_TAGS_MAX_COUNT,
-} from "@langwatch/gateway-contract";
+import { normalizeVkTags, VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contract";
 
 import {
   parseTagsCsv,
@@ -21,21 +17,12 @@ import {
 
 describe("given the Tags field description", () => {
   it("quotes the limits the server enforces", () => {
-    expect(VK_TAGS_FIELD_DESCRIPTION).toContain(
-      `keeps the first ${VK_TAGS_MAX_COUNT} tags`,
-    );
-    expect(VK_TAGS_FIELD_DESCRIPTION).toContain(
-      `trims each to ${VK_TAG_MAX_LENGTH} characters`,
-    );
+    expect(VK_TAGS_FIELD_DESCRIPTION).toContain(`keeps the first ${VK_TAGS_MAX_COUNT} tags`);
+    expect(VK_TAGS_FIELD_DESCRIPTION).toContain(`trims each to ${VK_TAG_MAX_LENGTH} characters`);
   });
 
   it("covers every way saving changes what was typed", () => {
-    const kept = normalizeVkTags([
-      "team=ml",
-      " team=ml ",
-      "",
-      "x".repeat(VK_TAG_MAX_LENGTH + 1),
-    ]);
+    const kept = normalizeVkTags(["team=ml", " team=ml ", "", "x".repeat(VK_TAG_MAX_LENGTH + 1)]);
 
     expect(kept).toEqual(["team=ml", "x".repeat(VK_TAG_MAX_LENGTH)]);
     expect(VK_TAGS_FIELD_DESCRIPTION).toMatch(/drops blanks and repeats/);
@@ -49,9 +36,7 @@ describe("given the Tags field description", () => {
   });
 
   it("keeps internal vocabulary out of the customer's way", () => {
-    expect(VK_TAGS_FIELD_DESCRIPTION).not.toMatch(
-      /AND-subset|vk_tags|metadata\.tags|\bVKs?\b/,
-    );
+    expect(VK_TAGS_FIELD_DESCRIPTION).not.toMatch(/AND-subset|vk_tags|metadata\.tags|\bVKs?\b/);
   });
 
   it("uses no em dash", () => {
@@ -74,9 +59,7 @@ describe("given the field's own length cap", () => {
   describe("when the tags are made of astral-plane characters", () => {
     it("still fits, because the cap counts UTF-16 units and the server counts code points", () => {
       const emojiTag = "🙂".repeat(VK_TAG_MAX_LENGTH);
-      const fullList = Array.from({ length: VK_TAGS_MAX_COUNT }, () => emojiTag).join(
-        ", ",
-      );
+      const fullList = Array.from({ length: VK_TAGS_MAX_COUNT }, () => emojiTag).join(", ");
 
       expect([...emojiTag]).toHaveLength(VK_TAG_MAX_LENGTH);
       expect(emojiTag.length).toBeGreaterThan(VK_TAG_MAX_LENGTH);
@@ -95,10 +78,9 @@ describe("given a line of typed tags", () => {
 
   describe("when it holds more distinct tags than the key keeps", () => {
     it("says only the first ones will be saved", () => {
-      const tooMany = Array.from(
-        { length: VK_TAGS_MAX_COUNT + 1 },
-        (_, i) => `team=${i}`,
-      ).join(",");
+      const tooMany = Array.from({ length: VK_TAGS_MAX_COUNT + 1 }, (_, i) => `team=${i}`).join(
+        ",",
+      );
 
       expect(tagsBeyondLimitsNotice(tooMany)).toBe(
         `Only the first ${VK_TAGS_MAX_COUNT} tags will be saved.`,
@@ -148,9 +130,6 @@ describe("given a line of typed tags", () => {
 
 describe("given the line is split into tags on save", () => {
   it("trims each and drops the blanks", () => {
-    expect(parseTagsCsv(" tier=enterprise ,, team=ml , ")).toEqual([
-      "tier=enterprise",
-      "team=ml",
-    ]);
+    expect(parseTagsCsv(" tier=enterprise ,, team=ml , ")).toEqual(["tier=enterprise", "team=ml"]);
   });
 });

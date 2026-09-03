@@ -14,11 +14,7 @@ import {
   traceContextChip,
   workflowContextChip,
 } from "../langy-context-chips";
-import {
-  type LangyContextChip,
-  selectAddableChips,
-  selectVisibleChips,
-} from "../langy.store";
+import { type LangyContextChip, selectAddableChips, selectVisibleChips } from "../langy.store";
 
 /** The chip Langy derives for itself from the open drawer / the route. */
 const autoDerivedTrace: LangyContextChip = traceContextChip("abc123def456");
@@ -62,11 +58,7 @@ describe("mergeContextChips", () => {
 
     describe("when they name different resources", () => {
       it("keeps both, in source order", () => {
-        const merged = mergeContextChips([
-          autoDerivedTrace,
-          filterChip,
-          pickedEvaluation,
-        ]);
+        const merged = mergeContextChips([autoDerivedTrace, filterChip, pickedEvaluation]);
 
         expect(merged.map((chip) => chip.id)).toEqual([
           "trace:abc123def456",
@@ -173,9 +165,7 @@ describe("traceContextChip", () => {
 describe("datasetContextChip", () => {
   describe("given a dataset id and its name (a list row)", () => {
     it("mints the chip with the readable name", () => {
-      expect(
-        datasetContextChip({ datasetId: "ds_12345678", name: "checkout runs" }),
-      ).toEqual({
+      expect(datasetContextChip({ datasetId: "ds_12345678", name: "checkout runs" })).toEqual({
         id: "dataset:ds_12345678",
         kind: "dataset",
         label: "dataset: checkout runs",
@@ -229,9 +219,7 @@ describe("promptContextChip", () => {
   describe("given the prompt editor drawer minted a chip for the same prompt", () => {
     it("shares the drawer's id key, so the two dedupe", () => {
       // The drawer derives `prompt:<drawer.promptId>` (see useLangyDrawerContext).
-      expect(promptContextChip({ promptId: "prompt_123456" }).id).toBe(
-        "prompt:prompt_123456",
-      );
+      expect(promptContextChip({ promptId: "prompt_123456" }).id).toBe("prompt:prompt_123456");
     });
   });
 });
@@ -239,15 +227,15 @@ describe("promptContextChip", () => {
 describe("the resource chip factories", () => {
   describe("given a card on a list page that knows the resource's name", () => {
     it("leads with the name a person recognises, not the id", () => {
-      expect(
-        workflowContextChip({ workflowId: "wf_123456789", name: "checkout" }).label,
-      ).toBe("workflow: checkout");
-      expect(
-        agentContextChip({ agentId: "ag_123456789", name: "triage bot" }).label,
-      ).toBe("agent: triage bot");
-      expect(
-        dashboardContextChip({ dashboardId: "db_123456789", name: "costs" }).label,
-      ).toBe("dashboard: costs");
+      expect(workflowContextChip({ workflowId: "wf_123456789", name: "checkout" }).label).toBe(
+        "workflow: checkout",
+      );
+      expect(agentContextChip({ agentId: "ag_123456789", name: "triage bot" }).label).toBe(
+        "agent: triage bot",
+      );
+      expect(dashboardContextChip({ dashboardId: "db_123456789", name: "costs" }).label).toBe(
+        "dashboard: costs",
+      );
     });
 
     it("still sends the id to the agent, where an id is what is wanted", () => {

@@ -66,10 +66,7 @@ describe("the coding-assistants help footer", () => {
 
     for (const name of footerEntries(help)) {
       const cmd = program.commands.find((c) => c.name() === name);
-      expect(
-        cmd,
-        `the footer names '${name}' but no such command is registered`,
-      ).toBeDefined();
+      expect(cmd, `the footer names '${name}' but no such command is registered`).toBeDefined();
       // Hidden keeps the command out of commander's own Commands section,
       // so each name appears exactly once in --help. `_hidden` is private
       // commander state; there is no public accessor.

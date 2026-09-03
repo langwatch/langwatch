@@ -56,8 +56,7 @@ export function useFilteredProjects(
     for (const org of organizations) {
       for (const team of org.teams) {
         // Skip teams where current user is not a member
-        const isTeamMember =
-          currentUserId && team.members?.some((m) => m.userId === currentUserId);
+        const isTeamMember = currentUserId && team.members?.some((m) => m.userId === currentUserId);
         if (!isTeamMember) continue;
 
         for (const proj of team.projects) {
@@ -70,8 +69,7 @@ export function useFilteredProjects(
             org.name.toLowerCase().includes(lowerQuery) ||
             team.name.toLowerCase().includes(lowerQuery)
           ) {
-            const orgTeam =
-              team.name !== org.name ? `${org.name} / ${team.name}` : org.name;
+            const orgTeam = team.name !== org.name ? `${org.name} / ${team.name}` : org.name;
             projects.push({ slug: proj.slug, name: proj.name, orgTeam });
           }
         }

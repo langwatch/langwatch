@@ -92,10 +92,7 @@ function eventRecord(
 beforeAll(async () => {
   if (!clickHouseUrl) return;
   ch = createTestClickHouseClient(clickHouseUrl);
-  repository = new CodingAgentSessionEventsClickHouseRepository(
-    new SingleClickHousePort(ch),
-    30,
-  );
+  repository = new CodingAgentSessionEventsClickHouseRepository(new SingleClickHousePort(ch), 30);
 }, 120_000);
 
 afterAll(async () => {
@@ -167,9 +164,7 @@ integration("CodingAgentSessionEventsClickHouseRepository", () => {
     });
 
     it("filters by kind without disturbing the walk", async () => {
-      const toolResultCount = records.filter(
-        (record) => record.eventKind === "tool_result",
-      ).length;
+      const toolResultCount = records.filter((record) => record.eventKind === "tool_result").length;
 
       const { events } = await repository.findBySessionId({
         tenantId,

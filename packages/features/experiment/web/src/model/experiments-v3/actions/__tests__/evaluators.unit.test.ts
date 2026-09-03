@@ -19,9 +19,7 @@ const schemaIssueFor = (run: () => unknown, field: string): string => {
   try {
     run();
   } catch (error) {
-    const issues = (
-      error as { issues?: { path: unknown[]; message: string }[] }
-    ).issues;
+    const issues = (error as { issues?: { path: unknown[]; message: string }[] }).issues;
     return issues?.find((issue) => issue.path[0] === field)?.message ?? "";
   }
   return "";
@@ -196,10 +194,7 @@ describe("addEvaluator", () => {
         },
       });
 
-      expect(state.evaluators[1]?.comparison?.variants).toEqual([
-        "target-a",
-        "target-b",
-      ]);
+      expect(state.evaluators[1]?.comparison?.variants).toEqual(["target-a", "target-b"]);
     });
   });
 
@@ -219,9 +214,7 @@ describe("addEvaluator", () => {
         "evaluatorType",
       );
 
-      expect(message).toContain(
-        'Unknown evaluator type "langevals/exact_matches"',
-      );
+      expect(message).toContain('Unknown evaluator type "langevals/exact_matches"');
       expect(message).toContain('Run "langwatch evaluator types"');
     });
   });
@@ -280,10 +273,7 @@ describe("attachEvaluator", () => {
         } as EvaluatorConfig,
       });
 
-      expect(state.evaluators.map((e) => e.id)).toEqual([
-        "evaluator_1",
-        "evaluator_2",
-      ]);
+      expect(state.evaluators.map((e) => e.id)).toEqual(["evaluator_1", "evaluator_2"]);
     });
   });
 });

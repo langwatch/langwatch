@@ -116,10 +116,7 @@ export function extractLiquidVariables(text: string): LiquidVariableExtractionRe
   };
 }
 
-function extractVariablesFromExpression(
-  expression: string,
-  inputVariables: Set<string>,
-): void {
+function extractVariablesFromExpression(expression: string, inputVariables: Set<string>): void {
   const variablePart = expression.slice(2, -2).trim().split("|")[0]?.trim();
   const rootVariable = variablePart?.split(".")[0]?.trim();
   if (rootVariable && !LIQUID_KEYWORDS.has(rootVariable)) {

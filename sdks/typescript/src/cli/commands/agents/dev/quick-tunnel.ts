@@ -62,10 +62,7 @@ function verifyBinary(binPath: string): void {
       `No pinned cloudflared checksum for ${platformKey}. Refusing to run an unverified binary. Bring your own tunnel with --tunnel-url.`,
     );
   }
-  const actual = crypto
-    .createHash("sha256")
-    .update(fs.readFileSync(binPath))
-    .digest("hex");
+  const actual = crypto.createHash("sha256").update(fs.readFileSync(binPath)).digest("hex");
   if (actual !== expected) {
     // Removing it makes the next run download the pinned release, so the
     // advice below resolves the mismatch instead of repeating it.

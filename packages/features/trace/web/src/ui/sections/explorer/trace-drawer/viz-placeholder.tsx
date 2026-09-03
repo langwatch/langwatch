@@ -20,20 +20,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 // so cursors render anywhere a peer's cursor lands in the drawer — the
 // previous scope hid peers as soon as they hovered out of the
 // viz pane.
-import {
-  PresenceMarker,
-  selectPeersMatching,
-  usePresenceStore,
-} from "@langwatch/presence-web";
+import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-web";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility";
 import type { VizTab } from "../../../../index";
-import {
-  FlameView,
-  SequenceSkeleton,
-  TopologySkeleton,
-  useDrawerStore,
-} from "../../../../index";
+import { FlameView, SequenceSkeleton, TopologySkeleton, useDrawerStore } from "../../../../index";
 import { spanTypeColor } from "../utils/span-type-color";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu";
 import { WaterfallView } from "./waterfall-view";
@@ -82,8 +73,7 @@ function VizTabPresenceDot({ traceId, panel }: { traceId: string; panel: VizTab 
       selectPeersMatching(
         s,
         (session) =>
-          session.location.route.traceId === traceId &&
-          session.location.view?.panel === panel,
+          session.location.route.traceId === traceId && session.location.view?.panel === panel,
       ),
     ),
   );
@@ -317,8 +307,7 @@ export function VizPlaceholder({
       const clientY = "touches" in e ? e.touches[0]!.clientY : e.clientY;
       const delta = clientY - dragStartY.current;
       const raw = dragStartHeight.current + delta;
-      const next =
-        raw < MIN_HEIGHT / 2 ? 0 : Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, raw));
+      const next = raw < MIN_HEIGHT / 2 ? 0 : Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, raw));
       setHeight(next);
     };
 
@@ -455,9 +444,7 @@ export function VizPlaceholder({
           {!fillParent && (
             <HStack gap={1.5}>
               <Tooltip
-                content={
-                  isMinimized ? "Show" : height >= EXPANDED_HEIGHT ? "Minimize" : "Expand"
-                }
+                content={isMinimized ? "Show" : height >= EXPANDED_HEIGHT ? "Minimize" : "Expand"}
                 positioning={{ placement: "top" }}
               >
                 <Flex
@@ -533,9 +520,7 @@ export function VizPlaceholder({
             flex={fillParent ? 1 : undefined}
             minHeight={0}
             overflow={fillParent ? "auto" : "hidden"}
-            transition={
-              fillParent ? undefined : isDragging.current ? "none" : "height 0.2s ease"
-            }
+            transition={fillParent ? undefined : isDragging.current ? "none" : "height 0.2s ease"}
             onClick={isCollapsed ? handleExpandFromCollapsed : undefined}
             cursor={isCollapsed ? "pointer" : "default"}
             position="relative"
@@ -686,27 +671,11 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
   const totalDuration = maxEnd - minStart || 1;
 
   return (
-    <Flex
-      align="center"
-      height="full"
-      paddingX={4}
-      paddingY={2}
-      gap={0}
-      position="relative"
-    >
-      <Box
-        width="full"
-        height="32px"
-        position="relative"
-        borderRadius="md"
-        overflow="hidden"
-      >
+    <Flex align="center" height="full" paddingX={4} paddingY={2} gap={0} position="relative">
+      <Box width="full" height="32px" position="relative" borderRadius="md" overflow="hidden">
         {spans.map((span) => {
           const left = ((span.startTimeMs - minStart) / totalDuration) * 100;
-          const width = Math.max(
-            0.5,
-            ((span.endTimeMs - span.startTimeMs) / totalDuration) * 100,
-          );
+          const width = Math.max(0.5, ((span.endTimeMs - span.startTimeMs) / totalDuration) * 100);
           const isError = span.status === "error";
           const color = spanTypeColor(span.type);
 

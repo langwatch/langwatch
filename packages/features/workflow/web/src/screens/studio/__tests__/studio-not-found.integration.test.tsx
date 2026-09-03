@@ -60,7 +60,6 @@ vi.mock("../../../ui/sections/optimization_studio/optimization-studio", () => ({
   default: () => <div data-testid="studio-canvas" />,
 }));
 
-
 vi.mock("../../../behavior/studio-host/api", () => ({
   api: {
     useUtils: () => ({ workflow: { getById: { invalidate: vi.fn() } } }),

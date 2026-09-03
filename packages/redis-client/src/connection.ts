@@ -122,11 +122,7 @@ export class RedisConnectionService {
     return this.connectStandaloneResolved({ config });
   }
 
-  private connectStandaloneResolved({
-    config,
-  }: {
-    config: RedisStandaloneConfig;
-  }): Redis {
+  private connectStandaloneResolved({ config }: { config: RedisStandaloneConfig }): Redis {
     const connection = new IORedis(config.url, {
       ...SHARED_OPTIONS,
       db: config.db,
@@ -151,9 +147,7 @@ export class RedisConnectionService {
 
     connection.on("connect", () => logger.info(context, "connected"));
     connection.on("ready", () => logger.info(context, "ready to accept commands"));
-    connection.on("error", (error: Error) =>
-      logger.error({ ...context, error }, "error"),
-    );
+    connection.on("error", (error: Error) => logger.error({ ...context, error }, "error"));
     connection.on("close", () => logger.info(context, "connection closed"));
     connection.on("reconnecting", () => logger.info(context, "reconnecting..."));
   }

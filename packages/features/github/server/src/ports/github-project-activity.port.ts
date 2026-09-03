@@ -20,8 +20,5 @@ export abstract class GithubProjectActivityPort {
   abstract getOrganizationId(projectId: string): Promise<string>;
 
   /** Stamps a project as having just had a coding-agent pull request mapped. */
-  abstract touchCodingAgentPullRequestSeen(input: {
-    projectId: string;
-    at: Date;
-  }): Promise<void>;
+  abstract touchCodingAgentPullRequestSeen(input: { projectId: string; at: Date }): Promise<void>;
 }

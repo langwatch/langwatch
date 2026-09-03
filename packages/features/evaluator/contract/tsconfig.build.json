@@ -1,6 +1,11 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/evaluator-contract-build.tsbuildinfo", "noEmit": false, "outDir": "dist", "rootDir": "src" },
+  "compilerOptions": {
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/evaluator-contract-build.tsbuildinfo",
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/__tests__/**", "tests"]
 }

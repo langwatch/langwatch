@@ -102,24 +102,24 @@ const datasetRuntime = AppDatasetRuntime.create({ database: prisma });
 
 `services/errors.ts` — 403 lines, 21 classes, 5 extend `HandledError`. Compensated by:
 
-| Where | What |
-|---|---|
-| `transport/api-rest/dataset.error-handler.ts:24-64` | `DOMAIN_ERROR_HTTP`, **keyed on `error.name`**, 15 entries |
-| `transport/api-trpc/dataset-record.api.ts:76,86,95,104,236` | `instanceof` ladder |
-| `transport/api-trpc/dataset.api.ts:101` | `error.name === name` helper |
+| Where                                                       | What                                                       |
+| ----------------------------------------------------------- | ---------------------------------------------------------- |
+| `transport/api-rest/dataset.error-handler.ts:24-64`         | `DOMAIN_ERROR_HTTP`, **keyed on `error.name`**, 15 entries |
+| `transport/api-trpc/dataset-record.api.ts:76,86,95,104,236` | `instanceof` ladder                                        |
+| `transport/api-trpc/dataset.api.ts:101`                     | `error.name === name` helper                               |
 
 Rename a class and REST silently degrades 404 → 500. The handler documents its own
 damage at `dataset.error-handler.ts:88-93`: a handled 404 logs as a 500 incident.
 
 ### P5 — Two of five ports have one implementation (breaks R4)
 
-| Port | Impls | Verdict |
-|---|---|---|
-| `DatasetStorage` | 3 — S3, Azure, local | **Keep** |
-| `DatasetStorageResolver` | 1, in `platform/app` | **Keep** — cross-package inversion |
-| `DatasetNormalizeQueuePort` | 1 in-package, app may swap | **Keep** |
-| `DatasetContentPort` | 1, same package | **Delete** |
-| `DatasetUploadPort` | 1, same package | **Delete** |
+| Port                        | Impls                      | Verdict                            |
+| --------------------------- | -------------------------- | ---------------------------------- |
+| `DatasetStorage`            | 3 — S3, Azure, local       | **Keep**                           |
+| `DatasetStorageResolver`    | 1, in `platform/app`       | **Keep** — cross-package inversion |
+| `DatasetNormalizeQueuePort` | 1 in-package, app may swap | **Keep**                           |
+| `DatasetContentPort`        | 1, same package            | **Delete**                         |
+| `DatasetUploadPort`         | 1, same package            | **Delete**                         |
 
 ### P6 — `index.ts` publishes ~40 symbols; 2 are used outside (breaks R8)
 
@@ -188,9 +188,19 @@ export abstract class DatasetContentRepository {
     fn: (tx: DatasetContentRepository) => Promise<T>,
   ): Promise<T>;
 
-  abstract findForMutation(input: { projectId: string; datasetId: string }): Promise<DatasetMutationRecord>;
-  abstract updateCounts(input: { projectId: string; datasetId: string; counts: RecomputedDatasetCounts }): Promise<void>;
-  abstract countRecordsByDataset(input: { projectId: string; datasetIds: string[] }): Promise<Map<string, number>>;
+  abstract findForMutation(input: {
+    projectId: string;
+    datasetId: string;
+  }): Promise<DatasetMutationRecord>;
+  abstract updateCounts(input: {
+    projectId: string;
+    datasetId: string;
+    counts: RecomputedDatasetCounts;
+  }): Promise<void>;
+  abstract countRecordsByDataset(input: {
+    projectId: string;
+    datasetIds: string[];
+  }): Promise<Map<string, number>>;
 }
 ```
 
@@ -236,11 +246,15 @@ second-repository bug with it.
 ```ts
 export class UploadTooLargeError extends HandledError {
   constructor(sizeBytes: number, maxBytes: number) {
-    super("dataset_upload_too_large", `The upload is ${sizeBytes} bytes; the limit is ${maxBytes}.`, {
-      httpStatus: 400,
-      fault: "customer",
-      meta: { sizeBytes, maxBytes },
-    });
+    super(
+      "dataset_upload_too_large",
+      `The upload is ${sizeBytes} bytes; the limit is ${maxBytes}.`,
+      {
+        httpStatus: 400,
+        fault: "customer",
+        meta: { sizeBytes, maxBytes },
+      },
+    );
   }
 }
 ```
@@ -253,11 +267,11 @@ keys go, both tRPC ladders go, and the handled-404-logs-as-500 bug goes with the
 ```ts
 export class DatasetApp {
   static create(options: {
-    database: PrismaClient;              // only here, at the composition seam
+    database: PrismaClient; // only here, at the composition seam
     storage: DatasetStorageResolver;
     queue: DatasetNormalizeQueuePort;
     experiments?: DatasetExperimentLookup;
-  }): DatasetApp
+  }): DatasetApp;
 }
 ```
 

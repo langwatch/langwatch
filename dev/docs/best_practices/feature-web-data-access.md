@@ -389,8 +389,8 @@ Getting this backwards makes a correct call site fail to compile, or an
 incorrect one pass.
 
 The same file holds `readChangeTraceNameRejection`, which turns the handled
-error's `meta` into a typed reason. The *shape* of a rejection is the server's
-and belongs in the contract; the *words* stay in the component (ADR-045).
+error's `meta` into a typed reason. The _shape_ of a rejection is the server's
+and belongs in the contract; the _words_ stay in the component (ADR-045).
 
 ### 2. The map, and the binding
 
@@ -403,9 +403,17 @@ cache key; spell one differently and the hooks quietly stop sharing a cache.
 `packages/features/trace/web/src/use-trace-header.ts`
 
 ```ts
-export function useTraceHeader({ projectId, traceId, occurredAtMs, full, enabled = true,
-  staleTimeMs = 300_000 }: TraceHeaderReadInput & { full: boolean; enabled?: boolean;
-  staleTimeMs?: number }): { header: TraceHeader | undefined; isLoading: boolean } {
+export function useTraceHeader({
+  projectId,
+  traceId,
+  occurredAtMs,
+  full,
+  enabled = true,
+  staleTimeMs = 300_000,
+}: TraceHeaderReadInput & { full: boolean; enabled?: boolean; staleTimeMs?: number }): {
+  header: TraceHeader | undefined;
+  isLoading: boolean;
+} {
   const query = traceApi.tracesV2.header.useQuery(
     { projectId, traceId, ...(occurredAtMs !== void 0 ? { occurredAtMs } : {}), full },
     { enabled: enabled && projectId.length > 0 && traceId.length > 0, staleTime: staleTimeMs },
@@ -429,7 +437,7 @@ const mutation = traceApi.tracesV2.changeName.useMutation({
   onSuccess: async ({ traceId }, variables) => {
     await Promise.all([
       utils.tracesV2.header.invalidate({ projectId: variables.projectId, traceId }),
-      invalidateProcedure("tracesV2.list"),   // not in the map yet
+      invalidateProcedure("tracesV2.list"), // not in the map yet
     ]);
   },
 });
@@ -469,7 +477,7 @@ clear-eyed about this.
 What holds the two sides together today is weaker than a type check and stronger
 than nothing: both take their payload types from the contract package, so an
 input or output shape cannot drift without one of them failing to compile. What
-is unchecked is the *path* — nothing catches `tracesV2` being renamed on the
+is unchecked is the _path_ — nothing catches `tracesV2` being renamed on the
 router, or a procedure being removed. The failure mode is a runtime tRPC error
 on that one call, not a broken build.
 
@@ -539,7 +547,7 @@ Those two packages take data through injected ports — the
 
 **This is a genuine fork in the road and someone has to settle it.** The
 governance rules were written to keep screens transport-free; the evidence from
-`traces-v2` is that for a cache-orchestrating feature the cache *is* the domain
+`traces-v2` is that for a cache-orchestrating feature the cache _is_ the domain
 model — 16 `setData` seeds, 25 invalidations, 6 `cancel`, 6 `prefetch`, and
 three places that depend on the exact byte shape of a tRPC key. A port that
 hides React Query cannot express that, and the Agent adapter's attempt to is the
@@ -558,15 +566,15 @@ gates hooks that have nothing to do with organizations.
 
 It is at least seven hooks wearing one name:
 
-| What it does | What it should be | Where |
-| --- | --- | --- |
-| Resolves org/team/project from the URL, with a `useLocalStorage` last-used team | `useProjectScope()` → `{ projectId, projectSlug, organizationId, teamId, isLoading }` | `features/project/web` |
-| `hasPermission` / `hasOrgPermission` / `hasAnyPermission` | `useHasPermission()` | `features/authz/web` (does not exist yet) |
-| Redirects to onboarding / project onboarding, resolves redirect sub-paths, reads the navigation-mode store | `useScopeRedirects({ ... })`, called by route shells only | `apps/ui` |
-| Reads `modelProvider.getAllForProject` | `useModelProviders(projectId)` | `features/model-provider/web` |
-| Substitutes `sharedTrace.get` for everything on the public share route | `useSharedTraceScope()` | `features/share/web` |
-| Swaps the project slug in demo mode from `publicEnv` | `useDemoProject()` | `features/project/web` |
-| Requires a session and redirects without one | already `useRequiredSession` | `features/auth/web` |
+| What it does                                                                                               | What it should be                                                                     | Where                                     |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Resolves org/team/project from the URL, with a `useLocalStorage` last-used team                            | `useProjectScope()` → `{ projectId, projectSlug, organizationId, teamId, isLoading }` | `features/project/web`                    |
+| `hasPermission` / `hasOrgPermission` / `hasAnyPermission`                                                  | `useHasPermission()`                                                                  | `features/authz/web` (does not exist yet) |
+| Redirects to onboarding / project onboarding, resolves redirect sub-paths, reads the navigation-mode store | `useScopeRedirects({ ... })`, called by route shells only                             | `apps/ui`                                 |
+| Reads `modelProvider.getAllForProject`                                                                     | `useModelProviders(projectId)`                                                        | `features/model-provider/web`             |
+| Substitutes `sharedTrace.get` for everything on the public share route                                     | `useSharedTraceScope()`                                                               | `features/share/web`                      |
+| Swaps the project slug in demo mode from `publicEnv`                                                       | `useDemoProject()`                                                                    | `features/project/web`                    |
+| Requires a session and redirects without one                                                               | already `useRequiredSession`                                                          | `features/auth/web`                       |
 
 **Almost every caller wants `project?.id`.** In `traces-v2` that is what 18 of
 the importers use it for; a handful also read `project?.slug` or call
@@ -577,7 +585,7 @@ browser hook — to get a string.
 Two specific findings worth acting on:
 
 - **The 25 type errors are structural, not incidental.** The hook returns a
-  *union of two different shapes*: the early-return at line 661 omits
+  _union of two different shapes_: the early-return at line 661 omits
   `organizations`, `team`, `projectId`, `modelProviders` and `isRefetching`,
   which the success return at 754 has. Every caller destructures across that
   union. Splitting it fixes the errors by construction; patching the types

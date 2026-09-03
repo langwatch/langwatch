@@ -16,10 +16,7 @@ export async function listWorkflows(): Promise<WorkflowSummary[]> {
 }
 
 export async function getWorkflow(id: string): Promise<WorkflowSummary> {
-  return makeRequest(
-    "GET",
-    `/api/workflows/${encodeURIComponent(id)}`,
-  ) as Promise<WorkflowSummary>;
+  return makeRequest("GET", `/api/workflows/${encodeURIComponent(id)}`) as Promise<WorkflowSummary>;
 }
 
 export async function runWorkflow(
@@ -33,9 +30,7 @@ export async function runWorkflow(
   ) as Promise<Record<string, unknown>>;
 }
 
-export async function deleteWorkflow(
-  id: string,
-): Promise<{ id: string; archived: boolean }> {
+export async function deleteWorkflow(id: string): Promise<{ id: string; archived: boolean }> {
   return makeRequest("DELETE", `/api/workflows/${encodeURIComponent(id)}`) as Promise<{
     id: string;
     archived: boolean;

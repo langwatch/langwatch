@@ -5,13 +5,7 @@ export type LangyAnalyticsEventRecord = {
 } & LangyAnalyticsEventProjectionRecord;
 
 export abstract class LangyAnalyticsEventSinkPort {
-  abstract insert(
-    record: LangyAnalyticsEventRecord,
-    retentionDays: number,
-  ): Promise<void>;
+  abstract insert(record: LangyAnalyticsEventRecord, retentionDays: number): Promise<void>;
 
-  abstract insertBatch(
-    records: LangyAnalyticsEventRecord[],
-    retentionDays: number,
-  ): Promise<void>;
+  abstract insertBatch(records: LangyAnalyticsEventRecord[], retentionDays: number): Promise<void>;
 }

@@ -152,10 +152,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       throw error;
     }
 
-    expect(error.blocked.map((mutation) => mutation.mutationId)).toEqual([
-      "mut-1",
-      "mut-2",
-    ]);
+    expect(error.blocked.map((mutation) => mutation.mutationId)).toEqual(["mut-1", "mut-2"]);
     expect(error.message).toContain("mut-1");
     expect(error.message).toContain("mut-2");
 

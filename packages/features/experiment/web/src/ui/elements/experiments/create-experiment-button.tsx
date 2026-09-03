@@ -76,10 +76,7 @@ export const CreateExperimentButton = () => {
           </Box>
         </Menu.Item>
         <Menu.Item value="experiment-sdk" asChild>
-          <Link
-            href="https://langwatch.ai/docs/evaluations/experiments/sdk"
-            target="_blank"
-          >
+          <Link href="https://langwatch.ai/docs/evaluations/experiments/sdk" target="_blank">
             <Box width="100%">
               <HStack gap={1}>
                 <Text fontWeight="medium">New Experiment via SDK</Text>

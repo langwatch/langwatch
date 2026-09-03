@@ -11,9 +11,7 @@ export function resolveMaxTokensCeiling(
   modelProvider: ProviderWithCustomModels | null | undefined,
 ): number | undefined {
   const modelName = modelId.split("/").slice(1).join("/");
-  const custom = modelProvider?.customModels?.find(
-    (entry) => entry.modelId === modelName,
-  );
+  const custom = modelProvider?.customModels?.find((entry) => entry.modelId === modelName);
   if (custom?.maxTokens && custom.maxTokens > 0) return custom.maxTokens;
 
   const model = getModelById(modelId) ?? getModelById(modelName);

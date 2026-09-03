@@ -100,9 +100,7 @@ export interface LiteMemberRestrictionInfo {
   resource?: string;
 }
 
-export function extractLiteMemberRestrictionInfo(
-  error: unknown,
-): LiteMemberRestrictionInfo | null {
+export function extractLiteMemberRestrictionInfo(error: unknown): LiteMemberRestrictionInfo | null {
   if (!(error instanceof TRPCClientError)) return null;
   if (error.data?.code !== "UNAUTHORIZED") return null;
 
@@ -184,12 +182,7 @@ export function extractMissingModelInfo(error: unknown): MissingModelExtracted |
   if (!cause.featureKey || !cause.role) return null;
 
   const role = cause.role as MissingModelExtracted["role"];
-  if (
-    role !== "DEFAULT" &&
-    role !== "FAST" &&
-    role !== "LANGY" &&
-    role !== "EMBEDDINGS"
-  ) {
+  if (role !== "DEFAULT" && role !== "FAST" && role !== "LANGY" && role !== "EMBEDDINGS") {
     return null;
   }
 
@@ -236,9 +229,7 @@ export interface ProviderDisabledExtracted {
  * but that model's provider is currently disabled — so the toast can
  * offer a one-click swap to the next cascade candidate (if any).
  */
-export function extractProviderDisabledInfo(
-  error: unknown,
-): ProviderDisabledExtracted | null {
+export function extractProviderDisabledInfo(error: unknown): ProviderDisabledExtracted | null {
   if (!(error instanceof TRPCClientError)) return null;
   const cause = error.data?.cause as
     | {
@@ -267,20 +258,11 @@ export function extractProviderDisabledInfo(
   }
 
   const role = cause.role as ProviderDisabledExtracted["role"];
-  if (
-    role !== "DEFAULT" &&
-    role !== "FAST" &&
-    role !== "LANGY" &&
-    role !== "EMBEDDINGS"
-  ) {
+  if (role !== "DEFAULT" && role !== "FAST" && role !== "LANGY" && role !== "EMBEDDINGS") {
     return null;
   }
   const resolvedScope = cause.resolvedScope as ProviderDisabledExtracted["resolvedScope"];
-  if (
-    resolvedScope !== "project" &&
-    resolvedScope !== "team" &&
-    resolvedScope !== "organization"
-  ) {
+  if (resolvedScope !== "project" && resolvedScope !== "team" && resolvedScope !== "organization") {
     return null;
   }
 
@@ -327,12 +309,7 @@ export function extractAiCallFailedInfo(error: unknown): AiCallFailedExtracted |
   if (cause?.code !== AI_CALL_FAILED_CAUSE) return null;
   if (!cause.featureKey || !cause.role) return null;
   const role = cause.role as AiCallFailedExtracted["role"];
-  if (
-    role !== "DEFAULT" &&
-    role !== "FAST" &&
-    role !== "LANGY" &&
-    role !== "EMBEDDINGS"
-  ) {
+  if (role !== "DEFAULT" && role !== "FAST" && role !== "LANGY" && role !== "EMBEDDINGS") {
     return null;
   }
 

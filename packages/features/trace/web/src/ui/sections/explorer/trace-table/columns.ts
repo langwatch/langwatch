@@ -505,15 +505,11 @@ export function buildTraceColumns(ids: string[]): Array<ColumnDef<TraceListItem,
  * per-evaluator eval columns in `columnOrder` order. Dynamic `eval:*`
  * columns are not here — they are built by `buildEvalColumnDef`.
  */
-export function getTraceColumnDef(
-  id: string,
-): ColumnDef<TraceListItem, unknown> | undefined {
+export function getTraceColumnDef(id: string): ColumnDef<TraceListItem, unknown> | undefined {
   return traceColumnDefsByString[id];
 }
 
-export function buildConversationColumns(
-  ids: string[],
-): Array<ColumnDef<ConversationGroup, any>> {
+export function buildConversationColumns(ids: string[]): Array<ColumnDef<ConversationGroup, any>> {
   return ids
     .map((id) => conversationColumnDefs[id])
     .filter((def): def is ColumnDef<ConversationGroup, any> => Boolean(def));
@@ -524,9 +520,7 @@ export function buildGroupColumns(
   groupBy: "service" | "model" | "user",
 ): Array<ColumnDef<TraceGroup, any>> {
   const defs = buildGroupColumnDefs(groupBy);
-  return ids
-    .map((id) => defs[id])
-    .filter((def): def is ColumnDef<TraceGroup, any> => Boolean(def));
+  return ids.map((id) => defs[id]).filter((def): def is ColumnDef<TraceGroup, any> => Boolean(def));
 }
 
 export const allTraceColumnIds = Object.keys(traceColumnDefs);

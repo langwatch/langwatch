@@ -421,12 +421,8 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
     );
     expect(toolSpans.length).toBeGreaterThan(0);
 
-    const primaryToolSpans = toolSpans.filter((span) =>
-      span.name.includes("primary_tool"),
-    );
-    const fallbackToolSpans = toolSpans.filter((span) =>
-      span.name.includes("fallback_tool"),
-    );
+    const primaryToolSpans = toolSpans.filter((span) => span.name.includes("primary_tool"));
+    const fallbackToolSpans = toolSpans.filter((span) => span.name.includes("fallback_tool"));
 
     expect(primaryToolSpans.length).toBeGreaterThanOrEqual(0);
     expect(fallbackToolSpans.length).toBeGreaterThan(0);
@@ -464,8 +460,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
             schema: z.object({
               task: z.string().describe("Task to analyze"),
             }),
-            func: async ({ task }: { task: string }) =>
-              `${name} analysis result: ${task}`,
+            func: async ({ task }: { task: string }) => `${name} analysis result: ${task}`,
           }),
         ];
 

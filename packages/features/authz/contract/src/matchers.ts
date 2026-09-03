@@ -11,12 +11,7 @@
 import { bindingScopeCanGrantPermission, permissionSatisfiedBy } from "./registry";
 import { builtinRoleGrants, roleKeyForTeamRole } from "./roles";
 import { audienceMatches, type ScopeChainLink } from "./scope";
-import type {
-  AuthzScopeRef,
-  CollectedBinding,
-  CollectedGrants,
-  ResourceGrant,
-} from "./authz";
+import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "./authz";
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a flat, ordered sequence of legacy grant rules (fence → org-scoped semantics → custom role → EXTERNAL cap → built-in bag) whose ORDER is the stage-A parity contract; the score counts the guards, and splitting them would scatter the one place the rules read top to bottom.
 export function bindingGrants({

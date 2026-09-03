@@ -3,11 +3,11 @@
 Three stages per feature, per the standard in
 [`feature-cleanup-review.md`](../../best_practices/feature-cleanup-review.md).
 
-| Stage | What | Writes |
-| --- | --- | --- |
-| 1 · review | Audit the feature against R1–R8 | `<feature>.md` |
+| Stage      | What                                                                       | Writes                                  |
+| ---------- | -------------------------------------------------------------------------- | --------------------------------------- |
+| 1 · review | Audit the feature against R1–R8                                            | `<feature>.md`                          |
 | 2 · verify | Adversarially check the review: struck claims, missed problems, over-reach | `<feature>.md` (a Verification section) |
-| 3 · enact | Apply the verified review, commit by commit | source |
+| 3 · enact  | Apply the verified review, commit by commit                                | source                                  |
 
 Stage 1 and 2 are read-only over source. Stage 3 writes, and runs in small
 batches because features share `platform/app/src/features/errors/logic/{codes,presentation}.ts`.
@@ -17,57 +17,57 @@ enactment by hand first; stage-3 agents copy that, they do not invent it.
 
 ## Status
 
-| Feature | Files | Lines | 1 · review | 2 · verify | 3 · enact |
-| --- | ---: | ---: | --- | --- | --- |
-| dataset | 35 | 9147 | done | | commits 1-4 |
-| secret | 9 | 639 | done | |  |
-| stored-object | 22 | 2592 | done | |  |
-| api-key | 24 | 4102 | done | | hidden-name list |
-| trace | 181 | 29990 | done | |  |
-| governance (ent) | 143 | 24097 | done | | 3 layers cut |
-| scenario | 90 | 16758 | done | |  |
-| gateway | 79 | 16278 | done | |  |
-| langy | 85 | 15111 | done | |  |
-| authz | 51 | 13531 | done | | engine gate |
-| automation | 78 | 10925 | done | | TS2554 fixed |
-| coding-agent | 52 | 10059 | done | | registry + typecheck |
-| analytics | 30 | 9917 |  | |  |
-| ops | 49 | 9508 |  | |  |
-| organization | 20 | 7885 |  | |  |
-| experiment | 40 | 7106 | done | |  |
-| identity | 48 | 6956 |  | |  |
-| model-provider | 33 | 6595 | done | | REST statuses |
-| billing (ent) | 42 | 6287 | done | |  |
-| prompt | 19 | 6156 |  | |  |
-| webhook (ent) | 20 | 5056 |  | |  |
-| topic | 29 | 4783 |  | |  |
-| github | 34 | 4668 |  | |  |
-| evaluation | 31 | 4284 |  | |  |
-| dashboard | 16 | 3889 |  | |  |
-| scim (ent) | 20 | 3860 |  | |  |
-| workflow | 16 | 3814 |  | |  |
-| metric | 26 | 3334 |  | |  |
-| suite | 22 | 3136 |  | |  |
-| project | 12 | 2740 |  | |  |
-| annotation | 11 | 2691 |  | |  |
-| evaluator | 14 | 2619 |  | |  |
-| user | 11 | 2567 |  | |  |
-| agent | 14 | 2269 |  | |  |
-| data-retention | 18 | 1792 |  | |  |
-| role | 10 | 1658 |  | |  |
-| feature-flag | 16 | 1653 |  | |  |
-| monitor | 8 | 1605 |  | |  |
-| share | 11 | 1601 |  | |  |
-| licensing (ent) | 16 | 1571 |  | |  |
-| log | 13 | 1366 |  | |  |
-| sso (ent) | 5 | 1202 |  | |  |
-| auth | 9 | 971 |  | |  |
-| presence | 9 | 731 |  | |  |
-| data-privacy | 6 | 391 |  | |  |
-| entitlement | 5 | 338 |  | |  |
-| managed-provider (ent) | 7 | 305 |  | |  |
-| audit-log (ent) | 5 | 206 |  | |  |
-| notification | 5 | 114 |  | |  |
+| Feature                | Files | Lines | 1 · review | 2 · verify | 3 · enact            |
+| ---------------------- | ----: | ----: | ---------- | ---------- | -------------------- |
+| dataset                |    35 |  9147 | done       |            | commits 1-4          |
+| secret                 |     9 |   639 | done       |            |                      |
+| stored-object          |    22 |  2592 | done       |            |                      |
+| api-key                |    24 |  4102 | done       |            | hidden-name list     |
+| trace                  |   181 | 29990 | done       |            |                      |
+| governance (ent)       |   143 | 24097 | done       |            | 3 layers cut         |
+| scenario               |    90 | 16758 | done       |            |                      |
+| gateway                |    79 | 16278 | done       |            |                      |
+| langy                  |    85 | 15111 | done       |            |                      |
+| authz                  |    51 | 13531 | done       |            | engine gate          |
+| automation             |    78 | 10925 | done       |            | TS2554 fixed         |
+| coding-agent           |    52 | 10059 | done       |            | registry + typecheck |
+| analytics              |    30 |  9917 |            |            |                      |
+| ops                    |    49 |  9508 |            |            |                      |
+| organization           |    20 |  7885 |            |            |                      |
+| experiment             |    40 |  7106 | done       |            |                      |
+| identity               |    48 |  6956 |            |            |                      |
+| model-provider         |    33 |  6595 | done       |            | REST statuses        |
+| billing (ent)          |    42 |  6287 | done       |            |                      |
+| prompt                 |    19 |  6156 |            |            |                      |
+| webhook (ent)          |    20 |  5056 |            |            |                      |
+| topic                  |    29 |  4783 |            |            |                      |
+| github                 |    34 |  4668 |            |            |                      |
+| evaluation             |    31 |  4284 |            |            |                      |
+| dashboard              |    16 |  3889 |            |            |                      |
+| scim (ent)             |    20 |  3860 |            |            |                      |
+| workflow               |    16 |  3814 |            |            |                      |
+| metric                 |    26 |  3334 |            |            |                      |
+| suite                  |    22 |  3136 |            |            |                      |
+| project                |    12 |  2740 |            |            |                      |
+| annotation             |    11 |  2691 |            |            |                      |
+| evaluator              |    14 |  2619 |            |            |                      |
+| user                   |    11 |  2567 |            |            |                      |
+| agent                  |    14 |  2269 |            |            |                      |
+| data-retention         |    18 |  1792 |            |            |                      |
+| role                   |    10 |  1658 |            |            |                      |
+| feature-flag           |    16 |  1653 |            |            |                      |
+| monitor                |     8 |  1605 |            |            |                      |
+| share                  |    11 |  1601 |            |            |                      |
+| licensing (ent)        |    16 |  1571 |            |            |                      |
+| log                    |    13 |  1366 |            |            |                      |
+| sso (ent)              |     5 |  1202 |            |            |                      |
+| auth                   |     9 |   971 |            |            |                      |
+| presence               |     9 |   731 |            |            |                      |
+| data-privacy           |     6 |   391 |            |            |                      |
+| entitlement            |     5 |   338 |            |            |                      |
+| managed-provider (ent) |     7 |   305 |            |            |                      |
+| audit-log (ent)        |     5 |   206 |            |            |                      |
+| notification           |     5 |   114 |            |            |                      |
 
 49 features, 268,000 lines of feature-server source. 15 reviewed, 7 partly enacted.
 
@@ -77,7 +77,6 @@ commit left `coding-agent-server` with ten TS2352s that main does not have.
 
 Stage 1 fans out; stage 3 does not, until the dataset enactment is finished by
 hand — agents copy a proven reference, they do not discover a design.
-
 
 ---
 
@@ -135,11 +134,11 @@ In the order they bite. Every one of these has actually happened here.
 
 1. **Prose.** A `\s*\(` lookahead matches `categorical (evaluation_runs)` in a
    docblock. Use `\(` with no whitespace.
-2. **Declarations.** The same pattern rewrites a *declaration* as readily as a
+2. **Declarations.** The same pattern rewrites a _declaration_ as readily as a
    call — a port's type literal, a class's own member, a consumer with a method
    of the same name, a fixture with a function of the same name.
 3. **Same name, different module.** Fifteen `platform/app` tests import
-   `applySpanToSummary` from a *fixture* that binds a runtime; repointing them
+   `applySpanToSummary` from a _fixture_ that binds a runtime; repointing them
    at the class of the same name would have compiled and tested the wrong
    function. Only "which module does this import come from" catches it.
 4. **Collisions.** `collectDroppedCategories`, `wrap`, `hasPersistableSignal`,
@@ -147,7 +146,7 @@ In the order they bite. Every one of these has actually happened here.
 5. **Spread calls.** `...originAttrs(` is preceded by a dot, so a plain
    `(?<![.\w])` lookbehind skips it.
 6. **Bare references that are not calls.** `when: hasSyncableEvaluations,` in a
-   pipeline definition. Sweep for the name *not followed by* `(`, tracking
+   pipeline definition. Sweep for the name _not followed by_ `(`, tracking
    whether you are inside an import block — do not filter by "line ends in a
    comma", which hides exactly these.
 
@@ -180,15 +179,15 @@ is correct is a product decision.
 
 Measured at `a48f86df5e`, feature packages only:
 
-| directory | functions | note |
-| --- | ---: | --- |
-| transport | 210 | route handlers — mostly the framework's shape |
-| adapters | 159 | ~0.55 per file |
-| repositories | 158 | ~0.6 per file |
-| services | 133 | ~0.4 per file |
-| subscribers | 45 | was 81 |
-| intents | 23 | |
-| projections / ports / processes / stores | < 20 each | |
+| directory                                | functions | note                                          |
+| ---------------------------------------- | --------: | --------------------------------------------- |
+| transport                                |       210 | route handlers — mostly the framework's shape |
+| adapters                                 |       159 | ~0.55 per file                                |
+| repositories                             |       158 | ~0.6 per file                                 |
+| services                                 |       133 | ~0.4 per file                                 |
+| subscribers                              |        45 | was 81                                        |
+| intents                                  |        23 |                                               |
+| projections / ports / processes / stores | < 20 each |                                               |
 
 The concentration is gone: the largest single file holds seven, and most hold
 one or two — a `create` helper beside its class, or a genuinely shared utility.

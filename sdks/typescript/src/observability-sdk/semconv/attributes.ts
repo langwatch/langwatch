@@ -186,8 +186,7 @@ export const ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA = "langwatch.langchain.run.me
  * LangWatch LangChain run extra parameters attribute key
  * Used to store additional parameters for a LangChain run
  */
-export const ATTR_LANGWATCH_LANGCHAIN_RUN_EXTRA_PARAMS =
-  "langwatch.langchain.run.extra_params";
+export const ATTR_LANGWATCH_LANGCHAIN_RUN_EXTRA_PARAMS = "langwatch.langchain.run.extra_params";
 
 /**
  * LangWatch LangChain run parent ID attribute key

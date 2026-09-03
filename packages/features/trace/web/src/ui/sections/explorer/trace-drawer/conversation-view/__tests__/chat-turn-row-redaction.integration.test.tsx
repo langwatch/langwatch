@@ -17,15 +17,18 @@ vi.mock("../../scenario-roles", async () => {
   return { ...actual, useIsScenarioRole: () => false };
 });
 
-vi.mock("../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context", () => ({
-  useConversationExpand: () => ({
-    isExpandable: false,
-    shouldExpandAll: false,
+vi.mock(
+  "../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context",
+  () => ({
+    useConversationExpand: () => ({
+      isExpandable: false,
+      shouldExpandAll: false,
+    }),
+    ConversationExpandContext: {
+      Provider: ({ children }: { children: unknown }) => children,
+    },
   }),
-  ConversationExpandContext: {
-    Provider: ({ children }: { children: unknown }) => children,
-  },
-}));
+);
 
 // The per-turn translate hook dispatches through tRPC; these tests pin
 // redaction rendering, so stub it to the identity passthrough.
@@ -85,10 +88,7 @@ function turn(over: Partial<TraceListItem>): TraceListItem {
   };
 }
 
-function renderRow(
-  over: Partial<TraceListItem>,
-  texts?: { user?: string; assistant?: string },
-) {
+function renderRow(over: Partial<TraceListItem>, texts?: { user?: string; assistant?: string }) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <ChatTurnRow
@@ -123,10 +123,7 @@ describe("ChatTurnRow redaction", () => {
 
   describe("given the user input was redacted", () => {
     it("renders the Redacted marker on the user side", () => {
-      renderRow(
-        { inputRedacted: true, inputVisibleTo: "no one" },
-        { assistant: "the answer" },
-      );
+      renderRow({ inputRedacted: true, inputVisibleTo: "no one" }, { assistant: "the answer" });
       expect(screen.getByText("Redacted")).toBeInTheDocument();
       expect(screen.getByText(/hidden by privacy settings/i)).toBeInTheDocument();
     });

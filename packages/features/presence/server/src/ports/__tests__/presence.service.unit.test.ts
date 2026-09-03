@@ -1,10 +1,7 @@
 import type { PresenceSession } from "@langwatch/presence-contract";
 import { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  PresenceBroadcastPort,
-  PresenceDiagnosticsPort,
-} from "../presence.port";
+import { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../presence.port";
 import { PresenceRepository } from "../../repositories/presence.repository";
 import { PresenceService } from "../../services/presence.service";
 
@@ -60,9 +57,7 @@ describe("PresenceService", () => {
   it("uses the canonical Project service for the effective policy", async () => {
     const { service, projects } = createService();
     projects.enabled = false;
-    await expect(service.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(
-      false,
-    );
+    await expect(service.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(false);
   });
 
   /** @scenario "A first heartbeat joins a project" */
@@ -78,10 +73,7 @@ describe("PresenceService", () => {
     ).resolves.toMatchObject({
       updatedAt: 42,
     });
-    expect(repository.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ updatedAt: 42 }),
-      30,
-    );
+    expect(repository.upsert).toHaveBeenCalledWith(expect.objectContaining({ updatedAt: 42 }), 30);
     expect(broadcast.publish).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: "project-1",

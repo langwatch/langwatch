@@ -7,11 +7,11 @@ Status: fixed for analytics, open as a repo-wide pattern.
 `aggregation-builder`, `field-mappings`, `filter-translator` and
 `metric-translator` existed twice, ~5,700 lines each side:
 
-| | `platform/app/src/server/analytics/clickhouse/` | `packages/features/analytics/server/src/clickhouse/` |
-|---|---|---|
-| Reached at runtime | no — zero importers outside its own directory | yes: `presets.ts` → `AnalyticsAdapter` → `ClickHouseAnalyticsRepository` |
-| Test files | 22 | 1 |
-| Test cases | 385 | a single characterization test |
+|                    | `platform/app/src/server/analytics/clickhouse/` | `packages/features/analytics/server/src/clickhouse/`                     |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------ |
+| Reached at runtime | no — zero importers outside its own directory   | yes: `presets.ts` → `AnalyticsAdapter` → `ClickHouseAnalyticsRepository` |
+| Test files         | 22                                              | 1                                                                        |
+| Test cases         | 385                                             | a single characterization test                                           |
 
 Every assertion was pointed at the dead half.
 
@@ -32,7 +32,7 @@ field as FilterField                     field as string   // casts nothing
 ```
 
 The table is exhaustive on purpose: `translateFilter` falls back to a no-op when a
-field has no handler, and the *type* was the only thing preventing that. Widened,
+field has no handler, and the _type_ was the only thing preventing that. Widened,
 a new filter field compiles fine and is silently ignored at query time. The same
 widening hit the aggregation builder's four `filters` parameters.
 

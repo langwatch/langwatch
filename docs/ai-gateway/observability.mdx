@@ -56,13 +56,12 @@ Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gatew
 - `langwatch.thread_id`, thread/conversation ID when provided via `X-LangWatch-Thread-Id` header.
 
 <Info>
-  The following attributes are **not yet emitted** (tracked for v1.1):
-  `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `.warnings`,
-  `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome`,
-  `.forced_injected`. Operators looking for these signals should use the Prometheus
-  counters documented below. Request-id correlation via the
-  `X-LangWatch-Gateway-Request-Id` header lets operators join metric spikes back to
-  individual traces.
+  The following attributes are **not yet emitted** (tracked for v1.1): `langwatch.policy.blocked`,
+  `langwatch.budget.breached_scope`, `.warnings`, `langwatch.stream.*`, `langwatch.client.name`,
+  `langwatch.cache.outcome`, `.forced_injected`. Operators looking for these signals should use the
+  Prometheus counters documented below. Request-id correlation via the
+  `X-LangWatch-Gateway-Request-Id` header lets operators join metric spikes back to individual
+  traces.
 </Info>
 
 ## Filtering in the LangWatch UI

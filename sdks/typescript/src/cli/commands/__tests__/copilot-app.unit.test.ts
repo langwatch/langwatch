@@ -65,9 +65,7 @@ describe("connectCopilotApp", () => {
 
       const spec = install.mock.calls[0]![0];
       expect(spec.execPath).toContain("GitHub Copilot.app");
-      expect(spec.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
-        "Authorization=Bearer ik-lw-abc_secret",
-      );
+      expect(spec.env.OTEL_EXPORTER_OTLP_HEADERS).toBe("Authorization=Bearer ik-lw-abc_secret");
     });
 
     /** @scenario Connect confirms where the captured traces will appear */

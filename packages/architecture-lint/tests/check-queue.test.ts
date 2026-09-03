@@ -14,14 +14,7 @@
  */
 
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import {
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -191,8 +184,7 @@ function maxOverlap(events: Event[]): number {
   return peak;
 }
 
-const startOrder = (events: Event[]) =>
-  events.filter((e) => e.event === "start").map((e) => e.tag);
+const startOrder = (events: Event[]) => events.filter((e) => e.event === "start").map((e) => e.tag);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -336,7 +328,9 @@ describe("check queue", () => {
       }
       // The tools themselves: each must be one the installer actually shims.
       for (const tool of ["tsgo", "tsc", "oxlint", "oxfmt"]) {
-        expect(queuedTools, `${tool} is invoked by a root check but is not shimmed`).toContain(tool);
+        expect(queuedTools, `${tool} is invoked by a root check but is not shimmed`).toContain(
+          tool,
+        );
       }
     });
 
@@ -535,9 +529,7 @@ describe("check queue", () => {
       });
       const [, second] = await Promise.all([holder.done, agent.done]);
 
-      expect(second.stderr).toContain(
-        "CHECK_SLOTS=0 is ignored in an agent shell",
-      );
+      expect(second.stderr).toContain("CHECK_SLOTS=0 is ignored in an agent shell");
       expect(second.stderr).toContain("Only a person may turn the queue off");
       expect(second.stderr).toContain("1 check is already active");
       expect(maxOverlap(readEvents())).toBe(1);
@@ -550,15 +542,7 @@ describe("check queue", () => {
       // an agent shell the marker is what carries the gate-off through.
       const run = startRun({
         tag: "outer",
-        argv: [
-          "node",
-          QUEUE_SCRIPT,
-          "node",
-          fakeCommand,
-          logFile,
-          "inner",
-          "0",
-        ],
+        argv: ["node", QUEUE_SCRIPT, "node", fakeCommand, logFile, "inner", "0"],
         // Bounds the failure mode: a regression here queues the inner run
         // behind the outer's held slot, and "starting anyway" breaks the
         // silence assertion instead of hanging the suite for the default wait.
@@ -878,9 +862,7 @@ describe("check queue", () => {
       const call = source.indexOf("spawn(commandArgv[0]");
       const end = source.indexOf("});", call);
       if (call === -1 || end === -1) {
-        throw new Error(
-          "the queue no longer spawns the command the way this test stalls it",
-        );
+        throw new Error("the queue no longer spawns the command the way this test stalls it");
       }
       const at = end + "});".length;
       const copy = path.join(scratch, "check-queue-stalled.mjs");

@@ -44,10 +44,10 @@ type SpendSettlementIntents = {
  * evolution is what fences racing workers — so the query and the sends run
  * behind the outbox lease as an intent instead.
  */
-export const spendSettlementWake: WakeHandler<
-  SpendSettlementState,
-  SpendSettlementIntents
-> = (state, ctx) => ({
+export const spendSettlementWake: WakeHandler<SpendSettlementState, SpendSettlementIntents> = (
+  state,
+  ctx,
+) => ({
   state: { ...state, lastSweepAt: ctx.at },
   intents: [ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
 });

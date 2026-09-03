@@ -2,10 +2,7 @@ import { useMemo } from "react";
 import { useDrawerStore } from "../../../../index";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import type { PresenceLocation } from "@langwatch/presence-contract";
-import {
-  selectMostVisibleSection,
-  useSectionTrackerStore,
-} from "@langwatch/presence-web";
+import { selectMostVisibleSection, useSectionTrackerStore } from "@langwatch/presence-web";
 import { usePresence } from "./use-presence";
 import { usePresenceFeatureEnabled } from "../../../../behavior/presence/use-presence-feature-enabled";
 

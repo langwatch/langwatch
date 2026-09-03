@@ -38,9 +38,7 @@ describe("buildCopilotAppEnv", () => {
         captureContent: true,
       });
 
-      expect(env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
-        "Authorization=Bearer ik-lw-abc_secret",
-      );
+      expect(env.OTEL_EXPORTER_OTLP_HEADERS).toBe("Authorization=Bearer ik-lw-abc_secret");
     });
 
     /** @scenario Content capture is enabled by default */
@@ -137,9 +135,7 @@ describe("renderLaunchAgent", () => {
       const plist = d.files[0]!;
       expect(plist.path).toBe(d.registerPath);
       expect(plist.content).toContain("<key>RunAtLoad</key>");
-      expect(plist.content).toContain(
-        "/Applications/GitHub Copilot.app/Contents/MacOS/github",
-      );
+      expect(plist.content).toContain("/Applications/GitHub Copilot.app/Contents/MacOS/github");
       expect(plist.content).toContain("Authorization=Bearer ik-lw-abc_secret");
     });
 
@@ -224,8 +220,7 @@ describe("renderLaunchAgent", () => {
     const winSpec = {
       platform: "win32" as const,
       home: "C:\\Users\\dev",
-      execPath:
-        "C:\\Users\\dev\\AppData\\Local\\Programs\\GitHub Copilot\\GitHub Copilot.exe",
+      execPath: "C:\\Users\\dev\\AppData\\Local\\Programs\\GitHub Copilot\\GitHub Copilot.exe",
       env,
     };
 

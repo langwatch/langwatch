@@ -53,9 +53,7 @@ export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits
     canPublish: plan.canPublish,
     maxMembersLite: plan.maxMembersLite ?? DEFAULT_MEMBERS_LITE,
     webhookEndpointsEnabled: plan.webhookEndpointsEnabled,
-    usageUnit: KNOWN_USAGE_UNITS.includes(
-      plan.usageUnit as (typeof KNOWN_USAGE_UNITS)[number],
-    )
+    usageUnit: KNOWN_USAGE_UNITS.includes(plan.usageUnit as (typeof KNOWN_USAGE_UNITS)[number])
       ? (plan.usageUnit ?? "traces")
       : "traces",
   };

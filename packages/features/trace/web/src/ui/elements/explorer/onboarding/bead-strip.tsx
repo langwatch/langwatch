@@ -1,7 +1,11 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { CHAPTERS, type ChapterId, chapterIndex } from "../../../../model/explorer/onboarding/chapters/chapters";
+import {
+  CHAPTERS,
+  type ChapterId,
+  chapterIndex,
+} from "../../../../model/explorer/onboarding/chapters/chapters";
 import type { StageId } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
 
 interface BeadStripProps {
@@ -108,9 +112,7 @@ export function BeadStrip({ stage, onJump }: BeadStripProps): React.ReactElement
                 background={isCurrent || isPast ? "orange.solid" : "bg.surface"}
                 borderWidth="1px"
                 borderColor={isCurrent || isPast ? "orange.solid" : "border.muted"}
-                boxShadow={
-                  isCurrent ? "0 0 0 3px var(--chakra-colors-orange-muted)" : undefined
-                }
+                boxShadow={isCurrent ? "0 0 0 3px var(--chakra-colors-orange-muted)" : undefined}
                 transition="all 220ms cubic-bezier(0.16, 1, 0.3, 1)"
                 _hover={onJump ? { background: "orange.solid" } : undefined}
                 _focusVisible={
@@ -125,11 +127,7 @@ export function BeadStrip({ stage, onJump }: BeadStripProps): React.ReactElement
               />
             );
             return (
-              <Tooltip
-                key={chapter.id}
-                content={labelNode}
-                positioning={{ placement: "top" }}
-              >
+              <Tooltip key={chapter.id} content={labelNode} positioning={{ placement: "top" }}>
                 {dot}
               </Tooltip>
             );

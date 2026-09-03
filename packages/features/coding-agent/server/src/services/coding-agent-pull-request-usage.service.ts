@@ -85,9 +85,7 @@ export class CodingAgentPullRequestUsageService {
     cacheReadTokens: number;
     cacheCreationTokens: number;
   }): number {
-    return (
-      row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheCreationTokens
-    );
+    return row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheCreationTokens;
   }
 
   groupedRows(
@@ -129,8 +127,7 @@ export class CodingAgentPullRequestUsageService {
       if (priced) {
         row.costUsd = (row.costUsd ?? 0) + session.costUsd;
         row.billedCostUsd = (row.billedCostUsd ?? 0) + (nonBilled ? 0 : session.costUsd);
-        row.nonBilledCostUsd =
-          (row.nonBilledCostUsd ?? 0) + (nonBilled ? session.costUsd : 0);
+        row.nonBilledCostUsd = (row.nonBilledCostUsd ?? 0) + (nonBilled ? session.costUsd : 0);
       }
       for (const model of session.models) row.modelSet.add(model);
     }
@@ -160,8 +157,7 @@ export class CodingAgentPullRequestUsageService {
         cacheReadTokens: totals.cacheReadTokens + row.cacheReadTokens,
         cacheCreationTokens: totals.cacheCreationTokens + row.cacheCreationTokens,
         totalTokens: totals.totalTokens + row.totalTokens,
-        costUsd:
-          row.costUsd === null ? totals.costUsd : (totals.costUsd ?? 0) + row.costUsd,
+        costUsd: row.costUsd === null ? totals.costUsd : (totals.costUsd ?? 0) + row.costUsd,
         billedCostUsd:
           row.billedCostUsd === null
             ? totals.billedCostUsd
@@ -217,10 +213,7 @@ export class CodingAgentPullRequestUsageService {
   latestActivity(sessions: readonly CodingAgentSessionBranchRecord[]): number {
     return sessions.reduce(
       (latest, session) =>
-        Math.max(
-          latest,
-          Math.max(session.startedAtMs, session.lastEventOccurredAtMs || 0),
-        ),
+        Math.max(latest, Math.max(session.startedAtMs, session.lastEventOccurredAtMs || 0)),
       0,
     );
   }

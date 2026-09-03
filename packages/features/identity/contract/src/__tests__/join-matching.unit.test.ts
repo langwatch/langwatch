@@ -25,7 +25,6 @@ function asked(decision: JoinLookupDecision): readonly JoinOffer[] {
   return decision.organizations;
 }
 
-
 /**
  * The reveal discipline, as a table of refusals.
  *
@@ -67,9 +66,7 @@ describe("given a verified work address", () => {
 
       expect(decision).toEqual({
         outcome: "ask",
-        organizations: [
-          { organizationId: "org_acme", name: "Acme", colleagueCount: 100 },
-        ],
+        organizations: [{ organizationId: "org_acme", name: "Acme", colleagueCount: 100 }],
       });
       // Nothing about who those colleagues are: the offer's whole shape is
       // three fields, and none of them names a person.
@@ -95,9 +92,10 @@ describe("given a verified work address", () => {
       ]);
 
       expect(decision.outcome).toBe("ask");
-      expect(
-        asked(decision).map((organization) => organization.organizationId),
-      ).toEqual(["org_acme", "org_acme_labs"]);
+      expect(asked(decision).map((organization) => organization.organizationId)).toEqual([
+        "org_acme",
+        "org_acme_labs",
+      ]);
     });
 
     /** @scenario The colleague count is coarse and never a list */
@@ -124,9 +122,7 @@ describe("given a verified work address", () => {
     it("matches through the attach-time fold and refuses a subdomain", () => {
       // Uppercase, a plus tag and surrounding space all fold to the same
       // domain the identifier was attached with.
-      expect(lookup([acme], { email: "  SAM+news@Acme.COM " }).outcome).toBe(
-        "ask",
-      );
+      expect(lookup([acme], { email: "  SAM+news@Acme.COM " }).outcome).toBe("ask");
 
       // A subdomain is a DIFFERENT domain, and that is settled before any
       // organization is consulted: the candidate list is built for whatever
@@ -153,9 +149,9 @@ describe("given an address a public email provider issued", () => {
       const consumer = { ...acme, autoJoinDomains: ["gmail.com"] };
 
       for (const domainJoin of ["request", "auto"] as const) {
-        expect(
-          lookup([{ ...consumer, domainJoin }], { email: "sam@gmail.com" }),
-        ).toEqual({ outcome: "none" });
+        expect(lookup([{ ...consumer, domainJoin }], { email: "sam@gmail.com" })).toEqual({
+          outcome: "none",
+        });
       }
     });
 
@@ -219,9 +215,7 @@ describe("given a work organization with a single member", () => {
       // hold uses LangWatch, and the one person there decides.
       expect(lookup([solo])).toEqual({
         outcome: "ask",
-        organizations: [
-          { organizationId: "org_acme", name: "Acme", colleagueCount: 1 },
-        ],
+        organizations: [{ organizationId: "org_acme", name: "Acme", colleagueCount: 1 }],
       });
     });
 
@@ -296,9 +290,8 @@ describe("given an organization that admits its domain automatically", () => {
 
     it("falls back to asking when the administrator never named the domain", () => {
       expect(
-        lookup([
-          { ...acme, domainJoin: "auto", autoJoinDomains: [], verifiedMembersOnDomain: 4 },
-        ]).outcome,
+        lookup([{ ...acme, domainJoin: "auto", autoJoinDomains: [], verifiedMembersOnDomain: 4 }])
+          .outcome,
       ).toBe("ask");
     });
 

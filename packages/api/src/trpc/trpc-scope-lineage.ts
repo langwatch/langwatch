@@ -33,9 +33,7 @@ type ScopeLineageParams<TContext> = {
  * requires a return assignable to tRPC's `MiddlewareResult`, and narrowing it
  * makes every call site a compile error.
  */
-type ScopeLineageMiddleware<TContext> = (
-  params: ScopeLineageParams<TContext>,
-) => Promise<any>;
+type ScopeLineageMiddleware<TContext> = (params: ScopeLineageParams<TContext>) => Promise<any>;
 
 function asScopeLineageInput(input: unknown): AuthzScopeLineageInput {
   return typeof input === "object" && input !== null ? input : {};

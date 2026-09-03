@@ -32,9 +32,7 @@ function harness(options?: {
     storeUserHashKeyIfMissing: vi.fn().mockResolvedValue(undefined),
     findEmail: vi
       .fn()
-      .mockResolvedValue(
-        options?.email === undefined ? "sam@acme.com" : options.email,
-      ),
+      .mockResolvedValue(options?.email === undefined ? "sam@acme.com" : options.email),
     // The ceremonies never ask it — the collision guard does, one layer
     // down — but the double is the whole port.
     findUserIdByEmail: vi.fn().mockResolvedValue(null),
@@ -85,9 +83,7 @@ describe("the identity ceremonies", () => {
 
       // The hook returns without refusing, so better-auth deletes the row
       // exactly as it would with no ceremonies wired.
-      await expect(
-        ceremonies.beforeUserDelete({ id: USER }),
-      ).resolves.toBeUndefined();
+      await expect(ceremonies.beforeUserDelete({ id: USER })).resolves.toBeUndefined();
       expect(identity.eraseUser).not.toHaveBeenCalled();
     });
   });
@@ -136,9 +132,7 @@ describe("the identity ceremonies", () => {
     it("mints the row id when better-auth supplied none", async () => {
       const { ceremonies, identity } = harness();
 
-      const result = await ceremonies.beforeAccountCreate(
-        accountRow({ id: undefined }),
-      );
+      const result = await ceremonies.beforeAccountCreate(accountRow({ id: undefined }));
 
       const minted = (result as { data: { id: string } }).data.id;
       expect(minted).toBeTruthy();
@@ -162,9 +156,9 @@ describe("the identity ceremonies", () => {
         },
       });
 
-      await expect(
-        ceremonies.beforeAccountCreate(accountRow()),
-      ).rejects.toBeInstanceOf(IdentityPrimaryMustDemoteFirstError);
+      await expect(ceremonies.beforeAccountCreate(accountRow())).rejects.toBeInstanceOf(
+        IdentityPrimaryMustDemoteFirstError,
+      );
     });
   });
 
@@ -212,9 +206,7 @@ describe("the identity ceremonies", () => {
       // There is deliberately no user.create ceremony. The mint used to live
       // there ungated, which made a sign-up on an unmigrated organization
       // write `User.userHashKey` it otherwise would not have.
-      expect(
-        (ceremonies as unknown as Record<string, unknown>).afterUserCreate,
-      ).toBeUndefined();
+      expect((ceremonies as unknown as Record<string, unknown>).afterUserCreate).toBeUndefined();
       expect(users.storeUserHashKeyIfMissing).not.toHaveBeenCalled();
     });
   });

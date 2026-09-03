@@ -7,8 +7,5 @@
  * says so, rather than a null object that reads as wired.
  */
 export abstract class ExperimentRunErrorReportingPort {
-  abstract captureException(
-    error: unknown,
-    context: { extra: Record<string, unknown> },
-  ): void;
+  abstract captureException(error: unknown, context: { extra: Record<string, unknown> }): void;
 }

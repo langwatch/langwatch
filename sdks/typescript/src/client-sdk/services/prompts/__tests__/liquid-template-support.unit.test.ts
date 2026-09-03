@@ -91,9 +91,7 @@ describe("Prompt", () => {
 
       describe("when template has undefined variables in Liquid tags", () => {
         it("tolerates them and renders remaining content", () => {
-          const prompt = promptWithTemplate(
-            "{% if mood == 'happy' %}Great!{% endif %} Hello",
-          );
+          const prompt = promptWithTemplate("{% if mood == 'happy' %}Great!{% endif %} Hello");
 
           const result = prompt.compile({});
 

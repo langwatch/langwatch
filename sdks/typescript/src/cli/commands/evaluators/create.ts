@@ -70,9 +70,7 @@ export const createEvaluatorCommand = async (
     data: evaluator,
     table: () => {
       if (evaluator.platformUrl) {
-        console.log(
-          `  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`,
-        );
+        console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
       }
     },
   };

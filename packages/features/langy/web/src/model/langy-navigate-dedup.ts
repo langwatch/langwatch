@@ -30,13 +30,7 @@ export function navigateDedupKey({
  * Mutates `seen` as its side effect, mirroring the server-side frame-nonce
  * dedup's `SADD`-then-check shape.
  */
-export function reserveNavigate({
-  seen,
-  key,
-}: {
-  seen: Set<string>;
-  key: string;
-}): boolean {
+export function reserveNavigate({ seen, key }: { seen: Set<string>; key: string }): boolean {
   if (seen.has(key)) return false;
   seen.add(key);
   return true;

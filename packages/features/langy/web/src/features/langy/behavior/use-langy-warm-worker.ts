@@ -27,13 +27,7 @@ function warmKey({
  * all, and the first message cold-started while the earlier warm worker sat
  * idle.
  */
-function forgetFreshWarms({
-  fired,
-  projectId,
-}: {
-  fired: Set<string>;
-  projectId: string;
-}): void {
+function forgetFreshWarms({ fired, projectId }: { fired: Set<string>; projectId: string }): void {
   const freshPrefix = `${projectId}::`;
   for (const key of fired) {
     if (key.startsWith(freshPrefix)) fired.delete(key);

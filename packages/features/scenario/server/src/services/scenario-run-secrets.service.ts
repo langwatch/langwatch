@@ -11,10 +11,7 @@ export class ScenarioRunSecretsService {
 
   encrypt(values: Record<string, string>): RunSecretCiphertext {
     return Object.fromEntries(
-      Object.entries(values).map(([name, value]) => [
-        name,
-        this.cipherPort.encrypt(value),
-      ]),
+      Object.entries(values).map(([name, value]) => [name, this.cipherPort.encrypt(value)]),
     );
   }
 
@@ -24,9 +21,7 @@ export class ScenarioRunSecretsService {
         try {
           return [name, this.cipherPort.decrypt(ciphertext)];
         } catch {
-          throw new Error(
-            `Secret parameter "${name}" could not be decrypted for this run`,
-          );
+          throw new Error(`Secret parameter "${name}" could not be decrypted for this run`);
         }
       }),
     );

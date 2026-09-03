@@ -26,12 +26,7 @@ export const MenuContent = React.forwardRef<HTMLDivElement, MenuContentProps>(
           }}
         >
           <OverlayDepthContext.Provider value={depth}>
-            <ChakraMenu.Content
-              ref={ref}
-              borderRadius="lg"
-              background="bg.panel"
-              {...rest}
-            />
+            <ChakraMenu.Content ref={ref} borderRadius="lg" background="bg.panel" {...rest} />
           </OverlayDepthContext.Provider>
         </ChakraMenu.Positioner>
       </Portal>
@@ -49,21 +44,20 @@ export const MenuArrow = React.forwardRef<HTMLDivElement, ChakraMenu.ArrowProps>
   },
 );
 
-export const MenuCheckboxItem = React.forwardRef<
-  HTMLDivElement,
-  ChakraMenu.CheckboxItemProps
->(function MenuCheckboxItem(props, ref) {
-  return (
-    <ChakraMenu.CheckboxItem ps="8" ref={ref} {...props}>
-      <AbsoluteCenter axis="horizontal" insetStart="4" asChild>
-        <ChakraMenu.ItemIndicator>
-          <Check aria-hidden="true" />
-        </ChakraMenu.ItemIndicator>
-      </AbsoluteCenter>
-      {props.children}
-    </ChakraMenu.CheckboxItem>
-  );
-});
+export const MenuCheckboxItem = React.forwardRef<HTMLDivElement, ChakraMenu.CheckboxItemProps>(
+  function MenuCheckboxItem(props, ref) {
+    return (
+      <ChakraMenu.CheckboxItem ps="8" ref={ref} {...props}>
+        <AbsoluteCenter axis="horizontal" insetStart="4" asChild>
+          <ChakraMenu.ItemIndicator>
+            <Check aria-hidden="true" />
+          </ChakraMenu.ItemIndicator>
+        </AbsoluteCenter>
+        {props.children}
+      </ChakraMenu.CheckboxItem>
+    );
+  },
+);
 
 export const MenuRadioItem = React.forwardRef<HTMLDivElement, ChakraMenu.RadioItemProps>(
   function MenuRadioItem(props, ref) {
@@ -86,9 +80,7 @@ export const MenuItemGroup = React.forwardRef<HTMLDivElement, ChakraMenu.ItemGro
     const { title, children, ...rest } = props;
     return (
       <ChakraMenu.ItemGroup ref={ref} {...rest}>
-        {title && (
-          <ChakraMenu.ItemGroupLabel userSelect="none">{title}</ChakraMenu.ItemGroupLabel>
-        )}
+        {title && <ChakraMenu.ItemGroupLabel userSelect="none">{title}</ChakraMenu.ItemGroupLabel>}
         {children}
       </ChakraMenu.ItemGroup>
     );

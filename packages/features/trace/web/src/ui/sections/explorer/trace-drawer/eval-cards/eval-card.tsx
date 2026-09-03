@@ -1,27 +1,11 @@
-import {
-  Box,
-  Button,
-  chakra,
-  Flex,
-  HStack,
-  Icon,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, chakra, Flex, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
 import { type ReactNode, useState } from "react";
 import { LuCircleAlert, LuCircleSlash, LuQuote } from "react-icons/lu";
 import { AZURE_SAFETY_NOT_CONFIGURED_MESSAGE } from "@langwatch/evaluation-contract";
 import { formatCost, formatDuration } from "../../../../../index";
 import { RunHistorySparkline } from "./run-history-sparkline";
 import { useEvalInputs } from "./use-eval-inputs";
-import {
-  type EvalEntry,
-  formatInputValue,
-  isCategoryOnly,
-  isNoVerdict,
-  STATUS,
-} from "./utils";
+import { type EvalEntry, formatInputValue, isCategoryOnly, isNoVerdict, STATUS } from "./utils";
 
 export function EvalCard({
   eval_,
@@ -74,10 +58,7 @@ export function EvalCard({
   // for them and fetch on open.
   const canLazyLoadInputs =
     !!eval_.evaluationId &&
-    (status === "pass" ||
-      status === "fail" ||
-      status === "processed" ||
-      status === "error");
+    (status === "pass" || status === "fail" || status === "processed" || status === "error");
   const mightHaveInputs = hasListInputs || canLazyLoadInputs;
   const hasRetries = (eval_.retries ?? 0) > 0;
   // The labeled categorical/boolean verdict is sometimes more informative
@@ -91,8 +72,7 @@ export function EvalCard({
   const meta: string[] = [];
   if (eval_.executionTime !== undefined && eval_.executionTime > 0)
     meta.push(formatDuration(eval_.executionTime));
-  if (eval_.evalCost !== undefined && eval_.evalCost > 0)
-    meta.push(formatCost(eval_.evalCost));
+  if (eval_.evalCost !== undefined && eval_.evalCost > 0) meta.push(formatCost(eval_.evalCost));
   if (eval_.evaluatorType) meta.push(eval_.evaluatorType);
   if (hasRetries) meta.push(`${eval_.retries} retr${eval_.retries === 1 ? "y" : "ies"}`);
 
@@ -113,70 +93,34 @@ export function EvalCard({
     !!eval_.reasoning;
   // On errored entries, expose the evaluation/evaluator IDs so support can
   // grep logs without having to dig into the raw payload.
-  const showErrorIds =
-    status === "error" && (!!eval_.evaluationId || !!eval_.evaluatorId);
+  const showErrorIds = status === "error" && (!!eval_.evaluationId || !!eval_.evaluatorId);
   // Whether we have anything that warrants the "Show details" expand.
   const hasExpandableDetails =
-    mightHaveInputs ||
-    hasStacktrace ||
-    showLabelDetailRow ||
-    showErrorPanel ||
-    showErrorIds;
+    mightHaveInputs || hasStacktrace || showLabelDetailRow || showErrorPanel || showErrorIds;
   const hasFooterRow = !!eval_.spanName || meta.length > 0 || hasExpandableDetails;
 
   return (
-    <Box
-      borderRadius="md"
-      borderWidth="1px"
-      borderColor="border"
-      bg="bg.panel"
-      overflow="hidden"
-    >
+    <Box borderRadius="md" borderWidth="1px" borderColor="border" bg="bg.panel" overflow="hidden">
       {/* Header strip */}
       <HStack
         paddingX={3}
         paddingY={2}
         gap={2}
-        borderBottomWidth={
-          hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"
-        }
+        borderBottomWidth={hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"}
         borderColor="border.muted"
         align="center"
       >
         {!categoryOnly && (
-          <HStack
-            paddingX={2}
-            paddingY={0.5}
-            borderRadius="sm"
-            bg={tone.bg}
-            flexShrink={0}
-            gap={1}
-          >
-            {status === "skipped" && (
-              <Icon as={LuCircleSlash} boxSize={2.5} color={tone.fg} />
-            )}
-            {status === "error" && (
-              <Icon as={LuCircleAlert} boxSize={2.5} color={tone.fg} />
-            )}
-            <Text
-              textStyle="2xs"
-              fontWeight="bold"
-              color={tone.fg}
-              letterSpacing="0.06em"
-            >
+          <HStack paddingX={2} paddingY={0.5} borderRadius="sm" bg={tone.bg} flexShrink={0} gap={1}>
+            {status === "skipped" && <Icon as={LuCircleSlash} boxSize={2.5} color={tone.fg} />}
+            {status === "error" && <Icon as={LuCircleAlert} boxSize={2.5} color={tone.fg} />}
+            <Text textStyle="2xs" fontWeight="bold" color={tone.fg} letterSpacing="0.06em">
               {tone.label}
             </Text>
           </HStack>
         )}
         {hasLabel && <CategoryChip label={eval_.label!} />}
-        <Text
-          textStyle="sm"
-          fontWeight="semibold"
-          color="fg"
-          flex={1}
-          minWidth={0}
-          truncate
-        >
+        <Text textStyle="sm" fontWeight="semibold" color="fg" flex={1} minWidth={0} truncate>
           {name}
         </Text>
         {eval_.runHistory && eval_.runHistory.length > 1 && (
@@ -197,27 +141,17 @@ export function EvalCard({
       </HStack>
 
       {/* Score bar (numeric, only when the eval actually produced a score) */}
-      {!noVerdict &&
-        !categoryOnly &&
-        scoreType === "numeric" &&
-        typeof score === "number" && (
-          <Box
-            height="3px"
-            bg="bg.subtle"
-            position="relative"
-            borderBottomWidth={
-              hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"
-            }
-            borderColor="border.muted"
-          >
-            <Box
-              height="100%"
-              bg={tone.color}
-              width={`${barFill}%`}
-              transition="width 0.3s ease"
-            />
-          </Box>
-        )}
+      {!noVerdict && !categoryOnly && scoreType === "numeric" && typeof score === "number" && (
+        <Box
+          height="3px"
+          bg="bg.subtle"
+          position="relative"
+          borderBottomWidth={hasReasoning || meta.length > 0 || eval_.spanName ? "1px" : "0"}
+          borderColor="border.muted"
+        >
+          <Box height="100%" bg={tone.color} width={`${barFill}%`} transition="width 0.3s ease" />
+        </Box>
+      )}
 
       {/* Reasoning / status message */}
       {(hasReasoning || (noVerdict && primaryStatusText)) && (
@@ -231,11 +165,7 @@ export function EvalCard({
           <HStack align="flex-start" gap={2}>
             <Icon
               as={
-                status === "error"
-                  ? LuCircleAlert
-                  : status === "skipped"
-                    ? LuCircleSlash
-                    : LuQuote
+                status === "error" ? LuCircleAlert : status === "skipped" ? LuCircleSlash : LuQuote
               }
               boxSize={3}
               color={showStatusMessage ? tone.fg : "fg.subtle"}
@@ -421,12 +351,7 @@ function EvalCardFooter({
           )}
           {showErrorPanel && eval_.errorMessage && (
             <DetailRow label="Error">
-              <Text
-                textStyle="xs"
-                color={tone.fg}
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-              >
+              <Text textStyle="xs" color={tone.fg} whiteSpace="pre-wrap" wordBreak="break-word">
                 {eval_.errorMessage}
               </Text>
             </DetailRow>
@@ -436,12 +361,7 @@ function EvalCardFooter({
               <VStack align="stretch" gap={1}>
                 {eval_.evaluationId && (
                   <HStack align="flex-start" gap={2} minWidth={0}>
-                    <Text
-                      textStyle="2xs"
-                      color="fg.subtle"
-                      flexShrink={0}
-                      minWidth="80px"
-                    >
+                    <Text textStyle="2xs" color="fg.subtle" flexShrink={0} minWidth="80px">
                       evaluation
                     </Text>
                     <Text textStyle="2xs" color="fg" wordBreak="break-all">
@@ -451,12 +371,7 @@ function EvalCardFooter({
                 )}
                 {eval_.evaluatorId && (
                   <HStack align="flex-start" gap={2} minWidth={0}>
-                    <Text
-                      textStyle="2xs"
-                      color="fg.subtle"
-                      flexShrink={0}
-                      minWidth="80px"
-                    >
+                    <Text textStyle="2xs" color="fg.subtle" flexShrink={0} minWidth="80px">
                       evaluator
                     </Text>
                     <Text textStyle="2xs" color="fg" wordBreak="break-all">
@@ -498,12 +413,7 @@ function EvalCardFooter({
                 <VStack align="stretch" gap={1}>
                   {inputEntries.map(([key, value]) => (
                     <HStack key={key} align="flex-start" gap={2} minWidth={0}>
-                      <Text
-                        textStyle="2xs"
-                        color="fg.subtle"
-                        flexShrink={0}
-                        minWidth="80px"
-                      >
+                      <Text textStyle="2xs" color="fg.subtle" flexShrink={0} minWidth="80px">
                         {key}
                       </Text>
                       <Box

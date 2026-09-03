@@ -11,24 +11,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  ArrowUpRight,
-  Check,
-  Copy,
-  HelpCircle,
-  Sparkles,
-  Wand2,
-  Zap,
-} from "lucide-react";
+import { ArrowUpRight, Check, Copy, HelpCircle, Sparkles, Wand2, Zap } from "lucide-react";
 import type React from "react";
 import { Drawer } from "../../drawer";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  FIELD_VALUES,
-  SEARCH_FIELDS,
-  type SearchFieldMeta,
-} from "@langwatch/trace-contract";
+import { FIELD_VALUES, SEARCH_FIELDS, type SearchFieldMeta } from "@langwatch/trace-contract";
 import { useFilterStore, useUIStore } from "../../../../index";
 import { QueryPreview } from "./query-preview";
 
@@ -152,8 +140,7 @@ const VALUE_ROWS: ReadonlyArray<{
   {
     form: "Free text",
     example: '"refund policy"',
-    notes:
-      "Searches input, output, trace name, and span names. Quote multi-word phrases.",
+    notes: "Searches input, output, trace name, and span names. Quote multi-word phrases.",
   },
 ];
 
@@ -198,10 +185,7 @@ const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose: _onClose }) =>
 
   return (
     <VStack align="stretch" gap={6} paddingX={5} paddingY={6}>
-      <Section
-        title="Cookbook"
-        caption="Click to add to your filter. Stack as many as you like."
-      >
+      <Section title="Cookbook" caption="Click to add to your filter. Stack as many as you like.">
         <ExampleCookbook onApply={apply} />
       </Section>
 
@@ -241,10 +225,7 @@ const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose: _onClose }) =>
         />
       </Section>
 
-      <Section
-        title="Fields"
-        caption={`${Object.keys(SEARCH_FIELDS).length} queryable fields`}
-      >
+      <Section title="Fields" caption={`${Object.keys(SEARCH_FIELDS).length} queryable fields`}>
         <FieldsTable onApply={apply} />
       </Section>
 
@@ -273,12 +254,7 @@ const SyntaxTipStrip: React.FC = () => (
     <HStack gap={4} flexWrap="wrap" rowGap={2}>
       {SYNTAX_TIPS.map((tip) => (
         <HStack key={tip.label} gap={1.5}>
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            textTransform="uppercase"
-            letterSpacing="0.06em"
-          >
+          <Text textStyle="2xs" color="fg.subtle" textTransform="uppercase" letterSpacing="0.06em">
             {tip.label}:
           </Text>
           <QueryPreview query={tip.example} />
@@ -365,12 +341,7 @@ const ExampleCard: React.FC<{
       </HStack>
       <VStack align="stretch" gap={1}>
         {group.examples.map((ex) => (
-          <ExampleRow
-            key={ex.query}
-            example={ex}
-            accent={group.accent}
-            onApply={onApply}
-          />
+          <ExampleRow key={ex.query} example={ex} accent={group.accent} onApply={onApply} />
         ))}
       </VStack>
     </VStack>

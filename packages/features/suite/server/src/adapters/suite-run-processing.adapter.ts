@@ -73,48 +73,50 @@ function requireJobId<TPayload>(
  * No subscriber on this pipeline — cross-pipeline subscribers live on the simulation pipeline.
  */
 export function createSuiteRunProcessingPipeline(deps: SuiteRunProcessingPipelineDeps) {
-  return definePipeline<SuiteRunProcessingEvent>({
-    name: "suite_run_processing",
-    aggregate: defineAggregate({
-      type: "suite_run",
-      events: defineEvents(SUITE_RUN_PROCESSING_EVENT_TYPES),
-    }),
-  })
-    .withClickHouseFoldProjection(
-      new SuiteRunStateFoldProjection({
-        store: deps.suiteRunStateFoldStore,
+  return (
+    definePipeline<SuiteRunProcessingEvent>({
+      name: "suite_run_processing",
+      aggregate: defineAggregate({
+        type: "suite_run",
+        events: defineEvents(SUITE_RUN_PROCESSING_EVENT_TYPES),
       }),
-    )
-    // Every one of these three folds by addition — StartedCount + 1,
-    // CompletedCount + 1, FailedCount + 1 — and the fold executor drops a
-    // replay by `event.id`, which two deliveries of the same command do not
-    // share. All three commands define `makeJobId`, but `withCommand` reads
-    // deduplication only from these options, so without them the method is
-    // inert and a redelivered simulation event double-counts a suite run's
-    // progress, which can flip its status to SUCCESS or FAILURE before the
-    // run has finished.
-    .withCommand("startSuiteRun", StartSuiteRunCommand, {
-      deduplication: {
-        makeId: requireJobId("startSuiteRun", StartSuiteRunCommand.makeJobId),
-        ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-      },
     })
-    .withCommand("recordSuiteRunItemStarted", RecordSuiteRunItemStartedCommand, {
-      deduplication: {
-        makeId: requireJobId(
-          "recordSuiteRunItemStarted",
-          RecordSuiteRunItemStartedCommand.makeJobId,
-        ),
-        ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-      },
-    })
-    .withCommand("completeSuiteRunItem", CompleteSuiteRunItemCommand, {
-      deduplication: {
-        makeId: requireJobId("completeSuiteRunItem", CompleteSuiteRunItemCommand.makeJobId),
-        ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
-      },
-    })
-    .build();
+      .withClickHouseFoldProjection(
+        new SuiteRunStateFoldProjection({
+          store: deps.suiteRunStateFoldStore,
+        }),
+      )
+      // Every one of these three folds by addition — StartedCount + 1,
+      // CompletedCount + 1, FailedCount + 1 — and the fold executor drops a
+      // replay by `event.id`, which two deliveries of the same command do not
+      // share. All three commands define `makeJobId`, but `withCommand` reads
+      // deduplication only from these options, so without them the method is
+      // inert and a redelivered simulation event double-counts a suite run's
+      // progress, which can flip its status to SUCCESS or FAILURE before the
+      // run has finished.
+      .withCommand("startSuiteRun", StartSuiteRunCommand, {
+        deduplication: {
+          makeId: requireJobId("startSuiteRun", StartSuiteRunCommand.makeJobId),
+          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+        },
+      })
+      .withCommand("recordSuiteRunItemStarted", RecordSuiteRunItemStartedCommand, {
+        deduplication: {
+          makeId: requireJobId(
+            "recordSuiteRunItemStarted",
+            RecordSuiteRunItemStartedCommand.makeJobId,
+          ),
+          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+        },
+      })
+      .withCommand("completeSuiteRunItem", CompleteSuiteRunItemCommand, {
+        deduplication: {
+          makeId: requireJobId("completeSuiteRunItem", CompleteSuiteRunItemCommand.makeJobId),
+          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+        },
+      })
+      .build()
+  );
 }
 
 /**

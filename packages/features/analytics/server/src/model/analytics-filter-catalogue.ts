@@ -30,8 +30,7 @@ const requiringKey = new Set<string>(FIELDS_REQUIRING_KEY);
 const requiringSubkey = new Set<string>(FIELDS_REQUIRING_SUBKEY);
 
 /** Whether this field's options can only be read once a key is chosen. */
-export const filterFieldRequiresKey = (field: FilterField): boolean =>
-  requiringKey.has(field);
+export const filterFieldRequiresKey = (field: FilterField): boolean => requiringKey.has(field);
 
 /** Whether this field's options can only be read once a subkey is chosen. */
 export const filterFieldRequiresSubkey = (field: FilterField): boolean =>

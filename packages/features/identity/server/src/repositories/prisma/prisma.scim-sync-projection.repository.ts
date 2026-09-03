@@ -5,7 +5,11 @@ import type {
   ScimSyncState,
 } from "@langwatch/identity-contract";
 import type { ScimSyncReadRepository } from "../../scim-sync.repository";
-import type { Prisma, PrismaClient, ScimSyncState as ScimSyncRow } from "@langwatch/prisma-client/generated";
+import type {
+  Prisma,
+  PrismaClient,
+  ScimSyncState as ScimSyncRow,
+} from "@langwatch/prisma-client/generated";
 import type { ScimSyncFoldState } from "../../projections/scim-sync-state.projection";
 import type {
   ProjectionStoreContext,

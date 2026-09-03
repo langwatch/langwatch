@@ -96,11 +96,7 @@ describe("closing event sourcing", () => {
         finishQueueDrain();
         await closing;
 
-        expect(order).toEqual([
-          "globalQueue:start",
-          "globalQueue:done",
-          "projectionRegistry",
-        ]);
+        expect(order).toEqual(["globalQueue:start", "globalQueue:done", "projectionRegistry"]);
       });
     });
   });

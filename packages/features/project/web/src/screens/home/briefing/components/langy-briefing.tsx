@@ -3,12 +3,7 @@ import { GitPullRequest, Sparkles } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import { LangyPanelSurface } from "@langwatch/langy-web/asaplangy";
 import { Chip } from "@langwatch/trace-web/explorer/components/TraceDrawer/Chip";
-import type {
-  BriefingData,
-  BriefingReceipt,
-  BriefingSeverity,
-  ScenarioBar,
-} from "../types";
+import type { BriefingData, BriefingReceipt, BriefingSeverity, ScenarioBar } from "../types";
 import { QuietHeadline } from "./quiet-headline";
 import { useProjectHomeHost } from "../../../../model/project-home-host";
 
@@ -32,8 +27,7 @@ import { useProjectHomeHost } from "../../../../model/project-home-host";
  */
 
 /** The serif display voice, self-hosted with the panel's fallbacks. */
-const SERIF =
-  'var(--langy-font-serif, "Sentient", "Charter", "Source Serif Pro", Georgia, serif)';
+const SERIF = 'var(--langy-font-serif, "Sentient", "Charter", "Source Serif Pro", Georgia, serif)';
 
 const BAR_FILL: Record<ScenarioBar["status"], string> = {
   pass: "green.solid",
@@ -462,13 +456,7 @@ function ReceiptRow({
         />
         <Text fontSize="13px" color="fg.muted" flex={1} minWidth={0} lineHeight="1.5">
           {receipt.subject ? (
-            <Text
-              as="span"
-              fontFamily="mono"
-              fontSize="12.5px"
-              fontWeight="600"
-              color="fg"
-            >
+            <Text as="span" fontFamily="mono" fontSize="12.5px" fontWeight="600" color="fg">
               {receipt.subject}{" "}
             </Text>
           ) : null}

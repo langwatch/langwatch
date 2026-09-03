@@ -208,9 +208,7 @@ describe("planComparisonSeeding", () => {
         });
 
         expect(Object.keys(plan.seedTargetOutputs)).toEqual(["0:baseline"]);
-        expect(plan.extraCells).toEqual([
-          { rowIndex: 1, targetId: "baseline" },
-        ]);
+        expect(plan.extraCells).toEqual([{ rowIndex: 1, targetId: "baseline" }]);
       });
     });
   });
@@ -226,10 +224,7 @@ describe("planComparisonSeeding", () => {
         results: savedBaselineOutputs(),
       });
 
-      expect(Object.keys(plan.seedTargetOutputs)).toEqual([
-        "0:baseline",
-        "1:baseline",
-      ]);
+      expect(Object.keys(plan.seedTargetOutputs)).toEqual(["0:baseline", "1:baseline"]);
       expect(plan.extraCells).toEqual([
         { rowIndex: 0, targetId: "candidate" },
         { rowIndex: 1, targetId: "candidate" },
@@ -391,10 +386,7 @@ describe("buildExecutionRequest", () => {
         scope: { type: "full" },
       });
 
-      expect(built?.request.evaluators[0]?.comparison?.variants).toEqual([
-        "baseline",
-        "candidate",
-      ]);
+      expect(built?.request.evaluators[0]?.comparison?.variants).toEqual(["baseline", "candidate"]);
     });
   });
 });

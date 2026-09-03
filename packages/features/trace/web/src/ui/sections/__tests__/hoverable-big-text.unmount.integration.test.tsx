@@ -20,9 +20,7 @@ import { HoverableBigText } from "../hoverable-big-text";
 
 const renderText = () =>
   render(<HoverableBigText>a very long value</HoverableBigText>, {
-    wrapper: ({ children }) => (
-      <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-    ),
+    wrapper: ({ children }) => <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>,
   });
 
 describe("HoverableBigText overflow probe lifetime", () => {
@@ -47,10 +45,7 @@ describe("HoverableBigText overflow probe lifetime", () => {
 
         view.unmount();
 
-        expect(
-          vi.getTimerCount(),
-          "no measurement may outlive the component",
-        ).toBe(0);
+        expect(vi.getTimerCount(), "no measurement may outlive the component").toBe(0);
         expect(() => vi.runAllTimers()).not.toThrow();
       });
     });

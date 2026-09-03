@@ -1,9 +1,5 @@
 import { createHash } from "node:crypto";
-import {
-  type MessageAttributeValue,
-  SendMessageCommand,
-  SQSClient,
-} from "@aws-sdk/client-sqs";
+import { type MessageAttributeValue, SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import type { AwsClientConfig, AwsClientConfigInput } from "@langwatch/aws-client";
 import {
   assertDispatchBudget,
@@ -114,9 +110,7 @@ export function sqsMessageAttributes({
           },
         }
       : {}),
-    ...(isTestFire
-      ? { [TEST_FIRE_ATTRIBUTE]: { DataType: "String", StringValue: "true" } }
-      : {}),
+    ...(isTestFire ? { [TEST_FIRE_ATTRIBUTE]: { DataType: "String", StringValue: "true" } } : {}),
   };
 }
 
@@ -282,9 +276,7 @@ export interface SqsDestinationConfig {
 const ERROR_SNIPPET_CHARS = 500;
 
 /** The attributes one delivery rides with, signature included. */
-function attributesFor(
-  request: WebhookDispatchRequest,
-): Record<string, MessageAttributeValue> {
+function attributesFor(request: WebhookDispatchRequest): Record<string, MessageAttributeValue> {
   const signature =
     request.signingSecrets.length > 0
       ? signWebhookPayload({
@@ -454,9 +446,7 @@ function clientCacheKey(config: SqsDestinationConfig): string {
     config.accessKeyId ?? "",
     // The secret decides identity as much as the key id does, and it must not
     // be readable from a cache key, so it is reduced to a fingerprint.
-    config.secretAccessKey
-      ? createHash("sha256").update(config.secretAccessKey).digest("hex")
-      : "",
+    config.secretAccessKey ? createHash("sha256").update(config.secretAccessKey).digest("hex") : "",
   ].join(KEY_SEPARATOR);
 }
 

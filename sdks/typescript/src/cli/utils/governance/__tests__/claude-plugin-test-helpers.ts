@@ -84,13 +84,7 @@ export const seedMarketplace = ({
   repo?: string;
   publishedVersion?: string;
 }): void => {
-  const installLocation = path.join(
-    home,
-    ".claude",
-    "plugins",
-    "marketplaces",
-    "langwatch",
-  );
+  const installLocation = path.join(home, ".claude", "plugins", "marketplaces", "langwatch");
   if (publishedVersion !== undefined) {
     writeClaudeJson({
       home,
@@ -295,13 +289,9 @@ export function installClaudePluginHarness({
     home: () => state.home,
     settingsPath,
     pluginsDir: () => path.join(state.home, ".claude", "plugins"),
-    writeJson: ({ segments, value }) =>
-      writeClaudeJson({ home: state.home, segments, value }),
+    writeJson: ({ segments, value }) => writeClaudeJson({ home: state.home, segments, value }),
     readSettings: <T>() => JSON.parse(fs.readFileSync(settingsPath(), "utf8")) as T,
-    seedInstalledPlugin: ({
-      version,
-      scope,
-    }: { version?: string; scope?: string } = {}) =>
+    seedInstalledPlugin: ({ version, scope }: { version?: string; scope?: string } = {}) =>
       seedInstalledPlugin({ home: state.home, version, scope }),
     seedMarketplace: ({
       repo,

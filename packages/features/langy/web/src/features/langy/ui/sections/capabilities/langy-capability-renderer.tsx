@@ -30,10 +30,7 @@ import {
   toCliToolResult,
 } from "@langwatch/langy-contract";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import {
-  digestOfToolCall,
-  LangyCardBoundary,
-} from "../../../../../index";
+import { digestOfToolCall, LangyCardBoundary } from "../../../../../index";
 import {
   type CapabilityCardInput,
   type CapabilityDescriptor,

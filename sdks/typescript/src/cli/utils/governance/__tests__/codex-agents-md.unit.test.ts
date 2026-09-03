@@ -115,10 +115,7 @@ describe("the codex AGENTS.md guidance block", () => {
 
   describe("when only half a marker pair is in the file", () => {
     it("reports no guidance, the same region removal accepts", () => {
-      fs.writeFileSync(
-        file,
-        `${USER_CONTENT}\n<!-- >>> langwatch agent guidance begin >>> -->\n`,
-      );
+      fs.writeFileSync(file, `${USER_CONTENT}\n<!-- >>> langwatch agent guidance begin >>> -->\n`);
 
       expect(hasCodexAgentGuidance(file)).toBe(false);
       expect(removeCodexAgentGuidance(file)).toBe(false);

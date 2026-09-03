@@ -1,14 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { WebhookDestinationService } from "../webhook-destination.service";
 import { WebhookDeliveryService } from "../webhook-delivery.service";
-import {
-  WebhookEnvelopeService,
-  type WebhookSpendEventRow,
-} from "../webhook-envelope.service";
+import { WebhookEnvelopeService, type WebhookSpendEventRow } from "../webhook-envelope.service";
 
-const spendRow = (
-  overrides: Partial<WebhookSpendEventRow> = {},
-): WebhookSpendEventRow => ({
+const spendRow = (overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRow => ({
   tenantId: "project_1",
   gatewayRequestId: "request_1",
   organizationId: "org_1",
@@ -62,14 +57,10 @@ describe("webhook server", () => {
   it("accepts canonical standard SQS URLs and refuses FIFO", () => {
     const service = WebhookDestinationService.create();
     expect(
-      service.inspectSqsQueueUrl(
-        "https://sqs.eu-west-1.amazonaws.com/123456789012/events",
-      ).ok,
+      service.inspectSqsQueueUrl("https://sqs.eu-west-1.amazonaws.com/123456789012/events").ok,
     ).toBe(true);
     expect(
-      service.inspectSqsQueueUrl(
-        "https://sqs.eu-west-1.amazonaws.com/123456789012/events.fifo",
-      ),
+      service.inspectSqsQueueUrl("https://sqs.eu-west-1.amazonaws.com/123456789012/events.fifo"),
     ).toEqual({ ok: false, problem: "fifo" });
   });
 });

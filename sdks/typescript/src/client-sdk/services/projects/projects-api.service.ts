@@ -92,11 +92,7 @@ export class ProjectsApiService {
     };
   }
 
-  private async request<T>(
-    operation: string,
-    path: string,
-    init?: RequestInit,
-  ): Promise<T> {
+  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
@@ -129,17 +125,11 @@ export class ProjectsApiService {
     if (options?.page) params.set("page", String(options.page));
     if (options?.limit) params.set("limit", String(options.limit));
     const qs = params.toString();
-    return this.request<PaginatedProjects>(
-      "list projects",
-      `/api/projects${qs ? `?${qs}` : ""}`,
-    );
+    return this.request<PaginatedProjects>("list projects", `/api/projects${qs ? `?${qs}` : ""}`);
   }
 
   async get(id: string): Promise<Project> {
-    return this.request<Project>(
-      `get project "${id}"`,
-      `/api/projects/${encodeURIComponent(id)}`,
-    );
+    return this.request<Project>(`get project "${id}"`, `/api/projects/${encodeURIComponent(id)}`);
   }
 
   async create(input: CreateProjectInput): Promise<ProjectWithServiceKey> {

@@ -18,9 +18,7 @@ function readString(rec: Record<string, unknown>, key: string): string | null {
   return typeof value === "string" && value !== "" ? value : null;
 }
 
-export function readJobContext(
-  data: Record<string, unknown> | null,
-): JobContextInfo | null {
+export function readJobContext(data: Record<string, unknown> | null): JobContextInfo | null {
   const ctx = data?.__context;
   if (!isRecord(ctx)) return null;
 

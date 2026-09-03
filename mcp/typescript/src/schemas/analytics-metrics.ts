@@ -124,17 +124,7 @@ export const analyticsMetrics: MetricInfo[] = [
     category: "events",
     name: "event_score",
     label: "Event Score",
-    allowedAggregations: [
-      "terms",
-      "avg",
-      "sum",
-      "min",
-      "max",
-      "median",
-      "p99",
-      "p95",
-      "p90",
-    ],
+    allowedAggregations: ["terms", "avg", "sum", "min", "max", "median", "p99", "p95", "p90"],
     description: "Numeric score from events (requires event_type key and metrics key)",
   },
   {
@@ -142,8 +132,7 @@ export const analyticsMetrics: MetricInfo[] = [
     name: "event_details",
     label: "Event Details",
     allowedAggregations: ["cardinality"],
-    description:
-      "Event detail key/value distribution (requires event_type key and details key)",
+    description: "Event detail key/value distribution (requires event_type key and details key)",
   },
   // evaluations
   {

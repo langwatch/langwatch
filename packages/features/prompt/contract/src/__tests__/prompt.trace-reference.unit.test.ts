@@ -352,8 +352,7 @@ describe("parsePromptReference()", () => {
     it("extracts variables from valid JSON wrapper", () => {
       const attrs = {
         "langwatch.prompt.id": "team/sample-prompt:3",
-        "langwatch.prompt.variables":
-          '{"type":"json","value":{"name":"Alice","topic":"AI"}}',
+        "langwatch.prompt.variables": '{"type":"json","value":{"name":"Alice","topic":"AI"}}',
       };
       const result = parsePromptReference(attrs);
       expect(result.promptVariables).toEqual({

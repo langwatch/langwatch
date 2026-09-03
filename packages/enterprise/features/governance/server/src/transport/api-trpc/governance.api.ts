@@ -37,11 +37,7 @@ import {
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
   type GovernanceService,
 } from "@langwatch/enterprise-governance-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { GovernanceApp } from "#app/governance.app";
 
@@ -86,12 +82,7 @@ const resolveActorPersonalProjectSchema = organizationScope.extend({
 });
 
 const quarantineFillStatsSchema = organizationScope.extend({
-  windowSeconds: z
-    .number()
-    .int()
-    .min(10)
-    .max(3600)
-    .default(QUARANTINE_DEFAULT_WINDOW_SECONDS),
+  windowSeconds: z.number().int().min(10).max(3600).default(QUARANTINE_DEFAULT_WINDOW_SECONDS),
   threshold: z.number().int().min(1).default(QUARANTINE_DEFAULT_THRESHOLD),
 });
 
@@ -116,8 +107,7 @@ export class GovernanceTrpcApi {
        * identity-routing for non-admins still works.
        */
       setupState: policy("governance:view")(procedure.input(organizationScope)).query(
-        async ({ ctx, input }) =>
-          ctx.app.governance.resolveSetupState(input.organizationId),
+        async ({ ctx, input }) => ctx.app.governance.resolveSetupState(input.organizationId),
       ),
 
       /**

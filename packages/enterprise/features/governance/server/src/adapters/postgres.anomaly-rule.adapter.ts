@@ -7,10 +7,7 @@ export class PostgresAnomalyRuleAdapter {
     private readonly now: (() => Date) | undefined,
   ) {}
 
-  static create(options: {
-    database: object;
-    now?: () => Date;
-  }): PostgresAnomalyRuleAdapter {
+  static create(options: { database: object; now?: () => Date }): PostgresAnomalyRuleAdapter {
     return new PostgresAnomalyRuleAdapter(options.database, options.now);
   }
 

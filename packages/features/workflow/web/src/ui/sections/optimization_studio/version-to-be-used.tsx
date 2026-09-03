@@ -18,9 +18,9 @@ import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { useVersionState } from "./history";
 
 export const VersionToBeUsed = () => {
-  const { checkCanCommitNewVersion } = useWorkflowStore(
-    ({ checkCanCommitNewVersion }) => ({ checkCanCommitNewVersion }),
-  );
+  const { checkCanCommitNewVersion } = useWorkflowStore(({ checkCanCommitNewVersion }) => ({
+    checkCanCommitNewVersion,
+  }));
   const canSave = checkCanCommitNewVersion();
 
   if (canSave) {
@@ -99,9 +99,7 @@ export function NewVersionFields({
   // on a re-run. The handle therefore lives on a ref and is only dropped on
   // unmount; clearing it per effect run would swallow the generation whenever
   // the deps changed before the timeout fired.
-  const generateCommitMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const generateCommitMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const generateCommitMessageCallback = useCallback(
     (prevDsl: StudioWorkflow, newDsl: StudioWorkflow, options?: { force?: boolean }) => {
@@ -168,13 +166,7 @@ export function NewVersionFields({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    canSave,
-    previousVersion,
-    previousVersionDsl,
-    resolvedDefault.isFetched,
-    isModelConfigured,
-  ]);
+  }, [canSave, previousVersion, previousVersionDsl, resolvedDefault.isFetched, isModelConfigured]);
 
   useEffect(
     () => () => {
@@ -259,9 +251,7 @@ export function NewVersionFields({
                 },
               })}
               placeholder={
-                generateCommitMessage.isPending
-                  ? "Generating..."
-                  : "What changes have you made?"
+                generateCommitMessage.isPending ? "Generating..." : "What changes have you made?"
               }
               width="full"
               disabled={!canSave}

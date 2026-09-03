@@ -40,9 +40,7 @@ export const hasDSLChanged = (
     JSON.stringify(
       recursiveAlphabeticallySortedKeys(clearDsl(dslCurrent, includeExecutionStates)),
     ) !==
-    JSON.stringify(
-      recursiveAlphabeticallySortedKeys(clearDsl(dslPrevious, includeExecutionStates)),
-    )
+    JSON.stringify(recursiveAlphabeticallySortedKeys(clearDsl(dslPrevious, includeExecutionStates)))
   );
 };
 

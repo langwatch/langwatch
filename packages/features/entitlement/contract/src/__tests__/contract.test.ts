@@ -3,9 +3,7 @@ import { planSchema, type Plan, type PlanProvider } from "../index";
 
 describe("Entitlements contract", () => {
   it("exposes a provider-neutral plan", () => {
-    expectTypeOf<
-      Awaited<ReturnType<PlanProvider["getActivePlan"]>>
-    >().toEqualTypeOf<Plan>();
+    expectTypeOf<Awaited<ReturnType<PlanProvider["getActivePlan"]>>>().toEqualTypeOf<Plan>();
   });
 
   it("compiles and validates the provider-neutral plan schema", () => {

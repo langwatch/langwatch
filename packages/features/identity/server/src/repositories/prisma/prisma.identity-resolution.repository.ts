@@ -31,9 +31,7 @@ interface ResolutionRow {
  * carries no foreign key, which is the same reason its own repository keys
  * every query by migration name first.
  */
-export class PrismaIdentityResolutionRepository
-  implements IdentityResolutionPort
-{
+export class PrismaIdentityResolutionRepository implements IdentityResolutionPort {
   constructor(private readonly prisma: PrismaClient) {}
 
   async tryResolveByIdentifierValue({

@@ -43,9 +43,7 @@ export function getArchivedScenarioIds(
   if (!scenarios) return [];
 
   const activeIds = new Set(scenarios.map((scenario) => scenario.id));
-  return selectedScenarioIds
-    .filter((id) => !activeIds.has(id))
-    .map((id) => ({ id, name: id }));
+  return selectedScenarioIds.filter((id) => !activeIds.has(id)).map((id) => ({ id, name: id }));
 }
 
 export function getArchivedTargets(
@@ -98,10 +96,7 @@ export function filterScenarios(
   return filtered;
 }
 
-export function filterTargets(
-  availableTargets: SuiteFormAvailableTarget[],
-  search: string,
-) {
+export function filterTargets(availableTargets: SuiteFormAvailableTarget[], search: string) {
   if (!search.trim()) return availableTargets;
 
   const query = search.toLowerCase();

@@ -138,10 +138,9 @@ export function EvaluateModalContent({
     }),
   );
 
-  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
-    useModelProviderKeys({
-      workflow: getWorkflow(),
-    });
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } = useModelProviderKeys({
+    workflow: getWorkflow(),
+  });
 
   const entryNode = getWorkflow().nodes.find((node) => node.type === "entry") as
     | Node<Entry>
@@ -160,10 +159,7 @@ export function EvaluateModalContent({
 
   useEffect(() => {
     if (!evaluateOn) {
-      form.setValue(
-        "evaluateOn",
-        total && total > 50 ? splitOptions[1]! : splitOptions[0]!,
-      );
+      form.setValue("evaluateOn", total && total > 50 ? splitOptions[1]! : splitOptions[0]!);
     }
   }, [form, total, evaluateOn]);
 
@@ -236,13 +232,7 @@ export function EvaluateModalContent({
       deselectAllNodes();
       setOpenResultsPanelRequest("evaluations");
     }
-  }, [
-    evaluationState?.status,
-    hasStarted,
-    onClose,
-    deselectAllNodes,
-    setOpenResultsPanelRequest,
-  ]);
+  }, [evaluationState?.status, hasStarted, onClose, deselectAllNodes, setOpenResultsPanelRequest]);
 
   const onSubmit = useCallback(
     async ({ version, commitMessage, evaluateOn }: EvaluateForm) => {
@@ -313,8 +303,7 @@ export function EvaluateModalContent({
       startEvaluationExecution({
         workflow_version_id: versionId,
         evaluate_on: evaluateOn.value,
-        dataset_entry:
-          evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
+        dataset_entry: evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
       });
       setHasStarted(true);
     },
@@ -379,11 +368,7 @@ export function EvaluateModalContent({
                 name="evaluateOn"
                 rules={{ required: "Evaluate on is required" }}
                 render={({ field }) => (
-                  <DatasetSplitSelect
-                    field={field}
-                    options={splitOptions}
-                    total={total}
-                  />
+                  <DatasetSplitSelect field={field} options={splitOptions} total={total} />
                 )}
               />
             </VStack>
@@ -399,9 +384,7 @@ export function EvaluateModalContent({
             )}
             <HStack width="full">
               <Text fontWeight={500}>
-                {isDatasetLoading
-                  ? "Loading dataset..."
-                  : `${estimatedTotal ?? 0} entries`}
+                {isDatasetLoading ? "Loading dataset..." : `${estimatedTotal ?? 0} entries`}
               </Text>
               <Spacer />
               <Tooltip content={isDisabled}>
@@ -448,9 +431,7 @@ const DatasetSplitSelect = ({
         value={field.value?.value ? [field.value.value] : []}
         onChange={undefined}
         onValueChange={(change) => {
-          const selectedOption = options.find(
-            (option) => option.value === change.value[0],
-          );
+          const selectedOption = options.find((option) => option.value === change.value[0]);
           field.onChange({
             target: {
               name: field.name,

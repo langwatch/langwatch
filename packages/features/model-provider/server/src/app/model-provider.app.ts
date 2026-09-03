@@ -103,9 +103,7 @@ export class ModelProviderApp {
   }
 
   /** Every provider attached anywhere inside the organization, keys masked. */
-  listForOrganization(
-    input: ModelProviderListOrganizationInput,
-  ): Promise<ModelProviderSummary[]> {
+  listForOrganization(input: ModelProviderListOrganizationInput): Promise<ModelProviderSummary[]> {
     return this.dependencies.modelProviders.listForOrganization(input);
   }
 
@@ -118,10 +116,7 @@ export class ModelProviderApp {
   }
 
   /** Removes a provider row, attributed to the caller. */
-  delete(
-    input: Omit<ModelProviderDeleteInput, "actorId">,
-    by: ModelProviderCaller,
-  ): Promise<void> {
+  delete(input: Omit<ModelProviderDeleteInput, "actorId">, by: ModelProviderCaller): Promise<void> {
     return this.dependencies.modelProviders.delete({ ...input, actorId: by.id });
   }
 
@@ -268,10 +263,7 @@ export class ModelProviderApp {
   }
 
   /** Removes one cost rule, authorized against the STORED row's scope. */
-  deleteCost(
-    input: Omit<ModelCostDeleteInput, "actorId">,
-    by: ModelProviderCaller,
-  ): Promise<void> {
+  deleteCost(input: Omit<ModelCostDeleteInput, "actorId">, by: ModelProviderCaller): Promise<void> {
     return this.dependencies.modelProviders.deleteCost({ ...input, actorId: by.id });
   }
 

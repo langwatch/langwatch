@@ -208,10 +208,7 @@ export interface EvaluationRunRestPorts {
    * an unconfigured cascade is to fall back to the evaluator's own default, so
    * the distinction the exception carried has no consumer here.
    */
-  resolveModelForFeature(input: {
-    projectId: string;
-    featureKey: string;
-  }): Promise<string | null>;
+  resolveModelForFeature(input: { projectId: string; featureKey: string }): Promise<string | null>;
   /** Records what a run of an evaluator cost. */
   recordCost(input: {
     id: string;
@@ -346,7 +343,6 @@ export function createEvaluationsLegacyRestApp(options: {
   const { security, ports } = options;
   const secured = security.createServiceApp({ basePath: "/api" });
 
-
   // ---------- GET /api/evaluations/list ----------
   /**
    * The catalogue, built once.
@@ -409,7 +405,6 @@ export function createEvaluationsLegacyRestApp(options: {
       return c.json({ evaluators: evaluatorCatalogue });
     },
   );
-
 
   // The batch result log, where this process composed the experiment run
   // writer and the evaluation pipeline it dispatches onto.
@@ -515,10 +510,14 @@ export function createEvaluationsLegacyRestApp(options: {
           return c.json({ error: "Either experiment_id or experiment_slug is required" }, 400);
         }
 
-        if (params.timestamps?.created_at && params.timestamps.created_at.toString().length === 10) {
+        if (
+          params.timestamps?.created_at &&
+          params.timestamps.created_at.toString().length === 10
+        ) {
           return c.json(
             {
-              error: "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+              error:
+                "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
             },
             400,
           );
@@ -560,8 +559,6 @@ export function createEvaluationsLegacyRestApp(options: {
         return c.json({ message: "ok" });
       },
     );
-
-
   }
 
   // The four evaluate doors, where this process composed an evaluator
@@ -814,7 +811,11 @@ export function createEvaluationsLegacyRestApp(options: {
           checkType = evaluation;
         }
 
-        const evaluator = await getEvaluatorIncludingCustom(run, project.id, checkType as EvaluatorTypes);
+        const evaluator = await getEvaluatorIncludingCustom(
+          run,
+          project.id,
+          checkType as EvaluatorTypes,
+        );
         if (!evaluator) {
           return c.json({ error: `Evaluator not found: ${checkType}` }, 400);
         }
@@ -906,7 +907,6 @@ export function createEvaluationsLegacyRestApp(options: {
         return c.json(result);
       },
     );
-
   }
 
   return secured;

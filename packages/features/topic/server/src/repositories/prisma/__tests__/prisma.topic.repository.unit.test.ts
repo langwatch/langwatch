@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  PrismaTopicRepository,
-  type TopicDatabase,
-} from "../prisma.topic.repository";
+import { PrismaTopicRepository, type TopicDatabase } from "../prisma.topic.repository";
 
 const topicRows = [
   {

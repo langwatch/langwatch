@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { computeBTLeaderboard } from "@langwatch/experiment-web";
 import { computeParetoDominance } from "@langwatch/experiment-web";
-import type {
-  BTLeaderboard,
-  BTLeaderboardEntry,
-  VariantMetrics,
-} from "@langwatch/experiment-web";
+import type { BTLeaderboard, BTLeaderboardEntry, VariantMetrics } from "@langwatch/experiment-web";
 
 /**
  * Dominance is the one claim on the trade-off chart a reader acts on
@@ -171,9 +167,7 @@ describe("computeParetoDominance", () => {
     });
 
     it("leaves only the winner on the front", () => {
-      expect(computeParetoDominance({ leaderboard, variantMetrics }).front).toEqual([
-        "a",
-      ]);
+      expect(computeParetoDominance({ leaderboard, variantMetrics }).front).toEqual(["a"]);
     });
   });
 
@@ -191,9 +185,7 @@ describe("computeParetoDominance", () => {
     });
 
     it("still reports the variant as beaten outright", () => {
-      expect(
-        computeParetoDominance({ leaderboard, variantMetrics }).dominatedBy.b,
-      ).toEqual(["a"]);
+      expect(computeParetoDominance({ leaderboard, variantMetrics }).dominatedBy.b).toEqual(["a"]);
     });
 
     /** @scenario "Dominance is never claimed from a quality difference the run cannot see" */
@@ -311,9 +303,7 @@ describe("computeParetoDominance", () => {
       const dominance = computeParetoDominance({ leaderboard, variantMetrics });
 
       expect(dominance.dimensions).not.toContain("cost");
-      expect(dominance.edges.find((e) => e.loserId === "b")!.strictlyBetterOn).toEqual([
-        "quality",
-      ]);
+      expect(dominance.edges.find((e) => e.loserId === "b")!.strictlyBetterOn).toEqual(["quality"]);
     });
   });
 

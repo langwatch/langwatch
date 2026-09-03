@@ -10,11 +10,7 @@ export interface EvaluationSummary {
 export function formatEvaluationLines(evaluations: EvaluationSummary[]): string[] {
   return evaluations.map((evaluation) => {
     const status =
-      evaluation.passed === true
-        ? "PASSED"
-        : evaluation.passed === false
-          ? "FAILED"
-          : "N/A";
+      evaluation.passed === true ? "PASSED" : evaluation.passed === false ? "FAILED" : "N/A";
     return `- **${evaluation.name || evaluation.evaluator_id}**: ${status}${evaluation.score != null ? ` (score: ${evaluation.score})` : ""}${evaluation.label ? ` [${evaluation.label}]` : ""}`;
   });
 }

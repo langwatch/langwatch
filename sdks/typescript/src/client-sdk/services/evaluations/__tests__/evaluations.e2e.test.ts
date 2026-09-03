@@ -53,8 +53,7 @@ describe("Evaluations E2E", () => {
 
   describe("evaluate()", () => {
     it("runs a basic evaluator successfully", async () => {
-      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service"))
-        return;
+      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
 
       const result = await langwatch.evaluations.evaluate("presidio/pii_detection", {
         data: {
@@ -68,8 +67,7 @@ describe("Evaluations E2E", () => {
     });
 
     it("runs evaluator as guardrail", async () => {
-      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service"))
-        return;
+      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
 
       const result = await langwatch.evaluations.evaluate("presidio/pii_detection", {
         data: {
@@ -84,8 +82,7 @@ describe("Evaluations E2E", () => {
     });
 
     it("handles custom settings", async () => {
-      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service"))
-        return;
+      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
 
       const result = await langwatch.evaluations.evaluate("presidio/pii_detection", {
         data: {
@@ -127,8 +124,7 @@ describe("Evaluations E2E", () => {
     });
 
     it("returns valid result structure for PII detection", async () => {
-      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service"))
-        return;
+      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
 
       const result = await langwatch.evaluations.evaluate("presidio/pii_detection", {
         data: {

@@ -41,9 +41,7 @@ describe("fallbackSuggestionsFor", () => {
   it("points a missing default model at the Default Models settings page", () => {
     const explanation = fallbackSuggestionsFor("model_not_configured");
 
-    expect(
-      explanation?.suggestions.some((s) => s.includes("Default Models")),
-    ).toBe(true);
+    expect(explanation?.suggestions.some((s) => s.includes("Default Models"))).toBe(true);
     expect(explanation?.docUrl).toContain("/platform/model-providers");
   });
 
@@ -63,9 +61,7 @@ describe("withFallbackSuggestions", () => {
       domain({ code: "missing_api_key", kind: "missing_api_key" }),
     );
 
-    expect(enriched.suggestions).toEqual(
-      fallbackSuggestionsFor("missing_api_key")?.suggestions,
-    );
+    expect(enriched.suggestions).toEqual(fallbackSuggestionsFor("missing_api_key")?.suggestions);
     expect(enriched.docUrl).toBe("https://langwatch.ai/docs/integration/cli");
   });
 
@@ -103,9 +99,7 @@ describe("withFallbackSuggestions", () => {
       }),
     );
 
-    expect(docUrlOnly.suggestions).toEqual(
-      fallbackSuggestionsFor("missing_api_key")?.suggestions,
-    );
+    expect(docUrlOnly.suggestions).toEqual(fallbackSuggestionsFor("missing_api_key")?.suggestions);
     expect(docUrlOnly.docUrl).toBe("https://langwatch.ai/docs/server-page");
   });
 

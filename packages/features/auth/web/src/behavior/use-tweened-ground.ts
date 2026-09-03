@@ -56,9 +56,7 @@ export function useTweenedGround(
     const step = () => {
       const elapsed = performance.now() - startedAt;
       const t = Math.min(1, elapsed / GROUND_TWEEN_MS);
-      setCurrent(
-        t >= 1 ? target : mixGroundShift(from, target, easeInOutCubic(t)),
-      );
+      setCurrent(t >= 1 ? target : mixGroundShift(from, target, easeInOutCubic(t)));
       if (t < 1) frame = requestAnimationFrame(step);
     };
 

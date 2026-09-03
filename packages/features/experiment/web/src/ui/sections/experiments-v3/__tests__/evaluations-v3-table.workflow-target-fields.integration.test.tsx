@@ -212,9 +212,7 @@ describe("Workflow agent target fields", () => {
         });
 
         await waitFor(() => {
-          expect(targetInStore()?.inputs).toEqual([
-            { identifier: "question", type: "str" },
-          ]);
+          expect(targetInStore()?.inputs).toEqual([{ identifier: "question", type: "str" }]);
         });
       });
 
@@ -229,9 +227,7 @@ describe("Workflow agent target fields", () => {
         await waitFor(() => {
           expect(targetInStore()?.outputs).toHaveLength(2);
         });
-        expect(
-          useEvaluationsV3Store.temporal.getState().pastStates,
-        ).toHaveLength(0);
+        expect(useEvaluationsV3Store.temporal.getState().pastStates).toHaveLength(0);
       });
     });
 
@@ -258,8 +254,7 @@ describe("Workflow agent target fields", () => {
         await user.click(screen.getByText("Edit Configuration"));
 
         expect(openedDrawerType).toBe("evaluatorEditor");
-        const sources = openedDrawerParams.mappingsConfig
-          ?.availableSources as AvailableSource[];
+        const sources = openedDrawerParams.mappingsConfig?.availableSources as AvailableSource[];
         expect(sources[0]?.name).toBe("wf agent");
         expect(sources[0]?.fields).toEqual([
           { name: "output", type: "str" },
@@ -355,9 +350,7 @@ describe("Workflow agent target fields", () => {
             fieldsResolved: true,
           },
         ];
-        seed(
-          workflowTarget({ outputs: [{ identifier: "output", type: "str" }] }),
-        );
+        seed(workflowTarget({ outputs: [{ identifier: "output", type: "str" }] }));
 
         render(<EvaluationsV3Table disableVirtualization />, {
           wrapper: Wrapper,
@@ -376,8 +369,7 @@ describe("Workflow agent target fields", () => {
         });
         await user.click(screen.getByText("Edit Configuration"));
 
-        const sources = openedDrawerParams.mappingsConfig
-          ?.availableSources as AvailableSource[];
+        const sources = openedDrawerParams.mappingsConfig?.availableSources as AvailableSource[];
         expect(sources[0]?.fields).toEqual([]);
       });
     });

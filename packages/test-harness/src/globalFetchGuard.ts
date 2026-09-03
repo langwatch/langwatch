@@ -27,9 +27,7 @@ export function guardAgainstGlobalFetch(): void {
     original = Object.getOwnPropertyDescriptor(globalThis, "fetch");
     Object.defineProperty(globalThis, "fetch", {
       value: vi.fn(() => {
-        throw new Error(
-          "this code must call undici's fetch, not the global fetch",
-        );
+        throw new Error("this code must call undici's fetch, not the global fetch");
       }),
       configurable: true,
       writable: true,

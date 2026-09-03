@@ -71,8 +71,7 @@ const KEYED_MESSAGES: Record<string, string> = {
   // actually look at.
   invalid_origin:
     "LangWatch is set up for a different web address than the one you are using. Check the address and try again.",
-  user_already_exists:
-    "An account with that email already exists. Try signing in instead.",
+  user_already_exists: "An account with that email already exists. Try signing in instead.",
   email_not_verified: "Verify your email address before signing in.",
 };
 
@@ -102,12 +101,8 @@ const registryMessage = (key: string): string | null => {
     traceId: undefined,
   });
   if (!explanation) return null;
-  const title = explanation.title.endsWith(".")
-    ? explanation.title
-    : `${explanation.title}.`;
-  return explanation.description
-    ? `${title} ${explanation.description}`
-    : title;
+  const title = explanation.title.endsWith(".") ? explanation.title : `${explanation.title}.`;
+  return explanation.description ? `${title} ${explanation.description}` : title;
 };
 
 /**
@@ -146,10 +141,7 @@ export const authFailureMessage = ({
   // registry has no entry for them. The registry BEFORE the status class,
   // because a platform refusal with named copy must not be flattened into
   // "something went wrong on our side" by its own 5xx.
-  const keyed =
-    KEYED_MESSAGES[key] ??
-    registryMessage(key) ??
-    statusClassMessage(status, key);
+  const keyed = KEYED_MESSAGES[key] ?? registryMessage(key) ?? statusClassMessage(status, key);
   if (keyed) {
     return keyed;
   }

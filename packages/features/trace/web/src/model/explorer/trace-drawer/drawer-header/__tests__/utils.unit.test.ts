@@ -27,9 +27,7 @@ describe("readNumberAttribute", () => {
   describe("given a reserved sum and a raw per-span key are both offered", () => {
     describe("when only the raw key is present", () => {
       it("falls through to it, so a trace folded before the sum landed still reads", () => {
-        expect(
-          readNumberAttribute({ [RAW_PER_SPAN]: "10" }, RESERVED_SUM, RAW_PER_SPAN),
-        ).toBe(10);
+        expect(readNumberAttribute({ [RAW_PER_SPAN]: "10" }, RESERVED_SUM, RAW_PER_SPAN)).toBe(10);
       });
     });
 
@@ -61,9 +59,7 @@ describe("readNumberAttribute", () => {
   describe("given none of the requested keys are present", () => {
     describe("when the value is read", () => {
       it("returns null rather than zero, which a caller would render as a real reading", () => {
-        expect(
-          readNumberAttribute({}, "langwatch.reserved.context_size_tokens"),
-        ).toBeNull();
+        expect(readNumberAttribute({}, "langwatch.reserved.context_size_tokens")).toBeNull();
       });
     });
   });

@@ -64,10 +64,7 @@ export const PRODUCTS: readonly ProductDefinition[] = [
     icon: Waypoints,
     scopeKind: "organization",
     homeHref: () => "/gateway/virtual-keys",
-    gates: [
-      { flag: "release_ui_ai_gateway_menu_enabled" },
-      { permission: "virtualKeys:view" },
-    ],
+    gates: [{ flag: "release_ui_ai_gateway_menu_enabled" }, { permission: "virtualKeys:view" }],
   },
   {
     id: "governance",
@@ -76,10 +73,7 @@ export const PRODUCTS: readonly ProductDefinition[] = [
     icon: Building2,
     scopeKind: "organization",
     homeHref: () => "/governance",
-    gates: [
-      { flag: "release_ui_ai_governance_enabled" },
-      { permission: "governance:view" },
-    ],
+    gates: [{ flag: "release_ui_ai_governance_enabled" }, { permission: "governance:view" }],
   },
 ];
 
@@ -95,13 +89,7 @@ export function productById(id: ProductId): ProductDefinition {
  * "metadata" as the Me product and "settings-team" as Settings, because a
  * project slug is a top-level address and those names are not reserved.
  */
-export function isPathUnder({
-  pathname,
-  base,
-}: {
-  pathname: string;
-  base: string;
-}): boolean {
+export function isPathUnder({ pathname, base }: { pathname: string; base: string }): boolean {
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
@@ -150,8 +138,5 @@ export function productFromPathname(pathname: string): ProductId | null {
  * Spec: specs/navigation/ops-navigation-v2.feature
  */
 export function isSettingsShellRoute(pathname: string): boolean {
-  return (
-    isPathUnder({ pathname, base: "/settings" }) ||
-    isPathUnder({ pathname, base: "/ops" })
-  );
+  return isPathUnder({ pathname, base: "/settings" }) || isPathUnder({ pathname, base: "/ops" });
 }

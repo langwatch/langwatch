@@ -17,9 +17,7 @@ export function useLangyTraceViewContext(): LangyContextChip {
   const activeLens = useViewStore((state) =>
     state.allLenses.find((lens) => lens.id === state.activeLensId),
   );
-  const hasLocalChanges = useViewStore((state) =>
-    state.draftState.has(state.activeLensId),
-  );
+  const hasLocalChanges = useViewStore((state) => state.draftState.has(state.activeLensId));
   const grouping = useViewStore((state) => state.grouping);
   const sort = useViewStore((state) => state.sort);
 

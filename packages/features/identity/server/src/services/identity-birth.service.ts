@@ -11,7 +11,11 @@ import { deriveNewbornUserId } from "../crypto/identifier-identity";
 import { type IdentityGuards } from "../guards";
 import { adoptUserEmailCommandId } from "../identity-command-id";
 import { type IdentityReservationRepository } from "../identity-reservations.repository";
-import { IdentityEngineUnavailableError, type IdentityBirthPort, type IdentityNewborn } from "../better-auth/identity-birth";
+import {
+  IdentityEngineUnavailableError,
+  type IdentityBirthPort,
+  type IdentityNewborn,
+} from "../better-auth/identity-birth";
 import { createLogger } from "@langwatch/observability";
 import type { IdentityEvent } from "../adapters/identity-pipeline-definition.adapter";
 import { identityEventsFor } from "../adapters/identity-pipeline-definition.adapter";

@@ -38,9 +38,7 @@ export function CacheRuleCreateDrawer({ open, onOpenChange, onCreated }: Props) 
   });
 
   const [state, setState] = useState<CacheRuleFormState>(emptyFormState());
-  const [fieldComplaint, setFieldComplaint] = useState<CacheRuleFormComplaint | null>(
-    null,
-  );
+  const [fieldComplaint, setFieldComplaint] = useState<CacheRuleFormComplaint | null>(null);
 
   const handleClose = () => {
     if (createMutation.isPending) return;
@@ -103,11 +101,7 @@ export function CacheRuleCreateDrawer({ open, onOpenChange, onCreated }: Props) 
         <Drawer.Footer>
           <HStack width="full">
             <Spacer />
-            <Button
-              variant="ghost"
-              onClick={handleClose}
-              disabled={createMutation.isPending}
-            >
+            <Button variant="ghost" onClick={handleClose} disabled={createMutation.isPending}>
               Cancel
             </Button>
             <Button

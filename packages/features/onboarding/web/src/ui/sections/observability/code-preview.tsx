@@ -89,24 +89,14 @@ export function CodePreview({
   const { colorMode } = useColorMode();
   const [internalIsVisible, setInternalIsVisible] = useState(false);
 
-  const isVisible =
-    controlledIsVisible !== void 0 ? controlledIsVisible : internalIsVisible;
+  const isVisible = controlledIsVisible !== void 0 ? controlledIsVisible : internalIsVisible;
 
   const shikiAdapter = useMemo(() => {
     return createShikiAdapter<HighlighterGeneric<any, any>>({
       async load() {
         const { createHighlighter } = await import("shiki");
         return createHighlighter({
-          langs: [
-            "typescript",
-            "python",
-            "go",
-            "yaml",
-            "bash",
-            "json",
-            "ini",
-            "shellscript",
-          ],
+          langs: ["typescript", "python", "go", "yaml", "bash", "json", "ini", "shellscript"],
           themes: ["github-dark", "github-light"],
         });
       },
@@ -169,11 +159,7 @@ export function CodePreview({
             boxShadow="0 4px 30px rgba(0,0,0,0.06)"
             overflow="hidden"
           >
-            <CodeBlock.Header
-              display="flex"
-              justifyContent="space-between"
-              borderColor="gray.200"
-            >
+            <CodeBlock.Header display="flex" justifyContent="space-between" borderColor="gray.200">
               <CodeBlock.Title fontSize="xs" pt={2}>
                 {languageIconUrl ? (
                   <Icon size="xs">
@@ -193,9 +179,7 @@ export function CodePreview({
                     surrounding banner instead. */}
                 {!disableActions && enableVisibilityToggle && (
                   <Tooltip
-                    content={
-                      isVisible ? "Hide sensitive values" : "Show sensitive values"
-                    }
+                    content={isVisible ? "Hide sensitive values" : "Show sensitive values"}
                     openDelay={0}
                     showArrow
                   >
@@ -203,20 +187,14 @@ export function CodePreview({
                       size="2xs"
                       variant="ghost"
                       onClick={toggleVisibility}
-                      aria-label={
-                        isVisible ? "Hide sensitive values" : "Show sensitive values"
-                      }
+                      aria-label={isVisible ? "Hide sensitive values" : "Show sensitive values"}
                     >
                       {isVisible ? <EyeOff /> : <Eye />}
                     </IconButton>
                   </Tooltip>
                 )}
                 {!disableActions && llmPrompt && (
-                  <Tooltip
-                    content="Copy LLM-optimized integration prompt"
-                    openDelay={0}
-                    showArrow
-                  >
+                  <Tooltip content="Copy LLM-optimized integration prompt" openDelay={0} showArrow>
                     <IconButton
                       size="2xs"
                       variant="ghost"
@@ -227,9 +205,7 @@ export function CodePreview({
                     </IconButton>
                   </Tooltip>
                 )}
-                {!disableActions && (
-                  <SnippetCopyControl copyText={copyText} filename={filename} />
-                )}
+                {!disableActions && <SnippetCopyControl copyText={copyText} filename={filename} />}
               </HStack>
             </CodeBlock.Header>
             <CodeBlock.Content

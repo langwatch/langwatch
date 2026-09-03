@@ -46,9 +46,7 @@ function SortChip({
           ? "var(--chakra-colors-orange-500)"
           : "var(--chakra-colors-border-muted)",
         backgroundColor: active ? "var(--chakra-colors-orange-50)" : "transparent",
-        color: active
-          ? "var(--chakra-colors-orange-700)"
-          : "var(--chakra-colors-fg-muted)",
+        color: active ? "var(--chakra-colors-orange-700)" : "var(--chakra-colors-fg-muted)",
         fontSize: 12,
         fontWeight: 500,
         cursor: "pointer",
@@ -113,8 +111,8 @@ function GovernanceUsersListPage() {
             </Text>
             <Heading size="md">All users by {SORT_LABEL[sortBy]}</Heading>
             <Text color="fg.muted" fontSize="sm">
-              Every LangWatch member that reported activity in the last 30 days. Click a
-              row to drill into a single user.
+              Every LangWatch member that reported activity in the last 30 days. Click a row to
+              drill into a single user.
             </Text>
           </VStack>
         </HStack>
@@ -164,17 +162,10 @@ function UserSpendPanel({
         <Text fontSize="sm" color="fg.muted" id="sort-by-label">
           Sort by:
         </Text>
-        <SortChips
-          value={sortBy}
-          onChange={onSortChange}
-          ariaLabelledBy="sort-by-label"
-        />
+        <SortChips value={sortBy} onChange={onSortChange} ariaLabelledBy="sort-by-label" />
       </HStack>
 
-      <HandledErrorAlert
-        error={usersQuery.error}
-        fallbackTitle="Couldn't load member activity"
-      />
+      <HandledErrorAlert error={usersQuery.error} fallbackTitle="Couldn't load member activity" />
 
       <VStack
         align="stretch"
@@ -260,8 +251,7 @@ function Header() {
 
 function Row({ user }: { user: SpendByUser }) {
   const dotColor = getHexColorForString(user.actor);
-  const arrow =
-    user.trendVsPreviousPct > 0 ? "↑" : user.trendVsPreviousPct < 0 ? "↓" : "·";
+  const arrow = user.trendVsPreviousPct > 0 ? "↑" : user.trendVsPreviousPct < 0 ? "↓" : "·";
   const trendColor = !user.hasPriorBaseline
     ? "fg.muted"
     : user.trendVsPreviousPct > 25
@@ -303,9 +293,7 @@ function Row({ user }: { user: SpendByUser }) {
           {fmtRelative(user.lastActivityIso)}
         </Box>
         <Box flex={2} color={trendColor}>
-          {user.hasPriorBaseline
-            ? `${arrow} ${fmtTrendPct(user.trendVsPreviousPct)}`
-            : "—"}
+          {user.hasPriorBaseline ? `${arrow} ${fmtTrendPct(user.trendVsPreviousPct)}` : "—"}
         </Box>
         <Box flex={2} color="fg.muted">
           {user.mostUsedTarget}

@@ -25,11 +25,7 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types";
 import { api } from "../../behavior/organization-api";
 import { getDefaultTeamRoleForOrganizationRole } from "../../model/member-role-constraints";
-import type {
-  InviteData,
-  MembersForm,
-  TeamAssignment,
-} from "../../model/member-invite-form";
+import type { InviteData, MembersForm, TeamAssignment } from "../../model/member-invite-form";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
 import {
   LITE_MEMBER_EXPLANATION,
@@ -191,10 +187,7 @@ export function AddMembersForm({
           customRoleId: undefined,
         };
       }
-      if (
-        data.orgRole === OrganizationUserRole.MEMBER &&
-        team.role === TeamUserRole.VIEWER
-      ) {
+      if (data.orgRole === OrganizationUserRole.MEMBER && team.role === TeamUserRole.VIEWER) {
         return { ...team, role: TeamUserRole.MEMBER, customRoleId: undefined };
       }
       return team;
@@ -227,9 +220,7 @@ export function AddMembersForm({
                     .map((e) => e.trim())
                     .filter(Boolean);
                   if (emails.length === 0) return "At least one email is required";
-                  const invalid = emails.find(
-                    (e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e),
-                  );
+                  const invalid = emails.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
                   if (invalid) return `Invalid email: ${invalid}`;
                   return true;
                 },
@@ -359,9 +350,7 @@ export function AddMembersForm({
 
         {teamFields.length === 0 && (
           <VStack align="start" gap={2} width="100%">
-            {orgRole === OrganizationUserRole.EXTERNAL && (
-              <LiteMemberNeedsTeamWarning />
-            )}
+            {orgRole === OrganizationUserRole.EXTERNAL && <LiteMemberNeedsTeamWarning />}
             <HStack gap={2}>
               <Button
                 type="button"
@@ -380,11 +369,7 @@ export function AddMembersForm({
           <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
             {onCloseText}
           </Button>
-          <Button
-            colorPalette={isLoading ? "gray" : "orange"}
-            type="submit"
-            disabled={isLoading}
-          >
+          <Button colorPalette={isLoading ? "gray" : "orange"} type="submit" disabled={isLoading}>
             <HStack>
               {isLoading ? <Spinner size="sm" /> : <Mail size={18} />}
               <Text>{hasEmailProvider ? "Send invites" : "Create invites"}</Text>
@@ -458,10 +443,7 @@ function getFilteredTeamRoles(
   if (orgRole === OrganizationUserRole.EXTERNAL) return [teamRolesOptions.VIEWER];
   if (orgRole === OrganizationUserRole.MEMBER) {
     if (!isInviterAdmin) return [teamRolesOptions.MEMBER];
-    return [
-      ...baseRoles.filter((r) => r.value !== TeamUserRole.VIEWER),
-      ...customRoleOptions,
-    ];
+    return [...baseRoles.filter((r) => r.value !== TeamUserRole.VIEWER), ...customRoleOptions];
   }
   return [...baseRoles, ...customRoleOptions];
 }
@@ -488,10 +470,7 @@ function TeamRoleSelect({
     [orgRole, customRoles.data, isInviterAdmin],
   );
 
-  const roleCollection = useMemo(
-    () => createListCollection({ items: roleOptions }),
-    [roleOptions],
-  );
+  const roleCollection = useMemo(() => createListCollection({ items: roleOptions }), [roleOptions]);
 
   return (
     <Controller

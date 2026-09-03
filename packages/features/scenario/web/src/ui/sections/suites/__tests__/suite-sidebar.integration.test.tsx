@@ -23,10 +23,7 @@ vi.mock("posthog-js", () => ({
 
 import { NowContext } from "../../../../behavior/use-now";
 import { SUITE_SIDEBAR_COLLAPSED_KEY, SuiteSidebar } from "../suite-sidebar";
-import {
-  ALL_RUNS_ID,
-  toExternalSetSelection,
-} from "../../../../behavior/suites/use-suite-routing";
+import { ALL_RUNS_ID, toExternalSetSelection } from "../../../../behavior/suites/use-suite-routing";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -54,9 +51,7 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   };
 }
 
-function makeExternalSet(
-  overrides: Partial<ExternalSetSummary> = {},
-): ExternalSetSummary {
+function makeExternalSet(overrides: Partial<ExternalSetSummary> = {}): ExternalSetSummary {
   return {
     scenarioSetId: "nightly-regression",
     passedCount: 10,
@@ -90,9 +85,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.queryByTestId("external-sets-header"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("external-sets-header")).not.toBeInTheDocument();
     });
   });
 
@@ -113,9 +106,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByTestId("external-sets-header")).toHaveTextContent(
-        "EXTERNAL SETS",
-      );
+      expect(screen.getByTestId("external-sets-header")).toHaveTextContent("EXTERNAL SETS");
     });
 
     /** @scenario "External set batch entry displays the set name" */
@@ -155,9 +146,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
-            externalSets={[
-              makeExternalSet({ passedCount: 10, totalCount: 10 }),
-            ]}
+            externalSets={[makeExternalSet({ passedCount: 10, totalCount: 10 })]}
           />,
           { wrapper: Wrapper },
         );
@@ -197,9 +186,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         );
 
         await user.click(screen.getByText("nightly-regression"));
-        expect(onSelectSuite).toHaveBeenCalledWith(
-          toExternalSetSelection("nightly-regression"),
-        );
+        expect(onSelectSuite).toHaveBeenCalledWith(toExternalSetSelection("nightly-regression"));
       });
     });
 
@@ -233,9 +220,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         );
 
         const listItems = screen.getAllByTestId("external-set-list-item");
-        const unselectedItem = listItems.find((item) =>
-          within(item).queryByText("ci-smoke-tests"),
-        );
+        const unselectedItem = listItems.find((item) => within(item).queryByText("ci-smoke-tests"));
         expect(unselectedItem).toBeDefined();
         expect(unselectedItem).not.toHaveAttribute("data-selected");
       });
@@ -256,14 +241,9 @@ describe("<SuiteSidebar/> External Sets", () => {
       it("shows matching suites", async () => {
         const user = userEvent.setup();
 
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            externalSets={externalSets}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />, {
+          wrapper: Wrapper,
+        });
 
         await user.type(screen.getByPlaceholderText("Search..."), "billing");
         expect(screen.getByText("Billing Tests")).toBeInTheDocument();
@@ -272,14 +252,9 @@ describe("<SuiteSidebar/> External Sets", () => {
       it("shows matching external sets", async () => {
         const user = userEvent.setup();
 
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            externalSets={externalSets}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />, {
+          wrapper: Wrapper,
+        });
 
         await user.type(screen.getByPlaceholderText("Search..."), "billing");
         expect(screen.getByText("billing-ci")).toBeInTheDocument();
@@ -290,24 +265,14 @@ describe("<SuiteSidebar/> External Sets", () => {
       it("hides both sections and shows no matching message", async () => {
         const user = userEvent.setup();
 
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            externalSets={externalSets}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />, {
+          wrapper: Wrapper,
+        });
 
-        await user.type(
-          screen.getByPlaceholderText("Search..."),
-          "zzz-no-match",
-        );
+        await user.type(screen.getByPlaceholderText("Search..."), "zzz-no-match");
         expect(screen.queryByText("Billing Tests")).not.toBeInTheDocument();
         expect(screen.queryByText("billing-ci")).not.toBeInTheDocument();
-        expect(
-          screen.queryByTestId("external-sets-header"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("external-sets-header")).not.toBeInTheDocument();
         expect(screen.getByText("No matching run plans")).toBeInTheDocument();
       });
     });
@@ -388,9 +353,7 @@ describe("<SuiteSidebar/> External Sets", () => {
       );
 
       const items = screen.getAllByTestId("external-set-list-item");
-      expect(
-        within(items[0]!).queryByTestId("suite-menu-button"),
-      ).not.toBeInTheDocument();
+      expect(within(items[0]!).queryByTestId("suite-menu-button")).not.toBeInTheDocument();
     });
   });
 
@@ -470,11 +433,7 @@ describe("<SuiteSidebar/>", () => {
     describe("when a suite is selected", () => {
       it("highlights the selected suite", () => {
         render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            selectedSuiteSlug="billing-edge"
-          />,
+          <SuiteSidebar {...defaultProps} suites={suites} selectedSuiteSlug="billing-edge" />,
           { wrapper: Wrapper },
         );
 
@@ -488,14 +447,9 @@ describe("<SuiteSidebar/>", () => {
         const user = userEvent.setup();
         const onSelectSuite = vi.fn();
 
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            onSelectSuite={onSelectSuite}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} onSelectSuite={onSelectSuite} />, {
+          wrapper: Wrapper,
+        });
 
         await user.click(screen.getByText("Critical Path"));
         expect(onSelectSuite).toHaveBeenCalledWith("critical-path");
@@ -507,14 +461,9 @@ describe("<SuiteSidebar/>", () => {
         const user = userEvent.setup();
         const onRunSuite = vi.fn();
 
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            onRunSuite={onRunSuite}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} onRunSuite={onRunSuite} />, {
+          wrapper: Wrapper,
+        });
 
         const runButtons = screen.getAllByText("Run");
         // Click the first suite's Run button
@@ -528,21 +477,13 @@ describe("<SuiteSidebar/>", () => {
         const user = userEvent.setup();
         const onContextMenu = vi.fn();
 
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            onContextMenu={onContextMenu}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} onContextMenu={onContextMenu} />, {
+          wrapper: Wrapper,
+        });
 
         const suiteItem = screen.getByText("Critical Path");
         await user.pointer({ keys: "[MouseRight]", target: suiteItem });
-        expect(onContextMenu).toHaveBeenCalledWith(
-          expect.any(Object),
-          "suite_1",
-        );
+        expect(onContextMenu).toHaveBeenCalledWith(expect.any(Object), "suite_1");
       });
     });
 
@@ -554,9 +495,7 @@ describe("<SuiteSidebar/>", () => {
 
         // The icon itself is aria-hidden; the input carries the "Search"
         // accessible name instead — see specs/components/search-input.feature.
-        expect(
-          screen.getByRole("searchbox", { name: "Search" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("searchbox", { name: "Search" })).toBeInTheDocument();
       });
     });
 
@@ -637,27 +576,17 @@ describe("<SuiteSidebar/>", () => {
       ]);
 
       it("displays pass count", () => {
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            runSummaries={runSummaries}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />, {
+          wrapper: Wrapper,
+        });
 
         expect(screen.getByText(/8 passed/)).toBeInTheDocument();
       });
 
       it("displays pass rate with circle", () => {
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            runSummaries={runSummaries}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />, {
+          wrapper: Wrapper,
+        });
 
         expect(screen.getByText("100%")).toBeInTheDocument();
       });
@@ -672,14 +601,9 @@ describe("<SuiteSidebar/>", () => {
         vi.useFakeTimers();
         vi.setSystemTime(FIXED_NOW);
         try {
-          render(
-            <SuiteSidebar
-              {...defaultProps}
-              suites={suites}
-              runSummaries={runSummaries}
-            />,
-            { wrapper: NowWrapper },
-          );
+          render(<SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />, {
+            wrapper: NowWrapper,
+          });
 
           const suiteItems = screen.getAllByTestId("suite-list-item");
           const texts = suiteItems.map((el) => el.textContent).join(" ");
@@ -704,27 +628,17 @@ describe("<SuiteSidebar/>", () => {
       ]);
 
       it("displays pass count", () => {
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            runSummaries={runSummaries}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />, {
+          wrapper: Wrapper,
+        });
 
         expect(screen.getByText(/9 passed/)).toBeInTheDocument();
       });
 
       it("displays pass rate reflecting failures", () => {
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            runSummaries={runSummaries}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} runSummaries={runSummaries} />, {
+          wrapper: Wrapper,
+        });
 
         expect(screen.getByText("75%")).toBeInTheDocument();
       });
@@ -744,12 +658,8 @@ describe("<SuiteSidebar/>", () => {
           wrapper: Wrapper,
         });
 
-        expect(
-          screen.queryByTestId("status-icon-pass"),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByTestId("status-icon-fail"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("status-icon-pass")).not.toBeInTheDocument();
+        expect(screen.queryByTestId("status-icon-fail")).not.toBeInTheDocument();
       });
     });
 
@@ -768,11 +678,7 @@ describe("<SuiteSidebar/>", () => {
         ]);
 
         const { rerender } = render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            runSummaries={initialSummaries}
-          />,
+          <SuiteSidebar {...defaultProps} suites={suites} runSummaries={initialSummaries} />,
           { wrapper: Wrapper },
         );
 
@@ -792,11 +698,7 @@ describe("<SuiteSidebar/>", () => {
 
         rerender(
           <Wrapper>
-            <SuiteSidebar
-              {...defaultProps}
-              suites={suites}
-              runSummaries={updatedSummaries}
-            />
+            <SuiteSidebar {...defaultProps} suites={suites} runSummaries={updatedSummaries} />
           </Wrapper>,
         );
 
@@ -885,14 +787,9 @@ describe("<SuiteSidebar/>", () => {
         const user = userEvent.setup();
         const onContextMenu = vi.fn();
 
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            onContextMenu={onContextMenu}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} onContextMenu={onContextMenu} />, {
+          wrapper: Wrapper,
+        });
 
         const suiteItem = screen
           .getByText("Critical Path")
@@ -902,10 +799,7 @@ describe("<SuiteSidebar/>", () => {
         const menuButton = screen.getByTestId("suite-menu-button");
         await user.click(menuButton);
 
-        expect(onContextMenu).toHaveBeenCalledWith(
-          expect.any(Object),
-          "suite_1",
-        );
+        expect(onContextMenu).toHaveBeenCalledWith(expect.any(Object), "suite_1");
       });
     });
   });
@@ -950,9 +844,7 @@ describe("<SuiteSidebar/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.getByRole("button", { name: "Collapse sidebar" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
     });
   });
 
@@ -991,9 +883,7 @@ describe("<SuiteSidebar/>", () => {
       it("displays the collapse button", () => {
         renderSidebar();
 
-        expect(
-          screen.getByRole("button", { name: "Collapse sidebar" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeInTheDocument();
       });
     });
 
@@ -1001,21 +891,15 @@ describe("<SuiteSidebar/>", () => {
       it("hides search box", async () => {
         const { user } = renderSidebar();
 
-        await user.click(
-          screen.getByRole("button", { name: "Collapse sidebar" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
 
-        expect(
-          screen.queryByPlaceholderText("Search..."),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
       });
 
       it("shows suite avatar icons", async () => {
         const { user } = renderSidebar();
 
-        await user.click(
-          screen.getByRole("button", { name: "Collapse sidebar" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
 
         expect(screen.getByText("C")).toBeInTheDocument();
         expect(screen.getByText("B")).toBeInTheDocument();
@@ -1024,33 +908,23 @@ describe("<SuiteSidebar/>", () => {
       it("shows the expand button", async () => {
         const { user } = renderSidebar();
 
-        await user.click(
-          screen.getByRole("button", { name: "Collapse sidebar" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
 
-        expect(
-          screen.getByRole("button", { name: "Expand sidebar" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
       });
 
       it("shows the all runs icon button", async () => {
         const { user } = renderSidebar();
 
-        await user.click(
-          screen.getByRole("button", { name: "Collapse sidebar" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
 
-        expect(
-          screen.getByRole("button", { name: "All Runs" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "All Runs" })).toBeInTheDocument();
       });
 
       it("persists collapsed state to localStorage", async () => {
         const { user } = renderSidebar();
 
-        await user.click(
-          screen.getByRole("button", { name: "Collapse sidebar" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
 
         expect(localStorage.getItem(SUITE_SIDEBAR_COLLAPSED_KEY)).toBe("true");
       });
@@ -1060,12 +934,8 @@ describe("<SuiteSidebar/>", () => {
       it("restores search box", async () => {
         const { user } = renderSidebar();
 
-        await user.click(
-          screen.getByRole("button", { name: "Collapse sidebar" }),
-        );
-        await user.click(
-          screen.getByRole("button", { name: "Expand sidebar" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+        await user.click(screen.getByRole("button", { name: "Expand sidebar" }));
 
         expect(screen.getByPlaceholderText("Search...")).toBeInTheDocument();
       });
@@ -1075,9 +945,7 @@ describe("<SuiteSidebar/>", () => {
       it("navigates to that suite", async () => {
         const { user, props } = renderSidebar();
 
-        await user.click(
-          screen.getByRole("button", { name: "Collapse sidebar" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
         await user.click(screen.getByRole("button", { name: "Critical Path" }));
 
         expect(props.onSelectSuite).toHaveBeenCalledWith("critical-path");
@@ -1089,16 +957,10 @@ describe("<SuiteSidebar/>", () => {
         const { user } = renderSidebar();
 
         await user.type(screen.getByPlaceholderText("Search..."), "Critical");
-        await user.click(
-          screen.getByRole("button", { name: "Collapse sidebar" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
 
-        expect(
-          screen.getByRole("button", { name: "Critical Path" }),
-        ).toBeInTheDocument();
-        expect(
-          screen.queryByRole("button", { name: "Billing Edge" }),
-        ).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Critical Path" })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Billing Edge" })).not.toBeInTheDocument();
       });
     });
 
@@ -1110,12 +972,8 @@ describe("<SuiteSidebar/>", () => {
           wrapper: Wrapper,
         });
 
-        expect(
-          screen.getByRole("button", { name: "Expand sidebar" }),
-        ).toBeInTheDocument();
-        expect(
-          screen.queryByPlaceholderText("Search..."),
-        ).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Expand sidebar" })).toBeInTheDocument();
+        expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
       });
     });
   });

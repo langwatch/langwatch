@@ -53,10 +53,7 @@ export function selectPeerSessions(state: PresenceState): PresenceSession[] {
 }
 
 /** Peer sessions whose location points at the given trace. */
-export function selectPeersOnTrace(
-  state: PresenceState,
-  traceId: string,
-): PresenceSession[] {
+export function selectPeersOnTrace(state: PresenceState, traceId: string): PresenceSession[] {
   return selectPeerSessions(state).filter((s) => s.location.route.traceId === traceId);
 }
 

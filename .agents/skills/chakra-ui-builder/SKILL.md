@@ -90,20 +90,16 @@ The CLI detects your framework and writes files to the right place:
 **Next.js App Router** (`app/layout.tsx`):
 
 ```tsx
-import { Provider } from "@/components/ui/provider"
+import { Provider } from "@/components/ui/provider";
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
         <Provider>{children}</Provider>
       </body>
     </html>
-  )
+  );
 }
 ```
 
@@ -114,21 +110,21 @@ generated provider file already has it.
 **Next.js Pages Router** (`pages/_app.tsx`):
 
 ```tsx
-import { Provider } from "@/components/ui/provider"
+import { Provider } from "@/components/ui/provider";
 
 export default function App({ Component, pageProps }) {
   return (
     <Provider>
       <Component {...pageProps} />
     </Provider>
-  )
+  );
 }
 ```
 
 **Vite** (`src/main.tsx`):
 
 ```tsx
-import { Provider } from "./components/ui/provider"
+import { Provider } from "./components/ui/provider";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -136,7 +132,7 @@ createRoot(document.getElementById("root")!).render(
       <App />
     </Provider>
   </StrictMode>,
-)
+);
 ```
 
 ### Manual Provider (if CLI is unavailable)
@@ -145,9 +141,9 @@ If the CLI fails, create `components/ui/provider.tsx` manually and install
 `next-themes` separately:
 
 ```tsx
-"use client"
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react"
-import { ThemeProvider } from "next-themes"
+"use client";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ThemeProvider } from "next-themes";
 
 export function Provider({ children }: { children: React.ReactNode }) {
   return (
@@ -156,7 +152,7 @@ export function Provider({ children }: { children: React.ReactNode }) {
         {children}
       </ThemeProvider>
     </ChakraProvider>
-  )
+  );
 }
 ```
 
@@ -289,18 +285,18 @@ export default function ProductCard({ name, price }: Props) {
       <Text fontWeight="bold">{name}</Text>
       <Text color="fg.muted">{price}</Text>
     </Box>
-  )
+  );
 }
 
 // Client Component — needs the directive
-;("use client")
+("use client");
 export function AddToCartButton({ productId }: { productId: string }) {
-  const [added, setAdded] = useState(false)
+  const [added, setAdded] = useState(false);
   return (
     <Button onClick={() => setAdded(true)} colorPalette="blue">
       {added ? "Added!" : "Add to cart"}
     </Button>
-  )
+  );
 }
 ```
 
@@ -352,9 +348,9 @@ Produce:
 
 ```tsx
 // Good import style
-import { Box, Button, Field, Stack, Text } from "@chakra-ui/react"
+import { Box, Button, Field, Stack, Text } from "@chakra-ui/react";
 // Then local
-import { SomeLocalComponent } from "./SomeLocalComponent"
+import { SomeLocalComponent } from "./SomeLocalComponent";
 ```
 
 ---

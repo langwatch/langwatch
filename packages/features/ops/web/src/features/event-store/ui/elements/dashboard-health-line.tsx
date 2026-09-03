@@ -9,11 +9,7 @@ export interface HealthLineProps {
 }
 
 /** Compact all-clear state for the ops dashboard. */
-export function HealthLine({
-  errorClusterCount,
-  anomalyCount,
-  anomaliesKnown,
-}: HealthLineProps) {
+export function HealthLine({ errorClusterCount, anomalyCount, anomaliesKnown }: HealthLineProps) {
   if (errorClusterCount > 0 || anomalyCount > 0 || !anomaliesKnown) return null;
 
   return (

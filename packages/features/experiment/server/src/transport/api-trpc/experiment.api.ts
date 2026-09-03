@@ -494,8 +494,7 @@ export class ExperimentTrpcApi {
             page.versions.map((version) => version.authorId).filter((id): id is string => !!id),
           ),
         ];
-        const authors =
-          authorIds.length > 0 ? await ports.resolveAuthorNames(ctx, authorIds) : [];
+        const authors = authorIds.length > 0 ? await ports.resolveAuthorNames(ctx, authorIds) : [];
         const nameById = new Map(authors.map((author) => [author.id, author.name]));
 
         return {
@@ -657,9 +656,9 @@ export class ExperimentTrpcApi {
         };
       }),
 
-      getAllByProjectId: policy("experiments:view")(
-        procedure.input(projectScopeSchema),
-      ).query(async ({ ctx, input }) => ctx.app.experiments.list({ projectId: input.projectId })),
+      getAllByProjectId: policy("experiments:view")(procedure.input(projectScopeSchema)).query(
+        async ({ ctx, input }) => ctx.app.experiments.list({ projectId: input.projectId }),
+      ),
 
       getAllForEvaluationsList: policy("experiments:view")(
         procedure.input(
@@ -703,9 +702,9 @@ export class ExperimentTrpcApi {
           .filter((id): id is string => !!id);
 
         const datasetsById = Object.fromEntries(
-          (
-            await ctx.app.experiments.getDatasets({ projectId: input.projectId, datasetIds })
-          ).map((dataset: Dataset) => [dataset.id, { id: dataset.id, name: dataset.name }]),
+          (await ctx.app.experiments.getDatasets({ projectId: input.projectId, datasetIds })).map(
+            (dataset: Dataset) => [dataset.id, { id: dataset.id, name: dataset.name }],
+          ),
         );
 
         const runsByExperimentId = await ctx.app.experiments.listRuns({
@@ -731,8 +730,7 @@ export class ExperimentTrpcApi {
                 primaryMetric,
                 latestRun: { timestamps: latestRun?.timestamps },
               },
-              dataset:
-                datasetsById[datasetIdOf(experiment.workflow?.currentVersion?.dsl) ?? ""],
+              dataset: datasetsById[datasetIdOf(experiment.workflow?.currentVersion?.dsl) ?? ""],
               updatedAt: latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
             };
           })
@@ -824,9 +822,7 @@ export class ExperimentTrpcApi {
       }),
 
       getExperimentBatchEvaluationRun: policy("experiments:view")(
-        procedure.input(
-          projectScopeSchema.extend({ experimentId: z.string(), runId: z.string() }),
-        ),
+        procedure.input(projectScopeSchema.extend({ experimentId: z.string(), runId: z.string() })),
       ).query(async ({ ctx, input }) => {
         const experiment = await ctx.app.experiments
           .getById({ projectId: input.projectId, id: input.experimentId })
@@ -892,8 +888,7 @@ export class ExperimentTrpcApi {
         if (!hasSourcePermission) {
           throw new TRPCError({
             code: "UNAUTHORIZED",
-            message:
-              "You do not have permission to manage evaluations in the source project",
+            message: "You do not have permission to manage evaluations in the source project",
           });
         }
 
@@ -984,9 +979,7 @@ export class ExperimentTrpcApi {
       }),
 
       /** Whether the project's last experiment is still a draft. */
-      getLastExperiment: policy("experiments:view")(
-        procedure.input(projectScopeSchema),
-      ).query(
+      getLastExperiment: policy("experiments:view")(procedure.input(projectScopeSchema)).query(
         async ({ ctx, input }) =>
           await ctx.app.experiments.tryGetLatest({ projectId: input.projectId }),
       ),
@@ -1020,9 +1013,10 @@ const copyEvaluationsV3Experiment = async ({
   sourceProjectId: string;
   copyDatasets?: boolean;
 }) => {
-  const workbenchState = JSON.parse(
-    JSON.stringify(experiment.workbenchState ?? {}),
-  ) as Record<string, unknown>;
+  const workbenchState = JSON.parse(JSON.stringify(experiment.workbenchState ?? {})) as Record<
+    string,
+    unknown
+  >;
 
   // Execution results are not copied into the new project.
   delete workbenchState.results;

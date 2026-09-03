@@ -12,9 +12,7 @@ export class PrismaIngestionPullLifecycleRepository extends IngestionPullLifecyc
     super();
   }
 
-  static create(
-    database: IngestionPullLifecycleDatabase,
-  ): PrismaIngestionPullLifecycleRepository {
+  static create(database: IngestionPullLifecycleDatabase): PrismaIngestionPullLifecycleRepository {
     return new PrismaIngestionPullLifecycleRepository(database);
   }
 

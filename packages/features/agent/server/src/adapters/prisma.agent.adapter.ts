@@ -1,8 +1,4 @@
-import type {
-  AgentsAuditLogPort,
-  AgentsDatabase,
-  AgentsWorkflowPort,
-} from "../ports/agent.port";
+import type { AgentsAuditLogPort, AgentsDatabase, AgentsWorkflowPort } from "../ports/agent.port";
 import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository";
 import { AgentService } from "../services/agent.service";
 

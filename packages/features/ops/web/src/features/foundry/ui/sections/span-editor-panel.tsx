@@ -17,7 +17,12 @@ import { LLMSpanEditor } from "./llm-span-editor";
 import { PromptSpanEditor } from "./prompt-span-editor";
 import { RAGSpanEditor } from "./rag-span-editor";
 import { useTraceStore } from "../../behavior/trace.store";
-import { SPAN_TYPE_ICONS, SPAN_TYPES, type SpanConfig, type SpanType } from "../../model/foundry-types";
+import {
+  SPAN_TYPE_ICONS,
+  SPAN_TYPES,
+  type SpanConfig,
+  type SpanType,
+} from "../../model/foundry-types";
 
 function findSpan(spans: SpanConfig[], id: string): SpanConfig | undefined {
   for (const span of spans) {
@@ -117,9 +122,7 @@ export function SpanEditorPanel() {
             size="sm"
             type="number"
             value={span.durationMs}
-            onChange={(e) =>
-              updateSpan(span.id, { durationMs: parseInt(e.target.value) || 0 })
-            }
+            onChange={(e) => updateSpan(span.id, { durationMs: parseInt(e.target.value) || 0 })}
             min={0}
           />
         </Box>
@@ -131,9 +134,7 @@ export function SpanEditorPanel() {
             size="sm"
             type="number"
             value={span.offsetMs}
-            onChange={(e) =>
-              updateSpan(span.id, { offsetMs: parseInt(e.target.value) || 0 })
-            }
+            onChange={(e) => updateSpan(span.id, { offsetMs: parseInt(e.target.value) || 0 })}
             min={0}
           />
         </Box>
@@ -168,13 +169,7 @@ export function SpanEditorPanel() {
       </Flex>
 
       {span.status === "error" && (
-        <Box
-          rounded="lg"
-          border="1px solid"
-          borderColor="red.500/30"
-          bg="red.500/5"
-          p={3}
-        >
+        <Box rounded="lg" border="1px solid" borderColor="red.500/30" bg="red.500/5" p={3}>
           <Text fontSize="xs" fontWeight="medium" color="red.400" mb={1}>
             Exception
           </Text>
@@ -227,9 +222,7 @@ export function SpanEditorPanel() {
             }
             onChange={(e) =>
               updateSpan(span.id, {
-                input: e.target.value
-                  ? { type: "text", value: e.target.value }
-                  : undefined,
+                input: e.target.value ? { type: "text", value: e.target.value } : undefined,
               })
             }
           />
@@ -252,9 +245,7 @@ export function SpanEditorPanel() {
             }
             onChange={(e) =>
               updateSpan(span.id, {
-                output: e.target.value
-                  ? { type: "text", value: e.target.value }
-                  : undefined,
+                output: e.target.value ? { type: "text", value: e.target.value } : undefined,
               })
             }
           />

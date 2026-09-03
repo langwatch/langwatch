@@ -16,10 +16,11 @@ import { defineCommandSchema } from "./commandSchema";
  * Uses Event (base) for the event type parameter so commands are compatible with
  * any pipeline event union (covariant event type).
  */
-export type DefinedCommandClass<
+export type DefinedCommandClass<TCommandData, TCmdType extends CommandType> = CommandHandlerClass<
   TCommandData,
-  TCmdType extends CommandType,
-> = CommandHandlerClass<TCommandData, TCmdType, Event> & {
+  TCmdType,
+  Event
+> & {
   makeJobId?: (data: TCommandData) => string;
 };
 

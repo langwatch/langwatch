@@ -118,9 +118,7 @@ export function createGovernanceHomeTrpcRouter<
   TContext extends GovernanceHomeTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
->(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> & Readonly<{ ports: GovernanceHomeTrpcPorts }>,
-) {
+>(mount: TrpcApiMount<TContext, TOptions, TRoot> & Readonly<{ ports: GovernanceHomeTrpcPorts }>) {
   const policy = appTrpcPolicy(mount.middlewares);
   const { ports } = mount;
 

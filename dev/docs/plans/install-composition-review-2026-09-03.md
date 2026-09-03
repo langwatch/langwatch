@@ -17,7 +17,7 @@ api-map lane (§5), which is blocked on the tRPC flatten's steps C and D.
 - **`runtime-composition` pruned to `ResourceScope`** — `src/` is
   `index.ts` + `resource-scope.ts`. The gateway `FeatureDefinition` wrapper and
   `GatewayRealtimeSessionReconciliationWorker` were deleted with it, which
-  settled the worker-lane question in §5 ("should this run at all") as *no*.
+  settled the worker-lane question in §5 ("should this run at all") as _no_.
 - **`enterprise-web` deleted**, with the lint's `"web"` composition role;
   `packages/enterprise/composition/` is `api` + `worker`.
 - **apps/ui: the fold and the page helper.** All 36
@@ -47,7 +47,7 @@ Current measurements:
   `trace/web/src/ui/sections/internal/use-rename-trace.ts` and
   `analytics/web/src/behavior/analytics-api.ts`, switch to
   `trpcReact.useUtils()`), and `git mv src/trpc-query-key.ts
-  apps/ui/src/behavior/ui-trpc-query-key.ts` with its test (consumers:
+apps/ui/src/behavior/ui-trpc-query-key.ts` with its test (consumers:
   `ui-rpc.ts`, `ui-session-queries.ts`, `ui-organization-facts.ts`). The
   package is then `app-router-client.ts` alone.
 - In apps/ui: with one `trpcReact` instance, the 36 `uiFeatureApi(...)`

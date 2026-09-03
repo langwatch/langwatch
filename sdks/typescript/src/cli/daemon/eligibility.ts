@@ -230,11 +230,7 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     return { eligible: false, reason: "denied-command" };
   }
 
-  if (
-    DENIED_COMMAND_PHRASES.some((phrase) =>
-      phrase.every((word) => input.args.includes(word)),
-    )
-  ) {
+  if (DENIED_COMMAND_PHRASES.some((phrase) => phrase.every((word) => input.args.includes(word)))) {
     return { eligible: false, reason: "denied-command" };
   }
 

@@ -29,9 +29,7 @@ export const updateAgentCommand = async (
 
     const agent = await service.update(id, params);
 
-    spinner.succeed(
-      `Updated agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`,
-    );
+    spinner.succeed(`Updated agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`);
 
     return {
       data: agent,

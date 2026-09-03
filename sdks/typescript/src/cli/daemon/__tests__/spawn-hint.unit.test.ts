@@ -68,10 +68,7 @@ describe("recordMissAndDecideToSpawn", () => {
     describe("when a miss is recorded", () => {
       it("recovers instead of breaking the command", () => {
         fs.mkdirSync(identity.socketDir, { recursive: true, mode: 0o700 });
-        fs.writeFileSync(
-          path.join(identity.socketDir, "aaaaaaaaaaaaaaaa.hint"),
-          "not json at all",
-        );
+        fs.writeFileSync(path.join(identity.socketDir, "aaaaaaaaaaaaaaaa.hint"), "not json at all");
 
         expect(() => recordMissAndDecideToSpawn(identity)).not.toThrow();
       });

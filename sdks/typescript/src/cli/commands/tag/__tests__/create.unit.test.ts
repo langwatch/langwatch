@@ -29,9 +29,7 @@ describe("tagCreateCommand", () => {
     vi.clearAllMocks();
     mockCreateTag = vi.fn();
     vi.mocked(PromptsApiService).mockImplementation(function () {
-      return { createTag: mockCreateTag } as unknown as InstanceType<
-        typeof PromptsApiService
-      >;
+      return { createTag: mockCreateTag } as unknown as InstanceType<typeof PromptsApiService>;
     });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
@@ -61,9 +59,7 @@ describe("tagCreateCommand", () => {
       const result = await tagCreateCommand("canary");
       result?.table();
 
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining("Created tag: canary"),
-      );
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Created tag: canary"));
     });
   });
 
@@ -77,9 +73,7 @@ describe("tagCreateCommand", () => {
     it("prints an error about invalid tag name format", async () => {
       await expect(tagCreateCommand("INVALID_NAME!")).rejects.toThrow(ProcessExitError);
 
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("Invalid tag name"),
-      );
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining("Invalid tag name"));
     });
 
     it("exits with code 1", async () => {

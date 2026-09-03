@@ -111,10 +111,7 @@ describe("an endpoint that declares no input", () => {
 
     // No declared schema, so there is nothing to hand the handler: not the body
     // it was posted, not an empty object standing in for one.
-    expect(handler.mock.calls.map((call) => (call as unknown[])[1])).toEqual([
-      void 0,
-      void 0,
-    ]);
+    expect(handler.mock.calls.map((call) => (call as unknown[])[1])).toEqual([void 0, void 0]);
   });
 });
 

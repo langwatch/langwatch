@@ -230,7 +230,6 @@ export function composeApiProductInfraCollaborators(
   };
 }
 
-
 /** Writes each absence to the process log, with what it costs. */
 export class LoggedApiProductInfraAbsence extends ApiProductInfraAbsenceReport {
   static create(logger: Pick<Logger, "warn">): LoggedApiProductInfraAbsence {

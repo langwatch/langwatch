@@ -1,10 +1,5 @@
 import { getRequestListener } from "@hono/node-server";
-import {
-  createServer,
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-} from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Logger } from "@langwatch/observability";
 import type { Hono } from "hono";

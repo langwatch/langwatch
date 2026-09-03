@@ -18,7 +18,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type ProjectFormData, TechStackSelector } from "@langwatch/project-web/ui/blocks/tech-stack";
+import {
+  type ProjectFormData,
+  TechStackSelector,
+} from "@langwatch/project-web/ui/blocks/tech-stack";
 import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { useRouter } from "../../behavior/next-router";
@@ -106,9 +109,8 @@ export default function ProjectOnboarding() {
             Create New Project
           </Heading>
           <Text paddingBottom={4} fontSize="14px">
-            You can set up separate projects for each service or LLM feature of your
-            application (for example, one for your ChatBot, another for that Content
-            Generation feature).
+            You can set up separate projects for each service or LLM feature of your application
+            (for example, one for your ChatBot, another for that Content Generation feature).
             <br />
           </Text>
           <Field.Root>

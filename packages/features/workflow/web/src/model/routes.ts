@@ -287,9 +287,7 @@ export type Route = {
 type RouteMap = Record<keyof typeof projectRoutes, Route>;
 
 export const findCurrentRoute = (currentPathname: string): Route | undefined => {
-  return Object.values(projectRoutes as RouteMap).find(
-    (route) => route.path === currentPathname,
-  );
+  return Object.values(projectRoutes as RouteMap).find((route) => route.path === currentPathname);
 };
 
 export function getRoutePath(params: {
@@ -360,9 +358,7 @@ export function buildProjectSwitchHref({
   const currentRoute = findCurrentRoute(routePattern);
 
   if (currentRoute?.path.includes("[project]")) {
-    const hasOtherDynamicSegments = currentRoute.path
-      .replace("[project]", "")
-      .includes("[");
+    const hasOtherDynamicSegments = currentRoute.path.replace("[project]", "").includes("[");
     if (hasOtherDynamicSegments && currentRoute.parent) {
       return projectRoutes[currentRoute.parent].path
         .replace("[project]", targetSlug)

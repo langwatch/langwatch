@@ -69,11 +69,7 @@ export function decodeFoldCacheEntry<State>(raw: string): {
     );
   }
 
-  if (
-    typeof parsed === "object" &&
-    parsed !== null &&
-    (parsed as { v?: unknown }).v === 1
-  ) {
+  if (typeof parsed === "object" && parsed !== null && (parsed as { v?: unknown }).v === 1) {
     const entry = parsed as FoldCacheEntry<State>;
     return {
       state: entry.s,
@@ -125,7 +121,5 @@ export function mergeAppliedEventIds({
   const kept = previous.filter((id) => !seen.has(id));
   const merged = [...kept, ...applied];
 
-  return merged.length > MAX_APPLIED_EVENT_IDS
-    ? merged.slice(-MAX_APPLIED_EVENT_IDS)
-    : merged;
+  return merged.length > MAX_APPLIED_EVENT_IDS ? merged.slice(-MAX_APPLIED_EVENT_IDS) : merged;
 }

@@ -85,13 +85,9 @@ export const getMonitorCommand = async (id: string): Promise<CommandResult | voi
       if (monitor.evaluatorId) {
         console.log(`  ${chalk.gray("Evaluator:")} ${monitor.evaluatorId}`);
       }
-      console.log(
-        `  ${chalk.gray("Created:")}   ${new Date(monitor.createdAt).toLocaleString()}`,
-      );
+      console.log(`  ${chalk.gray("Created:")}   ${new Date(monitor.createdAt).toLocaleString()}`);
       if (monitor.platformUrl) {
-        console.log(
-          `  ${chalk.bold("View:")}     ${chalk.underline(monitor.platformUrl)}`,
-        );
+        console.log(`  ${chalk.bold("View:")}     ${chalk.underline(monitor.platformUrl)}`);
       }
       console.log();
     },

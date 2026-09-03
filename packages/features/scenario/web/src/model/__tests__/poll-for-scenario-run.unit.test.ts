@@ -5,10 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import type {
-  BatchRunDataResult,
-  ScenarioRunData,
-} from "@langwatch/scenario-contract";
+import type { BatchRunDataResult, ScenarioRunData } from "@langwatch/scenario-contract";
 import { pollForScenarioRun } from "../poll-for-scenario-run";
 
 type FetchBatchRunData = (params: {

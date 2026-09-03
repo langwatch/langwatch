@@ -162,9 +162,7 @@ export function createStreamingStore() {
     clearByIds(serverIds: string[]) {
       const idSet = new Set(serverIds);
       const before = messages.length;
-      messages = messages.filter(
-        (m) => !(idSet.has(m.messageId) && m.status === "complete"),
-      );
+      messages = messages.filter((m) => !(idSet.has(m.messageId) && m.status === "complete"));
       if (messages.length !== before) {
         scheduleNotify();
       }

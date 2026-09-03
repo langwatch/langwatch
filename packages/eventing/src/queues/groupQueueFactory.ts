@@ -6,10 +6,7 @@ import {
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
-import type {
-  EventSourcedQueueDefinition,
-  EventSourcedQueueProcessor,
-} from "./queue.types";
+import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queue.types";
 
 export interface EventingGroupQueueFactoryOptions {
   dependencies: GroupQueueDependencies<Record<string, unknown>>;
@@ -59,8 +56,7 @@ export function createEventingGroupQueueFactory({
       consumer = eventingDefinition.processBatch
         ? configuredConsumer.handleBatch({
             each: (payload, context) => eventingDefinition.process(payload, context),
-            batch: (payloads, context) =>
-              eventingDefinition.processBatch!(payloads, context),
+            batch: (payloads, context) => eventingDefinition.processBatch!(payloads, context),
           })
         : configuredConsumer.handle((payload, context) =>
             eventingDefinition.process(payload, context),

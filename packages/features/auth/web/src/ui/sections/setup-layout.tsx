@@ -8,13 +8,7 @@ export const SetupLayout = ({
   maxWidth = "780px",
 }: PropsWithChildren<{ maxWidth?: string }>) => {
   return (
-    <Box
-      width="full"
-      height="full"
-      minHeight="100vh"
-      backgroundColor="gray.300"
-      paddingTop={16}
-    >
+    <Box width="full" height="full" minHeight="100vh" backgroundColor="gray.300" paddingTop={16}>
       <HStack position="fixed" top={2} right={2} zIndex={99}>
         <Spacer />
         <Button variant="ghost" onClick={() => void signOut()}>

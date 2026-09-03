@@ -1,8 +1,5 @@
 import type { TargetConfig } from "../../types";
-import {
-  type UpdateTargetModelPayload,
-  updateTargetModelPayloadSchema,
-} from "../schemas";
+import { type UpdateTargetModelPayload, updateTargetModelPayloadSchema } from "../schemas";
 import { requireTarget } from "./helpers";
 import { type Transform, TransformError } from "./types";
 

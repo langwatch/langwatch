@@ -4,7 +4,6 @@
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 
-
 /**
  * Message thrown by `organization.acceptInvite` when the invite has already
  * been consumed. Shared between server (where it's thrown) and client (where
@@ -53,11 +52,11 @@ export class AlreadyOrganizationMemberError extends HandledError {
   declare readonly code: "already_organization_member";
 
   constructor(email: string) {
-    super(
-      "already_organization_member",
-      "This person is already a member of the organization",
-      { meta: { email }, httpStatus: 409, fault: "customer" },
-    );
+    super("already_organization_member", "This person is already a member of the organization", {
+      meta: { email },
+      httpStatus: 409,
+      fault: "customer",
+    });
     this.name = "AlreadyOrganizationMemberError";
   }
 }
@@ -127,11 +126,10 @@ export class InviteWrongAccountError extends HandledError {
   declare readonly code: "invite_wrong_account";
 
   constructor(invitedHint: string) {
-    super(
-      "invite_wrong_account",
-      "This invitation was sent to a different account",
-      { httpStatus: 403, meta: { invitedHint } },
-    );
+    super("invite_wrong_account", "This invitation was sent to a different account", {
+      httpStatus: 403,
+      meta: { invitedHint },
+    });
     this.name = "InviteWrongAccountError";
   }
 }

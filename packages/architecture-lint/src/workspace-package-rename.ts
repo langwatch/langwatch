@@ -1,16 +1,7 @@
 import { extname } from "node:path";
 import ts from "typescript";
 
-const SOURCE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".mts",
-  ".cts",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-]);
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]);
 const JSON_EXTENSIONS = new Set([".json", ".jsonc"]);
 
 type TextEdit = { start: number; end: number; text: string };
@@ -37,13 +28,7 @@ function sourceEdits(
 ): TextEdit[] {
   const kind =
     file.endsWith(".tsx") || file.endsWith(".jsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
-  const sourceFile = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    kind,
-  );
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, kind);
   const edits: TextEdit[] = [];
   const editedStarts = new Set<number>();
   const add = (node: ts.Node | undefined) => {
@@ -73,8 +58,7 @@ function sourceEdits(
       add(node.argument.literal);
     } else if (ts.isCallExpression(node)) {
       const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-      const isRequire =
-        ts.isIdentifier(node.expression) && node.expression.text === "require";
+      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === "require";
       if (isDynamicImport || isRequire) add(node.arguments[0]);
     }
     ts.forEachChild(node, visit);
@@ -107,8 +91,7 @@ function applyEdits(source: string, edits: TextEdit[]): string {
   return [...edits]
     .sort((left, right) => right.start - left.start)
     .reduce(
-      (result, edit) =>
-        `${result.slice(0, edit.start)}${edit.text}${result.slice(edit.end)}`,
+      (result, edit) => `${result.slice(0, edit.start)}${edit.text}${result.slice(edit.end)}`,
       source,
     );
 }
@@ -124,20 +107,11 @@ export function renameWorkspaceReference(input: {
   if (SOURCE_EXTENSIONS.has(extension)) {
     return applyEdits(
       input.source,
-      sourceEdits(
-        input.file,
-        input.source,
-        input.from,
-        input.to,
-        input.allStringLiterals ?? false,
-      ),
+      sourceEdits(input.file, input.source, input.from, input.to, input.allStringLiterals ?? false),
     );
   }
   if (JSON_EXTENSIONS.has(extension)) {
-    return applyEdits(
-      input.source,
-      jsonEdits(input.file, input.source, input.from, input.to),
-    );
+    return applyEdits(input.source, jsonEdits(input.file, input.source, input.from, input.to));
   }
   return input.source.split(input.from).join(input.to);
 }

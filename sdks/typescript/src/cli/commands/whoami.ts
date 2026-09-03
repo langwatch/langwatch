@@ -1,9 +1,5 @@
 import chalk from "chalk";
-import {
-  loadConfig,
-  isLoggedIn,
-  type GovernanceConfig,
-} from "@/cli/utils/governance/config";
+import { loadConfig, isLoggedIn, type GovernanceConfig } from "@/cli/utils/governance/config";
 
 /**
  * One line for what the login key reaches. The key is minted from the scope

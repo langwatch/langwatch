@@ -4,11 +4,7 @@ import type {
 } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  buildCodeConfig,
-  DEFAULT_CODE,
-  getCodeFromConfig,
-} from "../model/code-agent-config";
+import { buildCodeConfig, DEFAULT_CODE, getCodeFromConfig } from "../model/code-agent-config";
 import type { Field } from "@langwatch/workflow-contract";
 
 describe("code-agent-config", () => {
@@ -23,9 +19,7 @@ describe("code-agent-config", () => {
   });
 
   it("preserves a present legacy code value", () => {
-    const config = JSON.parse(
-      '{"parameters":[{"identifier":"code","type":"code","value":42}]}',
-    );
+    const config = JSON.parse('{"parameters":[{"identifier":"code","type":"code","value":42}]}');
 
     expect(getCodeFromConfig(config)).toBe(42);
   });

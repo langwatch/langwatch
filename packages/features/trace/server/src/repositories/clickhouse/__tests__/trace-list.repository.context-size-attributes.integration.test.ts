@@ -23,10 +23,7 @@ let repo: TraceListClickHouseRepository;
 
 const base = Date.now() - 60 * 60 * 1000;
 
-function makeTraceSummaryRow(
-  i: number,
-  overrides: Record<string, unknown> = {},
-) {
+function makeTraceSummaryRow(i: number, overrides: Record<string, unknown> = {}) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: "unused",
@@ -120,18 +117,10 @@ integration("TraceListClickHouseRepository.findAll cache/reasoning/context attri
 
       const row = page.rows.find((r) => r.traceId === "cache-trace");
       expect(row).toBeDefined();
-      expect(row?.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
-        "31680",
-      );
-      expect(row?.attributes["langwatch.reserved.cache_creation_tokens"]).toBe(
-        "6",
-      );
-      expect(row?.attributes["langwatch.reserved.reasoning_tokens"]).toBe(
-        "100",
-      );
-      expect(row?.attributes["langwatch.reserved.context_size_tokens"]).toBe(
-        "52878",
-      );
+      expect(row?.attributes["langwatch.reserved.cache_read_tokens"]).toBe("31680");
+      expect(row?.attributes["langwatch.reserved.cache_creation_tokens"]).toBe("6");
+      expect(row?.attributes["langwatch.reserved.reasoning_tokens"]).toBe("100");
+      expect(row?.attributes["langwatch.reserved.context_size_tokens"]).toBe("52878");
       // The pre-existing allow-listed keys still flow through.
       expect(row?.attributes["langwatch.origin"]).toBe("coding_agent");
     });

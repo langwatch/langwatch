@@ -29,10 +29,7 @@ const MAX_SKELETON_SPAN_ROWS = 30;
 // density — close enough that the post-load swap reads as silent.
 const SPAN_SKELETON_ROW_PX = 36;
 
-export function TraceDrawerSkeleton({
-  onClose,
-  expectedSpanCount,
-}: TraceDrawerSkeletonProps) {
+export function TraceDrawerSkeleton({ onClose, expectedSpanCount }: TraceDrawerSkeletonProps) {
   return (
     // Solid surface bg — `Drawer.Content` is transparent (so the real
     // header below can run a backdrop-blur fill against the page),
@@ -58,13 +55,7 @@ export function TraceDrawerSkeleton({
             <Skeleton height="24px" width="24px" borderRadius="md" />
             <Skeleton height="24px" width="24px" borderRadius="md" />
             <Skeleton height="24px" width="24px" borderRadius="md" />
-            <Box
-              width="1px"
-              height="16px"
-              bg="border.muted"
-              marginX={0.5}
-              flexShrink={0}
-            />
+            <Box width="1px" height="16px" bg="border.muted" marginX={0.5} flexShrink={0} />
             <Tooltip content="Close" positioning={{ placement: "bottom" }}>
               <Button
                 size="xs"
@@ -86,24 +77,14 @@ export function TraceDrawerSkeleton({
         {/* Row 2: metric pills (Duration / Spans / TTFT / Cost / Tokens / Model). */}
         <HStack gap={1.5} flexWrap="wrap" align="center">
           {[88, 70, 78, 80, 110, 96].map((w, i) => (
-            <Skeleton
-              key={`metric-${i}`}
-              height="22px"
-              width={`${w}px`}
-              borderRadius="md"
-            />
+            <Skeleton key={`metric-${i}`} height="22px" width={`${w}px`} borderRadius="md" />
           ))}
         </HStack>
 
         {/* Row 3: chip / pin strip. */}
         <HStack gap={1.5} flexWrap="wrap" align="center">
           {[120, 92, 144, 100].map((w, i) => (
-            <Skeleton
-              key={`chip-${i}`}
-              height="22px"
-              width={`${w}px`}
-              borderRadius="md"
-            />
+            <Skeleton key={`chip-${i}`} height="22px" width={`${w}px`} borderRadius="md" />
           ))}
         </HStack>
 
@@ -160,11 +141,7 @@ export function TraceDrawerSkeleton({
             {Array.from({
               length: Math.min(expectedSpanCount, MAX_SKELETON_SPAN_ROWS),
             }).map((_, i) => (
-              <Skeleton
-                key={`span-${i}`}
-                height={`${SPAN_SKELETON_ROW_PX}px`}
-                borderRadius="sm"
-              />
+              <Skeleton key={`span-${i}`} height={`${SPAN_SKELETON_ROW_PX}px`} borderRadius="sm" />
             ))}
           </>
         ) : (

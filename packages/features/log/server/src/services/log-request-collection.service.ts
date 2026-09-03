@@ -24,7 +24,6 @@ import { IO_PREVIEW_BYTES, utf8Preview } from "@langwatch/trace-server";
  */
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
-
 export interface LogRequestCollectionDeps {
   traceCanonicalisation: TraceCanonicalisationService;
   logs: LogService;

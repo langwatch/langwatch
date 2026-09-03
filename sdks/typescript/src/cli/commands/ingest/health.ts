@@ -42,9 +42,7 @@ export async function ingestHealthCommand(
   console.log(`Events (30d):  ${health.events30d}`);
   console.log(
     `Last event:    ${
-      health.lastSuccessIso
-        ? humanRelative(new Date(health.lastSuccessIso))
-        : chalk.gray("—")
+      health.lastSuccessIso ? humanRelative(new Date(health.lastSuccessIso)) : chalk.gray("—")
     }`,
   );
 }

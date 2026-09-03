@@ -254,9 +254,7 @@ describe("LangWatchLogsExporter", () => {
 
       // URL constructor behavior: new URL("/api/otel/v1/logs", "https://subdomain.example.com:8080/path")
       // results in "https://subdomain.example.com:8080/api/otel/v1/logs" (path gets replaced, not appended)
-      expect((exporter as any).url).toBe(
-        `https://subdomain.example.com:8080${LOGS_PATH}`,
-      );
+      expect((exporter as any).url).toBe(`https://subdomain.example.com:8080${LOGS_PATH}`);
     });
   });
 

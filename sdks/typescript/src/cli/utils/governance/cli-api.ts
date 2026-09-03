@@ -151,8 +151,7 @@ export interface CliApiOptions {
 }
 
 /** Copy shown when the session cannot be recovered without a fresh login. */
-export const SESSION_EXPIRED_MESSAGE =
-  "Session expired, run `langwatch login --device` again";
+export const SESSION_EXPIRED_MESSAGE = "Session expired, run `langwatch login --device` again";
 
 /**
  * Send an authenticated control-plane request, keeping the device
@@ -181,9 +180,7 @@ async function authorizedFetch(
   const send = () =>
     f(url, {
       ...init(cfg.access_token!),
-      ...(opts.timeoutMs === undefined
-        ? {}
-        : { signal: AbortSignal.timeout(opts.timeoutMs) }),
+      ...(opts.timeoutMs === undefined ? {} : { signal: AbortSignal.timeout(opts.timeoutMs) }),
     });
   await refreshSessionIfExpired(cfg, deps);
 
@@ -240,8 +237,7 @@ async function getJSON<T>(
       error_description?: string;
       upgrade_url?: string;
     };
-    const description =
-      body.error_description ?? "This feature requires an Enterprise plan";
+    const description = body.error_description ?? "This feature requires an Enterprise plan";
     const upgrade = body.upgrade_url
       ? `\n\n  Upgrade your organization at:\n    ${body.upgrade_url}`
       : "";
@@ -471,11 +467,7 @@ export async function getBudgetOverview(
   options: CliApiOptions = {},
 ): Promise<BudgetOverviewResponse | null> {
   try {
-    return await getJSON<BudgetOverviewResponse>(
-      cfg,
-      `/api/auth/cli/budget-overview`,
-      options,
-    );
+    return await getJSON<BudgetOverviewResponse>(cfg, `/api/auth/cli/budget-overview`, options);
   } catch (err) {
     if (err instanceof GovernanceCliError && err.status === 404) {
       return null;

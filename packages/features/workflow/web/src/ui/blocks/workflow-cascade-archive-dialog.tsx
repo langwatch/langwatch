@@ -8,16 +8,7 @@
  * lists — linked evaluators and agents are ARCHIVED and the online evaluations
  * those evaluators back are DELETED.
  */
-import {
-  Alert,
-  Button,
-  HStack,
-  Input,
-  List,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Button, HStack, Input, List, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle } from "react-feather";
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -162,11 +153,7 @@ export function WorkflowCascadeArchiveDialog({
                           "Evaluators",
                           "will be archived",
                         )}
-                        {renderEntityList(
-                          relatedEntities.agents,
-                          "Agents",
-                          "will be archived",
-                        )}
+                        {renderEntityList(relatedEntities.agents, "Agents", "will be archived")}
                         {renderEntityList(
                           relatedEntities.monitors,
                           "Online Evaluations",
@@ -228,9 +215,7 @@ export function WorkflowCascadeArchiveDialog({
                 onConfirm();
               }
             }}
-            disabled={
-              confirmationText.toLowerCase() !== "delete" || isLoading || isLoadingRelated
-            }
+            disabled={confirmationText.toLowerCase() !== "delete" || isLoading || isLoadingRelated}
             data-testid="cascade-archive-confirm-button"
           >
             {isLoading ? <Spinner size="sm" /> : "Delete"}

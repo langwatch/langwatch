@@ -24,12 +24,7 @@ import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 // Types
 // ============================================================================
 
-export type ExecutionStatus =
-  | "idle"
-  | "running"
-  | "stopped"
-  | "completed"
-  | "error";
+export type ExecutionStatus = "idle" | "running" | "stopped" | "completed" | "error";
 
 export type UseExecuteEvaluationReturn = {
   /** Current execution status */
@@ -57,16 +52,9 @@ export type UseExecuteEvaluationReturn = {
     options?: { onRunStarted?: (runId: string) => void },
   ) => Promise<void>;
   /** Re-run a single evaluator for a specific cell, using existing target output */
-  rerunEvaluator: (
-    rowIndex: number,
-    targetId: string,
-    evaluatorId: string,
-  ) => Promise<void>;
+  rerunEvaluator: (rowIndex: number, targetId: string, evaluatorId: string) => Promise<void>;
   /** Run an evaluator on all rows that have existing target outputs */
-  runEvaluatorOnAllRows: (
-    targetId: string,
-    evaluatorId: string,
-  ) => Promise<void>;
+  runEvaluatorOnAllRows: (targetId: string, evaluatorId: string) => Promise<void>;
   /** Request abort of current execution */
   abort: () => Promise<void>;
   /** Reset state to idle */
@@ -83,10 +71,9 @@ export type UseExecuteEvaluationReturn = {
  * generic unknown state PLUS the copyable error id (ADR-045). Without the
  * trace id that second case tells the customer, and support, nothing at all.
  */
-const asHandledEnvelope = (event: {
-  domainError?: SerializedHandledError;
-  traceId?: string;
-}) => ({ data: { error: event.domainError, traceId: event.traceId } });
+const asHandledEnvelope = (event: { domainError?: SerializedHandledError; traceId?: string }) => ({
+  data: { error: event.domainError, traceId: event.traceId },
+});
 
 // ============================================================================
 // Hook
@@ -133,8 +120,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   );
 
   // Find active dataset
-  const activeDataset =
-    datasets.find((d) => d.id === activeDatasetId) ?? datasets[0];
+  const activeDataset = datasets.find((d) => d.id === activeDatasetId) ?? datasets[0];
 
   /**
    * Write one target's output into the store.
@@ -186,12 +172,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
   /** Write one evaluator's result into the store. */
   const updateEvaluatorResult = useCallback(
-    (
-      rowIndex: number,
-      targetId: string,
-      evaluatorId: string,
-      result: unknown,
-    ) => {
+    (rowIndex: number, targetId: string, evaluatorId: string, result: unknown) => {
       useEvaluationsV3Store.setState((state) => ({
         results: applyEvaluatorResult({
           results: state.results,
@@ -254,12 +235,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
 
         case "evaluator_result":
-          updateEvaluatorResult(
-            event.rowIndex,
-            event.targetId,
-            event.evaluatorId,
-            event.result,
-          );
+          updateEvaluatorResult(event.rowIndex, event.targetId, event.evaluatorId, event.result);
           break;
 
         case "progress":
@@ -289,28 +265,16 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           if (event.rowIndex !== undefined && event.targetId) {
             if (event.evaluatorId) {
               // Evaluator error
-              updateEvaluatorResult(
-                event.rowIndex,
-                event.targetId,
-                event.evaluatorId,
-                {
-                  status: "error",
-                  error_type: "EvaluatorError",
-                  details: detail,
-                  traceback: [],
-                  ...(event.domainError
-                    ? { domainError: event.domainError }
-                    : {}),
-                },
-              );
+              updateEvaluatorResult(event.rowIndex, event.targetId, event.evaluatorId, {
+                status: "error",
+                error_type: "EvaluatorError",
+                details: detail,
+                traceback: [],
+                ...(event.domainError ? { domainError: event.domainError } : {}),
+              });
             } else {
               // Target error — the code, not the sentence it renders as.
-              updateTargetError(
-                event.rowIndex,
-                event.targetId,
-                event.message,
-                event.domainError,
-              );
+              updateTargetError(event.rowIndex, event.targetId, event.message, event.domainError);
             }
           } else {
             // Fatal error
@@ -464,9 +428,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
           // For evaluator-only scopes, determine which single evaluator to clear
           const specificEvaluatorId =
-            isEvaluatorOnlyScope && "evaluatorId" in scope
-              ? scope.evaluatorId
-              : undefined;
+            isEvaluatorOnlyScope && "evaluatorId" in scope ? scope.evaluatorId : undefined;
 
           const evaluatorIds = specificEvaluatorId
             ? [specificEvaluatorId]
@@ -491,11 +453,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
               );
 
               // Clear errors (also array-based with holes)
-              newErrors = clearCellFromArrayRecord(
-                newErrors,
-                cell.targetId,
-                cell.rowIndex,
-              );
+              newErrors = clearCellFromArrayRecord(newErrors, cell.targetId, cell.rowIndex);
             }
 
             // Clear evaluator results (only specific evaluator for evaluator scopes)
@@ -513,10 +471,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
                 const newEvalResults = evalResults ? [...evalResults] : [];
                 newEvalResults[cell.rowIndex] = { status: "running" };
                 newTargetResults[evaluatorId] = newEvalResults;
-              } else if (
-                evalResults &&
-                evalResults[cell.rowIndex] !== undefined
-              ) {
+              } else if (evalResults && evalResults[cell.rowIndex] !== undefined) {
                 const newEvalResults = [...evalResults];
                 newEvalResults[cell.rowIndex] = undefined;
                 newTargetResults[evaluatorId] = newEvalResults;
@@ -544,8 +499,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       const cleanupThisExecution = () => {
         useEvaluationsV3Store.setState((state) => {
           // Remove only the cells from THIS execution
-          let remainingCells: Set<string> | undefined = state.results
-            .executingCells
+          let remainingCells: Set<string> | undefined = state.results.executingCells
             ? new Set(
                 [...state.results.executingCells].filter(
                   (cellKey) => !executingCellsSet.has(cellKey),
@@ -556,8 +510,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
           // Remove runningEvaluators for THIS execution's cells
           // Key format: "rowIndex:targetId:evaluatorId"
-          let remainingEvaluators: Set<string> | undefined = state.results
-            .runningEvaluators
+          let remainingEvaluators: Set<string> | undefined = state.results.runningEvaluators
             ? new Set(
                 [...state.results.runningEvaluators].filter((evalKey) => {
                   // Extract rowIndex:targetId from the evaluator key
@@ -574,24 +527,20 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
           // Determine if there's remaining work from other concurrent executions
           const hasRemainingWork =
-            (remainingCells?.size ?? 0) > 0 ||
-            (remainingEvaluators?.size ?? 0) > 0;
+            (remainingCells?.size ?? 0) > 0 || (remainingEvaluators?.size ?? 0) > 0;
 
           // Determine the final status:
           // - If there's remaining work, keep current status
           // - If status was explicitly set to "stopped", keep it
           // - Otherwise, set to "success"
-          const shouldKeepCurrentStatus =
-            hasRemainingWork || state.results.status === "stopped";
+          const shouldKeepCurrentStatus = hasRemainingWork || state.results.status === "stopped";
 
           return {
             results: {
               ...state.results,
               executingCells: remainingCells,
               runningEvaluators: remainingEvaluators,
-              status: shouldKeepCurrentStatus
-                ? state.results.status
-                : "success",
+              status: shouldKeepCurrentStatus ? state.results.status : "success",
             },
           };
         });
@@ -609,8 +558,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             }
             handleEvent(event);
           },
-          shouldStopProcessing: (event) =>
-            event.type === "done" || event.type === "stopped",
+          shouldStopProcessing: (event) => event.type === "done" || event.type === "stopped",
           timeout: 30_000, // 30s to connect
           chunkTimeout: 300_000, // 5min between events
           onError: (err) => {
@@ -689,8 +637,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         setIsAborting(false);
         toaster.create({
           title: "Already finished",
-          description:
-            "The run completed on its own before the stop request reached the server.",
+          description: "The run completed on its own before the stop request reached the server.",
           type: "info",
         });
         return;
@@ -730,8 +677,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       // Get the existing target output and trace ID from the store
       const state = useEvaluationsV3Store.getState();
       const targetOutput = state.results.targetOutputs[targetId]?.[rowIndex];
-      const traceId =
-        state.results.targetMetadata[targetId]?.[rowIndex]?.traceId;
+      const traceId = state.results.targetMetadata[targetId]?.[rowIndex]?.traceId;
 
       // Immediately set the evaluator result to "running" for UI feedback
       updateEvaluatorResult(rowIndex, targetId, evaluatorId, {

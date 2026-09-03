@@ -63,8 +63,7 @@ export default function NewExperimentWorkbench() {
   const { project } = useOrganizationTeamProject();
   const hasCreatedRef = useRef(false);
 
-  const datasetId =
-    typeof router.query.datasetId === "string" ? router.query.datasetId : undefined;
+  const datasetId = typeof router.query.datasetId === "string" ? router.query.datasetId : undefined;
 
   const datasetQuery = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
@@ -101,9 +100,7 @@ export default function NewExperimentWorkbench() {
         const experiment = await createExperiment.mutateAsync({
           projectId: project.id,
           experimentId: undefined,
-          state: persistedState as Parameters<
-            typeof createExperiment.mutateAsync
-          >[0]["state"],
+          state: persistedState as Parameters<typeof createExperiment.mutateAsync>[0]["state"],
         });
 
         void router.replace(`/${project.slug}/experiments/workbench/${experiment.slug}`);

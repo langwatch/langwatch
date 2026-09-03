@@ -23,7 +23,12 @@ import {
   type OrgModelProvider,
   resolveEligible,
 } from "../../model/eligible-model-providers";
-import { TAGS_CSV_MAX_LENGTH, VK_TAGS_FIELD_DESCRIPTION, parseTagsCsv, tagsBeyondLimitsNotice } from "../../model/virtual-key-tags-field";
+import {
+  TAGS_CSV_MAX_LENGTH,
+  VK_TAGS_FIELD_DESCRIPTION,
+  parseTagsCsv,
+  tagsBeyondLimitsNotice,
+} from "../../model/virtual-key-tags-field";
 import { humanizeGatewayError } from "../../../../model/gateway-error-copy";
 import { useGatewayToaster } from "../../../../behavior/gateway-feedback";
 import {
@@ -66,12 +71,7 @@ type VirtualKeyCreateDrawerProps = {
   organizationId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (result: {
-    id: string;
-    name: string;
-    secret: string;
-    model?: string;
-  }) => void;
+  onCreated: (result: { id: string; name: string; secret: string; model?: string }) => void;
 };
 
 export function VirtualKeyCreateDrawer({
@@ -93,8 +93,7 @@ export function VirtualKeyCreateDrawer({
     traceProjectId: null,
   });
   const [budget, setBudget] = useState<VirtualKeyBudgetValue>(EMPTY_BUDGET);
-  const [providerAccess, setProviderAccess] =
-    useState<ProviderAccessValue>(ALL_PROVIDERS);
+  const [providerAccess, setProviderAccess] = useState<ProviderAccessValue>(ALL_PROVIDERS);
   const [routing, setRouting] = useState<VirtualKeyRoutingValue>(ROUTING_NONE);
   const [expiration, setExpiration] = useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
   const [expiryFieldError, setExpiryFieldError] = useState<string | null>(null);
@@ -126,8 +125,7 @@ export function VirtualKeyCreateDrawer({
     setOwnership((prev) => {
       if (prev.projectId ?? prev.teamId) return prev;
       const seedProject = project?.id ?? availableProjects[0]?.id ?? null;
-      const seedTeam =
-        availableTeams.length === 1 ? (availableTeams[0]?.id ?? null) : null;
+      const seedTeam = availableTeams.length === 1 ? (availableTeams[0]?.id ?? null) : null;
       // A no-op seed must keep the previous state's identity: a fresh
       // but value-identical object re-arms this effect through its own
       // render and spins the drawer at 100% CPU in an org with no
@@ -252,8 +250,7 @@ export function VirtualKeyCreateDrawer({
         organizationId,
         name,
         description: description || undefined,
-        principalUserId:
-          ownership.kind === "PERSONAL" ? (currentUser?.id ?? null) : null,
+        principalUserId: ownership.kind === "PERSONAL" ? (currentUser?.id ?? null) : null,
         scopes,
         traceProjectId: ownershipTraceProjectId(ownership),
         routingMode: routing.mode,
@@ -347,9 +344,7 @@ export function VirtualKeyCreateDrawer({
                 placeholder="e.g. tier=enterprise, team=ml"
                 maxLength={TAGS_CSV_MAX_LENGTH}
               />
-              {tagsNotice && (
-                <Field.HelperText color="orange.600">{tagsNotice}</Field.HelperText>
-              )}
+              {tagsNotice && <Field.HelperText color="orange.600">{tagsNotice}</Field.HelperText>}
             </Field.Root>
 
             <Separator />
@@ -366,9 +361,7 @@ export function VirtualKeyCreateDrawer({
               onChange={setBudget}
               organizationId={organizationId}
               scopes={scopes}
-              principalUserId={
-                ownership.kind === "PERSONAL" ? (currentUser?.id ?? null) : null
-              }
+              principalUserId={ownership.kind === "PERSONAL" ? (currentUser?.id ?? null) : null}
             />
 
             <Separator />
@@ -385,11 +378,7 @@ export function VirtualKeyCreateDrawer({
             />
 
             <Separator />
-            <VirtualKeyRoutingSection
-              value={routing}
-              onChange={setRouting}
-              policies={policies}
-            />
+            <VirtualKeyRoutingSection value={routing} onChange={setRouting} policies={policies} />
 
             <Separator />
             <VirtualKeyExpirationSection
@@ -407,11 +396,7 @@ export function VirtualKeyCreateDrawer({
               </Text>
             )}
             <Spacer />
-            <Button
-              variant="ghost"
-              onClick={handleClose}
-              disabled={createMutation.isPending}
-            >
+            <Button variant="ghost" onClick={handleClose} disabled={createMutation.isPending}>
               Cancel
             </Button>
             {cannotIssueReason ? (

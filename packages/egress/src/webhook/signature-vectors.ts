@@ -1,7 +1,4 @@
-import {
-  WEBHOOK_DELIVERY_ID_HEADER,
-  WEBHOOK_EVENT_ID_HEADER,
-} from "./delivery-classification";
+import { WEBHOOK_DELIVERY_ID_HEADER, WEBHOOK_EVENT_ID_HEADER } from "./delivery-classification";
 import {
   signWebhookPayload,
   WEBHOOK_SIGNATURE_HEADER,
@@ -43,11 +40,7 @@ export const VECTORS_RELATIVE_PATH = "specs/webhooks/signature-vectors.json";
  * order below is the order the checks run in, so a case that is both
  * malformed and stale is reported as malformed.
  */
-export type VectorOutcome =
-  | "valid"
-  | "malformed_header"
-  | "stale_timestamp"
-  | "invalid_signature";
+export type VectorOutcome = "valid" | "malformed_header" | "stale_timestamp" | "invalid_signature";
 
 export interface SigningVector {
   name: string;
@@ -381,8 +374,7 @@ export function buildVectors(): SignatureVectorFile {
     },
     algorithm: {
       header: "X-LangWatch-Signature: t=<unix seconds>,v1=<hex>[,v1=<hex>]",
-      signed_payload:
-        "`${timestamp}.${raw body}`, using the timestamp as parsed from `t`",
+      signed_payload: "`${timestamp}.${raw body}`, using the timestamp as parsed from `t`",
       digest: "HMAC-SHA256, lowercase hex, compared in constant time",
       repeated_v1:
         "During a secret rotation the header carries one v1 per valid secret, newest first. Verification passes when ANY (held secret, v1) pair matches.",

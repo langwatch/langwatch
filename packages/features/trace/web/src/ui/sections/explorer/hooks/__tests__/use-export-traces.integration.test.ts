@@ -299,9 +299,7 @@ describe("useExportTraces()", () => {
     it("drops the report rather than throwing when no host is mounted", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => void 0);
 
-      expect(() =>
-        showErrorToast({ fallbackTitle: "Couldn't export the traces" }),
-      ).not.toThrow();
+      expect(() => showErrorToast({ fallbackTitle: "Couldn't export the traces" })).not.toThrow();
       expect(warn).toHaveBeenCalled();
     });
   });

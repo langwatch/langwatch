@@ -70,14 +70,10 @@ export function applyFilters(
  * );
  * ```
  */
-export function applyFilterRule(
-  rule: TraceFilter,
-  spans: ReadableSpan[],
-): ReadableSpan[] {
+export function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): ReadableSpan[] {
   if ("preset" in rule && rule.preset) {
     return applyPreset(
-      (rule as { preset: TraceFilter extends { preset: infer P } ? P : never })
-        .preset as any,
+      (rule as { preset: TraceFilter extends { preset: infer P } ? P : never }).preset as any,
       spans,
     );
   }
@@ -280,14 +276,9 @@ export function isHttpRequestSpan(span: ReadableSpan): boolean {
   if (HTTP_INSTRUMENTATION_SCOPES.has(scopeName)) return true;
 
   const attributes = (span.attributes ?? {}) as Record<string, unknown>;
-  if (
-    attributes["http.request.method"] !== undefined ||
-    attributes["http.method"] !== undefined
-  ) {
+  if (attributes["http.request.method"] !== undefined || attributes["http.method"] !== undefined) {
     return true;
   }
 
-  return /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD|CONNECT|TRACE)( |$)/.test(
-    span.name ?? "",
-  );
+  return /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD|CONNECT|TRACE)( |$)/.test(span.name ?? "");
 }

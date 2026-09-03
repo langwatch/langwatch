@@ -82,9 +82,7 @@ describe("the /auth/verify-email landing page", () => {
 
       expect(screen.getByTestId("verify-email-landing")).toBeDefined();
       expect(
-        screen.getByText(
-          "Opening this link on its own does not confirm anything.",
-        ),
+        screen.getByText("Opening this link on its own does not confirm anything."),
       ).toBeDefined();
     });
   });

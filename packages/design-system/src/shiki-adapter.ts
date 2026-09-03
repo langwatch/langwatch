@@ -169,13 +169,7 @@ export function useShikiAdapter(colorMode: string) {
  * Exposed as a named export so integration tests can spy on it:
  *   `vi.spyOn(shikiAdapter, 'codeToHtml')`
  */
-export async function codeToHtml({
-  code,
-  lang,
-}: {
-  code: string;
-  lang: string;
-}): Promise<string> {
+export async function codeToHtml({ code, lang }: { code: string; lang: string }): Promise<string> {
   return codeToHtmlThemed({ code, lang, theme: "github-light" });
 }
 

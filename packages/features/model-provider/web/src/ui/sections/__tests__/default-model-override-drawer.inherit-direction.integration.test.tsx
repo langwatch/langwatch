@@ -55,9 +55,7 @@ vi.mock("@langwatch/authz-web/surfaces/scope-picker", async () => {
       <button
         type="button"
         data-testid="pick-org-scope"
-        onClick={() =>
-          onChange([{ scopeType: "ORGANIZATION", scopeId: "org-1" }])
-        }
+        onClick={() => onChange([{ scopeType: "ORGANIZATION", scopeId: "org-1" }])}
       />
     ),
   };
@@ -145,11 +143,7 @@ function renderDrawer(editingId?: string) {
 
 /** The config payload of the drawer's first save call. */
 function savedConfig(): Record<string, string> | undefined {
-  return (
-    mockSave.mock.calls[0]?.[0] as
-      | { config: Record<string, string> }
-      | undefined
-  )?.config;
+  return (mockSave.mock.calls[0]?.[0] as { config: Record<string, string> } | undefined)?.config;
 }
 
 describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", () => {
@@ -202,12 +196,8 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
 
       renderDrawer("cfg_proj");
 
-      expect(
-        screen.getAllByText("Inherit (from organization)").length,
-      ).toBeGreaterThan(0);
-      expect(
-        screen.queryByText("Inherit (from project)"),
-      ).not.toBeInTheDocument();
+      expect(screen.getAllByText("Inherit (from organization)").length).toBeGreaterThan(0);
+      expect(screen.queryByText("Inherit (from project)")).not.toBeInTheDocument();
 
       // The entry is a label over a value that flows down, not a value
       // of its own: leaving it selected saves the key as absent.
@@ -275,9 +265,7 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
       fireEvent.click(save);
 
       await vi.waitFor(() => {
-        expect(mockSave).toHaveBeenCalledWith(
-          expect.objectContaining({ id: "cfg_org" }),
-        );
+        expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ id: "cfg_org" }));
       });
       // Hydrated from the settled row, not left empty by the latch.
       expect(savedConfig()).toEqual({ DEFAULT: "openai/gpt-5.5" });
@@ -295,9 +283,7 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
       fireEvent.click(screen.getByTestId("config-save"));
 
       await vi.waitFor(() => {
-        expect(mockSave).toHaveBeenCalledWith(
-          expect.objectContaining({ id: "cfg_proj" }),
-        );
+        expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ id: "cfg_proj" }));
       });
       expect(savedConfig()).toEqual({});
     });
@@ -349,9 +335,7 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
     it("shows a note that the existing config gets replaced", () => {
       renderDrawer(undefined);
 
-      expect(
-        screen.queryByTestId("replaced-configs-note"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("replaced-configs-note")).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId("pick-org-scope"));
 

@@ -19,10 +19,7 @@ interface RowCheckboxProps {
   ariaLabel: string;
 }
 
-const RowCheckbox: React.FC<RowCheckboxProps> = ({
-  traceIds: candidateTraceIds,
-  ariaLabel,
-}) => {
+const RowCheckbox: React.FC<RowCheckboxProps> = ({ traceIds: candidateTraceIds, ariaLabel }) => {
   const traceIdSet = useSelectionStore((s) => s.traceIds);
   const mode = useSelectionStore((s) => s.mode);
   const setMany = useSelectionStore((s) => s.setMany);

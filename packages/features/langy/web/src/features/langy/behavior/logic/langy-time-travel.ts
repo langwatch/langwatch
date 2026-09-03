@@ -27,10 +27,7 @@
  *                   turn's accumulated reasoning — what the thinking line and
  *                   status row were showing right then.
  */
-import {
-  LANGY_CONVERSATION_EVENT_TYPES,
-  type LangyEventCursor,
-} from "@langwatch/langy-contract";
+import { LANGY_CONVERSATION_EVENT_TYPES, type LangyEventCursor } from "@langwatch/langy-contract";
 
 import type { LangyMessageDto } from "@langwatch/langy-contract";
 import {
@@ -146,18 +143,13 @@ export function buildTimeTravelView({
   // Skew guard alongside the timestamp check: if a history row already shows
   // this exact text as the newest user message, the send has landed — a
   // synthetic copy would render the question twice.
-  const lastSettledUser = [...messages]
-    .reverse()
-    .find((message) => message.role === "user");
+  const lastSettledUser = [...messages].reverse().find((message) => message.role === "user");
   const sendAlreadySettled =
     !!sendText &&
     !!lastSettledUser &&
     JSON.stringify(lastSettledUser.parts).includes(JSON.stringify(sendText));
   const pendingSend =
-    !!lastSend &&
-    !terminal &&
-    !sendAlreadySettled &&
-    lastSend.atMs > newestBaselineUserAt;
+    !!lastSend && !terminal && !sendAlreadySettled && lastSend.atMs > newestBaselineUserAt;
 
   if (pendingSend && lastSend) {
     messages.push({

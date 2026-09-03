@@ -15,9 +15,9 @@ describe("resolveHomeComposition", () => {
   describe("when the signal-focused rollout is off", () => {
     /** @scenario Without Langy the classic home renders */
     it("falls back to classic without Langy", () => {
-      expect(
-        resolveHomeComposition({ showSignalFocusedHome: false, showLangy: false }),
-      ).toBe("classic");
+      expect(resolveHomeComposition({ showSignalFocusedHome: false, showLangy: false })).toBe(
+        "classic",
+      );
     });
   });
 });

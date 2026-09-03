@@ -130,9 +130,7 @@ export const experimentVersionsCommand = async (
         const autosave = result.versions.find((version) => version.autoSaved);
         if (autosave) {
           console.log(
-            chalk.gray(
-              `The autosave restores as version ${chalk.cyan(autosave.version)}.`,
-            ),
+            chalk.gray(`The autosave restores as version ${chalk.cyan(autosave.version)}.`),
           );
         }
       },

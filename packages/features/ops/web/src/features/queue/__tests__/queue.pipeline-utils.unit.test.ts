@@ -95,10 +95,7 @@ describe("classifyGroup", () => {
       /** @scenario "Work due now is distinguished from work deferred into the future" */
       it("reads the eligible one as due and the deferred one as scheduled with its time", () => {
         const due = classifyGroup(makeGroup({ pendingJobs: 3, score: NOW - 500 }), NOW);
-        const deferred = classifyGroup(
-          makeGroup({ pendingJobs: 3, score: NOW + 120_000 }),
-          NOW,
-        );
+        const deferred = classifyGroup(makeGroup({ pendingJobs: 3, score: NOW + 120_000 }), NOW);
         expect(due.state).toBe("due");
         expect(deferred.state).toBe("scheduled");
         expect(deferred.nextEligibleMs).toBe(NOW + 120_000);
@@ -108,10 +105,7 @@ describe("classifyGroup", () => {
 
   describe("given a group with an active job and no failures", () => {
     it("classifies it as active", () => {
-      const c = classifyGroup(
-        makeGroup({ hasActiveJob: true, activeJobId: "job-1" }),
-        NOW,
-      );
+      const c = classifyGroup(makeGroup({ hasActiveJob: true, activeJobId: "job-1" }), NOW);
       expect(c.state).toBe("active");
       expect(c.isFailing).toBe(false);
     });
@@ -125,17 +119,15 @@ describe("classifyGroup", () => {
 
   describe("given blocked-set groups", () => {
     it("classifies a blocked group with work as blocked", () => {
-      expect(
-        classifyGroup(makeGroup({ isBlocked: true, errorMessage: "poison" }), NOW).state,
-      ).toBe("blocked");
+      expect(classifyGroup(makeGroup({ isBlocked: true, errorMessage: "poison" }), NOW).state).toBe(
+        "blocked",
+      );
     });
 
     it("classifies an empty blocked group as stale", () => {
       expect(
-        classifyGroup(
-          makeGroup({ isBlocked: true, isStaleBlock: true, pendingJobs: 0 }),
-          NOW,
-        ).state,
+        classifyGroup(makeGroup({ isBlocked: true, isStaleBlock: true, pendingJobs: 0 }), NOW)
+          .state,
       ).toBe("stale");
     });
   });
@@ -165,10 +157,9 @@ describe("sortGroupsBySeverity", () => {
     describe("when the table orders its rows", () => {
       /** @scenario "Trouble sorts above healthy work" */
       it("puts blocked first and retrying before all healthy work", () => {
-        const ordered = sortGroupsBySeverity(
-          [idle, active, blocked, retrying, due],
-          NOW,
-        ).map((g) => g.groupId);
+        const ordered = sortGroupsBySeverity([idle, active, blocked, retrying, due], NOW).map(
+          (g) => g.groupId,
+        );
         expect(ordered[0]).toBe("g/blocked");
         expect(ordered.indexOf("g/retrying")).toBeLessThan(ordered.indexOf("g/due"));
         expect(ordered.indexOf("g/retrying")).toBeLessThan(ordered.indexOf("g/active"));

@@ -67,10 +67,7 @@ function markedPids(): number[] {
     .filter((n) => Number.isInteger(n));
 }
 
-async function waitUntil(
-  predicate: () => boolean,
-  { timeoutMs = 6000 } = {},
-): Promise<boolean> {
+async function waitUntil(predicate: () => boolean, { timeoutMs = 6000 } = {}): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return true;
@@ -141,11 +138,11 @@ describe("die-with-parent hook", () => {
   describe("given a process that loads the watch and has nothing else to do", () => {
     /** @scenario "The watch never keeps an exiting process alive" */
     it("exits on its own", () => {
-      const r = spawnSync(
-        "node",
-        ["--require", HOOK, "-e", "process.exitCode = 7"],
-        { encoding: "utf8", env: { ...process.env, ...FAST }, timeout: 5000 },
-      );
+      const r = spawnSync("node", ["--require", HOOK, "-e", "process.exitCode = 7"], {
+        encoding: "utf8",
+        env: { ...process.env, ...FAST },
+        timeout: 5000,
+      });
       expect(r.status).toBe(7);
     });
   });

@@ -1,9 +1,6 @@
 import Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  SubscriptionStatus,
-  type StripePriceMap,
-} from "@langwatch/enterprise-billing-contract";
+import { SubscriptionStatus, type StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import {
   SeatEventSubscriptionService,
   StripeCustomerCurrencyService,
@@ -366,9 +363,7 @@ describe("seatEventSubscription", () => {
         // Falling back to zero rendered "$0" as the new billing amount beside a
         // button that charges the card.
         db.subscription.findMany.mockResolvedValue([linkedActive]);
-        stripe.subscriptions.retrieve.mockResolvedValue(
-          seatSubscription({ unitAmount: null }),
-        );
+        stripe.subscriptions.retrieve.mockResolvedValue(seatSubscription({ unitAmount: null }));
         stripe.invoices.createPreview.mockResolvedValue({
           currency: "usd",
           total: 1500,
@@ -431,8 +426,7 @@ describe("seatEventSubscription", () => {
           totalMembers: 8,
         });
 
-        const previewed =
-          stripe.invoices.createPreview.mock.calls[0]![0].subscription_details;
+        const previewed = stripe.invoices.createPreview.mock.calls[0]![0].subscription_details;
         const applied = stripe.subscriptions.update.mock.calls[0]![1];
 
         expect(previewed).toEqual(applied);
@@ -832,10 +826,7 @@ describe("seatEventSubscription", () => {
   describe("createSeatEventCheckout()", () => {
     describe("when stale PENDING subscriptions exist", () => {
       beforeEach(() => {
-        db.subscription.findMany.mockResolvedValue([
-          { id: "stale_sub_1" },
-          { id: "stale_sub_2" },
-        ]);
+        db.subscription.findMany.mockResolvedValue([{ id: "stale_sub_1" }, { id: "stale_sub_2" }]);
 
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",
@@ -978,9 +969,7 @@ describe("seatEventSubscription", () => {
         });
 
         const callArgs = stripe.checkout.sessions.create.mock.calls[0]![0];
-        expect(callArgs.success_url).toBe(
-          "https://app.test/settings/subscription?success",
-        );
+        expect(callArgs.success_url).toBe("https://app.test/settings/subscription?success");
       });
 
       it("appends upgraded_from param when isUpgradeFromTiered is true", async () => {

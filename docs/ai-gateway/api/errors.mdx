@@ -37,8 +37,8 @@ Read the reason chain from the plane you called. Nothing else about the envelope
 
 <Note>
   `402 budget_exceeded` is a data-plane refusal because a budget stops **traffic**, not
-  administration. Creating or editing a budget over the control plane is never refused for
-  being over cap.
+  administration. Creating or editing a budget over the control plane is never refused for being
+  over cap.
 </Note>
 
 ### Fields
@@ -64,8 +64,8 @@ The gateway data plane adds three fields on the errors it can offer a next step 
 A client that reads only `type`, `code`, `message` and `meta` works unchanged against both planes; the three fields above are additive.
 
 <Note>
-  Clients must ignore unknown fields. Fields are added to this envelope over time and none
-  of the additions above changes an existing one.
+  Clients must ignore unknown fields. Fields are added to this envelope over time and none of the
+  additions above changes an existing one.
 </Note>
 
 ## Response headers
@@ -237,8 +237,8 @@ Once bytes are flowing, the HTTP status is already 200, so the distinguishing si
 
 <Note>
   The `type` on a streaming terminal frame always reflects the category (`provider_error`,
-  `guardrail_blocked`), clients keying off `type` will already have a usable
-  classification. The `code` is the granular discriminator if you need it (for example, a
-  retry policy that distinguishes "upstream flaked, retry with a different VK" from
-  "guardrail policy said no, don't retry").
+  `guardrail_blocked`), clients keying off `type` will already have a usable classification. The
+  `code` is the granular discriminator if you need it (for example, a retry policy that
+  distinguishes "upstream flaked, retry with a different VK" from "guardrail policy said no, don't
+  retry").
 </Note>

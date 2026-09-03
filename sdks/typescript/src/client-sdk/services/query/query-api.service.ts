@@ -1,8 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -73,11 +70,7 @@ export class QueryApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(
-    operation: string,
-    error: unknown,
-    response?: Response,
-  ): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const status = response?.status ?? extractStatusFromResponse(error);
     const message = formatApiErrorForOperation({
       operation: operation,
@@ -100,10 +93,7 @@ export class QueryApiService {
    * diagnostics, scoped to the caller's project.
    */
   async query(params: QueryRunParams): Promise<QueryRunResult> {
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/query",
-      { body: params },
-    );
+    const { data, error, response } = await this.apiClient.POST("/api/v1/query", { body: params });
     if (error) this.handleApiError("run query", error, response);
     return data;
   }
@@ -115,10 +105,7 @@ export class QueryApiService {
    * partition-pruning time column, freshness and a runnable example query.
    */
   async schema(): Promise<QuerySchemaResult> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/query/schema",
-      {},
-    );
+    const { data, error, response } = await this.apiClient.GET("/api/v1/query/schema", {});
     if (error) this.handleApiError("discover query schema", error, response);
     return data;
   }

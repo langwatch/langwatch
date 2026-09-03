@@ -107,9 +107,7 @@ export class ApiKeyPermissionDeniedError extends HandledError {
         meta: { permission, ...options.meta },
         httpStatus: 403,
         fault: "customer",
-        tips: [
-          "Re-create the API key with the required scope, or ask an admin to raise your role",
-        ],
+        tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
         docsUrl: "https://docs.langwatch.ai/api-reference/api-keys/create-api-key",
       },
     );
@@ -120,10 +118,7 @@ export class ApiKeyPermissionDeniedError extends HandledError {
 export class ApiKeyPermissionNotDelegableError extends HandledError {
   declare readonly code: "api_key_permission_not_delegable";
 
-  constructor(
-    permission: string,
-    options: { subject: string; meta?: Record<string, unknown> },
-  ) {
+  constructor(permission: string, options: { subject: string; meta?: Record<string, unknown> }) {
     super(
       "api_key_permission_not_delegable",
       `${options.subject} is never granted ${permission}, whatever key or role you use. Make this change in LangWatch yourself.`,

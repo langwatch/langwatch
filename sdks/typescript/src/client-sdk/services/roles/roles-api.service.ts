@@ -64,8 +64,7 @@ export class RolesApiService {
     this.#request = createManagementRequest({
       endpoint: resolveEndpoint(config?.endpoint),
       token: resolveManagementToken({ apiKey: config?.apiKey }),
-      errorFactory: ({ message, operation, body }) =>
-        new RolesApiError(message, operation, body),
+      errorFactory: ({ message, operation, body }) => new RolesApiError(message, operation, body),
     });
   }
 
@@ -92,13 +91,7 @@ export class RolesApiService {
     });
   }
 
-  async update({
-    id,
-    input,
-  }: {
-    id: string;
-    input: UpdateRoleInput;
-  }): Promise<CustomRole> {
+  async update({ id, input }: { id: string; input: UpdateRoleInput }): Promise<CustomRole> {
     return this.#request({
       operation: `update custom role "${id}"`,
       path: managementPath(`/api/roles/${encodeURIComponent(id)}`),

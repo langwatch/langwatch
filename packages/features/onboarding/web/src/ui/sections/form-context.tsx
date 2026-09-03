@@ -35,7 +35,5 @@ export function useOnboardingFormContext(): OnboardingFormContextValue {
 export const OnboardingFormProvider: React.FC<
   React.PropsWithChildren<{ value: OnboardingFormContextValue }>
 > = ({ value, children }) => (
-  <OnboardingFormContext.Provider value={value}>
-    {children}
-  </OnboardingFormContext.Provider>
+  <OnboardingFormContext.Provider value={value}>{children}</OnboardingFormContext.Provider>
 );

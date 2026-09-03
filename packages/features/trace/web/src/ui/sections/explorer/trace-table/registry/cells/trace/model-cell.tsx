@@ -52,11 +52,7 @@ function inferProvider(model: string): ProviderKey | null {
   if (lower.startsWith("claude-") || lower.startsWith("claude/")) {
     return "anthropic";
   }
-  if (
-    lower.startsWith("gemini-") ||
-    lower.startsWith("gemma-") ||
-    lower.startsWith("text-bison")
-  ) {
+  if (lower.startsWith("gemini-") || lower.startsWith("gemma-") || lower.startsWith("text-bison")) {
     return "gemini";
   }
   if (lower.startsWith("deepseek-")) return "deepseek";
@@ -81,13 +77,7 @@ function inferProvider(model: string): ProviderKey | null {
  * its doc comment in iconsMap.tsx for why this is a wrapper-level fix
  * rather than one baked into the SVGs themselves.
  */
-export function ProviderIcon({
-  model,
-  size,
-}: {
-  model: string;
-  size: "compact" | "comfortable";
-}) {
+export function ProviderIcon({ model, size }: { model: string; size: "compact" | "comfortable" }) {
   const provider = inferProvider(model);
   if (!provider) return null;
   const px = size === "comfortable" ? "14px" : "12px";
@@ -242,13 +232,7 @@ function renderModel(row: TraceListItem, density: Density) {
           </Text>
         )}
         {overflow > 0 && (
-          <Text
-            as="span"
-            textStyle="2xs"
-            color="fg.subtle"
-            fontWeight="semibold"
-            flexShrink={0}
-          >
+          <Text as="span" textStyle="2xs" color="fg.subtle" fontWeight="semibold" flexShrink={0}>
             +{overflow}
           </Text>
         )}

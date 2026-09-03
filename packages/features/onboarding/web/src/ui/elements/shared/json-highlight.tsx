@@ -68,8 +68,7 @@ export function JsonHighlight({
               css={{
                 "& pre, & code": {
                   background: "transparent !important",
-                  fontFamily:
-                    "'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace",
+                  fontFamily: "'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace",
                   fontSize: "12.5px",
                   lineHeight: "1.8",
                   letterSpacing: "0.01em",

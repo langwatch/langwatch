@@ -136,13 +136,7 @@ export interface RefreshResult {
 
 export class DeviceFlowError extends Error {
   constructor(
-    public readonly kind:
-      | "pending"
-      | "denied"
-      | "expired"
-      | "slow_down"
-      | "unauthorized"
-      | "other",
+    public readonly kind: "pending" | "denied" | "expired" | "slow_down" | "unauthorized" | "other",
     message: string,
   ) {
     super(message);
@@ -241,10 +235,7 @@ export async function exchange(
       throw new DeviceFlowError("slow_down", "polling too fast");
     default: {
       const body = await res.text().catch(() => "");
-      throw new DeviceFlowError(
-        "other",
-        `unexpected status ${res.status}: ${body.slice(0, 256)}`,
-      );
+      throw new DeviceFlowError("other", `unexpected status ${res.status}: ${body.slice(0, 256)}`);
     }
   }
 }
@@ -298,10 +289,7 @@ export async function refresh(
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new DeviceFlowError(
-      "other",
-      `refresh failed (${res.status}): ${body.slice(0, 256)}`,
-    );
+    throw new DeviceFlowError("other", `refresh failed (${res.status}): ${body.slice(0, 256)}`);
   }
   return (await res.json()) as RefreshResult;
 }
@@ -324,17 +312,10 @@ export async function logout(
   // 401/404 mean "already gone" — that's success for logout.
   if (res.status === 200 || res.status === 401 || res.status === 404) return;
   const text = await res.text().catch(() => "");
-  throw new DeviceFlowError(
-    "other",
-    `logout failed (${res.status}): ${text.slice(0, 256)}`,
-  );
+  throw new DeviceFlowError("other", `logout failed (${res.status}): ${text.slice(0, 256)}`);
 }
 
-async function postJSON<T>(
-  opts: DeviceFlowOptions,
-  path: string,
-  body: unknown,
-): Promise<T> {
+async function postJSON<T>(opts: DeviceFlowOptions, path: string, body: unknown): Promise<T> {
   const res = await rawPost(opts, path, body);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -343,11 +324,7 @@ async function postJSON<T>(
   return (await res.json()) as T;
 }
 
-function rawPost(
-  opts: DeviceFlowOptions,
-  path: string,
-  body: unknown,
-): Promise<Response> {
+function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<Response> {
   const url = normalizeEndpoint(opts.baseUrl) + path;
   const f = opts.fetchImpl ?? fetch;
   return f(url, {

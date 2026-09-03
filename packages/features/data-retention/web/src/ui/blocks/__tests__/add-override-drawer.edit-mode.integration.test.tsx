@@ -24,9 +24,7 @@ const editTarget: RetentionEditTarget = {
 // instead of rendering its own picker.
 const scopePicker = () => <div data-testid="scope-chip-picker" />;
 
-function renderDrawer(
-  props: Partial<React.ComponentProps<typeof AddOverrideDrawer>> = {},
-) {
+function renderDrawer(props: Partial<React.ComponentProps<typeof AddOverrideDrawer>> = {}) {
   return render(
     <Wrapper>
       <AddOverrideDrawer

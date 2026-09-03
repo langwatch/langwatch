@@ -11,5 +11,4 @@
  * success from where the customer is standing, so the hook redirects instead
  * of complaining.
  */
-export const INVITE_ALREADY_ACCEPTED_MESSAGE =
-  "Invite was already accepted" as const;
+export const INVITE_ALREADY_ACCEPTED_MESSAGE = "Invite was already accepted" as const;

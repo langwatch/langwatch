@@ -45,9 +45,7 @@ const legacyWorkflow = (overrides: {
 });
 
 const llmValueOf = (dsl: StudioWorkflow): LLMConfig | undefined =>
-  dsl.nodes[0]!.data.parameters?.find((p) => p.type === "llm")?.value as
-    | LLMConfig
-    | undefined;
+  dsl.nodes[0]!.data.parameters?.find((p) => p.type === "llm")?.value as LLMConfig | undefined;
 
 describe("migrateDSLVersion 1.4 → 1.5 (default_llm fold)", () => {
   /** @scenario spec_version 1.4 workflows fold default_llm into modelless LLM nodes */

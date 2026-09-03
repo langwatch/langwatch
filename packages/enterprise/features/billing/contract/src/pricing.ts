@@ -28,10 +28,7 @@ export function getGrowthSeatPriceCents(
 }
 
 /** Annual discount % derived from catalog (e.g. 8) */
-export function getAnnualDiscountPercent(
-  currency: Currency,
-  prices: StripePriceMap,
-): number {
+export function getAnnualDiscountPercent(currency: Currency, prices: StripePriceMap): number {
   const p = getGrowthSeatPriceCents(prices);
   return Math.round((1 - p[currency].annual / (p[currency].monthly * 12)) * 100);
 }
@@ -40,13 +37,7 @@ export function getAnnualDiscountPercent(
  * Format cents to display price with currency symbol.
  * Uses Intl.NumberFormat for proper thousands separators and decimal handling.
  */
-export function formatPrice({
-  cents,
-  currency,
-}: {
-  cents: number;
-  currency: Currency;
-}): string {
+export function formatPrice({ cents, currency }: { cents: number; currency: Currency }): string {
   const amount = cents / 100;
   return new Intl.NumberFormat(currency === Currency.EUR ? "en-IE" : "en-US", {
     style: "currency",

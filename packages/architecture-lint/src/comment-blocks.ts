@@ -10,16 +10,7 @@ const REVIEW_LINE_COUNT = 4;
 const MAX_COMMENT_BLOCK_LINES = 5;
 const SOURCE_WHITESPACE = new Set([" ", "\t", "\r", "\n"]);
 
-const SOURCE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mts",
-  ".cts",
-  ".mjs",
-  ".cjs",
-]);
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"]);
 
 const EXCLUDED_DIRECTORIES = new Set([
   ".git",
@@ -294,8 +285,7 @@ function mayContainReviewBlock(source: string): boolean {
     const lineComment = line.trimStart().startsWith("//");
     const blockStart = line.indexOf("/*");
     const blockEnd = line.indexOf("*/", insideBlockComment ? 0 : blockStart + 2);
-    const commentLike =
-      lineComment || insideBlockComment || line.trimStart().startsWith("/*");
+    const commentLike = lineComment || insideBlockComment || line.trimStart().startsWith("/*");
 
     if (commentLike) {
       contiguousLines += 1;
@@ -380,13 +370,7 @@ export function changedSourceFiles(root: string): string[] {
   }
 
   const paths = new Set([
-    ...gitPaths(resolvedRoot, [
-      "diff",
-      "--name-only",
-      "-z",
-      "--diff-filter=ACMR",
-      "HEAD",
-    ]),
+    ...gitPaths(resolvedRoot, ["diff", "--name-only", "-z", "--diff-filter=ACMR", "HEAD"]),
     ...gitPaths(resolvedRoot, ["ls-files", "--others", "--exclude-standard", "-z"]),
   ]);
   const base = mergeBase(resolvedRoot);
@@ -406,9 +390,7 @@ export function changedSourceFiles(root: string): string[] {
 
 function sourceFiles(root: string, files: readonly string[] | undefined): string[] {
   if (!files) return allSourceFiles(root);
-  return [...new Set(files.map((file) => resolve(root, file)))]
-    .filter(isSourceFile)
-    .sort();
+  return [...new Set(files.map((file) => resolve(root, file)))].filter(isSourceFile).sort();
 }
 
 function lineStarts(source: string): number[] {
@@ -436,10 +418,7 @@ function lineAt(starts: number[], position: number): number {
   return upper;
 }
 
-function commentRanges(
-  source: string,
-  file: ts.SourceFile,
-): Array<{ pos: number; end: number }> {
+function commentRanges(source: string, file: ts.SourceFile): Array<{ pos: number; end: number }> {
   const ranges = new Map<string, { pos: number; end: number }>();
   const add = (comments: ts.CommentRange[] | undefined): void => {
     for (const comment of comments ?? []) {
@@ -458,9 +437,7 @@ function commentRanges(
   add(ts.getLeadingCommentRanges(source, 0));
   add(ts.getTrailingCommentRanges(source, source.length));
   visit(file);
-  return [...ranges.values()].sort(
-    (left, right) => left.pos - right.pos || left.end - right.end,
-  );
+  return [...ranges.values()].sort((left, right) => left.pos - right.pos || left.end - right.end);
 }
 
 function commentLines(path: string, source: string): SourceLine[] {
@@ -490,8 +467,7 @@ function commentLines(path: string, source: string): SourceLine[] {
       completedComment = comments[commentIndex];
     }
     const comment = comments[commentIndex];
-    const inComment =
-      comment !== undefined && comment.pos <= index && index < comment.end;
+    const inComment = comment !== undefined && comment.pos <= index && index < comment.end;
     const character = source[index];
     const code = !inComment && !SOURCE_WHITESPACE.has(character ?? "");
     if (code) {
@@ -504,10 +480,7 @@ function commentLines(path: string, source: string): SourceLine[] {
   return lines;
 }
 
-function collectBlocks(
-  path: string,
-  source: string,
-): Array<{ line: number; lines: number }> {
+function collectBlocks(path: string, source: string): Array<{ line: number; lines: number }> {
   const blocks: Array<{ line: number; lines: number }> = [];
   const lines = commentLines(path, source);
   let start: number | undefined;

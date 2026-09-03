@@ -107,10 +107,7 @@ async function startEchoingModel(): Promise<StubModel> {
 }
 
 /** Runs `turns` turns the way the scenario executor does. */
-async function runTurns(
-  adapter: SerializedPromptConfigAdapter,
-  turns: number,
-): Promise<void> {
+async function runTurns(adapter: SerializedPromptConfigAdapter, turns: number): Promise<void> {
   let sequence = 0;
   const stamp = (message: AgentInput["messages"][number]): StampedMessage => ({
     ...message,
@@ -118,9 +115,7 @@ async function runTurns(
     traceId: `trace_${sequence}`,
   });
 
-  const conversation: StampedMessage[] = [
-    stamp({ role: "user", content: "I need a refund" }),
-  ];
+  const conversation: StampedMessage[] = [stamp({ role: "user", content: "I need a refund" })];
   const scenarioConfig: ScenarioConfig = {
     name: "prompt adapter test",
     description: "",
@@ -146,9 +141,7 @@ async function runTurns(
     const reply = await adapter.call(input);
 
     conversation.push(stamp({ role: "assistant", content: reply }));
-    conversation.push(
-      stamp({ role: "user", content: `Follow-up number ${turn}, please.` }),
-    );
+    conversation.push(stamp({ role: "user", content: `Follow-up number ${turn}, please.` }));
   }
 }
 
@@ -204,9 +197,7 @@ describe("prompt agent over four turns", () => {
           );
           // An escaped quote is the tell of a payload nested inside a payload:
           // it is what the escape depth climbed through on `main`, turn by turn.
-          expect(prompt, `turn ${index + 1} nests an escaped payload`).not.toContain(
-            '\\"',
-          );
+          expect(prompt, `turn ${index + 1} nests an escaped payload`).not.toContain('\\"');
         }
       });
 
@@ -337,9 +328,7 @@ describe("prompt agent over four turns", () => {
         // Names only — the bound values never reach the log line.
         expect(JSON.stringify([fields, message])).not.toContain("I need a refund");
         // The rendered prompt shows the placeholder where the value would be.
-        expect(model.systemPrompts()[0]).toContain(
-          "tier: [unbound input: customer_tier]",
-        );
+        expect(model.systemPrompts()[0]).toContain("tier: [unbound input: customer_tier]");
       });
     });
   });

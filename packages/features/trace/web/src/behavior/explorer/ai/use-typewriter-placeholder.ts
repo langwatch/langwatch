@@ -13,10 +13,7 @@ const HOLD_MS = 2600;
  * Shared by AiPromptInput and LangySidebar; keep it here (next to
  * useCyclingVerb) rather than copy-pasting the timing logic into each surface.
  */
-export function useTypewriterPlaceholder(
-  active: boolean,
-  examples: readonly string[],
-): string {
+export function useTypewriterPlaceholder(active: boolean, examples: readonly string[]): string {
   const reduceMotion = useReducedMotion();
   const [text, setText] = useState(examples[0] ?? "");
 

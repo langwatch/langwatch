@@ -77,10 +77,7 @@ export class GithubAppTokenAdapter extends GithubAppTokenPort {
       .sort()
       .join(",");
 
-    return createHash("sha256")
-      .update(`${repositories}|${permissions}`)
-      .digest("hex")
-      .slice(0, 16);
+    return createHash("sha256").update(`${repositories}|${permissions}`).digest("hex").slice(0, 16);
   }
 
   signAppJwt(nowSec?: number): string {
@@ -91,9 +88,7 @@ export class GithubAppTokenAdapter extends GithubAppTokenPort {
     return this.api.getInstallation(installationId);
   }
 
-  async mintInstallationToken(
-    input: MintInstallationTokenInput,
-  ): Promise<GithubInstallationToken> {
+  async mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken> {
     const permissions = input.permissions ?? GITHUB_WRITE_PERMISSIONS;
     const scopeKey = this.computeRepoScopeKey({
       repositoryIds: input.repositoryIds,
@@ -134,9 +129,7 @@ export class GithubAppTokenAdapter extends GithubAppTokenPort {
     }
   }
 
-  async listInstallationRepositories(
-    installationId: string,
-  ): Promise<GithubRepository[]> {
+  async listInstallationRepositories(installationId: string): Promise<GithubRepository[]> {
     const minted = await this.mintInstallationToken({ installationId });
     return this.api.listInstallationRepositories(minted.token);
   }

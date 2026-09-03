@@ -4,10 +4,7 @@ import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "../projections/abstractFoldProjection";
-import {
-  AbstractMapProjection,
-  type MapEventHandlers,
-} from "../projections/abstractMapProjection";
+import { AbstractMapProjection, type MapEventHandlers } from "../projections/abstractMapProjection";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import type { AppendStore } from "../projections/mapProjection.types";
 

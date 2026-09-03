@@ -18,18 +18,11 @@ import { LangyCapabilityCard } from "./langy-capability-card";
 
 function parseVerdict(output: unknown): string | null {
   const text = extractToolText(output);
-  const verdict = text.match(
-    /\b(passed|failed|success|error|running|pending|completed)\b/i,
-  );
+  const verdict = text.match(/\b(passed|failed|success|error|running|pending|completed)\b/i);
   return verdict ? verdict[1]! : null;
 }
 
-export function LangyScenarioCard({
-  descriptor,
-  input,
-  output,
-  projectSlug,
-}: CapabilityCardInput) {
+export function LangyScenarioCard({ descriptor, input, output, projectSlug }: CapabilityCardInput) {
   const id = extractPrimaryId(input, output);
   const name = extractResourceName(input, output);
   const verdict = parseVerdict(output);

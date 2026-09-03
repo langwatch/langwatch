@@ -11,10 +11,7 @@ const STATE_TTL_MS = GithubInstallStateAdapter.create({
   redis: null,
 }).getTtlMs();
 
-function signGithubInstallState(
-  payload: GithubInstallStatePayload,
-  signingKey: string,
-): string {
+function signGithubInstallState(payload: GithubInstallStatePayload, signingKey: string): string {
   return GithubInstallStateAdapter.create({
     signingKey,
     redis: null,
@@ -99,9 +96,7 @@ describe("signGithubInstallState + verifyGithubInstallState", () => {
   describe("when the state is older than the TTL", () => {
     it("returns null even though the signature is valid", () => {
       const token = signGithubInstallState(makePayload(), SIGNING_KEY);
-      expect(
-        verifyGithubInstallState(token, SIGNING_KEY, NOW + STATE_TTL_MS + 1),
-      ).toBeNull();
+      expect(verifyGithubInstallState(token, SIGNING_KEY, NOW + STATE_TTL_MS + 1)).toBeNull();
     });
   });
 

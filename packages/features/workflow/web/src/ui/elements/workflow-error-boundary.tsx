@@ -18,10 +18,7 @@
 import { Alert } from "@chakra-ui/react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-export class WorkflowErrorBoundary extends Component<
-  { children: ReactNode },
-  { failed: boolean }
-> {
+export class WorkflowErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   override state = { failed: false };
 
   static getDerivedStateFromError() {

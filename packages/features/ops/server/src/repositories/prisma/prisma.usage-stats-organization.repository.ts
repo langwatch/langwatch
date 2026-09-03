@@ -9,9 +9,7 @@ export class PrismaUsageStatsOrganizationRepository extends UsageStatsOrganizati
     super();
   }
 
-  static create(
-    database: UsageStatsOrganizationDatabase,
-  ): PrismaUsageStatsOrganizationRepository {
+  static create(database: UsageStatsOrganizationDatabase): PrismaUsageStatsOrganizationRepository {
     return new PrismaUsageStatsOrganizationRepository(database);
   }
 

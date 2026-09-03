@@ -57,9 +57,7 @@ describe("given the generated OpenAPI document", () => {
       for (const { path, method, success } of OPERATIONS) {
         if (success === "204") continue;
         const schema =
-          paths[path]?.[method]?.responses?.[success]?.content?.[
-            "application/json"
-          ]?.schema;
+          paths[path]?.[method]?.responses?.[success]?.content?.["application/json"]?.schema;
         expect(
           schema,
           `${method.toUpperCase()} ${path} publishes no response schema`,

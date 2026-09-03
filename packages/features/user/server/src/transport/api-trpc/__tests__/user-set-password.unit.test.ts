@@ -82,9 +82,7 @@ describe("user.setPassword", () => {
 
       await expect(call(h)).resolves.toMatchObject({ success: true });
 
-      expect(h.setFirstPassword).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "user-1" }),
-      );
+      expect(h.setFirstPassword).toHaveBeenCalledWith(expect.objectContaining({ id: "user-1" }));
     });
 
     /** @scenario A new password ends every other session */

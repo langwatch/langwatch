@@ -547,10 +547,7 @@ export class QueueRedisRepository implements QueueRepository {
     return Array.from(names);
   }
 
-  async scanQueues(params: {
-    queueNames: string[];
-    topN?: number;
-  }): Promise<QueueInfo[]> {
+  async scanQueues(params: { queueNames: string[]; topN?: number }): Promise<QueueInfo[]> {
     const queues = await Promise.all(
       params.queueNames.map((queueName) =>
         this.scanSingleQueue(queueName, params.topN ?? SUMMARY_TOP_N),
@@ -560,11 +557,7 @@ export class QueueRedisRepository implements QueueRepository {
     return queues;
   }
 
-  private async scanSingleQueue(
-    queueName: string,
-    limit: number,
-    offset = 0,
-  ): Promise<QueueInfo> {
+  private async scanSingleQueue(queueName: string, limit: number, offset = 0): Promise<QueueInfo> {
     const displayName = stripHashTag(queueName);
     const prefix = `${queueName}:gq:`;
 
@@ -681,10 +674,7 @@ export class QueueRedisRepository implements QueueRepository {
     }
     const errorResults = allGroupIds.length > 0 ? await errorPipeline.exec() : [];
 
-    const groupErrors = new Map<
-      string,
-      { message: string; stack: string; timestamp: string }
-    >();
+    const groupErrors = new Map<string, { message: string; stack: string; timestamp: string }>();
     for (let i = 0; i < allGroupIds.length; i++) {
       const errorHash = errorResults?.[i]?.[1] as Record<string, string> | null;
       if (errorHash?.message) {
@@ -919,8 +909,7 @@ export class QueueRedisRepository implements QueueRepository {
             jobDataRequests.push({ groupId: members[i]!, jobId: jobArr[0] });
           }
         }
-        const jobDataResults =
-          jobDataRequests.length > 0 ? await jobDataPipeline.exec() : [];
+        const jobDataResults = jobDataRequests.length > 0 ? await jobDataPipeline.exec() : [];
 
         const pipelineNames = new Map<string, string>();
         for (let i = 0; i < jobDataRequests.length; i++) {
@@ -1122,10 +1111,7 @@ export class QueueRedisRepository implements QueueRepository {
     const pipelineNames = new Map<string, string | null>();
     for (let i = 0; i < withJob.length; i++) {
       const raw = (dataResults?.[i]?.[1] as string) ?? null;
-      pipelineNames.set(
-        withJob[i]!.groupId,
-        raw ? readJobRoutingMeta(raw).pipelineName : null,
-      );
+      pipelineNames.set(withJob[i]!.groupId, raw ? readJobRoutingMeta(raw).pipelineName : null);
     }
 
     return groupIds.map((groupId, i) => {
@@ -1331,12 +1317,7 @@ export class QueueRedisRepository implements QueueRepository {
     const SCAN_BATCH = 1000;
 
     do {
-      const [next, members] = await this.redis.zscan(
-        readyKey,
-        cursor,
-        "COUNT",
-        SCAN_BATCH,
-      );
+      const [next, members] = await this.redis.zscan(readyKey, cursor, "COUNT", SCAN_BATCH);
       cursor = next;
 
       // members alternates [groupId, score, groupId, score, ...] — collect
@@ -1388,10 +1369,7 @@ export class QueueRedisRepository implements QueueRepository {
 
   // ── DLQ Operations ──────────────────────────────────────────────
 
-  async moveToDlq(params: {
-    queueName: string;
-    groupId: string;
-  }): Promise<{ jobsMoved: number }> {
+  async moveToDlq(params: { queueName: string; groupId: string }): Promise<{ jobsMoved: number }> {
     const prefix = `${params.queueName}:gq:`;
     const result = await moveToDlqScript.run(
       this.redis,
@@ -1706,10 +1684,7 @@ export class QueueRedisRepository implements QueueRepository {
     const dlqSize = await this.redis.scard(dlqIndexKey);
     if (dlqSize === 0) return { redrivenCount: 0, groupIds: [] };
 
-    const candidates = await this.redis.srandmember(
-      dlqIndexKey,
-      Math.min(count * 3, dlqSize),
-    );
+    const candidates = await this.redis.srandmember(dlqIndexKey, Math.min(count * 3, dlqSize));
     if (!candidates || candidates.length === 0) return { redrivenCount: 0, groupIds: [] };
 
     let groupsToRedrive = candidates.filter((id): id is string => id !== null);
@@ -1771,8 +1746,7 @@ export class QueueRedisRepository implements QueueRepository {
     const blockedKey = `${prefix}blocked`;
 
     const candidates = await this.redis.srandmember(blockedKey, count * 3);
-    if (!candidates || candidates.length === 0)
-      return { unblockedCount: 0, groupIds: [] };
+    if (!candidates || candidates.length === 0) return { unblockedCount: 0, groupIds: [] };
 
     let groupsToUnblock = candidates.filter((id): id is string => id !== null);
 
@@ -1934,8 +1908,7 @@ export class QueueRedisRepository implements QueueRepository {
           jobDataRequests.push({ groupId: members[i]! });
         }
       }
-      const jobDataResults =
-        jobDataRequests.length > 0 ? await jobDataPipeline.exec() : [];
+      const jobDataResults = jobDataRequests.length > 0 ? await jobDataPipeline.exec() : [];
 
       const groupPipelines = new Map<string, string>();
       for (let j = 0; j < jobDataRequests.length; j++) {
@@ -1954,10 +1927,7 @@ export class QueueRedisRepository implements QueueRepository {
         const msg = errorHash?.message ?? "Unknown error";
         const pName = groupPipelines.get(groupId) ?? "unknown";
 
-        if (
-          params.errorFilter &&
-          !msg.toLowerCase().includes(params.errorFilter.toLowerCase())
-        )
+        if (params.errorFilter && !msg.toLowerCase().includes(params.errorFilter.toLowerCase()))
           continue;
         if (params.pipelineFilter && pName !== params.pipelineFilter) continue;
 
@@ -2038,10 +2008,7 @@ export class QueueRedisRepository implements QueueRepository {
       });
       if (groupIds === null) return null;
 
-      const jobsKeys = Array.from(
-        groupIds,
-        (groupId) => `${prefix}group:${groupId}:jobs`,
-      );
+      const jobsKeys = Array.from(groupIds, (groupId) => `${prefix}group:${groupId}:jobs`);
 
       const summed = await this.sumPendingJobs({ jobsKeys, refreshLease });
       if (summed === null) return null;
@@ -2251,10 +2218,7 @@ export class QueueRedisRepository implements QueueRepository {
         if (!(await params.refreshLease())) return false;
       }
     } catch (err) {
-      logger.warn(
-        { error: err },
-        "Failed to adopt lifecycle-index groups into the pending index",
-      );
+      logger.warn({ error: err }, "Failed to adopt lifecycle-index groups into the pending index");
     }
     return true;
   }
@@ -2349,10 +2313,7 @@ export class QueueRedisRepository implements QueueRepository {
    * Only ever called by a pass that swept. Calling it otherwise moves the
    * deadline without the walk that earns it, and the sweep stops coming due.
    */
-  private async recordSweepOutcome(params: {
-    prefix: string;
-    adopted: number;
-  }): Promise<void> {
+  private async recordSweepOutcome(params: { prefix: string; adopted: number }): Promise<void> {
     const nextDueAt =
       params.adopted > 0 ? Date.now() : Date.now() + PENDING_RECONCILE_SWEEP_BACKSTOP_MS;
     await this.redis.set(`${params.prefix}${SWEEP_DUE_KEY_SUFFIX}`, String(nextDueAt));
@@ -2376,18 +2337,8 @@ export class QueueRedisRepository implements QueueRepository {
     do {
       const [nextCursor, members] =
         params.type === "zset"
-          ? await this.redis.zscan(
-              params.key,
-              cursor,
-              "COUNT",
-              PENDING_RECONCILE_PAGE_SIZE,
-            )
-          : await this.redis.sscan(
-              params.key,
-              cursor,
-              "COUNT",
-              PENDING_RECONCILE_PAGE_SIZE,
-            );
+          ? await this.redis.zscan(params.key, cursor, "COUNT", PENDING_RECONCILE_PAGE_SIZE)
+          : await this.redis.sscan(params.key, cursor, "COUNT", PENDING_RECONCILE_PAGE_SIZE);
       cursor = nextCursor;
       for (let i = 0; i < members.length; i += stride) {
         params.into.add(members[i]!);
@@ -2415,11 +2366,7 @@ export class QueueRedisRepository implements QueueRepository {
   }): Promise<{ groundTruth: number; emptyJobsKeys: string[] } | null> {
     let groundTruth = 0;
     const emptyJobsKeys: string[] = [];
-    for (
-      let offset = 0;
-      offset < params.jobsKeys.length;
-      offset += PENDING_RECONCILE_ZCARD_BATCH
-    ) {
+    for (let offset = 0; offset < params.jobsKeys.length; offset += PENDING_RECONCILE_ZCARD_BATCH) {
       const batch = await this.countOneBatch(
         params.jobsKeys.slice(offset, offset + PENDING_RECONCILE_ZCARD_BATCH),
         offset,
@@ -2510,10 +2457,7 @@ export class QueueRedisRepository implements QueueRepository {
         // exists to stop. Stop rather than press on.
         if (!(await params.refreshLease())) return;
       } catch (err) {
-        logger.warn(
-          { error: err },
-          "Failed to prune drained groups from the pending index",
-        );
+        logger.warn({ error: err }, "Failed to prune drained groups from the pending index");
         return;
       }
     }
@@ -2543,10 +2487,7 @@ export class QueueRedisRepository implements QueueRepository {
       );
       return Number(held) === 1;
     } catch (err) {
-      logger.warn(
-        { error: err },
-        "Failed to re-arm the pending reconcile single-flight marker",
-      );
+      logger.warn({ error: err }, "Failed to re-arm the pending reconcile single-flight marker");
       return false;
     }
   }
@@ -2608,10 +2549,7 @@ export class QueueRedisRepository implements QueueRepository {
     for (let i = 0; i < params.members.length; i++) {
       const jobArr = (filterResults?.[i * 2 + 1]?.[1] as string[]) ?? [];
       if (jobArr[0]) {
-        jobDataPipeline.hget(
-          `${params.prefix}group:${params.members[i]!}:data`,
-          jobArr[0],
-        );
+        jobDataPipeline.hget(`${params.prefix}group:${params.members[i]!}:data`, jobArr[0]);
         jobDataMap.set(params.members[i]!, jobFetchIdx++);
       }
     }
@@ -2628,8 +2566,7 @@ export class QueueRedisRepository implements QueueRepository {
         if (fetchIdx !== void 0) {
           const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
           if (raw) {
-            if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter)
-              return false;
+            if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter) return false;
           } else return false;
         } else return false;
       }
@@ -2673,8 +2610,7 @@ export class QueueRedisRepository implements QueueRepository {
         if (fetchIdx !== void 0) {
           const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
           if (raw) {
-            if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter)
-              return false;
+            if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter) return false;
           } else return false;
         } else return false;
       }

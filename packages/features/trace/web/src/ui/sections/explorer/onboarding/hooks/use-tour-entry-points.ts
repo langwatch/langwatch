@@ -56,9 +56,7 @@ export function useTourEntryPoints(): OnboardingEntryState {
   const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
   const setupDismissedByProject = useOnboardingStore((s) => s.setupDismissedByProject);
-  const setSetupDismissedForProject = useOnboardingStore(
-    (s) => s.setSetupDismissedForProject,
-  );
+  const setSetupDismissedForProject = useOnboardingStore((s) => s.setSetupDismissedForProject);
   const setTourActive = useOnboardingStore((s) => s.setTourActive);
   const tourActive = useOnboardingActive();
   const utils = api.useUtils();

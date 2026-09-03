@@ -90,12 +90,7 @@ export function HandledErrorAlert({
         </Box>
 
         <Stack gap="0.5" flex="1" minWidth={0}>
-          <Text
-            fontSize="13.5px"
-            fontWeight="640"
-            lineHeight="1.35"
-            letterSpacing="-0.005em"
-          >
+          <Text fontSize="13.5px" fontWeight="640" lineHeight="1.35" letterSpacing="-0.005em">
             {copy.title}
           </Text>
           {copy.description && (
@@ -105,13 +100,7 @@ export function HandledErrorAlert({
           )}
 
           {showAllTips && tips.length > 0 && (
-            <List.Root
-              gap={0.5}
-              marginTop={1.5}
-              fontSize="12.5px"
-              color="fg.muted"
-              paddingLeft={4}
-            >
+            <List.Root gap={0.5} marginTop={1.5} fontSize="12.5px" color="fg.muted" paddingLeft={4}>
               {/* Index key: tips are server-supplied prose, so two can be
                   identical and collide as keys. Their order is fixed. */}
               {tips.map((tip, index) => (

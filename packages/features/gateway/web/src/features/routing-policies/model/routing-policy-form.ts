@@ -99,9 +99,7 @@ export interface StoredRoutingPolicy {
   scopes: Array<{ scopeType: string; scopeId: string }>;
 }
 
-export function routingPolicyToFormValues(
-  policy: StoredRoutingPolicy,
-): RoutingPolicyFormValues {
+export function routingPolicyToFormValues(policy: StoredRoutingPolicy): RoutingPolicyFormValues {
   const aliases = readStringRecord(policy.modelAliases);
   const tiers = { complex: "", reasoning: "", fast: "" };
   const nameMappings: Array<{ from: string; to: string }> = [];
@@ -135,9 +133,7 @@ export function routingPolicyToFormValues(
  * it falls through to the default model at materialization rather than being
  * pinned to an empty string here.
  */
-export function modelAliasesFromForm(
-  values: RoutingPolicyFormValues,
-): Record<string, string> {
+export function modelAliasesFromForm(values: RoutingPolicyFormValues): Record<string, string> {
   const aliases: Record<string, string> = {};
   for (const tier of MODEL_TIERS) {
     const target = values.tiers[tier].trim();
@@ -154,10 +150,7 @@ export function modelAliasesFromForm(
 export function restrictionsToPayload(
   values: RoutingPolicyFormValues,
 ): Record<RestrictionDimension, { deny: string[]; allow: string[] | null }> {
-  const payload = {} as Record<
-    RestrictionDimension,
-    { deny: string[]; allow: string[] | null }
-  >;
+  const payload = {} as Record<RestrictionDimension, { deny: string[]; allow: string[] | null }>;
   for (const dimension of RESTRICTION_DIMENSIONS) {
     const deny = splitLines(values.restrictions[dimension].deny);
     const allow = splitLines(values.restrictions[dimension].allow);

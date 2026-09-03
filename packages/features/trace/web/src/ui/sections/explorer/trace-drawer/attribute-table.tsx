@@ -274,9 +274,7 @@ function correctionForKey({
       : { original: formatValue(capturedFlat[key]) };
   }
   const ancestor = capturedAncestorKey({ key, capturedFlat });
-  return ancestor === null
-    ? { original: null }
-    : { original: formatValue(capturedFlat[ancestor]) };
+  return ancestor === null ? { original: null } : { original: formatValue(capturedFlat[ancestor]) };
 }
 
 /**
@@ -308,10 +306,7 @@ type AttrViewMode = "flat" | "json";
 
 const VIEW_MODE_OPTIONS = ["flat", "json"] as const;
 
-const PIN_TINT: Record<
-  PinnedAttributeSource,
-  { bg: string; border: string; fg: string }
-> = {
+const PIN_TINT: Record<PinnedAttributeSource, { bg: string; border: string; fg: string }> = {
   resource: { bg: "purple.subtle", border: "purple.muted", fg: "purple.fg" },
   attribute: { bg: "blue.subtle", border: "blue.muted", fg: "blue.fg" },
 };
@@ -320,10 +315,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function flattenAttributes(
-  obj: Record<string, unknown>,
-  prefix = "",
-): Record<string, unknown> {
+function flattenAttributes(obj: Record<string, unknown>, prefix = ""): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
     const newKey = prefix ? `${prefix}.${key}` : key;
@@ -369,10 +361,7 @@ function filterAttributesBySearch(
   if (!term) return attrs;
   const result: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(attrs)) {
-    if (
-      key.toLowerCase().includes(term) ||
-      formatValue(val).toLowerCase().includes(term)
-    ) {
+    if (key.toLowerCase().includes(term) || formatValue(val).toLowerCase().includes(term)) {
       result[key] = val;
     }
   }
@@ -418,11 +407,7 @@ function PinToggle({
         flexShrink={0}
         _hover={pinned ? { bg: tint.bg, opacity: 1 } : { bg: "bg.muted" }}
       >
-        <Icon
-          as={pinned ? LuPinOff : LuPin}
-          boxSize={3}
-          color={pinned ? tint.fg : "fg.subtle"}
-        />
+        <Icon as={pinned ? LuPinOff : LuPin} boxSize={3} color={pinned ? tint.fg : "fg.subtle"} />
       </Button>
     </Tooltip>
   );
@@ -577,11 +562,7 @@ function CopyAllButton({ payload }: { payload: string }) {
       height="26px"
       gap={1}
     >
-      <Icon
-        as={copied ? LuCheck : LuCopy}
-        boxSize={3}
-        color={copied ? "green.fg" : "fg.subtle"}
-      />
+      <Icon as={copied ? LuCheck : LuCopy} boxSize={3} color={copied ? "green.fg" : "fg.subtle"} />
       <Text textStyle="2xs" color="fg.muted">
         {copied ? "Copied" : "Copy"}
       </Text>
@@ -684,12 +665,7 @@ function EditableValueCell({
         bg={editing.isChanged ? "green.subtle" : undefined}
         borderColor={editing.isChanged ? "green.muted" : "border.muted"}
       />
-      <Button
-        size="xs"
-        variant="ghost"
-        onClick={editing.onRemove}
-        aria-label={`Remove ${attrKey}`}
-      >
+      <Button size="xs" variant="ghost" onClick={editing.onRemove} aria-label={`Remove ${attrKey}`}>
         <Text textStyle="2xs">Remove</Text>
       </Button>
     </HStack>
@@ -697,13 +673,10 @@ function EditableValueCell({
 }
 
 /** A corrected row is tinted and ticked; a pinned one is only tinted. */
-function rowHighlight({
-  isCorrected,
-  isPinned,
-}: {
-  isCorrected: boolean;
-  isPinned: boolean;
-}): { bg?: string; boxShadow?: string } {
+function rowHighlight({ isCorrected, isPinned }: { isCorrected: boolean; isPinned: boolean }): {
+  bg?: string;
+  boxShadow?: string;
+} {
   if (isCorrected) {
     return {
       bg: "green.subtle",
@@ -846,8 +819,7 @@ function FlatRow({
   // on what it should say instead. Both drop the comment action, the way the
   // row's copy action already drops out while it is being edited.
   const anchorPath = `${comments?.pathPrefix}.${attrKey}`;
-  const rowComments =
-    comments && !rowEditing && restriction?.canSee !== false ? comments : null;
+  const rowComments = comments && !rowEditing && restriction?.canSee !== false ? comments : null;
   return (
     <HStack
       borderBottomWidth={isLast ? "0px" : "1px"}
@@ -859,12 +831,7 @@ function FlatRow({
       {...rowHighlight({ isCorrected: !!correction, isPinned: pinned })}
     >
       {pinnable ? (
-        <PinToggle
-          pinned={pinned}
-          source={source}
-          attrKey={attrKey}
-          onToggle={onTogglePin}
-        />
+        <PinToggle pinned={pinned} source={source} attrKey={attrKey} onToggle={onTogglePin} />
       ) : (
         // Synthetic leading rows (span_id) aren't real attributes, so they
         // can't be pinned to the trace header — show a disabled, faded pin
@@ -1127,10 +1094,7 @@ function AttrSection({
         </Box>
       )}
       {editing && (
-        <AddAttributeRow
-          existingKeys={allKeys ?? new Set(Object.keys(flat))}
-          {...editing}
-        />
+        <AddAttributeRow existingKeys={allKeys ?? new Set(Object.keys(flat))} {...editing} />
       )}
     </Box>
   );
@@ -1280,9 +1244,7 @@ export function AttributeTable({
     if (!correctedFrom) return {};
     const corrected = flattenAttributes(attributes);
     const captured = flattenAttributes(correctedFrom);
-    return Object.fromEntries(
-      Object.entries(captured).filter(([key]) => !(key in corrected)),
-    );
+    return Object.fromEntries(Object.entries(captured).filter(([key]) => !(key in corrected)));
   }, [attributes, correctedFrom]);
 
   // What the span carries once the correction is applied, which is what copying
@@ -1306,9 +1268,7 @@ export function AttributeTable({
   // under a different value still reads as that value. Rows sort by key, so
   // where a row goes in makes no difference to where it lands.
   const flatAttrs = useMemo(() => {
-    const removedRows = Object.entries(removedKeys).filter(
-      ([key]) => !(key in correctedFlat),
-    );
+    const removedRows = Object.entries(removedKeys).filter(([key]) => !(key in correctedFlat));
     if (removedRows.length === 0) return correctedFlat;
     return { ...correctedFlat, ...Object.fromEntries(removedRows) };
   }, [correctedFlat, removedKeys]);

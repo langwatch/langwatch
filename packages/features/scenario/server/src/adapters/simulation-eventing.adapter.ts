@@ -118,7 +118,10 @@ export class SimulationRunStateStoreAdapter implements ProjectionStore {
 
   createFoldStore(): FoldProjectionStore<SimulationRunStateData> {
     return new GatedSimulationRunStateFoldStore(
-      new RepositoryFoldStore<SimulationRunStateData>(this, SIMULATION_PROJECTION_VERSIONS.RUN_STATE),
+      new RepositoryFoldStore<SimulationRunStateData>(
+        this,
+        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      ),
     );
   }
 

@@ -60,10 +60,7 @@ describe("renderScenarioContent", () => {
         expect(result).toEqual({
           ok: true,
           situation: "The customer is on the platinum plan",
-          criteria: [
-            "The agent mentions platinum support hours",
-            "The agent stays in eu-central",
-          ],
+          criteria: ["The agent mentions platinum support hours", "The agent stays in eu-central"],
         });
       });
 
@@ -104,10 +101,7 @@ describe("renderScenarioContent", () => {
       it("fails naming the criterion that read it, by position", async () => {
         const result = await renderScenarioContent({
           situation: "The customer is on the {{ params.account_tier }} plan",
-          criteria: [
-            "The agent greets the customer",
-            "The agent stays in {{ params.region }}",
-          ],
+          criteria: ["The agent greets the customer", "The agent stays in {{ params.region }}"],
           parameters: { account_tier: "platinum" },
         });
 

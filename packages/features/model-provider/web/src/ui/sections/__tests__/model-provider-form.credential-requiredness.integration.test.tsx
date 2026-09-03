@@ -43,7 +43,10 @@ vi.mock("../../../behavior/model-provider-api", () => {
     listAllForProjectForFrontend: { useQuery: mockListAllForProjectForFrontendQuery },
     update: { useMutation: () => ({ mutateAsync: mockMutateAsync, isPending: false }) },
     setRoleAssignmentForScope: {
-      useMutation: () => ({ mutateAsync: vi.fn().mockResolvedValue({ ok: true }), isPending: false }),
+      useMutation: () => ({
+        mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
+        isPending: false,
+      }),
     },
     isManagedProvider: { useQuery: () => ({ data: { managed: false } }) },
     validateApiKey: { useMutation: () => ({ mutateAsync: mockValidateApiKey, isPending: false }) },

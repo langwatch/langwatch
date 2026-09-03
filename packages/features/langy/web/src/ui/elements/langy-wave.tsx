@@ -139,8 +139,7 @@ function sampleRope(
     // The wake ripple: one gaussian bump travelling top→bottom once, easing in
     // and out over its life.
     if (ripple !== null) {
-      x +=
-        Math.sin(Math.PI * ripple) * w * 0.018 * Math.exp(-(((ny - ripple) / 0.16) ** 2));
+      x += Math.sin(Math.PI * ripple) * w * 0.018 * Math.exp(-(((ny - ripple) / 0.16) ** 2));
     }
     // Error shake: the WHOLE rope shivers side to side (no `ny` term, so it
     // reads as one nervous line), high frequency, amplitude decaying to nothing
@@ -348,11 +347,8 @@ export function LangyWave({
       // phase so the pulse keeps running down the line while lit.
       const glitterTarget = statusActiveRef.current ? 1 : 0;
       const glitterTau =
-        glitterTarget > s.glitterEnergy
-          ? WAVE_GLITTER_RISE_TAU_S
-          : WAVE_GLITTER_FALL_TAU_S;
-      s.glitterEnergy +=
-        (glitterTarget - s.glitterEnergy) * (1 - Math.exp(-dt / glitterTau));
+        glitterTarget > s.glitterEnergy ? WAVE_GLITTER_RISE_TAU_S : WAVE_GLITTER_FALL_TAU_S;
+      s.glitterEnergy += (glitterTarget - s.glitterEnergy) * (1 - Math.exp(-dt / glitterTau));
       s.glitterPhase += dt / WAVE_GLITTER_TRAVEL_S;
 
       const pts = sampleRope(w, h, {

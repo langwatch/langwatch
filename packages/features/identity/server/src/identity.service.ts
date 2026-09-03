@@ -49,9 +49,7 @@ export class IdentityService
     private readonly ledger: IdentityLedger,
   ) {}
 
-  async attachIdentifier(
-    input: AttachIdentifierCommandData,
-  ): Promise<IdentityFact[]> {
+  async attachIdentifier(input: AttachIdentifierCommandData): Promise<IdentityFact[]> {
     const data = attachIdentifierCommandDataSchema.parse(input);
     return this.commit(
       { type: ATTACH_IDENTIFIER_COMMAND_TYPE, data },
@@ -59,9 +57,7 @@ export class IdentityService
     );
   }
 
-  async verifyIdentifier(
-    input: VerifyIdentifierCommandData,
-  ): Promise<IdentityFact[]> {
+  async verifyIdentifier(input: VerifyIdentifierCommandData): Promise<IdentityFact[]> {
     const data = verifyIdentifierCommandDataSchema.parse(input);
     return this.commit(
       { type: VERIFY_IDENTIFIER_COMMAND_TYPE, data },
@@ -77,9 +73,7 @@ export class IdentityService
     );
   }
 
-  async detachIdentifier(
-    input: DetachIdentifierCommandData,
-  ): Promise<IdentityFact[]> {
+  async detachIdentifier(input: DetachIdentifierCommandData): Promise<IdentityFact[]> {
     const data = detachIdentifierCommandDataSchema.parse(input);
     return this.commit(
       { type: DETACH_IDENTIFIER_COMMAND_TYPE, data },
@@ -89,10 +83,7 @@ export class IdentityService
 
   async eraseUser(input: EraseUserCommandData): Promise<IdentityFact[]> {
     const data = eraseUserCommandDataSchema.parse(input);
-    return this.commit(
-      { type: ERASE_USER_COMMAND_TYPE, data },
-      await this.guards.eraseUser(data),
-    );
+    return this.commit({ type: ERASE_USER_COMMAND_TYPE, data }, await this.guards.eraseUser(data));
   }
 
   async proposeLink(input: ProposeLinkCommandData): Promise<IdentityFact[]> {

@@ -117,13 +117,7 @@ export class RoleBindingsApiService {
     });
   }
 
-  async update({
-    id,
-    input,
-  }: {
-    id: string;
-    input: UpdateRoleBindingInput;
-  }): Promise<RoleBinding> {
+  async update({ id, input }: { id: string; input: UpdateRoleBindingInput }): Promise<RoleBinding> {
     return this.#request({
       operation: `update role binding "${id}"`,
       path: managementPath(`/api/role-bindings/${encodeURIComponent(id)}`),

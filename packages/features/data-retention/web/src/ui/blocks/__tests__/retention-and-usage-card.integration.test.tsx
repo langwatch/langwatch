@@ -28,9 +28,7 @@ describe("RetentionAndUsageCard", () => {
           />
         </Wrapper>,
       );
-      expect(
-        screen.getByText("How much space this organization's data uses today."),
-      ).toBeTruthy();
+      expect(screen.getByText("How much space this organization's data uses today.")).toBeTruthy();
       expect(screen.getByText(/2 projects/)).toBeTruthy();
     });
   });
@@ -48,9 +46,7 @@ describe("RetentionAndUsageCard", () => {
       );
       expect(screen.queryByText(/projects/)).toBeNull();
       // default project-scoped copy
-      expect(
-        screen.getByText("How much space this project's data uses today."),
-      ).toBeTruthy();
+      expect(screen.getByText("How much space this project's data uses today.")).toBeTruthy();
     });
   });
 });

@@ -4,13 +4,13 @@ description: "The SCIM 2.0 endpoints an identity provider calls to provision and
 ---
 
 <Note>
-  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a
-  self-hosted deployment needs an Enterprise license. The plan is checked on every call,
-  not only when a token is minted, so if the plan lapses, tokens that already exist stop
-  verifying and your identity provider's requests are refused with HTTP 403. Minting a
-  token through the [SCIM Tokens](/api-reference/scim-tokens/overview) API without an
-  Enterprise plan is refused with HTTP 402 and the error code `enterprise_plan_required`.
-  To enable it, reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted
+  deployment needs an Enterprise license. The plan is checked on every call, not only when a token
+  is minted, so if the plan lapses, tokens that already exist stop verifying and your identity
+  provider's requests are refused with HTTP 403. Minting a token through the [SCIM
+  Tokens](/api-reference/scim-tokens/overview) API without an Enterprise plan is refused with HTTP
+  402 and the error code `enterprise_plan_required`. To enable it, reach out to
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 ## Intro

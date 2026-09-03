@@ -12,7 +12,7 @@ The feature is **half-wired**. `adrs/001-package-boundary.md:5` is still
 `**Status:** Proposed`, and the code matches: the Postgres-backed lifecycle
 service, the public RPC family and the ClickHouse import migration are all
 built and none of them is reached by a production door. What production
-actually runs is the *legacy* implementation, 17 more files and **3,882 lines**
+actually runs is the _legacy_ implementation, 17 more files and **3,882 lines**
 still in `platform/app/src/server/stored-objects/`, baselined as
 `legacy-implementation` at
 `packages/architecture-lint/src/legacy-feature-fragment-baseline.json:622-638`.
@@ -73,8 +73,8 @@ are declared **five times**: `contract/src/stored-object.service.ts:59-101`,
 `app/stored-object.app.ts:76-83` declares two keys:
 
 ```ts
-storedObjects: StoredObjectService;      // getById → ReadStoredObjectResult
-files: StoredObjectFileReadPort;         // getById → StoredObjectFileRead | null
+storedObjects: StoredObjectService; // getById → ReadStoredObjectResult
+files: StoredObjectFileReadPort; // getById → StoredObjectFileRead | null
 ```
 
 Both interfaces require a method named `getById`, with return types that are
@@ -91,7 +91,7 @@ and `platform/app/src/server/app-layer/app.ts:531-537` acts on that claim:
 ```ts
 this.storedObjectApp = StoredObjectApp.create({
   storedObjects: deps.storedObjects,
-  files: deps.storedObjects,      // the same object
+  files: deps.storedObjects, // the same object
   owners: deps.storedObjectOwners,
 });
 ```
@@ -114,16 +114,16 @@ supplies `{} as StoredObjectServiceContract`. The type is satisfiable only by a 
 `grep -rn` across `apps/`, `packages/`, `platform/`, `services/` finds **zero**
 non-test references outside the package to:
 
-| Symbol | Lines | Declared |
-|---|---|---|
-| `StoredObjectsPublicApi` | 122 | `api/public/stored-object.api.ts:29` |
-| `ClickHouseImportStoredObjectMigration` | 244 | `migrations/clickhouse-import.stored-object.migration.ts:42` |
-| `StoredObjectProjectSourcePort` | | `ports/stored-object.port.ts:92` |
-| `StoredObjectLegacySourcePort` | | `ports/stored-object.port.ts:98` |
-| `StoredObjectLegacyLocationPort` | | `ports/stored-object.port.ts:106` |
-| `StoredObjectLegacyWriterDrainPort` | | `ports/stored-object.port.ts:113` |
-| `storedObjectsPublicRpc` | | `contract/src/stored-object.commands.ts:99` |
-| `storedObjectsInternalRpc` | | `contract/src/stored-object.queries.ts:60` |
+| Symbol                                  | Lines | Declared                                                     |
+| --------------------------------------- | ----- | ------------------------------------------------------------ |
+| `StoredObjectsPublicApi`                | 122   | `api/public/stored-object.api.ts:29`                         |
+| `ClickHouseImportStoredObjectMigration` | 244   | `migrations/clickhouse-import.stored-object.migration.ts:42` |
+| `StoredObjectProjectSourcePort`         |       | `ports/stored-object.port.ts:92`                             |
+| `StoredObjectLegacySourcePort`          |       | `ports/stored-object.port.ts:98`                             |
+| `StoredObjectLegacyLocationPort`        |       | `ports/stored-object.port.ts:106`                            |
+| `StoredObjectLegacyWriterDrainPort`     |       | `ports/stored-object.port.ts:113`                            |
+| `storedObjectsPublicRpc`                |       | `contract/src/stored-object.commands.ts:99`                  |
+| `storedObjectsInternalRpc`              |       | `contract/src/stored-object.queries.ts:60`                   |
 
 The migration cannot run: the registry is
 `platform/app/src/server/app-layer/system-migrations/runtime.ts:108-114`
@@ -164,15 +164,15 @@ and `packages/features/catalogue.json` lists the feature as governed. Checking
 every non-test server path against `SERVER_PATTERNS`
 (`packages/architecture-lint/src/feature-layout.ts:65-91`):
 
-| Path | Why it fails |
-|---|---|
-| `server/src/storage.ts` | second package-root barrel; only `index.ts` and `testing.ts` are allowed |
-| `server/src/api/public/stored-object.api.ts` | the pattern is `transport/<surface>/`, not `api/<surface>/` |
-| `server/src/ports/stored-object-owner.repository.ts` | a `.repository.ts` under `ports/` |
-| `server/src/adapters/stored-object-destination.policy.ts` | `.policy` is not a canonical artifact |
-| `server/src/adapters/stored-object-owner-lookup.runtime.ts` | `.runtime` is not a canonical artifact |
-| `server/src/adapters/stored-object-storage.registry.ts` | `.registry` is not a canonical artifact |
-| `server/src/adapters/stored-object-storage.runtime.ts` | `.runtime` is not a canonical artifact |
+| Path                                                        | Why it fails                                                             |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `server/src/storage.ts`                                     | second package-root barrel; only `index.ts` and `testing.ts` are allowed |
+| `server/src/api/public/stored-object.api.ts`                | the pattern is `transport/<surface>/`, not `api/<surface>/`              |
+| `server/src/ports/stored-object-owner.repository.ts`        | a `.repository.ts` under `ports/`                                        |
+| `server/src/adapters/stored-object-destination.policy.ts`   | `.policy` is not a canonical artifact                                    |
+| `server/src/adapters/stored-object-owner-lookup.runtime.ts` | `.runtime` is not a canonical artifact                                   |
+| `server/src/adapters/stored-object-storage.registry.ts`     | `.registry` is not a canonical artifact                                  |
+| `server/src/adapters/stored-object-storage.runtime.ts`      | `.runtime` is not a canonical artifact                                   |
 
 `StoredObjectStorageRegistry` additionally has a **public constructor and no
 `static create`** (`adapters/stored-object-storage.registry.ts:27`), against
@@ -180,24 +180,24 @@ ADR-002:118 ("Concrete runtime classes expose `static create`"), and
 `StoredObjectStorageRuntime.forProject` reaches for `new` at
 `adapters/stored-object-storage.runtime.ts:43`.
 
-*(Confirm by running the architecture lint; the grammar match above was done by
-hand against the regexes.)*
+_(Confirm by running the architecture lint; the grammar match above was done by
+hand against the regexes.)_
 
 ### P5 — Two ports have one same-package implementation; two more are satisfied by throwing stubs (breaks R4, R5)
 
-| Port | Real implementations | Verdict |
-|---|---|---|
-| `StoredObjectStorageDriver` (`adapters/…registry.ts:9`) | 3+ — app s3/azure/file, worker s3/file | **Keep** |
-| `StoredObjectAzureDestinationPort` (`…policy.ts:11`) | 2 — `project-storage-destination.ts:32`, `worker-stored-object-storage.adapter.ts:43` | **Keep** |
-| `StoredObjectStoragePort` (`ports/stored-object.port.ts:28`) | 1, in `platform/app` | **Keep** — cross-package inversion |
-| `StoredObjectOwnerInstanceDirectoryPort` (`…port.ts:17`) | 1, in `platform/app` | **Keep** |
-| `StoredObjectOwnerLookupTelemetryPort` (`…port.ts:9`) | 1, in `platform/app` | **Keep** |
-| `StoredObjectProjectS3ConfigPort` (`…policy.ts:15`) | 2, app + worker | **Keep** |
-| `StoredObjectStore` (`stores/stored-object.store.ts:36`) | 2, both in-package (`postgres/…store.ts:25`, `testing.ts:8`) | **Keep** — `testing.ts` is a published entry point |
-| `StoredObjectOwnerRepository` (`ports/stored-object-owner.repository.ts:12`) | 1, same package (`repositories/clickhouse/…:16`) | **Delete** |
-| `StoredObjectProjectDestinationResolverPort` (`…runtime.ts:20`) | 1, same package (`…policy.ts:20`) | **Delete** |
-| `StoredObjectDeliveryPort` (`ports/stored-object.port.ts:69`) | 0 — a stub that throws | see below |
-| `StoredObjectUploadTokenPort` (`ports/stored-object.port.ts:64`) | 0 — a stub that throws | see below |
+| Port                                                                         | Real implementations                                                                  | Verdict                                            |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `StoredObjectStorageDriver` (`adapters/…registry.ts:9`)                      | 3+ — app s3/azure/file, worker s3/file                                                | **Keep**                                           |
+| `StoredObjectAzureDestinationPort` (`…policy.ts:11`)                         | 2 — `project-storage-destination.ts:32`, `worker-stored-object-storage.adapter.ts:43` | **Keep**                                           |
+| `StoredObjectStoragePort` (`ports/stored-object.port.ts:28`)                 | 1, in `platform/app`                                                                  | **Keep** — cross-package inversion                 |
+| `StoredObjectOwnerInstanceDirectoryPort` (`…port.ts:17`)                     | 1, in `platform/app`                                                                  | **Keep**                                           |
+| `StoredObjectOwnerLookupTelemetryPort` (`…port.ts:9`)                        | 1, in `platform/app`                                                                  | **Keep**                                           |
+| `StoredObjectProjectS3ConfigPort` (`…policy.ts:15`)                          | 2, app + worker                                                                       | **Keep**                                           |
+| `StoredObjectStore` (`stores/stored-object.store.ts:36`)                     | 2, both in-package (`postgres/…store.ts:25`, `testing.ts:8`)                          | **Keep** — `testing.ts` is a published entry point |
+| `StoredObjectOwnerRepository` (`ports/stored-object-owner.repository.ts:12`) | 1, same package (`repositories/clickhouse/…:16`)                                      | **Delete**                                         |
+| `StoredObjectProjectDestinationResolverPort` (`…runtime.ts:20`)              | 1, same package (`…policy.ts:20`)                                                     | **Delete**                                         |
+| `StoredObjectDeliveryPort` (`ports/stored-object.port.ts:69`)                | 0 — a stub that throws                                                                | see below                                          |
+| `StoredObjectUploadTokenPort` (`ports/stored-object.port.ts:64`)             | 0 — a stub that throws                                                                | see below                                          |
 
 `StoredObjectServiceOptions` (`services/stored-object.service.ts:45-56`) makes
 `delivery` and `uploadTokens` **required**, and the only production composition
@@ -213,7 +213,7 @@ class AppUnavailableStoredObjectDeliveryPort extends StoredObjectDeliveryPort {
 ```
 
 This is R5's failure mode inverted: rather than an optional field guarded by a
-runtime throw, it is a required field whose only supplier *is* the throw. The
+runtime throw, it is a required field whose only supplier _is_ the throw. The
 constructor promises a capability the process cannot provide, and
 `resolveDelivery`/`createUpload`/`confirmUpload` on the avatar service are
 unreachable-except-to-crash.
@@ -308,7 +308,7 @@ and already carries the delivery/owner-resolution narrative.
 
 `specs/stored-objects.feature:2` carries a **file-level `@unimplemented`**.
 `check-feature-parity.ts:770` merges feature tags into every scenario and
-`:1329` counts a scenario as bound only when it has a binding tag *and* lacks
+`:1329` counts a scenario as bound only when it has a binding tag _and_ lacks
 `@unimplemented` — so all 10 `@integration` scenarios, including "A public
 client creates a direct upload" (`:53`) and "The system migration copies legacy
 ClickHouse rows directly" (`:123`), enforce nothing.
@@ -389,7 +389,9 @@ interface becomes satisfiable by the object production actually has:
 /** What the byte-delivery surface reads: a row, and the bytes when they exist. */
 export interface StoredObjectFileReadPort {
   headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead>;
-  readFile(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectFileRead | null>;
+  readFile(
+    input: Readonly<{ projectId: string; id: string }>,
+  ): Promise<StoredObjectFileRead | null>;
 }
 
 export interface StoredObjectAppDependencies {
@@ -419,7 +421,7 @@ asserting a capability the process does not have, and the docblock at
 export class StoredObjectRestApi {
   static create(options: {
     security: AppRestSecurity;
-    app: StoredObjectApp;                    // the object, not a thunk
+    app: StoredObjectApp; // the object, not a thunk
     dualAuth: MiddlewareHandler;
     permissions: FilesProjectPermissionCheck;
     rateLimit: FilesRateLimiter;
@@ -428,10 +430,26 @@ export class StoredObjectRestApi {
   install<E extends Env & { Variables: FilesDualAuthVariables }>(): SecuredApp<E>;
 
   private async read(c: Context<E>, method: "GET" | "HEAD"): Promise<Response>;
-  private async authorizeProject(input: { apiKeyProjectId?: string; userId?: string; ownerProjectId: string }): Promise<void>;
-  private async authorizePurpose(input: { userId?: string; ownerProjectId: string; purpose: string }): Promise<void>;
-  private async resolveOwner(input: { id: string; projectIdFromUrl?: string }): Promise<{ projectId: string } | null>;
-  private respond(input: { row: StoredObjectFileRow; stream: Readable; method: "GET" | "HEAD"; filename?: string }): Response;
+  private async authorizeProject(input: {
+    apiKeyProjectId?: string;
+    userId?: string;
+    ownerProjectId: string;
+  }): Promise<void>;
+  private async authorizePurpose(input: {
+    userId?: string;
+    ownerProjectId: string;
+    purpose: string;
+  }): Promise<void>;
+  private async resolveOwner(input: {
+    id: string;
+    projectIdFromUrl?: string;
+  }): Promise<{ projectId: string } | null>;
+  private respond(input: {
+    row: StoredObjectFileRow;
+    stream: Readable;
+    method: "GET" | "HEAD";
+    filename?: string;
+  }): Response;
 }
 ```
 
@@ -478,7 +496,7 @@ gains `static create` and loses its public constructor; the three files take
   throughout the package. Do not split it; the only complaint is length.
 - **`app/stored-object.app.ts` as a facade** — R3 allows exactly one, and the
   layout rule requires it (`feature-layout.ts:69-72`). Seven of seven methods
-  being one-line delegations is fine *for this file*; the problem is P1, not the
+  being one-line delegations is fine _for this file_; the problem is P1, not the
   delegation.
 - **`contract/src/stored-object.errors.ts`** — the right shape already. It needs
   presentation entries, not restructuring.
@@ -526,15 +544,15 @@ import `@langwatch/stored-object-contract`.**
 
 From the server package (25 symbols with an importer):
 
-| Consumer | Symbols |
-|---|---|
-| `apps/api/src/app-rest/app-rest.features.ts`, `apps/api/src/index.ts` | `createFilesRestApp`, `StoredObjectApp`, `isPermissionDenial`, `requiredPermissionForPurpose`, `FilesDualAuthVariables`, `FilesProjectPermissionCheck`, `FilesRateLimiter` |
-| `apps/api/src/features/stored-object/stored-object-trpc.mount.ts` | `StoredObjectTrpcApi`, `StoredObjectTrpcContext` |
-| `apps/worker/src/platform/infrastructure/worker-stored-object-storage.adapter.ts`, `worker-foundation.adapter.ts` | `StoredObjectStorageRuntime`, `StoredObjectDestinationPolicy`, `StoredObjectAzureDestinationPort`, `StoredObjectProjectS3ConfigPort`, `StoredObjectStorageSelection`, `StoredObjectStorageDriver` |
-| `platform/app/src/server/app-layer/presets.ts`, `app.ts` | `StoredObjectOwnerLookupRuntime`, `StoredObjectApp` |
-| `platform/app/src/runtime/app/features/*` (5 files) | `PostgresStoredObjectAdapter`, `StoredObjectService`, `StoredObjectStoragePort`, `StoredObjectDeliveryPort`, `StoredObjectUploadTokenPort`, `StoredObjectStorageAddress`, `StoredObjectOwnerInstanceDirectoryPort`, `StoredObjectOwnerLookupTelemetryPort`, `StoredObjectOwnerLookupSpan` |
-| `platform/app/src/server/stored-objects/storage-registry.ts` | `StoredObjectStorageRegistry`, `StoredObjectStorageDriver`, `StoredObjectStorageDriverFactory` — a pure re-export shim, which the repo's own rule forbids |
-| `platform/app/src/runtime/app/features/__tests__/…` | `InMemoryStoredObjectStore` (via `/testing`) |
+| Consumer                                                                                                          | Symbols                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/app-rest/app-rest.features.ts`, `apps/api/src/index.ts`                                             | `createFilesRestApp`, `StoredObjectApp`, `isPermissionDenial`, `requiredPermissionForPurpose`, `FilesDualAuthVariables`, `FilesProjectPermissionCheck`, `FilesRateLimiter`                                                                                                                |
+| `apps/api/src/features/stored-object/stored-object-trpc.mount.ts`                                                 | `StoredObjectTrpcApi`, `StoredObjectTrpcContext`                                                                                                                                                                                                                                          |
+| `apps/worker/src/platform/infrastructure/worker-stored-object-storage.adapter.ts`, `worker-foundation.adapter.ts` | `StoredObjectStorageRuntime`, `StoredObjectDestinationPolicy`, `StoredObjectAzureDestinationPort`, `StoredObjectProjectS3ConfigPort`, `StoredObjectStorageSelection`, `StoredObjectStorageDriver`                                                                                         |
+| `platform/app/src/server/app-layer/presets.ts`, `app.ts`                                                          | `StoredObjectOwnerLookupRuntime`, `StoredObjectApp`                                                                                                                                                                                                                                       |
+| `platform/app/src/runtime/app/features/*` (5 files)                                                               | `PostgresStoredObjectAdapter`, `StoredObjectService`, `StoredObjectStoragePort`, `StoredObjectDeliveryPort`, `StoredObjectUploadTokenPort`, `StoredObjectStorageAddress`, `StoredObjectOwnerInstanceDirectoryPort`, `StoredObjectOwnerLookupTelemetryPort`, `StoredObjectOwnerLookupSpan` |
+| `platform/app/src/server/stored-objects/storage-registry.ts`                                                      | `StoredObjectStorageRegistry`, `StoredObjectStorageDriver`, `StoredObjectStorageDriverFactory` — a pure re-export shim, which the repo's own rule forbids                                                                                                                                 |
+| `platform/app/src/runtime/app/features/__tests__/…`                                                               | `InMemoryStoredObjectStore` (via `/testing`)                                                                                                                                                                                                                                              |
 
 **With no external importer (24 of 49):** `ClickHouseImportStoredObjectMigration`,
 `ClickHouseImportStoredObjectMigrationOptions`,

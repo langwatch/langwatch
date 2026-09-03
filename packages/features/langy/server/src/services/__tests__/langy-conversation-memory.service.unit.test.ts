@@ -207,10 +207,7 @@ describe("LangyConversationMemoryService.tryRender", () => {
  */
 describe("LangyConversationMemoryService — ported scenarios", () => {
   /** An assistant message carrying one settled CLI tool part. */
-  function agentTurn(
-    parts: Record<string, unknown>[],
-    id = `m${Math.random()}`,
-  ): LangyMessageRow {
+  function agentTurn(parts: Record<string, unknown>[], id = `m${Math.random()}`): LangyMessageRow {
     return {
       id,
       role: "assistant",
@@ -261,9 +258,7 @@ describe("LangyConversationMemoryService — ported scenarios", () => {
   };
 
   const render = (messages: LangyMessageRow[]) =>
-    LangyConversationMemoryService.tryRender(
-      LangyConversationMemoryService.extract({ messages }),
-    );
+    LangyConversationMemoryService.tryRender(LangyConversationMemoryService.extract({ messages }));
 
   describe("extract", () => {
     describe("given an earlier turn that created a scenario", () => {
@@ -395,7 +390,10 @@ describe("LangyConversationMemoryService — ported scenarios", () => {
       /** @scenario A long conversation is remembered in bounded form */
       it("carries only the most recent handful", () => {
         const messages = Array.from({ length: 40 }, (_, i) =>
-          agentTurn([toolPart({ resource: "scenario", verb: "create", primaryId: `s${i}` })], `m${i}`),
+          agentTurn(
+            [toolPart({ resource: "scenario", verb: "create", primaryId: `s${i}` })],
+            `m${i}`,
+          ),
         );
 
         const entries = LangyConversationMemoryService.extract({ messages });

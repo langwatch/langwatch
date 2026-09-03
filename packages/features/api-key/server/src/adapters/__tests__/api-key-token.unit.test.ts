@@ -108,10 +108,7 @@ describe("verifySecret", () => {
     it("returns match_legacy", () => {
       const secret = "legacySecretValue123";
       // Simulate a hash created with the old plain SHA-256 algorithm
-      const legacyHash = require("node:crypto")
-        .createHash("sha256")
-        .update(secret)
-        .digest("hex");
+      const legacyHash = require("node:crypto").createHash("sha256").update(secret).digest("hex");
       expect(ApiKeyTokenAdapter.verifyApiKeySecret(secret, legacyHash, PEPPER)).toBe(
         "match_legacy",
       );
@@ -121,9 +118,7 @@ describe("verifySecret", () => {
   describe("when secret does not match", () => {
     it("returns no_match", () => {
       const hashed = ApiKeyTokenAdapter.hashApiKeySecret("correct", PEPPER);
-      expect(ApiKeyTokenAdapter.verifyApiKeySecret("wrong", hashed, PEPPER)).toBe(
-        "no_match",
-      );
+      expect(ApiKeyTokenAdapter.verifyApiKeySecret("wrong", hashed, PEPPER)).toBe("no_match");
     });
   });
 });
@@ -160,17 +155,13 @@ describe("getTokenType", () => {
     it("returns legacyProjectKey", () => {
       // Legacy keys are random strings from alphabets that include `_` and
       // `-` — an underscore must not flip them to the API key lookup path
-      expect(getTokenType("sk-lw-AbCdEfGhIjKlMnOpQrStUvWxYz012345_floM")).toBe(
-        "legacyProjectKey",
-      );
+      expect(getTokenType("sk-lw-AbCdEfGhIjKlMnOpQrStUvWxYz012345_floM")).toBe("legacyProjectKey");
     });
   });
 
   describe("when given an sk-lw- token with underscore but wrong segment lengths", () => {
     it("returns legacyProjectKey", () => {
-      expect(getTokenType("sk-lw-abcdef1234567890_secretsecret")).toBe(
-        "legacyProjectKey",
-      );
+      expect(getTokenType("sk-lw-abcdef1234567890_secretsecret")).toBe("legacyProjectKey");
     });
   });
 

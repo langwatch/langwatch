@@ -56,9 +56,7 @@ describe("given the LangWatchQL settings profile statement", () => {
       ["bytes scanned", "max_bytes_to_read = 333000 CONST"],
       ["scan overflow", "read_overflow_mode = 'throw' CONST"],
     ])("pins the %s ceiling", (_label, expected) => {
-      expect(lwqlSettingsProfileStatement({ names: NAMES, limits: LIMITS })).toContain(
-        expected,
-      );
+      expect(lwqlSettingsProfileStatement({ names: NAMES, limits: LIMITS })).toContain(expected);
     });
 
     /**
@@ -120,10 +118,9 @@ describe("given the LangWatchQL row policy", () => {
       // Without this the subquery yields both rows and `IN` admits both
       // tenants, so one bad row in the key map hands a caller another
       // tenant's data. With it the group is dropped and neither is admitted.
-      expect(
-        statement,
-        "a conflicting key map must revoke access, not widen it",
-      ).toContain("HAVING uniqExact(TenantId) = 1");
+      expect(statement, "a conflicting key map must revoke access, not widen it").toContain(
+        "HAVING uniqExact(TenantId) = 1",
+      );
     });
 
     it("selects the tenant only under that single-tenant guard", () => {

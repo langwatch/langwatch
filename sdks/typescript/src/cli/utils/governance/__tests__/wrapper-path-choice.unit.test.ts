@@ -63,12 +63,7 @@ describe("parseToolModeFlag", () => {
 
     /** @scenario "--tool-mode=gateway forces the gateway path" */
     it("strips the flag from the MIDDLE without disturbing surrounding args", () => {
-      const input = [
-        "--dangerously-skip-permissions",
-        "--tool-mode=gateway",
-        "-p",
-        "hi there",
-      ];
+      const input = ["--dangerously-skip-permissions", "--tool-mode=gateway", "-p", "hi there"];
       const out = parseToolModeFlag(input, {});
       expect(out.args).toEqual(["--dangerously-skip-permissions", "-p", "hi there"]);
       expect(out.override).toBe("gateway");
@@ -193,8 +188,7 @@ describe("resolveWrapperPath", () => {
         expect(out.prompted).toBe(true);
         // The select asked how the tool should run and offered both paths,
         // subscription (OTLP) first and pre-selected as the default.
-        const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
-          .calls[0]![0] as {
+        const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
           message: string;
           choices: Array<{ title: string; value: string; description?: string }>;
           initial: number;
@@ -389,8 +383,7 @@ describe("resolveWrapperPath", () => {
         writeImpl: vi.fn(),
         env: {},
       });
-      const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
-        .calls[0]![0] as {
+      const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
         choices: Array<{ value: string; description: string }>;
         initial: number;
       };
@@ -568,13 +561,9 @@ describe("resolveWrapperPath", () => {
     it("asks how the tool should run and names both paths in human terms", () => {
       expect(pathChoiceMessage("claude")).toBe("How should `langwatch claude` run?");
       expect(otlpChoiceTitle("claude")).toBe("Using a Claude subscription");
-      expect(otlpChoiceDescription()).toBe(
-        "keep your own plan, send only telemetry to LangWatch",
-      );
+      expect(otlpChoiceDescription()).toBe("keep your own plan, send only telemetry to LangWatch");
       expect(gatewayChoiceTitle()).toBe("Using an API key");
-      expect(gatewayChoiceDescription()).toBe(
-        "route calls through LangWatch with a virtual key",
-      );
+      expect(gatewayChoiceDescription()).toBe("route calls through LangWatch with a virtual key");
     });
 
     it("names the right subscription per tool, with a neutral fallback", () => {

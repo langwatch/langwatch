@@ -1,5 +1,9 @@
 import type { BackfillIdentifierRow } from "@langwatch/identity-contract";
-import type { BackfillAccountRow, BackfillUserRow, IdentityBackfillRepository } from "../../identity-backfill.repository";
+import type {
+  BackfillAccountRow,
+  BackfillUserRow,
+  IdentityBackfillRepository,
+} from "../../identity-backfill.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
@@ -7,16 +11,10 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * `Identifier` projection it proves itself against. Reads only: the one
  * write the pass owns besides its facts is the users repository's.
  */
-export class PrismaIdentityBackfillRepository
-  implements IdentityBackfillRepository
-{
+export class PrismaIdentityBackfillRepository implements IdentityBackfillRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async tryFindUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<BackfillUserRow | null> {
+  async tryFindUser({ userId }: { userId: string }): Promise<BackfillUserRow | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -37,11 +35,7 @@ export class PrismaIdentityBackfillRepository
     };
   }
 
-  async findAccountRows({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<BackfillAccountRow[]> {
+  async findAccountRows({ userId }: { userId: string }): Promise<BackfillAccountRow[]> {
     const rows = await this.prisma.account.findMany({
       where: { userId },
       select: {
@@ -66,11 +60,7 @@ export class PrismaIdentityBackfillRepository
     }));
   }
 
-  async findIdentifierRows({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<BackfillIdentifierRow[]> {
+  async findIdentifierRows({ userId }: { userId: string }): Promise<BackfillIdentifierRow[]> {
     return this.prisma.identifier.findMany({
       where: { userId },
       select: {

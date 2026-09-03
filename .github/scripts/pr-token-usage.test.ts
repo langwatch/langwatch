@@ -70,10 +70,7 @@ describe("given a usage rollup with rows for two contributors", () => {
     it("renders each contributor once with agent, sessions, tokens and cost, and a totals row", () => {
       const body = build(
         usage({
-          rows: [
-            row(),
-            row({ contributorLabel: "Grace Hopper", agent: "codex", costUsd: 3 }),
-          ],
+          rows: [row(), row({ contributorLabel: "Grace Hopper", agent: "codex", costUsd: 3 })],
           totals: {
             sessionsCount: 4,
             inputTokens: 2_000,
@@ -94,7 +91,10 @@ describe("given a usage rollup with rows for two contributors", () => {
         body,
         /\| Grace Hopper \| <img [^|]+\/> Codex \| 2 \| 37 thousand \| \$3\.00 \|/,
       );
-      assert.match(body, /\| \*\*Total\*\* \|  \| \*\*4\*\* \| \*\*74 thousand\*\* \| \*\*\$15\.50\*\* \|/);
+      assert.match(
+        body,
+        /\| \*\*Total\*\* \|  \| \*\*4\*\* \| \*\*74 thousand\*\* \| \*\*\$15\.50\*\* \|/,
+      );
     });
   });
 });
@@ -124,8 +124,14 @@ describe("given a usage rollup whose cost fields are null", () => {
           totals: { ...usage().totals, costUsd: null },
         }),
       );
-      assert.match(body, /\| Ada Lovelace \| <img [^|]+\/> Claude Code \| 2 \| 37 thousand \| — \|/);
-      assert.match(body, /\| \*\*Total\*\* \|  \| \*\*2\*\* \| \*\*37 thousand\*\* \| \*\*—\*\* \|/);
+      assert.match(
+        body,
+        /\| Ada Lovelace \| <img [^|]+\/> Claude Code \| 2 \| 37 thousand \| — \|/,
+      );
+      assert.match(
+        body,
+        /\| \*\*Total\*\* \|  \| \*\*2\*\* \| \*\*37 thousand\*\* \| \*\*—\*\* \|/,
+      );
       assert.ok(!body.includes("$0.00"));
     });
   });
@@ -247,9 +253,7 @@ describe("given the LangWatch API's answer", () => {
       });
       assert.equal(outcome.kind, "error");
       assert.ok(outcome.kind === "error" && outcome.message.includes("401"));
-      assert.ok(
-        outcome.kind === "error" && outcome.message.includes("invalid_credentials"),
-      );
+      assert.ok(outcome.kind === "error" && outcome.message.includes("invalid_credentials"));
     });
   });
 

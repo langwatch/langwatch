@@ -52,10 +52,7 @@ export const storedObjectsDeleteOutputSchema = z
   .strict();
 export type StoredObjectsDeleteOutput = z.infer<typeof storedObjectsDeleteOutputSchema>;
 
-export interface StoredObjectsRpcProcedure<
-  Input extends ZodTypeAny,
-  Output extends ZodTypeAny,
-> {
+export interface StoredObjectsRpcProcedure<Input extends ZodTypeAny, Output extends ZodTypeAny> {
   readonly method: "POST";
   readonly input: Input;
   readonly output: Output;
@@ -63,9 +60,7 @@ export interface StoredObjectsRpcProcedure<
   readonly audienceProof?: true;
 }
 
-function publicRpcContract(
-  createUploadInput: typeof storedObjectsCreateUploadInputSchema,
-) {
+function publicRpcContract(createUploadInput: typeof storedObjectsCreateUploadInputSchema) {
   return {
     createUpload: {
       method: "POST",
@@ -96,13 +91,9 @@ function publicRpcContract(
 }
 
 /** Portable declarations consumed by the unified API registration adapter. */
-export const storedObjectsPublicRpc = publicRpcContract(
-  storedObjectsCreateUploadInputSchema,
-);
+export const storedObjectsPublicRpc = publicRpcContract(storedObjectsCreateUploadInputSchema);
 
 /** Same declarations with the runtime's semantic maximum embedded in input validation. */
 export function createStoredObjectsPublicRpc(maximumUploadBytes: number) {
-  return publicRpcContract(
-    createStoredObjectsCreateUploadInputSchema(maximumUploadBytes),
-  );
+  return publicRpcContract(createStoredObjectsCreateUploadInputSchema(maximumUploadBytes));
 }

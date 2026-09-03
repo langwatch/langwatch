@@ -94,8 +94,7 @@ function buildMockTraceService(options: {
         groups: batch.map((t) => [t as any]),
         totalHits: options.totalHits,
         traceChecks: options.evaluations ?? {},
-        scrollId:
-          callIndex < options.batches.length - 1 ? `scroll-${callIndex + 1}` : undefined,
+        scrollId: callIndex < options.batches.length - 1 ? `scroll-${callIndex + 1}` : undefined,
       };
       callIndex++;
       return Promise.resolve(result);
@@ -140,12 +139,8 @@ describe("TraceExportService", () => {
 
     describe("when exporting summary CSV across multiple batches", () => {
       it("yields multiple chunks with progressive progress", async () => {
-        const batch1 = Array.from({ length: 3 }, (_, i) =>
-          buildTrace({ trace_id: `t${i}` }),
-        );
-        const batch2 = Array.from({ length: 2 }, (_, i) =>
-          buildTrace({ trace_id: `t${i + 3}` }),
-        );
+        const batch1 = Array.from({ length: 3 }, (_, i) => buildTrace({ trace_id: `t${i}` }));
+        const batch2 = Array.from({ length: 2 }, (_, i) => buildTrace({ trace_id: `t${i + 3}` }));
         const traceService = buildMockTraceService({
           batches: [batch1, batch2],
           totalHits: 5,

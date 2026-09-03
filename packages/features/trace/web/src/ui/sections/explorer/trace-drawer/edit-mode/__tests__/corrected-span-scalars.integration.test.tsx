@@ -63,9 +63,7 @@ describe("CorrectedSpanScalars", () => {
       it("names the captured type", () => {
         renderScalars(["type"]);
 
-        expect(
-          screen.getByLabelText("Span type, edited. Original: tool"),
-        ).toBeInTheDocument();
+        expect(screen.getByLabelText("Span type, edited. Original: tool")).toBeInTheDocument();
       });
     });
   });

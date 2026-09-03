@@ -24,13 +24,8 @@ import { LangyFailureReference } from "../../../../index";
  * change it. What the reading of the failure decides — headline, detail, code,
  * plan limit — lives in `logic/langy-tool-failure.ts`; this file only draws it.
  */
-export function LangyToolErrorCard({
-  presentation,
-}: {
-  presentation: LangyToolErrorPresentation;
-}) {
-  const hasActions =
-    presentation.traceUrl || presentation.logsUrl || presentation.docsUrl;
+export function LangyToolErrorCard({ presentation }: { presentation: LangyToolErrorPresentation }) {
+  const hasActions = presentation.traceUrl || presentation.logsUrl || presentation.docsUrl;
   const hasBody =
     !!presentation.detail ||
     !!presentation.tips?.length ||

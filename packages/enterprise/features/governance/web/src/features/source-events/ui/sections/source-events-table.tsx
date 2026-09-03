@@ -183,20 +183,14 @@ function EventDataRow({
       </Table.Cell>
       <Table.Cell textAlign="end" whiteSpace="nowrap">
         <Text textStyle="sm" color="fg.muted">
-          {hasTokens
-            ? `${fmtInteger(event.tokensInput)} → ${fmtInteger(event.tokensOutput)}`
-            : "—"}
+          {hasTokens ? `${fmtInteger(event.tokensInput)} → ${fmtInteger(event.tokensOutput)}` : "—"}
         </Text>
       </Table.Cell>
     </Table.Row>
   );
 }
 
-function SourceEventsPagination({
-  pager,
-}: {
-  pager: SourceEventsPager<SourceEventRowData>;
-}) {
+function SourceEventsPagination({ pager }: { pager: SourceEventsPager<SourceEventRowData> }) {
   const pageCount = Math.max(1, Math.ceil(pager.totalCount / pager.pageSize));
   const start = (pager.page - 1) * pager.pageSize + 1;
   const end = start + Math.max(0, pager.rows.length - 1);
@@ -286,9 +280,7 @@ function EventsTableBody({ pager }: { pager: SourceEventsPager<SourceEventRowDat
             event={event}
             isExpanded={expandedEventId === event.eventId}
             onToggle={() =>
-              setExpandedEventId((current) =>
-                current === event.eventId ? null : event.eventId,
-              )
+              setExpandedEventId((current) => (current === event.eventId ? null : event.eventId))
             }
           />
           {expandedEventId === event.eventId && (
@@ -325,8 +317,8 @@ export function SourceEventsTable({
         </Heading>
         {pager.status !== "error" && (
           <Text fontSize="sm" color="fg.muted">
-            Every OCSF-normalised event from this source, newest first. Click a row for
-            the raw and normalised records.
+            Every OCSF-normalised event from this source, newest first. Click a row for the raw and
+            normalised records.
           </Text>
         )}
       </VStack>
@@ -341,9 +333,7 @@ export function SourceEventsTable({
               them — it names itself above the table and the next click
               retries the walk. */}
           {pager.error != null && (
-            <Box marginBottom={2}>
-              {renderError(pager.error, "Couldn't load more events")}
-            </Box>
+            <Box marginBottom={2}>{renderError(pager.error, "Couldn't load more events")}</Box>
           )}
           {presentation?.renderTable?.({
             header: tableHeader,
@@ -356,9 +346,7 @@ export function SourceEventsTable({
               </Table.Root>
             </Box>
           )}
-          {presentation?.renderPagination?.(pager) ?? (
-            <SourceEventsPagination pager={pager} />
-          )}
+          {presentation?.renderPagination?.(pager) ?? <SourceEventsPagination pager={pager} />}
         </Box>
       )}
     </VStack>

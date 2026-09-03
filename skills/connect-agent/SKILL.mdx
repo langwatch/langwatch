@@ -321,29 +321,29 @@ If the endpoint creates its own conversation and returns its id, add `"sessionPa
 
 The body template renders as a Liquid template on every turn. The URL and header values render the same variables:
 
-| Variable | Value |
-|---|---|
-| `{{ messages }}` | The whole conversation as a raw JSON array of `{role, content}` messages |
-| `{{ input }}` | The text of the last user message |
-| `{{ threadId }}` | A conversation id, the same on every turn of a run |
-| `{{ params.NAME }}` | A run parameter the scenario declares |
+| Variable                             | Value                                                                                                                         |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `{{ messages }}`                     | The whole conversation as a raw JSON array of `{role, content}` messages                                                      |
+| `{{ input }}`                        | The text of the last user message                                                                                             |
+| `{{ threadId }}`                     | A conversation id, the same on every turn of a run                                                                            |
+| `{{ params.NAME }}`                  | A run parameter the scenario declares                                                                                         |
 | `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, for systems that read them from the body or a custom header instead of the `traceparent` header |
 
 Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise unchanged.
 
 ## Common Failures
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `langwatch agent list` shows no row for the agent | The process started without an API key, so the SDK opened no connection. | Set `LANGWATCH_API_KEY` in the process environment and restart the process. |
-| The row reads `Offline` | The process stopped, or its outbound connection is blocked. | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http`; the SDK then registers over HTTP long polling. |
+| Symptom                                                                                                  | Cause                                                                                                                                                             | Fix                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `langwatch agent list` shows no row for the agent                                                        | The process started without an API key, so the SDK opened no connection.                                                                                          | Set `LANGWATCH_API_KEY` in the process environment and restart the process.                                                                                                                 |
+| The row reads `Offline`                                                                                  | The process stopped, or its outbound connection is blocked.                                                                                                       | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http`; the SDK then registers over HTTP long polling.                                              |
 | The process logs `timed out during opening handshake` on every attempt while `curl` reaches the endpoint | The host resolves the endpoint to an IPv6 address it cannot reach, most often behind a VPN tunnel that drops IPv6, and an older SDK waited on that address alone. | Update the `langwatch` package to the latest release: it moves on to the next address after 0.25 s (`LANGWATCH_AGENT_HAPPY_EYEBALLS_DELAY` tunes it). Disconnecting the VPN also clears it. |
-| `langwatch agent get` lists a parameter without `options`, or does not list it at all | The annotation is not a `Literal`, an `Enum` or a `z.enum`, or the parameter has no default and the platform reads it as required. | Change the annotation or add the default, then restart the process. |
-| The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process and run again. |
-| The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so only its owner can run it. | Run it as the owner, or register it under a shared environment name such as `dev-shared`. |
-| The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code. |
-| A turn fails with `agent_call_timeout` | The call took longer than the agent's timeout. | Raise `timeout` on the connect function (up to 300 seconds), or make the agent answer faster. |
-| Trace-dependent criteria come back inconclusive | The agent reports its traces to a different LangWatch project, or it reports none at all. | Point the agent's tracing at the same project's API key. Set it up with the `tracing` skill. |
+| `langwatch agent get` lists a parameter without `options`, or does not list it at all                    | The annotation is not a `Literal`, an `Enum` or a `z.enum`, or the parameter has no default and the platform reads it as required.                                | Change the annotation or add the default, then restart the process.                                                                                                                         |
+| The run is refused with `agent_offline`                                                                  | No instance was connected when the run started.                                                                                                                   | Start the agent process and run again.                                                                                                                                                      |
+| The run is refused with `agent_owner_only`                                                               | The agent registered under `development` with a personal key, so only its owner can run it.                                                                       | Run it as the owner, or register it under a shared environment name such as `dev-shared`.                                                                                                   |
+| The run is refused with `scenario_parameter_option_invalid`                                              | A value is outside the closed option list the agent declares.                                                                                                     | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code.                                                                                   |
+| A turn fails with `agent_call_timeout`                                                                   | The call took longer than the agent's timeout.                                                                                                                    | Raise `timeout` on the connect function (up to 300 seconds), or make the agent answer faster.                                                                                               |
+| Trace-dependent criteria come back inconclusive                                                          | The agent reports its traces to a different LangWatch project, or it reports none at all.                                                                         | Point the agent's tracing at the same project's API key. Set it up with the `tracing` skill.                                                                                                |
 
 ## Common Mistakes
 

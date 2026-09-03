@@ -62,8 +62,7 @@ export function LangyCard({
   const reduce = useReducedMotion();
   const variant = CARD_TAXONOMY[intent];
   const dotColor = dot ?? variant.dot;
-  const dotOn =
-    showDot ?? (!variant.inline && intent !== "spotlight" && Boolean(overline));
+  const dotOn = showDot ?? (!variant.inline && intent !== "spotlight" && Boolean(overline));
 
   const statusDot = dotOn ? (
     <Box
@@ -72,11 +71,7 @@ export function LangyCard({
       borderRadius="full"
       flexShrink={0}
       background={dotColor}
-      css={
-        pulseDot && !reduce
-          ? { animation: `${dotPulse} 1.4s ease-in-out infinite` }
-          : undefined
-      }
+      css={pulseDot && !reduce ? { animation: `${dotPulse} 1.4s ease-in-out infinite` } : undefined}
     />
   ) : null;
 
@@ -111,8 +106,7 @@ export function LangyCard({
 
   // The eyebrow leads with the intent tone on the receipts, and stays subtle on
   // the accented cards where the warm material already carries the weight.
-  const overlineColor =
-    intent === "progress" || intent === "change" ? dotColor : "fg.subtle";
+  const overlineColor = intent === "progress" || intent === "change" ? dotColor : "fg.subtle";
   const overlineRow = overline ? (
     <HStack gap={1.5} align="center" {...TYPE.sectionLabel} color={overlineColor}>
       {statusDot}
@@ -203,11 +197,7 @@ function statusDotForInline(color: string, pulse: boolean, reduce: boolean): Rea
       borderRadius="full"
       flexShrink={0}
       background={color}
-      css={
-        pulse && !reduce
-          ? { animation: `${dotPulse} 1.4s ease-in-out infinite` }
-          : undefined
-      }
+      css={pulse && !reduce ? { animation: `${dotPulse} 1.4s ease-in-out infinite` } : undefined}
     />
   );
 }

@@ -53,8 +53,5 @@ export function isWithinPeriod({
   period: Period | null;
 }): boolean {
   if (period === null) return true;
-  return (
-    lastUpdateAtMs >= period.startDate.getTime() &&
-    lastUpdateAtMs <= period.endDate.getTime()
-  );
+  return lastUpdateAtMs >= period.startDate.getTime() && lastUpdateAtMs <= period.endDate.getTime();
 }

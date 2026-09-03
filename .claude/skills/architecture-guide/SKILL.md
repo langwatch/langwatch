@@ -13,11 +13,11 @@ they compose feature packages over their own database, Redis and ClickHouse hand
 
 A feature is a folder `packages/features/<name>/` that owns three workspace packages:
 
-| Directory  | Package                        | Holds                                                                |
-| ---------- | ------------------------------ | -------------------------------------------------------------------- |
-| `contract` | `@langwatch/<name>-contract`   | zod schemas, commands, queries, events, errors, the abstract service |
-| `server`   | `@langwatch/<name>-server`     | services, private persistence, ports, adapters, transports           |
-| `web`      | `@langwatch/<name>-web`        | screens, surfaces, hooks, pure view models (optional)                |
+| Directory  | Package                      | Holds                                                                |
+| ---------- | ---------------------------- | -------------------------------------------------------------------- |
+| `contract` | `@langwatch/<name>-contract` | zod schemas, commands, queries, events, errors, the abstract service |
+| `server`   | `@langwatch/<name>-server`   | services, private persistence, ports, adapters, transports           |
+| `web`      | `@langwatch/<name>-web`      | screens, surfaces, hooks, pure view models (optional)                |
 
 The root is not a package. It holds `feature.json` (`{ "layoutVersion": 0 }`), `specs/`
 and `adrs/`. Enterprise features mirror this under `packages/enterprise/features/<name>`,

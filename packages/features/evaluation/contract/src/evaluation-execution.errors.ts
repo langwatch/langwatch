@@ -5,7 +5,6 @@ import {
   remediation,
 } from "@langwatch/handled-error";
 
-
 export class TraceNotEvaluatableError extends HandledError {
   declare readonly code: "trace_not_evaluatable";
 
@@ -96,24 +95,16 @@ export class EvaluatorExecutionError extends HandledError {
 export class EvaluatorMissingFieldError extends HandledError {
   declare readonly code: "evaluator_missing_field";
 
-  constructor(
-    field: string,
-    evaluatorName: string,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
-    super(
-      "evaluator_missing_field",
-      `${field} is required for ${evaluatorName} evaluator`,
-      {
-        meta: { field, evaluatorName },
-        // Matches the status this replaces (a missing request field is a
-        // client Bad Request, not a semantic 422) — existing API consumers
-        // of this legacy endpoint keep seeing the same status code.
-        httpStatus: 400,
-        ...remediation("evaluator_missing_field"),
-        ...options,
-      },
-    );
+  constructor(field: string, evaluatorName: string, options: { reasons?: readonly Error[] } = {}) {
+    super("evaluator_missing_field", `${field} is required for ${evaluatorName} evaluator`, {
+      meta: { field, evaluatorName },
+      // Matches the status this replaces (a missing request field is a
+      // client Bad Request, not a semantic 422) — existing API consumers
+      // of this legacy endpoint keep seeing the same status code.
+      httpStatus: 400,
+      ...remediation("evaluator_missing_field"),
+      ...options,
+    });
     this.name = "EvaluatorMissingFieldError";
   }
 }

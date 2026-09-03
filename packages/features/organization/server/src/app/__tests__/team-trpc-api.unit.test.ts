@@ -16,10 +16,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  OrganizationApp,
-  type OrganizationAppDependencies,
-} from "../organization.app";
+import { OrganizationApp, type OrganizationAppDependencies } from "../organization.app";
 import { TeamTrpcApi } from "../../transport/api-trpc/team.api";
 
 type TestContext = {

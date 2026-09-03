@@ -7,11 +7,11 @@ following the worked example [`dataset.md`](dataset.md).
 
 **20,942 lines, 136 non-test source files, 50 test files** across three packages:
 
-| package | non-test files | non-test lines | test files |
-| --- | ---: | ---: | ---: |
-| `server/src` | 52 | 10,059 | 26 |
-| `contract/src` | 33 | 4,224 | 6 |
-| `web/src` | 51 | 6,659 | 18 |
+| package        | non-test files | non-test lines | test files |
+| -------------- | -------------: | -------------: | ---------: |
+| `server/src`   |             52 |         10,059 |         26 |
+| `contract/src` |             33 |          4,224 |          6 |
+| `web/src`      |             51 |          6,659 |         18 |
 
 **Eleven read operations, declared five times over.** The read path:
 
@@ -82,14 +82,14 @@ block in `create` (`:45-102`), which is composition-root work.
 (`:235-251`) hold the tenancy boundary. But six of its ten public methods are the
 second pass-through in the same chain:
 
-| `app/coding-agent.app.ts` | body |
-| --- | --- |
-| `:114-119` `getSessionEvents` | `return this.dependencies.codingAgents.getSessionEvents(input)` |
-| `:122-124` `getUsageTotals` | same shape |
-| `:127-129` `listRecent` | same shape |
-| `:132-136` `listForProject` | same shape |
-| `:139-141` `githubWebBase` | `return this.dependencies.github.getWebBase()` |
-| `:144-146` `tryResolveOrganizationForProject` | same shape — **and no caller anywhere** |
+| `app/coding-agent.app.ts`                     | body                                                            |
+| --------------------------------------------- | --------------------------------------------------------------- |
+| `:114-119` `getSessionEvents`                 | `return this.dependencies.codingAgents.getSessionEvents(input)` |
+| `:122-124` `getUsageTotals`                   | same shape                                                      |
+| `:127-129` `listRecent`                       | same shape                                                      |
+| `:132-136` `listForProject`                   | same shape                                                      |
+| `:139-141` `githubWebBase`                    | `return this.dependencies.github.getWebBase()`                  |
+| `:144-146` `tryResolveOrganizationForProject` | same shape — **and no caller anywhere**                         |
 
 `tryResolveOrganizationForProject` has zero call sites outside the class's own
 two private uses (`:213`, `:263`). `githubConnection` (`:235`) is public with one
@@ -100,7 +100,10 @@ caller, itself (`:227`).
 `adapters/coding-agent.adapter.ts:48-52`:
 
 ```ts
-const projectionRepositories = new WeakMap<CodingAgentProjectionPersistence, CodingAgentRepositories>();
+const projectionRepositories = new WeakMap<
+  CodingAgentProjectionPersistence,
+  CodingAgentRepositories
+>();
 const projectionClocks = new WeakMap<CodingAgentProjectionPersistence, CodingAgentClockPort>();
 ```
 
@@ -112,7 +115,7 @@ then reads them back out (`:154-155`) and throws at runtime when it cannot:
 
 ```ts
 if (repositories === undefined || clock === undefined) {
-  throw new Error("CodingAgentProjectionPersistence must be package-created");  // :156-158
+  throw new Error("CodingAgentProjectionPersistence must be package-created"); // :156-158
 }
 ```
 
@@ -126,14 +129,14 @@ signatures. The only non-test implementation is
 `adapters/coding-agent.adapter.ts:60-130`, in the sibling package of the same
 feature, and all six of its methods are one-liners:
 
-| adapter | forwards to |
-| --- | --- |
-| `:81-87` `storeSession` | `repositories.sessions.upsert` |
-| `:89-97` `storeSessionBatch` | `repositories.sessions.upsertBatch` |
+| adapter                            | forwards to                                           |
+| ---------------------------------- | ----------------------------------------------------- |
+| `:81-87` `storeSession`            | `repositories.sessions.upsert`                        |
+| `:89-97` `storeSessionBatch`       | `repositories.sessions.upsertBatch`                   |
 | `:99-108` `loadSessionWithApplied` | `repositories.sessions.tryFindBySessionIdWithApplied` |
-| `:110-115` `appendTraceSessions` | `repositories.traceSessions.ensure` |
-| `:117-122` `appendMetricSeries` | `repositories.metricSeries.ensure` |
-| `:124-129` `appendSessionEvents` | `repositories.sessionEvents.ensure` |
+| `:110-115` `appendTraceSessions`   | `repositories.traceSessions.ensure`                   |
+| `:117-122` `appendMetricSeries`    | `repositories.metricSeries.ensure`                    |
+| `:124-129` `appendSessionEvents`   | `repositories.sessionEvents.ensure`                   |
 
 The repositories are already abstract classes with `Null` twins
 (`repositories/coding-agent-session.repository.ts:7,56`,
@@ -183,7 +186,10 @@ methods to satisfy it: `platform/app/src/test-utils/test-coding-agent.service.ts
 `normalizeMetricName` with a hardcoded prefix regex:
 
 ```ts
-const name = raw.replace(/^(claude_code|claude_cowork|cowork|opencode|codex|gemini_cli|github\.copilot|copilot)\./, "");
+const name = raw.replace(
+  /^(claude_code|claude_cowork|cowork|opencode|codex|gemini_cli|github\.copilot|copilot)\./,
+  "",
+);
 if (name === "token.usage" || name === "turn.token_usage") return "token_usage";
 ```
 
@@ -192,9 +198,11 @@ The canonical one is exported from the contract at
 from the agent registry:
 
 ```ts
-return METRIC_ALIASES[stripAgentPrefix(rawMetricName)] ?? null;   // :212
-const METRIC_ALIASES = mergeAliasTables(BASE_METRIC_ALIASES,
-  CODING_AGENT_REGISTRY.map((agent) => agent.metricAliases));      // :257-260
+return METRIC_ALIASES[stripAgentPrefix(rawMetricName)] ?? null; // :212
+const METRIC_ALIASES = mergeAliasTables(
+  BASE_METRIC_ALIASES,
+  CODING_AGENT_REGISTRY.map((agent) => agent.metricAliases),
+); // :257-260
 ```
 
 `stripAgentPrefix` (`:544-551`) walks `CODING_AGENT_REGISTRY`. Add a seventh
@@ -221,8 +229,8 @@ Also duplicated, byte-for-byte: `emitSystemPrompt` at
 export type CodingAgentProjectionPersistenceOptions = {
   clickHouse: CodingAgentClickHousePort | null;
   retention: { defaultTraceRetentionDays: number };
-  readMetrics?: CodingAgentReadMetricsPort;   // :144
-  clock?: CodingAgentClockPort;               // :145
+  readMetrics?: CodingAgentReadMetricsPort; // :144
+  clock?: CodingAgentClockPort; // :145
 };
 ```
 
@@ -236,7 +244,7 @@ Every non-test call site, repo-wide:
 
 So `readMetrics` is supplied on every path that reads it, and `clock` is supplied
 on no path at all — its default `SystemCodingAgentClock.create()` (`:71`) is the
-only value it ever takes. Meanwhile the write path *does* construct its own clock
+only value it ever takes. Meanwhile the write path _does_ construct its own clock
 (`platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts:1053`),
 so one process holds two `SystemCodingAgentClock` instances and the injection
 point that would let a test replace the read-side one is never used by the
@@ -383,8 +391,8 @@ contract's persistence port and the `WeakMap`s both disappear, and with them the
 export type CodingAgentRuntimeOptions = {
   clickHouse: CodingAgentClickHousePort | null;
   retention: { defaultTraceRetentionDays: number };
-  readMetrics: CodingAgentReadMetricsPort;   // required — presets always passes it
-  clock: CodingAgentClockPort;               // required — one clock per process
+  readMetrics: CodingAgentReadMetricsPort; // required — presets always passes it
+  clock: CodingAgentClockPort; // required — one clock per process
   github: GithubService;
   projects: ProjectService;
   billing: CodingAgentBillingPolicyPort;
@@ -392,11 +400,14 @@ export type CodingAgentRuntimeOptions = {
 
 export class CodingAgentRuntime {
   readonly service: CodingAgentService;
-  readonly repositories: CodingAgentRepositories;   // named, not smuggled
+  readonly repositories: CodingAgentRepositories; // named, not smuggled
 
   static create(options: CodingAgentRuntimeOptions): CodingAgentRuntime {
     const repositories = createRepositories(options);
-    return new CodingAgentRuntime(CodingAgentApp.create({ ...options, repositories }), repositories);
+    return new CodingAgentRuntime(
+      CodingAgentApp.create({ ...options, repositories }),
+      repositories,
+    );
   }
 }
 ```

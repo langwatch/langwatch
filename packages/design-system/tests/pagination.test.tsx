@@ -69,12 +69,8 @@ describe("Pagination", () => {
     it("announces the page in view as the current one", () => {
       renderPagination({ page: 3 });
 
-      expect(screen.getByTestId("pagination-page-3").getAttribute("aria-current")).toBe(
-        "page",
-      );
-      expect(screen.getByTestId("pagination-page-2").hasAttribute("aria-current")).toBe(
-        false,
-      );
+      expect(screen.getByTestId("pagination-page-3").getAttribute("aria-current")).toBe("page");
+      expect(screen.getByTestId("pagination-page-2").hasAttribute("aria-current")).toBe(false);
     });
 
     it("refuses Back while the first page is in view", () => {
@@ -89,12 +85,8 @@ describe("Pagination", () => {
     it("reads the total, the range and the rows per page", () => {
       renderPagination({ totalCount: 7949, unitLabel: "traces" });
 
-      expect(textOf("pagination-indicator")).toContain(
-        "7,949 traces · showing 1–50 · per page",
-      );
-      expect((screen.getByTestId("pagination-page-size") as HTMLSelectElement).value).toBe(
-        "50",
-      );
+      expect(textOf("pagination-indicator")).toContain("7,949 traces · showing 1–50 · per page");
+      expect((screen.getByTestId("pagination-page-size") as HTMLSelectElement).value).toBe("50");
     });
 
     it("claims no total when the table does not name its rows", () => {
@@ -145,9 +137,7 @@ describe("Pagination", () => {
         renderPagination({ pageSizeOptions: [25, 50, 100] });
 
         const options = Array.from(
-          screen
-            .getByTestId("pagination-page-size")
-            .querySelectorAll<HTMLOptionElement>("option"),
+          screen.getByTestId("pagination-page-size").querySelectorAll<HTMLOptionElement>("option"),
         ).map((option) => option.value);
         expect(options).toEqual(["25", "50", "100"]);
       });
@@ -184,8 +174,7 @@ describe("Pagination", () => {
       expect(isDisabled("pagination-prev")).toBe(true);
       expect(isDisabled("pagination-next")).toBe(true);
       expect(isDisabled("pagination-page-4")).toBe(true);
-      expect((screen.getByTestId("pagination-page-size") as HTMLSelectElement).disabled)
-        .toBe(true);
+      expect((screen.getByTestId("pagination-page-size") as HTMLSelectElement).disabled).toBe(true);
     });
   });
 

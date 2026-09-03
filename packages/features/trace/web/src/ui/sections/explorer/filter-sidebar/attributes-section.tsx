@@ -4,7 +4,10 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { AttributeKeyRow } from "./attribute-key-row";
 import { MAX_VISIBLE_ATTRIBUTE_KEYS } from "../../../../index";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section";
-import type { AttributeKey, FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types";
+import type {
+  AttributeKey,
+  FacetValueState,
+} from "../../../../behavior/explorer/filter-sidebar/types";
 
 interface AttributesSectionProps {
   /**
@@ -87,17 +90,14 @@ const AttributesSectionInner: React.FC<AttributesSectionProps> = ({
     // Match the displayed (stripped) label so typing "env" finds
     // "environment" even though the underlying key is "metadata.environment".
     // Searches the FULL set — the cap only ever applies to the unfiltered list.
-    return sorted.filter((k) =>
-      stripPrefix(k.value, displayStripPrefix).toLowerCase().includes(q),
-    );
+    return sorted.filter((k) => stripPrefix(k.value, displayStripPrefix).toLowerCase().includes(q));
   }, [sorted, searchActive, searchQuery, displayStripPrefix]);
 
   // Cap the unfiltered list at the top N keys (by count); the "Show N more"
   // expander reveals the rest. A search bypasses the cap and shows all matches.
   const [showAll, setShowAll] = useState(false);
   const isCapped = !searchActive && filtered.length > MAX_VISIBLE_ATTRIBUTE_KEYS;
-  const visible =
-    isCapped && !showAll ? filtered.slice(0, MAX_VISIBLE_ATTRIBUTE_KEYS) : filtered;
+  const visible = isCapped && !showAll ? filtered.slice(0, MAX_VISIBLE_ATTRIBUTE_KEYS) : filtered;
   const hiddenCount = filtered.length - MAX_VISIBLE_ATTRIBUTE_KEYS;
 
   return (

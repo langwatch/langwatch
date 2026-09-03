@@ -72,9 +72,7 @@ async function findFreeBase(start: number): Promise<number | null> {
     candidate += PORT_SLOT_INCREMENT;
     const allocCandidate = allocatePorts(candidate);
     const taken = await Promise.all(
-      portsToCheck(allocCandidate).map(
-        async ({ port }) => (await pidHoldingPort(port)) != null,
-      ),
+      portsToCheck(allocCandidate).map(async ({ port }) => (await pidHoldingPort(port)) != null),
     );
     if (!taken.some(Boolean)) return candidate;
   }

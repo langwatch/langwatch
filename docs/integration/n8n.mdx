@@ -182,9 +182,7 @@ Run evaluators and record results with multiple operation modes for comprehensiv
 
 <Tab title="Record Result">Log a pre-computed evaluation result to LangWatch.</Tab>
 
-<Tab title="Run and Record">
-  Execute an evaluator and automatically record the results.
-</Tab>
+<Tab title="Run and Record">Execute an evaluator and automatically record the results.</Tab>
 
   <Tab title="Set Outputs (Dataset)">
     Write llm input and output back to a dataset for future use.
@@ -204,10 +202,7 @@ Run evaluators and record results with multiple operation modes for comprehensiv
 Retrieve and compile prompts from LangWatch Prompt Manager with variable substitution.
 
 <Frame>
-  <img
-    src="/images/integration/n8n/node-prompt.webp"
-    alt="Prompt node configuration interface"
-  />
+  <img src="/images/integration/n8n/node-prompt.webp" alt="Prompt node configuration interface" />
 </Frame>
 
 **Key Features:**
@@ -251,9 +246,7 @@ Automatically instrument your n8n workflows with OpenTelemetry to capture compre
   />
 </Frame>
 
-<Note>
-  Workflow observability is only available for self-hosted n8n instances, not n8n Cloud.
-</Note>
+<Note>Workflow observability is only available for self-hosted n8n instances, not n8n Cloud.</Note>
 
 ### Features
 
@@ -351,8 +344,7 @@ Automatically instrument your n8n workflows with OpenTelemetry to capture compre
 </ParamField>
 
 <ParamField path="N8N_OTEL_NODE_INCLUDE" type="string">
-  Comma-separated list of node names/types to include in tracing. If not set, all nodes
-  are traced.
+  Comma-separated list of node names/types to include in tracing. If not set, all nodes are traced.
 </ParamField>
 
 <ParamField path="N8N_OTEL_NODE_EXCLUDE" type="string">
@@ -411,8 +403,8 @@ Here's how to combine both LangWatch nodes and observability for a comprehensive
 ## LangWatch Concepts
 
 <Info>
-  For a complete understanding of LangWatch concepts like traces, spans, threads, and user
-  IDs, see our [Concepts Guide](/concepts).
+  For a complete understanding of LangWatch concepts like traces, spans, threads, and user IDs, see
+  our [Concepts Guide](/concepts).
 </Info>
 
 Key concepts for n8n integration:
@@ -432,15 +424,13 @@ Key concepts for n8n integration:
   </Accordion>
 
 <Accordion title="Observability not working">
-  - Verify environment variables are set correctly - Check that the hook file path is
-  correct - Look for the startup message in n8n logs - Ensure you're using self-hosted n8n
-  (not n8n Cloud)
+  - Verify environment variables are set correctly - Check that the hook file path is correct - Look
+  for the startup message in n8n logs - Ensure you're using self-hosted n8n (not n8n Cloud)
 </Accordion>
 
 <Accordion title="Credentials not working">
-  - Verify your API key is correct in LangWatch dashboard - Check the endpoint URL (should
-  be `https://app.langwatch.ai` for cloud) - Test the connection in the credential
-  settings
+  - Verify your API key is correct in LangWatch dashboard - Check the endpoint URL (should be
+  `https://app.langwatch.ai` for cloud) - Test the connection in the credential settings
 </Accordion>
 
   <Accordion title="No traces appearing in LangWatch">

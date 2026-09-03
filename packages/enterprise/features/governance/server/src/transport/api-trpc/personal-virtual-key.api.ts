@@ -23,11 +23,7 @@
  * transports reach.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { GovernanceApp } from "#app/governance.app";
 
@@ -139,8 +135,7 @@ export class PersonalVirtualKeyTrpcApi {
               .min(1)
               .max(64)
               .regex(/^[a-z0-9][a-z0-9_\-]*$/, {
-                message:
-                  "Label must be lowercase alphanumeric, dash, or underscore (no spaces)",
+                message: "Label must be lowercase alphanumeric, dash, or underscore (no spaces)",
               }),
             routingPolicyId: z.string().optional(),
           }),

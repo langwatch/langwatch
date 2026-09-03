@@ -67,15 +67,7 @@ function labelize(key: string): string {
 // that has no better name. It earns its place because a catalog keyed by kind
 // (the UI actions a page accepts) otherwise rendered as "UI action 1",
 // "UI action 2", which tells the reader nothing about any of them.
-const NAME_KEYS = [
-  "name",
-  "title",
-  "displayName",
-  "label",
-  "handle",
-  "slug",
-  "kind",
-];
+const NAME_KEYS = ["name", "title", "displayName", "label", "handle", "slug", "kind"];
 /** A row/document's id, however this endpoint spelled it. */
 const ROW_ID_KEYS = ["id", "trace_id", "traceId", "runId", "slug", "key"];
 
@@ -92,8 +84,7 @@ function firstString(value: unknown, keys: string[]): string | null {
 
 /** Renderable primitive → display text; null for anything structural. */
 function displayValue(value: unknown): string | null {
-  if (typeof value === "string")
-    return value.trim() ? truncate(value, SNIPPET_MAX) : null;
+  if (typeof value === "string") return value.trim() ? truncate(value, SNIPPET_MAX) : null;
   if (typeof value === "number") return value.toLocaleString();
   if (typeof value === "boolean") return value ? "yes" : "no";
   return null;
@@ -265,18 +256,14 @@ function RowsBody({
   const rows = collectionOf(document);
   if (!rows) {
     // The document is a single resource after all — read it as one.
-    return (
-      <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
-    );
+    return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
   }
 
   if (rows.length === 0) {
     const searched = ["search", "query"].includes(descriptor.command.verb);
     return (
       <BodyLine>
-        {searched
-          ? `No ${descriptor.noun.plural} matched.`
-          : `No ${descriptor.noun.plural} yet.`}
+        {searched ? `No ${descriptor.noun.plural} matched.` : `No ${descriptor.noun.plural} yet.`}
       </BodyLine>
     );
   }
@@ -290,8 +277,7 @@ function RowsBody({
       {shown.map((row, index) => {
         const name = firstString(row, NAME_KEYS);
         const id = firstString(row, ROW_ID_KEYS);
-        const primary =
-          name ?? id ?? `${capitalize(descriptor.noun.singular)} ${index + 1}`;
+        const primary = name ?? id ?? `${capitalize(descriptor.noun.singular)} ${index + 1}`;
         const secondary =
           firstString(row, ["status", "state", "description"]) ??
           (name && id && id !== name ? id : null);
@@ -328,9 +314,7 @@ function FactsBody({
 }) {
   if (Array.isArray(document) || collectionOf(document)) {
     // The document is a collection after all — read it as one.
-    return (
-      <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
-    );
+    return <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
   }
 
   // The card's title already shows the resource's name — don't repeat it.
@@ -369,9 +353,7 @@ function StatsBody({
   const stats = statsOf(document);
   if (stats.length === 0) {
     // Nothing counts as a figure — the resource's fields still tell the story.
-    return (
-      <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
-    );
+    return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
   }
   return <StreamingStatCard metrics={stats} />;
 }
@@ -544,11 +526,7 @@ export function LangyDeclarativeCard({
           projectSlug={projectSlug}
         />
       ) : (
-        <TextFallbackBody
-          descriptor={descriptor}
-          output={output}
-          projectSlug={projectSlug}
-        />
+        <TextFallbackBody descriptor={descriptor} output={output} projectSlug={projectSlug} />
       )}
     </LangyCapabilityCard>
   );
@@ -643,25 +621,11 @@ function WidgetBody({
 }) {
   switch (descriptor.body) {
     case "rows":
-      return (
-        <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
-      );
+      return <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
     case "facts":
-      return (
-        <FactsBody
-          descriptor={descriptor}
-          document={document}
-          projectSlug={projectSlug}
-        />
-      );
+      return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
     case "stats":
-      return (
-        <StatsBody
-          descriptor={descriptor}
-          document={document}
-          projectSlug={projectSlug}
-        />
-      );
+      return <StatsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
     case "diff":
       return (
         <DiffBody
@@ -686,24 +650,14 @@ function WidgetBody({
       return isPlottable(document) ? (
         <TimeseriesPlot payload={document} />
       ) : (
-        <StatsBody
-          descriptor={descriptor}
-          document={document}
-          projectSlug={projectSlug}
-        />
+        <StatsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />
       );
     // A widget the catalog grows before this switch does. Falling off the end
     // of the switch returned `undefined` — a card with no body at all, which
     // is how a registered `chart` widget rendered nothing for as long as it
     // existed. Facts read every document, so they are the safe floor.
     default:
-      return (
-        <FactsBody
-          descriptor={descriptor}
-          document={document}
-          projectSlug={projectSlug}
-        />
-      );
+      return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
   }
 }
 
@@ -750,9 +704,7 @@ function readTitle({
     }
     return capitalize(noun.plural);
   }
-  return (
-    dispatchedActionTitle(document) ?? name ?? id ?? capitalize(noun.singular)
-  );
+  return dispatchedActionTitle(document) ?? name ?? id ?? capitalize(noun.singular);
 }
 
 /**

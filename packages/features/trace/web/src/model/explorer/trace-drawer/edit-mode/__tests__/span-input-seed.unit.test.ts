@@ -10,10 +10,7 @@ const MESSAGES = [
 const SYSTEM_PROMPT = "You are a weather assistant.";
 
 /** What the reader's input panel shows: the prompt in front of the messages. */
-const displayInput = JSON.stringify([
-  { role: "system", content: SYSTEM_PROMPT },
-  ...MESSAGES,
-]);
+const displayInput = JSON.stringify([{ role: "system", content: SYSTEM_PROMPT }, ...MESSAGES]);
 
 describe("given a span whose system prompt is recorded apart from its messages", () => {
   describe("when the input editor is seeded", () => {
@@ -83,9 +80,7 @@ describe("given a span whose system prompt is recorded as content blocks", () =>
     [
       "as a JSON encoded array of content blocks",
       {
-        "gen_ai.system_instructions": JSON.stringify([
-          { type: "text", content: SYSTEM_PROMPT },
-        ]),
+        "gen_ai.system_instructions": JSON.stringify([{ type: "text", content: SYSTEM_PROMPT }]),
       },
     ],
   ];
@@ -142,9 +137,7 @@ describe("given a span with no system prompt attribute", () => {
       const recorded = JSON.stringify(MESSAGES);
 
       expect(capturedInputForEditing({ text: recorded, params: {} })).toBe(recorded);
-      expect(capturedInputForEditing({ text: "plain prose", params: null })).toBe(
-        "plain prose",
-      );
+      expect(capturedInputForEditing({ text: "plain prose", params: null })).toBe("plain prose");
       expect(capturedInputForEditing({ text: null, params: null })).toBeNull();
     });
   });

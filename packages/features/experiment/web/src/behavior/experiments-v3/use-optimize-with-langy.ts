@@ -17,13 +17,7 @@ import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
  * Returns undefined while the UI-action channel is flagged off, which is
  * what hides the menu item.
  */
-type OptimizeHandler = ({
-  target,
-  name,
-}: {
-  target: TargetConfig;
-  name: string;
-}) => void;
+type OptimizeHandler = ({ target, name }: { target: TargetConfig; name: string }) => void;
 
 export const useOptimizeWithLangy = (): OptimizeHandler | undefined => {
   const { project, organization } = useOrganizationTeamProject({

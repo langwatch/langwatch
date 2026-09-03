@@ -69,11 +69,7 @@ export abstract class AbstractEventStore<
    * Default: no-op.
    * ClickHouse override: structured logger call.
    */
-  protected logError(
-    _name: string,
-    _context: Record<string, unknown>,
-    _error: unknown,
-  ): void {
+  protected logError(_name: string, _context: Record<string, unknown>, _error: unknown): void {
     // no-op by default
   }
 
@@ -82,11 +78,7 @@ export abstract class AbstractEventStore<
    * Default: no-op.
    * ClickHouse override: structured logger call.
    */
-  protected logWarning(
-    _name: string,
-    _context: Record<string, unknown>,
-    _message: string,
-  ): void {
+  protected logWarning(_name: string, _context: Record<string, unknown>, _message: string): void {
     // no-op by default
   }
 
@@ -263,9 +255,7 @@ export abstract class AbstractEventStore<
             occurredAtFromMs,
           );
 
-          const events = records.map((record) =>
-            recordToEvent<EventType>(record, aggregateId),
-          );
+          const events = records.map((record) => recordToEvent<EventType>(record, aggregateId));
 
           const processed = this.postProcessEvents(events);
           return deduplicateEvents(processed);
@@ -325,15 +315,10 @@ export abstract class AbstractEventStore<
             // around the anchor cannot exclude one. `rehydrationLowerBoundMs`
             // returns undefined for long-lived types and for a missing anchor,
             // leaving those reads unbounded exactly as before.
-            occurredAtFromMs: rehydrationLowerBoundMs(
-              aggregateType,
-              upToEvent.occurredAt,
-            ),
+            occurredAtFromMs: rehydrationLowerBoundMs(aggregateType, upToEvent.occurredAt),
           });
 
-          const events = records.map((record) =>
-            recordToEvent<EventType>(record, aggregateId),
-          );
+          const events = records.map((record) => recordToEvent<EventType>(record, aggregateId));
 
           const processed = this.postProcessEvents(events);
           return deduplicateEvents(processed);
@@ -424,15 +409,10 @@ export abstract class AbstractEventStore<
             // Same bound as the unpaged read. It matters MORE here: without it
             // every page re-opens every partition, so the cost is paid once per
             // page rather than once per re-fold.
-            occurredAtFromMs: rehydrationLowerBoundMs(
-              aggregateType,
-              upToEvent.occurredAt,
-            ),
+            occurredAtFromMs: rehydrationLowerBoundMs(aggregateType, upToEvent.occurredAt),
           });
 
-          const events = records.map((record) =>
-            recordToEvent<EventType>(record, aggregateId),
-          );
+          const events = records.map((record) => recordToEvent<EventType>(record, aggregateId));
 
           // Do NOT dedup here: `deduplicateEvents` can drop the raw page's
           // last row (a retry sharing an idempotencyKey with an earlier row
@@ -539,12 +519,9 @@ export abstract class AbstractEventStore<
           for (let i = 0; i < events.length; i++) {
             const event = events[i];
             if (!event) {
-              throw new ValidationError(
-                `Event at index ${i} is undefined`,
-                "event",
-                void 0,
-                { index: i },
-              );
+              throw new ValidationError(`Event at index ${i} is undefined`, "event", void 0, {
+                index: i,
+              });
             }
             validateEventTenant(event, context, i);
             validateEventAggregateType(event, aggregateType, i);

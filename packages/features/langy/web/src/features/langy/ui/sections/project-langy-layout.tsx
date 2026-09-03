@@ -6,11 +6,7 @@ import { LangySidecar } from "./langy-panel";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset";
 import { useShowLangy } from "../../behavior/use-show-langy";
 import { LangyProvider, useLangy } from "./langy-context";
-import {
-  LANGY_DOCKED_OFFSET,
-  LANGY_TRANSITION,
-  useLangyStore,
-} from "../../../../index";
+import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION, useLangyStore } from "../../../../index";
 
 /**
  * Layout route that mounts Langy once per project, above the swapping page.
@@ -98,13 +94,7 @@ const ProjectLangySubtree = memo(function ProjectLangySubtree({
  * below the header. This wrapper then stands down, padding here too would
  * reserve the width twice. Spec: specs/langy/langy-panel-layout.feature
  */
-function LangyShiftedRoot({
-  showLangy,
-  children,
-}: {
-  showLangy: boolean;
-  children: ReactNode;
-}) {
+function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; children: ReactNode }) {
   const isOpen = useLangyStore((s) => s.isOpen);
   const panelMode = useLangyStore((s) => s.panelMode);
   const shellClaimed = useLangyStore((s) => s.dockShellClaims > 0);
@@ -143,9 +133,6 @@ function LangyShiftedRoot({
 function LangySidecarConnected() {
   const { proposalHandlersRef, actionHandlersRef } = useLangy();
   return (
-    <LangySidecar
-      proposalHandlersRef={proposalHandlersRef}
-      actionHandlersRef={actionHandlersRef}
-    />
+    <LangySidecar proposalHandlersRef={proposalHandlersRef} actionHandlersRef={actionHandlersRef} />
   );
 }

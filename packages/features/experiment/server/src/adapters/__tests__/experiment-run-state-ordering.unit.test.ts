@@ -49,10 +49,7 @@ function createReplacingMergeTreeStore(): FoldProjectionStore<ExperimentRunState
     async store(state: ExperimentRunStateData): Promise<void> {
       rows.push({ ...state });
     },
-    async get(
-      _key: string,
-      _ctx: ProjectionStoreContext,
-    ): Promise<ExperimentRunStateData | null> {
+    async get(_key: string, _ctx: ProjectionStoreContext): Promise<ExperimentRunStateData | null> {
       if (rows.length === 0) return null;
       return rows.reduce((best, row) => (row.UpdatedAt > best.UpdatedAt ? row : best));
     },
@@ -101,10 +98,7 @@ function createTargetResultEvent(index: number, occurredAt: number): TargetResul
   };
 }
 
-function createEvaluatorResultEvent(
-  index: number,
-  occurredAt: number,
-): EvaluatorResultEvent {
+function createEvaluatorResultEvent(index: number, occurredAt: number): EvaluatorResultEvent {
   return {
     id: `evt-eval-${index}`,
     aggregateId: "run-1",

@@ -35,9 +35,7 @@ function sectionBody(content: string, section: string): string | undefined {
   return match?.[1];
 }
 
-export function lintArchitectureRecords(
-  packages: ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintArchitectureRecords(packages: ClassifiedPackage[]): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   // Applications are composition and deployment roots documented by the
   // repository-level application ADR/spec. Package-local records belong to

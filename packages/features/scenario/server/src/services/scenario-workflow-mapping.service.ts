@@ -31,8 +31,7 @@ export class ScenarioWorkflowMappingService {
     inputs,
     scenarioMappings,
   }: Pick<WorkflowAgentData, "agentId" | "inputs" | "scenarioMappings">): void {
-    const hasMappings =
-      scenarioMappings !== undefined && Object.keys(scenarioMappings).length > 0;
+    const hasMappings = scenarioMappings !== undefined && Object.keys(scenarioMappings).length > 0;
 
     if (hasMappings) {
       return;

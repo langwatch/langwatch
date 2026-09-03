@@ -7,10 +7,7 @@ import {
 } from "..";
 import { logs, createNoopLogger } from "@opentelemetry/api-logs";
 import { type LangWatchLogRecord } from "../types";
-import {
-  resetObservabilitySdkConfig,
-  initializeObservabilitySdkConfig,
-} from "../../config";
+import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../../config";
 
 vi.mock("@opentelemetry/api-logs", () => ({
   logs: {
@@ -135,10 +132,7 @@ describe("LangWatch Logger", () => {
         getLogger: vi.fn().mockReturnValue(mockLogger),
       };
 
-      const logger = getLangWatchLoggerFromProvider(
-        customProvider as any,
-        "custom-logger",
-      );
+      const logger = getLangWatchLoggerFromProvider(customProvider as any, "custom-logger");
 
       expect(logger).toBeDefined();
       expect(customProvider.getLogger).toHaveBeenCalledWith("custom-logger", undefined);

@@ -88,9 +88,7 @@ function parseVersionNumber(raw: unknown): number | null {
   return Number.isInteger(version) && version > 0 ? version : null;
 }
 
-function parsePromptVariables(
-  attrs: Record<string, unknown>,
-): Record<string, string> | null {
+function parsePromptVariables(attrs: Record<string, unknown>): Record<string, string> | null {
   const fromBlob = parseVariablesBlob(attrs[promptVariablesAttribute]);
   const flat: Record<string, string> = {};
 
@@ -124,10 +122,7 @@ function parseVariablesBlob(raw: unknown): Record<string, string> | null {
     }
 
     return Object.fromEntries(
-      Object.entries(parsed.data.value).map(([key, entry]) => [
-        key,
-        stringifyVariableValue(entry),
-      ]),
+      Object.entries(parsed.data.value).map(([key, entry]) => [key, stringifyVariableValue(entry)]),
     );
   } catch {
     return null;

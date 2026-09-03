@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { IdentityHeads } from "../facts";
-import {
-  primaryChangeFacts,
-  userErasureFacts,
-} from "../identifier-aggregate";
+import { primaryChangeFacts, userErasureFacts } from "../identifier-aggregate";
 import {
   ACTOR,
   T0,
@@ -19,12 +16,8 @@ describe("primaryChangeFacts", () => {
     describe("when the person holds no PRIMARY", () => {
       /** @scenario "A first primary change routes one stream only" */
       it("states one promotion naming no previous", () => {
-        const heads = foldUser([
-          attached({ identifierId: "idf_work", state: "VERIFIED" }),
-        ]);
-        expect(
-          primaryChangeFacts({ heads, identifierId: "idf_work", actor: ACTOR }),
-        ).toEqual([
+        const heads = foldUser([attached({ identifierId: "idf_work", state: "VERIFIED" })]);
+        expect(primaryChangeFacts({ heads, identifierId: "idf_work", actor: ACTOR })).toEqual([
           {
             type: "lw.identity.primary_changed",
             data: {

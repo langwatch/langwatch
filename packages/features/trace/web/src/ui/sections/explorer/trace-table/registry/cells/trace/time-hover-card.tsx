@@ -137,13 +137,7 @@ const TimeHoverCardBody: React.FC<{ timestamp: number }> = ({ timestamp }) => {
           </Text>
         )}
         {dayOfWeek && (
-          <Box
-            width="1px"
-            height="9px"
-            bg="border.muted"
-            flexShrink={0}
-            aria-hidden="true"
-          />
+          <Box width="1px" height="9px" bg="border.muted" flexShrink={0} aria-hidden="true" />
         )}
         <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
           {viewerZone}
@@ -175,12 +169,7 @@ const Row: React.FC<{ label: string; value: string; mono?: boolean }> = ({
     <Text textStyle="2xs" color="fg.muted" fontWeight="500" width="32px" flexShrink={0}>
       {label}
     </Text>
-    <Text
-      textStyle="xs"
-      color="fg"
-      fontFamily={mono ? "mono" : undefined}
-      lineHeight="1.6"
-    >
+    <Text textStyle="xs" color="fg" fontFamily={mono ? "mono" : undefined} lineHeight="1.6">
       {value}
     </Text>
   </HStack>

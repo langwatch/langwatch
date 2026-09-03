@@ -69,24 +69,17 @@ function buildDataset({
   withContexts: boolean;
 }) {
   const source = goldenStyle === "label" ? LABEL_ROWS : FREE_TEXT_ROWS;
-  const picked = Array.from(
-    { length: rows },
-    (_, i) => source[i % source.length]!,
-  );
+  const picked = Array.from({ length: rows }, (_, i) => source[i % source.length]!);
 
   const columns = [
     { id: "input", name: "input", type: "string" },
     ...(goldenStyle === "none"
       ? []
       : [{ id: "expected_output", name: "expected_output", type: "string" }]),
-    ...(withContexts
-      ? [{ id: "contexts", name: "contexts", type: "list" }]
-      : []),
+    ...(withContexts ? [{ id: "contexts", name: "contexts", type: "list" }] : []),
   ];
   const records: Record<string, string[]> = {
-    input: picked.map((row, i) =>
-      i >= source.length ? `${row.input} (case ${i})` : row.input,
-    ),
+    input: picked.map((row, i) => (i >= source.length ? `${row.input} (case ${i})` : row.input)),
   };
   if (goldenStyle !== "none") {
     records.expected_output = picked.map((row) => row.expected);
@@ -173,9 +166,7 @@ function buildExactMatchEvaluator() {
  */
 function buildEvaluators({ goldenStyle }: { goldenStyle: GoldenStyle }) {
   if (goldenStyle === "none") return [];
-  return goldenStyle === "label"
-    ? [buildExactMatchEvaluator()]
-    : [buildAnswerMatchEvaluator()];
+  return goldenStyle === "label" ? [buildExactMatchEvaluator()] : [buildAnswerMatchEvaluator()];
 }
 
 /**
@@ -388,9 +379,7 @@ export async function seedComparisonWorkbench({
       }),
     ],
     activeDatasetId: DATASET_ID,
-    evaluators: isColumn
-      ? []
-      : [buildComparisonEvaluator({ judgeId: savedJudgeId })],
+    evaluators: isColumn ? [] : [buildComparisonEvaluator({ judgeId: savedJudgeId })],
     targets: [
       buildBaselineTarget({ promptId }),
       candidateTarget,
@@ -428,10 +417,7 @@ export interface SavedEvaluator {
   id: string;
   evaluatorType: string;
   comparison?: { variants: string[]; hasGoldenAnswer?: boolean };
-  mappings: Record<
-    string,
-    Record<string, Record<string, SavedFieldMapping | undefined>>
-  >;
+  mappings: Record<string, Record<string, Record<string, SavedFieldMapping | undefined>>>;
 }
 
 /** Layer-2 read: the saved workbench state, straight from the REST surface. */

@@ -6,10 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { datasetSpanSchema } from "../trace-format.schemas";
 import type { Span, Trace } from "../trace-format.schemas";
-import {
-  applyOverlayToTrace,
-  expandDeletedSpanIds,
-} from "../trace-edit-overlay-apply";
+import { applyOverlayToTrace, expandDeletedSpanIds } from "../trace-edit-overlay-apply";
 import type { TraceEditOverlayPatch } from "../trace-edit-overlay.contract";
 
 const span = (overrides: Partial<Span> & Pick<Span, "span_id">): Span =>
@@ -35,9 +32,7 @@ const trace = (spans: Span[], overrides: Partial<Trace> = {}): Trace =>
     ...overrides,
   }) as Trace;
 
-const patchOf = (
-  overrides: Partial<TraceEditOverlayPatch>,
-): TraceEditOverlayPatch => ({
+const patchOf = (overrides: Partial<TraceEditOverlayPatch>): TraceEditOverlayPatch => ({
   version: 1,
   spans: [],
   deletedSpanIds: [],
@@ -71,9 +66,7 @@ describe("applying a trace correction", () => {
         type: "text",
         value: "corrected output",
       });
-      expect(corrected.spans[0]?.timestamps).toEqual(
-        original.spans[0]?.timestamps,
-      );
+      expect(corrected.spans[0]?.timestamps).toEqual(original.spans[0]?.timestamps);
       expect(corrected.spans[0]?.metrics).toEqual(original.spans[0]?.metrics);
       expect(original.spans[0]?.output).toEqual({
         type: "text",
@@ -96,10 +89,7 @@ describe("applying a trace correction", () => {
         patch: patchOf({ deletedSpanIds: ["tool"] }),
       });
 
-      expect(corrected.spans.map((s) => s.span_id)).toEqual([
-        "root",
-        "sibling",
-      ]);
+      expect(corrected.spans.map((s) => s.span_id)).toEqual(["root", "sibling"]);
     });
 
     it("expands a deletion over a cyclic parent chain without hanging", () => {
@@ -152,20 +142,14 @@ describe("applying a trace correction", () => {
   describe("given a correction naming spans this trace does not have", () => {
     /** @scenario "Deleted span ids that are not in the trace are ignored" */
     it("returns every captured span", () => {
-      const original = trace([
-        span({ span_id: "span-1" }),
-        span({ span_id: "span-2" }),
-      ]);
+      const original = trace([span({ span_id: "span-1" }), span({ span_id: "span-2" })]);
 
       const corrected = applyOverlayToTrace({
         trace: original,
         patch: patchOf({ deletedSpanIds: ["span-from-another-trace"] }),
       });
 
-      expect(corrected.spans.map((s) => s.span_id)).toEqual([
-        "span-1",
-        "span-2",
-      ]);
+      expect(corrected.spans.map((s) => s.span_id)).toEqual(["span-1", "span-2"]);
     });
   });
 
@@ -183,13 +167,9 @@ describe("applying a trace correction", () => {
         }),
       ).toBe(original);
 
-      expect(applyOverlayToTrace({ trace: original, patch: null })).toBe(
-        original,
-      );
+      expect(applyOverlayToTrace({ trace: original, patch: null })).toBe(original);
 
-      expect(applyOverlayToTrace({ trace: original, patch: patchOf({}) })).toBe(
-        original,
-      );
+      expect(applyOverlayToTrace({ trace: original, patch: patchOf({}) })).toBe(original);
     });
   });
 

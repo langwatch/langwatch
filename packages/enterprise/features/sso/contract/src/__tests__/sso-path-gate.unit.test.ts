@@ -18,17 +18,13 @@ describe("normalizedRequestPathname", () => {
       expect(normalizedRequestPathname(`${host}/sign-up/email/?x=1`)).toBe(
         "/api/auth/sign-up/email",
       );
-      expect(normalizedRequestPathname(`${host}/sign-up/email//`)).toBe(
-        "/api/auth/sign-up/email",
-      );
+      expect(normalizedRequestPathname(`${host}/sign-up/email//`)).toBe("/api/auth/sign-up/email");
     });
   });
 
   describe("given a non-absolute URL (defensive fallback)", () => {
     it("falls back to a query-stripped split", () => {
-      expect(normalizedRequestPathname("/sign-in/social?code=abc")).toBe(
-        "/sign-in/social",
-      );
+      expect(normalizedRequestPathname("/sign-in/social?code=abc")).toBe("/sign-in/social");
     });
   });
 });
@@ -46,15 +42,9 @@ describe("requestPathname", () => {
 describe("isEmailAuthPath", () => {
   describe("given the email sign-in and sign-up endpoints", () => {
     it("matches them, trailing slash included, and nothing else", () => {
-      expect(isEmailAuthPath(normalizedRequestPathname(`${host}/sign-in/email/`))).toBe(
-        true,
-      );
-      expect(isEmailAuthPath(normalizedRequestPathname(`${host}/sign-up/email`))).toBe(
-        true,
-      );
-      expect(isEmailAuthPath(normalizedRequestPathname(`${host}/get-session`))).toBe(
-        false,
-      );
+      expect(isEmailAuthPath(normalizedRequestPathname(`${host}/sign-in/email/`))).toBe(true);
+      expect(isEmailAuthPath(normalizedRequestPathname(`${host}/sign-up/email`))).toBe(true);
+      expect(isEmailAuthPath(normalizedRequestPathname(`${host}/get-session`))).toBe(false);
     });
   });
 });
@@ -62,13 +52,11 @@ describe("isEmailAuthPath", () => {
 describe("isCredentialMutationPath", () => {
   describe("given the always-blocked mutation routes and the reset pair", () => {
     it("matches the mutation routes but not the reset pair", () => {
+      expect(isCredentialMutationPath(normalizedRequestPathname(`${host}/set-password`))).toBe(
+        true,
+      );
       expect(
-        isCredentialMutationPath(normalizedRequestPathname(`${host}/set-password`)),
-      ).toBe(true);
-      expect(
-        isCredentialMutationPath(
-          normalizedRequestPathname(`${host}/request-password-reset`),
-        ),
+        isCredentialMutationPath(normalizedRequestPathname(`${host}/request-password-reset`)),
       ).toBe(false);
     });
   });
@@ -77,15 +65,13 @@ describe("isCredentialMutationPath", () => {
 describe("isPasswordResetPath", () => {
   describe("given the reset pair and a neighbouring credential route", () => {
     it("matches only the reset pair", () => {
-      expect(
-        isPasswordResetPath(normalizedRequestPathname(`${host}/request-password-reset`)),
-      ).toBe(true);
-      expect(
-        isPasswordResetPath(normalizedRequestPathname(`${host}/reset-password?token=x`)),
-      ).toBe(true);
-      expect(isPasswordResetPath(normalizedRequestPathname(`${host}/set-password`))).toBe(
-        false,
+      expect(isPasswordResetPath(normalizedRequestPathname(`${host}/request-password-reset`))).toBe(
+        true,
       );
+      expect(isPasswordResetPath(normalizedRequestPathname(`${host}/reset-password?token=x`))).toBe(
+        true,
+      );
+      expect(isPasswordResetPath(normalizedRequestPathname(`${host}/set-password`))).toBe(false);
     });
   });
 });

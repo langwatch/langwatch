@@ -14,7 +14,11 @@ import {
 } from "../trace-derived.projection";
 import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store";
 import { TraceAnalyticsProjectionPort } from "../../ports/trace-analytics-projection.port";
-import { createSpanReceivedEvent, createTestRuntime, msToUnixNano } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createSpanReceivedEvent,
+  createTestRuntime,
+  msToUnixNano,
+} from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * The slim fold's STORAGE ANCHOR (ADR-071 step 3, migration 00061).
@@ -63,7 +67,13 @@ function foldAll(
 }
 
 /** A Path-B log record: real trace context, no span anywhere on the trace. */
-function logRecordEvent({ eventId, occurredAt }: { eventId: string; occurredAt: number }): FoldEvent {
+function logRecordEvent({
+  eventId,
+  occurredAt,
+}: {
+  eventId: string;
+  occurredAt: number;
+}): FoldEvent {
   return {
     id: eventId,
     type: LOG_RECORD_RECEIVED_EVENT_TYPE,

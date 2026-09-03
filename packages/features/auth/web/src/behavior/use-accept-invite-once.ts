@@ -60,12 +60,7 @@ type AcceptInviteMutationResult = Pick<
   "isPending" | "isSuccess" | "isError" | "error"
 >;
 
-export type AcceptInviteStatus =
-  | "idle"
-  | "loading"
-  | "success"
-  | "already-accepted"
-  | "error";
+export type AcceptInviteStatus = "idle" | "loading" | "success" | "already-accepted" | "error";
 
 export interface UseAcceptInviteOnceResult {
   status: AcceptInviteStatus;

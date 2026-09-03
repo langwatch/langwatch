@@ -23,7 +23,12 @@ import {
   type VirtualKeyScopeEntry,
 } from "../../model/eligible-model-providers";
 import { resolveTracesHrefForKey } from "../../model/traces-href-for-key";
-import { TAGS_CSV_MAX_LENGTH, VK_TAGS_FIELD_DESCRIPTION, parseTagsCsv, tagsBeyondLimitsNotice } from "../../model/virtual-key-tags-field";
+import {
+  TAGS_CSV_MAX_LENGTH,
+  VK_TAGS_FIELD_DESCRIPTION,
+  parseTagsCsv,
+  tagsBeyondLimitsNotice,
+} from "../../model/virtual-key-tags-field";
 import { humanizeGatewayError } from "../../../../model/gateway-error-copy";
 import {
   budgetInvalidReason,
@@ -136,8 +141,7 @@ export function VirtualKeyEditDrawer({
   const [budgetLoaded, setBudgetLoaded] = useState(false);
   const [isBudgetDirty, setIsBudgetDirty] = useState(false);
   const [hadManagedBudget, setHadManagedBudget] = useState(false);
-  const [providerAccess, setProviderAccess] =
-    useState<ProviderAccessValue>(ALL_PROVIDERS);
+  const [providerAccess, setProviderAccess] = useState<ProviderAccessValue>(ALL_PROVIDERS);
   const [routing, setRouting] = useState<VirtualKeyRoutingValue>(
     routingValueFromKey({ routingMode: "NONE", routingPolicyId: null }),
   );
@@ -352,9 +356,7 @@ export function VirtualKeyEditDrawer({
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
           },
           realtime: {
-            maxOpenSessions: maxOpenSessions.trim()
-              ? Number(maxOpenSessions.trim())
-              : null,
+            maxOpenSessions: maxOpenSessions.trim() ? Number(maxOpenSessions.trim()) : null,
           },
           metadata: {
             tags: parseTagsCsv(tagsCsv),
@@ -395,18 +397,11 @@ export function VirtualKeyEditDrawer({
                   docHref="/ai-gateway/virtual-keys#creating-a-vk"
                 />
               </Field.Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={128}
-              />
+              <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={128} />
             </Field.Root>
             <Field.Root>
               <Field.Label>Description</Field.Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
             </Field.Root>
             <Field.Root>
               <Field.Label>
@@ -423,9 +418,7 @@ export function VirtualKeyEditDrawer({
                 placeholder="e.g. tier=enterprise, team=ml"
                 maxLength={TAGS_CSV_MAX_LENGTH}
               />
-              {tagsNotice && (
-                <Field.HelperText color="orange.600">{tagsNotice}</Field.HelperText>
-              )}
+              {tagsNotice && <Field.HelperText color="orange.600">{tagsNotice}</Field.HelperText>}
             </Field.Root>
 
             {vk && (
@@ -433,9 +426,7 @@ export function VirtualKeyEditDrawer({
                 <Separator />
                 <VirtualKeyOwnershipReadOnly
                   scopes={vk.scopes}
-                  principal={
-                    vk.principalUserId && vk.principalUser ? vk.principalUser : undefined
-                  }
+                  principal={vk.principalUserId && vk.principalUser ? vk.principalUser : undefined}
                   traceProjectId={vk.traceProjectId ?? null}
                   traceProjectArchived={vk.traceProjectArchived ?? false}
                   viewTracesHref={viewTracesHref}
@@ -499,17 +490,13 @@ export function VirtualKeyEditDrawer({
                   <NativeSelect.Field
                     value={cacheMode}
                     onChange={(e) =>
-                      setCacheMode(
-                        (e.target.value as "respect" | "force" | "disable") ?? "respect",
-                      )
+                      setCacheMode((e.target.value as "respect" | "force" | "disable") ?? "respect")
                     }
                   >
                     <option value="respect">
                       Respect: pass provider cache directives through unchanged
                     </option>
-                    <option value="disable">
-                      Disable: strip cache directives before dispatch
-                    </option>
+                    <option value="disable">Disable: strip cache directives before dispatch</option>
                     <option value="force">
                       Force: inject cache_control on Anthropic (OpenAI auto, Gemini WARN)
                     </option>

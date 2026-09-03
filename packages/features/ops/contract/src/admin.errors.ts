@@ -2,11 +2,10 @@ import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 export class CannotImpersonateDeactivatedUserError extends HandledError {
   constructor(userId: string) {
-    super(
-      "cannot_impersonate_deactivated_user",
-      "Cannot impersonate a deactivated user",
-      { httpStatus: 400, meta: { userId } },
-    );
+    super("cannot_impersonate_deactivated_user", "Cannot impersonate a deactivated user", {
+      httpStatus: 400,
+      meta: { userId },
+    });
     this.name = "CannotImpersonateDeactivatedUserError";
   }
 }

@@ -1,8 +1,5 @@
 import { Card, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import {
-  retentionCategories,
-  type RetentionCategory,
-} from "@langwatch/data-retention-contract";
+import { retentionCategories, type RetentionCategory } from "@langwatch/data-retention-contract";
 import { CATEGORY_LABELS } from "../../model/retention-constants";
 import { formatBytes, formatDays } from "../../model/retention-format";
 import { renderPolicySummary } from "../../model/retention-grouping";
@@ -47,9 +44,7 @@ export function RetentionAndUsageCard({
                 <HStack key={category} justifyContent="space-between">
                   <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
                   <Text>
-                    {effective[category] !== undefined
-                      ? formatDays(effective[category]!)
-                      : "—"}
+                    {effective[category] !== undefined ? formatDays(effective[category]!) : "—"}
                   </Text>
                 </HStack>
               ))}

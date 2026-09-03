@@ -124,15 +124,9 @@ export type BucketBoundaryRow = {
 
 export abstract class GatewayBudgetRepository {
   abstract check(input: GatewayBudgetCheckReadInput): Promise<BudgetCheckResult>;
-  abstract list(
-    input: GatewayOrganizationBudgetReadInput,
-  ): Promise<GatewayBudgetWithSeats[]>;
-  abstract listForProject(
-    input: GatewayProjectBudgetReadInput,
-  ): Promise<GatewayBudgetWithSeats[]>;
-  abstract listWithHealth(
-    input: GatewayOrganizationBudgetReadInput,
-  ): Promise<BudgetListWithHealth>;
+  abstract list(input: GatewayOrganizationBudgetReadInput): Promise<GatewayBudgetWithSeats[]>;
+  abstract listForProject(input: GatewayProjectBudgetReadInput): Promise<GatewayBudgetWithSeats[]>;
+  abstract listWithHealth(input: GatewayOrganizationBudgetReadInput): Promise<BudgetListWithHealth>;
   abstract listPageWithHealth(
     input: GatewayBudgetPageInput & GatewayOrganizationBudgetReadInput,
   ): Promise<BudgetListWithHealth>;
@@ -142,9 +136,7 @@ export abstract class GatewayBudgetRepository {
   abstract tryGet(input: GatewayBudgetReadInput): Promise<GatewayBudgetWithSeats | null>;
   abstract tryGetWithHealth(input: GatewayBudgetReadInput): Promise<BudgetHealth | null>;
   abstract tryGetDetail(input: GatewayBudgetReadInput): Promise<BudgetDetail | null>;
-  abstract listScopeReachCandidates(
-    organizationId: string,
-  ): Promise<GatewayKeyReachCandidate[]>;
+  abstract listScopeReachCandidates(organizationId: string): Promise<GatewayKeyReachCandidate[]>;
   abstract create(input: CreateBudgetInput): Promise<GatewayBudgetResource>;
   abstract update(input: UpdateBudgetInput): Promise<GatewayBudgetResource>;
   abstract archive(input: ArchiveBudgetInput): Promise<GatewayBudgetResource>;

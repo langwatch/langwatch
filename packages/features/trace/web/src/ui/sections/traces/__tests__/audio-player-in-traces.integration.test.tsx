@@ -77,9 +77,7 @@ describe("Audio player in trace views", () => {
   /** @scenario "Legacy trace view plays an input_audio recording" */
   it("legacy input/output view shows an inline player for an input_audio recording", () => {
     render(
-      <RenderInputOutput
-        value={JSON.stringify([{ role: "user", content: [inputAudioPart] }])}
-      />,
+      <RenderInputOutput value={JSON.stringify([{ role: "user", content: [inputAudioPart] }])} />,
       { wrapper: Wrapper },
     );
 

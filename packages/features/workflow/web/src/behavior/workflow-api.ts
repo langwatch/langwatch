@@ -169,7 +169,6 @@ export type WorkflowOrganizationGraph = {
   }[];
 };
 
-
 /**
  * A procedure the OPTIMIZATION STUDIO calls whose row shape no contract package
  * publishes yet.
@@ -501,7 +500,6 @@ export type WorkflowApiMap = {
     getTracesWithSpansByThreadIds: UnpublishedQuery;
   };
 };
-
 
 /**
  * The Workflows family's typed tRPC hooks. Same machinery, same transport and

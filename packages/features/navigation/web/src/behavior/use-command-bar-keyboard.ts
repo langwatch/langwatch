@@ -58,14 +58,6 @@ export function useCommandBarKeyboard(
           break;
       }
     },
-    [
-      allItems,
-      selectedIndex,
-      setSelectedIndex,
-      handleSelect,
-      handleCopyLink,
-      isMac,
-      onAskLangy,
-    ],
+    [allItems, selectedIndex, setSelectedIndex, handleSelect, handleCopyLink, isMac, onAskLangy],
   );
 }

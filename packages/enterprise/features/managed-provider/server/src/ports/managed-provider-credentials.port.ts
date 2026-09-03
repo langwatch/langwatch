@@ -7,7 +7,5 @@ export type ManagedProviderCredentials = {
 };
 
 export abstract class ManagedProviderCredentialsPort {
-  abstract assumeCustomerRole(
-    config: ManagedBedrockConfig,
-  ): Promise<ManagedProviderCredentials>;
+  abstract assumeCustomerRole(config: ManagedBedrockConfig): Promise<ManagedProviderCredentials>;
 }

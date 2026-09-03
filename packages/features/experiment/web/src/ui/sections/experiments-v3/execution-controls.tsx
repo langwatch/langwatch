@@ -33,9 +33,7 @@ export function ExecutionControls({
   const isRunning = status === "running";
   const isIdle = status === "idle";
   const hasProgress = progress.total > 0;
-  const progressPercent = hasProgress
-    ? (progress.completed / progress.total) * 100
-    : 0;
+  const progressPercent = hasProgress ? (progress.completed / progress.total) * 100 : 0;
 
   const handleClick = async () => {
     if (isRunning) {
@@ -80,13 +78,7 @@ export function ExecutionControls({
             {progress.completed}/{progress.total}
           </Text>
           {!compact && (
-            <Box
-              width="80px"
-              height="4px"
-              bg="gray.muted"
-              borderRadius="full"
-              overflow="hidden"
-            >
+            <Box width="80px" height="4px" bg="gray.muted" borderRadius="full" overflow="hidden">
               <Box
                 height="100%"
                 bg="blue.solid"

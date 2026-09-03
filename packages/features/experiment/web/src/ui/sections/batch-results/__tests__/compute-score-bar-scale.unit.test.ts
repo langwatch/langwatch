@@ -13,11 +13,7 @@ import { computeScoreBarScale } from "../leaderboard-verdict-panel";
  * itself rather than the shape of the filter chain.
  */
 
-const entry = (
-  variantId: string,
-  score: number,
-  isDegenerate = false,
-): BTLeaderboardEntry => ({
+const entry = (variantId: string, score: number, isDegenerate = false): BTLeaderboardEntry => ({
   variantId,
   wins: 1,
   losses: 1,
@@ -60,10 +56,7 @@ describe("computeScoreBarScale", () => {
 
   describe("given a non-finite score", () => {
     it("ignores it rather than producing a NaN scale", () => {
-      const scale = computeScoreBarScale([
-        entry("a", 150),
-        entry("b", Number.POSITIVE_INFINITY),
-      ])!;
+      const scale = computeScoreBarScale([entry("a", 150), entry("b", Number.POSITIVE_INFINITY)])!;
 
       expect(Number.isFinite(scale.min)).toBe(true);
       expect(Number.isFinite(scale.pct(150))).toBe(true);
@@ -72,9 +65,7 @@ describe("computeScoreBarScale", () => {
 
   describe("given every variant is degenerate", () => {
     it("returns no scale rather than a degenerate axis", () => {
-      expect(
-        computeScoreBarScale([entry("a", -900, true), entry("b", 900, true)]),
-      ).toBeNull();
+      expect(computeScoreBarScale([entry("a", -900, true), entry("b", 900, true)])).toBeNull();
     });
   });
 

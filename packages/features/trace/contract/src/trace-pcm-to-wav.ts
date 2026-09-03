@@ -36,10 +36,7 @@ const G711_SAMPLE_RATE = 8000;
  * (wav/mp3/flac/…) and anything unrecognised — those are already playable and
  * must pass through untouched.
  */
-export function resolveRawPcmFormat(
-  format?: string,
-  mimeType?: string,
-): RawPcmFormat | null {
+export function resolveRawPcmFormat(format?: string, mimeType?: string): RawPcmFormat | null {
   const f = format?.toLowerCase();
   if (f === "pcm16" || f === "g711_ulaw" || f === "g711_alaw") return f;
 
@@ -67,10 +64,7 @@ export function pcm16ToWavBase64(dataBase64: string): string | null {
  * ready for a `data:audio/wav;base64,…` URI. Returns null when the payload
  * is empty or cannot be decoded.
  */
-export function rawPcmBase64ToWavBase64(
-  dataBase64: string,
-  format: RawPcmFormat,
-): string | null {
+export function rawPcmBase64ToWavBase64(dataBase64: string, format: RawPcmFormat): string | null {
   try {
     const samples = base64ToBytes(dataBase64);
     const wrapped = wrapRawPcmToWav(samples, format);
@@ -123,10 +117,7 @@ function g711ToPcm16(samples: Uint8Array, format: "g711_ulaw" | "g711_alaw"): Ui
  * a linear-PCM header; G.711 is expanded to linear PCM16 first (browser WAV
  * decoders are PCM-only — fmt codes 6/7 would produce a dead player).
  */
-export function wrapRawPcmToWav(
-  samples: Uint8Array,
-  format: RawPcmFormat,
-): Uint8Array | null {
+export function wrapRawPcmToWav(samples: Uint8Array, format: RawPcmFormat): Uint8Array | null {
   if (samples.length === 0) return null;
   const pcm = format === "pcm16" ? samples : g711ToPcm16(samples, format);
   const sampleRate = format === "pcm16" ? PCM16_SAMPLE_RATE : G711_SAMPLE_RATE;

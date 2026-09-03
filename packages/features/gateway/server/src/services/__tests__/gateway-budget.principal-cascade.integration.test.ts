@@ -59,9 +59,7 @@ const prisma = connection?.client as PrismaClient;
  * the contract stays unused, which the base class states by refusing it.
  */
 class SuiteProjectService extends TestProjectService {
-  override async tryGetWithTeam(
-    id: string,
-  ): ReturnType<ProjectService["tryGetWithTeam"]> {
+  override async tryGetWithTeam(id: string): ReturnType<ProjectService["tryGetWithTeam"]> {
     // The generated row types every JSON column as `JsonValue`, which is wider
     // than the contract's `JSONType` by the array case. The rows this suite
     // writes carry no JSON at all.
@@ -359,9 +357,7 @@ describe.skipIf(!databaseUrl)("GatewayService — PRINCIPAL cascade", () => {
       // $1000/$500/$200/$150 + $1 projected = $101 total — all under.
       expect(result.decision).not.toBe("hard_block");
       const scopeKinds = result.scopes.map((s) => s.scope).sort();
-      expect(scopeKinds).toEqual(
-        ["organization", "project", "team", "virtual_key"].sort(),
-      );
+      expect(scopeKinds).toEqual(["organization", "project", "team", "virtual_key"].sort());
       expect(scopeKinds).not.toContain("principal");
     });
 

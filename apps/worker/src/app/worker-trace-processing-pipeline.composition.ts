@@ -303,9 +303,7 @@ export type WorkerTraceProcessingPipelineOptions = Omit<
 >;
 
 export class WorkerTraceProcessingPipeline extends TraceProcessingPipelinePort {
-  static create(
-    options: WorkerTraceProcessingCompositionOptions,
-  ): WorkerTraceProcessingPipeline {
+  static create(options: WorkerTraceProcessingCompositionOptions): WorkerTraceProcessingPipeline {
     return new WorkerTraceProcessingPipeline(composeWorkerTraceProcessingDeps(options));
   }
 

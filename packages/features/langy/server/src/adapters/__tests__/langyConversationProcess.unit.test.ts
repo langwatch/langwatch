@@ -333,9 +333,7 @@ describe("LangyConversationProcess", () => {
       const titles = (await store.findMessagesByRef({ ref })).filter(
         (m) => m.intentType === LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE,
       );
-      expect(titles.map((m) => m.messageKey)).toEqual([
-        `process:${CONVERSATION_ID}:title:turn_2`,
-      ]);
+      expect(titles.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:title:turn_2`]);
     });
 
     it("does not title a second successful turn while the first request is still in flight", async () => {
@@ -350,9 +348,7 @@ describe("LangyConversationProcess", () => {
       const titles = (await store.findMessagesByRef({ ref })).filter(
         (m) => m.intentType === LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE,
       );
-      expect(titles.map((m) => m.messageKey)).toEqual([
-        `process:${CONVERSATION_ID}:title:turn_1`,
-      ]);
+      expect(titles.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:title:turn_1`]);
     });
 
     it("never retitles once titleSource is auto, regardless of later turns", async () => {
@@ -374,9 +370,7 @@ describe("LangyConversationProcess", () => {
       const titles = (await store.findMessagesByRef({ ref })).filter(
         (m) => m.intentType === LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE,
       );
-      expect(titles.map((m) => m.messageKey)).toEqual([
-        `process:${CONVERSATION_ID}:title:turn_1`,
-      ]);
+      expect(titles.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:title:turn_1`]);
     });
 
     it("records no automatic title after the user renamed the conversation", async () => {

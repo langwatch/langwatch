@@ -46,9 +46,7 @@ describe("describeAnnotationAnchor", () => {
     });
 
     it("names the span by its id when the caller does not", () => {
-      expect(describeAnchor({ anchorKind: "span", anchorId: "span-7" })).toBe(
-        "Span span-7",
-      );
+      expect(describeAnchor({ anchorKind: "span", anchorId: "span-7" })).toBe("Span span-7");
     });
   });
 

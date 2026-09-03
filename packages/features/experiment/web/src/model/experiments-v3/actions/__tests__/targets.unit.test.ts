@@ -2,12 +2,7 @@
  * @see specs/experiments-v3/workbench-actions.feature
  */
 import { describe, expect, it } from "vitest";
-import {
-  addTarget,
-  removeTarget,
-  setTargetPrompt,
-  updateTargetModel,
-} from "../transforms";
+import { addTarget, removeTarget, setTargetPrompt, updateTargetModel } from "../transforms";
 import { baseState, refusalCode } from "./workbench-fixtures";
 
 describe("addTarget", () => {
@@ -137,9 +132,7 @@ describe("setTargetPrompt", () => {
 
     expect(result?.targetId).toBe("target-a");
     expect(state.targets[0]!.localPromptConfig).toEqual(localPromptConfig);
-    expect(state.targets[0]!.inputs).toEqual([
-      { identifier: "input", type: "str" },
-    ]);
+    expect(state.targets[0]!.inputs).toEqual([{ identifier: "input", type: "str" }]);
   });
 
   it("rejects a config the prompt schema does not accept", () => {

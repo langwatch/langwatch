@@ -26,22 +26,20 @@ describe("parsePermissionFlags", () => {
   describe("when the permission flag is repeated", () => {
     /** @scenario Repeated permission flags compose into one permission set */
     it("composes the pairs into one set, in the order given, and names the shape it expects", () => {
-      expect(
-        parsePermissionFlags(["project:view", "trace:manage", "dataset:create"]),
-      ).toEqual(["project:view", "trace:manage", "dataset:create"]);
+      expect(parsePermissionFlags(["project:view", "trace:manage", "dataset:create"])).toEqual([
+        "project:view",
+        "trace:manage",
+        "dataset:create",
+      ]);
 
       // The same pair twice is one permission, not two.
-      expect(parsePermissionFlags(["project:view", "project:view"])).toEqual([
-        "project:view",
-      ]);
+      expect(parsePermissionFlags(["project:view", "project:view"])).toEqual(["project:view"]);
 
       // A value that is not a resource and action pair is refused by NAMING the
       // shape: "invalid" alone leaves the caller guessing.
       for (const malformed of ["project", "project:", ":view", "a:b:c"]) {
         expect(() => parsePermissionFlags([malformed])).toThrow(ManagementFlagError);
-        expect(() => parsePermissionFlags([malformed])).toThrow(
-          /Expected resource:action/,
-        );
+        expect(() => parsePermissionFlags([malformed])).toThrow(/Expected resource:action/);
       }
     });
   });
@@ -56,16 +54,12 @@ describe("parseBindingFlags", () => {
       ]);
 
       // Repeated, and case-insensitive on the two enumerations.
-      expect(
-        parseBindingFlags(["viewer:team:team_1", "CUSTOM:ORGANIZATION:org_1"]),
-      ).toEqual([
+      expect(parseBindingFlags(["viewer:team:team_1", "CUSTOM:ORGANIZATION:org_1"])).toEqual([
         { role: "VIEWER", scopeType: "TEAM", scopeId: "team_1" },
         { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: "org_1" },
       ]);
 
-      expect(() => parseBindingFlags(["ADMIN:PROJECT"])).toThrow(
-        /Expected role:scopeType:scopeId/,
-      );
+      expect(() => parseBindingFlags(["ADMIN:PROJECT"])).toThrow(/Expected role:scopeType:scopeId/);
       expect(() => parseBindingFlags(["ADMIN::project_abc"])).toThrow(
         /Expected role:scopeType:scopeId/,
       );
@@ -161,25 +155,21 @@ describe("the single-value parsers", () => {
         expect(() => parseCount({ value: malformed, flag: "--limit" })).toThrow(
           ManagementFlagError,
         );
-        expect(() => parseCount({ value: malformed, flag: "--limit" })).toThrow(
-          /--limit/,
-        );
+        expect(() => parseCount({ value: malformed, flag: "--limit" })).toThrow(/--limit/);
       }
 
       // All digits, and still not the number that was typed: 2^53 + 1 rounds
       // down and a long enough run of digits becomes Infinity, so sending
       // either would page by something the caller never asked for.
       for (const unsafe of ["9007199254740993", "9".repeat(400)]) {
-        expect(() => parseCount({ value: unsafe, flag: "--limit" })).toThrow(
-          ManagementFlagError,
-        );
+        expect(() => parseCount({ value: unsafe, flag: "--limit" })).toThrow(ManagementFlagError);
         expect(() => parseCount({ value: unsafe, flag: "--limit" })).toThrow(
           /Expected a whole number/,
         );
       }
-      expect(
-        parseCount({ value: String(Number.MAX_SAFE_INTEGER), flag: "--limit" }),
-      ).toBe(Number.MAX_SAFE_INTEGER);
+      expect(parseCount({ value: String(Number.MAX_SAFE_INTEGER), flag: "--limit" })).toBe(
+        Number.MAX_SAFE_INTEGER,
+      );
     });
   });
 

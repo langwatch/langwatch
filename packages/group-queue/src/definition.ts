@@ -29,18 +29,13 @@ export function defineGroupQueue<
   if (typeof options.identify !== "function") {
     throw new Error("Group Queue requires an identify(payload) rule");
   }
-  if (
-    options.delay !== undefined &&
-    (!Number.isFinite(options.delay) || options.delay < 0)
-  ) {
+  if (options.delay !== undefined && (!Number.isFinite(options.delay) || options.delay < 0)) {
     throw new Error("Group Queue delay must be a non-negative number");
   }
 
   return Object.freeze({
     ...options,
-    deduplication: options.deduplication
-      ? Object.freeze({ ...options.deduplication })
-      : undefined,
+    deduplication: options.deduplication ? Object.freeze({ ...options.deduplication }) : undefined,
     coalescing: options.coalescing ? Object.freeze({ ...options.coalescing }) : undefined,
     name: name as Name,
     transportName: `{${name}}` as `{${Name}}`,

@@ -66,10 +66,7 @@ export class PulledUsageEventingAdapter {
     }).withCommand("recordPulledUsage", RecordPulledUsageCommand);
     return this.ledger
       ? pipeline
-          .withProcessManager(
-            PULLED_USAGE_LEDGER_PROCESS_NAME,
-            this.ledger.processManager(),
-          )
+          .withProcessManager(PULLED_USAGE_LEDGER_PROCESS_NAME, this.ledger.processManager())
           .build()
       : pipeline.build();
   }

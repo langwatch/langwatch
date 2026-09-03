@@ -45,10 +45,7 @@ interface ToolbarProps {
   hideSampleDataAction?: boolean;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({
-  onExportAll,
-  hideSampleDataAction = false,
-}) => {
+export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAction = false }) => {
   // Tour entry point — kept for backwards compatibility. The journey
   // state machine (Phase 2) may still use onLaunchTour / onEndTour
   // internally. For Phase 1 the toolbar button exclusively toggles
@@ -130,12 +127,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       setSpotlightsActive(true);
       writeSpotlightFragment(firstId);
     }
-  }, [
-    spotlightsActive,
-    persistTourDismissal,
-    setSpotlightsActive,
-    setCurrentSpotlightId,
-  ]);
+  }, [spotlightsActive, persistTourDismissal, setSpotlightsActive, setCurrentSpotlightId]);
 
   // "Save Lens" outline button only surfaces when the active lens has
   // pending local changes. Clicking it opens the shared
@@ -194,11 +186,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           toolbar's exact pixel layout. */}
       {!hideSampleDataAction && showSampleDataToggle && (
         <Tooltip
-          content={
-            showSamplePreview
-              ? "Hide sample traces"
-              : "See sample traces to explore the UI"
-          }
+          content={showSamplePreview ? "Hide sample traces" : "See sample traces to explore the UI"}
           positioning={{ placement: "bottom" }}
         >
           <Button
@@ -270,11 +258,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </LensNamePopover>
         )}
         <Tooltip
-          content={
-            spotlightsActive
-              ? "End the guided tour"
-              : "Start the guided tour of this page"
-          }
+          content={spotlightsActive ? "End the guided tour" : "Start the guided tour of this page"}
           positioning={{ placement: "bottom" }}
         >
           {/* Full "Show me around" label only for accounts younger than
@@ -293,9 +277,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             >
               <Icon
                 boxSize={3.5}
-                color={
-                  spotlightsActive ? "blue.fg" : { base: "fg.muted", _dark: "fg.subtle" }
-                }
+                color={spotlightsActive ? "blue.fg" : { base: "fg.muted", _dark: "fg.subtle" }}
               >
                 <Map />
               </Icon>
@@ -338,12 +320,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             content="Export the current view to CSV or JSON"
             positioning={{ placement: "bottom" }}
           >
-            <IconButton
-              size="xs"
-              variant="ghost"
-              onClick={onExportAll}
-              aria-label="Export traces"
-            >
+            <IconButton size="xs" variant="ghost" onClick={onExportAll} aria-label="Export traces">
               <Icon boxSize={3.5}>
                 <Download />
               </Icon>

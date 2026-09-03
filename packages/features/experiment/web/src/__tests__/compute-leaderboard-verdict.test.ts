@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BTLeaderboard, BTLeaderboardEntry } from "@langwatch/experiment-web";
-import {
-  computeLeaderboardVerdict,
-  findCheaperTiedAlternative,
-} from "@langwatch/experiment-web";
+import { computeLeaderboardVerdict, findCheaperTiedAlternative } from "@langwatch/experiment-web";
 import type { VariantMetrics } from "@langwatch/experiment-web";
 
 const makeEntry = ({
@@ -46,9 +43,7 @@ const makeLeaderboard = (
   ...overrides,
 });
 
-const makeMetrics = (
-  costs: Record<string, number | null>,
-): Record<string, VariantMetrics> =>
+const makeMetrics = (costs: Record<string, number | null>): Record<string, VariantMetrics> =>
   Object.fromEntries(
     Object.entries(costs).map(([variantId, avg]) => [
       variantId,

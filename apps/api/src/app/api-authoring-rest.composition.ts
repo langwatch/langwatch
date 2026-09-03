@@ -174,10 +174,7 @@ export class LoggedApiAuthoringRestAbsence extends ApiAuthoringRestAbsenceReport
     door: "workflow-studio" | "playground" | "dataset-generate" | "scenario-generate",
     reason: string,
   ): void {
-    this.logger.warn(
-      { door, reason },
-      `${reason}, so this process serves no ${DOOR_NAMES[door]}`,
-    );
+    this.logger.warn({ door, reason }, `${reason}, so this process serves no ${DOOR_NAMES[door]}`);
   }
 }
 

@@ -1,5 +1,10 @@
 import { EvaluationCostRecorderPort } from "../ports/evaluation.port";
-import { CostReferenceType, CostType, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import {
+  CostReferenceType,
+  CostType,
+  Prisma,
+  type PrismaClient,
+} from "@langwatch/prisma-client/generated";
 
 export type EvaluationCostWrite = {
   id: string;

@@ -43,9 +43,7 @@ export interface LangyConversationListQueryResult {
  * The side-effect layer (new-arrival marking) lives in `useLangyConversationList`
  * so this hook stays trivially testable and re-composable.
  */
-export function useLangyConversationListQuery(
-  queryText = "",
-): LangyConversationListQueryResult {
+export function useLangyConversationListQuery(queryText = ""): LangyConversationListQueryResult {
   const { project } = useOrganizationTeamProject();
   // The panel stays mounted while closed — never fetch (and so never fail)
   // for a list nobody is looking at. Opening the panel arms the query.

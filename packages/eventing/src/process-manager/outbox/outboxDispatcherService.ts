@@ -121,9 +121,7 @@ function defaultRetryDelayMs({ attempt }: { attempt: number }): number {
 function retryAfterMsOf(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) return undefined;
   const retryAfterMs = Reflect.get(error, "retryAfterMs");
-  return typeof retryAfterMs === "number" &&
-    Number.isFinite(retryAfterMs) &&
-    retryAfterMs > 0
+  return typeof retryAfterMs === "number" && Number.isFinite(retryAfterMs) && retryAfterMs > 0
     ? retryAfterMs
     : undefined;
 }
@@ -201,8 +199,7 @@ export class OutboxDispatcherService {
     this.clock = options.clock ?? Date.now;
     this.leaseSafetyMarginMs = this.leaseDurationMs * LEASE_SAFETY_MARGIN_FRACTION;
     this.tracer = options.tracer ?? trace.getTracer("langwatch.process-manager");
-    this.logger =
-      options.logger ?? createLogger("langwatch:event-sourcing:process-outbox");
+    this.logger = options.logger ?? createLogger("langwatch:event-sourcing:process-outbox");
   }
 
   async runOnce(params: { now: number; limit?: number }): Promise<DispatchReport> {
@@ -241,20 +238,17 @@ export class OutboxDispatcherService {
     // lease-fenced, so the only thing being bounded here is concurrent load on
     // whatever the handlers call.
     let cursor = 0;
-    const workers = Array.from(
-      { length: Math.min(this.concurrency, leased.length) },
-      async () => {
-        while (cursor < leased.length) {
-          const message = leased[cursor++]!;
-          await this.dispatchOrShed({
-            message,
-            now: params.now,
-            leaseStartedAt,
-            report,
-          });
-        }
-      },
-    );
+    const workers = Array.from({ length: Math.min(this.concurrency, leased.length) }, async () => {
+      while (cursor < leased.length) {
+        const message = leased[cursor++]!;
+        await this.dispatchOrShed({
+          message,
+          now: params.now,
+          leaseStartedAt,
+          report,
+        });
+      }
+    });
     await Promise.all(workers);
     return report;
   }
@@ -421,8 +415,7 @@ export class OutboxDispatcherService {
     });
     this.logger.debug(
       fields,
-      "Released a leased outbox message un-attempted; the batch ran out of " +
-        "lease budget",
+      "Released a leased outbox message un-attempted; the batch ran out of " + "lease budget",
     );
   }
 
@@ -502,9 +495,7 @@ export class OutboxDispatcherService {
         try {
           const handler = this.handlers[message.intentType];
           if (!handler) {
-            throw new Error(
-              `No handler registered for intent type "${message.intentType}"`,
-            );
+            throw new Error(`No handler registered for intent type "${message.intentType}"`);
           }
           await handler({
             message: {
@@ -548,10 +539,7 @@ export class OutboxDispatcherService {
           });
           span.setStatus({ code: SpanStatusCode.ERROR });
           const dead = attempt >= this.maxAttempts || isTerminalError(error);
-          const retryDelayMs = Math.max(
-            this.retryDelayMs({ attempt }),
-            retryAfterMsOf(error) ?? 0,
-          );
+          const retryDelayMs = Math.max(this.retryDelayMs({ attempt }), retryAfterMsOf(error) ?? 0);
           const { applied } = await this.store.markFailed({
             identity,
             leaseToken: message.leaseToken,
@@ -583,9 +571,7 @@ export class OutboxDispatcherService {
               occurredAt: now,
               outcome: dead ? "dead" : "retry_scheduled",
               ...attemptDiagnostic,
-              ...(attemptRetryAfterMs !== undefined
-                ? { retryAfterMs: attemptRetryAfterMs }
-                : {}),
+              ...(attemptRetryAfterMs !== undefined ? { retryAfterMs: attemptRetryAfterMs } : {}),
             },
           });
           if (dead || attempt === 1) {
@@ -610,10 +596,7 @@ export class OutboxDispatcherService {
                 "Process-manager outbox message exhausted delivery attempts",
               );
             } else {
-              this.logger.warn(
-                fields,
-                "Process-manager outbox delivery failed; retry scheduled",
-              );
+              this.logger.warn(fields, "Process-manager outbox delivery failed; retry scheduled");
             }
           }
         } finally {

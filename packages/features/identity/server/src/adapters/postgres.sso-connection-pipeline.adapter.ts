@@ -80,7 +80,9 @@ export type PostgresSsoConnectionPipelineOptions = {
  * seam is what makes a divergent second reader unexpressible.
  */
 export class PostgresSsoConnectionPipelineAdapter {
-  static create(options: PostgresSsoConnectionPipelineOptions): PostgresSsoConnectionPipelineAdapter {
+  static create(
+    options: PostgresSsoConnectionPipelineOptions,
+  ): PostgresSsoConnectionPipelineAdapter {
     return new PostgresSsoConnectionPipelineAdapter(options);
   }
 

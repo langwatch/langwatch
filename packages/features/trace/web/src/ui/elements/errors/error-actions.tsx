@@ -119,11 +119,7 @@ export function ErrorActions({
           // reading "Copied") breaks voice control, which targets what the user
           // can see. Label and text must agree, so there is only one of them.
         >
-          {isCopied ? (
-            <CheckIcon width={10} height={10} />
-          ) : (
-            <CopyIcon width={10} height={10} />
-          )}
+          {isCopied ? <CheckIcon width={10} height={10} /> : <CopyIcon width={10} height={10} />}
           {hasFailed ? "Couldn't copy" : isCopied ? "Copied" : "Copy error ID"}
         </chakra.button>
       )}

@@ -32,9 +32,7 @@ describe("Tracing Skill", () => {
   it.skipIf(isCI)(
     "instruments a Python OpenAI bot with LangWatch",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-instrument-py-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-instrument-py-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "python-openai",
@@ -45,8 +43,7 @@ describe("Tracing Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI instrumentation",
-        description:
-          "Implementing LangWatch instrumentation in a Python OpenAI bot project.",
+        description: "Implementing LangWatch instrumentation in a Python OpenAI bot project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -80,9 +77,7 @@ describe("Tracing Skill", () => {
   it.skipIf(isCI)(
     "instruments a TypeScript Vercel AI bot with LangWatch",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-instrument-ts-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-instrument-ts-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "typescript-vercel",
@@ -140,8 +135,7 @@ describe("Tracing Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph instrumentation",
-        description:
-          "Implementing LangWatch instrumentation in a Python LangGraph agent project.",
+        description: "Implementing LangWatch instrumentation in a Python LangGraph agent project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -174,9 +168,7 @@ describe("Tracing Skill", () => {
   it.skipIf(isCI)(
     "instruments a TypeScript Mastra agent with LangWatch",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-tracing-mastra-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-tracing-mastra-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "typescript-mastra",
@@ -187,8 +179,7 @@ describe("Tracing Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra instrumentation",
-        description:
-          "Implementing LangWatch instrumentation in a TypeScript Mastra agent project.",
+        description: "Implementing LangWatch instrumentation in a TypeScript Mastra agent project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -234,8 +225,7 @@ describe("Tracing Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "Python Google ADK instrumentation",
-        description:
-          "Implementing LangWatch instrumentation in a Python Google ADK agent project.",
+        description: "Implementing LangWatch instrumentation in a Python Google ADK agent project.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -327,9 +317,7 @@ describe("Tracing Skill", () => {
   it.skipIf(isCI)(
     "instruments code via llms.txt fallback when told the CLI is not available",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-tracing-nocli-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-tracing-nocli-"));
       copyFixtureToWorkDir({
         fixtureSubpath: "python-openai",
         workingDirectory: tempFolder,
@@ -381,9 +369,7 @@ describe("Tracing Skill", () => {
   it.skipIf(isCI)(
     "asks user for API key when not found in environment or .env",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-tracing-nokey-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-tracing-nokey-"));
       copyFixtureToWorkDir({
         fixtureSubpath: "python-openai",
         workingDirectory: tempFolder,
@@ -395,8 +381,7 @@ describe("Tracing Skill", () => {
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "Tracing — agent asks for API key",
-        description:
-          "Agent instruments code but has no API key available. Must ask the user.",
+        description: "Agent instruments code but has no API key available. Must ask the user.",
         agents: [
           createClaudeCodeAgent({
             workingDirectory: tempFolder,

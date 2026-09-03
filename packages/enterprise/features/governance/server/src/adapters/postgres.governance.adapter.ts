@@ -36,9 +36,7 @@ export class PostgresGovernanceAdapter {
   }
 
   build(): PostgresGovernanceServices {
-    const repository = PrismaCostAttributionPolicyRepository.create(
-      this.options.database,
-    );
+    const repository = PrismaCostAttributionPolicyRepository.create(this.options.database);
     return {
       policy: PostgresGovernancePolicyService.create(repository, {
         diagnostics: this.options.diagnostics,

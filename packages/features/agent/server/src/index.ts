@@ -54,10 +54,7 @@ export {
  * The `/api/v1/agents` REST family: list, create, read, update, archive,
  * test, call and the HTTP long-poll `/connect/*` routes (ADR-128).
  */
-export {
-  type AgentsV1Deps,
-  createAgentV1RestApp,
-} from "./transport/api-rest/agent-v1.api";
+export { type AgentsV1Deps, createAgentV1RestApp } from "./transport/api-rest/agent-v1.api";
 export {
   registerCallEndpoint,
   relayCallBodySchema,
@@ -144,10 +141,7 @@ export {
   type RegisterAnswer,
   refusalStatus,
 } from "./services/connected-agent-long-poll.service";
-export {
-  ConnectUpgradeRouterPort,
-  type UpgradeHandler,
-} from "./ports/connect-upgrade-router.port";
+export { ConnectUpgradeRouterPort, type UpgradeHandler } from "./ports/connect-upgrade-router.port";
 export {
   CONNECT_PATH,
   ConnectGateway,

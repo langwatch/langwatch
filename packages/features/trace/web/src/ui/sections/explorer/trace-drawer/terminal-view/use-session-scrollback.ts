@@ -147,9 +147,7 @@ function deriveStatus({
 }): ScrollbackStatus {
   if (!hasSession) {
     if (conversationId && isTurnListLoading) return "pending";
-    return conversationId && turnCount >= CONVERSATION_TURN_CAP
-      ? "unavailable"
-      : "hidden";
+    return conversationId && turnCount >= CONVERSATION_TURN_CAP ? "unavailable" : "hidden";
   }
   if (phase === "loading") return "loading";
   if (phase === "error") return "error";
@@ -327,12 +325,7 @@ function useSessionPosition({
  * The opened turn as a ledger entry, stable while its parts are, so the merge
  * below it does not rebuild on every render.
  */
-function useOpenedTurn({
-  traceId,
-  timestamp,
-  entries,
-  toolSpans,
-}: LoadedTurn): LoadedTurn {
+function useOpenedTurn({ traceId, timestamp, entries, toolSpans }: LoadedTurn): LoadedTurn {
   return useMemo(
     () => ({ traceId, timestamp, entries, toolSpans }),
     [traceId, timestamp, entries, toolSpans],
@@ -412,10 +405,7 @@ export function useSessionScrollback({
   openedTranscript,
   openedToolSpans,
 }: SessionScrollbackInput): SessionScrollback {
-  const { turns, isLoading: isTurnListLoading } = useConversationContext(
-    conversationId,
-    traceId,
-  );
+  const { turns, isLoading: isTurnListLoading } = useConversationContext(conversationId, traceId);
   const key = `${projectId}|${traceId}|${conversationId ?? ""}`;
   const { current, loadTurn } = useTurnLedger({ key, projectId });
 
@@ -438,8 +428,7 @@ export function useSessionScrollback({
 
   const opened = useOpenedTurn({
     traceId,
-    timestamp:
-      turns[openedIndex]?.timestamp ?? occurredAtMs ?? openedTranscript[0]?.atMs ?? 0,
+    timestamp: turns[openedIndex]?.timestamp ?? occurredAtMs ?? openedTranscript[0]?.atMs ?? 0,
     entries: openedTranscript,
     toolSpans: openedToolSpans,
   });

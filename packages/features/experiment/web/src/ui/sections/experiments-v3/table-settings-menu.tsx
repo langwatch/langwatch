@@ -7,21 +7,8 @@
  * - Automation: opens the "Run via API" dialog to run this evaluation from a
  *   pipeline
  */
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@chakra-ui/react";
-import {
-  ListChevronsDownUp,
-  ListChevronsUpDown,
-  SlidersHorizontal,
-  Terminal,
-} from "lucide-react";
+import { Box, Button, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { ListChevronsDownUp, ListChevronsUpDown, SlidersHorizontal, Terminal } from "lucide-react";
 import React, { useState } from "react";
 import { LuGauge } from "react-icons/lu";
 import type { RowHeightMode } from "@langwatch/dataset-web";
@@ -169,9 +156,7 @@ type TableSettingsMenuProps = {
  * Popover menu containing table settings and actions. Surfaced in the toolbar
  * as a "Run Options" button.
  */
-export function TableSettingsMenu({
-  disabled = false,
-}: TableSettingsMenuProps) {
+export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) {
   const {
     rowHeightMode,
     setRowHeightMode,
@@ -208,10 +193,7 @@ export function TableSettingsMenu({
 
   return (
     <>
-      <Popover.Root
-        open={popoverOpen}
-        onOpenChange={(e) => setPopoverOpen(e.open)}
-      >
+      <Popover.Root open={popoverOpen} onOpenChange={(e) => setPopoverOpen(e.open)}>
         <Popover.Trigger asChild>
           <Button
             variant="ghost"
@@ -241,9 +223,7 @@ export function TableSettingsMenu({
                     <Button
                       key={option.value}
                       variant={isActive ? "surface" : "ghost"}
-                      onClick={() =>
-                        !isDisabled && setRowHeightMode(option.value)
-                      }
+                      onClick={() => !isDisabled && setRowHeightMode(option.value)}
                       display="flex"
                       flexDirection="column"
                       alignItems="center"
@@ -286,10 +266,7 @@ export function TableSettingsMenu({
               Concurrency
             </Text>
             <VStack align="stretch" gap={1}>
-              <ConcurrencyPopover
-                value={concurrency}
-                onChange={setConcurrency}
-              />
+              <ConcurrencyPopover value={concurrency} onChange={setConcurrency} />
             </VStack>
 
             {/* Automation Section */}
@@ -332,9 +309,7 @@ export function TableSettingsMenu({
       {showRunViaApi && (
         <RunViaApiDialogContainer
           open={runDialog.open}
-          onOpenChange={(open) =>
-            open ? runDialog.onOpen() : runDialog.onClose()
-          }
+          onOpenChange={(open) => (open ? runDialog.onOpen() : runDialog.onClose())}
         />
       )}
     </>

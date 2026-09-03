@@ -4,9 +4,7 @@ import { pulledUsageObservedEventDataSchema } from "./pulled-usage.events";
 export const PULLED_USAGE_COMMAND_TYPES = {
   RECORD: "lw.obs.pulled_usage.record",
 } as const;
-export const PULLED_USAGE_PROCESSING_COMMAND_TYPES = Object.values(
-  PULLED_USAGE_COMMAND_TYPES,
-);
+export const PULLED_USAGE_PROCESSING_COMMAND_TYPES = Object.values(PULLED_USAGE_COMMAND_TYPES);
 
 export const recordPulledUsageCommandSchema = z
   .object({

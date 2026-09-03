@@ -42,10 +42,6 @@ export function grandfatheredSsoConnectionId({
  * `<commandId>:<index>`, so a second pass derives byte-identical keys and
  * the event store dedupes every one of them.
  */
-export function grandfatherCommandId({
-  organizationId,
-}: {
-  organizationId: string;
-}): string {
+export function grandfatherCommandId({ organizationId }: { organizationId: string }): string {
   return `grandfather:${organizationId}`;
 }

@@ -105,9 +105,7 @@ const stopDaemon = async (): Promise<void> => {
 describe("the CLI served by a daemon", () => {
   beforeAll(async () => {
     if (!fs.existsSync(CLI_PATH)) {
-      throw new Error(
-        `${CLI_PATH} is missing — run \`pnpm build\` before the integration tests.`,
-      );
+      throw new Error(`${CLI_PATH} is missing — run \`pnpm build\` before the integration tests.`);
     }
 
     server = http.createServer((req, res) => {
@@ -153,12 +151,7 @@ describe("the CLI served by a daemon", () => {
     describe("when a command runs with the daemon path enabled", () => {
       it("behaves exactly as it does today", async () => {
         const inProcess = await run(["trace", "search", "--format", "json"]);
-        const withDaemonEnabled = await runViaDaemon([
-          "trace",
-          "search",
-          "--format",
-          "json",
-        ]);
+        const withDaemonEnabled = await runViaDaemon(["trace", "search", "--format", "json"]);
 
         expect(withDaemonEnabled.exitCode).toBe(inProcess.exitCode);
         expect(withDaemonEnabled.stdout).toBe(inProcess.stdout);
@@ -261,21 +254,10 @@ describe("the CLI served by a daemon", () => {
         // The daemon's own cwd is the home directory. A command that reads a
         // local file must still see the caller's.
         const callerDir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-cwd-"));
-        fs.writeFileSync(
-          path.join(callerDir, "prompts.json"),
-          JSON.stringify({ prompts: {} }),
-        );
+        fs.writeFileSync(path.join(callerDir, "prompts.json"), JSON.stringify({ prompts: {} }));
 
-        const inProcess = await run(
-          ["prompt", "list", "--format", "json"],
-          {},
-          callerDir,
-        );
-        const served = await runViaDaemon(
-          ["prompt", "list", "--format", "json"],
-          {},
-          callerDir,
-        );
+        const inProcess = await run(["prompt", "list", "--format", "json"], {}, callerDir);
+        const served = await runViaDaemon(["prompt", "list", "--format", "json"], {}, callerDir);
 
         expect(served.exitCode).toBe(inProcess.exitCode);
         expect(served.stdout).toBe(inProcess.stdout);

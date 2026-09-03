@@ -11,11 +11,7 @@
  */
 import { z } from "zod";
 
-import {
-  langyJsonValueSchema,
-  langyMessagePartSchema,
-  langyMessageRoleSchema,
-} from "../../json";
+import { langyJsonValueSchema, langyMessagePartSchema, langyMessageRoleSchema } from "../../json";
 
 /**
  * ConversationStarted — an explicit conversation-creation event. Sets the owner
@@ -77,9 +73,7 @@ export const langyMessageRecordedEventDataSchema = z.object({
   /** Derived from the first user message; operational state keeps the first non-empty. */
   title: z.string().nullable().optional(),
 });
-export type LangyMessageRecordedEventData = z.infer<
-  typeof langyMessageRecordedEventDataSchema
->;
+export type LangyMessageRecordedEventData = z.infer<typeof langyMessageRecordedEventDataSchema>;
 
 /**
  * MessageImported — one immutable message copied into a fork. It is distinct
@@ -96,9 +90,7 @@ export const langyMessageImportedEventDataSchema = z.object({
   role: langyMessageRoleSchema,
   parts: z.array(langyMessagePartSchema).default([]),
 });
-export type LangyMessageImportedEventData = z.infer<
-  typeof langyMessageImportedEventDataSchema
->;
+export type LangyMessageImportedEventData = z.infer<typeof langyMessageImportedEventDataSchema>;
 
 /**
  * AgentTurnAccepted — the user's turn was durably admitted for dispatch.
@@ -119,9 +111,7 @@ export const langyAgentTurnAcceptedEventDataSchema = z.object({
   questionParts: z.array(langyMessagePartSchema).optional(),
   model: z.string().optional(),
 });
-export type LangyAgentTurnAcceptedEventData = z.infer<
-  typeof langyAgentTurnAcceptedEventDataSchema
->;
+export type LangyAgentTurnAcceptedEventData = z.infer<typeof langyAgentTurnAcceptedEventDataSchema>;
 
 /**
  * ToolCallInitiated — the agent began a tool call during a response. Recorded
@@ -147,9 +137,7 @@ export const langyToolCallInitiatedEventDataSchema = z.object({
   command: z.string().optional(),
   input: langyJsonValueSchema.optional(),
 });
-export type LangyToolCallInitiatedEventData = z.infer<
-  typeof langyToolCallInitiatedEventDataSchema
->;
+export type LangyToolCallInitiatedEventData = z.infer<typeof langyToolCallInitiatedEventDataSchema>;
 
 /**
  * ToolCallSucceeded — a tool call the agent initiated returned without error.
@@ -173,9 +161,7 @@ export const langyToolCallSucceededEventDataSchema = z.object({
   input: langyJsonValueSchema.optional(),
   durationMs: z.number().optional(),
 });
-export type LangyToolCallSucceededEventData = z.infer<
-  typeof langyToolCallSucceededEventDataSchema
->;
+export type LangyToolCallSucceededEventData = z.infer<typeof langyToolCallSucceededEventDataSchema>;
 
 /**
  * ToolCallFailed — a tool call the agent initiated returned an error. The
@@ -195,9 +181,7 @@ export const langyToolCallFailedEventDataSchema = z.object({
   durationMs: z.number().optional(),
   errorText: z.string().optional(),
 });
-export type LangyToolCallFailedEventData = z.infer<
-  typeof langyToolCallFailedEventDataSchema
->;
+export type LangyToolCallFailedEventData = z.infer<typeof langyToolCallFailedEventDataSchema>;
 
 /**
  * PlanUpdated — a full snapshot of the agent's plan (its `todowrite` todo list)
@@ -260,9 +244,7 @@ export const langyAgentRespondedEventDataSchema = z.object({
   outcome: z.enum(["completed", "failed", "stopped"]).default("completed"),
   error: z.string().nullable().optional(),
 });
-export type LangyAgentRespondedEventData = z.infer<
-  typeof langyAgentRespondedEventDataSchema
->;
+export type LangyAgentRespondedEventData = z.infer<typeof langyAgentRespondedEventDataSchema>;
 
 /**
  * ConversationArchived — soft-delete. Flips the fold's status/ArchivedAt.

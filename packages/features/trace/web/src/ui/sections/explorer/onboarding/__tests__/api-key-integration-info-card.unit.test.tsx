@@ -33,12 +33,15 @@ vi.mock("../../../use-public-env", () => ({
   usePublicEnv: () => ({ data: { BASE_HOST: mockBaseHost } }),
 }));
 
-vi.mock("@langwatch/onboarding-web/features/onboarding/components/sections/observability/CodePreview", () => ({
-  CodePreview: (props: Record<string, unknown>) => {
-    capturedCodePreviewProps = props;
-    return <div data-testid="code-preview">{String(props.code)}</div>;
-  },
-}));
+vi.mock(
+  "@langwatch/onboarding-web/features/onboarding/components/sections/observability/CodePreview",
+  () => ({
+    CodePreview: (props: Record<string, unknown>) => {
+      capturedCodePreviewProps = props;
+      return <div data-testid="code-preview">{String(props.code)}</div>;
+    },
+  }),
+);
 
 // ─── Module under test ──────────────────────────────────────────────────────────
 
@@ -77,9 +80,7 @@ describe("<ApiKeyIntegrationInfoCard /> with a minted token", () => {
   describe("when the token has been generated", () => {
     it("shows the shown-once warning", () => {
       renderCard();
-      expect(
-        screen.getByText(/Copy this token before you move on\./i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Copy this token before you move on\./i)).toBeInTheDocument();
     });
 
     it("reveals the token in full by default rather than masking it", () => {
@@ -103,9 +104,7 @@ describe("<ApiKeyIntegrationInfoCard /> with a minted token", () => {
     it("copies the raw token when the copy button is clicked", async () => {
       renderCard();
       fireEvent.click(screen.getByRole("button", { name: /copy token/i }));
-      await waitFor(() =>
-        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(TOKEN),
-      );
+      await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(TOKEN));
     });
 
     it("highlights every env line on cloud (api key + project id)", () => {

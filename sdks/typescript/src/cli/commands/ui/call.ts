@@ -102,9 +102,7 @@ export const uiCallCommand = async (
   if (options.payload && options.payloadFile) {
     // Picking one silently would apply a payload the caller did not name, and
     // this command writes to the page the user is watching.
-    process.stderr.write(
-      "Pass either --payload or --payload-file, not both.\n",
-    );
+    process.stderr.write("Pass either --payload or --payload-file, not both.\n");
     process.exitCode = 1;
     return;
   }
@@ -120,9 +118,7 @@ export const uiCallCommand = async (
     try {
       raw = await source.read();
     } catch (error) {
-      process.stderr.write(
-        `${error instanceof Error ? error.message : String(error)}\n`,
-      );
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
       process.exitCode = 1;
       return;
     }

@@ -24,9 +24,7 @@ export function compareCursors(left: ProjectionCursor, right: ProjectionCursor):
 }
 
 export function orderEvents<E extends Event>(events: readonly E[]): E[] {
-  return [...events].sort((left, right) =>
-    compareCursors(cursorFor(left), cursorFor(right)),
-  );
+  return [...events].sort((left, right) => compareCursors(cursorFor(left), cursorFor(right)));
 }
 
 /**
@@ -87,9 +85,7 @@ export class StateProjectionExecutor {
   }): Promise<StoredProjection<State> | null> {
     const matching = orderEvents(
       events.filter(
-        (event) =>
-          projection.eventTypes.length === 0 ||
-          projection.eventTypes.includes(event.type),
+        (event) => projection.eventTypes.length === 0 || projection.eventTypes.includes(event.type),
       ),
     );
     if (matching.length === 0) return null;

@@ -36,9 +36,7 @@ describe("toggleFacet", () => {
         // this combinator any more — but the store mechanism stays.)
         useFilterStore.getState().applyQueryText("model:gpt-4o");
         useFilterStore.getState().toggleFacet("status", "error", { combinator: "OR" });
-        expect(useFilterStore.getState().queryText).toBe(
-          "(model:gpt-4o) OR (status:error)",
-        );
+        expect(useFilterStore.getState().queryText).toBe("(model:gpt-4o) OR (status:error)");
       });
     });
   });
@@ -81,9 +79,7 @@ describe("toggleFacet", () => {
         // trace's origin can't be both `sample` and `application`.
         useFilterStore.getState().applyQueryText("origin:sample");
         useFilterStore.getState().toggleFacet("origin", "application");
-        expect(useFilterStore.getState().queryText).toBe(
-          "(origin:sample OR origin:application)",
-        );
+        expect(useFilterStore.getState().queryText).toBe("(origin:sample OR origin:application)");
       });
     });
 
@@ -106,9 +102,7 @@ describe("toggleFacet", () => {
       it("AND-combines — a different field narrows rather than ORs", () => {
         useFilterStore.getState().applyQueryText("origin:sample");
         useFilterStore.getState().toggleFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe(
-          "origin:sample AND status:error",
-        );
+        expect(useFilterStore.getState().queryText).toBe("origin:sample AND status:error");
       });
     });
   });
@@ -177,9 +171,7 @@ describe("excludeFacet", () => {
       it("AND-combines the NOT clause", () => {
         useFilterStore.getState().applyQueryText("model:gpt-4o");
         useFilterStore.getState().excludeFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe(
-          "model:gpt-4o AND NOT status:error",
-        );
+        expect(useFilterStore.getState().queryText).toBe("model:gpt-4o AND NOT status:error");
       });
     });
   });

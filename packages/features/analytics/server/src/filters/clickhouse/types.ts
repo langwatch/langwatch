@@ -7,7 +7,10 @@ export type FilterConditionResult = {
   params: Record<string, unknown>;
 };
 
-import type { AnalyticsFilterValue as FilterParam, FilterField } from "@langwatch/analytics-contract";
+import type {
+  AnalyticsFilterValue as FilterParam,
+  FilterField,
+} from "@langwatch/analytics-contract";
 
 export type ClickHouseFilterQueryParams = {
   tenantId: string;
@@ -29,10 +32,7 @@ export type FilterOption = {
 /**
  * ClickHouse tables that support filter queries.
  */
-export type ClickHouseFilterTable =
-  | "trace_summaries"
-  | "stored_spans"
-  | "evaluation_runs";
+export type ClickHouseFilterTable = "trace_summaries" | "stored_spans" | "evaluation_runs";
 
 export type ClickHouseFilterDefinition = {
   /**

@@ -217,8 +217,8 @@ export function LangyHomeHero() {
 
         {!canAsk ? (
           <Text fontSize="12px" color="fg.subtle" textAlign="center">
-            You can read Langy conversations here. To start one, ask whoever manages your
-            account for access.
+            You can read Langy conversations here. To start one, ask whoever manages your account
+            for access.
           </Text>
         ) : null}
       </VStack>

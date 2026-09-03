@@ -16,10 +16,7 @@
  * sentence and cannot replace it.
  */
 
-import type {
-  CheaperAlternative,
-  LeaderboardVerdict,
-} from "./batch-evaluation-results.verdict";
+import type { CheaperAlternative, LeaderboardVerdict } from "./batch-evaluation-results.verdict";
 
 export type LeaderboardHeadline = {
   /** Sentence fragment naming the action, e.g. "Ship support-warm". */
@@ -100,8 +97,7 @@ export const formatLeaderboardHeadline = ({
     // 99.7% saving, not a giveaway.
     const percent = Math.min(99, Math.round(cheaperAlternative.savingRatio * 100));
     const name = nameOf(cheaperAlternative.variantId, variantNames);
-    const others =
-      verdict.tiedIds.length > 2 ? "the others it ties with" : "the one it ties with";
+    const others = verdict.tiedIds.length > 2 ? "the others it ties with" : "the one it ties with";
     const price = `${formatCost(cheaperAlternative.cost)} vs ${formatCost(
       cheaperAlternative.dearestCost,
     )} per row.`;

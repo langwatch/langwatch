@@ -1,7 +1,4 @@
-import {
-  extractLiquidVariables,
-  type PromptConfigFields,
-} from "@langwatch/prompt-contract";
+import { extractLiquidVariables, type PromptConfigFields } from "@langwatch/prompt-contract";
 
 type LlmConfigInputType = NonNullable<PromptConfigFields["inputs"]>[number]["type"];
 

@@ -8,8 +8,8 @@ keywords: langchain, instrumentation, callback, langwatch, typescript, tracing
 
 <Tip>
   **Quick setup?** Instead of following these steps manually, [copy a
-  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set
-  this up for you automatically.
+  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up
+  for you automatically.
 </Tip>
 
 LangWatch integrates with Langchain to provide detailed observability into your chains, agents, LLM calls, and tool usage.
@@ -38,8 +38,7 @@ bun add langwatch @langchain/openai @langchain/core
 ## Usage
 
 <Info>
-  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment
-  variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
 Use `LangWatchCallbackHandler` to capture Langchain events as spans within your trace.

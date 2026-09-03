@@ -64,11 +64,7 @@ export interface AddonRenderContext<TRow> {
 export interface AddonDef<TRow> {
   id: string;
   label: string;
-  shouldRender: (args: {
-    row: TRow;
-    isExpanded: boolean;
-    densityMode: Density;
-  }) => boolean;
+  shouldRender: (args: { row: TRow; isExpanded: boolean; densityMode: Density }) => boolean;
   render: (ctx: AddonRenderContext<TRow>) => ReactNode;
 }
 

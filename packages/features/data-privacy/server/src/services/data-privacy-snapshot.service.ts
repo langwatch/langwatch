@@ -40,9 +40,7 @@ import type { DataPrivacyPermissionsPort } from "../ports/data-privacy-permissio
  * wider service that composes it.
  */
 export type DataPrivacySnapshotPolicies = Readonly<{
-  getResolvedForProject(input: {
-    projectId: string;
-  }): Promise<DataPrivacySnapshot["effective"]>;
+  getResolvedForProject(input: { projectId: string }): Promise<DataPrivacySnapshot["effective"]>;
   listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]>;
 }>;
 
@@ -52,11 +50,7 @@ export class DataPrivacySnapshotService {
     directory: DataPrivacyDirectoryPort;
     permissions: DataPrivacyPermissionsPort;
   }): DataPrivacySnapshotService {
-    return new DataPrivacySnapshotService(
-      options.policies,
-      options.directory,
-      options.permissions,
-    );
+    return new DataPrivacySnapshotService(options.policies, options.directory, options.permissions);
   }
 
   private constructor(
@@ -65,10 +59,7 @@ export class DataPrivacySnapshotService {
     private readonly permissions: DataPrivacyPermissionsPort,
   ) {}
 
-  async getSnapshot(input: {
-    userId: string;
-    projectId: string;
-  }): Promise<DataPrivacySnapshot> {
+  async getSnapshot(input: { userId: string; projectId: string }): Promise<DataPrivacySnapshot> {
     const { userId, projectId } = input;
     const [effective, project] = await Promise.all([
       this.policies.getResolvedForProject({ projectId }),
@@ -176,9 +167,7 @@ export class DataPrivacySnapshotService {
       // to organization managers. An archived department stays out of the
       // picker but keeps its name resolvable for the rules above.
       departments: canManageOrganization
-        ? directory.departments
-            .filter((row) => !row.archived)
-            .map(({ id, name }) => ({ id, name }))
+        ? directory.departments.filter((row) => !row.archived).map(({ id, name }) => ({ id, name }))
         : [],
       teams: directory.teams
         .filter((team) => teamManage.get(team.id) === true)

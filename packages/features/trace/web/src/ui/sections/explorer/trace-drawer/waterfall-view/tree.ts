@@ -49,9 +49,7 @@ export function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
   return buildNodes(null, 0);
 }
 
-export function groupSiblings(
-  children: WaterfallTreeNode[],
-): (WaterfallTreeNode | SiblingGroup)[] {
+export function groupSiblings(children: WaterfallTreeNode[]): (WaterfallTreeNode | SiblingGroup)[] {
   if (children.length <= SIBLING_GROUP_THRESHOLD) return children;
 
   const nameGroups = new Map<string, WaterfallTreeNode[]>();
@@ -118,12 +116,7 @@ export function siblingGroupKey(group: {
   type: string;
   toolName: string | null;
 }): string {
-  return JSON.stringify([
-    group.parentSpanId,
-    group.name,
-    group.type,
-    group.toolName ?? "",
-  ]);
+  return JSON.stringify([group.parentSpanId, group.name, group.type, group.toolName ?? ""]);
 }
 
 export function flattenTree(

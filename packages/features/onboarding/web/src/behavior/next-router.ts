@@ -16,9 +16,7 @@
 import { useMemo } from "react";
 import { useOnboardingHost } from "../model/onboarding-host";
 
-type PushTarget =
-  | string
-  | { pathname?: string; query?: Readonly<Record<string, unknown>> };
+type PushTarget = string | { pathname?: string; query?: Readonly<Record<string, unknown>> };
 
 export type OnboardingCompatRouter = {
   query: Readonly<Record<string, string | undefined>>;
@@ -30,10 +28,7 @@ export type OnboardingCompatRouter = {
   replace: (url: PushTarget, as?: unknown, options?: { shallow?: boolean }) => Promise<void>;
 };
 
-function addressOf(
-  target: PushTarget,
-  fallbackPathname: string,
-): { href: string } {
+function addressOf(target: PushTarget, fallbackPathname: string): { href: string } {
   if (typeof target === "string") return { href: target };
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(target.query ?? {})) {

@@ -217,10 +217,7 @@ describe("readClaudePluginState", () => {
           value: { langwatch: { source: { source: "git", url } } },
         });
         const { readClaudePluginState } = await loadModule();
-        expect(
-          readClaudePluginState().marketplaceOwnedByLangwatch,
-          `${url} is ours`,
-        ).toBe(true);
+        expect(readClaudePluginState().marketplaceOwnedByLangwatch, `${url} is ours`).toBe(true);
       }
     });
 

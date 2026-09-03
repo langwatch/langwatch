@@ -3,12 +3,7 @@ import type {
   WebhookDestinationKind,
 } from "@langwatch/enterprise-webhook-contract";
 
-export type WebhookUrlProblemCode =
-  | "invalid_url"
-  | "scheme"
-  | "host"
-  | "port"
-  | "credentials";
+export type WebhookUrlProblemCode = "invalid_url" | "scheme" | "host" | "port" | "credentials";
 
 export type ParsedSqsQueueUrl = {
   queueUrl: string;
@@ -82,9 +77,7 @@ export class WebhookDestinationService {
   }
 
   isRoleArn(value: string): boolean {
-    return /^arn:aws(?:-cn|-us-gov)?:iam::\d{12}:role\/[\w+=,.@/-]{1,512}$/.test(
-      value.trim(),
-    );
+    return /^arn:aws(?:-cn|-us-gov)?:iam::\d{12}:role\/[\w+=,.@/-]{1,512}$/.test(value.trim());
   }
 
   sqsCredentialMode(input: {

@@ -73,8 +73,7 @@ describe("carrying account secrets onto credential rows", () => {
       });
 
       it("inserts nothing the second time it runs", async () => {
-        const { service, insertCredentialIfMissing, overwriteCredential } =
-          harness([pair()]);
+        const { service, insertCredentialIfMissing, overwriteCredential } = harness([pair()]);
         insertCredentialIfMissing.mockResolvedValue(false);
 
         const outcome = await service.carryForUser({ userId: USER });
@@ -143,15 +142,14 @@ describe("carrying account secrets onto credential rows", () => {
   describe("given a user holding both a stale credential and an uncarried account", () => {
     describe("when the pass runs", () => {
       it("heals one and carries the other in the same sweep", async () => {
-        const { service, insertCredentialIfMissing, overwriteCredential } =
-          harness([
-            pair({
-              accountId: "acc_stale",
-              credentialUpdatedAtMs: T0,
-              accountUpdatedAtMs: T0 + 1,
-            }),
-            pair({ accountId: "acc_new", credentialUpdatedAtMs: null }),
-          ]);
+        const { service, insertCredentialIfMissing, overwriteCredential } = harness([
+          pair({
+            accountId: "acc_stale",
+            credentialUpdatedAtMs: T0,
+            accountUpdatedAtMs: T0 + 1,
+          }),
+          pair({ accountId: "acc_new", credentialUpdatedAtMs: null }),
+        ]);
 
         const outcome = await service.carryForUser({ userId: USER });
 

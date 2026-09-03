@@ -154,9 +154,21 @@ describe("Coding Agent session ClickHouse repository", () => {
         const { endpoint, repository } = await createRepository();
 
         await repository.upsertBatch([
-          { row: session({ sessionId: "batched", updatedAt: 0 }), retentionDays: 14, appliedEventIds: [] },
-          { row: session({ sessionId: "batched", updatedAt: 0 }), retentionDays: 14, appliedEventIds: [] },
-          { row: session({ sessionId: "batched", updatedAt: 0 }), retentionDays: 14, appliedEventIds: [] },
+          {
+            row: session({ sessionId: "batched", updatedAt: 0 }),
+            retentionDays: 14,
+            appliedEventIds: [],
+          },
+          {
+            row: session({ sessionId: "batched", updatedAt: 0 }),
+            retentionDays: 14,
+            appliedEventIds: [],
+          },
+          {
+            row: session({ sessionId: "batched", updatedAt: 0 }),
+            retentionDays: 14,
+            appliedEventIds: [],
+          },
         ]);
 
         const stamps = (endpoint.requests[0]?.body ?? "")

@@ -78,9 +78,7 @@ describe("ScimSyncGuards", () => {
           op: "create",
         });
 
-        expect(facts.map((fact) => fact.type)).toEqual([
-          SCIM_USER_PUSHED_EVENT_TYPE,
-        ]);
+        expect(facts.map((fact) => fact.type)).toEqual([SCIM_USER_PUSHED_EVENT_TYPE]);
       });
     });
 
@@ -140,9 +138,7 @@ describe("ScimSyncGuards", () => {
           userId: "user_sam",
         });
 
-        expect(facts.map((fact) => fact.type)).toEqual([
-          SCIM_APPLY_FAILED_EVENT_TYPE,
-        ]);
+        expect(facts.map((fact) => fact.type)).toEqual([SCIM_APPLY_FAILED_EVENT_TYPE]);
       });
     });
 
@@ -187,9 +183,7 @@ describe("ScimSyncGuards", () => {
           userId: "user_sam",
         });
 
-        const retired = facts.find(
-          (fact) => fact.type === SCIM_APPLY_RETIRED_EVENT_TYPE,
-        );
+        const retired = facts.find((fact) => fact.type === SCIM_APPLY_RETIRED_EVENT_TYPE);
         expect(retired?.data).toMatchObject({
           op: "deactivate_user",
           errorCode: "offboard_incomplete",
@@ -221,9 +215,7 @@ describe("ScimSyncGuards", () => {
           userId: "user_other",
         });
 
-        expect(facts.map((fact) => fact.type)).toEqual([
-          SCIM_APPLY_FAILED_EVENT_TYPE,
-        ]);
+        expect(facts.map((fact) => fact.type)).toEqual([SCIM_APPLY_FAILED_EVENT_TYPE]);
       });
     });
 
@@ -269,9 +261,7 @@ describe("ScimSyncGuards", () => {
         cause: "revoke",
       });
 
-      expect(first.map((fact) => fact.type)).toEqual([
-        SCIM_TOKEN_REVOKED_EVENT_TYPE,
-      ]);
+      expect(first.map((fact) => fact.type)).toEqual([SCIM_TOKEN_REVOKED_EVENT_TYPE]);
       expect(second).toEqual([]);
     });
   });

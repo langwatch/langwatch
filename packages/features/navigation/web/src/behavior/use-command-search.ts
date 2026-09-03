@@ -111,11 +111,7 @@ export function useCommandSearch(query: string, isOpen: boolean) {
     navigationApi.evaluators.getAll.useQuery({ projectId }, { enabled: canFetch });
 
   const isLoading =
-    promptsLoading ||
-    agentsLoading ||
-    datasetsLoading ||
-    workflowsLoading ||
-    evaluatorsLoading;
+    promptsLoading || agentsLoading || datasetsLoading || workflowsLoading || evaluatorsLoading;
 
   // Detect ID-based navigation (immediate, no debounce needed)
   const idResult = useMemo<SearchResult | null>(() => {
@@ -201,16 +197,7 @@ export function useCommandSearch(query: string, isOpen: boolean) {
       });
 
     return results;
-  }, [
-    shouldSearch,
-    debouncedQuery,
-    prompts,
-    agents,
-    datasets,
-    workflows,
-    evaluators,
-    projectSlug,
-  ]);
+  }, [shouldSearch, debouncedQuery, prompts, agents, datasets, workflows, evaluators, projectSlug]);
 
   return {
     idResult,

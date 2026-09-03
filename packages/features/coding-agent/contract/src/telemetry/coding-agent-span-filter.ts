@@ -75,9 +75,7 @@ function isAiSemanticCodingAgentSpan({
     // ai.* (ai.streamText, ai.streamText.doStream, ai.toolCall, ...). Its
     // infra spans are named after internal modules (sql.execute, Session.get,
     // Config.get) and carry no gen_ai/ai attributes.
-    const hasAi = attributeKeys.some(
-      (k) => k.startsWith("ai.") || k.startsWith("gen_ai."),
-    );
+    const hasAi = attributeKeys.some((k) => k.startsWith("ai.") || k.startsWith("gen_ai."));
     return spanName.startsWith("ai.") || hasAi;
   }
   return true;

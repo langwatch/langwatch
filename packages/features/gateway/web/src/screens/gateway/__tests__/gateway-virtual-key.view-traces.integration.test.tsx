@@ -118,9 +118,7 @@ const host = fakeGatewayHost({
       {
         id: TEAM_ID,
         name: "platform",
-        projects: [
-          { id: PROJECT_ID, name: "web-app", slug: PROJECT_SLUG, teamId: TEAM_ID },
-        ],
+        projects: [{ id: PROJECT_ID, name: "web-app", slug: PROJECT_SLUG, teamId: TEAM_ID }],
       },
     ],
   },
@@ -164,8 +162,7 @@ describe("View traces on the virtual key page", () => {
       it("links to the destination's trace explorer filtered to the key", () => {
         renderWithGatewayHost(<VirtualKeyDetailPage />, { host });
 
-        const href =
-          screen.getByTestId("vk-view-traces").closest("a")?.getAttribute("href") ?? "";
+        const href = screen.getByTestId("vk-view-traces").closest("a")?.getAttribute("href") ?? "";
         expect(href.startsWith(`/${PROJECT_SLUG}/traces#all-traces?`)).toBe(true);
         expect(href).toContain(encodeURIComponent(`"${VK_ID}"`));
       });

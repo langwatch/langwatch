@@ -105,9 +105,7 @@ describe("governance backend contract", () => {
   });
 
   it("recognizes governance traces by the canonical origin attribute", () => {
-    expect(isGovernanceOriginTrace({ "langwatch.origin.kind": "ingestion_source" })).toBe(
-      true,
-    );
+    expect(isGovernanceOriginTrace({ "langwatch.origin.kind": "ingestion_source" })).toBe(true);
     expect(isGovernanceOriginTrace(undefined)).toBe(false);
   });
 

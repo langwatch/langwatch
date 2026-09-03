@@ -23,10 +23,7 @@ export abstract class ShareRepository {
   abstract tryFindByToken(token: string): Promise<ShareWithProject | null>;
 
   /** Resolve a project-scoped link without loading a cross-tenant row. */
-  abstract tryFindById(params: {
-    id: string;
-    projectId: string;
-  }): Promise<ShareWithProject | null>;
+  abstract tryFindById(params: { id: string; projectId: string }): Promise<ShareWithProject | null>;
 
   abstract listByResource(params: {
     projectId: string;

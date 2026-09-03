@@ -174,9 +174,8 @@ function PageHeading() {
         Routing policies
       </Heading>
       <Text color="fg.muted" fontSize="sm">
-        Decide which providers and models your keys reach, and what the model tiers mean
-        here. A project policy wins over a team policy, which wins over the organization
-        policy.
+        Decide which providers and models your keys reach, and what the model tiers mean here. A
+        project policy wins over a team policy, which wins over the organization policy.
       </Text>
     </VStack>
   );
@@ -255,9 +254,9 @@ function NoDefaultNotice({
             {hasPolicies ? "Pick a default policy" : "Publish a default policy"}
           </Text>
           <Text fontSize="xs" color="fg.muted">
-            Without one, a new key routes through whichever providers it can reach, in no
-            order you chose, and the model tiers mean nothing. A default policy at the
-            organization level pins both, and a team or project can still override it.
+            Without one, a new key routes through whichever providers it can reach, in no order you
+            chose, and the model tiers mean nothing. A default policy at the organization level pins
+            both, and a team or project can still override it.
           </Text>
           <HStack gap={3} paddingTop={1}>
             <Button size="xs" colorPalette="orange" onClick={onAddOrganizationPolicy}>

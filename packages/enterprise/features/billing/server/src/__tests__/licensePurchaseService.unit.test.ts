@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  LicenseGenerator,
-  LicensePurchaseDelivery,
-  LicensePurchaseService,
-} from "../index";
+import { LicenseGenerator, LicensePurchaseDelivery, LicensePurchaseService } from "../index";
 
 class TestLicenseGenerator extends LicenseGenerator {
   readonly generate = vi.fn().mockReturnValue({

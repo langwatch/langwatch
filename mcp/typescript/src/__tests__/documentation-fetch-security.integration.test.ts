@@ -108,8 +108,7 @@ describe("MCP documentation fetch security", () => {
         targetServer.listen(0, "127.0.0.1", resolve);
       });
       const targetAddress = targetServer.address();
-      targetPort =
-        typeof targetAddress === "object" && targetAddress ? targetAddress.port : 0;
+      targetPort = typeof targetAddress === "object" && targetAddress ? targetAddress.port : 0;
 
       initConfig({ endpoint: "https://app.langwatch.ai" });
       const { startHttpServer } = await import("../http-server.js");
@@ -181,10 +180,7 @@ describe("MCP documentation fetch security", () => {
       "blocks %s from reaching a loopback HTTP server",
       async (tool) => {
         const hitsBefore = targetHits;
-        const body = await callDocumentationTool(
-          tool,
-          `http://127.0.0.1:${targetPort}/secrets`,
-        );
+        const body = await callDocumentationTool(tool, `http://127.0.0.1:${targetPort}/secrets`);
 
         expect(body).toContain("trusted LangWatch documentation URL");
         expect(targetHits).toBe(hitsBefore);

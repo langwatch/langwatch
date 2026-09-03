@@ -52,8 +52,7 @@ export const SampleDataBanner: React.FC = () => {
               "0 6px 24px -4px color-mix(in oklab, var(--chakra-colors-orange-solid) 55%, transparent), inset 0 -1px 0 var(--chakra-colors-orange-muted)",
           },
           "100%": {
-            boxShadow:
-              "0 0 0 0 transparent, inset 0 -1px 0 var(--chakra-colors-orange-muted)",
+            boxShadow: "0 0 0 0 transparent, inset 0 -1px 0 var(--chakra-colors-orange-muted)",
           },
         },
         "@media (prefers-reduced-motion: reduce)": {

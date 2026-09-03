@@ -66,8 +66,7 @@ describe("splitLeadingContextBlocks", () => {
 
   describe("when the body itself contains later tags", () => {
     it("strips only the leading block and keeps the body's own tags", () => {
-      const input =
-        "<system-reminder>ctx</system-reminder>\n\ncompare <a>1</a> and <b>2</b>";
+      const input = "<system-reminder>ctx</system-reminder>\n\ncompare <a>1</a> and <b>2</b>";
       const { context, body } = splitLeadingContextBlocks(input);
       expect(context).toBe("<system-reminder>ctx</system-reminder>");
       expect(body).toBe("compare <a>1</a> and <b>2</b>");

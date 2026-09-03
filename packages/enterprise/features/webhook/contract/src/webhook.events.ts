@@ -23,8 +23,7 @@ export const WEBHOOK_EVENT_TYPES = [
     family: "gateway",
     schemaVersion: "1",
     isEmitting: true,
-    description:
-      "An admitted request settled with unknown cost and flagged for reconciliation.",
+    description: "An admitted request settled with unknown cost and flagged for reconciliation.",
   },
   {
     type: "gateway.budget.threshold_crossed",
@@ -88,10 +87,7 @@ export function isValidEventSelector(selector: string): boolean {
   return knownTypes.has(selector);
 }
 
-export function eventMatches(
-  enabledEvents: readonly string[],
-  eventType: string,
-): boolean {
+export function eventMatches(enabledEvents: readonly string[], eventType: string): boolean {
   const family = eventType.split(".")[0] ?? "";
   return enabledEvents.some(
     (selector) =>

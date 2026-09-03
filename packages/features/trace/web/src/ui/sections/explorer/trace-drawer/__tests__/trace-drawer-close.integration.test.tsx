@@ -97,7 +97,8 @@ vi.mock("../../hooks/use-trace-refresh", () => ({
   useTraceRefresh: () => ({ refresh: vi.fn() }),
 }));
 
-const { clearDrawerStack, getDrawerStack, useDrawer } = await import("../../../../../behavior/use-drawer");
+const { clearDrawerStack, getDrawerStack, useDrawer } =
+  await import("../../../../../behavior/use-drawer");
 const { useDrawerStore } = await import("../../../../../index");
 const { useTraceDrawerScaffold } = await import("../use-trace-drawer-scaffold");
 

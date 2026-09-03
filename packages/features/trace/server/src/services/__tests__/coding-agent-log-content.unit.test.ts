@@ -156,10 +156,7 @@ describe("the derivation cannot read a content attribute the table misses", () =
     ];
     const derivation = services
       .map((file) =>
-        readFileSync(
-          join(process.cwd(), "../../coding-agent/contract/src", file),
-          "utf8",
-        ),
+        readFileSync(join(process.cwd(), "../../coding-agent/contract/src", file), "utf8"),
       )
       .join("\n");
     // `readString(attrs, "x")` / `readNumber(attrs, "x")` — the only way the

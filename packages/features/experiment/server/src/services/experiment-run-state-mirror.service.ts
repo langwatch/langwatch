@@ -58,10 +58,7 @@ export const createRunStateMirror = ({
    * must not reach the `for await` loop the run is streaming through: that
    * would write an error frame to the customer and abandon a healthy run.
    */
-  const mirrored = async (
-    what: string,
-    write: () => Promise<unknown>,
-  ): Promise<void> => {
+  const mirrored = async (what: string, write: () => Promise<unknown>): Promise<void> => {
     try {
       await write();
     } catch (error) {
@@ -77,9 +74,7 @@ export const createRunStateMirror = ({
     if (!id) return;
     if (event.type === "done") {
       ended = true;
-      await mirrored("completeRun", () =>
-        progress.completeRun(id, event.summary),
-      );
+      await mirrored("completeRun", () => progress.completeRun(id, event.summary));
       return;
     }
     if (event.type === "stopped") {

@@ -76,9 +76,7 @@ function workspacePath(root: string, path: string): string {
 function isWithin(root: string, path: string): boolean {
   const pathFromRoot = relative(root, path);
   const escapesRoot =
-    pathFromRoot.startsWith(`..${sep}`) ||
-    pathFromRoot === ".." ||
-    isAbsolute(pathFromRoot);
+    pathFromRoot.startsWith(`..${sep}`) || pathFromRoot === ".." || isAbsolute(pathFromRoot);
   return pathFromRoot === "" || !escapesRoot;
 }
 
@@ -114,11 +112,7 @@ function importsIn(file: string): SourceImport[] {
   let mode: "export" | "import" | "require" | null = null;
   let acceptsString = false;
 
-  for (
-    let token = scanner.scan();
-    token !== ts.SyntaxKind.EndOfFileToken;
-    token = scanner.scan()
-  ) {
+  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
     if (token === ts.SyntaxKind.ImportKeyword) {
       mode = "import";
       acceptsString = true;
@@ -165,8 +159,7 @@ function importsIn(file: string): SourceImport[] {
     }
   }
   return found.sort(
-    (left, right) =>
-      left.line - right.line || left.specifier.localeCompare(right.specifier),
+    (left, right) => left.line - right.line || left.specifier.localeCompare(right.specifier),
   );
 }
 
@@ -204,9 +197,7 @@ function packageForPhysicalApplicationSpecifier(
 ): ClassifiedPackage | undefined {
   const match = specifier.match(/^(?:\.\/|\.\.\/)*apps\/(ui|api|worker|server)(?:\/|$)/);
   if (!match) return void 0;
-  return packages.find(
-    (pkg) => pkg.kind === "application" && pkg.applicationRole === match[1],
-  );
+  return packages.find((pkg) => pkg.kind === "application" && pkg.applicationRole === match[1]);
 }
 
 function targetPackage(
@@ -234,14 +225,10 @@ function matchingEnterpriseComposition(
   return importer.applicationRole === target.enterpriseCompositionRole;
 }
 
-function lintClassifiedSourceImports(
-  packages: ClassifiedPackage[],
-): ArchitectureViolation[] {
+function lintClassifiedSourceImports(packages: ClassifiedPackage[]): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const sourcePackages = packages.filter((pkg) =>
-    ["application", "dev-runtime", "enterprise-root", "enterprise-composition"].includes(
-      pkg.kind,
-    ),
+    ["application", "dev-runtime", "enterprise-root", "enterprise-composition"].includes(pkg.kind),
   );
 
   for (const pkg of sourcePackages) {
@@ -255,8 +242,7 @@ function lintClassifiedSourceImports(
           line: sourceImport.line,
           specifier: sourceImport.specifier,
           message: `Application ${pkg.applicationRole} cannot import application ${target.applicationRole} source.`,
-          allowed:
-            "Move reusable behaviour to its owning feature or infrastructure package.",
+          allowed: "Move reusable behaviour to its owning feature or infrastructure package.",
         });
       }
 
@@ -277,10 +263,7 @@ function lintClassifiedSourceImports(
         });
       }
 
-      if (
-        pkg.kind === "enterprise-composition" &&
-        target?.kind === "enterprise-composition"
-      ) {
+      if (pkg.kind === "enterprise-composition" && target?.kind === "enterprise-composition") {
         violations.push({
           policy: "enterprise-composition",
           file: sourceImport.file,
@@ -326,9 +309,7 @@ function lintClassifiedSourceImports(
   return violations;
 }
 
-function lintCompositionSourceShape(
-  packages: ClassifiedPackage[],
-): ArchitectureViolation[] {
+function lintCompositionSourceShape(packages: ClassifiedPackage[]): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of packages) {
     if (
@@ -375,16 +356,10 @@ function lintRuntimeConstructionImports(
   packages: ClassifiedPackage[],
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
-  const importers = [
-    ...sourceImports(join(root, "apps")),
-    ...sourceImports(join(root, "tools")),
-  ];
+  const importers = [...sourceImports(join(root, "apps")), ...sourceImports(join(root, "tools"))];
   const groups = new Map<string, Set<string>>();
   for (const sourceImport of importers) {
-    if (
-      sourceImport.specifier !== API_RUNTIME &&
-      sourceImport.specifier !== WORKER_RUNTIME
-    ) {
+    if (sourceImport.specifier !== API_RUNTIME && sourceImport.specifier !== WORKER_RUNTIME) {
       continue;
     }
     const file = workspacePath(root, sourceImport.file);
@@ -557,8 +532,8 @@ export function formatLegacyApplicationBoundaryBaseline(
   const populatedKinds = LEGACY_KINDS.filter((kind) => grouped.has(kind));
   for (const [kindIndex, kind] of populatedKinds.entries()) {
     lines.push(`    ${JSON.stringify(kind)}: {`);
-    const importers = [...(grouped.get(kind) ?? new Map()).entries()].sort(
-      ([left], [right]) => left.localeCompare(right),
+    const importers = [...(grouped.get(kind) ?? new Map()).entries()].sort(([left], [right]) =>
+      left.localeCompare(right),
     );
     for (const [importerIndex, [importer, specifiers]] of importers.entries()) {
       const sortedSpecifiers = [...new Set(specifiers)].sort();
@@ -635,8 +610,7 @@ function readLegacyBaseline(root: string): {
     if (
       importerKeys.some(
         (importer, index) =>
-          importer !==
-          [...importerKeys].sort((left, right) => left.localeCompare(right))[index],
+          importer !== [...importerKeys].sort((left, right) => left.localeCompare(right))[index],
       )
     ) {
       violations.push({

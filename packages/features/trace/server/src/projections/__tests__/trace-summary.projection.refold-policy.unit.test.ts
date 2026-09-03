@@ -74,11 +74,10 @@ describe("TraceSummaryFoldProjection re-fold policy", () => {
     const eventLoader = vi.fn().mockResolvedValue([]);
     projection.eventLoader = eventLoader;
 
-    const result = await new FoldProjectionExecutor().execute(
-      projection,
-      spanEventAt(1_000, "a"),
-      { aggregateId: TRACE_ID, tenantId: TENANT_ID },
-    );
+    const result = await new FoldProjectionExecutor().execute(projection, spanEventAt(1_000, "a"), {
+      aggregateId: TRACE_ID,
+      tenantId: TENANT_ID,
+    });
 
     expect(eventLoader).not.toHaveBeenCalled();
     expect(result.spanCount).toBe(MAX_PROCESSED_SPANS + 2);

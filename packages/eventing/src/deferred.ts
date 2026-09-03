@@ -5,10 +5,7 @@ import type { QueueSendOptions } from "./queues/queue.types";
  *
  * Matches the signature: `(data: P, options?: QueueSendOptions<P>) => Promise<void>`
  */
-export type CommandDispatcher<P> = (
-  data: P,
-  options?: QueueSendOptions<P>,
-) => Promise<void>;
+export type CommandDispatcher<P> = (data: P, options?: QueueSendOptions<P>) => Promise<void>;
 
 /**
  * Typed container for a function that will be provided after construction.

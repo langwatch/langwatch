@@ -73,12 +73,8 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   const fieldErrors = asFieldErrors(handled.meta.fieldErrors);
   const formErrors = asStringArray(handled.meta.formErrors);
 
-  const nonEmpty = Object.entries(fieldErrors).filter(
-    ([, messages]) => messages.length > 0,
-  );
-  const applicable = nonEmpty.filter((entry) =>
-    isPaintedField({ form, field: entry[0] }),
-  );
+  const nonEmpty = Object.entries(fieldErrors).filter(([, messages]) => messages.length > 0);
+  const applicable = nonEmpty.filter((entry) => isPaintedField({ form, field: entry[0] }));
 
   // Only the errors this form can actually put on screen count towards
   // claiming it. See `hasFormErrorSlot`.
@@ -93,8 +89,7 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   // Whether the form can show the WHOLE rejection. When it can't, the caller
   // still toasts, so the parts this form can't display aren't lost.
   const claimsEverything =
-    applicable.length === nonEmpty.length &&
-    showableFormErrors.length === formErrors.length;
+    applicable.length === nonEmpty.length && showableFormErrors.length === formErrors.length;
 
   if (applicable.length === 0 && showableFormErrors.length === 0) return false;
 

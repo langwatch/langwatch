@@ -4,8 +4,7 @@ export const LANGY_PROMPT_HANDLES = {
   turnOverride: "langy-turn-override",
 } as const;
 
-export type LangyPromptHandle =
-  (typeof LANGY_PROMPT_HANDLES)[keyof typeof LANGY_PROMPT_HANDLES];
+export type LangyPromptHandle = (typeof LANGY_PROMPT_HANDLES)[keyof typeof LANGY_PROMPT_HANDLES];
 
 /** The production tag is opt-in; an absent registry row keeps the fallback. */
 export const LANGY_PROMPT_DEFAULT_TAG = "production";

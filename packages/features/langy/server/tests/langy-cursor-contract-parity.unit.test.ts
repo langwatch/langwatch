@@ -1,13 +1,5 @@
-import {
-  compareCursors,
-  createTenantId,
-  cursorFor,
-  type Event,
-} from "@langwatch/eventing";
-import {
-  compareLangyEventCursors,
-  cursorHasReachedEvent,
-} from "@langwatch/langy-contract";
+import { compareCursors, createTenantId, cursorFor, type Event } from "@langwatch/eventing";
+import { compareLangyEventCursors, cursorHasReachedEvent } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 /**

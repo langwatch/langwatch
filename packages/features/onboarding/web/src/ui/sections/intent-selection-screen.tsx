@@ -92,12 +92,7 @@ export const IntentSelectionScreen: React.FC = () => {
                 </Icon>
               </Box>
               <VStack gap={0.5} align="start" flex={1}>
-                <Text
-                  fontSize="md"
-                  fontWeight="semibold"
-                  color="fg"
-                  letterSpacing="-0.01em"
-                >
+                <Text fontSize="md" fontWeight="semibold" color="fg" letterSpacing="-0.01em">
                   {opt.title}
                 </Text>
                 <Text fontSize="sm" color="fg.muted" lineHeight="tall">

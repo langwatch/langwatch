@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  salvageJsonText,
-  salvageLangyDerivedCard,
-} from "../salvage";
+import { salvageJsonText, salvageLangyDerivedCard } from "../salvage";
 
 describe("salvageJsonText", () => {
   describe("given an undamaged document", () => {
@@ -42,11 +39,7 @@ describe("salvageJsonText", () => {
       ["trailing comma in array", "[1, 2,]", [1, 2]],
       ["trailing comma then truncation", '{"a": [1, 2,', { a: [1, 2] }],
       ["unterminated top-level string", '"abc', "abc"],
-      [
-        "raw newline inside a string",
-        '{"a": "line one\nline two"}',
-        { a: "line one\nline two" },
-      ],
+      ["raw newline inside a string", '{"a": "line one\nline two"}', { a: "line one\nline two" }],
       ["unknown escape kept literally", '{"a": "x\\qy"}', { a: "xqy" }],
     ];
 
@@ -117,9 +110,7 @@ describe("salvageLangyDerivedCard", () => {
     it.each([["traces"], ["evalRun"], ["resourceCreated"], ["metrics"]])(
       "refuses a %s block as invalid",
       (kind) => {
-        const result = salvageLangyDerivedCard(
-          `{"kind": "${kind}", "blockId": "b1", "items": []}`,
-        );
+        const result = salvageLangyDerivedCard(`{"kind": "${kind}", "blockId": "b1", "items": []}`);
         expect(result).toEqual({ ok: false, reason: "invalid" });
       },
     );

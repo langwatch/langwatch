@@ -55,9 +55,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
 
   const idsArray = Array.from(traceIds);
   const allPageRowsSelected =
-    mode === "explicit" &&
-    pageTraceIds.length > 0 &&
-    pageTraceIds.every((id) => traceIds.has(id));
+    mode === "explicit" && pageTraceIds.length > 0 && pageTraceIds.every((id) => traceIds.has(id));
   const canSelectAllMatching = allPageRowsSelected && totalHits > pageTraceIds.length;
   const isAllMatchingMode = mode === "all-matching";
   const allMatchingHitsCap = totalHits >= SELECT_ALL_MATCHING_CAP;
@@ -73,12 +71,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
                 : `${displayCount.toLocaleString()} selected`}
             </Text>
             {canSelectAllMatching && (
-              <Button
-                size="xs"
-                variant="ghost"
-                colorPalette="blue"
-                onClick={enableAllMatching}
-              >
+              <Button size="xs" variant="ghost" colorPalette="blue" onClick={enableAllMatching}>
                 Select all {totalHits.toLocaleString()} matching
               </Button>
             )}

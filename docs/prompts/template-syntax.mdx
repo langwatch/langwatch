@@ -181,10 +181,10 @@ Filters transform a value. Chain them with the pipe character (`|`).
 | `json`    | `{{ data \| json }}`            | JSON-encoded string       |
 
 <Note>
-  **Truncate behavior differs between SDKs.** In the TypeScript SDK (LiquidJS), `truncate:
-  N` outputs N characters of content then appends `"..."`. In the Python SDK
-  (python-liquid), `truncate: N` means N total characters including the `"..."` suffix.
-  Keep this in mind if you rely on exact output length.
+  **Truncate behavior differs between SDKs.** In the TypeScript SDK (LiquidJS), `truncate: N`
+  outputs N characters of content then appends `"..."`. In the Python SDK (python-liquid),
+  `truncate: N` means N total characters including the `"..."` suffix. Keep this in mind if you rely
+  on exact output length.
 </Note>
 
 ## Assignment

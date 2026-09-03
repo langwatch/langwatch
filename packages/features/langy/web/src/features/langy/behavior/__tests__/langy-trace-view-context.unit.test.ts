@@ -25,9 +25,7 @@ describe("traceViewContextChip", () => {
     });
 
     expect(chip.label).toBe("Traces · Last 15 days · searched");
-    expect(chip.ref).toContain(
-      'search and attribute filters: status:"error" AND duration:>5m',
-    );
+    expect(chip.ref).toContain('search and attribute filters: status:"error" AND duration:>5m');
   });
 
   it("carries the active lens or saved view identity", () => {

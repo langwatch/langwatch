@@ -138,9 +138,9 @@ Same passthrough discipline.
 - Mid-stream failures are visible via `gateway_http_requests_total{status="500"}` + the single span's error state + request-id correlation to the gateway log line.
 
 <Info>
-  Per-stream telemetry attrs (`langwatch.stream.chunk_count`, `.first_chunk_ms`,
-  `.total_ms`, `.terminated_at_chunk`) are a v1.1 observability follow-up. In v1, the
-  single-span-per-request model + log-line correlation is the operator signal.
+  Per-stream telemetry attrs (`langwatch.stream.chunk_count`, `.first_chunk_ms`, `.total_ms`,
+  `.terminated_at_chunk`) are a v1.1 observability follow-up. In v1, the single-span-per-request
+  model + log-line correlation is the operator signal.
 </Info>
 
 ## Usage extraction (critical for streaming budgets)

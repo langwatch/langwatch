@@ -42,9 +42,7 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
     docUrl: `${DOCS}/platform/api-keys`,
   },
   forbidden: {
-    suggestions: [
-      "Ask a workspace admin to grant you access to this project or resource",
-    ],
+    suggestions: ["Ask a workspace admin to grant you access to this project or resource"],
   },
   // The management APIs (organization, members, invites, roles, role bindings,
   // groups, SCIM tokens) answer 402 below an Enterprise plan. Nothing the

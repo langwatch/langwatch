@@ -23,10 +23,7 @@ import { useParagraphDragDrop } from "./hooks/use-paragraph-drag-drop";
 import { useTemplateLogicMenu } from "./hooks/use-template-logic-menu";
 import { useTextareaResize } from "./hooks/use-textarea-resize";
 import { useVariableMenu } from "./hooks/use-variable-menu";
-import {
-  extractLiquidVariables,
-  tokenizeLiquidTemplate,
-} from "@langwatch/prompt-contract";
+import { extractLiquidVariables, tokenizeLiquidTemplate } from "@langwatch/prompt-contract";
 import type { PromptTextAreaWithVariablesProps } from "./prompt-textarea.types";
 import {
   findJustCompletedVariable,
@@ -77,9 +74,7 @@ export const PromptTextAreaWithVariables = ({
     for (const source of externalSources) {
       const availableFields = otherNodesFields[source.id];
       if (availableFields !== undefined) {
-        const filteredFields = source.fields.filter((f) =>
-          availableFields.includes(f.name),
-        );
+        const filteredFields = source.fields.filter((f) => availableFields.includes(f.name));
         if (filteredFields.length > 0) {
           sources.push({ ...source, fields: filteredFields });
           addedNodeIds.add(source.id);
@@ -213,8 +208,7 @@ export const PromptTextAreaWithVariables = ({
 
   // Variables that are defined locally (loop iterators, assign) - not "undefined"
   const locallyDefinedVariables = useMemo(
-    () =>
-      new Set([...liquidVariables.loopVariables, ...liquidVariables.assignedVariables]),
+    () => new Set([...liquidVariables.loopVariables, ...liquidVariables.assignedVariables]),
     [liquidVariables],
   );
 
@@ -260,8 +254,7 @@ export const PromptTextAreaWithVariables = ({
     observer.observe(node);
     return () => observer.disconnect();
   }, [invalidVariablesKey]);
-  const reservedBottomPadding =
-    invalidVariables.length > 0 ? Math.max(bannerHeight + 8, 28) : null;
+  const reservedBottomPadding = invalidVariables.length > 0 ? Math.max(bannerHeight + 8, 28) : null;
 
   // Handle keyboard input - dispatches to whichever menu is active
   const handleKeyDown = useCallback(
@@ -323,10 +316,7 @@ export const PromptTextAreaWithVariables = ({
         }
 
         if (!logicMenu.menuOpen) {
-          setTimeout(
-            () => logicMenu.openMenu(unclosedPercent.start, unclosedPercent.query),
-            0,
-          );
+          setTimeout(() => logicMenu.openMenu(unclosedPercent.start, unclosedPercent.query), 0);
         } else {
           logicMenu.setMenuQuery(unclosedPercent.query);
         }
@@ -343,10 +333,7 @@ export const PromptTextAreaWithVariables = ({
 
       if (unclosedBraces) {
         if (!variableMenu.menuOpen) {
-          setTimeout(
-            () => variableMenu.openMenu(unclosedBraces.start, unclosedBraces.query),
-            0,
-          );
+          setTimeout(() => variableMenu.openMenu(unclosedBraces.start, unclosedBraces.query), 0);
         } else {
           variableMenu.setMenuQuery(unclosedBraces.query);
         }
@@ -497,11 +484,7 @@ export const PromptTextAreaWithVariables = ({
             width: "100%",
             minHeight: fillHeight ? "100%" : minHeight,
             maxHeight: fillHeight ? undefined : maxHeight,
-            height: fillHeight
-              ? "100%"
-              : userResizedHeight
-                ? `${userResizedHeight}px`
-                : undefined,
+            height: fillHeight ? "100%" : userResizedHeight ? `${userResizedHeight}px` : undefined,
             fontFamily: borderless
               ? undefined
               : 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
@@ -514,9 +497,7 @@ export const PromptTextAreaWithVariables = ({
             border: borderless
               ? "none"
               : `1px solid ${
-                  hasError
-                    ? "var(--chakra-colors-red-500)"
-                    : "var(--chakra-colors-border)"
+                  hasError ? "var(--chakra-colors-red-500)" : "var(--chakra-colors-border)"
                 }`,
             borderRadius: borderless ? "0" : "12px",
             outline: "none",
@@ -642,17 +623,13 @@ export const PromptTextAreaWithVariables = ({
           position={variableMenu.menuPosition}
           availableSources={availableSources}
           query={variableMenu.menuQuery}
-          onQueryChange={
-            variableMenu.buttonMenuMode ? variableMenu.setMenuQuery : undefined
-          }
+          onQueryChange={variableMenu.buttonMenuMode ? variableMenu.setMenuQuery : undefined}
           highlightedIndex={variableMenu.highlightedIndex}
           onHighlightChange={variableMenu.setHighlightedIndex}
           isKeyboardNav={variableMenu.isKeyboardNav}
           onKeyboardNavChange={variableMenu.setIsKeyboardNav}
           onSelect={variableMenu.handleSelectField}
-          onCreateVariable={
-            onCreateVariable ? variableMenu.handleCreateVariable : undefined
-          }
+          onCreateVariable={onCreateVariable ? variableMenu.handleCreateVariable : undefined}
           onClose={variableMenu.closeMenu}
           triggerRef={variableMenu.addButtonRef}
         />

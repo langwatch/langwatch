@@ -6,7 +6,10 @@ import { createEvaluationProcessingPipeline } from "../evaluation-processing.ada
 const producer = () =>
   createEvaluationProcessingProducerPipeline({ processName: "langwatch-api" }) as unknown as {
     metadata: { name: string; commands: ReadonlyArray<{ name: string }> };
-    foldProjections: Map<string, { definition: { store: { store(state: unknown, context: unknown): Promise<void> } } }>;
+    foldProjections: Map<
+      string,
+      { definition: { store: { store(state: unknown, context: unknown): Promise<void> } } }
+    >;
   };
 
 /** The consumer's, built from stores and handlers a caller would supply. */

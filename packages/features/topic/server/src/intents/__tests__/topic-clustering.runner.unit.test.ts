@@ -236,9 +236,7 @@ describe("clusterTopicsForProject", () => {
 
       // Traces with empty/null input should be filtered, leaving 10
       const fetchCall = deps.langevals.postClustering.mock.calls[0];
-      const body = fetchCall?.[0]?.body as
-        | { traces: Array<{ input: string }> }
-        | undefined;
+      const body = fetchCall?.[0]?.body as { traces: Array<{ input: string }> } | undefined;
       expect(body?.traces).toHaveLength(10);
       expect(body?.traces[0]?.input).toBe("User message 0");
     });

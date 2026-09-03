@@ -5,10 +5,7 @@ import type {
   PlatformIngestionTemplateSyncResult,
 } from "@langwatch/enterprise-governance-contract";
 
-export type NewIngestionTemplate = Omit<
-  IngestionTemplate,
-  "id" | "platformPublished" | "enabled"
->;
+export type NewIngestionTemplate = Omit<IngestionTemplate, "id" | "platformPublished" | "enabled">;
 
 export type IngestionTemplateMutationResult =
   | { status: "updated"; template: IngestionTemplate }

@@ -24,9 +24,7 @@ import { EMPTY_AST, parse } from "@langwatch/trace-contract";
 import { EvaluatorDrilldown } from "../evaluator-drilldown";
 import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types";
 
-const buildItem = (
-  aggregates?: Partial<NonNullable<FacetItem["aggregates"]>>,
-): FacetItem => ({
+const buildItem = (aggregates?: Partial<NonNullable<FacetItem["aggregates"]>>): FacetItem => ({
   value: "faithfulness",
   label: "Faithfulness",
   count: 64,

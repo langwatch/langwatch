@@ -110,13 +110,7 @@ export class BlobLeases {
     return blobLeaseSetKey({ queueName: this.queueName, projectId, hash });
   }
 
-  private legacyHolderKey({
-    projectId,
-    hash,
-  }: {
-    projectId: TenantId;
-    hash: string;
-  }): string {
+  private legacyHolderKey({ projectId, hash }: { projectId: TenantId; hash: string }): string {
     return blobHolderSetKey({ queueName: this.queueName, projectId, hash });
   }
 
@@ -212,10 +206,7 @@ export class BlobLeases {
     hash: string;
     tier: BlobRef["tier"];
   }): [number, ...string[]] {
-    const keys = [
-      this.leaseKey({ projectId, hash }),
-      this.legacyHolderKey({ projectId, hash }),
-    ];
+    const keys = [this.leaseKey({ projectId, hash }), this.legacyHolderKey({ projectId, hash })];
     if (tier === "redis") {
       keys.push(redisBlobKey({ queueName: this.queueName, projectId, hash }));
     }
@@ -274,17 +265,9 @@ export class BlobLeases {
     return Number(graced) === 1;
   }
 
-  async countLive({
-    projectId,
-    hash,
-  }: {
-    projectId: TenantId;
-    hash: string;
-  }): Promise<number> {
+  async countLive({ projectId, hash }: { projectId: TenantId; hash: string }): Promise<number> {
     // Test-only inspection seam. This is deliberately not a passive read: the
     // Lua script prunes expired members and deletes an empty lease set.
-    return Number(
-      await countLiveScript.run(this.redis, 1, this.leaseKey({ projectId, hash })),
-    );
+    return Number(await countLiveScript.run(this.redis, 1, this.leaseKey({ projectId, hash })));
   }
 }

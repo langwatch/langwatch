@@ -22,9 +22,7 @@ export function useGenericOnboardingFlow<
   },
 ) {
   const router = useRouter();
-  const [currentScreenIndex, setCurrentScreenIndex] = useState<TScreenIndex>(
-    flowConfig.first,
-  );
+  const [currentScreenIndex, setCurrentScreenIndex] = useState<TScreenIndex>(flowConfig.first);
   const [direction, setDirection] = useState<OnboardingFlowDirection>(
     OnboardingFlowDirection.FORWARD,
   );

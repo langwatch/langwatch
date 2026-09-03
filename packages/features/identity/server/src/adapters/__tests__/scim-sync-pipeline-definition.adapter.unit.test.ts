@@ -1,15 +1,7 @@
-import {
-  emptyScimSync,
-  type ScimSyncState,
-  scimSyncIdFor,
-} from "@langwatch/identity-contract";
+import { emptyScimSync, type ScimSyncState, scimSyncIdFor } from "@langwatch/identity-contract";
 import { ScimSyncGuards } from "../../scim-sync-guards";
 import { describe, expect, it } from "vitest";
-import {
-  type Command,
-  createTenantId,
-  validateEventAggregateType,
-} from "@langwatch/eventing";
+import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import {
   IssueScimTokenCommand,
   RecordScimApplyFailureCommand,
@@ -111,10 +103,7 @@ describe("directory sync event aggregate type", () => {
           cause: "teardown" as const,
         },
       },
-    ])("the store accepts every event $label emits", async ({
-      handler,
-      data,
-    }) => {
+    ])("the store accepts every event $label emits", async ({ handler, data }) => {
       const declared = createScimSyncPipeline({
         scimSyncProjectionStore: {} as never,
         scimSyncGuards: {} as never,
@@ -123,9 +112,7 @@ describe("directory sync event aggregate type", () => {
 
       expect(events.length).toBeGreaterThan(0);
       for (const [index, event] of events.entries()) {
-        expect(() =>
-          validateEventAggregateType(event as never, declared, index),
-        ).not.toThrow();
+        expect(() => validateEventAggregateType(event as never, declared, index)).not.toThrow();
       }
     });
   });
@@ -162,21 +149,14 @@ describe("directory sync event aggregate type", () => {
         }),
       );
 
-      expect(events.map((event) => event.idempotencyKey)).toEqual([
-        "scimcmd_4:0",
-        "scimcmd_4:1",
-      ]);
+      expect(events.map((event) => event.idempotencyKey)).toEqual(["scimcmd_4:0", "scimcmd_4:1"]);
     });
   });
 
   describe("the pipeline's aggregate", () => {
     it("is the sync, so one connection's pushes never share a lane with another's", () => {
-      expect(IssueScimTokenCommand.getAggregateId({ scimSyncId: SYNC })).toBe(
-        SYNC,
-      );
-      expect(
-        RecordScimUserPushCommand.getAggregateId({ scimSyncId: "other" }),
-      ).toBe("other");
+      expect(IssueScimTokenCommand.getAggregateId({ scimSyncId: SYNC })).toBe(SYNC);
+      expect(RecordScimUserPushCommand.getAggregateId({ scimSyncId: "other" })).toBe("other");
     });
   });
 

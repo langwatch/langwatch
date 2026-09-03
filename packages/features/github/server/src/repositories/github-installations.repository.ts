@@ -36,13 +36,9 @@ export interface UpsertGithubInstallationInput {
 }
 
 export abstract class GithubInstallationsRepository {
-  abstract findAllForOrganization(
-    organizationId: string,
-  ): Promise<GithubInstallationRow[]>;
+  abstract findAllForOrganization(organizationId: string): Promise<GithubInstallationRow[]>;
 
-  abstract tryFindByInstallationId(
-    installationId: string,
-  ): Promise<GithubInstallationRow | null>;
+  abstract tryFindByInstallationId(installationId: string): Promise<GithubInstallationRow | null>;
 
   abstract upsert(input: UpsertGithubInstallationInput): Promise<void>;
 
@@ -65,18 +61,13 @@ export abstract class GithubInstallationsRepository {
     repositories: GithubRepositoryRef[] | null;
   }): Promise<void>;
 
-  abstract setSuspended(params: {
-    installationId: string;
-    suspended: boolean;
-  }): Promise<void>;
+  abstract setSuspended(params: { installationId: string; suspended: boolean }): Promise<void>;
 
   abstract deleteByInstallationId(installationId: string): Promise<number>;
 }
 
 export class NullGithubInstallationsRepository extends GithubInstallationsRepository {
-  async findAllForOrganization(
-    _organizationId: string,
-  ): Promise<GithubInstallationRow[]> {
+  async findAllForOrganization(_organizationId: string): Promise<GithubInstallationRow[]> {
     return [];
   }
   async tryFindByInstallationId(): Promise<GithubInstallationRow | null> {

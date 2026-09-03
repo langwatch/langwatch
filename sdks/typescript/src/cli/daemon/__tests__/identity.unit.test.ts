@@ -303,9 +303,7 @@ describe("inspectSocketTrust", () => {
     });
 
     it("reports a missing directory rather than throwing", () => {
-      expect(inspectSocketTrust(path.join(dir, "gone", "d.sock"))).toBe(
-        "socket-dir-missing",
-      );
+      expect(inspectSocketTrust(path.join(dir, "gone", "d.sock"))).toBe("socket-dir-missing");
     });
   });
 });

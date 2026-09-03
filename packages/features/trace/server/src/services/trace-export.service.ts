@@ -18,10 +18,7 @@ import {
   serializeTracesToFullCsv,
   serializeTracesToSummaryCsv,
 } from "./trace-export-csv.rules";
-import {
-  serializeTraceToFullJson,
-  serializeTraceToSummaryJson,
-} from "./trace-export-json.rules";
+import { serializeTraceToFullJson, serializeTraceToSummaryJson } from "./trace-export-json.rules";
 import type { ExportProgress, ExportRequest } from "./trace-export.vocabulary";
 
 const BATCH_SIZE = 100;
@@ -202,10 +199,7 @@ export class TraceExportService {
       }
     }
 
-    logger.info(
-      { projectId: request.projectId, exported, total },
-      "Trace export completed",
-    );
+    logger.info({ projectId: request.projectId, exported, total }, "Trace export completed");
   }
 }
 
@@ -309,9 +303,7 @@ function serializeJsonBatch({
 }): string {
   switch (request.mode) {
     case "summary":
-      return (
-        traces.map((trace) => serializeTraceToSummaryJson({ trace })).join("\n") + "\n"
-      );
+      return traces.map((trace) => serializeTraceToSummaryJson({ trace })).join("\n") + "\n";
     case "full":
       return traces.map((trace) => serializeTraceToFullJson({ trace })).join("\n") + "\n";
     default: {

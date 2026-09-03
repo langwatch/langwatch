@@ -149,9 +149,7 @@ function withSlug(receipt: BriefingReceipt, slug: string | undefined): BriefingR
 export function buildAttentionInbox(signals: AttentionInboxSignals): BriefingReceipt[] {
   const currentShapes = aggregateShapes(signals.currentErrorShapes ?? []);
   const previousShapes = aggregateShapes(signals.previousErrorShapes ?? []);
-  const previousByShape = new Map(
-    previousShapes.map((shape) => [shape.key, shape.count]),
-  );
+  const previousByShape = new Map(previousShapes.map((shape) => [shape.key, shape.count]));
   const hasShapeBaseline = signals.previousErrorShapes !== undefined;
   const canProveShapeAbsent = signals.previousErrorShapesComplete === true;
   const ranked: RankedReceipt[] = [];
@@ -168,19 +166,10 @@ export function buildAttentionInbox(signals: AttentionInboxSignals): BriefingRec
       shape.count / previous >= ERROR_REGRESSION_RATIO;
     const isRepeated = shape.count >= SHARED_SIGNAL_MIN_COUNT;
 
-    const status = isNew
-      ? "new"
-      : isRegressed
-        ? "regressed"
-        : isRepeated
-          ? "repeated"
-          : "observed";
+    const status = isNew ? "new" : isRegressed ? "regressed" : isRepeated ? "repeated" : "observed";
     const displayShape = truncate(shape.values[0]!);
-    const shapeClauses = shape.values.map(
-      (value) => `errorMessage:${quoteQueryValue(value)}`,
-    );
-    const query =
-      shapeClauses.length === 1 ? shapeClauses[0]! : `(${shapeClauses.join(" OR ")})`;
+    const shapeClauses = shape.values.map((value) => `errorMessage:${quoteQueryValue(value)}`);
+    const query = shapeClauses.length === 1 ? shapeClauses[0]! : `(${shapeClauses.join(" OR ")})`;
     const label = `${status === "observed" ? "Error" : `${status} error shape`}: ${displayShape}`;
     const evidence = receiptEvidence({
       id: `error-shape:${shape.key}`,
@@ -301,9 +290,7 @@ export function buildAttentionInbox(signals: AttentionInboxSignals): BriefingRec
     }
   }
 
-  const hasErrorReceipt = ranked.some(({ receipt }) =>
-    receipt.id.startsWith("error-shape:"),
-  );
+  const hasErrorReceipt = ranked.some(({ receipt }) => receipt.id.startsWith("error-shape:"));
   if (!hasErrorReceipt && (signals.errorTraces ?? 0) > 0) {
     const count = signals.errorTraces!;
     const query = "status:error";

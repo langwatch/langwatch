@@ -31,9 +31,7 @@ const capturedRunOnSuccess = vi.hoisted(
     ({
       current: null,
     }) as {
-      current:
-        | ((result: any, variables: { id: string; batchRunId?: string }) => void)
-        | null;
+      current: ((result: any, variables: { id: string; batchRunId?: string }) => void) | null;
     },
 );
 

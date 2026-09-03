@@ -51,11 +51,7 @@ export const jobBlocks = (lines: string[]): JobBlock[] => {
 
     const match = /^(\s+)["']?([A-Za-z0-9_-]+)["']?:\s*(?:#.*)?$/.exec(line);
     const indent = match?.[1]?.length;
-    if (
-      match?.[2] &&
-      indent !== undefined &&
-      (jobIndent === undefined || indent === jobIndent)
-    ) {
+    if (match?.[2] && indent !== undefined && (jobIndent === undefined || indent === jobIndent)) {
       jobIndent ??= indent;
       if (current) {
         jobs.push(current);
@@ -108,9 +104,7 @@ export const jobIfExpression = (job: JobBlock): string | undefined => {
   const fieldIndent = job.lines.reduce<number | undefined>((minimum, line) => {
     const match = fieldPattern.exec(line);
     const indent = match?.[1]?.length;
-    return indent === undefined || (minimum !== undefined && minimum <= indent)
-      ? minimum
-      : indent;
+    return indent === undefined || (minimum !== undefined && minimum <= indent) ? minimum : indent;
   }, undefined);
   if (fieldIndent === undefined) {
     return undefined;
@@ -125,8 +119,7 @@ export const jobIfExpression = (job: JobBlock): string | undefined => {
 
   const firstLine = job.lines[ifStart] ?? "";
   const firstValue = stripYamlComment(firstLine.replace(ifPattern, ""));
-  const ifLines =
-    /^(?:[>|][+-]?)?$/.test(firstValue) || firstValue === "" ? [] : [firstValue];
+  const ifLines = /^(?:[>|][+-]?)?$/.test(firstValue) || firstValue === "" ? [] : [firstValue];
 
   for (let index = ifStart + 1; index < job.lines.length; index++) {
     const line = job.lines[index] ?? "";
@@ -216,8 +209,7 @@ const main = (): number => {
 };
 
 const isEntrypoint = (): boolean =>
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntrypoint()) {
   process.exitCode = main();

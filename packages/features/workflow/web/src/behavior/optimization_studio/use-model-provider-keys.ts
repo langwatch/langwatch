@@ -1,11 +1,6 @@
 import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project";
 
-import type {
-  Component,
-  LLMConfig,
-  Signature,
-  StudioWorkflow,
-} from "@langwatch/workflow-contract";
+import type { Component, LLMConfig, Signature, StudioWorkflow } from "@langwatch/workflow-contract";
 
 export const useModelProviderKeys = ({
   workflow,
@@ -33,9 +28,7 @@ export const useModelProviderKeys = ({
               .map((p) => (p.value as LLMConfig | undefined)?.model?.split("/")[0])
           : [],
       )
-      .filter(
-        (provider): provider is string => provider !== undefined && provider !== "",
-      );
+      .filter((provider): provider is string => provider !== undefined && provider !== "");
   };
 
   const nodeProviders = new Set(getModelProviders(nodesWithLLMParameter as Component[]));

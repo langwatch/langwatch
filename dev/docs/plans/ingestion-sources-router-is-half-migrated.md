@@ -8,12 +8,12 @@ Found while working down `typecheck:tests` — the governance inventory page's
 `platform/app/src/server/api/routers/governance/ingestionSources.ts` is mounted
 at `root.ts:870` and references four things that are not there:
 
-| name | state |
-| --- | --- |
-| `toDto` | Defined nowhere. Called at lines 160, 169, 271. It was renamed to `toIngestionSourceDto` / `dtoForRow` in the same file; the call sites were not updated. |
-| `hasPollerCursor` | Exists, and is exported from `@langwatch/enterprise-governance-server` — just never imported here. |
-| `IngestionSourceService` | Exists in the governance package; used at line 141 as a parameter type, never imported. |
-| `service.liveTraceProjectIds(...)` | Called by `dtoForRow`. No service anywhere declares it — the name appears only inside this file. |
+| name                               | state                                                                                                                                                     |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `toDto`                            | Defined nowhere. Called at lines 160, 169, 271. It was renamed to `toIngestionSourceDto` / `dtoForRow` in the same file; the call sites were not updated. |
+| `hasPollerCursor`                  | Exists, and is exported from `@langwatch/enterprise-governance-server` — just never imported here.                                                        |
+| `IngestionSourceService`           | Exists in the governance package; used at line 141 as a parameter type, never imported.                                                                   |
+| `service.liveTraceProjectIds(...)` | Called by `dtoForRow`. No service anywhere declares it — the name appears only inside this file.                                                          |
 
 The first three are omissions. The fourth is a design question: nothing yet
 answers "which of these trace projects still exist", and `toIngestionSourceDto`

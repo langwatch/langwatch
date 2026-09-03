@@ -139,9 +139,7 @@ export class DefaultGovernanceAiToolCatalogService {
   }
 
   listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]> {
-    return this.repository.listConfiguredProvidersForUser(
-      aiToolMemberInputSchema.parse(input),
-    );
+    return this.repository.listConfiguredProvidersForUser(aiToolMemberInputSchema.parse(input));
   }
 
   async listProviderOptionsForAdmin(
@@ -189,15 +187,11 @@ export class DefaultGovernanceAiToolCatalogService {
     for (const tile of sorted) {
       const kind = tile.config.assistantKind;
       if (typeof kind !== "string") continue;
-      const slug =
-        ASSISTANT_KIND_TO_TOOL_SLUG[kind as keyof typeof ASSISTANT_KIND_TO_TOOL_SLUG];
+      const slug = ASSISTANT_KIND_TO_TOOL_SLUG[kind as keyof typeof ASSISTANT_KIND_TO_TOOL_SLUG];
       if (!slug || overrides[slug]) continue;
-      let allowVk =
-        tile.config.allowVk === undefined ? true : Boolean(tile.config.allowVk);
+      let allowVk = tile.config.allowVk === undefined ? true : Boolean(tile.config.allowVk);
       let allowOtelDirect =
-        tile.config.allowOtelDirect === undefined
-          ? true
-          : Boolean(tile.config.allowOtelDirect);
+        tile.config.allowOtelDirect === undefined ? true : Boolean(tile.config.allowOtelDirect);
       if (slug === "code") allowVk = false;
       if (slug === "cursor") allowOtelDirect = false;
       overrides[slug] = { allowVk, allowOtelDirect };
@@ -242,8 +236,7 @@ export class DefaultGovernanceAiToolCatalogService {
     for (const tile of sortTiles(assistantTiles)) {
       const kind = tile.config.assistantKind;
       if (typeof kind !== "string") continue;
-      const slug =
-        ASSISTANT_KIND_TO_TOOL_SLUG[kind as keyof typeof ASSISTANT_KIND_TO_TOOL_SLUG];
+      const slug = ASSISTANT_KIND_TO_TOOL_SLUG[kind as keyof typeof ASSISTANT_KIND_TO_TOOL_SLUG];
       if (!slug || seenTools.has(slug)) continue;
       seenTools.add(slug);
       tools.push({ slug, displayName: tile.displayName });
@@ -273,10 +266,7 @@ export class DefaultGovernanceAiToolCatalogService {
     return entry;
   }
 
-  private async assertDepartments(
-    organizationId: string,
-    departmentIds: string[],
-  ): Promise<void> {
+  private async assertDepartments(organizationId: string, departmentIds: string[]): Promise<void> {
     if (departmentIds.length === 0) return;
     const valid = await this.repository.departmentsBelongToOrganization({
       organizationId,
@@ -288,7 +278,6 @@ export class DefaultGovernanceAiToolCatalogService {
 
 function sortTiles(entries: AiToolEntry[]): AiToolEntry[] {
   return [...entries].sort(
-    (left, right) =>
-      left.order - right.order || left.displayName.localeCompare(right.displayName),
+    (left, right) => left.order - right.order || left.displayName.localeCompare(right.displayName),
   );
 }

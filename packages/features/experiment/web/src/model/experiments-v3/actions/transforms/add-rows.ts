@@ -1,18 +1,8 @@
 import { type AddRowsPayload, addRowsPayloadSchema } from "../schemas";
-import {
-  inlineRowCount,
-  replaceDataset,
-  requireInlineDataset,
-} from "./helpers";
+import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers";
 import type { Transform } from "./types";
 
-const paddedTo = ({
-  values,
-  length,
-}: {
-  values: string[];
-  length: number;
-}): string[] => {
+const paddedTo = ({ values, length }: { values: string[]; length: number }): string[] => {
   const padded = [...values];
   while (padded.length < length) {
     padded.push("");

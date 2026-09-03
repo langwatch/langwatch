@@ -44,7 +44,13 @@ function registeredOpsRoutes(): string[] {
 }
 
 /** Whether some entry in the menu answers for this address. */
-function isClaimedBy({ address, groups }: { address: string; groups: SettingsMenuGroup[] }): boolean {
+function isClaimedBy({
+  address,
+  groups,
+}: {
+  address: string;
+  groups: SettingsMenuGroup[];
+}): boolean {
   return groups.some((group) =>
     group.items.some((item) => isSettingsMenuItemActive({ item, pathname: address })),
   );

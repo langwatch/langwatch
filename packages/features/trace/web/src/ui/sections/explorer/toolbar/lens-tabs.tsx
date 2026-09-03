@@ -4,21 +4,11 @@ import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
 import { Kbd } from "@langwatch/ops-web";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  MenuContent,
-  MenuItem,
-  MenuRoot,
-  MenuTrigger,
-} from "@langwatch/design-system/menu";
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-system/menu";
 import { useErrorCount } from "../hooks/use-error-count";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility";
 import type { LensConfig } from "../../../../index";
-import {
-  COST_LENS_IDS,
-  PERFORMANCE_LENS_IDS,
-  useUIStore,
-  useViewStore,
-} from "../../../../index";
+import { COST_LENS_IDS, PERFORMANCE_LENS_IDS, useUIStore, useViewStore } from "../../../../index";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu";
 import { CreateLensButton } from "./create-lens-button";
 import { LensNameDialog } from "./lens-name-dialog";
@@ -33,9 +23,7 @@ const LENS_GROUPS: { label: string; ids: readonly string[] }[] = [
   { label: "Cost", ids: COST_LENS_IDS },
   { label: "Performance", ids: PERFORMANCE_LENS_IDS },
 ];
-const GROUPED_LENS_IDS: ReadonlySet<string> = new Set(
-  LENS_GROUPS.flatMap((g) => [...g.ids]),
-);
+const GROUPED_LENS_IDS: ReadonlySet<string> = new Set(LENS_GROUPS.flatMap((g) => [...g.ids]));
 const isGroupedLens = (id: string): boolean => GROUPED_LENS_IDS.has(id);
 // Headroom reserved on the right edge of the scroller for the inline
 // "+" button + the overflow "⋮" trigger sitting just outside it.
@@ -61,10 +49,7 @@ export const LensTabs: React.FC = () => {
   // they're pulled out of the flat tab strip (and out of overflow tracking,
   // which measures rendered tabs by data-value). See
   // specs/traces-v2/lens-preset-groups.feature
-  const flatLenses = useMemo(
-    () => allLenses.filter((l) => !isGroupedLens(l.id)),
-    [allLenses],
-  );
+  const flatLenses = useMemo(() => allLenses.filter((l) => !isGroupedLens(l.id)), [allLenses]);
   // Each group's lenses in the group's declared order, dropping any the user
   // has dismissed (absent from allLenses).
   const lensGroups = useMemo(
@@ -95,10 +80,7 @@ export const LensTabs: React.FC = () => {
   const activeLens = allLenses.find((l) => l.id === activeLensId);
   const activeLensIsDraft = isDraft(activeLensId);
   const overflowItems = useMemo(
-    () =>
-      flatLenses
-        .filter((l) => hiddenIds.has(l.id))
-        .map((l) => ({ id: l.id, label: l.name })),
+    () => flatLenses.filter((l) => hiddenIds.has(l.id)).map((l) => ({ id: l.id, label: l.name })),
     [flatLenses, hiddenIds],
   );
 
@@ -323,9 +305,7 @@ const LensGroupMenu: React.FC<{
           _hover={{ bg: "bg.subtle" }}
           _focusVisible={{ outline: "none", bg: "bg.subtle" }}
           aria-label={
-            active && activeName
-              ? `${label} lenses, currently ${activeName}`
-              : `${label} lenses`
+            active && activeName ? `${label} lenses, currently ${activeName}` : `${label} lenses`
           }
         >
           {label}

@@ -13,12 +13,7 @@ import { codexOtelBlockEndpoint, writeCodexOtelBlock } from "../../codex-config-
 import { appSettingsTargetFor, installAppEnv } from "../app-settings";
 import * as cliApi from "../cli-api";
 import { buildOtelEnvBlock } from "../otel-env-block";
-import {
-  buildScopedToolFunction,
-  persistBlockToRc,
-  rcPath,
-  toolMarkers,
-} from "../shell-rc";
+import { buildScopedToolFunction, persistBlockToRc, rcPath, toolMarkers } from "../shell-rc";
 import { refreshTelemetryWiringForLogin } from "../telemetry-refresh";
 import {
   baseCfg,
@@ -92,10 +87,7 @@ describe("refreshTelemetryWiringForLogin", () => {
         expect(claudeEnv.OTEL_EXPORTER_OTLP_HEADERS).not.toContain(STALE_TOKEN);
 
         expect(codexOtelBlockEndpoint()).toBe(`${CURRENT_ENDPOINT}/v1/traces`);
-        const codexToml = fs.readFileSync(
-          path.join(temp.home, ".codex", "config.toml"),
-          "utf8",
-        );
+        const codexToml = fs.readFileSync(path.join(temp.home, ".codex", "config.toml"), "utf8");
         expect(codexToml).not.toContain(STALE_TOKEN);
         // The refresh heals the harvest wiring beside the exporters: a
         // device whose block predates the notify seam gains it here.
@@ -111,22 +103,17 @@ describe("refreshTelemetryWiringForLogin", () => {
         const result = await refreshTelemetryWiringForLogin(cfg);
 
         expect(result.mintedAny).toBe(true);
-        const minted = (
-          cliApi.mintIngestionKey as ReturnType<typeof vi.fn>
-        ).mock.calls.map((c: unknown[]) => c[1]);
-        expect(minted).toEqual(
-          expect.arrayContaining(["claude_code", "codex", "gemini"]),
+        const minted = (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mock.calls.map(
+          (c: unknown[]) => c[1],
         );
+        expect(minted).toEqual(expect.arrayContaining(["claude_code", "codex", "gemini"]));
         expect(minted).not.toContain("opencode");
         expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toContain("minted");
       });
 
       it("keeps the persisted codex Authorization header, rotated to the new key", async () => {
         await refreshTelemetryWiringForLogin(baseCfg());
-        const codexToml = fs.readFileSync(
-          path.join(temp.home, ".codex", "config.toml"),
-          "utf8",
-        );
+        const codexToml = fs.readFileSync(path.join(temp.home, ".codex", "config.toml"), "utf8");
         expect(codexToml).toMatch(/headers = .*Bearer ik-lw-code/);
       });
     });
@@ -144,9 +131,9 @@ describe("refreshTelemetryWiringForLogin", () => {
         // personal wiring, so the stale endpoint stays and no codex key
         // is minted.
         expect(codexOtelBlockEndpoint()).toBe(`${STALE_ENDPOINT}/v1/traces`);
-        expect(
-          vi.mocked(cliApi.mintIngestionKey).mock.calls.map((c) => c[1]),
-        ).not.toContain("codex");
+        expect(vi.mocked(cliApi.mintIngestionKey).mock.calls.map((c) => c[1])).not.toContain(
+          "codex",
+        );
         // The unpinned tools are still refreshed.
         expect(result.labels.some((l) => l.includes("claude"))).toBe(true);
         expect(result.labels.some((l) => l.includes("gemini"))).toBe(true);
@@ -168,27 +155,25 @@ describe("refreshTelemetryWiringForLogin", () => {
           fs.readFileSync(appSettingsTargetFor("claude")!.path, "utf8"),
         ).env;
         expect(claudeEnv.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(STALE_ENDPOINT);
-        const minted = (
-          cliApi.mintIngestionKey as ReturnType<typeof vi.fn>
-        ).mock.calls.map((c: unknown[]) => c[1]);
+        const minted = (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mock.calls.map(
+          (c: unknown[]) => c[1],
+        );
         expect(minted).not.toContain("claude_code");
       });
     });
 
     describe("when the mint fails for one tool", () => {
       it("skips that tool and still refreshes the others", async () => {
-        vi.mocked(cliApi.mintIngestionKey).mockImplementation(
-          async (_cfg, sourceType) => {
-            if (sourceType === "claude_code") {
-              throw new Error("no personal workspace yet");
-            }
-            return {
-              token: `ik-lw-${sourceType.slice(0, 4)}000000000000_minted`,
-              prefix: `ik-lw-${sourceType.slice(0, 4)}`,
-              endpoint: CURRENT_ENDPOINT,
-            };
-          },
-        );
+        vi.mocked(cliApi.mintIngestionKey).mockImplementation(async (_cfg, sourceType) => {
+          if (sourceType === "claude_code") {
+            throw new Error("no personal workspace yet");
+          }
+          return {
+            token: `ik-lw-${sourceType.slice(0, 4)}000000000000_minted`,
+            prefix: `ik-lw-${sourceType.slice(0, 4)}`,
+            endpoint: CURRENT_ENDPOINT,
+          };
+        });
 
         const result = await refreshTelemetryWiringForLogin(baseCfg());
 
@@ -225,9 +210,7 @@ describe("refreshTelemetryWiringForLogin", () => {
           buildOtelEnvBlock("claude", STALE_ENDPOINT, STALE_TOKEN),
         );
 
-        vi.mocked(cliApi.listIngestionKeys).mockRejectedValue(
-          new Error("network unreachable"),
-        );
+        vi.mocked(cliApi.listIngestionKeys).mockRejectedValue(new Error("network unreachable"));
         vi.mocked(cliApi.mintIngestionKey).mockResolvedValue({
           token: CURRENT_TOKEN,
           prefix: "ik-lw-newl",
@@ -236,10 +219,7 @@ describe("refreshTelemetryWiringForLogin", () => {
 
         await refreshTelemetryWiringForLogin(cfg);
 
-        expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(
-          expect.any(Object),
-          "claude_code",
-        );
+        expect(cliApi.mintIngestionKey).toHaveBeenCalledWith(expect.any(Object), "claude_code");
         const claudeEnv = JSON.parse(
           fs.readFileSync(appSettingsTargetFor("claude")!.path, "utf8"),
         ).env;

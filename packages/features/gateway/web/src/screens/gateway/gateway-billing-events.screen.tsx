@@ -248,9 +248,7 @@ function BillingEventFilters({ ledger }: { ledger: Ledger }) {
         size="sm"
         width="140px"
         value={[ledger.status]}
-        onValueChange={({ value }) =>
-          ledger.setStatus((value[0] as StatusFilter) ?? "all")
-        }
+        onValueChange={({ value }) => ledger.setStatus((value[0] as StatusFilter) ?? "all")}
         data-testid="filter-status"
       >
         <Select.Trigger>
@@ -330,16 +328,10 @@ function BillingEventRow({
 }) {
   return (
     <Table.Row>
-      <Table.Cell whiteSpace="nowrap">
-        {new Date(row.occurredAt).toLocaleString()}
-      </Table.Cell>
+      <Table.Cell whiteSpace="nowrap">{new Date(row.occurredAt).toLocaleString()}</Table.Cell>
       <Table.Cell>
         {row.traceId && projectSlug ? (
-          <Link
-            href={`/${projectSlug}/traces/${row.traceId}`}
-            fontFamily="mono"
-            fontSize="xs"
-          >
+          <Link href={`/${projectSlug}/traces/${row.traceId}`} fontFamily="mono" fontSize="xs">
             {row.gatewayRequestId.slice(0, 12)}
           </Link>
         ) : (
@@ -447,11 +439,7 @@ function BillingEventsPage() {
           !ledger.query.data?.clickHouseDisabled && <NoBillingEventsState />}
 
         {ledger.rows.length > 0 && (
-          <BillingEventsTable
-            rows={ledger.rows}
-            names={ledger.names}
-            projectSlug={project?.slug}
-          />
+          <BillingEventsTable rows={ledger.rows} names={ledger.names} projectSlug={project?.slug} />
         )}
 
         {ledger.hasMore && (

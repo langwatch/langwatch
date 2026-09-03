@@ -95,10 +95,7 @@ describe("given a request that nobody has answered", () => {
     });
 
     it("does not remind twice when the wake is redelivered", () => {
-      const reminded = joinRequestLifecycleWake(
-        armed(),
-        ctx(REMIND_AT) as never,
-      ).state;
+      const reminded = joinRequestLifecycleWake(armed(), ctx(REMIND_AT) as never).state;
 
       const context = ctx(REMIND_AT + 1000);
       const evolution = joinRequestLifecycleWake(reminded, context as never);
@@ -117,15 +114,12 @@ describe("given a request that nobody has answered", () => {
       const context = ctx(EXPIRES_AT);
       const evolution = joinRequestLifecycleWake(armed(), context as never);
 
-      expect(context.intents.expireRequest).toHaveBeenCalledWith(
-        `join-expire:${EXPIRES_AT}`,
-        {
-          joinRequestId: "jreq_1",
-          organizationId: "org_acme",
-          // Business time is the SLOT, not when the worker got round to it.
-          scheduledFor: EXPIRES_AT,
-        },
-      );
+      expect(context.intents.expireRequest).toHaveBeenCalledWith(`join-expire:${EXPIRES_AT}`, {
+        joinRequestId: "jreq_1",
+        organizationId: "org_acme",
+        // Business time is the SLOT, not when the worker got round to it.
+        scheduledFor: EXPIRES_AT,
+      });
       expect(evolution.nextWakeAt).toBeNull();
       expect(evolution.state).toEqual(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE);
     });
@@ -153,10 +147,7 @@ describe("given a request that reached an ending", () => {
 
       // And a wake that somehow still fired does nothing at all.
       const context = ctx(EXPIRES_AT);
-      const afterwards = joinRequestLifecycleWake(
-        evolution.state,
-        context as never,
-      );
+      const afterwards = joinRequestLifecycleWake(evolution.state, context as never);
       expect(context.intents.expireRequest).not.toHaveBeenCalled();
       expect(context.intents.remindAdmins).not.toHaveBeenCalled();
       expect(afterwards.nextWakeAt).toBeNull();

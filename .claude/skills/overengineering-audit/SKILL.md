@@ -56,7 +56,7 @@ Four questions, in this order. Each needs a `path:line` answer.
 **Where does a database client stop?** (R1) A service takes a repository, never
 a `PrismaClient`, `Prisma.TransactionClient` or ClickHouse client. If a service
 opens a transaction or writes raw SQL, that belongs behind the repository, and
-the callback should receive a transactional *repository*, not a client.
+the callback should receive a transactional _repository_, not a client.
 
 **What does the composition root actually pass?** (R5) Find every
 `XApp.create` / `XRuntime.create` call in `platform/app/src/server/app-layer/presets.ts`,

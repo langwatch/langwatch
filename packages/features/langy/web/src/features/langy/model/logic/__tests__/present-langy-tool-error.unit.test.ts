@@ -16,8 +16,7 @@
 import { describe, expect, it } from "vitest";
 import { presentLangyToolError } from "../langy-tool-failure";
 
-const failureDocument = (error: Record<string, unknown>) =>
-  JSON.stringify({ ok: false, error });
+const failureDocument = (error: Record<string, unknown>) => JSON.stringify({ ok: false, error });
 
 const present = (errorText: unknown, title = "Creating scenario") =>
   presentLangyToolError({ title, errorText });
@@ -57,9 +56,7 @@ describe("presentLangyToolError", () => {
     // the system mints it from their own permissions.
     it("points at the one person who can change it, and offers no link", () => {
       const presentation = present(denial);
-      expect(presentation.detail).toBe(
-        "Ask whoever manages access for your team if you need it.",
-      );
+      expect(presentation.detail).toBe("Ask whoever manages access for your team if you need it.");
       expect(presentation.docsUrl).toBeUndefined();
     });
 
@@ -93,9 +90,7 @@ describe("presentLangyToolError", () => {
           isHandled: true,
         }),
       );
-      expect(presentation.message).toBe(
-        "This action isn't available to you in this project.",
-      );
+      expect(presentation.message).toBe("This action isn't available to you in this project.");
       expect(presentation.message).not.toContain("API key");
     });
   });
@@ -145,9 +140,7 @@ describe("presentLangyToolError", () => {
         current: 1,
         max: 3,
       });
-      expect(present(partial).message).toBe(
-        "You're using 1 of the 3 datasets your plan includes.",
-      );
+      expect(present(partial).message).toBe("You're using 1 of the 3 datasets your plan includes.");
     });
 
     it("names a limit type the label table has never heard of in plain words", () => {
@@ -179,9 +172,7 @@ describe("presentLangyToolError", () => {
         meta: {},
         isHandled: true,
       });
-      expect(present(blocked).message).toBe(
-        "The request was blocked by a content policy.",
-      );
+      expect(present(blocked).message).toBe("The request was blocked by a content policy.");
       expect(present(blocked).code).toBe("policy_violation");
     });
   });
@@ -259,9 +250,7 @@ describe("presentLangyToolError", () => {
     ].join("\n");
 
     it("names what failed", () => {
-      expect(present(traceback, "Counting traces").title).toBe(
-        "Counting traces failed",
-      );
+      expect(present(traceback, "Counting traces").title).toBe("Counting traces failed");
     });
 
     /** @scenario "A traceback is kept out of the card body" */
@@ -277,14 +266,11 @@ describe("presentLangyToolError", () => {
     });
 
     it("keeps the whole traceback for the disclosure", () => {
-      expect(present(traceback, "Counting traces").raw).toContain(
-        "JSONDecodeError",
-      );
+      expect(present(traceback, "Counting traces").raw).toContain("JSONDecodeError");
     });
 
     it("keeps an exception line out of the body even with no frames", () => {
-      const bare =
-        "json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)";
+      const bare = "json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)";
       expect(present(bare, "Counting traces").detail).toBeUndefined();
       expect(present(bare, "Counting traces").raw).toBe(bare);
     });
@@ -308,9 +294,7 @@ describe("presentLangyToolError", () => {
 
     /** @scenario "A one-line failure sentence is still shown as a detail" */
     it("shows the text it was given rather than swallowing it", () => {
-      expect(present(stderr).detail).toBe(
-        "Failed to reach the API: socket hang up (ECONNRESET)",
-      );
+      expect(present(stderr).detail).toBe("Failed to reach the API: socket hang up (ECONNRESET)");
     });
 
     it("claims no code it was never given", () => {

@@ -73,12 +73,7 @@ export type CodingAgentMetric =
  * that actually costs money (a cache READ is cheap, a cache WRITE costs more
  * than fresh input) is spelled differently by every one of them.
  */
-export type TokenType =
-  | "input"
-  | "output"
-  | "cache_read"
-  | "cache_creation"
-  | "reasoning";
+export type TokenType = "input" | "output" | "cache_read" | "cache_creation" | "reasoning";
 
 /**
  * The identity signal for one record, pre-lowercased by the engine so every
@@ -158,10 +153,7 @@ export interface CodingAgentDefinition {
    * turn into its own session. Return null to fall back to the shared
    * resolution; never return a value that is not this agent's session id.
    */
-  sessionKeyFromSpan?(params: {
-    name: string;
-    attrs: Record<string, unknown>;
-  }): string | null;
+  sessionKeyFromSpan?(params: { name: string; attrs: Record<string, unknown> }): string | null;
 
   /**
    * True when the agent's tool runs are reported only on its LOG events

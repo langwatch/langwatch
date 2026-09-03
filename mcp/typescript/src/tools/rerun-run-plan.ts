@@ -1,7 +1,4 @@
-import {
-  rerunRunPlan as apiRerunRunPlan,
-  type RunParameters,
-} from "../langwatch-api-run-plans.js";
+import { rerunRunPlan as apiRerunRunPlan, type RunParameters } from "../langwatch-api-run-plans.js";
 import { formatRunPlanRun } from "./format-run-plan.js";
 
 /**

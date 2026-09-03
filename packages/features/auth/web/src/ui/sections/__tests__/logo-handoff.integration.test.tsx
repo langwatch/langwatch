@@ -64,15 +64,11 @@ describe("given the front door painting for the first time", () => {
       try {
         renderFrontDoor();
 
-        expect(document.body.classList.contains("lw-front-door-enter")).toBe(
-          true,
-        );
+        expect(document.body.classList.contains("lw-front-door-enter")).toBe(true);
 
         vi.runAllTimers();
 
-        expect(document.body.classList.contains("lw-front-door-enter")).toBe(
-          false,
-        );
+        expect(document.body.classList.contains("lw-front-door-enter")).toBe(false);
       } finally {
         vi.useRealTimers();
       }
@@ -82,9 +78,7 @@ describe("given the front door painting for the first time", () => {
     it("leaves the field live and typeable while the card is still settling", () => {
       renderFrontDoor();
 
-      expect(document.body.classList.contains("lw-front-door-enter")).toBe(
-        true,
-      );
+      expect(document.body.classList.contains("lw-front-door-enter")).toBe(true);
       const field = screen.getByLabelText("Email");
       expect(field).toBeTruthy();
       expect(field.hasAttribute("disabled")).toBe(false);
@@ -93,17 +87,13 @@ describe("given the front door painting for the first time", () => {
     /** @scenario The entrance plays once, and never in front of a keystroke */
     it("plays once for the page, not once per screen", async () => {
       renderFrontDoor();
-      expect(document.body.classList.contains("lw-front-door-enter")).toBe(
-        true,
-      );
+      expect(document.body.classList.contains("lw-front-door-enter")).toBe(true);
       cleanup();
 
       renderFrontDoor();
 
       await waitFor(() => {
-        expect(document.body.classList.contains("lw-front-door-enter")).toBe(
-          false,
-        );
+        expect(document.body.classList.contains("lw-front-door-enter")).toBe(false);
       });
     });
   });
@@ -115,9 +105,7 @@ describe("given the front door painting for the first time", () => {
 
       renderFrontDoor();
 
-      expect(document.body.classList.contains("lw-front-door-enter")).toBe(
-        false,
-      );
+      expect(document.body.classList.contains("lw-front-door-enter")).toBe(false);
       expect(screen.getByLabelText("Email")).toBeTruthy();
     });
   });

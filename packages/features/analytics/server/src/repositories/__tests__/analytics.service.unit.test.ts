@@ -9,10 +9,7 @@ import type {
 import { AnalyticsService } from "../../services/analytics.service";
 import { AnalyticsAdapter } from "../../index";
 import { NullAnalyticsEvaluationRepository } from "../../testing";
-import {
-  AnalyticsRepository,
-  type AnalyticsTimeseriesQuery,
-} from "../analytics.repository";
+import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository";
 
 const input = (overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesInput => ({
   projectId: "project-1",

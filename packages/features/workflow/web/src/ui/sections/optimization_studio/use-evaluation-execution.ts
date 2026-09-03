@@ -9,12 +9,13 @@ import { useWorkflowStore } from "@langwatch/workflow-web";
 export const useEvaluationExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
 
-  const { getWorkflow, setEvaluationState, setOpenResultsPanelRequest } =
-    useWorkflowStore((state) => ({
+  const { getWorkflow, setEvaluationState, setOpenResultsPanelRequest } = useWorkflowStore(
+    (state) => ({
       getWorkflow: state.getWorkflow,
       setEvaluationState: state.setEvaluationState,
       setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
-    }));
+    }),
+  );
 
   const getWorkflowRef = useRef(getWorkflow);
   getWorkflowRef.current = getWorkflow;

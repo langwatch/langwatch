@@ -4,12 +4,7 @@ export class GroupNotFoundError extends NotFoundError {
   declare readonly code: "group_not_found";
 
   constructor(groupId?: string) {
-    super(
-      "group_not_found",
-      "Group",
-      groupId ?? "",
-      groupId ? { meta: { groupId } } : {},
-    );
+    super("group_not_found", "Group", groupId ?? "", groupId ? { meta: { groupId } } : {});
     this.name = "GroupNotFoundError";
   }
 }
@@ -71,11 +66,10 @@ export class GroupScopeNotInOrganizationError extends HandledError {
   declare readonly code: "scope_not_in_organization";
 
   constructor(scopeType?: string) {
-    super(
-      "scope_not_in_organization",
-      "That scope does not belong to this organization",
-      { httpStatus: 422, ...(scopeType ? { meta: { scopeType } } : {}) },
-    );
+    super("scope_not_in_organization", "That scope does not belong to this organization", {
+      httpStatus: 422,
+      ...(scopeType ? { meta: { scopeType } } : {}),
+    });
     this.name = "GroupScopeNotInOrganizationError";
   }
 }
@@ -84,11 +78,9 @@ export class GroupCustomRoleRequiredError extends HandledError {
   declare readonly code: "custom_role_id_required";
 
   constructor() {
-    super(
-      "custom_role_id_required",
-      "A CUSTOM binding has to name which custom role it grants",
-      { httpStatus: 422 },
-    );
+    super("custom_role_id_required", "A CUSTOM binding has to name which custom role it grants", {
+      httpStatus: 422,
+    });
     this.name = "GroupCustomRoleRequiredError";
   }
 }

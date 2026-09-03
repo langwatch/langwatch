@@ -223,9 +223,7 @@ describe("emitsResult", () => {
       let seen: string | undefined;
       const program = buildProgram((p) => {
         emitsResult(
-          p
-            .command("paged")
-            .option("--limit <n>", "Rows fetched per page; the walk covers all"),
+          p.command("paged").option("--limit <n>", "Rows fetched per page; the walk covers all"),
           (options: { limit?: string }) => {
             seen = options.limit;
             return { data: PAYLOAD, table: () => console.log("HUMAN TABLE") };

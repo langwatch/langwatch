@@ -48,17 +48,11 @@ export type StripePriceDetail = {
   metadata: Record<string, string>;
 };
 
-export type StripePriceMapping = Record<
-  StripePriceName,
-  Record<StripeEnvironment, string>
->;
+export type StripePriceMapping = Record<StripePriceName, Record<StripeEnvironment, string>>;
 
 export const STRIPE_METER_NAMES = ["BILLABLE_EVENTS"] as const;
 export type StripeMeterName = (typeof STRIPE_METER_NAMES)[number];
-export type StripeMeterMapping = Record<
-  StripeMeterName,
-  Record<StripeEnvironment, string>
->;
+export type StripeMeterMapping = Record<StripeMeterName, Record<StripeEnvironment, string>>;
 export type StripeMeterMap = Record<StripeMeterName, string>;
 
 export type StripePricesFile = {

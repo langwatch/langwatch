@@ -1,10 +1,7 @@
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 
 /** License status with metadata fields (excludes corrupted/no-license states) */
-export type LicenseStatusWithMetadata = Extract<
-  LicenseStatus,
-  { hasLicense: true; plan: string }
->;
+export type LicenseStatusWithMetadata = Extract<LicenseStatus, { hasLicense: true; plan: string }>;
 
 /**
  * Type guard that checks if a license status has metadata fields.
@@ -21,9 +18,7 @@ export function hasLicenseMetadata(
  * Type guard that checks if a license is corrupted.
  * Corrupted licenses have hasLicense: true but cannot be read.
  */
-export function isCorruptedLicense(
-  status: Extract<LicenseStatus, { hasLicense: true }>,
-): boolean {
+export function isCorruptedLicense(status: Extract<LicenseStatus, { hasLicense: true }>): boolean {
   return "corrupted" in status && status.corrupted === true;
 }
 

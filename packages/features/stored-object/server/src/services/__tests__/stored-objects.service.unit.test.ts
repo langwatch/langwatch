@@ -124,8 +124,7 @@ function makeService({
     repository,
     registry,
     mintStorageUri:
-      mintStorageUri ??
-      (async ({ projectId, sha256 }) => `file:///tmp/${projectId}/${sha256}`),
+      mintStorageUri ?? (async ({ projectId, sha256 }) => `file:///tmp/${projectId}/${sha256}`),
     telemetry: makeTelemetry(),
   });
 }
@@ -205,9 +204,7 @@ describe("storeFromBytes", () => {
       // rather than later in the dedup correctness.
       vi.mocked(repo.findById).mockResolvedValue(null);
 
-      const expectedSha256 = createHash("sha256")
-        .update(TEST_BYTES)
-        .digest("hex");
+      const expectedSha256 = createHash("sha256").update(TEST_BYTES).digest("hex");
       const expectedId = deriveStoredObjectId({
         projectId: PROJECT_ID,
         sha256: expectedSha256,
@@ -227,9 +224,7 @@ describe("storeFromBytes", () => {
       const storageError = new Error("S3 unavailable");
       vi.mocked(registry.put).mockRejectedValue(storageError);
 
-      await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(
-        "S3 unavailable",
-      );
+      await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow("S3 unavailable");
       expect(repo.insert).not.toHaveBeenCalled();
     });
   });
@@ -293,9 +288,7 @@ describe("storeFromBytes", () => {
         vi.mocked(repo.insert).mockRejectedValueOnce(insertError);
         vi.mocked(registry.delete).mockRejectedValueOnce(deleteError);
 
-        await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(
-          insertError,
-        );
+        await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(insertError);
 
         expect(logger.error.mock.calls[0]?.[0]).toMatchObject({
           insertError,
@@ -428,9 +421,9 @@ describe("getById", () => {
       vi.mocked(repo.findById).mockResolvedValue(row);
       vi.mocked(registry.get).mockRejectedValue(networkError);
 
-      await expect(
-        service.getById({ projectId: PROJECT_ID, id: "obj-1" }),
-      ).rejects.toThrow("network timeout");
+      await expect(service.getById({ projectId: PROJECT_ID, id: "obj-1" })).rejects.toThrow(
+        "network timeout",
+      );
     });
   });
 });

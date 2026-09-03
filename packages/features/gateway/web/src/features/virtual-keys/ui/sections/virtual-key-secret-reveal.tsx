@@ -79,9 +79,7 @@ export function VirtualKeySecretReveal({
       <Dialog.Content bg="bg" maxWidth="560px">
         <Dialog.Header>
           <Dialog.Title>
-            {kind === "rotate"
-              ? "Save your rotated secret"
-              : "Save your virtual key secret"}
+            {kind === "rotate" ? "Save your rotated secret" : "Save your virtual key secret"}
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
@@ -91,8 +89,8 @@ export function VirtualKeySecretReveal({
               <Alert.Content>
                 <Alert.Title>You will only see this secret once.</Alert.Title>
                 <Alert.Description>
-                  LangWatch stores only a hash. Copy and save the raw secret in your
-                  password manager or secret store before closing.
+                  LangWatch stores only a hash. Copy and save the raw secret in your password
+                  manager or secret store before closing.
                 </Alert.Description>
               </Alert.Content>
             </Alert.Root>
@@ -102,9 +100,9 @@ export function VirtualKeySecretReveal({
                 <Alert.Content>
                   <Alert.Title>24-hour grace window active.</Alert.Title>
                   <Alert.Description>
-                    The previous secret keeps working for 24 hours so clients can roll
-                    over gradually. After that it hard-fails with a 401 even though this
-                    key stays active.
+                    The previous secret keeps working for 24 hours so clients can roll over
+                    gradually. After that it hard-fails with a 401 even though this key stays
+                    active.
                   </Alert.Description>
                 </Alert.Content>
               </Alert.Root>
@@ -141,12 +139,7 @@ export function VirtualKeySecretReveal({
                 >
                   {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
                 </IconButton>
-                <IconButton
-                  aria-label="Copy secret"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCopy}
-                >
+                <IconButton aria-label="Copy secret" variant="ghost" size="sm" onClick={handleCopy}>
                   {copied ? <Check size={14} /> : <Copy size={14} />}
                 </IconButton>
               </HStack>

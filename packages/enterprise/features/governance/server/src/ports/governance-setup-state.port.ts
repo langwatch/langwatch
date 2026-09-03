@@ -12,8 +12,5 @@ export abstract class GovernanceSetupStateRepository {
 }
 
 export abstract class GovernanceSetupActivityPort {
-  abstract hasRecentActivity(input: {
-    tenantId: string;
-    sinceMs: number;
-  }): Promise<boolean>;
+  abstract hasRecentActivity(input: { tenantId: string; sinceMs: number }): Promise<boolean>;
 }

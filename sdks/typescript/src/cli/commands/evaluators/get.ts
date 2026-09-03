@@ -20,12 +20,8 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   console.log(`  ${chalk.gray("ID:")}          ${evaluator.id}`);
   console.log(`  ${chalk.gray("Slug:")}        ${evaluator.slug ?? chalk.gray("—")}`);
   console.log(`  ${chalk.gray("Type:")}        ${chalk.yellow(evaluatorType)}`);
-  console.log(
-    `  ${chalk.gray("Created:")}     ${new Date(evaluator.createdAt).toLocaleString()}`,
-  );
-  console.log(
-    `  ${chalk.gray("Updated:")}     ${new Date(evaluator.updatedAt).toLocaleString()}`,
-  );
+  console.log(`  ${chalk.gray("Created:")}     ${new Date(evaluator.createdAt).toLocaleString()}`);
+  console.log(`  ${chalk.gray("Updated:")}     ${new Date(evaluator.updatedAt).toLocaleString()}`);
 
   if (evaluator.workflowId) {
     console.log(`  ${chalk.gray("Workflow ID:")} ${evaluator.workflowId}`);
@@ -58,9 +54,7 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     console.log(chalk.bold("  Settings:"));
     for (const [key, value] of Object.entries(config.settings)) {
       const displayValue =
-        typeof value === "object"
-          ? JSON.stringify(value)
-          : `${value as string | number | boolean}`;
+        typeof value === "object" ? JSON.stringify(value) : `${value as string | number | boolean}`;
       console.log(`    ${chalk.gray(key + ":")} ${displayValue}`);
     }
   }
@@ -76,9 +70,7 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
  * Returns the evaluator rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getEvaluatorCommand = async (
-  idOrSlug: string,
-): Promise<CommandResult | void> => {
+export const getEvaluatorCommand = async (idOrSlug: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new EvaluatorsApiService();

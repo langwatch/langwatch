@@ -190,7 +190,12 @@ function hostWithoutProject(grants = ["project:manage", "organization:view"]) {
 
 function hostWithProject(grants = ["project:manage", "organization:view"]) {
   return new FakeModelProviderHost({
-    scope: { organizationId: "org-1", teamId: "team-1", projectId: "proj-1", projectSlug: "web-app" },
+    scope: {
+      organizationId: "org-1",
+      teamId: "team-1",
+      projectId: "proj-1",
+      projectSlug: "web-app",
+    },
     grants: new Set(grants),
     availableScopes: ORGANIZATION_ONLY_SCOPES,
   });

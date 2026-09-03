@@ -45,9 +45,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
       const prompt = createMockPrompt("gato");
       const result = versionedPromptToPromptConfigFormValues(prompt);
 
-      expect(
-        result.version.configData.demonstrations?.inline?.columnTypes,
-      ).toEqual([
+      expect(result.version.configData.demonstrations?.inline?.columnTypes).toEqual([
         { id: "input", name: "input", type: "string" },
         { id: "output", name: "output", type: "string" },
       ]);
@@ -67,11 +65,9 @@ describe("versionedPromptToPromptConfigFormValues", () => {
 
       const result = versionedPromptToPromptConfigFormValues(prompt);
 
-      expect(result.version.configData.demonstrations?.inline?.records).toEqual(
-        {
-          input: ["a question"],
-        },
-      );
+      expect(result.version.configData.demonstrations?.inline?.records).toEqual({
+        input: ["a question"],
+      });
     });
   });
 
@@ -105,9 +101,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     });
 
     it("keeps folder handle unchanged", () => {
-      const result = versionedPromptToPromptConfigFormValues(
-        createMockPrompt("folder/gato"),
-      );
+      const result = versionedPromptToPromptConfigFormValues(createMockPrompt("folder/gato"));
       expect(result.handle).toBe("folder/gato");
     });
   });

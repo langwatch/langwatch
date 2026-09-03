@@ -53,10 +53,7 @@ export const AutoUppercaseOperators = Extension.create({
           if (!match) return null;
           const word = match[1] ?? "";
           const wordStart = diffAt - word.length;
-          if (
-            isInsideQuoted(newText, wordStart) ||
-            isInsideBrackets(newText, wordStart)
-          ) {
+          if (isInsideQuoted(newText, wordStart) || isInsideBrackets(newText, wordStart)) {
             return null;
           }
 

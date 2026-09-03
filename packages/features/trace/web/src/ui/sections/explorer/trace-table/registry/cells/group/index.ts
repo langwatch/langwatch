@@ -1,13 +1,7 @@
 import type { CellDef } from "../../types";
 import { GroupSelectCell } from "../select-cells";
 import { GroupLabelCell } from "./group-label-cell";
-import {
-  AvgDurationCell,
-  CostCell,
-  CountCell,
-  ErrorsCell,
-  TokensCell,
-} from "./simple-cells";
+import { AvgDurationCell, CostCell, CountCell, ErrorsCell, TokensCell } from "./simple-cells";
 import type { TraceGroup } from "./types";
 
 export const groupCells: Record<string, CellDef<TraceGroup>> = {

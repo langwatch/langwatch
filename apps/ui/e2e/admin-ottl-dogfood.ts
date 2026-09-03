@@ -134,10 +134,7 @@ void (async () => {
     // Close any open drawer first
     await page.keyboard.press("Escape");
     await page.waitForTimeout(400);
-    await page
-      .locator('text="Org-authored"')
-      .first()
-      .waitFor({ state: "visible", timeout: 5_000 });
+    await page.locator('text="Org-authored"').first().waitFor({ state: "visible", timeout: 5_000 });
     await shoot(page, "06-list-with-org-authored-row");
   });
 
@@ -152,9 +149,7 @@ void (async () => {
   });
 
   await step(results, "archive-org-authored-row", async () => {
-    const archiveCandidates = page.locator(
-      'tr:has(span:has-text("Org-authored")) button',
-    );
+    const archiveCandidates = page.locator('tr:has(span:has-text("Org-authored")) button');
     const count = await archiveCandidates.count();
     if (count < 2) throw new Error(`expected 2+ buttons in org row, got ${count}`);
     await archiveCandidates.last().click();

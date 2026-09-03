@@ -156,10 +156,7 @@ describe("given a turn carrying annotations", () => {
 
       await user.click(screen.getByRole("button", { name: /Grace/ }));
 
-      expect(screen.getByTestId("correction-popover")).toHaveAttribute(
-        "data-mode",
-        "suggest",
-      );
+      expect(screen.getByTestId("correction-popover")).toHaveAttribute("data-mode", "suggest");
     });
   });
 

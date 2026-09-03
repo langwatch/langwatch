@@ -42,10 +42,7 @@ export class TenantRateLimiter {
 
   constructor(config?: TierConfig) {
     this.config = config ?? DEFAULT_TIERS;
-    this.cleanupTimer = setInterval(
-      () => this.cleanupStaleBuckets(),
-      CLEANUP_INTERVAL_MS,
-    );
+    this.cleanupTimer = setInterval(() => this.cleanupStaleBuckets(), CLEANUP_INTERVAL_MS);
   }
 
   /**
@@ -80,9 +77,7 @@ export class TenantRateLimiter {
     // Rate-limited — emit a single warning per tenant
     if (!this.warnedTenants.has(tenantId)) {
       this.warnedTenants.add(tenantId);
-      console.warn(
-        `[TenantRateLimiter] Rate limit hit for tenant "${tenantId}" on tier "${tier}"`,
-      );
+      console.warn(`[TenantRateLimiter] Rate limit hit for tenant "${tenantId}" on tier "${tier}"`);
     }
 
     return false;

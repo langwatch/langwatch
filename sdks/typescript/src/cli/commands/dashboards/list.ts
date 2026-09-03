@@ -21,9 +21,7 @@ export const listDashboardsCommand = async (): Promise<CommandResult | void> => 
     const result = await service.list();
     const dashboards = result.data;
 
-    spinner.succeed(
-      `Found ${dashboards.length} dashboard${dashboards.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${dashboards.length} dashboard${dashboards.length !== 1 ? "s" : ""}`);
 
     return {
       data: result,
@@ -56,9 +54,7 @@ export const listDashboardsCommand = async (): Promise<CommandResult | void> => 
 
         console.log();
         console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch dashboard get <id>")} to view dashboard details`,
-          ),
+          chalk.gray(`Use ${chalk.cyan("langwatch dashboard get <id>")} to view dashboard details`),
         );
       },
     };

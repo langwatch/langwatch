@@ -1,7 +1,4 @@
-import type {
-  BatchClusteringParams,
-  IncrementalClusteringParams,
-} from "@langwatch/topic-contract";
+import type { BatchClusteringParams, IncrementalClusteringParams } from "@langwatch/topic-contract";
 
 /**
  * The langevals boundary for topic clustering (the workspace member at

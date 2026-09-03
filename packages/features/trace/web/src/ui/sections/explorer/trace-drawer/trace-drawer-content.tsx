@@ -83,9 +83,7 @@ export function TraceDrawerContent({
   // `null` for share viewers: Langy is an authenticated in-app affordance, and
   // the read-only share surface carries no session to act on it. See ADR-057.
   const langyTrace = useLangyContextTarget(
-    trace && !readOnly
-      ? traceContextChip(trace.traceId, trace.traceName || trace.name)
-      : null,
+    trace && !readOnly ? traceContextChip(trace.traceId, trace.traceName || trace.name) : null,
   );
 
   const viewMode = useDrawerStore((s) => s.viewMode);
@@ -158,9 +156,7 @@ export function TraceDrawerContent({
               bg={{ base: "bg.surface", _dark: "bg.panel" }}
             >
               <ScenarioRoleProvider
-                isScenario={
-                  !!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])
-                }
+                isScenario={!!(trace.scenarioRunId ?? trace.attributes["scenario.run_id"])}
               >
                 {/* Conversation view is suppressed for read-only share
                     viewers: it is backed by `tracesV2.list` (disabled without
@@ -269,13 +265,7 @@ function ConversationModePane({
  * summary, above the summary accordions. Shares the store-backed collapse
  * state, so collapsing the strip in one view collapses it in both.
  */
-function SummaryModePane({
-  trace,
-  spanTree,
-}: {
-  trace: TraceHeader;
-  spanTree: SpanTreeNode[];
-}) {
+function SummaryModePane({ trace, spanTree }: { trace: TraceHeader; spanTree: SpanTreeNode[] }) {
   const ctxPaneState = useDrawerStore((s) => s.paneState.conversationContext);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
   // Summary-tab span references (eval / event / exception rows) jump into the
@@ -284,10 +274,7 @@ function SummaryModePane({
   const openSpanInTrace = useDrawerStore((s) => s.openSpanInTrace);
 
   return (
-    <IsolatedErrorBoundary
-      scope="Couldn't render trace summary"
-      resetKeys={[trace.traceId]}
-    >
+    <IsolatedErrorBoundary scope="Couldn't render trace summary" resetKeys={[trace.traceId]}>
       {trace.conversationId && (
         <IsolatedErrorBoundary
           scope="Couldn't render conversation context"
@@ -330,16 +317,9 @@ function SummaryModePane({
 function SessionModePane({ trace }: { trace: TraceHeader }) {
   const { projectId } = useTraceQueryArgs();
   return (
-    <IsolatedErrorBoundary
-      scope="Couldn't render session overview"
-      resetKeys={[trace.traceId]}
-    >
+    <IsolatedErrorBoundary scope="Couldn't render session overview" resetKeys={[trace.traceId]}>
       <Box flex={1} minHeight={0}>
-        <SessionTab
-          projectId={projectId}
-          traceId={trace.traceId}
-          occurredAtMs={trace.timestamp}
-        />
+        <SessionTab projectId={projectId} traceId={trace.traceId} occurredAtMs={trace.timestamp} />
       </Box>
     </IsolatedErrorBoundary>
   );
@@ -352,10 +332,7 @@ function SessionModePane({ trace }: { trace: TraceHeader }) {
 function TerminalModePane({ trace }: { trace: TraceHeader }) {
   const { projectId } = useTraceQueryArgs();
   return (
-    <IsolatedErrorBoundary
-      scope="Couldn't render terminal session"
-      resetKeys={[trace.traceId]}
-    >
+    <IsolatedErrorBoundary scope="Couldn't render terminal session" resetKeys={[trace.traceId]}>
       <Box flex={1} minHeight={0}>
         {/* Keyed by trace: stepping to a sibling turn with J/K opens a
             different point in the session, so the turns walked back from the

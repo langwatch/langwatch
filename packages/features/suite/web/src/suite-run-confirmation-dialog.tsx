@@ -13,13 +13,7 @@ import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Popover } from "@langwatch/design-system/popover";
 
-function ParameterInfoTooltip({
-  description,
-  testId,
-}: {
-  description: string;
-  testId: string;
-}) {
+function ParameterInfoTooltip({ description, testId }: { description: string; testId: string }) {
   return (
     <Popover.Root positioning={{ placement: "right-start" }}>
       <Popover.Trigger asChild>
@@ -81,8 +75,7 @@ export function SuiteRunConfirmationDialog({
   // A secret has no default and the run refuses to start without it, so the
   // dialog holds the run here rather than sending it to be rejected.
   const missingSecrets = parameters.some(
-    (parameter) =>
-      parameter.secret === true && (parameterValues[parameter.name] ?? "") === "",
+    (parameter) => parameter.secret === true && (parameterValues[parameter.name] ?? "") === "",
   );
 
   return (

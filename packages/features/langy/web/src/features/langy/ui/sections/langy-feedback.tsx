@@ -8,10 +8,7 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
 import { api } from "../../../../behavior/langy-api";
 import { useLangyFeedback } from "../../behavior/data/use-langy-feedback";
-import {
-  type LangyFeedbackSentiment,
-  useLangyStore,
-} from "../../../../index";
+import { type LangyFeedbackSentiment, useLangyStore } from "../../../../index";
 
 /** What the backend feedback capture accepts as the coarse rating + tone. */
 type FeedbackRating = "up" | "down";
@@ -135,10 +132,7 @@ export function LangyFeedback({
   useEffect(() => {
     if (origin === "preview" || origin === "requested") return;
     if (markedShownRef.current || !conversationId || !project?.id) return;
-    if (
-      messageId &&
-      useLangyStore.getState().dismissedFeedbackMessageIds.has(messageId)
-    ) {
+    if (messageId && useLangyStore.getState().dismissedFeedbackMessageIds.has(messageId)) {
       return;
     }
     markedShownRef.current = true;
@@ -343,13 +337,7 @@ export function LangyFeedback({
   );
 }
 
-function Segment({
-  children,
-  onClick,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-}) {
+function Segment({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <chakra.button
       type="button"

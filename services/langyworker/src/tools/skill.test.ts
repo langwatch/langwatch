@@ -15,9 +15,7 @@ describe("parseSkillFrontmatter", () => {
     });
 
     it("strips surrounding quotes", () => {
-      expect(
-        parseSkillFrontmatter("---\nname: \"quoted\"\ndescription: 'also'\n---\n"),
-      ).toEqual({
+      expect(parseSkillFrontmatter("---\nname: \"quoted\"\ndescription: 'also'\n---\n")).toEqual({
         name: "quoted",
         description: "also",
       });
@@ -46,10 +44,7 @@ describe("listSkills", () => {
   describe("when a skills directory with valid and invalid entries", () => {
     it("lists only directories carrying a readable SKILL.md, sorted", () => {
       mkdirSync(join(skillsDir, "beta"));
-      writeFileSync(
-        join(skillsDir, "beta", "SKILL.md"),
-        "---\nname: beta\ndescription: B\n---\n",
-      );
+      writeFileSync(join(skillsDir, "beta", "SKILL.md"), "---\nname: beta\ndescription: B\n---\n");
       mkdirSync(join(skillsDir, "alpha"));
       writeFileSync(join(skillsDir, "alpha", "SKILL.md"), "no frontmatter body");
       mkdirSync(join(skillsDir, "empty-dir"));
@@ -70,10 +65,7 @@ describe("listSkills", () => {
     // so the skill existed in the inventory and could never be loaded.
     it("falls back to the directory name", () => {
       mkdirSync(join(skillsDir, "gamma"));
-      writeFileSync(
-        join(skillsDir, "gamma", "SKILL.md"),
-        '---\nname: ""\ndescription: G\n---\n',
-      );
+      writeFileSync(join(skillsDir, "gamma", "SKILL.md"), '---\nname: ""\ndescription: G\n---\n');
       mkdirSync(join(skillsDir, "delta"));
       writeFileSync(
         join(skillsDir, "delta", "SKILL.md"),
@@ -95,9 +87,7 @@ describe("listSkills", () => {
 describe("renderSkillInventory", () => {
   it("lists names with descriptions", () => {
     expect(
-      renderSkillInventory([
-        { name: "a", description: "does a", filePath: "/x", baseDir: "/" },
-      ]),
+      renderSkillInventory([{ name: "a", description: "does a", filePath: "/x", baseDir: "/" }]),
     ).toBe("Installed skills:\n- a: does a");
   });
 

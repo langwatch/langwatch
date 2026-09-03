@@ -60,9 +60,7 @@ describe("buildCatalog", () => {
 
   it("covers every registered non-hidden top-level command", () => {
     const registered = buildProgram()
-      .commands.filter(
-        (command) => (command as unknown as { _hidden?: boolean })._hidden !== true,
-      )
+      .commands.filter((command) => (command as unknown as { _hidden?: boolean })._hidden !== true)
       .map((command) => command.name());
     const cataloged = catalog.map((entry) => entry.path);
     expect(cataloged.sort()).toEqual(registered.sort());
@@ -135,9 +133,7 @@ describe("buildCatalog", () => {
     // Exact formula check on one entry: rebuild the synthetic help by hand.
     const traceGet = flat.find((entry) => entry.path === "trace get")!;
     const usage = `langwatch trace get <traceId> — ${traceGet.description}`;
-    const flags = traceGet.flags
-      .map((flag) => `\n  ${flag.name}  ${flag.description}`)
-      .join("");
+    const flags = traceGet.flags.map((flag) => `\n  ${flag.name}  ${flag.description}`).join("");
     expect(traceGet.tokenCost).toBe(Math.ceil((usage + flags).length / 4));
   });
 });

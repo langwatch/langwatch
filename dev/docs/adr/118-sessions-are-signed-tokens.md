@@ -33,7 +33,7 @@ That gives session resolution three properties worth naming:
   have touched it.
 
 The pressure that makes this worth changing now is D06 (`amr`, `identifierId`)
-and ADR-117's router: sessions are about to start *carrying* things — what a
+and ADR-117's router: sessions are about to start _carrying_ things — what a
 sign-in proved, which identifier minted it, who is impersonating whom. Each of
 those is a column on a row that is read on every request, and each makes the
 read wider rather than rarer.
@@ -43,9 +43,9 @@ read wider rather than rarer.
 Two jobs, and they are not the same job:
 
 1. **Authentication** — "this cookie belongs to user X, and it has not
-   expired". This is a *statement*, and a statement can be signed.
+   expired". This is a _statement_, and a statement can be signed.
 2. **Revocation** — "this session was ended before it expired". This is a
-   *fact that changes*, and it cannot be signed into the token, because the
+   _fact that changes_, and it cannot be signed into the token, because the
    whole point is that it happens afterwards.
 
 Storing job 1 in a database is how we currently get job 2 for free: delete the
@@ -76,7 +76,7 @@ This is the load-bearing consequence and the reason the decision is worth an
 ADR rather than a refactor.
 
 Today Redis is optional: a miss falls through to the database and correctness is
-preserved. Under this decision a Redis miss is *not* a cache miss — it is the
+preserved. Under this decision a Redis miss is _not_ a cache miss — it is the
 answer "not revoked", and answering it wrongly means honouring a session
 somebody ended. So the revocation store has to be a store, not a cache:
 

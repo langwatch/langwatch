@@ -87,9 +87,7 @@ export class ClickHouseRetroactiveRetentionRepository extends RetroactiveRetenti
     return { tables };
   }
 
-  async getMutationProgress(input: {
-    projectId: string;
-  }): Promise<RetroactiveMutationProgress[]> {
+  async getMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {
     const client = await this.resolveClient(input.projectId);
     const result = await client.query({
       query: `
@@ -115,9 +113,7 @@ export class ClickHouseRetroactiveRetentionRepository extends RetroactiveRetenti
   async killMutation(input: { projectId: string; mutationId: string }): Promise<void> {
     const client = await this.resolveClient(input.projectId);
     await client.command({
-      query:
-        "KILL MUTATION WHERE mutation_id = {mutationId:String} " +
-        `AND ${tenantFilterSql}`,
+      query: "KILL MUTATION WHERE mutation_id = {mutationId:String} " + `AND ${tenantFilterSql}`,
       query_params: {
         mutationId: input.mutationId,
         ...tenantFilterParams(input.projectId),
@@ -166,9 +162,7 @@ export class ClickHouseRetroactiveRetentionRepository extends RetroactiveRetenti
 
   private categoryForTable(table: string): RetentionCategory | null {
     return (
-      Object.entries(RETENTION_TABLE_CATEGORY_MAP).find(
-        ([name]) => name === table,
-      )?.[1] ?? null
+      Object.entries(RETENTION_TABLE_CATEGORY_MAP).find(([name]) => name === table)?.[1] ?? null
     );
   }
 }

@@ -162,11 +162,7 @@ describe("Target Trace Isolation", () => {
     const evaluation = await langwatch.experiments.init("test-all-unique");
 
     await evaluation.run(
-      [
-        { question: "Question A" },
-        { question: "Question B" },
-        { question: "Question C" },
-      ],
+      [{ question: "Question A" }, { question: "Question B" }, { question: "Question C" }],
       async ({ item }) => {
         await Promise.all([
           evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {

@@ -95,9 +95,7 @@ function evaluate(row: Record<string, unknown>, expression: string): number | st
     return Array.isArray(value) ? value.length : 0;
   }
   if (expression.includes("+")) {
-    return expression
-      .split("+")
-      .reduce((sum, column) => sum + Number(row[column.trim()] ?? 0), 0);
+    return expression.split("+").reduce((sum, column) => sum + Number(row[column.trim()] ?? 0), 0);
   }
   const raw = row[expression];
   if (typeof raw === "number") return raw;

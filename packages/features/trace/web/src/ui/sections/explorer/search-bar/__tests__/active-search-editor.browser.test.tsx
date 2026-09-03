@@ -477,9 +477,7 @@ describe("SearchBar in real Chromium", () => {
       expect(tokens[1]?.textContent).toBe("origin:evaluation");
 
       // Each token's data-value is just the value, NOT `evaluation\u00A0AND`.
-      const widgets = editor.querySelectorAll(
-        "[data-filter-delete]",
-      ) as NodeListOf<HTMLElement>;
+      const widgets = editor.querySelectorAll("[data-filter-delete]") as NodeListOf<HTMLElement>;
       for (const w of Array.from(widgets)) {
         expect(w.getAttribute("data-value")).toBe("evaluation");
       }
@@ -913,9 +911,7 @@ describe("SearchBar in real Chromium", () => {
       await userEvent.click(editor);
       await userEvent.keyboard("status:error AND model:gpt-4o AND origin:application");
 
-      const widgets = editor.querySelectorAll(
-        "[data-filter-delete]",
-      ) as NodeListOf<HTMLElement>;
+      const widgets = editor.querySelectorAll("[data-filter-delete]") as NodeListOf<HTMLElement>;
       expect(widgets.length).toBe(3);
       const middle = widgets[1]!;
       await userEvent.hover(middle);
@@ -992,12 +988,8 @@ describe("SearchBar in real Chromium", () => {
       await userEvent.click(editor);
       await userEvent.keyboard("status:error AND model:gpt-4o");
 
-      const tokens = Array.from(
-        editor.querySelectorAll(".filter-token"),
-      ) as HTMLElement[];
-      const deletes = Array.from(
-        editor.querySelectorAll(".filter-token-delete"),
-      ) as HTMLElement[];
+      const tokens = Array.from(editor.querySelectorAll(".filter-token")) as HTMLElement[];
+      const deletes = Array.from(editor.querySelectorAll(".filter-token-delete")) as HTMLElement[];
       expect(tokens.length).toBe(2);
       expect(deletes.length).toBe(2);
 
@@ -1137,10 +1129,7 @@ describe("SearchBar in real Chromium", () => {
       // throughout (never flicker out, never multiply).
       for (let i = 0; i < 5; i++) {
         await userEvent.keyboard("[Backspace]");
-        expect(
-          editor.querySelectorAll(".filter-token").length,
-          `after backspace ${i + 1}`,
-        ).toBe(1);
+        expect(editor.querySelectorAll(".filter-token").length, `after backspace ${i + 1}`).toBe(1);
       }
       // We're now at `status:` — chip still here.
       expect(plainText(editor)).toBe("status:");

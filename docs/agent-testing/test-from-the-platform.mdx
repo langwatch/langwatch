@@ -25,7 +25,11 @@ Write criteria about outcomes, not wording. For example, "The agent looks up the
 Open **Agent Testing** in the sidebar. The **Scenarios** tab lists the test suites of the project in the rail on the left, and the scenarios of the open test suite in the table. A test suite is a named group of scenarios, for example the ones about refunds. Every project has a **Default** test suite. Labels organize scenarios inside a test suite and across test suites.
 
 <Frame>
-<img className="block" src="/images/agent-testing/scenarios-tab.png" alt="The Scenarios tab with the test suite rail on the left and the scenarios of the Refunds test suite, with their labels" />
+  <img
+    className="block"
+    src="/images/agent-testing/scenarios-tab.png"
+    alt="The Scenarios tab with the test suite rail on the left and the scenarios of the Refunds test suite, with their labels"
+  />
 </Frame>
 
 Press **New Test Suite** in the rail to create one. A test suite is only a name. You pick the agent when you run it.
@@ -35,7 +39,11 @@ Press **New Test Suite** in the rail to create one. A test suite is only a name.
 Press **New scenario**. The editor asks for the title, the test suite, the situation and the criteria, one criterion per line.
 
 <Frame>
-<img className="block" src="/images/agent-testing/scenario-editor.png" alt="The scenario editor with a title, a situation and three criteria filled in" />
+  <img
+    className="block"
+    src="/images/agent-testing/scenario-editor.png"
+    alt="The scenario editor with a title, a situation and three criteria filled in"
+  />
 </Frame>
 
 Two tips:
@@ -44,7 +52,9 @@ Two tips:
 - Include at least one "must not" criterion, for the failure you want to catch: an invented date, another customer's data, a promise the policy forbids.
 
 <Note>
-Everyone with access to the project can read a scenario. Remove names, contact details, account numbers and other personal data before you paste real material, or replace them with invented ones. The test works the same with invented details.
+  Everyone with access to the project can read a scenario. Remove names, contact details, account
+  numbers and other personal data before you paste real material, or replace them with invented
+  ones. The test works the same with invented details.
 </Note>
 
 **Save** stores the scenario. **Save & Run** stores it and opens the run dialog. Every save is a version, and the editor shows the version number next to **History**.
@@ -54,7 +64,11 @@ Everyone with access to the project can read a scenario. Remove names, contact d
 Langy, the assistant in the bottom corner of every page, writes scenarios for you. Paste text from a document or a conversation, say what must hold, and Langy writes and saves the scenario:
 
 <Frame>
-<img className="block" src="/images/agent-testing/langy-creates-scenario.png" alt="Langy creating a scenario from a pasted snippet of a customer chat" />
+  <img
+    className="block"
+    src="/images/agent-testing/langy-creates-scenario.png"
+    alt="Langy creating a scenario from a pasted snippet of a customer chat"
+  />
 </Frame>
 
 Good material to paste: notes from a lost deal or an escalation, user interview quotes, acceptance criteria from a ticket, or a transcript where the agent got it wrong. Remove personal data from the text first.
@@ -70,7 +84,11 @@ Through the [LangWatch MCP integration](/integration/mcp), coding assistants suc
 **Run** on a scenario row, or **Save & Run** in the editor, opens the run dialog. It asks for the run name and the agent to test. The name is prefilled, and the defaults are fine for a first run.
 
 <Frame>
-<img className="block" src="/images/agent-testing/run-dialog.png" alt="The run dialog with the run name, the agent to be tested and the Customize your run chips" />
+  <img
+    className="block"
+    src="/images/agent-testing/run-dialog.png"
+    alt="The run dialog with the run name, the agent to be tested and the Customize your run chips"
+  />
 </Frame>
 
 ### Run a test suite
@@ -82,7 +100,11 @@ Through the [LangWatch MCP integration](/integration/mcp), coding assistants suc
 The run opens as soon as it starts. Every row is one conversation with your agent, and its result appears when the judge is done. Press a row to watch the conversation.
 
 <Frame>
-<img className="block" src="/images/agent-testing/run-detail-running.png" alt="A run in progress, with scenarios still running and the first results in" />
+  <img
+    className="block"
+    src="/images/agent-testing/run-detail-running.png"
+    alt="A run in progress, with scenarios still running and the first results in"
+  />
 </Frame>
 
 A run of a few scenarios takes a few minutes. You can leave the page. **Open recent run** at the top of the table, or in a scenario's row menu, takes you back to the latest run.
@@ -92,7 +114,11 @@ A run of a few scenarios takes a few minutes. You can leave the page. **Open rec
 Press a row of a finished run. The drawer shows the conversation, then the verdict: **FAILED CRITERIA**, **PASSED CRITERIA** and **JUDGE REASONING**. The reasoning cites what the agent did, for example which lookup it made before answering.
 
 <Frame>
-<img className="block" src="/images/agent-testing/run-drawer-passed.png" alt="The conversation drawer of a passed run, with the transcript, the passed criteria and the judge reasoning" />
+  <img
+    className="block"
+    src="/images/agent-testing/run-drawer-passed.png"
+    alt="The conversation drawer of a passed run, with the transcript, the passed criteria and the judge reasoning"
+  />
 </Frame>
 
 A criterion has three possible outcomes:
@@ -108,7 +134,11 @@ Each turn has a **View trace** link with the exact steps the agent took for that
 The **Results** tab lists every run plan of the project. A run plan is the history of one configuration: the same scenarios against the same agent, run again and again. Each row shows the last run, the pass rate and the trend of recent runs, so you see a regression at the next run.
 
 <Frame>
-<img className="block" src="/images/agent-testing/results-tab.png" alt="The Results tab with the run plans of the project, their pass rates and trends" />
+  <img
+    className="block"
+    src="/images/agent-testing/results-tab.png"
+    alt="The Results tab with the run plans of the project, their pass rates and trends"
+  />
 </Frame>
 
 ## Make it a habit

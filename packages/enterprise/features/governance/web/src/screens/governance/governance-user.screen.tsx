@@ -1,12 +1,4 @@
-import {
-  Box,
-  Heading,
-  HStack,
-  SimpleGrid,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Heading, HStack, SimpleGrid, Spinner, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import GovernanceLayout from "../../ui/sections/governance-layout";
 import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
@@ -39,8 +31,7 @@ const fmtRelative = (date: Date | string | null): string => {
 
 function GovernanceUserDetailPage() {
   const router = useGovernanceRouter();
-  const actor =
-    typeof router.query.id === "string" ? decodeURIComponent(router.query.id) : null;
+  const actor = typeof router.query.id === "string" ? decodeURIComponent(router.query.id) : null;
   const { organization, hasAnyPermission } = useGovernanceScope();
   const orgId = organization?.id ?? "";
   const canReadActivity = hasAnyPermission("activityMonitor:view");
@@ -111,18 +102,13 @@ function GovernanceUserDetailPage() {
               <Stat label="Most-used" value={user.mostUsedTarget ?? "—"} />
             </SimpleGrid>
 
-            <Box
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="md"
-              padding={4}
-            >
+            <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
               <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend trend and per-model breakdown for this user will land here
-                in a follow-up.
+                Per-day spend trend and per-model breakdown for this user will land here in a
+                follow-up.
               </Text>
               {personalProject && (
                 <>
@@ -135,8 +121,8 @@ function GovernanceUserDetailPage() {
                     View {personalProject.displayName}'s personal workspace →
                   </Link>
                   <Text fontSize="xs" color="fg.subtle" marginTop={1} marginBottom={3}>
-                    Opens their trace explorer with a 'Viewing as admin' banner. Each
-                    access is recorded at /settings/audit-log.
+                    Opens their trace explorer with a 'Viewing as admin' banner. Each access is
+                    recorded at /settings/audit-log.
                   </Text>
                 </>
               )}
@@ -144,8 +130,8 @@ function GovernanceUserDetailPage() {
                 See this user in the bird's-eye chart →
               </Link>
               <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                The chart's {`'By User'`} toggle exercises the same data through one
-                orthogonal lens until the dedicated drilldown ships.
+                The chart's {`'By User'`} toggle exercises the same data through one orthogonal lens
+                until the dedicated drilldown ships.
               </Text>
             </Box>
           </>

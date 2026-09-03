@@ -188,9 +188,7 @@ describe("WorkflowNlpExecutionService", () => {
     }
 
     const signature = event.payload.workflow.nodes[0];
-    const signatureData = z
-      .looseObject({ llm: llmConfigSchema.optional() })
-      .parse(signature?.data);
+    const signatureData = z.looseObject({ llm: llmConfigSchema.optional() }).parse(signature?.data);
     const parameter = signature?.data.parameters?.[0];
 
     expect(signatureData.llm).toEqual({

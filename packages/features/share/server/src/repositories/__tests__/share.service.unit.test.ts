@@ -124,9 +124,7 @@ describe("ShareService", () => {
       /** @scenario A viewer refreshing a single-view link keeps access */
       it("still resolves a link their own earlier view already spent", async () => {
         vi.mocked(cache.isNewViewing).mockResolvedValue(false);
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(
-          buildShare({ maxViews: 1, viewCount: 1 }),
-        );
+        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 1 }));
 
         await expect(
           service.resolveForViewer({
@@ -315,9 +313,7 @@ describe("ShareService", () => {
     describe("given a project-scoped link", () => {
       /** @scenario A project link requires a member of the same project */
       it("grants a member of that project", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(
-          buildShare({ visibility: "PROJECT" }),
-        );
+        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare({ visibility: "PROJECT" }));
         vi.mocked(permissions.getDecision).mockResolvedValue({
           permitted: true,
         } as never);
@@ -336,9 +332,7 @@ describe("ShareService", () => {
       });
 
       it("denies a non-member", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(
-          buildShare({ visibility: "PROJECT" }),
-        );
+        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare({ visibility: "PROJECT" }));
 
         await expect(
           service.resolveForViewer({ token: "tok_abc", viewer: anonymousViewer }),
@@ -349,9 +343,7 @@ describe("ShareService", () => {
     describe("given a single-view link", () => {
       /** @scenario A single-view link resolves exactly once */
       it("grants the first view through the atomic consume", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(
-          buildShare({ maxViews: 1, viewCount: 0 }),
-        );
+        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 0 }));
 
         const share = await service.resolveForViewer({
           token: "tok_abc",
@@ -367,9 +359,7 @@ describe("ShareService", () => {
       });
 
       it("throws exhausted once the view was already spent, without a write attempt", async () => {
-        vi.mocked(repo.tryFindByToken).mockResolvedValue(
-          buildShare({ maxViews: 1, viewCount: 1 }),
-        );
+        vi.mocked(repo.tryFindByToken).mockResolvedValue(buildShare({ maxViews: 1, viewCount: 1 }));
 
         await expect(
           service.resolveForViewer({ token: "tok_abc", viewer: anonymousViewer }),
@@ -584,9 +574,9 @@ describe("ShareService", () => {
     it("uses the same redaction-aware key for reads and writes", async () => {
       vi.mocked(cache.tryGetPayload).mockResolvedValue({ trace: "cached" });
 
-      await expect(
-        service.tryGetCachedPayload({ token: "token", protections }),
-      ).resolves.toEqual({ trace: "cached" });
+      await expect(service.tryGetCachedPayload({ token: "token", protections })).resolves.toEqual({
+        trace: "cached",
+      });
       await service.cachePayload({
         token: "token",
         protections,
@@ -635,10 +625,7 @@ describe("ShareService", () => {
       });
 
       it("continues with the remaining traces when one auto-unpin fails", async () => {
-        vi.mocked(repo.findAllTraceShareResourceIds).mockResolvedValue([
-          "trace_a",
-          "trace_b",
-        ]);
+        vi.mocked(repo.findAllTraceShareResourceIds).mockResolvedValue(["trace_a", "trace_b"]);
         vi.mocked(dataRetention.autoUnpin)
           .mockRejectedValueOnce(new Error("boom"))
           .mockResolvedValueOnce(void 0);

@@ -30,14 +30,12 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     apiKeyId: "key-warm",
   }));
   const checkPermit = vi.fn(async () => ({ allowed: true }));
-  const getOrProvision = vi.fn(
-    async (): Promise<Record<string, unknown>> => ({
-      organizationId: "org-1",
-      llmVirtualKey: "vk",
-      langwatchEndpoint: "http://lw",
-      gatewayBaseUrl: "http://gw",
-    }),
-  );
+  const getOrProvision = vi.fn(async (): Promise<Record<string, unknown>> => ({
+    organizationId: "org-1",
+    llmVirtualKey: "vk",
+    langwatchEndpoint: "http://lw",
+    gatewayBaseUrl: "http://gw",
+  }));
   const getModelsAllowed = vi.fn(async (): Promise<string[] | null> => null);
 
   const conversations = {
@@ -220,9 +218,7 @@ describe("LangyTurnWarmService.warmConversationWorker", () => {
     /** @scenario A user whose role cannot carry Langy scope sees nothing */
     it("swallows the scope refusal and reports it warmed nothing", async () => {
       const { deps, mocks } = makeDeps();
-      mocks.mintSessionKey.mockRejectedValue(
-        new LangySessionKeyScopeError("no scope"),
-      );
+      mocks.mintSessionKey.mockRejectedValue(new LangySessionKeyScopeError("no scope"));
       const service = LangyTurnWarmService.create(deps);
 
       const result = await service.warmConversationWorker(warmInput());
@@ -287,9 +283,7 @@ describe("LangyTurnWarmService.warmConversationWorker", () => {
       });
       const service = LangyTurnWarmService.create(deps);
 
-      await service.warmConversationWorker(
-        warmInput({ requestedConversationId: "conv-external" }),
-      );
+      await service.warmConversationWorker(warmInput({ requestedConversationId: "conv-external" }));
 
       expect(mocks.ensureConversation).toHaveBeenCalledWith(
         expect.objectContaining({

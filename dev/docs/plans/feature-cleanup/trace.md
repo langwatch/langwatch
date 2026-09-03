@@ -17,11 +17,11 @@ sites naming files that no longer exist, and one genuinely dead module.
 
 **56,043 lines across 376 non-test files**, in three published packages.
 
-| Package | Files | Lines | External importers |
-|---|---:|---:|---:|
-| `@langwatch/trace-server` | 181 | 29,990 | 50 |
-| `@langwatch/trace-contract` | 60 | 8,427 | 237 |
-| `@langwatch/trace-web` | 135 | 17,626 | 235 (all `platform/app`) |
+| Package                     | Files |  Lines |       External importers |
+| --------------------------- | ----: | -----: | -----------------------: |
+| `@langwatch/trace-server`   |   181 | 29,990 |                       50 |
+| `@langwatch/trace-contract` |    60 |  8,427 |                      237 |
+| `@langwatch/trace-web`      |   135 | 17,626 | 235 (all `platform/app`) |
 
 Plus 90 test files in the server package.
 
@@ -99,15 +99,15 @@ The 42 split cleanly into two populations that share nothing:
 **(a) Vendor canonicalisation rules — 24 files**, each imported by exactly one
 canonicaliser one directory down:
 
-| Canonicaliser | Lines | Its rules files, one directory up | Their lines |
-|---|---:|---|---:|
-| `canonicalisation/langwatch.canonicaliser.ts` | 19 | `langwatch-value` · `langwatch-metrics` · `langwatch-metadata` · `langwatch-identity` (+ `langwatch-structured-value`) | 408 |
-| `canonicalisation/vertex-adk.canonicaliser.ts` | 23 | `vertex-adk-core` · `-request` · `-response` · `-tool-call` | 291 |
-| `canonicalisation/gen-ai.canonicaliser.ts` | 19 | `gen-ai-span` · `gen-ai-log` | 335 |
-| `canonicalisation/codex.canonicaliser.ts` | 21 | `codex-span` · `codex-log` (+ `codex-canonical-value`) | 325 |
-| `canonicalisation/vercel.canonicaliser.ts` | 17 | `vercel-core` → `vercel-tool-call` · `vercel-io` | 292 |
-| `canonicalisation/mastra.canonicaliser.ts` | 249 | `mastra-value` | 225 |
-| `services/trace-canonicalisation.service.ts` | 226 | `claude-code-request` → `claude-code-truncated-request` (+ `-response`, `-content`, `-call-policy`) | 919 |
+| Canonicaliser                                  | Lines | Its rules files, one directory up                                                                                      | Their lines |
+| ---------------------------------------------- | ----: | ---------------------------------------------------------------------------------------------------------------------- | ----------: |
+| `canonicalisation/langwatch.canonicaliser.ts`  |    19 | `langwatch-value` · `langwatch-metrics` · `langwatch-metadata` · `langwatch-identity` (+ `langwatch-structured-value`) |         408 |
+| `canonicalisation/vertex-adk.canonicaliser.ts` |    23 | `vertex-adk-core` · `-request` · `-response` · `-tool-call`                                                            |         291 |
+| `canonicalisation/gen-ai.canonicaliser.ts`     |    19 | `gen-ai-span` · `gen-ai-log`                                                                                           |         335 |
+| `canonicalisation/codex.canonicaliser.ts`      |    21 | `codex-span` · `codex-log` (+ `codex-canonical-value`)                                                                 |         325 |
+| `canonicalisation/vercel.canonicaliser.ts`     |    17 | `vercel-core` → `vercel-tool-call` · `vercel-io`                                                                       |         292 |
+| `canonicalisation/mastra.canonicaliser.ts`     |   249 | `mastra-value`                                                                                                         |         225 |
+| `services/trace-canonicalisation.service.ts`   |   226 | `claude-code-request` → `claude-code-truncated-request` (+ `-response`, `-content`, `-call-policy`)                    |         919 |
 
 `vercel.canonicaliser.ts` in full — this is the whole file:
 
@@ -146,10 +146,10 @@ file as if it were a rule. Not re-exported from `index.ts`.
 
 ### P3 — Two `capPayloadString` implementations, same algorithm, same marker (R8)
 
-| File | Lines | Consumers |
-|---|---:|---|
-| `services/payload-cap.rules.ts` | 22 | `claude-code-request.rules.ts:4`, `claude-code-response.rules.ts:3`, `claude-code-content.rules.ts:1` |
-| `services/trace-payload-cap.rules.ts` | 75 (48 comment / 24 code) | `index.ts` only → 2 external files |
+| File                                  |                     Lines | Consumers                                                                                             |
+| ------------------------------------- | ------------------------: | ----------------------------------------------------------------------------------------------------- |
+| `services/payload-cap.rules.ts`       |                        22 | `claude-code-request.rules.ts:4`, `claude-code-response.rules.ts:3`, `claude-code-content.rules.ts:1` |
+| `services/trace-payload-cap.rules.ts` | 75 (48 comment / 24 code) | `index.ts` only → 2 external files                                                                    |
 
 Byte-identical marker string in both — `payload-cap.rules.ts:15` and
 `trace-payload-cap.rules.ts:54`:
@@ -175,13 +175,13 @@ the old value.
 
 ### P4 — Five more helpers defined two or three times each (R8)
 
-| Helper | Definitions |
-|---|---|
-| `isRecord` | `repositories/clickhouse/trace-full-protection.mapper.ts:176` · `repositories/clickhouse/trace-full-record.mapper.ts:301` · `services/canonical-guard.rules.ts:4` |
-| `safeStringify` | `services/canonical-guard.rules.ts:102` · `services/langwatch-structured-value.rules.ts:17` · `services/claude-code-response.rules.ts:255` |
-| `stringifyToolPayload` | `services/vercel-tool-call.rules.ts:53` · `services/gemini-content.rules.ts:146` — **behaviourally identical**, one written as `function`, one as `const` |
-| `utf8ByteLength` | `services/trace-attribute-cap.rules.ts:51` · `services/trace-payload-cap.rules.ts:34` |
-| `traceScopeSchema` | `transport/api-trpc/trace-edit-overlay.api.ts:104` · `traces.api.ts:148` · `spans.api.ts:70` — same `z.object({ projectId, traceId })` three times |
+| Helper                 | Definitions                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isRecord`             | `repositories/clickhouse/trace-full-protection.mapper.ts:176` · `repositories/clickhouse/trace-full-record.mapper.ts:301` · `services/canonical-guard.rules.ts:4` |
+| `safeStringify`        | `services/canonical-guard.rules.ts:102` · `services/langwatch-structured-value.rules.ts:17` · `services/claude-code-response.rules.ts:255`                        |
+| `stringifyToolPayload` | `services/vercel-tool-call.rules.ts:53` · `services/gemini-content.rules.ts:146` — **behaviourally identical**, one written as `function`, one as `const`         |
+| `utf8ByteLength`       | `services/trace-attribute-cap.rules.ts:51` · `services/trace-payload-cap.rules.ts:34`                                                                             |
+| `traceScopeSchema`     | `transport/api-trpc/trace-edit-overlay.api.ts:104` · `traces.api.ts:148` · `spans.api.ts:70` — same `z.object({ projectId, traceId })` three times                |
 
 Separately, `asNumber` has **three divergent** definitions
 (`canonical-guard.rules.ts:29` handles `bigint`; `codex-canonical-value.rules.ts:17`
@@ -244,14 +244,14 @@ The problem is concentrated.
 
 **Six files carry more comment than code, most by 2× or more:**
 
-| Ratio | Comment / code | File |
-|---:|---:|---|
-| 4.36 | 48 / 11 | `services/trace-span-storage-group.rules.ts` |
-| 2.80 | 98 / 35 | `services/trace-storage-anchor.rules.ts` |
-| 2.36 | 26 / 11 | `adapters/trace-facet-span-status.clickhouse.adapter.ts` |
-| 2.09 | 46 / 22 | `services/trace-viewer-protections.service.ts` |
-| 2.03 | 59 / 29 | `services/trace-span-command-shard.rules.ts` |
-| 2.00 | 48 / 24 | `services/trace-payload-cap.rules.ts` |
+| Ratio | Comment / code | File                                                     |
+| ----: | -------------: | -------------------------------------------------------- |
+|  4.36 |        48 / 11 | `services/trace-span-storage-group.rules.ts`             |
+|  2.80 |        98 / 35 | `services/trace-storage-anchor.rules.ts`                 |
+|  2.36 |        26 / 11 | `adapters/trace-facet-span-status.clickhouse.adapter.ts` |
+|  2.09 |        46 / 22 | `services/trace-viewer-protections.service.ts`           |
+|  2.03 |        59 / 29 | `services/trace-span-command-shard.rules.ts`             |
+|  2.00 |        48 / 24 | `services/trace-payload-cap.rules.ts`                    |
 
 Every one is an **incident narrative or a rollout note**, exactly the class R7 sends
 to an ADR. `trace-span-storage-group.rules.ts:1-29` is a 29-line header for a 6-line
@@ -273,25 +273,25 @@ superseded design:
 **17 distinct file references in comments point at files that no longer exist**, at
 25 sites. R7's own example. The full list:
 
-| Named file | Cited at |
-|---|---|
-| `./services/storage-anchor.ts` (a `{@link}`) | `projections/trace-derived.projection.ts:383,464` |
-| `traceAnalytics.foldProjection.ts` | `services/trace-storage-anchor.rules.ts:15` |
-| `commandShardKey.ts` | `services/trace-span-storage-group.rules.ts:15` |
-| `spanStorageGroupKey.ts` | `projections/span-storage.projection.ts:33` |
-| `trace-request-collection.service.ts` | `projections/trace-summary.projection.ts:461` |
-| `claudeCode.ts` | `services/trace-io-accumulation.service.ts:126` |
-| `meta-handlers.ts` | `adapters/trace-facet-registry.clickhouse.adapter.ts:164` · `adapters/trace-query.clickhouse.adapter.ts:385` · `contract/src/trace-query-metadata.ts:451` |
-| `filter-to-clickhouse/ast.ts` | `adapters/trace-facet-event-attribute-keys…:25` · `…metadata-keys…:20` · `…span-attribute-keys…:34` |
-| `filter-to-clickhouse/build-handlers.ts` | `adapters/trace-facet-registry.clickhouse.adapter.ts:54` |
-| `build-handlers.ts` | `adapters/trace-query-evaluation.adapter.ts:76` |
-| `span-attribute-keys.ts` | `adapters/trace-facet-event-attribute-keys…:19` · `…metadata-keys…:26` |
-| `facet-registry.ts` | `adapters/trace-facet-query.clickhouse.adapter.ts:12` |
-| `metadata-keys.ts` | `web/src/facet-constants.ts:45` |
-| `densityStore.ts` | `web/src/url-state.ts:2` |
-| `mutations.ts` | `contract/src/trace-query-analysis.ts:4` · `contract/src/trace-query-ast.ts:3` |
-| `queries.ts` | `contract/src/trace-query-ast.ts:2` |
-| `_extraction.ts` | `contract/src/trace-span-io.ts:47` |
+| Named file                                   | Cited at                                                                                                                                                  |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `./services/storage-anchor.ts` (a `{@link}`) | `projections/trace-derived.projection.ts:383,464`                                                                                                         |
+| `traceAnalytics.foldProjection.ts`           | `services/trace-storage-anchor.rules.ts:15`                                                                                                               |
+| `commandShardKey.ts`                         | `services/trace-span-storage-group.rules.ts:15`                                                                                                           |
+| `spanStorageGroupKey.ts`                     | `projections/span-storage.projection.ts:33`                                                                                                               |
+| `trace-request-collection.service.ts`        | `projections/trace-summary.projection.ts:461`                                                                                                             |
+| `claudeCode.ts`                              | `services/trace-io-accumulation.service.ts:126`                                                                                                           |
+| `meta-handlers.ts`                           | `adapters/trace-facet-registry.clickhouse.adapter.ts:164` · `adapters/trace-query.clickhouse.adapter.ts:385` · `contract/src/trace-query-metadata.ts:451` |
+| `filter-to-clickhouse/ast.ts`                | `adapters/trace-facet-event-attribute-keys…:25` · `…metadata-keys…:20` · `…span-attribute-keys…:34`                                                       |
+| `filter-to-clickhouse/build-handlers.ts`     | `adapters/trace-facet-registry.clickhouse.adapter.ts:54`                                                                                                  |
+| `build-handlers.ts`                          | `adapters/trace-query-evaluation.adapter.ts:76`                                                                                                           |
+| `span-attribute-keys.ts`                     | `adapters/trace-facet-event-attribute-keys…:19` · `…metadata-keys…:26`                                                                                    |
+| `facet-registry.ts`                          | `adapters/trace-facet-query.clickhouse.adapter.ts:12`                                                                                                     |
+| `metadata-keys.ts`                           | `web/src/facet-constants.ts:45`                                                                                                                           |
+| `densityStore.ts`                            | `web/src/url-state.ts:2`                                                                                                                                  |
+| `mutations.ts`                               | `contract/src/trace-query-analysis.ts:4` · `contract/src/trace-query-ast.ts:3`                                                                            |
+| `queries.ts`                                 | `contract/src/trace-query-ast.ts:2`                                                                                                                       |
+| `_extraction.ts`                             | `contract/src/trace-span-io.ts:47`                                                                                                                        |
 
 One more outside the package, pointing back in:
 `platform/app/src/runtime/app/trace-processing.adapter.ts:97` says "See
@@ -363,7 +363,7 @@ The unused-value set includes eleven whole service classes and projections
 every `mapSpan*` / `redact*` mapper that `trace-read-mappers.api.ts` already shares
 internally with `shared-trace.api.ts`.
 
-Of the 147 that *are* used, only **26 are used by more than one file**; `Protections`
+Of the 147 that _are_ used, only **26 are used by more than one file**; `Protections`
 alone accounts for 16.
 
 Two `.rules.ts` files exist solely to feed this barrel:
@@ -657,7 +657,7 @@ copy already sitting in `presentation.ts:256` starts reaching customers.
 - **`services/canonicalisation/` — the open set stays open.** One canonicaliser per
   vendor, sixteen of them, each `implements CanonicalAttributesPort`
   (`ports/canonical-attributes.port.ts:25`). New vendors arrive without touching the
-  others; that is correct and P1 is about *where the vendor's rules files sit*, never
+  others; that is correct and P1 is about _where the vendor's rules files sit_, never
   about collapsing the set.
 - **`ports/` — 26 files, 29 abstract classes, 56 signatures.** The fragmentation is
   policy: `packages/architecture-lint/src/port-modules.ts` requires a `.port.ts`
@@ -665,18 +665,19 @@ copy already sitting in `presentation.ts:256` starts reaching customers.
   ports are implemented in `platform/app/src/runtime/app/`** — genuine cross-package
   inversions, exactly R4's keep criterion:
 
-  | Port | Implementation |
-  |---|---|
-  | `TraceSpanPiiRedactionPort` · `…CostEnrichmentPort` · `…TokenEstimationPort` · `…ContentDropPort` · `…SpoolPort` · `TraceSpanNormalizationPort` | `runtime/app/trace-record-span.adapter.ts:31,49,84,107,158,132` |
-  | `TraceAnalyticsProjectionPort` · `TraceAnalyticsRollupPort` · `TraceSpanStoragePort` | `runtime/app/trace-projection-storage.adapter.ts:60,39,21` |
-  | `TraceSummaryProjectionPort` | `runtime/app/trace-summary-fold.adapter.ts:13` |
-  | `TraceProcessingPipelinePort` | `runtime/app/trace-processing.adapter.ts:121` |
-  | `TraceFullIoPort` · `TracePayloadReaderPort` | `runtime/app/features/trace.ts:265,236` |
-  | `TraceIoExtractionPort` · `TraceMediaReferencePort` · `TraceModelCostPort` | `runtime/app/trace-projections.adapter.ts:113,114,115` (structural) |
+  | Port                                                                                                                                            | Implementation                                                      |
+  | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+  | `TraceSpanPiiRedactionPort` · `…CostEnrichmentPort` · `…TokenEstimationPort` · `…ContentDropPort` · `…SpoolPort` · `TraceSpanNormalizationPort` | `runtime/app/trace-record-span.adapter.ts:31,49,84,107,158,132`     |
+  | `TraceAnalyticsProjectionPort` · `TraceAnalyticsRollupPort` · `TraceSpanStoragePort`                                                            | `runtime/app/trace-projection-storage.adapter.ts:60,39,21`          |
+  | `TraceSummaryProjectionPort`                                                                                                                    | `runtime/app/trace-summary-fold.adapter.ts:13`                      |
+  | `TraceProcessingPipelinePort`                                                                                                                   | `runtime/app/trace-processing.adapter.ts:121`                       |
+  | `TraceFullIoPort` · `TracePayloadReaderPort`                                                                                                    | `runtime/app/features/trace.ts:265,236`                             |
+  | `TraceIoExtractionPort` · `TraceMediaReferencePort` · `TraceModelCostPort`                                                                      | `runtime/app/trace-projections.adapter.ts:113,114,115` (structural) |
 
   `CanonicalAttributesPort` has sixteen in-package implementations — real
   polymorphism. Only `ports/trace.port.ts` is flagged (P11), and only because it is a
   repository wearing a port's filename.
+
 - **`services/trace-io-accumulation.service.ts` (494 lines)** — the trace summary
   fold, the hottest correctness path in the feature, already inside its quality
   ceiling. Its one rotted comment reference (`:126`, `claudeCode.ts`) is worth a
@@ -690,7 +691,7 @@ copy already sitting in `presentation.ts:256` starts reaching customers.
 - **`ClickHouseTraceAdapter.createNull` and its seven `Null*` classes**
   (`adapters/clickhouse.trace.adapter.ts:50-158`). This looks like test scaffolding
   and is not: `presets.ts:2109` and `presets.ts:1536` take it in production whenever
-  `clickhouseEnabled` is false. Only the *optionality* around it goes (P8a).
+  `clickhouseEnabled` is false. Only the _optionality_ around it goes (P8a).
 - **`repositories/clickhouse/` (12 files, 4,491 lines).** Every ClickHouse client
   access in the feature is here, below a repository. R1 is clean and should stay
   clean — no service, projection, subscriber or app file in this package holds a
@@ -744,11 +745,11 @@ already written.
 
 ## 6. Blast radius
 
-| Package | External non-test importers | Where they live |
-|---|---:|---|
-| `@langwatch/trace-server` | **50** | `platform/app` 43 · `apps/api` 5 · `apps/worker` 2 — **zero** in `packages/` |
-| `@langwatch/trace-contract` | **237** | `platform/app` 184 · 53 across 13 other feature packages |
-| `@langwatch/trace-web` | **235** | `platform/app` only (205 under `features/traces-v2/`) |
+| Package                     | External non-test importers | Where they live                                                              |
+| --------------------------- | --------------------------: | ---------------------------------------------------------------------------- |
+| `@langwatch/trace-server`   |                      **50** | `platform/app` 43 · `apps/api` 5 · `apps/worker` 2 — **zero** in `packages/` |
+| `@langwatch/trace-contract` |                     **237** | `platform/app` 184 · 53 across 13 other feature packages                     |
+| `@langwatch/trace-web`      |                     **235** | `platform/app` only (205 under `features/traces-v2/`)                        |
 
 **Server package: 150 distinct symbols across 61 import statements; only 26 are used
 by more than one file.** `Protections` leads at 16 files, then `RecordSpanCommand`,
@@ -758,13 +759,13 @@ by more than one file.** `Protections` leads at 16 files, then `RecordSpanComman
 The concentration is what makes the moves cheap. Fourteen files import more than
 three symbols; five of those account for most of the surface:
 
-| File | Symbols |
-|---|---:|
-| `platform/app/src/runtime/app/trace-processing.adapter.ts` | 28 |
-| `platform/app/src/runtime/app/features/trace.ts` | 19 |
-| `platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts` | 17 |
-| `platform/app/src/runtime/app/trace-record-span.adapter.ts` | 10 |
-| `apps/api/src/features/trace/trace-trpc.mount.ts` | 10 |
+| File                                                                      | Symbols |
+| ------------------------------------------------------------------------- | ------: |
+| `platform/app/src/runtime/app/trace-processing.adapter.ts`                |      28 |
+| `platform/app/src/runtime/app/features/trace.ts`                          |      19 |
+| `platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts` |      17 |
+| `platform/app/src/runtime/app/trace-record-span.adapter.ts`               |      10 |
+| `apps/api/src/features/trace/trace-trpc.mount.ts`                         |      10 |
 
 The other 36 importers pull one to three symbols each.
 

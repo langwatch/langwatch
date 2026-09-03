@@ -48,9 +48,7 @@ export const WelcomeScreen: React.FC = () => {
   // survives onboarding). Only relative in-app paths are honored.
   const rawReturnTo = router.query.return_to;
   const returnTo =
-    typeof rawReturnTo === "string" &&
-    rawReturnTo.startsWith("/") &&
-    !rawReturnTo.startsWith("//")
+    typeof rawReturnTo === "string" && rawReturnTo.startsWith("/") && !rawReturnTo.startsWith("//")
       ? rawReturnTo
       : null;
 
@@ -146,11 +144,8 @@ export const WelcomeScreen: React.FC = () => {
     return <LoadingScreen />;
   }
 
-  const currentVisibleIndex = flow.visibleScreens.findIndex(
-    (s) => s === currentScreenIndex,
-  );
-  const currentScreen =
-    currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
+  const currentVisibleIndex = flow.visibleScreens.findIndex((s) => s === currentScreenIndex);
+  const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
 
   const isFirstScreen = currentVisibleIndex <= 0;
   const isLastScreen =
@@ -158,8 +153,7 @@ export const WelcomeScreen: React.FC = () => {
     currentVisibleIndex === flow.visibleScreens.length - 1 &&
     (flow.variant !== "self_hosted" || !isPublicEnvLoading);
 
-  const pendingOrSuccessful =
-    initializeOrganization.isPending || initializeOrganization.isSuccess;
+  const pendingOrSuccessful = initializeOrganization.isPending || initializeOrganization.isSuccess;
 
   return (
     <AnalyticsBoundary name="onboarding_welcome" sendViewedEvent>
@@ -219,10 +213,7 @@ export const WelcomeScreen: React.FC = () => {
                   sendViewedEvent
                 >
                   <OnboardingFormProvider value={formContextValue}>
-                    <fieldset
-                      disabled={pendingOrSuccessful}
-                      style={{ width: "100%", minWidth: 0 }}
-                    >
+                    <fieldset disabled={pendingOrSuccessful} style={{ width: "100%", minWidth: 0 }}>
                       {currentScreen?.component ? <currentScreen.component /> : null}
                     </fieldset>
                   </OnboardingFormProvider>

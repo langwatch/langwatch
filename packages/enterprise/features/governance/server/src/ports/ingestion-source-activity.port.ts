@@ -17,9 +17,7 @@ export abstract class ActivityMonitorRepository {
   abstract summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary>;
   abstract spendByUser(input: ActivityMonitorPagedWindowQuery): Promise<SpendByUserRow[]>;
   abstract spendByTeam(input: ActivityMonitorPagedWindowQuery): Promise<SpendByTeamRow[]>;
-  abstract spendByDepartment(
-    input: ActivityMonitorWindowQuery,
-  ): Promise<SpendByDepartmentRow[]>;
+  abstract spendByDepartment(input: ActivityMonitorWindowQuery): Promise<SpendByDepartmentRow[]>;
   abstract spendOverTime(input: {
     organizationId: string;
     windowDays: number;
@@ -57,7 +55,5 @@ export abstract class GovernanceClickHouseClientPort {
 }
 
 export abstract class GovernanceClickHouseResolverPort {
-  abstract tryResolve(
-    organizationId: string,
-  ): Promise<GovernanceClickHouseClientPort | null>;
+  abstract tryResolve(organizationId: string): Promise<GovernanceClickHouseClientPort | null>;
 }

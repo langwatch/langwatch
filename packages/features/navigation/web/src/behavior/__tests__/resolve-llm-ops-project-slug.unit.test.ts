@@ -67,9 +67,9 @@ describe("resolveLlmOpsProjectSlug", () => {
     });
 
     it("opens a project of a team the reader is on when nothing is remembered", () => {
-      expect(
-        resolve({ ambientProject: { slug: "personal-mia-abc123", isPersonal: true } }),
-      ).toBe("acme-app");
+      expect(resolve({ ambientProject: { slug: "personal-mia-abc123", isPersonal: true } })).toBe(
+        "acme-app",
+      );
     });
   });
 
@@ -79,9 +79,9 @@ describe("resolveLlmOpsProjectSlug", () => {
     });
 
     it("keeps it when the host offers every team, as it does for an admin", () => {
-      expect(
-        resolve({ rememberedProjectSlug: "platform-app", openableTeams: ADMIN_REACH }),
-      ).toBe("platform-app");
+      expect(resolve({ rememberedProjectSlug: "platform-app", openableTeams: ADMIN_REACH })).toBe(
+        "platform-app",
+      );
     });
   });
 

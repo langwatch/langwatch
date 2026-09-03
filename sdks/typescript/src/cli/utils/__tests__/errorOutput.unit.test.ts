@@ -117,9 +117,7 @@ describe("given a failure the platform named", () => {
     });
 
     it("marks the document as a failure so it cannot be mistaken for a result", () => {
-      const parsed: unknown = JSON.parse(
-        renderErrorAsJson(readCommandError(handledError())),
-      );
+      const parsed: unknown = JSON.parse(renderErrorAsJson(readCommandError(handledError())));
 
       expect(parsed).toMatchObject({ ok: false });
     });
@@ -227,9 +225,7 @@ describe("given a domain error whose meta holds an actionable identifier", () =>
 
   describe("when rendering it for a machine", () => {
     it("hands the identifier through so the agent can act on it", () => {
-      const parsed = readCliErrorDocument(
-        renderErrorAsJson(readCommandError(withKeyLikeIds())),
-      );
+      const parsed = readCliErrorDocument(renderErrorAsJson(readCommandError(withKeyLikeIds())));
 
       expect(parsed?.meta).toEqual({
         virtualKeyId: "vk-abc123def456",
@@ -413,11 +409,7 @@ describe("given two concurrent daemon requests in one window", () => {
 
   describe("when they were invoked with different formats", () => {
     it("renders each request's errors in its OWN format", async () => {
-      const render = (
-        id: string,
-        format: string | undefined,
-        delayMs: number,
-      ): Promise<string> =>
+      const render = (id: string, format: string | undefined, delayMs: number): Promise<string> =>
         withExecutionContext(contextFor(id), async () => {
           setOutputFormat(format);
           // Interleave: yield so the other request records ITS format before

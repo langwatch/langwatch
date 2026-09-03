@@ -1,11 +1,7 @@
 import { redactSecretsInText } from "@langwatch/redaction";
 import { describe, expect, it } from "vitest";
 
-import {
-  API_KEY_PREFIX,
-  INGEST_KEY_PREFIX,
-  LEGACY_PAT_PREFIX,
-} from "../api-key.tokens";
+import { API_KEY_PREFIX, INGEST_KEY_PREFIX, LEGACY_PAT_PREFIX } from "../api-key.tokens";
 
 /**
  * The redaction package lists our own key prefixes as known vendor prefixes, and

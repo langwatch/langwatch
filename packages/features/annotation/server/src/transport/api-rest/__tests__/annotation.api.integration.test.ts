@@ -13,10 +13,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createAnnotationsRestApp,
-  type AnnotationRestCredentialPort,
-} from "../annotation.api";
+import { createAnnotationsRestApp, type AnnotationRestCredentialPort } from "../annotation.api";
 
 describe("given the annotations REST family", () => {
   describe("when a project credential resolves", () => {
@@ -168,10 +165,7 @@ function annotationApp(methods: Record<string, unknown>): AnnotationApp {
  * empty by construction and the credential port IS the authentication — which
  * is exactly what these tests need to drive.
  */
-function mount(options: {
-  app: AnnotationApp;
-  credential?: AnnotationRestCredentialPort;
-}) {
+function mount(options: { app: AnnotationApp; credential?: AnnotationRestCredentialPort }) {
   const markUsed = vi.fn();
   const permissions: string[] = [];
   const credential: AnnotationRestCredentialPort =

@@ -6,10 +6,7 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**
@@ -68,8 +65,8 @@ export class EvaluationWorkerFeatureInstaller implements WorkerFeatureInstallerP
     installer: EvaluationWorkerCapability<TEvent>;
     eventing: WorkerEventingRuntime;
   }): EvaluationWorkerFeatureInstaller {
-    return new EvaluationWorkerFeatureInstaller(() =>
-      options.eventing.eventSourcing.register(options.installer.buildProcessing()).commands,
+    return new EvaluationWorkerFeatureInstaller(
+      () => options.eventing.eventSourcing.register(options.installer.buildProcessing()).commands,
     );
   }
 

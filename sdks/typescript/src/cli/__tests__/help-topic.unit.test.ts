@@ -102,9 +102,7 @@ describe("`langwatch help` command", () => {
 
     it("keeps every help topic clear of the registered command tree", () => {
       const program = buildProgram();
-      const registered = new Set(
-        program.commands.flatMap((cmd) => [cmd.name(), ...cmd.aliases()]),
-      );
+      const registered = new Set(program.commands.flatMap((cmd) => [cmd.name(), ...cmd.aliases()]));
 
       const collisions = HELP_TOPIC_NAMES.filter((name) => registered.has(name));
 
@@ -199,12 +197,10 @@ describe("the name usage and errors are titled with", () => {
 
   describe("given the caller's bin travels with the request", () => {
     it("titles usage with the caller's bin, not the serving process's", () => {
-      expect(buildProgram({ bin: "/usr/local/bin/lw" }).helpInformation()).toContain(
-        "Usage: lw ",
+      expect(buildProgram({ bin: "/usr/local/bin/lw" }).helpInformation()).toContain("Usage: lw ");
+      expect(buildProgram({ bin: "/usr/local/bin/langwatch" }).helpInformation()).toContain(
+        "Usage: langwatch ",
       );
-      expect(
-        buildProgram({ bin: "/usr/local/bin/langwatch" }).helpInformation(),
-      ).toContain("Usage: langwatch ");
     });
 
     it("titles commander's own errors with it too, which is where most callers meet the name", () => {

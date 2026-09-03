@@ -624,8 +624,9 @@ describe("ExperimentService", () => {
         const { repository, service } = build();
         repository.values.push(row());
 
-        await expect(service.getById({ projectId: "project_1", id: "experiment_1" })).resolves
-          .toMatchObject({ id: "experiment_1" });
+        await expect(
+          service.getById({ projectId: "project_1", id: "experiment_1" }),
+        ).resolves.toMatchObject({ id: "experiment_1" });
       });
     });
   });

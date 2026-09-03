@@ -4,10 +4,7 @@ import {
   createProcessManagerMaintenancePipeline,
   type ProcessRetentionMetricsPort,
 } from "@langwatch/eventing/server";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** The queue-owned blob keyspace pass, injected because the sweeper holds Redis. */

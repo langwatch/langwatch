@@ -34,9 +34,7 @@ export async function handleListDatasetRecords(params: {
   );
 
   for (const record of records) {
-    lines.push(
-      `**${escapeMarkdown(record.id)}**: ${escapeMarkdown(JSON.stringify(record.entry))}`,
-    );
+    lines.push(`**${escapeMarkdown(record.id)}**: ${escapeMarkdown(JSON.stringify(record.entry))}`);
   }
 
   if (pagination.page < pagination.totalPages) {

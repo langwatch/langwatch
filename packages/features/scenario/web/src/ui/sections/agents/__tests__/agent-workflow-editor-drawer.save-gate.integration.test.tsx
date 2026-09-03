@@ -68,32 +68,24 @@ vi.mock("@langwatch/ui-drawer", () => ({
 // Partial mock: stub the heavy React component but keep the real
 // isScenarioMappingValid / hasScenarioInputMapping so the save-gate tests
 // exercise the actual predicate, not a mock.
-vi.mock(
-  "../../../elements/suites/scenario-input-mapping-section",
-  async (importOriginal) => {
-    const mod =
-      await importOriginal<
-        typeof import("../../../elements/suites/scenario-input-mapping-section")
-      >();
-    return {
-      ...mod,
-      ScenarioInputMappingSection: ({
-        inputs,
-      }: ScenarioInputMappingSectionProps) => (
-        <div data-testid="scenario-mapping-section">
-          {inputs.map((i) => (
-            <div
-              key={i.identifier}
-              data-testid={`scenario-mapping-input-${i.identifier}`}
-            >
-              {i.identifier}
-            </div>
-          ))}
-        </div>
-      ),
-    };
-  },
-);
+vi.mock("../../../elements/suites/scenario-input-mapping-section", async (importOriginal) => {
+  const mod =
+    await importOriginal<
+      typeof import("../../../elements/suites/scenario-input-mapping-section")
+    >();
+  return {
+    ...mod,
+    ScenarioInputMappingSection: ({ inputs }: ScenarioInputMappingSectionProps) => (
+      <div data-testid="scenario-mapping-section">
+        {inputs.map((i) => (
+          <div key={i.identifier} data-testid={`scenario-mapping-input-${i.identifier}`}>
+            {i.identifier}
+          </div>
+        ))}
+      </div>
+    ),
+  };
+});
 
 vi.mock("../../../../behavior/scenario-api", () => ({
   api: {

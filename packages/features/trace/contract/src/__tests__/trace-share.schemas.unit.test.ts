@@ -85,8 +85,7 @@ const INTENTIONALLY_NOT_SHARED: Record<string, string[]> = {
   evaluations: ["inputs"],
 };
 
-const keysOf = (schema: { shape: Record<string, unknown> }) =>
-  Object.keys(schema.shape).sort();
+const keysOf = (schema: { shape: Record<string, unknown> }) => Object.keys(schema.shape).sort();
 
 describe("sharedTrace output schema", () => {
   describe("given an internal read schema the share payload mirrors", () => {

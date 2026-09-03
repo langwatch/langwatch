@@ -1,22 +1,9 @@
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Link } from "../../ui/elements/link";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "../../model/prisma-types";
+import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "../../model/prisma-types";
 import { api } from "../../behavior/organization-api";
 import {
   BindingInputRow,
@@ -71,12 +58,8 @@ export function MemberDetailDialog({
   const queryClient = api.useUtils();
 
   const [pendingRole, setPendingRole] = useState<OrganizationUserRole>(member.role);
-  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(
-    new Set(),
-  );
-  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<
-    PendingBinding[]
-  >([]);
+  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(new Set());
+  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<PendingBinding[]>([]);
   // The input row holds a complete draft the admin never pressed Add on. It
   // counts as a change so Save is enabled, and the save flushes it.
   const [hasDraftBinding, setHasDraftBinding] = useState(false);
@@ -108,8 +91,7 @@ export function MemberDetailDialog({
   const updateOrgRole = api.organization.updateMemberRole.useMutation();
   const applyMemberBindings = api.roleBinding.applyMemberBindings.useMutation();
 
-  const hasBindingChanges =
-    pendingBindingRemovals.size > 0 || pendingBindingAdditions.length > 0;
+  const hasBindingChanges = pendingBindingRemovals.size > 0 || pendingBindingAdditions.length > 0;
   const roleChanged = pendingRole !== member.role;
   const hasChanges = hasBindingChanges || roleChanged || hasDraftBinding;
 
@@ -132,14 +114,11 @@ export function MemberDetailDialog({
   const stageAddition = (incoming: PendingBinding) => {
     const binding = constrainStagedRowToSeat(incoming);
     const alreadyHeld = (directBindings.data ?? []).some(
-      (row) =>
-        !pendingBindingRemovals.has(row.id) && bindingKey(row) === bindingKey(binding),
+      (row) => !pendingBindingRemovals.has(row.id) && bindingKey(row) === bindingKey(binding),
     );
     if (alreadyHeld) return;
     setPendingBindingAdditions((prev) =>
-      prev.some((staged) => bindingKey(staged) === bindingKey(binding))
-        ? prev
-        : [...prev, binding],
+      prev.some((staged) => bindingKey(staged) === bindingKey(binding)) ? prev : [...prev, binding],
     );
   };
 
@@ -196,8 +175,7 @@ export function MemberDetailDialog({
       heldKeys.add(key);
       return true;
     });
-    const hasBindingChangesNow =
-      pendingBindingRemovals.size > 0 || allBindingAdditions.length > 0;
+    const hasBindingChangesNow = pendingBindingRemovals.size > 0 || allBindingAdditions.length > 0;
 
     setIsSaving(true);
     try {
@@ -308,10 +286,7 @@ export function MemberDetailDialog({
                     You cannot change your own organization role.
                   </Text>
                 ) : (
-                  <OrganizationUserRoleField
-                    value={pendingRole}
-                    onChange={setPendingRole}
-                  />
+                  <OrganizationUserRoleField value={pendingRole} onChange={setPendingRole} />
                 )}
               </Box>
             )}
@@ -325,8 +300,7 @@ export function MemberDetailDialog({
 
                 {directBindings.isLoading ? (
                   <Spinner size="sm" />
-                ) : userDirectBindings.length === 0 &&
-                  pendingBindingAdditions.length === 0 ? (
+                ) : userDirectBindings.length === 0 && pendingBindingAdditions.length === 0 ? (
                   <Text fontSize="sm" color="fg.muted" fontStyle="italic">
                     No access configured.
                   </Text>
@@ -361,26 +335,23 @@ export function MemberDetailDialog({
                             {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
                           </Badge>
                           <Spacer />
-                          {b.scopeType !== RoleBindingScopeType.PROJECT &&
-                            !mirrorsTheSeat(b) && (
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                color={markedForRemoval ? "blue.500" : "fg.muted"}
-                                aria-label={
-                                  markedForRemoval ? "Undo removal" : "Remove binding"
-                                }
-                                onClick={() =>
-                                  setPendingBindingRemovals((prev) => {
-                                    const next = new Set(prev);
-                                    next.has(b.id) ? next.delete(b.id) : next.add(b.id);
-                                    return next;
-                                  })
-                                }
-                              >
-                                <X size={14} />
-                              </Button>
-                            )}
+                          {b.scopeType !== RoleBindingScopeType.PROJECT && !mirrorsTheSeat(b) && (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              color={markedForRemoval ? "blue.500" : "fg.muted"}
+                              aria-label={markedForRemoval ? "Undo removal" : "Remove binding"}
+                              onClick={() =>
+                                setPendingBindingRemovals((prev) => {
+                                  const next = new Set(prev);
+                                  next.has(b.id) ? next.delete(b.id) : next.add(b.id);
+                                  return next;
+                                })
+                              }
+                            >
+                              <X size={14} />
+                            </Button>
+                          )}
                         </HStack>
                       );
                     })}
@@ -408,9 +379,7 @@ export function MemberDetailDialog({
                           color="fg.muted"
                           aria-label="Undo add"
                           onClick={() =>
-                            setPendingBindingAdditions((prev) =>
-                              prev.filter((_, j) => j !== i),
-                            )
+                            setPendingBindingAdditions((prev) => prev.filter((_, j) => j !== i))
                           }
                         >
                           <X size={14} />

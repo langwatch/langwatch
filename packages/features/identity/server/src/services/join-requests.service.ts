@@ -61,10 +61,7 @@ export interface JoinRequestNotifier {
     requesterUserId: string;
     domain: string;
   }): Promise<void>;
-  requestStillWaiting(args: {
-    joinRequestId: string;
-    organizationId: string;
-  }): Promise<void>;
+  requestStillWaiting(args: { joinRequestId: string; organizationId: string }): Promise<void>;
   requestApproved(args: {
     joinRequestId: string;
     organizationId: string;
@@ -184,9 +181,7 @@ export class JoinRequestsService {
 
     await this.assertNotLooking({ userId });
 
-    const organizations = await this.deps.candidates.findCandidateOrganizations(
-      { domain },
-    );
+    const organizations = await this.deps.candidates.findCandidateOrganizations({ domain });
     const decision = resolveJoinLookup({
       email: verifiedEmail,
       verified: true,
@@ -229,14 +224,9 @@ export class JoinRequestsService {
       organizationId,
       domain,
     });
-    if (
-      !candidate ||
-      !organizationAdmitsDomain({ organization: candidate, domain })
-    ) {
+    if (!candidate || !organizationAdmitsDomain({ organization: candidate, domain })) {
       // The same refusal an organization that does not exist produces.
-      throw new JoinNotAvailableError(
-        `organization ${organizationId} is not open to ${domain}`,
-      );
+      throw new JoinNotAvailableError(`organization ${organizationId} is not open to ${domain}`);
     }
 
     await this.assertNotAsking({ userId, organizationId });
@@ -550,11 +540,7 @@ export class JoinRequestsService {
   }
 
   /** What this person is waiting on. */
-  async pendingForUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<JoinRequestAggregateState[]> {
+  async pendingForUser({ userId }: { userId: string }): Promise<JoinRequestAggregateState[]> {
     return this.deps.reads.findPendingForUser({ userId });
   }
 
@@ -637,16 +623,10 @@ export class JoinRequestsService {
   }
 
   /** The domain the caller has PROVED, or the universal nothing. */
-  private provenDomainOrRefuse({
-    verifiedEmail,
-  }: {
-    verifiedEmail: string | null;
-  }): string {
+  private provenDomainOrRefuse({ verifiedEmail }: { verifiedEmail: string | null }): string {
     const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
     if (!domain || isPublicEmailDomain(domain)) {
-      throw new JoinNotAvailableError(
-        "no verified company address is available for this request",
-      );
+      throw new JoinNotAvailableError("no verified company address is available for this request");
     }
     return domain;
   }
@@ -666,17 +646,10 @@ export class JoinRequestsService {
     if (!limit.allowed) {
       throw new JoinRequestThrottledError(retryAfterSeconds(limit.resetAt));
     }
-    logger.debug(
-      { organizationId },
-      "join request rate limit checked for an asking user",
-    );
+    logger.debug({ organizationId }, "join request rate limit checked for an asking user");
   }
 
-  private async assertNotLooking({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<void> {
+  private async assertNotLooking({ userId }: { userId: string }): Promise<void> {
     const limit = await this.deps.rateLimit({
       key: `joinRequests.lookup:${userId}`,
       windowSeconds: JOIN_REQUEST_RATE_WINDOW_SECONDS,

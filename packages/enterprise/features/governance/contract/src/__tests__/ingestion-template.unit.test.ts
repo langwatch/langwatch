@@ -27,9 +27,7 @@ describe("ingestion template contract", () => {
   });
 
   it("rejects source types outside the stable wire format", () => {
-    expect(ingestionTemplateSourceTypeSchema.safeParse("Invalid Source!").success).toBe(
-      false,
-    );
+    expect(ingestionTemplateSourceTypeSchema.safeParse("Invalid Source!").success).toBe(false);
     expect(
       createIngestionTemplateInputSchema.safeParse({
         organizationId: "organization-1",

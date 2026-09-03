@@ -53,16 +53,10 @@ function MarkdownWithPluginsAndProxy({
     );
   }
 
-  const urlTransform = (url: string) =>
-    url.startsWith("data:") ? url : defaultUrlTransform(url);
+  const urlTransform = (url: string) => (url.startsWith("data:") ? url : defaultUrlTransform(url));
 
   return (
-    <Prose
-      className={className}
-      fontSize={fontSize}
-      maxWidth="none"
-      {...(color ? { color } : {})}
-    >
+    <Prose className={className} fontSize={fontSize} maxWidth="none" {...(color ? { color } : {})}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         urlTransform={urlTransform}

@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { setupObservability } from "../../setup";
-import {
-  InMemoryLogRecordExporter,
-  SimpleLogRecordProcessor,
-} from "@opentelemetry/sdk-logs";
+import { InMemoryLogRecordExporter, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { getLangWatchLogger } from "../../../../logger";
 import { resetObservabilitySdkConfig } from "../../../../config.js";
 

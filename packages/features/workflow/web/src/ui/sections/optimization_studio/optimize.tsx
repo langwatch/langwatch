@@ -322,14 +322,11 @@ export function OptimizeModalContent({
     ],
   );
 
-  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
-    useModelProviderKeys({
-      workflow: getWorkflow(),
-      extra_llms:
-        "llm" in optimizer.params && "llm" in params && params.llm
-          ? [params.llm]
-          : undefined,
-    });
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } = useModelProviderKeys({
+    workflow: getWorkflow(),
+    extra_llms:
+      "llm" in optimizer.params && "llm" in params && params.llm ? [params.llm] : undefined,
+  });
 
   const isRunning = optimizationState?.status === "running";
 
@@ -512,9 +509,7 @@ export function OptimizeModalContent({
                 <Button
                   variant="outline"
                   type="submit"
-                  loading={
-                    commitVersion.isPending || optimizationState?.status === "waiting"
-                  }
+                  loading={commitVersion.isPending || optimizationState?.status === "waiting"}
                   disabled={!!isDisabled}
                 >
                   <CheckSquare size={16} />
@@ -545,9 +540,7 @@ const OptimizerSelect = ({
       value={field.value?.value ? [field.value.value] : []}
       onChange={undefined}
       onValueChange={(change) => {
-        const selectedOption = optimizerOptions.find(
-          (option) => option.value === change.value[0],
-        );
+        const selectedOption = optimizerOptions.find((option) => option.value === change.value[0]);
         field.onChange({
           target: {
             name: field.name,

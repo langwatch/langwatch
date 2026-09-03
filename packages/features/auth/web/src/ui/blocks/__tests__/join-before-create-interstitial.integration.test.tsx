@@ -20,9 +20,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { JoinBeforeCreateInterstitial } from "../join-before-create-interstitial";
 
 const renderStep = (
-  props: Partial<
-    React.ComponentProps<typeof JoinBeforeCreateInterstitial>
-  > = {},
+  props: Partial<React.ComponentProps<typeof JoinBeforeCreateInterstitial>> = {},
 ) => {
   const onCreateWorkspace = vi.fn();
   const onJoinOrganization = vi.fn();
@@ -43,9 +41,7 @@ const renderStep = (
 
 const openToAcme: JoinLookupDecision = {
   outcome: "ask",
-  organizations: [
-    { organizationId: "org_acme", name: "Acme", colleagueCount: 10 },
-  ],
+  organizations: [{ organizationId: "org_acme", name: "Acme", colleagueCount: 10 }],
 };
 
 describe("given a verified address that matches no organization", () => {
@@ -103,12 +99,7 @@ describe("given a domain that admits verified colleagues automatically", () => {
   describe("when sign-up reaches the join-before-create step", () => {
     /** @scenario Automatic joining skips the step entirely */
     it("shows neither a join offer nor a workspace creation step", async () => {
-      const {
-        container,
-        onCreateWorkspace,
-        onJoinOrganization,
-        onAlreadyJoined,
-      } = renderStep({
+      const { container, onCreateWorkspace, onJoinOrganization, onAlreadyJoined } = renderStep({
         lookup: {
           outcome: "auto",
           organization: {

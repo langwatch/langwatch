@@ -4,8 +4,17 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
 import { Link } from "../../elements/link";
-import { type AvailableSource, type FieldMapping, VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
-import { getComplexProps, getFlowCallbacks, useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
+import {
+  type AvailableSource,
+  type FieldMapping,
+  VariablesSection,
+} from "@langwatch/prompt-web/surfaces/variables";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web";
 import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";

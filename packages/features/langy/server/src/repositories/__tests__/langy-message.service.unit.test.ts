@@ -13,9 +13,7 @@ function makeMessageRepo(overrides?: Partial<LangyMessageRepository>) {
   } as LangyMessageRepository;
 }
 
-function conversationRow(
-  overrides: Partial<LangyConversationRow> = {},
-): LangyConversationRow {
+function conversationRow(overrides: Partial<LangyConversationRow> = {}): LangyConversationRow {
   return {
     id: "conversation-1",
     userId: "user-1",

@@ -53,13 +53,9 @@ describe("classifyPromptText", () => {
       "<task-notification><summary>\n  Monitor event\n  fired twice\n</summary></task-notification>",
     );
 
-    expect(long.notices[0]?.label.length).toBeLessThanOrEqual(
-      "task notification: ".length + 120,
-    );
+    expect(long.notices[0]?.label.length).toBeLessThanOrEqual("task notification: ".length + 120);
     expect(long.notices[0]?.label.endsWith("…")).toBe(true);
-    expect(multiline.notices[0]?.label).toBe(
-      "task notification: Monitor event fired twice",
-    );
+    expect(multiline.notices[0]?.label).toBe("task notification: Monitor event fired twice");
   });
 
   it("handles the plain system marker and an unclosed block", () => {
@@ -69,9 +65,7 @@ describe("classifyPromptText", () => {
     expect(marker.notices[0]?.label).toBe("Rate limit reset");
     expect(marker.remainder).toBeNull();
 
-    const unclosed = classifyPromptText(
-      "<task-notification>never closed, and then some words",
-    );
+    const unclosed = classifyPromptText("<task-notification>never closed, and then some words");
     expect(unclosed.notices).toEqual([]);
     expect(unclosed.remainder).toContain("never closed");
   });

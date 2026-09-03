@@ -49,9 +49,7 @@ describe("tagDeleteCommand", () => {
     vi.clearAllMocks();
     mockDeleteTag = vi.fn();
     vi.mocked(PromptsApiService).mockImplementation(function () {
-      return { deleteTag: mockDeleteTag } as unknown as InstanceType<
-        typeof PromptsApiService
-      >;
+      return { deleteTag: mockDeleteTag } as unknown as InstanceType<typeof PromptsApiService>;
     });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
@@ -77,9 +75,7 @@ describe("tagDeleteCommand", () => {
       const result = await tagDeleteCommand("canary");
       result?.table();
 
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining("Deleted tag: canary"),
-      );
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Deleted tag: canary"));
     });
   });
 
@@ -124,9 +120,7 @@ describe("tagDeleteCommand", () => {
       const result = await tagDeleteCommand("canary", { force: true });
       result?.table();
 
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining("Deleted tag: canary"),
-      );
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Deleted tag: canary"));
     });
   });
 });

@@ -67,7 +67,10 @@ const complete = endpoint
   .handle((_context: Context, input) => ({ ok: input.projectId.length > 0 }));
 
 type _HandledIsRecorded = Assert<
-  Equal<typeof complete, RestEndpoint<{ app: true }, typeof scopedInput, typeof output, true, true, true, true, true>>
+  Equal<
+    typeof complete,
+    RestEndpoint<{ app: true }, typeof scopedInput, typeof output, true, true, true, true, true>
+  >
 >;
 
 /** An endpoint that takes nothing and answers nothing is complete as it is. */

@@ -19,16 +19,10 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
-import {
-  type HttpPollingConfig,
-  HttpPollingPullerAdapter,
-} from "./http-poller.adapter";
+import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http-poller.adapter";
 import type { GovernanceHttpPort } from "../ports/governance-http.port";
 import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port";
-import type {
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
+import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
 /**
  * Locked reference config for Anthropic's compliance API. Admins
@@ -86,10 +80,7 @@ export class ClaudeComplianceReferencePuller extends HttpPollingPullerAdapter {
     return CLAUDE_COMPLIANCE_PULL_CONFIG;
   }
 
-  override async runOnce(
-    options: PullRunOptions,
-    _config: HttpPollingConfig,
-  ): Promise<PullResult> {
+  override async runOnce(options: PullRunOptions, _config: HttpPollingConfig): Promise<PullResult> {
     return super.runOnce(options, CLAUDE_COMPLIANCE_PULL_CONFIG);
   }
 }

@@ -37,10 +37,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import {
-  LANGY_PROMPT_DEFAULT_TAG,
-  type LangyPromptHandle,
-} from "@langwatch/langy-contract";
+import { LANGY_PROMPT_DEFAULT_TAG, type LangyPromptHandle } from "@langwatch/langy-contract";
 
 const logger = createLogger("langwatch:langy:prompt-registry");
 

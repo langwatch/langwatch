@@ -16,9 +16,7 @@ type ActivePlanLike = {
  */
 const OPEN_SOURCE_PLAN_TYPE = "OPEN_SOURCE";
 
-export function resolveCurrentComparisonPlan(
-  activePlan?: ActivePlanLike,
-): ComparisonPlanId | null {
+export function resolveCurrentComparisonPlan(activePlan?: ActivePlanLike): ComparisonPlanId | null {
   if (!activePlan) {
     return null;
   }
@@ -33,10 +31,7 @@ export function resolveCurrentComparisonPlan(
     return "free";
   }
 
-  if (
-    normalizedType === "GROWTH" ||
-    (normalizedType && isGrowthSeatEventPlan(normalizedType))
-  ) {
+  if (normalizedType === "GROWTH" || (normalizedType && isGrowthSeatEventPlan(normalizedType))) {
     return "growth";
   }
 

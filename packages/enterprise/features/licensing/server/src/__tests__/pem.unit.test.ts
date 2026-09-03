@@ -4,8 +4,7 @@ import { NodeLicenseCryptographyAdapter } from "../index";
 import { canonicalPemKey, mangledPemPastes } from "../testing";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing";
 
-const { isEncryptedPemKey, looksLikePemKey, normalizePemKey } =
-  NodeLicenseCryptographyAdapter;
+const { isEncryptedPemKey, looksLikePemKey, normalizePemKey } = NodeLicenseCryptographyAdapter;
 
 /** A pristine key, exactly as `openssl` writes it. */
 const canonicalKey = canonicalPemKey(TEST_PRIVATE_KEY);
@@ -63,9 +62,7 @@ describe("normalizePemKey, given input that is not one plain key", () => {
     });
 
     it("keeps a bundle signable, as it was before normalization", () => {
-      expect(signAndVerify(normalizePemKey(`${TEST_PUBLIC_KEY}${canonicalKey}`))).toBe(
-        true,
-      );
+      expect(signAndVerify(normalizePemKey(`${TEST_PUBLIC_KEY}${canonicalKey}`))).toBe(true);
     });
 
     it("selects the private key when it comes first too", () => {

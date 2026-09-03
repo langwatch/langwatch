@@ -4,8 +4,7 @@ export const LICENSING_FEATURE_ID = "licensing" as const;
 
 export const CONTACT_SALES_URL = "https://langwatch.ai/get-a-demo";
 
-export const DEFAULT_LICENSE_PURCHASE_URL =
-  "https://buy.stripe.com/dRm3cwaIDgXs6yK6sX0480f";
+export const DEFAULT_LICENSE_PURCHASE_URL = "https://buy.stripe.com/dRm3cwaIDgXs6yK6sX0480f";
 
 /**
  * Default limit for fields not present in older licenses.

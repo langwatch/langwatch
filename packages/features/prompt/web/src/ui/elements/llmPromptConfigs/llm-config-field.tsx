@@ -2,10 +2,7 @@ import { Box, Popover as ChakraPopover, HStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import {
-  LLMConfigPopover,
-  type Output,
-} from "./llm-config-popover";
+import { LLMConfigPopover, type Output } from "./llm-config-popover";
 import { AddModelProviderKey } from "@langwatch/workflow-web/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import type { ModelOption } from "@langwatch/topic-contract";

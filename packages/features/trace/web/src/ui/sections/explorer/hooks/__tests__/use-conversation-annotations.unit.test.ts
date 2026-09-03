@@ -61,9 +61,7 @@ describe("useConversationAnnotations", () => {
     it("groups them under the turn each was left on", () => {
       annotations.rows = [annotation("trace-1"), annotation("trace-2")];
 
-      const { result } = renderHook(() =>
-        useConversationAnnotations(["trace-1", "trace-2"]),
-      );
+      const { result } = renderHook(() => useConversationAnnotations(["trace-1", "trace-2"]));
 
       expect(result.current.all).toHaveLength(2);
       expect(result.current.hasAny).toBe(true);

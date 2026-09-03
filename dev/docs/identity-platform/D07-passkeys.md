@@ -20,7 +20,7 @@ Passkeys become first-class identifiers: WebAuthn ceremonies via the official pl
 
 **Decided 2026-08-24. `amr: ["phw"]` counts, and the person is not held at D06's enrollment gate.**
 
-The reasoning, in one paragraph so nobody re-opens it. `mfaRequired` exists to stop an attacker who has the password. A passkey is possession-based, so it clears that bar on its own; and it is phishing-resistant, so it also clears a bar TOTP does not — a convincing website can talk somebody through reading a code off their screen, and cannot talk a browser into signing a challenge for the wrong origin. Requiring an enrollment on top of a passkey would therefore demand a *weaker* proof in addition to a stronger one, which is theatre.
+The reasoning, in one paragraph so nobody re-opens it. `mfaRequired` exists to stop an attacker who has the password. A passkey is possession-based, so it clears that bar on its own; and it is phishing-resistant, so it also clears a bar TOTP does not — a convincing website can talk somebody through reading a code off their screen, and cannot talk a browser into signing a challenge for the wrong origin. Requiring an enrollment on top of a passkey would therefore demand a _weaker_ proof in addition to a stronger one, which is theatre.
 
 One boundary worth stating, because it is the one thing that differs from an account-level enrollment: a passkey satisfies the condition **per sign-in**, not for the account. The passkey proved itself on the session it minted; a password sign-in by the same person is a different sign-in that proves nothing extra. So somebody whose only second factor is a passkey still meets the gate when they sign in another way — and signing in with the passkey is the shortest way through it.
 
@@ -30,14 +30,14 @@ A passkey synced across a person's devices is genuinely weaker than one bound to
 
 # Out of Scope
 
-- Passkeys as an MFA *second* factor (they're a first factor here). Conditional UI / autofill polish beyond plugin defaults.
+- Passkeys as an MFA _second_ factor (they're a first factor here). Conditional UI / autofill polish beyond plugin defaults.
 - The org-level hardware-bound-keys-only refinement (above).
 
 # Research
 
 - better-auth 1.6.23: passkey is a **separate package**, not in core (verified against the installed copy — its `./plugins/*` exports list `two-factor` but no `passkey`), and `@better-auth/passkey` is **not yet a dependency of anything in the repo**, so D07 opens with an install; plugin migrations Kysely-only ⇒ hand-written Prisma model; plugin tables bypass `databaseHooks` — moot under R10: the identity adapter sees plugin-table writes uniformly.
 - Already in place, so D07 adds behavior rather than vocabulary: `packages/identity/src/vocabulary.ts` lists `passkey` as a provider kind, and `signin-routing.ts` already classifies it as a local method. `ADR-117` reserves the picker slot ("password + social + passkey placeholder until D07").
-- `specs/auth/phase-1-better-auth-config.feature:166` asserts generic OAuth is the *only* registered plugin. D06 retires that scenario when it registers `twoFactor`; if D07 lands first, it retires it instead.
+- `specs/auth/phase-1-better-auth-config.feature:166` asserts generic OAuth is the _only_ registered plugin. D06 retires that scenario when it registers `twoFactor`; if D07 lands first, it retires it instead.
 - Greenfield otherwise — nothing in `specs/` mentioned a passkey or WebAuthn before this.
 
 # Technical Plan

@@ -18,15 +18,18 @@ vi.mock("../../scenario-roles", async () => {
   return { ...actual, useIsScenarioRole: () => false };
 });
 
-vi.mock("../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context", () => ({
-  useConversationExpand: () => ({
-    isExpandable: false,
-    shouldExpandAll: false,
+vi.mock(
+  "../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context",
+  () => ({
+    useConversationExpand: () => ({
+      isExpandable: false,
+      shouldExpandAll: false,
+    }),
+    ConversationExpandContext: {
+      Provider: ({ children }: { children: unknown }) => children,
+    },
   }),
-  ConversationExpandContext: {
-    Provider: ({ children }: { children: unknown }) => children,
-  },
-}));
+);
 
 vi.mock("../../../../markdown", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
@@ -186,9 +189,7 @@ describe("given a turn whose messages the reader cannot read", () => {
           .getAllByRole("button")
           .map((button) => button.textContent),
       ).toEqual(["Translate"]);
-      expect(
-        screen.queryByRole("button", { name: /^Annotate this/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Annotate this/ })).not.toBeInTheDocument();
     });
   });
 });

@@ -15,10 +15,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  HttpPollingPullerAdapter,
-  type HttpPollingConfig,
-} from "../http-poller.adapter";
+import { HttpPollingPullerAdapter, type HttpPollingConfig } from "../http-poller.adapter";
 import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
 
 const VALID_CONFIG = {

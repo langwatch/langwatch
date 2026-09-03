@@ -127,8 +127,7 @@ export class DatasetService {
 
   async upsertDataset(params: UpsertDatasetParams) {
     // Business logic: resolve name, check conflicts, migrate columns
-    const resolvedName =
-      name ?? (await this.resolveExperimentName(projectId, experimentId));
+    const resolvedName = name ?? (await this.resolveExperimentName(projectId, experimentId));
     // ... orchestrate repositories
   }
 }

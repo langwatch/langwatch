@@ -113,9 +113,9 @@ describe("given a browser posting telemetry", () => {
       // length check on the decoded string passes something 3x over the cap.
       const multibyte = "☃".repeat(RUM_MAX_BODY_BYTES / 2);
 
-      await expect(
-        readCappedBody(requestWith({ body: multibyte })),
-      ).rejects.toBeInstanceOf(RumPayloadTooLargeError);
+      await expect(readCappedBody(requestWith({ body: multibyte }))).rejects.toBeInstanceOf(
+        RumPayloadTooLargeError,
+      );
     });
   });
 
@@ -280,10 +280,7 @@ describe("given a browser posting telemetry", () => {
         "an attribute that is not an object",
         '{"resourceSpans":[{"resource":{"attributes":[null]},"scopeSpans":[{"spans":[{}]}]}]}',
       ],
-      [
-        "scopeSpans that are not a list",
-        '{"resourceSpans":[{"scopeSpans":{"spans":[{}]}}]}',
-      ],
+      ["scopeSpans that are not a list", '{"resourceSpans":[{"scopeSpans":{"spans":[{}]}}]}'],
       ["spans that are not a list", '{"resourceSpans":[{"scopeSpans":[{"spans":7}]}]}'],
     ])("refuses %s rather than failing on it", async (_case, body) => {
       const ingest = ingestBrowserTraces({

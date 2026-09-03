@@ -14,9 +14,7 @@ export class AwsStsManagedProviderCredentialAdapter extends ManagedProviderCrede
     return new AwsStsManagedProviderCredentialAdapter();
   }
 
-  async assumeCustomerRole(
-    config: ManagedBedrockConfig,
-  ): Promise<ManagedProviderCredentials> {
+  async assumeCustomerRole(config: ManagedBedrockConfig): Promise<ManagedProviderCredentials> {
     const proxyClient = new STSClient({
       region: config.region,
       credentials: {
@@ -54,11 +52,7 @@ export class AwsStsManagedProviderCredentialAdapter extends ManagedProviderCrede
       }),
     );
     const credentials = customer.Credentials;
-    if (
-      !credentials?.AccessKeyId ||
-      !credentials.SecretAccessKey ||
-      !credentials.SessionToken
-    ) {
+    if (!credentials?.AccessKeyId || !credentials.SecretAccessKey || !credentials.SessionToken) {
       throw new Error("Failed to get customer credentials");
     }
     return {

@@ -6,16 +6,11 @@
  */
 import type { PropsWithChildren } from "react";
 
-import {
-  type DatasetTableContextValue,
-  DatasetTableProvider,
-} from "@langwatch/dataset-web";
+import { type DatasetTableContextValue, DatasetTableProvider } from "@langwatch/dataset-web";
 import { renderDatasetImage } from "@langwatch/dataset-web/components/datasets/editor/renderDatasetImage";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
 
-export function EvaluationsV3DatasetTableProvider({
-  children,
-}: PropsWithChildren) {
+export function EvaluationsV3DatasetTableProvider({ children }: PropsWithChildren) {
   const value: DatasetTableContextValue = useEvaluationsV3Store((state) => ({
     rowHeightMode: state.ui.rowHeightMode,
     expandedCells: state.ui.expandedCells,

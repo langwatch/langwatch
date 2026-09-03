@@ -123,9 +123,7 @@ const host = fakeGatewayHost({
       {
         id: "team-1",
         name: "platform",
-        projects: [
-          { id: PROJECT_ID, name: "web-app", slug: "web-app", teamId: "team-1" },
-        ],
+        projects: [{ id: PROJECT_ID, name: "web-app", slug: "web-app", teamId: "team-1" }],
       },
     ],
   },
@@ -134,10 +132,7 @@ const host = fakeGatewayHost({
 import VirtualKeysPage from "../gateway-virtual-keys.screen";
 
 function renderPage() {
-  return renderWithGatewayHost(
-    <VirtualKeysPage />,
-    { host },
-  );
+  return renderWithGatewayHost(<VirtualKeysPage />, { host });
 }
 
 describe("virtual keys status column", () => {
@@ -195,9 +190,7 @@ describe("virtual keys status column", () => {
 
       const row = screen.getByTestId("vk-status-vk-paused").closest("tr");
       expect(row).not.toBeNull();
-      await userEvent.click(
-        within(row as HTMLElement).getByRole("button", { name: "Actions" }),
-      );
+      await userEvent.click(within(row as HTMLElement).getByRole("button", { name: "Actions" }));
 
       await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
       expect(screen.getByText("View traces")).toBeInTheDocument();

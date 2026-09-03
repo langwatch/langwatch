@@ -136,10 +136,11 @@ type RestReady<
  * permission is about THAT project is the cross-tenant case, and it does not
  * compile.
  */
-type ScopeBound<
-  TInput extends z.ZodObject | undefined,
-  TScopeBound extends boolean,
-> = [ScopeIdsIn<TInput>] extends [never] ? true : TScopeBound;
+type ScopeBound<TInput extends z.ZodObject | undefined, TScopeBound extends boolean> = [
+  ScopeIdsIn<TInput>,
+] extends [never]
+  ? true
+  : TScopeBound;
 
 /**
  * What a handler may answer with.
@@ -149,8 +150,9 @@ type ScopeBound<
  * serialization. Stated from the other side: returning something REQUIRES
  * `.withOutput()`, because the schema is what validates and documents it.
  */
-export type RestHandlerResult<TOutput extends z.ZodType | undefined> =
-  TOutput extends z.ZodType ? z.input<TOutput> | Promise<z.input<TOutput>> : void | Promise<void>;
+export type RestHandlerResult<TOutput extends z.ZodType | undefined> = TOutput extends z.ZodType
+  ? z.input<TOutput> | Promise<z.input<TOutput>>
+  : void | Promise<void>;
 
 /**
  * The handler an endpoint's declarations imply.
@@ -279,16 +281,7 @@ export interface RestEndpoint<
   >;
   withoutRateLimit(
     reason: string,
-  ): RestEndpoint<
-    TApp,
-    TInput,
-    TOutput,
-    TPermission,
-    true,
-    TResourceLimit,
-    THandled,
-    TScopeBound
-  >;
+  ): RestEndpoint<TApp, TInput, TOutput, TPermission, true, TResourceLimit, THandled, TScopeBound>;
   withResourceLimit(
     limitType: string,
   ): RestEndpoint<TApp, TInput, TOutput, TPermission, TRateLimit, true, THandled, TScopeBound>;

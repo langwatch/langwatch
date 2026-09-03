@@ -1,8 +1,5 @@
 import chalk from "chalk";
-import type {
-  TestSuite,
-  TestSuitesApiService,
-} from "@/client-sdk/services/test-suites";
+import type { TestSuite, TestSuitesApiService } from "@/client-sdk/services/test-suites";
 import { createCliTestSuitesService } from "./cli-test-suites-service";
 
 /**
@@ -46,9 +43,7 @@ export async function resolveSuiteReference({
   const matches =
     exact.length > 0
       ? exact
-      : suites.filter(
-          (suite) => suite.name.toLowerCase() === wanted.toLowerCase(),
-        );
+      : suites.filter((suite) => suite.name.toLowerCase() === wanted.toLowerCase());
 
   if (matches.length === 1) return matches[0]!;
 

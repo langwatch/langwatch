@@ -24,16 +24,13 @@
 
 const SENTENCE_BY_CODE: Record<string, string> = {
   enterprise_plan_required: "This capability needs the Enterprise plan",
-  insufficient_permissions:
-    "This credential does not carry the permission this call needs",
+  insufficient_permissions: "This credential does not carry the permission this call needs",
   missing_credentials: "This request carried no API key",
   invalid_credentials: "That API key is not valid",
-  organization_not_found:
-    "That API key does not resolve to an organization on this instance",
+  organization_not_found: "That API key does not resolve to an organization on this instance",
   validation_error: "The request did not pass validation",
   custom_role_in_use: "That role is still held by a member or a role binding",
-  custom_role_id_required:
-    "A CUSTOM role binding has to name which custom role it grants",
+  custom_role_id_required: "A CUSTOM role binding has to name which custom role it grants",
   custom_role_not_assignable: "That custom role cannot be granted here",
   custom_role_name_reserved: "That role name is reserved",
   custom_role_name_taken: "A role with that name already exists here",
@@ -43,8 +40,7 @@ const SENTENCE_BY_CODE: Record<string, string> = {
   org_exclusive_permission_scope:
     "That role carries an organization-only permission, so it cannot be bound to a team or a project",
   member_seat_limit_reached: "The plan's member seats are all in use",
-  personal_workspace_not_managed_here:
-    "Personal workspaces are not managed through this API",
+  personal_workspace_not_managed_here: "Personal workspaces are not managed through this API",
   already_organization_member: "They are already in this organization",
   user_not_in_organization: "That user is not a member of this organization",
   group_not_in_organization: "That group does not belong to this organization",
@@ -60,8 +56,7 @@ const SENTENCE_BY_CODE: Record<string, string> = {
   duplicate_invite: "They already have a pending invite",
   cannot_remove_self: "A credential cannot remove its own member",
   cannot_disable_self: "A credential cannot disable its own member",
-  cannot_remove_last_admin:
-    "That is the organization's last administrator, so it has to keep them",
+  cannot_remove_last_admin: "That is the organization's last administrator, so it has to keep them",
   api_key_scope_violation: "That API key cannot be given that access",
 };
 
@@ -76,13 +71,7 @@ const humanizeCode = (code: string): string => {
  * True when the body's `message` says nothing the `code` did not: the envelope
  * forwarded the code, so there is no server prose to prefer over our copy.
  */
-export const isCodeAsMessage = ({
-  code,
-  message,
-}: {
-  code: unknown;
-  message: unknown;
-}): boolean =>
+export const isCodeAsMessage = ({ code, message }: { code: unknown; message: unknown }): boolean =>
   typeof code === "string" &&
   code.length > 0 &&
   typeof message === "string" &&

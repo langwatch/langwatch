@@ -21,10 +21,7 @@ describe("rankedErrorSpans", () => {
   describe("given a flat list of spans with no errors", () => {
     describe("when ranking is requested", () => {
       it("returns an empty array", () => {
-        const spans = [
-          span({ spanId: "a", status: "ok" }),
-          span({ spanId: "b", status: "ok" }),
-        ];
+        const spans = [span({ spanId: "a", status: "ok" }), span({ spanId: "b", status: "ok" })];
         expect(rankedErrorSpans(spans)).toEqual([]);
       });
     });

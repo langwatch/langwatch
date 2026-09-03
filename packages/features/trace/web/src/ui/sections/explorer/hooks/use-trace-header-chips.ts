@@ -1,9 +1,6 @@
 import { useDrawer } from "../../../../behavior/use-drawer";
 import type { TraceHeader } from "@langwatch/trace-contract";
-import {
-  type ScenarioChipData,
-  useScenarioChipData,
-} from "../trace-drawer/scenario-chip";
+import { type ScenarioChipData, useScenarioChipData } from "../trace-drawer/scenario-chip";
 import type { SdkInfo } from "../../../../index";
 import {
   parseSdkInfo,
@@ -97,8 +94,7 @@ export function useTraceHeaderChips(
     closeDrawer();
   };
 
-  const scenarioRunId =
-    trace.scenarioRunId ?? trace.attributes["scenario.run_id"] ?? null;
+  const scenarioRunId = trace.scenarioRunId ?? trace.attributes["scenario.run_id"] ?? null;
   const scenarioData = useScenarioChipData(scenarioRunId);
 
   const sdkInfo: SdkInfo | null = parseSdkInfo({
@@ -122,9 +118,7 @@ export function useTraceHeaderChips(
   // we still surface *something* while the lookup is in flight or for
   // unmanaged prompts.
   const lastUsedDisplayHandle = lastUsedResolvedHandle ?? lastUsedHandle;
-  const { resolvedHandle: selectedResolvedHandle } = usePromptByHandle(
-    trace.selectedPromptId,
-  );
+  const { resolvedHandle: selectedResolvedHandle } = usePromptByHandle(trace.selectedPromptId);
   const selectedDisplayId = selectedResolvedHandle ?? trace.selectedPromptId;
   const lastUsedState: PromptChipState = { latestVersion, missing };
 

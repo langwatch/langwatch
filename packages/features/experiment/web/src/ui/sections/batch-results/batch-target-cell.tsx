@@ -10,11 +10,7 @@ import { type ReactNode, useCallback, useRef, useState } from "react";
 import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
-import {
-  COLLAPSED_CELL_HEIGHT_PX,
-  DEFAULT_ROW_HEIGHT,
-  type RowHeight,
-} from "./table-utils";
+import { COLLAPSED_CELL_HEIGHT_PX, DEFAULT_ROW_HEIGHT, type RowHeight } from "./table-utils";
 import {
   type DescribeBatchCellFailure,
   formatCost,
@@ -65,13 +61,7 @@ const MetricBadge = ({
   children: ReactNode;
 }) => (
   <Tooltip content={tooltipLabel} positioning={{ placement: "top" }} openDelay={100}>
-    <Text
-      fontSize="11px"
-      color="fg.muted"
-      whiteSpace="nowrap"
-      px={1}
-      data-testid={testId}
-    >
+    <Text fontSize="11px" color="fg.muted" whiteSpace="nowrap" px={1} data-testid={testId}>
       {children}
     </Text>
   </Tooltip>
@@ -216,23 +206,12 @@ export function BatchTargetCell({
       return (
         <Tooltip
           content={
-            <VStack
-              align="start"
-              gap={1}
-              data-testid={`error-tooltip-${targetOutput.targetId}`}
-            >
+            <VStack align="start" gap={1} data-testid={`error-tooltip-${targetOutput.targetId}`}>
               <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
-                {failure.description
-                  ? `${failure.title}. ${failure.description}`
-                  : failure.title}
+                {failure.description ? `${failure.title}. ${failure.description}` : failure.title}
               </Text>
               {failure.raw && (
-                <Text
-                  fontSize="12px"
-                  opacity={0.8}
-                  whiteSpace="pre-wrap"
-                  wordBreak="break-word"
-                >
+                <Text fontSize="12px" opacity={0.8} whiteSpace="pre-wrap" wordBreak="break-word">
                   {failure.raw}
                 </Text>
               )}
@@ -320,9 +299,7 @@ export function BatchTargetCell({
   // Render evaluator chips
   const renderEvaluatorChips = () => {
     const visibleResults = suppressedEvaluatorIds
-      ? targetOutput.evaluatorResults.filter(
-          (r) => !suppressedEvaluatorIds.has(r.evaluatorId),
-        )
+      ? targetOutput.evaluatorResults.filter((r) => !suppressedEvaluatorIds.has(r.evaluatorId))
       : targetOutput.evaluatorResults;
     if (visibleResults.length === 0) return null;
 
@@ -330,9 +307,7 @@ export function BatchTargetCell({
       <HStack flexWrap="wrap" gap={1.5}>
         {visibleResults.map((evalResult) => {
           return renderEvaluatorResult ? (
-            <Box key={evalResult.evaluatorId}>
-              {renderEvaluatorResult({ result: evalResult })}
-            </Box>
+            <Box key={evalResult.evaluatorId}>{renderEvaluatorResult({ result: evalResult })}</Box>
           ) : (
             <HStack key={evalResult.evaluatorId} gap={1} fontSize="11px" color="fg.muted">
               <Text>{evalResult.evaluatorName}</Text>
@@ -393,9 +368,7 @@ export function BatchTargetCell({
           </Button>
         </Tooltip>
       )}
-      {showOutput &&
-        targetOutput.traceId &&
-        renderTracePeek?.({ traceId: targetOutput.traceId })}
+      {showOutput && targetOutput.traceId && renderTracePeek?.({ traceId: targetOutput.traceId })}
       {/* Copy button */}
       {showOutput && rawOutput && (
         <Tooltip

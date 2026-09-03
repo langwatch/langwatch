@@ -1,7 +1,12 @@
 import { Flex, Text } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DENSE_SPAN_THRESHOLD, ROW_GAP, ROW_HEIGHT, ZOOM_FIT_PADDING } from "../../../model/flame/constants";
+import {
+  DENSE_SPAN_THRESHOLD,
+  ROW_GAP,
+  ROW_HEIGHT,
+  ZOOM_FIT_PADDING,
+} from "../../../model/flame/constants";
 import { FlameCanvas } from "./flame-canvas";
 import { FlameBreadcrumbs } from "./flame-breadcrumbs";
 import { FlameContextStrip } from "./flame-context-strip";

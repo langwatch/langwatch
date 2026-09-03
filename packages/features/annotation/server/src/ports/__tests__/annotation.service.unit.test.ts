@@ -58,9 +58,7 @@ class FakeRepository extends AnnotationRepository {
   countAnnotationScores = vi.fn(
     async ({ scoreTypeIds }: { scoreTypeIds: string[] }) => scoreTypeIds.length,
   );
-  countAnnotationQueues = vi.fn(
-    async ({ queueIds }: { queueIds: string[] }) => queueIds.length,
-  );
+  countAnnotationQueues = vi.fn(async ({ queueIds }: { queueIds: string[] }) => queueIds.length);
 }
 
 function createService(repository: FakeRepository) {
@@ -80,9 +78,9 @@ describe("AnnotationService", () => {
     repository.getById.mockRejectedValue(new AnnotationNotFoundError("missing"));
     const { service } = createService(repository);
 
-    await expect(
-      service.getById({ id: "missing", projectId: "project-1" }),
-    ).rejects.toBeInstanceOf(AnnotationNotFoundError);
+    await expect(service.getById({ id: "missing", projectId: "project-1" })).rejects.toBeInstanceOf(
+      AnnotationNotFoundError,
+    );
   });
 
   /** @scenario "annotation input is validated by the contract" */
@@ -186,8 +184,8 @@ describe("AnnotationService", () => {
     const { service, projects } = createService(repository);
     projects.getOrganizationId.mockRejectedValueOnce(new ProjectNotFoundError("missing"));
 
-    await expect(
-      service.getProjectOrganizationId({ projectId: "missing" }),
-    ).rejects.toBeInstanceOf(AnnotationProjectNotFoundError);
+    await expect(service.getProjectOrganizationId({ projectId: "missing" })).rejects.toBeInstanceOf(
+      AnnotationProjectNotFoundError,
+    );
   });
 });

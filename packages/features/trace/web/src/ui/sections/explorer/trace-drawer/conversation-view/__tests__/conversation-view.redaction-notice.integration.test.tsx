@@ -89,8 +89,7 @@ function renderConversation(items: TraceListItem[]) {
   );
 }
 
-const notices = () =>
-  screen.queryAllByText(/redacted by this project's privacy settings/i);
+const notices = () => screen.queryAllByText(/redacted by this project's privacy settings/i);
 
 afterEach(cleanup);
 

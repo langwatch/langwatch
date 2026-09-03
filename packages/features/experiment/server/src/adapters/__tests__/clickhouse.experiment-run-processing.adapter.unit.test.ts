@@ -83,15 +83,16 @@ function compose(options: { foldCacheTtlSeconds?: number } = {}) {
   const set = vi.fn(async (..._args: unknown[]) => "OK");
   const redis = { get: vi.fn(async () => null), set };
 
-  const pipeline: ExperimentRunProcessingPipeline =
-    ClickHouseExperimentRunProcessingAdapter.create({
+  const pipeline: ExperimentRunProcessingPipeline = ClickHouseExperimentRunProcessingAdapter.create(
+    {
       resolveClient: resolveClient as never,
       defaultRetentionDays: 49,
       redis: redis as never,
       ...(options.foldCacheTtlSeconds === undefined
         ? {}
         : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
-    }).buildProcessing();
+    },
+  ).buildProcessing();
 
   return { pipeline, insert, resolveClient, redis, set };
 }
@@ -110,9 +111,8 @@ function runItemStore(
 ): AppendStore<ClickHouseExperimentRunResultRecord> {
   const map = pipeline.mapProjections.get("experimentRunResultStorage");
   expect(map, "the pipeline registered no experimentRunResultStorage map").toBeDefined();
-  return (
-    map!.definition as unknown as { store: AppendStore<ClickHouseExperimentRunResultRecord> }
-  ).store;
+  return (map!.definition as unknown as { store: AppendStore<ClickHouseExperimentRunResultRecord> })
+    .store;
 }
 
 async function storeThrough(pipeline: ExperimentRunProcessingPipeline): Promise<void> {
@@ -203,9 +203,7 @@ describe("ClickHouseExperimentRunProcessingAdapter", () => {
       });
 
       expect(resolveClient).toHaveBeenCalledWith("project_alpha");
-      expect(insert.mock.calls.map(([request]) => request.table)).toEqual([
-        "experiment_run_items",
-      ]);
+      expect(insert.mock.calls.map(([request]) => request.table)).toEqual(["experiment_run_items"]);
       expect(insert.mock.calls[0]![0].values[0]).toMatchObject({
         ProjectionId: "item_1",
         _retention_days: 49,

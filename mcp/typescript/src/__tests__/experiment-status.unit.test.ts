@@ -41,9 +41,7 @@ describe("deriveRunStatus()", () => {
   describe("when no terminal marker and no recent updates", () => {
     it("is interrupted", () => {
       const now = 1_000_000;
-      expect(deriveRunStatus({ updatedAt: now - 6 * 60 * 1000 }, now)).toBe(
-        "interrupted",
-      );
+      expect(deriveRunStatus({ updatedAt: now - 6 * 60 * 1000 }, now)).toBe("interrupted");
     });
   });
 
@@ -96,11 +94,7 @@ describe("handleExperimentStatus()", () => {
         experimentSlug: "doc-qa",
       });
 
-      expect(mockMakeRequest).toHaveBeenNthCalledWith(
-        1,
-        "GET",
-        "/api/experiments/runs/sdk_run",
-      );
+      expect(mockMakeRequest).toHaveBeenNthCalledWith(1, "GET", "/api/experiments/runs/sdk_run");
       expect(mockMakeRequest).toHaveBeenNthCalledWith(
         2,
         "GET",
@@ -153,9 +147,7 @@ describe("handleExperimentStatus()", () => {
     });
 
     it("rethrows non-404 errors from the status endpoint", async () => {
-      mockMakeRequest.mockRejectedValueOnce(
-        new LangWatchApiError("boom", 500, "Internal error"),
-      );
+      mockMakeRequest.mockRejectedValueOnce(new LangWatchApiError("boom", 500, "Internal error"));
 
       await expect(handleExperimentStatus({ runId: "nope" })).rejects.toThrow();
     });

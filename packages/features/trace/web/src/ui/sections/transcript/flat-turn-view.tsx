@@ -2,7 +2,12 @@ import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
 import { LuBot, LuChevronUp, LuUser } from "react-icons/lu";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../../elements/scenario-role";
 import { BlockStack } from "./block-stack";
-import { getRolePalette, ROLE_ICONS, ROLE_LABELS, type RolePalette } from "../../blocks/transcript/role-chip";
+import {
+  getRolePalette,
+  ROLE_ICONS,
+  ROLE_LABELS,
+  type RolePalette,
+} from "../../blocks/transcript/role-chip";
 import type { ContentBlock, ConversationTurn } from "../../../model/transcript/types";
 
 /**

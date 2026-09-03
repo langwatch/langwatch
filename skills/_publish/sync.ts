@@ -54,10 +54,7 @@ export function sync(targetDir: string): void {
     console.log(`  ✓ ${target}`);
   }
 
-  fs.copyFileSync(
-    path.join(skillsRoot, "version.txt"),
-    path.join(targetDir, "version.txt"),
-  );
+  fs.copyFileSync(path.join(skillsRoot, "version.txt"), path.join(targetDir, "version.txt"));
   console.log("  ✓ version.txt");
   console.log("Done.");
 }

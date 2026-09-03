@@ -39,8 +39,7 @@ const sameFields = ({
   (recorded ?? []).length === derived.length &&
   (recorded ?? []).every(
     (field, index) =>
-      field.identifier === derived[index]?.identifier &&
-      field.type === derived[index]?.type,
+      field.identifier === derived[index]?.identifier && field.type === derived[index]?.type,
   );
 
 /**

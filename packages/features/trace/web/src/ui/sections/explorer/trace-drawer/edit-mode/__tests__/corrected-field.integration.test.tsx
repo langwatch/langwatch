@@ -42,9 +42,7 @@ describe("CorrectedField", () => {
         renderFrame(CAPTURED_OUTPUT);
 
         expect(screen.getByText("Edited")).toBeInTheDocument();
-        expect(
-          document.querySelector('[data-corrected-field="output"]'),
-        ).toBeInTheDocument();
+        expect(document.querySelector('[data-corrected-field="output"]')).toBeInTheDocument();
       });
     });
 

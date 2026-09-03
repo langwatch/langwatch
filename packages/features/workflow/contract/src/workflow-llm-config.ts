@@ -1,11 +1,7 @@
 import { mapReasoningToProvider } from "@langwatch/prompt-contract";
 import { z } from "zod";
 
-import {
-  llmConfigSchema,
-  type LLMConfig,
-  type LocalPromptLlmConfig,
-} from "./studio-workflow";
+import { llmConfigSchema, type LLMConfig, type LocalPromptLlmConfig } from "./studio-workflow";
 
 export type SupportedLlmParameter = string;
 
@@ -23,9 +19,7 @@ const looseLlmConfigSchema = llmConfigSchema.passthrough();
 const looseLlmParametersSchema = z.looseObject({});
 
 /** Converts legacy editor camelCase keys without requiring a complete config. */
-export function normalizeWorkflowLlmParameters(
-  llmParameters: unknown,
-): Record<string, unknown> {
+export function normalizeWorkflowLlmParameters(llmParameters: unknown): Record<string, unknown> {
   const result = { ...looseLlmParametersSchema.parse(llmParameters) };
 
   for (const [camelKey, snakeKey] of Object.entries(camelToSnakeLlmParameter)) {

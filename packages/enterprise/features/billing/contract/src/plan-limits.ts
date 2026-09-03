@@ -1,10 +1,6 @@
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import {
-  GROWTH_SEAT_PLAN_TYPES,
-  type PlanTypes as PlanType,
-  PlanTypes,
-} from "./plan-types";
+import { GROWTH_SEAT_PLAN_TYPES, type PlanTypes as PlanType, PlanTypes } from "./plan-types";
 
 /**
  * Sentinel value representing no message cap.

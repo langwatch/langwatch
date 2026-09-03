@@ -65,21 +65,22 @@ const workflowDsl = {
   edges: [],
 } as unknown as StudioWorkflow;
 
-const makeCell = (overrides?: Partial<ExecutionCell>): ExecutionCell => ({
-  rowIndex: 0,
-  targetId: "wf-target",
-  targetConfig: {
-    id: "wf-target",
-    type: "workflow",
-    workflowId: "wf_1",
-    inputs: [],
-    outputs: [],
-    mappings: {},
-  },
-  evaluatorConfigs: [],
-  datasetEntry: { _datasetId: "dataset-1", question: "is a dog an animal?" },
-  ...overrides,
-} as unknown as ExecutionCell);
+const makeCell = (overrides?: Partial<ExecutionCell>): ExecutionCell =>
+  ({
+    rowIndex: 0,
+    targetId: "wf-target",
+    targetConfig: {
+      id: "wf-target",
+      type: "workflow",
+      workflowId: "wf_1",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    },
+    evaluatorConfigs: [],
+    datasetEntry: { _datasetId: "dataset-1", question: "is a dog an animal?" },
+    ...overrides,
+  }) as unknown as ExecutionCell;
 
 /**
  * A grading evaluator attached to the target column in the workbench, reading

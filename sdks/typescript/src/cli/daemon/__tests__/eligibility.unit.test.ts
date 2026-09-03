@@ -121,9 +121,7 @@ describe("evaluateEligibility", () => {
 
     it("refuses --stdin even when fd 0 could not be inspected", () => {
       expect(
-        evaluateEligibility(
-          piped({ args: ["dataset", "records", "add", "my-ds", "--stdin"] }),
-        ),
+        evaluateEligibility(piped({ args: ["dataset", "records", "add", "my-ds", "--stdin"] })),
       ).toEqual({ eligible: false, reason: "reads-stdin" });
     });
 
@@ -149,9 +147,10 @@ describe("evaluateEligibility", () => {
 
     /** @scenario "A command asks me a question at a prompt" */
     it("refuses prompt tag delete, which confirms by typing the tag name", () => {
-      expect(
-        evaluateEligibility(piped({ args: ["prompt", "tag", "delete", "prod"] })),
-      ).toEqual({ eligible: false, reason: "denied-command" });
+      expect(evaluateEligibility(piped({ args: ["prompt", "tag", "delete", "prod"] }))).toEqual({
+        eligible: false,
+        reason: "denied-command",
+      });
     });
 
     it("keeps serving the tag commands that never prompt", () => {
@@ -162,9 +161,9 @@ describe("evaluateEligibility", () => {
 
     it("keeps serving a --tag VALUE, which the phrase rule exists to spare", () => {
       // Denying the bare word `tag` would have taken this with it.
-      expect(
-        evaluateEligibility(piped({ args: ["pull", "--tag", "production"] })),
-      ).toEqual({ eligible: true });
+      expect(evaluateEligibility(piped({ args: ["pull", "--tag", "production"] }))).toEqual({
+        eligible: true,
+      });
     });
   });
 
@@ -172,15 +171,15 @@ describe("evaluateEligibility", () => {
     // The forwarded-env allowlist carries neither the session identity
     // (CLAUDE_CODE_SESSION_ID) nor TRACEPARENT nor CODEX_HOME, so a
     // daemon-served declaration resolves the wrong session or none.
-    it.each([
-      [["ingest", "context"]],
-      [["ingest", "guidance", "claude-code"]],
-    ])("refuses %j", (args) => {
-      expect(evaluateEligibility(piped({ args }))).toEqual({
-        eligible: false,
-        reason: "denied-command",
-      });
-    });
+    it.each([[["ingest", "context"]], [["ingest", "guidance", "claude-code"]]])(
+      "refuses %j",
+      (args) => {
+        expect(evaluateEligibility(piped({ args }))).toEqual({
+          eligible: false,
+          reason: "denied-command",
+        });
+      },
+    );
 
     it("keeps serving the other ingest commands", () => {
       expect(evaluateEligibility(piped({ args: ["ingest", "list"] }))).toEqual({
@@ -239,9 +238,9 @@ describe("evaluateEligibility", () => {
     });
 
     it("still serves an allowed command behind the same option", () => {
-      expect(
-        evaluateEligibility(piped({ args: ["-o", "json", "trace", "search"] })),
-      ).toEqual({ eligible: true });
+      expect(evaluateEligibility(piped({ args: ["-o", "json", "trace", "search"] }))).toEqual({
+        eligible: true,
+      });
     });
   });
 
@@ -256,9 +255,9 @@ describe("evaluateEligibility", () => {
 
   describe("when the command would never terminate", () => {
     it("refuses --follow", () => {
-      expect(
-        evaluateEligibility(piped({ args: ["ingest", "tail", "src-1", "--follow"] })),
-      ).toEqual({ eligible: false, reason: "long-running-flag" });
+      expect(evaluateEligibility(piped({ args: ["ingest", "tail", "src-1", "--follow"] }))).toEqual(
+        { eligible: false, reason: "long-running-flag" },
+      );
     });
 
     it("refuses --wait, which polls a run past the client's request deadline", () => {
@@ -305,9 +304,9 @@ describe("evaluateEligibility", () => {
     });
 
     it("still serves a command that follows a global option's value", () => {
-      expect(
-        evaluateEligibility(piped({ args: ["-o", "json", "trace", "list"] })),
-      ).toEqual({ eligible: true });
+      expect(evaluateEligibility(piped({ args: ["-o", "json", "trace", "list"] }))).toEqual({
+        eligible: true,
+      });
     });
 
     it("still serves a command behind a boolean global option", () => {

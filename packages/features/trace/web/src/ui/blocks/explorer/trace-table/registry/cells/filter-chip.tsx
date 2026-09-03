@@ -47,10 +47,7 @@ type FilterChipProps = FilterChipBaseProps &
 export const FilterChip = forwardRef<
   HTMLDivElement,
   FilterChipProps & Omit<BoxProps, "onClick" | "children">
->(function FilterChip(
-  { onFilter, filterLabel, openHref, openLabel, children, ...rest },
-  ref,
-) {
+>(function FilterChip({ onFilter, filterLabel, openHref, openLabel, children, ...rest }, ref) {
   return (
     <Box
       ref={ref}

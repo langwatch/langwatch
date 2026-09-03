@@ -17,18 +17,10 @@ Evaluators are scoring functions that assess the quality of your LLM's outputs. 
 There are three ways to evaluate your LLM outputs with LangWatch:
 
 <CardGroup cols={3}>
-  <Card
-    title="Built-in Evaluators"
-    icon="bolt"
-    href="/evaluations/evaluators/built-in-evaluators"
-  >
+  <Card title="Built-in Evaluators" icon="bolt" href="/evaluations/evaluators/built-in-evaluators">
     Use LangWatch's library of evaluators directly in your code.
   </Card>
-  <Card
-    title="Saved Evaluators"
-    icon="bookmark"
-    href="/evaluations/evaluators/saved-evaluators"
-  >
+  <Card title="Saved Evaluators" icon="bookmark" href="/evaluations/evaluators/saved-evaluators">
     Create reusable evaluator configs on the platform.
   </Card>
   <Card title="Custom Scoring" icon="code" href="/evaluations/evaluators/custom-scoring">
@@ -45,9 +37,8 @@ There are three ways to evaluate your LLM outputs with LangWatch:
 | **Custom Scoring**      | N/A - you send the score directly                   | Proprietary logic, domain-specific metrics |
 
 <Accordion title="Decision flowchart">
-  ``` Do you have your own evaluation logic? ├─ Yes → Use Custom Scoring └─ No → Do you
-  want to configure via UI and reuse? ├─ Yes → Use Saved Evaluators └─ No → Use Built-in
-  Evaluators ```
+  ``` Do you have your own evaluation logic? ├─ Yes → Use Custom Scoring └─ No → Do you want to
+  configure via UI and reuse? ├─ Yes → Use Saved Evaluators └─ No → Use Built-in Evaluators ```
 </Accordion>
 
 ## What is an Evaluator?
@@ -197,8 +188,8 @@ Check each evaluator's documentation for required and optional inputs.
 ## The `name` Parameter
 
 <Warning>
-  **Important:** Always provide a descriptive `name` when running evaluators. This helps
-  identify evaluation results in Analytics and traces.
+  **Important:** Always provide a descriptive `name` when running evaluators. This helps identify
+  evaluation results in Analytics and traces.
 </Warning>
 
 ```python

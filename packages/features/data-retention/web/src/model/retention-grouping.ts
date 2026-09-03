@@ -53,9 +53,7 @@ export function groupRulesByScope(rules: RetentionRuleRow[]): RetentionScopeGrou
 /** Render a single Policy cell value. If all three categories share the same
  *  retention, show one number ("1820 days"). Otherwise show the per-category
  *  breakdown so a divergent legacy override is still legible. */
-export function renderPolicyValue(
-  byCategory: Partial<Record<RetentionCategory, number>>,
-): string {
+export function renderPolicyValue(byCategory: Partial<Record<RetentionCategory, number>>): string {
   const present = retentionCategories.filter((c) => byCategory[c] !== undefined);
   if (present.length === 0) return "—";
   const values = present.map((c) => byCategory[c]!);
@@ -63,9 +61,7 @@ export function renderPolicyValue(
   if (allSame && present.length === retentionCategories.length) {
     return formatDays(values[0]!);
   }
-  return present
-    .map((c) => `${CATEGORY_LABELS[c]}: ${formatDays(byCategory[c]!)}`)
-    .join(" · ");
+  return present.map((c) => `${CATEGORY_LABELS[c]}: ${formatDays(byCategory[c]!)}`).join(" · ");
 }
 
 /** Top-line summary used in the Retention + Usage card. When all three

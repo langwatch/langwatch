@@ -106,14 +106,11 @@ export class GroupsApiService {
     this.#request = createManagementRequest({
       endpoint: resolveEndpoint(config?.endpoint),
       token: resolveManagementToken({ apiKey: config?.apiKey }),
-      errorFactory: ({ message, operation, body }) =>
-        new GroupsApiError(message, operation, body),
+      errorFactory: ({ message, operation, body }) => new GroupsApiError(message, operation, body),
     });
   }
 
-  async list(
-    options: { page?: number; limit?: number } = {},
-  ): Promise<ListGroupsResponse> {
+  async list(options: { page?: number; limit?: number } = {}): Promise<ListGroupsResponse> {
     return this.#request({
       operation: "list groups",
       path: "/api/groups",

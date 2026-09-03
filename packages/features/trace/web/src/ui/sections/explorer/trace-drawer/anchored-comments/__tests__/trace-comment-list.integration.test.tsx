@@ -94,9 +94,7 @@ describe("given comments on a span, on an attribute and on the trace itself", ()
   it("lists each comment with the part of the trace it is about", () => {
     renderList(comments);
 
-    expect(
-      screen.getByRole("button", { name: "Go to Span web_search" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to Span web_search" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
         name: "Go to Span web_search · Parameters · gen_ai.request.model",
@@ -149,9 +147,7 @@ describe("given a comment on a span a correction deleted", () => {
   it("reads as being about a part of the trace that is no longer there", () => {
     renderList([onADeletedSpan]);
 
-    expect(
-      screen.getByText("On a part of the trace that is no longer there"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("On a part of the trace that is no longer there")).toBeInTheDocument();
   });
 
   /** @scenario "A comment whose anchor is gone offers nowhere to jump to" */

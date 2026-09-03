@@ -23,13 +23,10 @@ export async function getAnnotation(id: string): Promise<AnnotationResponse> {
   ) as Promise<AnnotationResponse>;
 }
 
-export async function getAnnotationsByTrace(
-  traceId: string,
-): Promise<AnnotationResponse[]> {
-  return makeRequest(
-    "GET",
-    `/api/annotations/trace/${encodeURIComponent(traceId)}`,
-  ) as Promise<AnnotationResponse[]>;
+export async function getAnnotationsByTrace(traceId: string): Promise<AnnotationResponse[]> {
+  return makeRequest("GET", `/api/annotations/trace/${encodeURIComponent(traceId)}`) as Promise<
+    AnnotationResponse[]
+  >;
 }
 
 export async function createAnnotation(
@@ -43,9 +40,7 @@ export async function createAnnotation(
   ) as Promise<AnnotationResponse>;
 }
 
-export async function deleteAnnotation(
-  id: string,
-): Promise<{ status?: string; message?: string }> {
+export async function deleteAnnotation(id: string): Promise<{ status?: string; message?: string }> {
   return makeRequest("DELETE", `/api/annotations/${encodeURIComponent(id)}`) as Promise<{
     status?: string;
     message?: string;

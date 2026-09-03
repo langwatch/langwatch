@@ -45,9 +45,7 @@ describe("strict contract declaration build configs", () => {
       exclude: ["tests"],
     });
 
-    expect(
-      lintStrictContractBuildConfigs(root, [contractPackage("future-feature")]),
-    ).toEqual([]);
+    expect(lintStrictContractBuildConfigs(root, [contractPackage("future-feature")])).toEqual([]);
   });
 
   it("rejects a config that can include a package test root", () => {
@@ -58,16 +56,16 @@ describe("strict contract declaration build configs", () => {
       exclude: [],
     });
 
-    expect(
-      lintStrictContractBuildConfigs(root, [contractPackage("api-key")]),
-    ).toMatchObject([{ policy: "contract-build-config" }]);
+    expect(lintStrictContractBuildConfigs(root, [contractPackage("api-key")])).toMatchObject([
+      { policy: "contract-build-config" },
+    ]);
   });
 
   it("requires the build config when a discovered strict contract has a build script", () => {
     root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
 
-    expect(
-      lintStrictContractBuildConfigs(root, [contractPackage("new-contract")]),
-    ).toMatchObject([{ policy: "contract-build-config" }]);
+    expect(lintStrictContractBuildConfigs(root, [contractPackage("new-contract")])).toMatchObject([
+      { policy: "contract-build-config" },
+    ]);
   });
 });

@@ -107,9 +107,7 @@ describe("given a conversation carrying annotations", () => {
       await userEvent.click(annotationsChip());
 
       expect(
-        await screen.findByText(
-          "Annotations appear beside each turn in the Conversation view.",
-        ),
+        await screen.findByText("Annotations appear beside each turn in the Conversation view."),
       ).toBeInTheDocument();
     });
 

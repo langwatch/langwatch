@@ -8,10 +8,7 @@ import {
 } from "../../__tests__/helpers/pilotProcess.fixture";
 import { ProcessManagerService } from "../../processManagerService";
 import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore";
-import {
-  type DispatchableMessage,
-  OutboxDispatcherService,
-} from "../outboxDispatcherService";
+import { type DispatchableMessage, OutboxDispatcherService } from "../outboxDispatcherService";
 
 const { observeDispatchLag } = vi.hoisted(() => ({
   observeDispatchLag: vi.fn(),
@@ -124,9 +121,7 @@ describe("OutboxDispatcherService", () => {
       it("uses a provider Retry-After as a floor over exponential backoff", async () => {
         const handler = vi
           .fn()
-          .mockRejectedValueOnce(
-            Object.assign(new Error("slow down"), { retryAfterMs: 90_000 }),
-          )
+          .mockRejectedValueOnce(Object.assign(new Error("slow down"), { retryAfterMs: 90_000 }))
           .mockResolvedValue(undefined);
         const dispatcher = new OutboxDispatcherService({
           store,
@@ -651,9 +646,7 @@ describe("OutboxDispatcherService", () => {
         const crashed = new OutboxDispatcherService({
           store,
           handlers: {
-            "worker-dispatch": vi
-              .fn()
-              .mockReturnValue(new Promise<void>(() => undefined)),
+            "worker-dispatch": vi.fn().mockReturnValue(new Promise<void>(() => undefined)),
           },
           leaseDurationMs: 100,
         });

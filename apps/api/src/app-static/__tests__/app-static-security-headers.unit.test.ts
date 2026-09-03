@@ -14,9 +14,7 @@ describe("buildSecurityHeaders", () => {
       "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
     );
     expect(headers["Content-Security-Policy"]).toBeDefined();
-    expect(headers["Strict-Transport-Security"]).toBe(
-      "max-age=31536000; includeSubDomains",
-    );
+    expect(headers["Strict-Transport-Security"]).toBe("max-age=31536000; includeSubDomains");
   });
 
   it("keeps the capability restrictions on development responses", () => {

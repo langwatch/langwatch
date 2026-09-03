@@ -117,13 +117,7 @@ export type UiActionBackendRunner = (args: {
 
 /** The minimal Redis surface the service needs (ioredis satisfies it). */
 export interface UiActionRedis {
-  set(
-    key: string,
-    value: string,
-    mode: "EX",
-    ttl: number,
-    nx?: "NX",
-  ): Promise<unknown>;
+  set(key: string, value: string, mode: "EX", ttl: number, nx?: "NX"): Promise<unknown>;
   get(key: string): Promise<string | null>;
   del(...keys: string[]): Promise<number>;
   lpush(key: string, value: string): Promise<number>;
@@ -285,10 +279,7 @@ export class LangyUiActionService {
     // apply, which is exactly what the caller is told.
     let timer: NodeJS.Timeout | undefined;
     const deadline = new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new LangyUiTimeoutError(kind)),
-        remainingMs,
-      );
+      timer = setTimeout(() => reject(new LangyUiTimeoutError(kind)), remainingMs);
     });
     let result: unknown;
     try {
@@ -341,10 +332,7 @@ export class LangyUiActionService {
     const remainingMs = Math.max(1_000, budgetMs - UI_ACTION_CLAIM_WINDOW_MS);
     try {
       const claimWindowSeconds = Math.ceil(UI_ACTION_CLAIM_WINDOW_MS / 1000);
-      const first = await blocking.blpop(
-        uiActionKeys.result(actionId),
-        claimWindowSeconds,
-      );
+      const first = await blocking.blpop(uiActionKeys.result(actionId), claimWindowSeconds);
       if (first) return this.toOutcome({ actionId, kind, raw: first[1] });
 
       // Take the claim key for the backend with the same SET NX a page uses:
@@ -384,10 +372,7 @@ export class LangyUiActionService {
       }
 
       const remainingSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
-      const second = await blocking.blpop(
-        uiActionKeys.result(actionId),
-        remainingSeconds,
-      );
+      const second = await blocking.blpop(uiActionKeys.result(actionId), remainingSeconds);
       if (second) return this.toOutcome({ actionId, kind, raw: second[1] });
 
       await this.redis.del(uiActionKeys.pending(actionId));
@@ -454,11 +439,7 @@ export class LangyUiActionService {
     actionId: string;
   }): Promise<{ isClaimed: boolean }> {
     const pending = await this.readPending(actionId);
-    if (
-      !pending ||
-      pending.projectId !== projectId ||
-      pending.conversationId !== conversationId
-    ) {
+    if (!pending || pending.projectId !== projectId || pending.conversationId !== conversationId) {
       return { isClaimed: false };
     }
     const set = await this.redis.set(
@@ -492,11 +473,7 @@ export class LangyUiActionService {
     completion: UiActionCompletion;
   }): Promise<{ isAccepted: boolean }> {
     const pending = await this.readPending(actionId);
-    if (
-      !pending ||
-      pending.projectId !== projectId ||
-      pending.conversationId !== conversationId
-    ) {
+    if (!pending || pending.projectId !== projectId || pending.conversationId !== conversationId) {
       return { isAccepted: false };
     }
     const claimant = await this.redis.get(uiActionKeys.claim(actionId));

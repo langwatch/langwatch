@@ -123,9 +123,7 @@ describe("Gateway usage page filter routing", () => {
     const user = userEvent.setup();
     const host = renderUsagePage("/gateway/usage?vk=vk_canary&days=30");
 
-    expect(screen.getByTestId("usage-key-filter")).toHaveTextContent(
-      "Canary Gateway Healthcheck",
-    );
+    expect(screen.getByTestId("usage-key-filter")).toHaveTextContent("Canary Gateway Healthcheck");
     await user.click(screen.getByRole("button", { name: "Clear key filter" }));
 
     expect(host.recording.navigations).toEqual([]);

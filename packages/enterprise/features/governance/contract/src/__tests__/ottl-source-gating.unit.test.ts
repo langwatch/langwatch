@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  getStarterTemplate,
-  isOttlEnabledSourceType,
-  OTTL_ENABLED_SOURCE_TYPES,
-} from "../index";
+import { getStarterTemplate, isOttlEnabledSourceType, OTTL_ENABLED_SOURCE_TYPES } from "../index";
 
 describe("OTTL_ENABLED_SOURCE_TYPES", () => {
   it("only enables OTTL for the custom catch-all (otel_generic)", () => {

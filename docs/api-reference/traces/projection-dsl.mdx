@@ -168,9 +168,9 @@ object.
 | `annotations.scores.<name>`   | json    | A single score, addressed by its AnnotationScore **name** (e.g. `annotations.scores.quality`).                     |
 
 <Info>
-  Annotations are manual reviews captured in the LangWatch UI (thumbs, scores, comments).
-  They live alongside SDK-emitted `events` and are joined into the same response — no
-  separate annotations call needed.
+  Annotations are manual reviews captured in the LangWatch UI (thumbs, scores, comments). They live
+  alongside SDK-emitted `events` and are joined into the same response — no separate annotations
+  call needed.
 </Info>
 
 ## Choosing the date axis
@@ -202,14 +202,13 @@ your last watermark), so no change is ever lost across pulls. A CDC loop that
 advances its watermark to the previous pull's start time gets every change.
 
 <Note>
-  The `updated` watermark advances on every ClickHouse-side change to a trace —
-  evaluations, metadata updates, spans, and annotation **creates** and **deletes**. **One
-  gap today:** an **in-place edit** to an existing annotation (e.g. changing a score from
-  3 to 5) writes Postgres only and does not advance the trace's ClickHouse `updated_at`,
-  so `dateField: "updated"` does not pick it up until the trace changes again. New and
-  removed annotations *are* caught. See
-  [#4736](https://github.com/langwatch/langwatch/issues/4736) for the cross-store
-  watermark follow-up.
+  The `updated` watermark advances on every ClickHouse-side change to a trace — evaluations,
+  metadata updates, spans, and annotation **creates** and **deletes**. **One gap today:** an
+  **in-place edit** to an existing annotation (e.g. changing a score from 3 to 5) writes Postgres
+  only and does not advance the trace's ClickHouse `updated_at`, so `dateField: "updated"` does not
+  pick it up until the trace changes again. New and removed annotations *are* caught. See
+  [#4736](https://github.com/langwatch/langwatch/issues/4736) for the cross-store watermark
+  follow-up.
 </Note>
 
 ## Performance

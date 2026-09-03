@@ -15,17 +15,11 @@ export interface UsageStatsCollectionServiceOptions {
 export class UsageStatsCollectionService {
   private constructor(private readonly options: UsageStatsCollectionServiceOptions) {}
 
-  static create(
-    options: UsageStatsCollectionServiceOptions,
-  ): UsageStatsCollectionService {
+  static create(options: UsageStatsCollectionServiceOptions): UsageStatsCollectionService {
     return new UsageStatsCollectionService(options);
   }
 
-  async collect({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<UsageStatsReport> {
+  async collect({ organizationId }: { organizationId: string }): Promise<UsageStatsReport> {
     const counts = await this.options.projects.collectProjectCounts({
       organizationId,
       builderChartKind: this.options.builderChartKind,

@@ -147,12 +147,8 @@ describe("replayEvents", () => {
       );
       expect(allEntries).toHaveLength(2);
 
-      const tenantAEntry = allEntries.find(
-        (e) => String(e.context.tenantId) === "tenant-A",
-      );
-      const tenantBEntry = allEntries.find(
-        (e) => String(e.context.tenantId) === "tenant-B",
-      );
+      const tenantAEntry = allEntries.find((e) => String(e.context.tenantId) === "tenant-A");
+      const tenantBEntry = allEntries.find((e) => String(e.context.tenantId) === "tenant-B");
 
       expect(tenantAEntry!.state).toEqual({ total: 30, count: 2 });
       expect(tenantBEntry!.state).toEqual({ total: 100, count: 1 });
@@ -162,8 +158,7 @@ describe("replayEvents", () => {
   describe("when projection has a custom key function", () => {
     it("groups events by custom key instead of aggregateId", async () => {
       const { projection, storeBatchSpy } = createTestProjection({
-        keyFn: (event: ReplayEvent) =>
-          `custom-${(event.data as { group: string }).group}`,
+        keyFn: (event: ReplayEvent) => `custom-${(event.data as { group: string }).group}`,
       });
       const events = [
         makeEvent({
@@ -229,10 +224,7 @@ describe("replayEvents", () => {
     /** @scenario the event log is read only for a deliberate rebuild */
     it("always starts from init state, never loads existing", async () => {
       const { projection, storeBatchSpy } = createTestProjection();
-      const events = [
-        makeEvent({ data: { value: 5 } }),
-        makeEvent({ data: { value: 7 } }),
-      ];
+      const events = [makeEvent({ data: { value: 5 } }), makeEvent({ data: { value: 7 } })];
 
       await replayEvents({ projection, events });
 
@@ -273,9 +265,7 @@ describe("FoldAccumulator", () => {
     const accumulator = new FoldAccumulator(projection);
 
     // Simulate interleaved events from two tenants (like streaming from CH)
-    accumulator.apply(
-      makeEvent({ tenantId: "t-A", aggregateId: "agg-1", data: { value: 10 } }),
-    );
+    accumulator.apply(makeEvent({ tenantId: "t-A", aggregateId: "agg-1", data: { value: 10 } }));
     accumulator.apply(
       makeEvent({
         tenantId: "t-B",
@@ -283,9 +273,7 @@ describe("FoldAccumulator", () => {
         data: { value: 100 },
       }),
     );
-    accumulator.apply(
-      makeEvent({ tenantId: "t-A", aggregateId: "agg-1", data: { value: 20 } }),
-    );
+    accumulator.apply(makeEvent({ tenantId: "t-A", aggregateId: "agg-1", data: { value: 20 } }));
 
     await accumulator.flush();
 
@@ -408,9 +396,7 @@ describe("MapAccumulator", () => {
         name: "nullMap",
         eventTypes: ["test.event"],
         map: (event: any) =>
-          (event.data?.value ?? 0) > 10
-            ? { doubled: (event.data?.value ?? 0) * 2 }
-            : null,
+          (event.data?.value ?? 0) > 10 ? { doubled: (event.data?.value ?? 0) * 2 } : null,
         store: {
           append: appendSpy,
           bulkAppend: vi.fn().mockResolvedValue(undefined),
@@ -625,8 +611,7 @@ describe("MapAccumulator", () => {
         map: (event: any) => {
           const attrs = event.data?.span?.attributes ?? [];
           const out =
-            attrs.find((a: any) => a.key === "langwatch.output")?.value?.stringValue ??
-            "";
+            attrs.find((a: any) => a.key === "langwatch.output")?.value?.stringValue ?? "";
           return { outLen: out.length };
         },
         store: { append: vi.fn(), bulkAppend: bulkAppendSpy },

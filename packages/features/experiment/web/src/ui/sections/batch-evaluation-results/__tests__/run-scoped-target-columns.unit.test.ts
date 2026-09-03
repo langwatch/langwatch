@@ -38,13 +38,9 @@ describe("given a run whose Targets snapshot lists the whole board", () => {
   describe("when the run holds rows for one target only", () => {
     /** @scenario "A run scoped to one target renders only that target" */
     it("keeps the target with rows and drops the other", () => {
-      const result = transformBatchEvaluationData(
-        runWithRowsFor(["target-classifier"]),
-      );
+      const result = transformBatchEvaluationData(runWithRowsFor(["target-classifier"]));
 
-      expect(result.targetColumns.map((c) => c.id)).toEqual([
-        "target-classifier",
-      ]);
+      expect(result.targetColumns.map((c) => c.id)).toEqual(["target-classifier"]);
     });
   });
 
@@ -77,10 +73,7 @@ describe("given a run whose Targets snapshot lists the whole board", () => {
     /** @scenario "A comparison column keeps its place though it owns no rows" */
     it("keeps it, though it holds a verdict rather than an output row", () => {
       const run = runWithRowsFor(["target-classifier", "target-summarizer"]);
-      run.targets = [
-        ...TARGETS,
-        { id: "cmp-1", name: "Comparison", type: "evaluator" },
-      ];
+      run.targets = [...TARGETS, { id: "cmp-1", name: "Comparison", type: "evaluator" }];
       run.evaluations = [
         {
           evaluator: "cmp-1",

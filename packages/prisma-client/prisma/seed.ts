@@ -68,11 +68,7 @@ import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-server/testing";
-import {
-  PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "../src/generated/client";
+import { PrismaClient, RoleBindingScopeType, TeamUserRole } from "../src/generated/client";
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
 import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
 import { modelProviders } from "@langwatch/model-provider-contract";
@@ -135,9 +131,7 @@ async function main() {
     process.env.LANGWATCH_API_KEY ??
     DEFAULT_INGESTION_KEY;
   // Redact — in non-haven flows apiKey may be a real credential, and logs get shipped.
-  console.log(
-    `🌱 Seeding static local dev identity (ingestion key: ${apiKey.slice(0, 8)}…)`,
-  );
+  console.log(`🌱 Seeding static local dev identity (ingestion key: ${apiKey.slice(0, 8)}…)`);
 
   // HAVEN_SEED_PRESET=demo seeds the project as already past onboarding
   // (firstMessage/integrated set), so the UI opens on the real product instead
@@ -303,20 +297,14 @@ async function main() {
       name: "Local Dev Private Access Token",
       description: "Static local-dev personal access token seeded by prisma/seed.ts",
       lookupId: PRIVATE_TOKEN_LOOKUP_ID,
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(
-        PRIVATE_TOKEN_SECRET,
-        API_KEY_PEPPER,
-      ),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, API_KEY_PEPPER),
       permissionMode: "all",
       userId: user.id,
       createdByUserId: user.id,
       organizationId: organization.id,
     },
     update: {
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(
-        PRIVATE_TOKEN_SECRET,
-        API_KEY_PEPPER,
-      ),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, API_KEY_PEPPER),
       userId: user.id,
       organizationId: organization.id,
       revokedAt: null,
@@ -359,21 +347,14 @@ async function main() {
     where: { lookupId: PUBLIC_TOKEN_LOOKUP_ID },
     create: {
       name: "Local Dev Public Ingestion Token",
-      description:
-        "Static local-dev ingestion-only token (traces:create) seeded by prisma/seed.ts",
+      description: "Static local-dev ingestion-only token (traces:create) seeded by prisma/seed.ts",
       lookupId: PUBLIC_TOKEN_LOOKUP_ID,
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(
-        PUBLIC_TOKEN_SECRET,
-        API_KEY_PEPPER,
-      ),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, API_KEY_PEPPER),
       permissionMode: "restricted",
       organizationId: organization.id,
     },
     update: {
-      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(
-        PUBLIC_TOKEN_SECRET,
-        API_KEY_PEPPER,
-      ),
+      hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, API_KEY_PEPPER),
       organizationId: organization.id,
       revokedAt: null,
     },
@@ -442,9 +423,7 @@ async function main() {
   // Only echo the key in full when it's the non-secret default; otherwise redact
   // (same rationale as the seeding log above — real credentials must not hit shipped logs).
   const displayApiKey =
-    project.apiKey === DEFAULT_INGESTION_KEY
-      ? project.apiKey
-      : `${project.apiKey.slice(0, 8)}…`;
+    project.apiKey === DEFAULT_INGESTION_KEY ? project.apiKey : `${project.apiKey.slice(0, 8)}…`;
   console.log(`✅ Ingestion key:        ${displayApiKey}`);
   console.log(`✅ Private access token: ${PRIVATE_ACCESS_TOKEN}`);
   console.log(`✅ Public access token:  ${PUBLIC_ACCESS_TOKEN}`);

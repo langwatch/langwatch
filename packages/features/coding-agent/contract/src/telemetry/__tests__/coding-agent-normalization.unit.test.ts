@@ -198,9 +198,7 @@ describe("normalizeEventName", () => {
       // sandboxed shell command, so mapping it onto tool_result would count
       // that command twice — it deliberately maps to nothing.
       expect(normalizeEventName("codex.sandbox_outcome")).toBeNull();
-      expect(normalizeEventName("github.copilot.session_compaction_complete")).toBe(
-        "compaction",
-      );
+      expect(normalizeEventName("github.copilot.session_compaction_complete")).toBe("compaction");
       expect(normalizeEventName("github.copilot.skill_invoked")).toBe("skill_activated");
       expect(normalizeEventName("gemini_cli.tool_call")).toBe("tool_result");
       expect(normalizeEventName("gemini_cli.chat_compression")).toBe("compaction");
@@ -318,18 +316,14 @@ describe("liftCodingAgentLogFacts", () => {
 describe("declaredCodingAgent", () => {
   describe("given a declaration naming an agent in the registry", () => {
     it("answers that agent", () => {
-      expect(declaredCodingAgent({ "coding_agent.name": "claude_code" })).toBe(
-        "claude_code",
-      );
+      expect(declaredCodingAgent({ "coding_agent.name": "claude_code" })).toBe("claude_code");
       expect(declaredCodingAgent({ "coding_agent.name": "codex" })).toBe("codex");
     });
   });
 
   describe("given a declaration LangWatch cannot resolve", () => {
     it("answers null rather than trusting the wire", () => {
-      expect(
-        declaredCodingAgent({ "coding_agent.name": "totally_new_agent" }),
-      ).toBeNull();
+      expect(declaredCodingAgent({ "coding_agent.name": "totally_new_agent" })).toBeNull();
       expect(declaredCodingAgent({ "coding_agent.name": "" })).toBeNull();
       expect(declaredCodingAgent({ "coding_agent.name": 42 })).toBeNull();
       expect(declaredCodingAgent({})).toBeNull();
@@ -435,9 +429,7 @@ describe("parseMcpToolName", () => {
 
 describe("Gemini CLI", () => {
   it("is recognised, and its dialect maps onto the same facts", () => {
-    expect(detectCodingAgent({ recordName: "gemini_cli.token.usage" })).toBe(
-      "gemini_cli",
-    );
+    expect(detectCodingAgent({ recordName: "gemini_cli.token.usage" })).toBe("gemini_cli");
     expect(detectCodingAgent({ scopeName: "gemini-cli" })).toBe("gemini_cli");
 
     // Gemini's tool log carries success + duration — it IS the tool result.
@@ -512,9 +504,7 @@ describe("sessionTitleFromPrompt", () => {
   describe("given text that is not the user's own words", () => {
     /** @scenario A machine-injected first prompt does not name the session */
     it("answers null for machine-injected turns, withheld text, and nothing", () => {
-      expect(
-        sessionTitleFromPrompt("<task-notification>\n<task-id>a</task-id>"),
-      ).toBeNull();
+      expect(sessionTitleFromPrompt("<task-notification>\n<task-id>a</task-id>")).toBeNull();
       expect(sessionTitleFromPrompt("[REDACTED]")).toBeNull();
       expect(sessionTitleFromPrompt("   \n  ")).toBeNull();
     });

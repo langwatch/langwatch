@@ -67,9 +67,7 @@ describe("per-evaluator eval column cell", () => {
         const { getByText } = renderCell({
           evaluatorKey: "e1",
           field: "score",
-          evaluations: [
-            evalResult({ evaluatorId: "e1", status: "skipped", score: null }),
-          ],
+          evaluations: [evalResult({ evaluatorId: "e1", status: "skipped", score: null })],
         });
         expect(getByText("—")).toBeTruthy();
       });

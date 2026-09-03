@@ -110,9 +110,7 @@ export function discoverClassifiedPackages(root: string): {
   const packages: ClassifiedPackage[] = [];
   const violations: ArchitectureViolation[] = [];
   const catalogue = readFeatureCatalogue(root, violations);
-  const catalogueByRoot = new Map(
-    catalogue.map((entry) => [join(root, entry.root), entry]),
-  );
+  const catalogueByRoot = new Map(catalogue.map((entry) => [join(root, entry.root), entry]));
 
   const discoverFeatures = (featuresRoot: string, enterprise: boolean) => {
     for (const feature of directories(featuresRoot)) {
@@ -152,8 +150,7 @@ export function discoverClassifiedPackages(root: string): {
             policy: "feature-layout",
             file: manifestPath,
             message: `Unknown feature package role "${roleName}".`,
-            allowed:
-              "Use contract, server, or web; documentation belongs at the feature root.",
+            allowed: "Use contract, server, or web; documentation belongs at the feature root.",
           });
           continue;
         }
@@ -287,15 +284,12 @@ export function discoverClassifiedPackages(root: string): {
   }
   if (
     existsSync(enterpriseLicense) &&
-    !/^#\s+LangWatch Enterprise License\s*$/m.test(
-      readFileSync(enterpriseLicense, "utf8"),
-    )
+    !/^#\s+LangWatch Enterprise License\s*$/m.test(readFileSync(enterpriseLicense, "utf8"))
   ) {
     violations.push({
       policy: "enterprise-license",
       file: enterpriseLicense,
-      message:
-        "packages/enterprise/LICENSE.md must contain the LangWatch Enterprise License.",
+      message: "packages/enterprise/LICENSE.md must contain the LangWatch Enterprise License.",
     });
   }
 
@@ -305,8 +299,7 @@ export function discoverClassifiedPackages(root: string): {
       violations.push({
         policy: "enterprise-layout",
         file: enterpriseManifest,
-        message:
-          'The portable Enterprise catalogue package must be named "@langwatch/enterprise".',
+        message: 'The portable Enterprise catalogue package must be named "@langwatch/enterprise".',
       });
     }
     if (
@@ -405,8 +398,7 @@ export function discoverClassifiedPackages(root: string): {
       violations.push({
         policy: "enterprise-license",
         file: pkg.manifestPath,
-        message:
-          "An Enterprise descendant package cannot claim that its source is Apache-2.0.",
+        message: "An Enterprise descendant package cannot claim that its source is Apache-2.0.",
         allowed:
           "Inherit the LangWatch Enterprise license rooted at packages/enterprise/LICENSE.md.",
       });

@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  pilotDefinition,
-  pilotEvent,
-  T0,
-} from "../../__tests__/helpers/pilotProcess.fixture";
+import { pilotDefinition, pilotEvent, T0 } from "../../__tests__/helpers/pilotProcess.fixture";
 import { ProcessManagerService } from "../../processManagerService";
 import { InMemoryProcessStore } from "../inMemoryProcessStore";
 

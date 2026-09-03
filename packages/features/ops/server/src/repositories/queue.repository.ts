@@ -65,17 +65,11 @@ export interface QueueRepository {
     pageSize: number;
   }): Promise<{ groups: ParkedGroupInfo[]; total: number }>;
 
-  unblockGroup(params: {
-    queueName: string;
-    groupId: string;
-  }): Promise<{ wasBlocked: boolean }>;
+  unblockGroup(params: { queueName: string; groupId: string }): Promise<{ wasBlocked: boolean }>;
 
   unblockAll(params: { queueName: string }): Promise<{ unblockedCount: number }>;
 
-  drainGroup(params: {
-    queueName: string;
-    groupId: string;
-  }): Promise<{ jobsRemoved: number }>;
+  drainGroup(params: { queueName: string; groupId: string }): Promise<{ jobsRemoved: number }>;
 
   pausePipeline(params: { queueName: string; key: string }): Promise<void>;
 
@@ -101,10 +95,7 @@ export interface QueueRepository {
     groupIdContains?: string;
   }): Promise<{ groupsDrained: number; jobsDrained: number }>;
 
-  moveToDlq(params: {
-    queueName: string;
-    groupId: string;
-  }): Promise<{ jobsMoved: number }>;
+  moveToDlq(params: { queueName: string; groupId: string }): Promise<{ jobsMoved: number }>;
 
   moveAllBlockedToDlq(params: {
     queueName: string;
@@ -112,10 +103,7 @@ export interface QueueRepository {
     errorFilter?: string;
   }): Promise<{ movedCount: number; jobsMoved: number }>;
 
-  replayFromDlq(params: {
-    queueName: string;
-    groupId: string;
-  }): Promise<{ jobsReplayed: number }>;
+  replayFromDlq(params: { queueName: string; groupId: string }): Promise<{ jobsReplayed: number }>;
 
   replayAllFromDlq(params: {
     queueName: string;

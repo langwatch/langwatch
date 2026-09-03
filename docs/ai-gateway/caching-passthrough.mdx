@@ -33,9 +33,9 @@ Malformed/unknown mode → `400 cache_override_invalid` with a reason in the env
 
 <Note>
   **Enforcement ordering:** the cache-override hook runs on `/v1/messages` **before**
-  blocked-pattern enforcement. A `disable`-mode request has its `cache_control` blocks
-  stripped first, then the regex checks fire on the post-strip body. This keeps policy
-  evaluation deterministic regardless of the caller's caching choice.
+  blocked-pattern enforcement. A `disable`-mode request has its `cache_control` blocks stripped
+  first, then the regex checks fire on the post-strip body. This keeps policy evaluation
+  deterministic regardless of the caller's caching choice.
 </Note>
 
 ## What's reported back

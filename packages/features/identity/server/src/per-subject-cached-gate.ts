@@ -50,10 +50,7 @@ export type PerSubjectCachedFlag = {
    * cache miss. Concurrent calls for the same subject while that read
    * is in flight all resolve to the SAME promise - `read` runs once.
    */
-  get(args: {
-    subject: string;
-    read: () => Promise<boolean>;
-  }): Promise<boolean>;
+  get(args: { subject: string; read: () => Promise<boolean> }): Promise<boolean>;
   /** Drop ONE subject's cached answer AND its in-flight read's right
    *  to cache: a read racing the invalidation may still answer its own
    *  callers with the old value, but it will not cache it, and the next
@@ -213,13 +210,7 @@ function evictUntilUnderCap({ state }: { state: GateState }): void {
   }
 }
 
-function invalidate({
-  state,
-  subject,
-}: {
-  state: GateState;
-  subject: string;
-}): void {
+function invalidate({ state, subject }: { state: GateState; subject: string }): void {
   state.cached.delete(subject);
   const pending = state.inFlight.get(subject);
   if (pending !== undefined) {

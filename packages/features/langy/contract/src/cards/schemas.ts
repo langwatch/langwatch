@@ -340,11 +340,7 @@ export const namesCreatedResource = (payload: unknown): boolean => {
     if (/(^|_)id$|Id$/.test(key) && isNamedValue(value)) return true;
     if (isLocalFileScaffold) continue;
     if (RESOURCE_NAME_KEYS.includes(key) && isNamedValue(value)) return true;
-    if (
-      RESOURCE_COLLECTION_KEYS.includes(key) &&
-      Array.isArray(value) &&
-      value.length > 0
-    ) {
+    if (RESOURCE_COLLECTION_KEYS.includes(key) && Array.isArray(value) && value.length > 0) {
       return true;
     }
   }
@@ -393,9 +389,7 @@ export const spendProbeSchema = z.union([
   z.looseObject({ total_cost: z.number() }),
   // Rows that each carry a cost — a trace page, a per-key spend breakdown.
   z.looseObject({
-    traces: z.array(
-      z.looseObject({ metrics: z.looseObject({ total_cost: z.number() }) }),
-    ),
+    traces: z.array(z.looseObject({ metrics: z.looseObject({ total_cost: z.number() }) })),
   }),
 ]);
 

@@ -24,8 +24,7 @@ import { useProjectHomeHost } from "../../../../model/project-home-host";
  * rather than a skeleton swap.
  */
 export function HomeBriefingSection() {
-  const { data, statusCells, isLoading, isAnalyticsLoading, isRefreshing } =
-    useLangyBriefing();
+  const { data, statusCells, isLoading, isAnalyticsLoading, isRefreshing } = useLangyBriefing();
   const project = useProjectHomeHost().project();
   // The sheet renders wherever the signal-focused home is rolled out — with
   // or without Langy (spec: specs/home/signal-focused-home-rollout.feature).

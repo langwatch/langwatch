@@ -34,8 +34,7 @@ export class OtelCodingAgentCostMetricsAdapter extends CodingAgentCostMetricsPor
     return new OtelCodingAgentCostMetricsAdapter(
       counter({
         name: "coding_agent_cost_computed_usd_total",
-        description:
-          "Coding-agent cost computed from tokens against the model registry, in USD",
+        description: "Coding-agent cost computed from tokens against the model registry, in USD",
       }),
       counter({
         name: "coding_agent_cost_reported_usd_total",

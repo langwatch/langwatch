@@ -53,11 +53,17 @@ vi.mock("../../../behavior/model-provider-api", () => {
     listAllForProjectForFrontend: { useQuery: mockListAllForProjectForFrontendQuery },
     update: { useMutation: () => ({ mutateAsync: mockMutateAsync, isPending: false }) },
     setRoleAssignmentForScope: {
-      useMutation: () => ({ mutateAsync: vi.fn().mockResolvedValue({ ok: true }), isPending: false }),
+      useMutation: () => ({
+        mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
+        isPending: false,
+      }),
     },
     isManagedProvider: { useQuery: () => ({ data: { managed: false } }) },
     validateApiKey: {
-      useMutation: () => ({ mutateAsync: vi.fn().mockResolvedValue({ valid: true }), isPending: false }),
+      useMutation: () => ({
+        mutateAsync: vi.fn().mockResolvedValue({ valid: true }),
+        isPending: false,
+      }),
     },
   };
   const useUtils = () => ({ modelProvider: { invalidate: vi.fn() } });
@@ -193,9 +199,7 @@ function getInputNearLabel(labelText: string): HTMLInputElement {
   // to come first in DOM order instead of failing loudly.
   const inputs = node.querySelectorAll("input");
   if (inputs.length !== 1) {
-    throw new Error(
-      `expected exactly one input near label "${labelText}", found ${inputs.length}`,
-    );
+    throw new Error(`expected exactly one input near label "${labelText}", found ${inputs.length}`);
   }
   return inputs[0] as HTMLInputElement;
 }

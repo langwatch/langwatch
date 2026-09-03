@@ -42,23 +42,20 @@ export function RunViaApiDialog({
   projectSlug?: string;
 }) {
   const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://app.langwatch.ai";
+    typeof window !== "undefined" ? window.location.origin : "https://app.langwatch.ai";
 
-  const { dataSource, setDataSource, tabs } = useRunViaApiTabs(
-    ({ lang, dataSource: source }) =>
-      buildRunSnippet({
-        kind: "experiment",
-        identifier: experimentSlug,
-        baseUrl,
-        entryFields,
-        datasetColumns,
-        datasetName,
-        dataSource: source,
-        projectSlug,
-        lang,
-      }),
+  const { dataSource, setDataSource, tabs } = useRunViaApiTabs(({ lang, dataSource: source }) =>
+    buildRunSnippet({
+      kind: "experiment",
+      identifier: experimentSlug,
+      baseUrl,
+      entryFields,
+      datasetColumns,
+      datasetName,
+      dataSource: source,
+      projectSlug,
+      lang,
+    }),
   );
 
   return (
@@ -68,9 +65,7 @@ export function RunViaApiDialog({
       snippets={[]}
       targets={[]}
       tabs={tabs}
-      controls={
-        <DataSourcePicker value={dataSource} onChange={setDataSource} />
-      }
+      controls={<DataSourcePicker value={dataSource} onChange={setDataSource} />}
       title="Run via API"
       description="Trigger this evaluation through the LangWatch API and read the per-row results back."
     />
@@ -103,8 +98,7 @@ export function RunViaApiDialogContainer({
 
   if (!experimentSlug) return null;
 
-  const activeDataset =
-    datasets.find((dataset) => dataset.id === activeDatasetId) ?? datasets[0];
+  const activeDataset = datasets.find((dataset) => dataset.id === activeDatasetId) ?? datasets[0];
   const columnNames = activeDataset?.columns.map((column) => column.name) ?? [];
   const entryFields: WorkflowField[] = columnNames.map((name) => ({
     identifier: name,

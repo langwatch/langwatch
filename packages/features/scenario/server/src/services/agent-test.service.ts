@@ -172,7 +172,10 @@ export class AgentTestService {
     return { success: true, data: { apiKey: project.apiKey, organizationId: null } };
   }
 
-  private async readAdapter(input: { projectId: string; target: TargetConfig }): Promise<AdapterRead> {
+  private async readAdapter(input: {
+    projectId: string;
+    target: TargetConfig;
+  }): Promise<AdapterRead> {
     const result = await this.targetPrefetch.tryFetch({
       projectId: input.projectId,
       target: input.target,
@@ -257,7 +260,12 @@ export class AgentTestService {
     const setId = getAgentTestSetId(input.projectId);
 
     const prefetch = await prefetchAgentTestData({
-      context: { projectId: input.projectId, scenarioId: AGENT_TEST_SCENARIO_ID, setId, batchRunId },
+      context: {
+        projectId: input.projectId,
+        scenarioId: AGENT_TEST_SCENARIO_ID,
+        setId,
+        batchRunId,
+      },
       target: queueableTarget,
       reads: {
         project: () => this.readProject(input.projectId),

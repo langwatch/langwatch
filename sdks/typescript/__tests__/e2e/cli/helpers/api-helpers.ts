@@ -19,9 +19,7 @@ export class ApiHelpers {
       (await this.langwatch.prompts.getAll())
         .map((p) => p.handle)
         .filter((h): h is string => !!h && h.startsWith(PROMPT_NAME_PREFIX));
-    const results = await Promise.allSettled(
-      targets.map((h) => this.langwatch.prompts.delete(h)),
-    );
+    const results = await Promise.allSettled(targets.map((h) => this.langwatch.prompts.delete(h)));
     const failures = results
       .map((r, i) => ({ r, handle: targets[i] }))
       .filter(({ r }) => r.status === "rejected");

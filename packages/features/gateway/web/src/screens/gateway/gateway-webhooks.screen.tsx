@@ -46,9 +46,7 @@ function statusBadge(endpoint: EndpointView) {
   }
   return (
     <Badge colorPalette="red" data-testid={`webhook-disabled-${endpoint.id}`}>
-      {endpoint.disabledReason === "auto_failures_72h"
-        ? "disabled: 72h of failures"
-        : "disabled"}
+      {endpoint.disabledReason === "auto_failures_72h" ? "disabled: 72h of failures" : "disabled"}
     </Badge>
   );
 }
@@ -175,9 +173,8 @@ function WebhooksUpsell() {
         <Alert.Content>
           <Alert.Title>Enterprise Feature</Alert.Title>
           <Alert.Description>
-            Webhook endpoints stream signed events (gateway billing, budgets, key
-            lifecycle) to your systems with durable retries and delivery history.
-            Available on Enterprise plans.
+            Webhook endpoints stream signed events (gateway billing, budgets, key lifecycle) to your
+            systems with durable retries and delivery history. Available on Enterprise plans.
           </Alert.Description>
         </Alert.Content>
       </Alert.Root>
@@ -205,18 +202,12 @@ function NoWebhookEndpointsState() {
 }
 
 /** The endpoint's own switch, whichever way it currently sits. */
-function WebhookStatusMenuItem({
-  endpoint,
-  organizationId,
-  mutations,
-}: EndpointActionProps) {
+function WebhookStatusMenuItem({ endpoint, organizationId, mutations }: EndpointActionProps) {
   if (endpoint.status === "ACTIVE") {
     return (
       <Menu.Item
         value="disable"
-        onClick={() =>
-          mutations.disable.mutate({ organizationId, endpointId: endpoint.id })
-        }
+        onClick={() => mutations.disable.mutate({ organizationId, endpointId: endpoint.id })}
       >
         <Pause size={14} /> Disable
       </Menu.Item>
@@ -244,11 +235,7 @@ function WebhookManageMenuItems(props: EndpointActionProps) {
         <RotateCw size={14} /> Roll secret
       </Menu.Item>
       <WebhookStatusMenuItem {...props} />
-      <Menu.Item
-        value="delete"
-        color="fg.error"
-        onClick={() => dialogs.setDeleting(endpoint)}
-      >
+      <Menu.Item value="delete" color="fg.error" onClick={() => dialogs.setDeleting(endpoint)}>
         <Trash2 size={14} /> Delete
       </Menu.Item>
     </>
@@ -265,10 +252,7 @@ function WebhookRowMenu(props: EndpointActionProps) {
         </Button>
       </Menu.Trigger>
       <Menu.Content>
-        <Menu.Item
-          value="deliveries"
-          onClick={() => dialogs.setViewingDeliveries(endpoint)}
-        >
+        <Menu.Item value="deliveries" onClick={() => dialogs.setViewingDeliveries(endpoint)}>
           <History size={14} /> Deliveries
         </Menu.Item>
         {canManage && <WebhookManageMenuItems {...props} />}
@@ -289,9 +273,7 @@ function WebhookRow(props: EndpointActionProps) {
       </Table.Cell>
       <Table.Cell>{statusBadge(endpoint)}</Table.Cell>
       <Table.Cell whiteSpace="nowrap">
-        {endpoint.lastSuccessAt
-          ? new Date(endpoint.lastSuccessAt).toLocaleString()
-          : "never"}
+        {endpoint.lastSuccessAt ? new Date(endpoint.lastSuccessAt).toLocaleString() : "never"}
       </Table.Cell>
       <Table.Cell>
         <WebhookRowMenu {...props} />
@@ -339,10 +321,7 @@ function WebhookEndpointsPanel({
       <HStack width="full" justify="space-between">
         <Heading size="lg">Webhooks</Heading>
         {actions.canManage && (
-          <PageLayout.HeaderButton
-            onClick={actions.dialogs.openCreate}
-            data-testid="webhook-new"
-          >
+          <PageLayout.HeaderButton onClick={actions.dialogs.openCreate} data-testid="webhook-new">
             <Plus size={14} /> New endpoint
           </PageLayout.HeaderButton>
         )}
@@ -502,10 +481,7 @@ function WebhooksManager({
 }) {
   const dialogs = useWebhookDialogs();
   const endpoints = api.webhookEndpoints.list.useQuery({ organizationId }, { enabled });
-  const eventTypes = api.webhookEndpoints.eventTypes.useQuery(
-    { organizationId },
-    { enabled },
-  );
+  const eventTypes = api.webhookEndpoints.eventTypes.useQuery({ organizationId }, { enabled });
   const mutations = useWebhookEndpointMutations({
     onCreated: (secret) => {
       dialogs.setDrawerOpen(false);

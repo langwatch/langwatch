@@ -125,9 +125,7 @@ describe("the session context hook's silence", () => {
       const stream = new PassThrough();
       stream.end('{"session_id":"abc"}');
 
-      await expect(readStdin({ stream, timeoutMs: 5_000 })).resolves.toBe(
-        '{"session_id":"abc"}',
-      );
+      await expect(readStdin({ stream, timeoutMs: 5_000 })).resolves.toBe('{"session_id":"abc"}');
     });
   });
 

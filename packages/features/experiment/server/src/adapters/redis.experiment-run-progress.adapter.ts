@@ -121,10 +121,7 @@ export class RedisExperimentRunProgressAdapter extends ExperimentRunProgressPort
     state.traceId = failure.traceId;
 
     await this.write(runId, state);
-    logger.error(
-      { runId, errorCode: failure.code, traceId: failure.traceId },
-      "Run failed",
-    );
+    logger.error({ runId, errorCode: failure.code, traceId: failure.traceId }, "Run failed");
   }
 
   async stopRun(runId: string): Promise<void> {

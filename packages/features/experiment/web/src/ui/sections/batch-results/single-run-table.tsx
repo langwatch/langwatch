@@ -179,11 +179,7 @@ const buildColumns = ({
 
           // Use expandable cell for text content
           return (
-            <ExpandableDatasetCell
-              value={value}
-              columnName={col.name}
-              rowHeight={rowHeight}
-            />
+            <ExpandableDatasetCell value={value} columnName={col.name} rowHeight={rowHeight} />
           );
         },
       }),
@@ -423,15 +419,11 @@ export function SingleRunTable({
   }
 
   // Calculate minimum table width
-  const datasetColCount = data.datasetColumns.filter(
-    (c) => !hiddenColumns.has(c.name),
-  ).length;
+  const datasetColCount = data.datasetColumns.filter((c) => !hiddenColumns.has(c.name)).length;
   // Target columns that don't host a comparison verdict collapse away when
   // both output/evaluation sections are hidden — see the matching skip in
   // buildColumns above.
-  const comparisonTargetIds = new Set(
-    (data.comparisonColumns ?? []).map((p) => p.evaluatorId),
-  );
+  const comparisonTargetIds = new Set((data.comparisonColumns ?? []).map((p) => p.evaluatorId));
   const showTargetColumns = showOutputs || showEvaluations || showCostAndLatency;
   const targetColCount = showTargetColumns
     ? data.targetColumns.length
@@ -442,11 +434,7 @@ export function SingleRunTable({
     data.comparisonColumns ?? [],
     data.targetColumns,
   ).length;
-  const minTableWidth = calculateMinTableWidth(
-    datasetColCount,
-    targetColCount,
-    comparisonColCount,
-  );
+  const minTableWidth = calculateMinTableWidth(datasetColCount, targetColCount, comparisonColCount);
 
   const tableStyles = getTableStyles(minTableWidth);
   const virtualRows = rowVirtualizer.getVirtualItems();
@@ -458,9 +446,7 @@ export function SingleRunTable({
   // Calculate padding to maintain scroll position (only when virtualizing)
   const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
   const paddingBottom =
-    virtualRows.length > 0
-      ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
-      : 0;
+    virtualRows.length > 0 ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0) : 0;
 
   return (
     <Box
@@ -502,10 +488,7 @@ export function SingleRunTable({
               {/* Top padding row to maintain scroll position */}
               {paddingTop > 0 && (
                 <tr>
-                  <td
-                    style={{ height: `${paddingTop}px`, padding: 0 }}
-                    colSpan={columnCount}
-                  />
+                  <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
                 </tr>
               )}
               {/* Render only virtualized rows - empty until container is measured */}
@@ -529,10 +512,7 @@ export function SingleRunTable({
               {/* Bottom padding row to maintain scroll position */}
               {paddingBottom > 0 && (
                 <tr>
-                  <td
-                    style={{ height: `${paddingBottom}px`, padding: 0 }}
-                    colSpan={columnCount}
-                  />
+                  <td style={{ height: `${paddingBottom}px`, padding: 0 }} colSpan={columnCount} />
                 </tr>
               )}
             </>

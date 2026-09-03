@@ -95,11 +95,7 @@ export function VirtualKeyRoutingSection({
               [...policies, { id: value.policyId, name: "Current policy" }]
             : policies
           ).map((p) => (
-            <Radio
-              key={p.id}
-              value={`POLICY:${p.id}`}
-              data-testid={`vk-routing-policy-${p.id}`}
-            >
+            <Radio key={p.id} value={`POLICY:${p.id}`} data-testid={`vk-routing-policy-${p.id}`}>
               <Text fontSize="sm">{p.name}</Text>
             </Radio>
           ))}

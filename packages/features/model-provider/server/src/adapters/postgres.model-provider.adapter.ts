@@ -10,7 +10,10 @@ import {
   ModelTranslationPort,
   type ModelProviderIdService,
 } from "../ports/model-provider.port";
-import { PrismaModelCostRepository, requireModelCostDatabase } from "../repositories/prisma/prisma.model-cost.repository";
+import {
+  PrismaModelCostRepository,
+  requireModelCostDatabase,
+} from "../repositories/prisma/prisma.model-cost.repository";
 import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository";
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository";
 import { ModelProviderService } from "../services/model-provider.service";
@@ -33,9 +36,7 @@ export interface PostgresModelProviderAdapterOptions {
 export class PostgresModelProviderAdapter {
   private constructor(private readonly options: PostgresModelProviderAdapterOptions) {}
 
-  static create(
-    options: PostgresModelProviderAdapterOptions,
-  ): PostgresModelProviderAdapter {
+  static create(options: PostgresModelProviderAdapterOptions): PostgresModelProviderAdapter {
     return new PostgresModelProviderAdapter(options);
   }
 

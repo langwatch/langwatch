@@ -92,10 +92,7 @@ describe("langyContextTargetStore", () => {
         store().pick(traceRow);
         store().pick(evaluationCard);
 
-        expect(store().picked.map((t) => t.id)).toEqual([
-          "trace:abc123",
-          "evaluation:mon_1",
-        ]);
+        expect(store().picked.map((t) => t.id)).toEqual(["trace:abc123", "evaluation:mon_1"]);
       });
 
       it("keeps a full copy so the pick outlives the target unmounting", () => {

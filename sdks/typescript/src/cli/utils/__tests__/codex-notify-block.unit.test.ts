@@ -147,10 +147,7 @@ describe("writeCodexNotifyBlock", () => {
   describe("given no config file yet", () => {
     describe("when the block is written", () => {
       it("creates the file holding just the block", () => {
-        const result = writeCodexNotifyBlock(
-          { command: HARVEST },
-          { filePath: configPath },
-        );
+        const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
         expect(result.action).toBe("created");
         expect(codexHasNotifyBlock(configPath)).toBe(true);
@@ -164,10 +161,7 @@ describe("writeCodexNotifyBlock", () => {
       /** @scenario "Enabling capture twice leaves a single harvest hook" */
       it("reports no change and leaves exactly one notify key", () => {
         writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
-        const result = writeCodexNotifyBlock(
-          { command: HARVEST },
-          { filePath: configPath },
-        );
+        const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
         const content = fs.readFileSync(configPath, "utf8");
         expect(result.action).toBe("unchanged");
@@ -181,12 +175,7 @@ describe("writeCodexNotifyBlock", () => {
         writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
         const result = writeCodexNotifyBlock(
           {
-            command: [
-              ...HARVEST.slice(0, 1),
-              "/opt/langwatch/cli2.js",
-              "ingest",
-              "codex",
-            ],
+            command: [...HARVEST.slice(0, 1), "/opt/langwatch/cli2.js", "ingest", "codex"],
           },
           { filePath: configPath },
         );
@@ -214,10 +203,7 @@ describe("writeCodexNotifyBlock", () => {
           ].join("\n"),
         );
 
-        const result = writeCodexNotifyBlock(
-          { command: HARVEST },
-          { filePath: configPath },
-        );
+        const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
         expect(result.chained).toEqual(["/usr/bin/terminal-notifier", "-title", "Codex"]);
         expect(codexNotifyCommand(configPath)).toContain("--chain");
@@ -264,10 +250,7 @@ describe("writeCodexNotifyBlock", () => {
           ].join("\n"),
         );
 
-        const result = writeCodexNotifyBlock(
-          { command: HARVEST },
-          { filePath: configPath },
-        );
+        const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
         const content = fs.readFileSync(configPath, "utf8");
         expect(result.chained).toEqual(DOLLAR_ARGV);
@@ -301,10 +284,7 @@ describe("writeCodexNotifyBlock", () => {
           ].join("\n"),
         );
 
-        const result = writeCodexNotifyBlock(
-          { command: HARVEST },
-          { filePath: configPath },
-        );
+        const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
         const content = fs.readFileSync(configPath, "utf8");
         expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
@@ -327,20 +307,13 @@ describe("writeCodexNotifyBlock", () => {
         const userArgv = ["/usr/bin/terminal-notifier", "-title", "Codex"];
         fs.writeFileSync(
           configPath,
-          [
-            `notify = ${JSON.stringify(userArgv)}`,
-            "",
-            "[otel]",
-            'environment = "mine"',
-            "",
-          ].join("\n"),
+          [`notify = ${JSON.stringify(userArgv)}`, "", "[otel]", 'environment = "mine"', ""].join(
+            "\n",
+          ),
         );
 
         writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
-        const result = writeCodexNotifyBlock(
-          { command: HARVEST },
-          { filePath: configPath },
-        );
+        const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
         const content = fs.readFileSync(configPath, "utf8");
         expect(result.chained).toEqual(userArgv);
@@ -452,21 +425,10 @@ describe("codexNotifyCommand", () => {
       it("reads the whole argv, not just its first line", () => {
         fs.writeFileSync(
           configPath,
-          [
-            "notify = [",
-            '  "/usr/bin/notifier",',
-            '  "-title",',
-            '  "Codex",',
-            "]",
-            "",
-          ].join("\n"),
+          ["notify = [", '  "/usr/bin/notifier",', '  "-title",', '  "Codex",', "]", ""].join("\n"),
         );
 
-        expect(codexNotifyCommand(configPath)).toEqual([
-          "/usr/bin/notifier",
-          "-title",
-          "Codex",
-        ]);
+        expect(codexNotifyCommand(configPath)).toEqual(["/usr/bin/notifier", "-title", "Codex"]);
       });
     });
   });
@@ -505,10 +467,7 @@ describe("given a notify key that belongs to another table", () => {
         ].join("\n"),
       );
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+      const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
       const content = fs.readFileSync(configPath, "utf8");
       expect(result.chained).toBeNull();
@@ -537,17 +496,12 @@ describe("given a multi-line nested array sits above the user's notify", () => {
         ].join("\n"),
       );
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+      const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
       const content = fs.readFileSync(configPath, "utf8");
       // A second live `notify` is a duplicate key, and codex then refuses to
       // parse its config at all.
-      const live = content
-        .split("\n")
-        .filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
+      const live = content.split("\n").filter((line) => /^[ \t]*notify[ \t]*=/.test(line));
       expect(live).toHaveLength(1);
       expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
       expect(content).toContain("matrix = [");
@@ -571,10 +525,7 @@ describe("given a single-quoted literal string holding an unbalanced bracket", (
         ].join("\n"),
       );
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+      const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
       const live = fs
         .readFileSync(configPath, "utf8")
@@ -606,10 +557,7 @@ describe("given a multi-line string holding brackets above the user's notify", (
         ].join("\n"),
       );
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+      const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
       const live = fs
         .readFileSync(configPath, "utf8")
@@ -632,10 +580,7 @@ describe("given a multi-line string holding brackets above the user's notify", (
         ].join("\n"),
       );
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+      const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
       const live = fs
         .readFileSync(configPath, "utf8")
@@ -658,10 +603,7 @@ describe("given a multi-line string holding brackets above the user's notify", (
         ].join("\n"),
       );
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+      const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
       // The documented example is not a live key, so nothing was displaced.
       expect(result.chained).toBeNull();
@@ -686,10 +628,7 @@ describe("given a comment inside the user's notify array", () => {
         ].join("\n"),
       );
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+      const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
       expect(result.chained).toEqual(["/usr/bin/terminal-notifier"]);
     });
@@ -707,10 +646,7 @@ describe("given a comment inside the user's notify array", () => {
         ].join("\n"),
       );
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+      const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
       // A second live `notify` is a duplicate top-level key, which stops
       // codex from reading its own config at all.
@@ -726,15 +662,9 @@ describe("given a comment inside the user's notify array", () => {
     it("keeps a hash inside a quoted element as part of the path", () => {
       // Only a `#` outside a string opens a comment. Reading this one as
       // one would truncate the path and run a program that is not there.
-      fs.writeFileSync(
-        configPath,
-        ['notify = ["/opt/tools/notify#2/run.sh"]', ""].join("\n"),
-      );
+      fs.writeFileSync(configPath, ['notify = ["/opt/tools/notify#2/run.sh"]', ""].join("\n"));
 
-      const result = writeCodexNotifyBlock(
-        { command: HARVEST },
-        { filePath: configPath },
-      );
+      const result = writeCodexNotifyBlock({ command: HARVEST }, { filePath: configPath });
 
       expect(result.chained).toEqual(["/opt/tools/notify#2/run.sh"]);
     });

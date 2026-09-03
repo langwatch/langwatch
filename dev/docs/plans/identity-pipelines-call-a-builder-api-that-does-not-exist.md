@@ -30,7 +30,7 @@ RESULT: THREW -> Cannot destructure property 'name' of 'config' as it is undefin
 ```ts
 definePipeline<IdentityEvent | MfaEvent>()
   .withName(IDENTITY_PIPELINE_NAME)
-  .withAggregateType(USER_IDENTITY_AGGREGATE_TYPE)
+  .withAggregateType(USER_IDENTITY_AGGREGATE_TYPE);
 ```
 
 `definePipeline` has two overloads and both require a `{ name, aggregate }`
@@ -46,8 +46,8 @@ calls `createIdentityPipeline(...)` directly inside `registerAll()`, and
 (`presets.ts:2403`). Composing the App therefore throws.
 
 The registration's own comment says the pipeline "ships dark: no production
-writer dispatches these commands". That is true of *dispatch* and says nothing
-about *registration* — the pipeline is still constructed, and construction is
+writer dispatches these commands". That is true of _dispatch_ and says nothing
+about _registration_ — the pipeline is still constructed, and construction is
 what fails.
 
 It also fails 20 of the package's 38 tests, which is how it surfaced.
@@ -62,13 +62,13 @@ This is in-flight work whose two halves disagree, not something that broke.
 
 1. **Give the builder the fluent head the pipelines expect.** Four files were
    written this way deliberately; one typo does not repeat four times. But
-   `withAggregateType` takes a type *string* while the config takes an
+   `withAggregateType` takes a type _string_ while the config takes an
    `AggregateDefinition`, so the builder would have to construct one — which
    means deciding where a pipeline's event list comes from.
 2. **Convert the four pipelines to the config form**, which is what the rest of
    the repo already does — `ingestion-pull`, `pulled-usage` and
    `governance-events` all call `definePipeline<T>({ name, aggregate:
-   defineAggregate({ type, events: defineEvents(TYPES) }) })` and work. Every
+defineAggregate({ type, events: defineEvents(TYPES) }) })` and work. Every
    ingredient exists for identity too: `defineAggregate`, `defineEvents`,
    `USER_IDENTITY_AGGREGATE_TYPE`, `IDENTITY_EVENT_TYPES`, `MFA_EVENT_TYPES`.
 

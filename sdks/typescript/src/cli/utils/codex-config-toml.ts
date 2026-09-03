@@ -184,9 +184,7 @@ export function codexOtelBlockHasAuthHeader(filePath: string): boolean {
  * absent. The login-time "latest login wins" refresh compares this to
  * the current login's endpoint to decide whether the block is stale.
  */
-export function codexOtelBlockEndpoint(
-  filePath: string = defaultCodexConfigPath(),
-): string | null {
+export function codexOtelBlockEndpoint(filePath: string = defaultCodexConfigPath()): string | null {
   let content: string;
   try {
     content = fs.readFileSync(filePath, "utf8");
@@ -285,8 +283,7 @@ export function writeCodexOtelBlock(
   // opt-in); otherwise preserve whatever the current block has, so the
   // unconditional setup write never strips a header a prior persist
   // installed.
-  const includeAuthHeader =
-    options.persistAuthHeader ?? codexOtelBlockHasAuthHeader(filePath);
+  const includeAuthHeader = options.persistAuthHeader ?? codexOtelBlockHasAuthHeader(filePath);
   const block = buildCodexOtelBlock(inputs, { includeAuthHeader });
 
   if (!fs.existsSync(filePath)) {
@@ -477,9 +474,7 @@ export function codexNotifyCommandIsEphemeral(command: readonly string[]): boole
  * the final argv, so `--notify` has to be last to receive it as its value.
  */
 export function buildCodexNotifyBlock(inputs: CodexNotifyBlockInputs): string {
-  const chained = inputs.chained?.length
-    ? ["--chain", JSON.stringify(inputs.chained)]
-    : [];
+  const chained = inputs.chained?.length ? ["--chain", JSON.stringify(inputs.chained)] : [];
   const argv = [...inputs.command, ...chained, NOTIFY_PAYLOAD_FLAG];
   return [
     NOTIFY_BEGIN,
@@ -702,9 +697,7 @@ function findNotifyAssignment(content: string): NotifyAssignment | null {
 }
 
 /** The argv codex currently runs on turn completion, or null when unset. */
-export function codexNotifyCommand(
-  filePath: string = defaultCodexConfigPath(),
-): string[] | null {
+export function codexNotifyCommand(filePath: string = defaultCodexConfigPath()): string[] | null {
   try {
     return findNotifyAssignment(fs.readFileSync(filePath, "utf8"))?.argv ?? null;
   } catch {
@@ -713,9 +706,7 @@ export function codexNotifyCommand(
 }
 
 /** Whether config.toml currently carries the langwatch notify block. */
-export function codexHasNotifyBlock(
-  filePath: string = defaultCodexConfigPath(),
-): boolean {
+export function codexHasNotifyBlock(filePath: string = defaultCodexConfigPath()): boolean {
   return fileHasMarker(filePath, NOTIFY_BEGIN);
 }
 
@@ -804,9 +795,7 @@ export function writeCodexNotifyBlock(
  * Remove the langwatch notify block, restoring a user-authored `notify` we had
  * commented out when we installed. Returns true when a block was removed.
  */
-export function removeCodexNotifyBlock(
-  filePath: string = defaultCodexConfigPath(),
-): boolean {
+export function removeCodexNotifyBlock(filePath: string = defaultCodexConfigPath()): boolean {
   let content: string;
   try {
     content = fs.readFileSync(filePath, "utf8");
@@ -1026,11 +1015,7 @@ function stripMarkerBlock(content: string, begin: string, end: string): string |
   return content.replace(re, "");
 }
 
-function removeMarkerBlockFromFile(
-  filePath: string,
-  begin: string,
-  end: string,
-): boolean {
+function removeMarkerBlockFromFile(filePath: string, begin: string, end: string): boolean {
   let content: string;
   try {
     content = fs.readFileSync(filePath, "utf8");
@@ -1060,9 +1045,7 @@ export function codexHasOtelBlock(filePath: string = defaultCodexConfigPath()): 
 }
 
 /** Whether config.toml currently carries the langwatch gateway block. */
-export function codexHasGatewayBlock(
-  filePath: string = defaultCodexConfigPath(),
-): boolean {
+export function codexHasGatewayBlock(filePath: string = defaultCodexConfigPath()): boolean {
   return fileHasMarker(filePath, GW_BEGIN);
 }
 
@@ -1071,9 +1054,7 @@ export function codexHasGatewayBlock(
  * present. User config outside the marker pair is preserved. Returns true
  * when a block was removed (idempotent — false when absent).
  */
-export function removeCodexOtelBlock(
-  filePath: string = defaultCodexConfigPath(),
-): boolean {
+export function removeCodexOtelBlock(filePath: string = defaultCodexConfigPath()): boolean {
   return removeMarkerBlockFromFile(filePath, BEGIN, END);
 }
 
@@ -1081,9 +1062,7 @@ export function removeCodexOtelBlock(
  * Remove the langwatch gateway (Path A) provider marker block from
  * config.toml, if present. Returns true when a block was removed.
  */
-export function removeCodexGatewayBlock(
-  filePath: string = defaultCodexConfigPath(),
-): boolean {
+export function removeCodexGatewayBlock(filePath: string = defaultCodexConfigPath()): boolean {
   return removeMarkerBlockFromFile(filePath, GW_BEGIN, GW_END);
 }
 

@@ -13,8 +13,7 @@ import { LangWatchLoggerInternal } from "./implementation";
  * replacement: a provider whose loggers are always the shared no-op logger.
  */
 const NOOP_LOGGER_PROVIDER: LoggerProvider = {
-  getLogger: (_name: string, _version?: string, _options?: LoggerOptions) =>
-    createNoopLogger(),
+  getLogger: (_name: string, _version?: string, _options?: LoggerOptions) => createNoopLogger(),
 };
 
 /**

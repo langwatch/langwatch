@@ -15,19 +15,14 @@ export class IngestionKeyService {
     private readonly repository: IngestionKeyRepository,
     private readonly issuer: IngestionKeyIssuerPort,
     private readonly organizations: OrganizationService,
-  ) {
-  }
+  ) {}
 
   static create(options: {
     repository: IngestionKeyRepository;
     issuer: IngestionKeyIssuerPort;
     organizations: OrganizationService;
   }): IngestionKeyService {
-    return new IngestionKeyService(
-      options.repository,
-      options.issuer,
-      options.organizations,
-    );
+    return new IngestionKeyService(options.repository, options.issuer, options.organizations);
   }
 
   async ensureForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey> {

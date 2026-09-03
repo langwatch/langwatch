@@ -40,9 +40,7 @@ describe("<ErrorActions />", () => {
 
       renderActions({ traceId: TRACE_ID });
 
-      await userEvent.click(
-        await screen.findByRole("button", { name: /copy error id/i }),
-      );
+      await userEvent.click(await screen.findByRole("button", { name: /copy error id/i }));
 
       expect(writeText).toHaveBeenCalledWith(TRACE_ID);
       expect(await screen.findByText("Copied")).toBeInTheDocument();
@@ -67,15 +65,11 @@ describe("<ErrorActions />", () => {
      */
     /** @scenario "An error id stays readable where it cannot be copied" */
     it("falls back to the id as selectable text", async () => {
-      withClipboard(
-        vi.fn<() => Promise<void>>().mockRejectedValue(new Error("denied")),
-      );
+      withClipboard(vi.fn<() => Promise<void>>().mockRejectedValue(new Error("denied")));
 
       renderActions({ traceId: TRACE_ID });
 
-      await userEvent.click(
-        await screen.findByRole("button", { name: /copy error id/i }),
-      );
+      await userEvent.click(await screen.findByRole("button", { name: /copy error id/i }));
 
       expect(await screen.findByText("Couldn't copy")).toBeInTheDocument();
       expect(screen.getByText(/4bf92f3577b34da6/)).toBeInTheDocument();
@@ -90,9 +84,7 @@ describe("<ErrorActions />", () => {
       renderActions({ traceId: TRACE_ID });
 
       expect(screen.getByText(/4bf92f3577b34da6/)).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /copy error id/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /copy error id/i })).not.toBeInTheDocument();
     });
   });
 

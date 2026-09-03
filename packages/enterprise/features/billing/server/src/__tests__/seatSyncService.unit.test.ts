@@ -6,9 +6,7 @@ import { PrismaOrganizationPricingRepository } from "../repositories/prisma/pris
 
 const createMockDb = ({ pricingModel }: { pricingModel: string | null }) => ({
   organization: {
-    findUnique: vi
-      .fn()
-      .mockResolvedValue(pricingModel === null ? null : { pricingModel }),
+    findUnique: vi.fn().mockResolvedValue(pricingModel === null ? null : { pricingModel }),
   },
 });
 
@@ -58,9 +56,7 @@ describe("seatSyncService", () => {
     describe("when the seat update fails with a handled error", () => {
       it("keeps its boolean contract and resolves false", async () => {
         const seatEventFns = {
-          updateSeatEventItems: vi
-            .fn()
-            .mockRejectedValue(new SubscriptionNotLinkedError()),
+          updateSeatEventItems: vi.fn().mockRejectedValue(new SubscriptionNotLinkedError()),
         };
         const service = SeatSyncService.create({
           seatEvents: seatEventFns as any,

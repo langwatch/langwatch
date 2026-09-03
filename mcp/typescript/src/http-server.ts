@@ -130,10 +130,7 @@ function sendUnauthorized({ res, error }: { res: Response; error: string }): voi
  * tool calls (which read config via `getConfig()`/`requireApiKey()`) see the
  * per-session API key instead of the global one.
  */
-async function handleWithSessionConfig<T>(
-  apiKey: string,
-  fn: () => Promise<T>,
-): Promise<T> {
+async function handleWithSessionConfig<T>(apiKey: string, fn: () => Promise<T>): Promise<T> {
   const baseConfig = getConfig();
   return runWithConfig({ ...baseConfig, apiKey }, fn);
 }
@@ -241,9 +238,7 @@ function overSessionLimit({
   sessions: SessionStore<StreamableHTTPServerTransport>;
   sseSessions: SessionStore<SSEServerTransport>;
 }): boolean {
-  return (
-    sessions.countForKey(apiKey) + sseSessions.countForKey(apiKey) >= MAX_SESSIONS_PER_KEY
-  );
+  return sessions.countForKey(apiKey) + sseSessions.countForKey(apiKey) >= MAX_SESSIONS_PER_KEY;
 }
 
 function sendSessionLimitReached(res: Response): void {
@@ -396,9 +391,7 @@ function registerStreamableHttpRoutes({
       const sessionServer = createMcpServer();
       try {
         await handleWithSessionConfig(apiKey, () => sessionServer.connect(transport));
-        await handleWithSessionConfig(apiKey, () =>
-          transport.handleRequest(req, res, req.body),
-        );
+        await handleWithSessionConfig(apiKey, () => transport.handleRequest(req, res, req.body));
       } catch (error) {
         if (transport.sessionId) sessions.remove(transport.sessionId);
         await transport.close().catch(() => undefined);
@@ -459,8 +452,7 @@ function registerStreamableHttpRoutes({
     const sessionId = sessionIdOf(req);
     const session = sessionId ? sessions.get(sessionId) : undefined;
     const owned =
-      session !== undefined &&
-      apiKeysMatch({ presentedKey: apiKey, expectedKey: session.apiKey });
+      session !== undefined && apiKeysMatch({ presentedKey: apiKey, expectedKey: session.apiKey });
 
     if (!sessionId || !session || !owned) {
       res.status(404).json({ error: "Session not found" });
@@ -531,8 +523,7 @@ function registerSseRoutes({
     const sessionId = req.query["sessionId"] as string | undefined;
     const session = sessionId ? sseSessions.get(sessionId) : undefined;
     const owned =
-      session !== undefined &&
-      apiKeysMatch({ presentedKey: apiKey, expectedKey: session.apiKey });
+      session !== undefined && apiKeysMatch({ presentedKey: apiKey, expectedKey: session.apiKey });
 
     if (!sessionId || !session || !owned) {
       res.status(400).json({ error: "Invalid or missing session ID" });
@@ -551,14 +542,8 @@ function registerSseRoutes({
 
 /** Sweeps idle sessions, expired tokens, and stale rate limiter entries. */
 function startReaper(runtime: ServerRuntime): NodeJS.Timeout {
-  const {
-    sessions,
-    sseSessions,
-    oauthTokens,
-    verifier,
-    authFailRateLimiter,
-    oauthRateLimiter,
-  } = runtime;
+  const { sessions, sseSessions, oauthTokens, verifier, authFailRateLimiter, oauthRateLimiter } =
+    runtime;
 
   const reaper = setInterval(() => {
     sessions.sweep();

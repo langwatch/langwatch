@@ -48,10 +48,7 @@ export function VirtualizedTableRows({
 }: Props) {
   const shouldVirtualize = count > threshold;
 
-  const getScrollElement = useCallback(
-    () => scrollContainerRef.current,
-    [scrollContainerRef],
-  );
+  const getScrollElement = useCallback(() => scrollContainerRef.current, [scrollContainerRef]);
   const estimateSize = useCallback(() => rowHeight, [rowHeight]);
 
   const virtualizer = useVirtualizer({
@@ -73,9 +70,7 @@ export function VirtualizedTableRows({
   const totalSize = virtualizer.getTotalSize();
   const paddingTop = virtualItems.length > 0 ? (virtualItems[0]?.start ?? 0) : 0;
   const paddingBottom =
-    virtualItems.length > 0
-      ? totalSize - (virtualItems[virtualItems.length - 1]?.end ?? 0)
-      : 0;
+    virtualItems.length > 0 ? totalSize - (virtualItems[virtualItems.length - 1]?.end ?? 0) : 0;
 
   return (
     <>

@@ -205,11 +205,7 @@ export function MessagePreview({ messages, streamingMessages }: MessagePreviewPr
               : null;
         if (toolCalls) {
           return toolCalls.map((tc: { function?: { name?: string } }, tcIdx: number) => (
-            <HStack
-              key={`${message.id ?? index}-tc-${tcIdx}`}
-              alignSelf="flex-start"
-              gap={1}
-            >
+            <HStack key={`${message.id ?? index}-tc-${tcIdx}`} alignSelf="flex-start" gap={1}>
               <Box color="orange.fg">
                 <Settings size={10} />
               </Box>
@@ -259,14 +255,8 @@ export function MessagePreview({ messages, streamingMessages }: MessagePreviewPr
       {pendingStreaming.map((sm) => {
         const isUser = sm.role === "user";
         return (
-          <Box
-            key={sm.messageId}
-            alignSelf={isUser ? "flex-end" : "flex-start"}
-            maxWidth="85%"
-          >
-            <PreviewBubble isUser={isUser}>
-              {sm.content || <TypingIndicator />}
-            </PreviewBubble>
+          <Box key={sm.messageId} alignSelf={isUser ? "flex-end" : "flex-start"} maxWidth="85%">
+            <PreviewBubble isUser={isUser}>{sm.content || <TypingIndicator />}</PreviewBubble>
           </Box>
         );
       })}

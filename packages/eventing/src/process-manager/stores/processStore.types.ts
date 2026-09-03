@@ -283,10 +283,7 @@ export interface ProcessStore {
    * the operator's failure record, pending rows are work. Returns the
    * deleted count.
    */
-  deleteDispatchedBefore(params: {
-    processName: string;
-    before: number;
-  }): Promise<number>;
+  deleteDispatchedBefore(params: { processName: string; before: number }): Promise<number>;
 
   /**
    * Retention sweep, dispatched family: delete at most `limit` DISPATCHED

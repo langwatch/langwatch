@@ -379,11 +379,7 @@ describe("validateProviderApiKey", () => {
      * API_KEY_INVALID actually means the key is wrong; the rest are project
      * or restriction problems that regenerating the key will never fix.
      */
-    const googleError = (
-      status: number,
-      reason: string,
-      message: string,
-    ): unknown => ({
+    const googleError = (status: number, reason: string, message: string): unknown => ({
       error: {
         code: status,
         message,
@@ -509,8 +505,7 @@ describe("validateProviderApiKey", () => {
             domain: "googleapis.com",
             metadata: {
               consumer: "projects/000000000000",
-              methodName:
-                "google.cloud.translate.v2.TranslateService.TranslateText",
+              methodName: "google.cloud.translate.v2.TranslateService.TranslateText",
               apiName: "translate",
               service: "translate.googleapis.com",
             },
@@ -546,11 +541,7 @@ describe("validateProviderApiKey", () => {
       it("still reports an invalid key", async () => {
         respondWith(
           400,
-          googleError(
-            400,
-            "API_KEY_INVALID",
-            "API key not valid. Please pass a valid API key.",
-          ),
+          googleError(400, "API_KEY_INVALID", "API key not valid. Please pass a valid API key."),
         );
 
         const result = await validateProviderApiKey("gemini", {
@@ -611,8 +602,7 @@ describe("validateProviderApiKey", () => {
         respondWith(401, {
           detail: {
             status: "invalid_api_key",
-            message:
-              "The xi-api-key you supplied is not associated with a workspace",
+            message: "The xi-api-key you supplied is not associated with a workspace",
           },
         });
 
@@ -706,9 +696,7 @@ describe("validateProviderApiKey", () => {
           error: {
             code: status,
             message: "blocked",
-            ...(reason
-              ? { details: [{ reason, domain: "googleapis.com" }] }
-              : {}),
+            ...(reason ? { details: [{ reason, domain: "googleapis.com" }] } : {}),
           },
         }),
     });
@@ -749,16 +737,10 @@ describe("validateProviderApiKey", () => {
       );
 
       expect(urls.some((url) => url.includes("/v1/models?key="))).toBe(true);
-      expect(urls.some((url) => url.includes("/v1beta/models?key="))).toBe(
-        true,
-      );
-      expect(urls.some((url) => url.includes("/v1beta/openai/models"))).toBe(
-        true,
-      );
+      expect(urls.some((url) => url.includes("/v1beta/models?key="))).toBe(true);
+      expect(urls.some((url) => url.includes("/v1beta/openai/models"))).toBe(true);
       expect(headers.some((h) => "x-goog-api-key" in h)).toBe(true);
-      expect(headers.some((h) => h.Authorization?.startsWith("Bearer "))).toBe(
-        true,
-      );
+      expect(headers.some((h) => h.Authorization?.startsWith("Bearer "))).toBe(true);
     });
 
     /** @scenario Probing stops at the first shape that answers */
@@ -812,9 +794,7 @@ describe("validateProviderApiKey", () => {
           JSON.stringify({
             error: {
               message: "API key not valid. Please pass a valid API key.",
-              details: [
-                { reason: "API_KEY_INVALID", domain: "googleapis.com" },
-              ],
+              details: [{ reason: "API_KEY_INVALID", domain: "googleapis.com" }],
             },
           }),
       };
@@ -859,9 +839,7 @@ describe("validateProviderApiKey", () => {
           JSON.stringify({
             error: {
               message: "API key not valid. Please pass a valid API key.",
-              details: [
-                { reason: "API_KEY_INVALID", domain: "googleapis.com" },
-              ],
+              details: [{ reason: "API_KEY_INVALID", domain: "googleapis.com" }],
             },
           }),
       });
@@ -981,21 +959,20 @@ describe("given a check that never reached the provider", () => {
 
   describe("when the provider uses credentials we cannot probe", () => {
     /** @scenario "Every reason a check does not run is reported as unchecked" */
-    it.each([
-      "bedrock",
-      "vertex_ai",
-      "azure",
-    ])("reports %s as unchecked rather than working", async (provider) => {
-      const result = await validateProviderApiKey(provider, {
-        SOME_KEY: "whatever",
-      });
+    it.each(["bedrock", "vertex_ai", "azure"])(
+      "reports %s as unchecked rather than working",
+      async (provider) => {
+        const result = await validateProviderApiKey(provider, {
+          SOME_KEY: "whatever",
+        });
 
-      expect(result).toMatchObject({
-        outcome: "unchecked",
-        reason: "provider_not_probeable",
-      });
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
+        expect(result).toMatchObject({
+          outcome: "unchecked",
+          reason: "provider_not_probeable",
+        });
+        expect(mockFetch).not.toHaveBeenCalled();
+      },
+    );
 
     /** @scenario "Content safety credentials are never probed as a language model" */
     it("never probes a content safety credential as a language model", async () => {
@@ -1006,8 +983,7 @@ describe("given a check that never reached the provider", () => {
       // credential would come back refused.
       const result = await validateProviderApiKey("azure_safety", {
         AZURE_CONTENT_SAFETY_KEY: "a-good-key",
-        AZURE_CONTENT_SAFETY_ENDPOINT:
-          "https://example.cognitiveservices.azure.com",
+        AZURE_CONTENT_SAFETY_ENDPOINT: "https://example.cognitiveservices.azure.com",
       });
 
       expect(result).toMatchObject({

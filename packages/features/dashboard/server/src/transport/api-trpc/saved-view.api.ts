@@ -83,9 +83,7 @@ export type SavedViewPeriod = Readonly<{
  * with the shape they have always had, rather than a narrowed copy of it.
  */
 export type SavedViewsPort<TView> = Readonly<{
-  getAll(
-    input: Readonly<{ projectId: string; userId?: string; kind?: string }>,
-  ): Promise<TView[]>;
+  getAll(input: Readonly<{ projectId: string; userId?: string; kind?: string }>): Promise<TView[]>;
   create(
     input: Readonly<{
       projectId: string;
@@ -99,15 +97,11 @@ export type SavedViewsPort<TView> = Readonly<{
       kind?: string;
     }>,
   ): Promise<TView>;
-  delete(
-    input: Readonly<{ projectId: string; viewId: string; userId: string }>,
-  ): Promise<TView>;
+  delete(input: Readonly<{ projectId: string; viewId: string; userId: string }>): Promise<TView>;
   rename(
     input: Readonly<{ projectId: string; viewId: string; name: string; userId: string }>,
   ): Promise<TView>;
-  reorder(
-    input: Readonly<{ projectId: string; viewIds: string[] }>,
-  ): Promise<{ success: true }>;
+  reorder(input: Readonly<{ projectId: string; viewIds: string[] }>): Promise<{ success: true }>;
 }>;
 
 export type SavedViewTrpcPorts<TView> = Readonly<{ savedViews: SavedViewsPort<TView> }>;
@@ -245,9 +239,7 @@ export class SavedViewTrpcApi {
       ),
 
       rename: policy("traces:view")(
-        procedure.input(
-          z.object({ projectId: z.string(), viewId: z.string(), name: nameSchema }),
-        ),
+        procedure.input(z.object({ projectId: z.string(), viewId: z.string(), name: nameSchema })),
       ).mutation(
         async ({ ctx, input }) =>
           await savedViewCall(() =>
@@ -261,9 +253,7 @@ export class SavedViewTrpcApi {
       ),
 
       reorder: policy("traces:view")(
-        procedure.input(
-          z.object({ projectId: z.string(), viewIds: z.array(z.string()) }),
-        ),
+        procedure.input(z.object({ projectId: z.string(), viewIds: z.array(z.string()) })),
       ).mutation(
         async ({ input }) =>
           await savedViewCall(() =>

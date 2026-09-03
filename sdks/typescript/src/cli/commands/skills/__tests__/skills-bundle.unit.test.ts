@@ -6,12 +6,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  findSkill,
-  SKILLS_BUNDLE,
-  SKILLS_BUNDLE_VERSION,
-  type BundledSkill,
-} from "../installer";
+import { findSkill, SKILLS_BUNDLE, SKILLS_BUNDLE_VERSION, type BundledSkill } from "../installer";
 
 const REPO_ROOT = path.join(__dirname, "../../../../../../../");
 const SKILLS_ROOT = path.join(REPO_ROOT, "skills");
@@ -22,9 +17,7 @@ const expectedPublishedSlugs = (): { slug: string; isRecipe: boolean }[] => {
     path.join(SKILLS_ROOT, "_lib/feature-skills.ts"),
     "utf8",
   );
-  const match = /export const FEATURE_SKILLS = \[([\s\S]*?)\] as const;/.exec(
-    featureSkillsSrc,
-  );
+  const match = /export const FEATURE_SKILLS = \[([\s\S]*?)\] as const;/.exec(featureSkillsSrc);
   const featureSkills = [...(match?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => ({
     slug: m[1]!,
     isRecipe: false,
@@ -32,9 +25,7 @@ const expectedPublishedSlugs = (): { slug: string; isRecipe: boolean }[] => {
   const recipes = fs
     .readdirSync(path.join(SKILLS_ROOT, "recipes"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .filter((entry) =>
-      fs.existsSync(path.join(SKILLS_ROOT, "recipes", entry.name, "SKILL.mdx")),
-    )
+    .filter((entry) => fs.existsSync(path.join(SKILLS_ROOT, "recipes", entry.name, "SKILL.mdx")))
     .map((entry) => ({ slug: entry.name, isRecipe: true }));
   return [...featureSkills, ...recipes];
 };
@@ -64,12 +55,7 @@ describe("the embedded skills bundle", () => {
 
   it("matches the committed native renders byte-for-byte (one artifact for CLI, publisher, and Langy)", () => {
     for (const entry of SKILLS_BUNDLE) {
-      const nativePath = path.join(
-        SKILLS_ROOT,
-        "_compiled/native",
-        entry.slug,
-        "SKILL.md",
-      );
+      const nativePath = path.join(SKILLS_ROOT, "_compiled/native", entry.slug, "SKILL.md");
       expect(
         fs.existsSync(nativePath),
         `${entry.slug}: missing native render — regenerate with bash skills/_compiled/generate.sh`,
@@ -87,9 +73,7 @@ describe("the embedded skills bundle", () => {
   it("embeds every body fully inlined: frontmatter intact, no MDX imports or JSX left", () => {
     for (const entry of SKILLS_BUNDLE) {
       expect(entry.body.startsWith("---"), `${entry.slug} frontmatter`).toBe(true);
-      expect(/^import .*\.mdx/m.test(entry.body), `${entry.slug} MDX imports`).toBe(
-        false,
-      );
+      expect(/^import .*\.mdx/m.test(entry.body), `${entry.slug} MDX imports`).toBe(false);
       expect(/<[A-Z][A-Za-z]* \/>/.test(entry.body), `${entry.slug} JSX`).toBe(false);
       expect(entry.description.length).toBeGreaterThan(0);
     }

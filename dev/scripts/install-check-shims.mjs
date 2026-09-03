@@ -121,7 +121,10 @@ function discoverBinDirs(repoRoot) {
       const member = `${parent}/${name}`;
       if (EXCLUDED_MEMBERS.has(member)) continue;
       // packages/features/<feature> holds contract/server/web, one level deeper.
-      const candidates = [member, ...childDirs(path.join(repoRoot, member)).map((c) => `${member}/${c}`)];
+      const candidates = [
+        member,
+        ...childDirs(path.join(repoRoot, member)).map((c) => `${member}/${c}`),
+      ];
       for (const candidate of candidates) {
         const bin = path.join(repoRoot, candidate, "node_modules/.bin");
         if (fs.existsSync(bin)) dirs.push(bin);

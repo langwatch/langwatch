@@ -28,11 +28,7 @@ export class RedisAnomalyStateRepository extends AnomalyStatePort {
   async upsert(anomaly: Anomaly): Promise<void> {
     const field = `${anomaly.kind}:${anomaly.tenantId}`;
     try {
-      await this.redis.hset(
-        RedisAnomalyStateRepository.hashKey,
-        field,
-        JSON.stringify(anomaly),
-      );
+      await this.redis.hset(RedisAnomalyStateRepository.hashKey, field, JSON.stringify(anomaly));
     } catch (err) {
       logger.warn(
         { field, err: err instanceof Error ? err.message : String(err) },
@@ -62,10 +58,7 @@ export class RedisAnomalyStateRepository extends AnomalyStatePort {
   }
 
   async tryGet(tenantId: string, kind: AnomalyKind): Promise<Anomaly | null> {
-    const raw = await this.redis.hget(
-      RedisAnomalyStateRepository.hashKey,
-      `${kind}:${tenantId}`,
-    );
+    const raw = await this.redis.hget(RedisAnomalyStateRepository.hashKey, `${kind}:${tenantId}`);
     if (!raw) {
       return null;
     }

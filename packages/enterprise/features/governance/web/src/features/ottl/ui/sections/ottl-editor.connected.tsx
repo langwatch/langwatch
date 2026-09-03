@@ -1,4 +1,7 @@
-import { GovernanceOttlValidationClient, type GovernanceOttlValidationResult } from "../../model/governance-ottl-validation-client";
+import {
+  GovernanceOttlValidationClient,
+  type GovernanceOttlValidationResult,
+} from "../../model/governance-ottl-validation-client";
 import { OttlEditor } from "../elements/ottl-editor";
 import { useMemo } from "react";
 import { api } from "../../../../behavior/governance-api";

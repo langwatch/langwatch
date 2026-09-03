@@ -77,14 +77,7 @@ const settledResult = (groups: ConversationGroup[]): SessionGroupsResult => ({
 });
 
 /** Sort dimensions `tracesV2.sessions` understands (see SessionGroupsService). */
-const SERVER_SORTABLE = new Set([
-  "started",
-  "lastTurn",
-  "duration",
-  "cost",
-  "tokens",
-  "turns",
-]);
+const SERVER_SORTABLE = new Set(["started", "lastTurn", "duration", "cost", "tokens", "turns"]);
 
 /**
  * Onboarding sample-preview groups, or null when no preview is active. The

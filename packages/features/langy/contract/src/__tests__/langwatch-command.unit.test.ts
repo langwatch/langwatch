@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
-import {
-  isSoleLangwatchInvocation,
-  parseLangwatchCommand,
-} from "@langwatch/langy-contract";
+import { isSoleLangwatchInvocation, parseLangwatchCommand } from "@langwatch/langy-contract";
 
 describe("parseLangwatchCommand", () => {
   describe("given a plain CLI invocation", () => {
     it("reads the resource and the verb", () => {
-      expect(parseLangwatchCommand("langwatch trace search --format json")).toMatchObject(
-        { resource: "trace", verb: "search" },
-      );
+      expect(parseLangwatchCommand("langwatch trace search --format json")).toMatchObject({
+        resource: "trace",
+        verb: "search",
+      });
     });
 
     it("reads a verb that carries an argument", () => {
@@ -20,9 +18,10 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("reads a kebab-case verb", () => {
-      expect(
-        parseLangwatchCommand("langwatch experiment list-runs my-experiment"),
-      ).toMatchObject({ resource: "experiment", verb: "list-runs" });
+      expect(parseLangwatchCommand("langwatch experiment list-runs my-experiment")).toMatchObject({
+        resource: "experiment",
+        verb: "list-runs",
+      });
     });
 
     it("reads a kebab-case resource", () => {
@@ -33,17 +32,18 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("reads a sub-command group as the verb", () => {
-      expect(
-        parseLangwatchCommand("langwatch dataset records list --format json"),
-      ).toMatchObject({ resource: "dataset", verb: "records" });
+      expect(parseLangwatchCommand("langwatch dataset records list --format json")).toMatchObject({
+        resource: "dataset",
+        verb: "records",
+      });
     });
   });
 
   describe("given the invocation is wrapped in other shell", () => {
     it("finds it after a directory change", () => {
-      expect(
-        parseLangwatchCommand("cd /tmp/work && langwatch dataset list -f json"),
-      ).toMatchObject({ resource: "dataset", verb: "list" });
+      expect(parseLangwatchCommand("cd /tmp/work && langwatch dataset list -f json")).toMatchObject(
+        { resource: "dataset", verb: "list" },
+      );
     });
 
     it("finds it before a pipe", () => {
@@ -68,9 +68,10 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("finds it when invoked by path", () => {
-      expect(
-        parseLangwatchCommand("/opt/homebrew/bin/langwatch analytics query"),
-      ).toMatchObject({ resource: "analytics", verb: "query" });
+      expect(parseLangwatchCommand("/opt/homebrew/bin/langwatch analytics query")).toMatchObject({
+        resource: "analytics",
+        verb: "query",
+      });
     });
 
     it("finds it across multiple lines and continuations", () => {
@@ -90,9 +91,7 @@ describe("parseLangwatchCommand", () => {
 
     it("matches the first invocation when several are chained", () => {
       expect(
-        parseLangwatchCommand(
-          "langwatch trace search --format json && langwatch dataset list",
-        ),
+        parseLangwatchCommand("langwatch trace search --format json && langwatch dataset list"),
       ).toMatchObject({ resource: "trace", verb: "search" });
     });
   });
@@ -130,16 +129,14 @@ describe("parseLangwatchCommand", () => {
     });
 
     it("parses --flag=value and keeps the positional under _", () => {
-      expect(
-        parseLangwatchCommand("langwatch dataset get golden-set --format=json")?.args,
-      ).toEqual({ _: ["golden-set"], format: "json" });
+      expect(parseLangwatchCommand("langwatch dataset get golden-set --format=json")?.args).toEqual(
+        { _: ["golden-set"], format: "json" },
+      );
     });
 
     it("reads a bare flag as true and collects a repeated flag into an array", () => {
       expect(
-        parseLangwatchCommand(
-          "langwatch experiment run my-exp --wait --label a --label b",
-        )?.args,
+        parseLangwatchCommand("langwatch experiment run my-exp --wait --label a --label b")?.args,
       ).toEqual({ _: ["my-exp"], wait: true, label: ["a", "b"] });
     });
 
@@ -204,9 +201,10 @@ describe("parseLangwatchCommand", () => {
    */
   describe("given globals in root position, before the resource", () => {
     it("skips a value-taking global and its value", () => {
-      expect(parseLangwatchCommand("langwatch --output json monitor list")).toMatchObject(
-        { resource: "monitor", verb: "list" },
-      );
+      expect(parseLangwatchCommand("langwatch --output json monitor list")).toMatchObject({
+        resource: "monitor",
+        verb: "list",
+      });
     });
 
     it("skips the short form too", () => {
@@ -242,15 +240,13 @@ describe("parseLangwatchCommand", () => {
 describe("isSoleLangwatchInvocation", () => {
   describe("given one plain langwatch invocation", () => {
     it("accepts a bare command with flags and positionals", () => {
-      expect(isSoleLangwatchInvocation("langwatch trace get run_1 --format json")).toBe(
-        true,
-      );
+      expect(isSoleLangwatchInvocation("langwatch trace get run_1 --format json")).toBe(true);
     });
 
     it("accepts wrappers and env assignments before the program", () => {
-      expect(
-        isSoleLangwatchInvocation("LANGWATCH_API_KEY=x npx langwatch monitor list"),
-      ).toBe(true);
+      expect(isSoleLangwatchInvocation("LANGWATCH_API_KEY=x npx langwatch monitor list")).toBe(
+        true,
+      );
     });
   });
 

@@ -17,10 +17,7 @@ import type {
 } from "@langwatch/eventing";
 import { IdentityLedgerWriter } from "../identity-ledger.adapter";
 import { identityProjectionConvergenceTimeoutsTotal } from "../identity-ledger.metrics";
-import {
-  inMemoryIdentityReservations,
-  inMemoryIdentityUsers,
-} from "../../testing";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };

@@ -50,9 +50,7 @@ describe("given the GitHub connect card", () => {
 
       const fallback = await screen.findByText("Install from settings");
       fireEvent.click(fallback);
-      await waitFor(() =>
-        expect(pushMock).toHaveBeenCalledWith("/settings/integrations#github"),
-      );
+      await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/settings/integrations#github"));
     });
   });
 });

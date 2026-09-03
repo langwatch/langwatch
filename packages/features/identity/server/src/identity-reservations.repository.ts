@@ -47,10 +47,7 @@ export interface IdentityReservationRepository {
    * any more — detached, dead-ended, or erased out of its value. Called by the
    * fold, which is the one place that knows a user's whole identifier state.
    */
-  release(args: {
-    userId: string;
-    holdingIdentifierIds: readonly string[];
-  }): Promise<number>;
+  release(args: { userId: string; holdingIdentifierIds: readonly string[] }): Promise<number>;
 
   /**
    * Claims older than the horizon that no live identifier backs at all: the

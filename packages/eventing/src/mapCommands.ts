@@ -7,9 +7,7 @@ export type MappedCommand<P> = {
 };
 
 export type MapCommands<T extends Record<string, EventSourcedQueueProcessor<any>>> = {
-  [K in keyof T]: T[K] extends EventSourcedQueueProcessor<infer P>
-    ? MappedCommand<P>
-    : never;
+  [K in keyof T]: T[K] extends EventSourcedQueueProcessor<infer P> ? MappedCommand<P> : never;
 };
 
 export function mapCommands<T extends Record<string, EventSourcedQueueProcessor<any>>>(
@@ -17,8 +15,7 @@ export function mapCommands<T extends Record<string, EventSourcedQueueProcessor<
 ): MapCommands<T> {
   const result = {} as Record<string, MappedCommand<any>>;
   for (const [name, processor] of Object.entries(commands)) {
-    const command = ((data, options) =>
-      processor.send(data, options)) as MappedCommand<any>;
+    const command = ((data, options) => processor.send(data, options)) as MappedCommand<any>;
     command.sendBatch = (data, options) => processor.sendBatch(data, options);
     result[name] = command;
   }

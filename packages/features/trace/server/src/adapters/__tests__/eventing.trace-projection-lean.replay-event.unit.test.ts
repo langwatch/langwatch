@@ -33,9 +33,7 @@ describe("rowToEvent", () => {
           EventType: SPAN_RECEIVED_EVENT_TYPE,
           EventPayload: JSON.stringify({
             span: {
-              attributes: [
-                { key: "langwatch.output", value: { stringValue: oversized } },
-              ],
+              attributes: [{ key: "langwatch.output", value: { stringValue: oversized } }],
             },
           }),
         }),
@@ -43,8 +41,7 @@ describe("rowToEvent", () => {
       );
 
       const attrs = (event.data as any)?.span?.attributes ?? [];
-      const out =
-        attrs.find((a: any) => a.key === "langwatch.output")?.value?.stringValue ?? "";
+      const out = attrs.find((a: any) => a.key === "langwatch.output")?.value?.stringValue ?? "";
       expect(out.length).toBeGreaterThan(0);
       expect(out.length).toBeLessThan(oversized.length);
     });

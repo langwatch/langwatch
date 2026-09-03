@@ -30,11 +30,7 @@ function ProjectionRow({ row }: { row: ProjectionHealthRow }) {
         </Text>
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <Text
-          textStyle="xs"
-          fontFamily="mono"
-          color={row.blocked > 0 ? "red.500" : "fg.muted"}
-        >
+        <Text textStyle="xs" fontFamily="mono" color={row.blocked > 0 ? "red.500" : "fg.muted"}>
           {row.blocked}
         </Text>
       </Table.Cell>
@@ -58,12 +54,7 @@ export function ProjectionsCard({ rows }: { rows: ProjectionHealthRow[] }) {
   return (
     <Card.Root>
       <Card.Body padding={0}>
-        <HStack
-          paddingX={4}
-          paddingY={2.5}
-          borderBottom="1px solid"
-          borderBottomColor="border"
-        >
+        <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
           <Text textStyle="sm" fontWeight="medium">
             Projections
           </Text>

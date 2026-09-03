@@ -47,7 +47,11 @@ describe("given the prompt drawer address", () => {
       // The clearing IS the behaviour here, so the key has to be present and
       // the value has to be `undefined` — `toHaveBeenCalledWith`-style
       // property-absence checks would pass even if the clearing stopped.
-      expect(Object.keys(next).sort()).toEqual(["drawer.datasetId", "drawer.open", "drawer.traceId"]);
+      expect(Object.keys(next).sort()).toEqual([
+        "drawer.datasetId",
+        "drawer.open",
+        "drawer.traceId",
+      ]);
       expect(next["drawer.datasetId"]).toBeUndefined();
       expect(next["drawer.open"]).toBe("traceV2Details");
       expect(next["drawer.traceId"]).toBe("trace_1");

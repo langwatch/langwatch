@@ -69,9 +69,7 @@ describe("ManagerCard", () => {
       it("says so instead of showing empty state", () => {
         renderCard({ ...running, instance: null, outbox: [] });
         expect(screen.getByText("Not started")).toBeDefined();
-        expect(
-          screen.getByText("This machine has not started for this aggregate."),
-        ).toBeDefined();
+        expect(screen.getByText("This machine has not started for this aggregate.")).toBeDefined();
       });
     });
   });

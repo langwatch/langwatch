@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  isTransientClickHouseError,
-  jitteredBackoffMs,
-  retryNoticeLevel,
-} from "../resilience";
+import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from "../resilience";
 
 const withCode = ({ message, code }: { message: string; code: string }): Error =>
   Object.assign(new Error(message), { code });
@@ -72,15 +68,11 @@ describe("isTransientClickHouseError", () => {
   describe("given a timeout", () => {
     describe("when only the message says so", () => {
       it("retries on the message alone", () => {
-        expect(isTransientClickHouseError({ error: new Error("Timeout error.") })).toBe(
-          true,
-        );
+        expect(isTransientClickHouseError({ error: new Error("Timeout error.") })).toBe(true);
       });
 
       it("tolerates the message without its trailing stop", () => {
-        expect(isTransientClickHouseError({ error: new Error("Timeout error") })).toBe(
-          true,
-        );
+        expect(isTransientClickHouseError({ error: new Error("Timeout error") })).toBe(true);
       });
     });
 

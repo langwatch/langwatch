@@ -79,9 +79,7 @@ export type StoredObjectFileRead =
  */
 export interface StoredObjectFileReadPort {
   headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead>;
-  getById(
-    input: Readonly<{ projectId: string; id: string }>,
-  ): Promise<StoredObjectFileRead | null>;
+  getById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectFileRead | null>;
 }
 
 /** What the process composes this feature's application from. */
@@ -102,9 +100,7 @@ export class StoredObjectApp {
   private constructor(private readonly dependencies: StoredObjectAppDependencies) {}
 
   /** Begins an upload and answers where to put the bytes. */
-  createUpload(
-    input: StoredObjectsCreateUploadInput,
-  ): Promise<StoredObjectsCreateUploadOutput> {
+  createUpload(input: StoredObjectsCreateUploadInput): Promise<StoredObjectsCreateUploadOutput> {
     return this.dependencies.storedObjects.createUpload(input);
   }
 

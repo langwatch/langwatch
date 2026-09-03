@@ -39,10 +39,7 @@ export abstract class AgentRepository {
     ids: string[];
     projectId: string;
   }): Promise<AgentReferenceState[]>;
-  abstract findNamesByIds(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<AgentName[]>;
+  abstract findNamesByIds(input: { ids: string[]; projectId: string }): Promise<AgentName[]>;
   abstract exists(input: { id: string; projectId: string }): Promise<boolean>;
   abstract findPage(input: {
     projectId: string;
@@ -90,13 +87,7 @@ export abstract class AgentRepository {
     config: AgentConfig;
   }): Promise<Agent>;
   /** Writes the presence projection of one agent. */
-  abstract touchLastSeenAt(input: {
-    id: string;
-    projectId: string;
-    at: Date;
-  }): Promise<void>;
+  abstract touchLastSeenAt(input: { id: string; projectId: string; at: Date }): Promise<void>;
   /** The display names of a set of users, for a connected agent's owner. */
-  abstract findUserNamesByIds(
-    ids: readonly string[],
-  ): Promise<Map<string, string | null>>;
+  abstract findUserNamesByIds(ids: readonly string[]): Promise<Map<string, string | null>>;
 }

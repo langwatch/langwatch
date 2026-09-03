@@ -39,11 +39,8 @@ describe("the seat-type choice", () => {
     it("says a lite member can view but not change, right on the option", () => {
       renderInviteForm();
 
-      const liteOption = screen.getByText("Lite Member").closest("label, div")!
-        .parentElement!;
-      expect(
-        within(liteOption).getByText(/view the work, but not change it/i),
-      ).toBeDefined();
+      const liteOption = screen.getByText("Lite Member").closest("label, div")!.parentElement!;
+      expect(within(liteOption).getByText(/view the work, but not change it/i)).toBeDefined();
     });
 
     /** @scenario The invite form explains what a lite member can do */

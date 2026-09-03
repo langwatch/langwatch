@@ -19,9 +19,8 @@ vi.mock("../../../../../behavior/langy/use-can-ask-langy", () => ({
 }));
 vi.mock("@langwatch/langy-web", async (importOriginal) => ({
   ...((await importOriginal()) as object),
-  useLangyStore: (
-    selector: (s: { attachContext: () => void; openPanel: () => void }) => unknown,
-  ) => selector({ attachContext: vi.fn(), openPanel: vi.fn() }),
+  useLangyStore: (selector: (s: { attachContext: () => void; openPanel: () => void }) => unknown) =>
+    selector({ attachContext: vi.fn(), openPanel: vi.fn() }),
 }));
 vi.mock("../../../../../behavior/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
@@ -97,9 +96,7 @@ describe("BulkActionBar add to annotation queue", () => {
 
         fireEvent.click(screen.getByRole("button", { name: /Add to annotation queue/ }));
 
-        expect(await screen.findByTestId("annotation-queue-dialog")).toHaveTextContent(
-          "t1,t2,t3",
-        );
+        expect(await screen.findByTestId("annotation-queue-dialog")).toHaveTextContent("t1,t2,t3");
       });
     });
   });
@@ -111,9 +108,7 @@ describe("BulkActionBar add to annotation queue", () => {
       useSelectionStore.getState().enableAllMatching();
       renderBar();
 
-      expect(
-        screen.getByRole("button", { name: /Add to annotation queue/ }),
-      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Add to annotation queue/ })).toBeDisabled();
     });
   });
 

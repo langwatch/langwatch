@@ -111,9 +111,7 @@ describe("audioPartToMediaData", () => {
     describe("when it carries raw header-less pcm16 data", () => {
       it("wraps the raw pcm16 in a WAV container so it is playable", () => {
         // 4 raw little-endian int16 samples — no RIFF header.
-        const pcm = new Uint8Array([
-          0x00, 0x00, 0x10, 0x20, 0xff, 0x7f, 0x00, 0x80,
-        ]);
+        const pcm = new Uint8Array([0x00, 0x00, 0x10, 0x20, 0xff, 0x7f, 0x00, 0x80]);
         const result = audioPartToMediaData({
           type: "input_audio",
           input_audio: {
@@ -141,9 +139,7 @@ describe("audioPartToMediaData", () => {
         expect(wav.readUInt16LE(22)).toBe(1); // mono
         expect(wav.readUInt32LE(24)).toBe(24000); // sample rate
         expect(wav.readUInt16LE(34)).toBe(16); // bits per sample
-        expect(Buffer.from(wav.subarray(44)).equals(Buffer.from(pcm))).toBe(
-          true,
-        );
+        expect(Buffer.from(wav.subarray(44)).equals(Buffer.from(pcm))).toBe(true);
       });
     });
 
@@ -157,9 +153,7 @@ describe("audioPartToMediaData", () => {
         });
 
         expect(result).not.toBeNull();
-        const source = (
-          result as { source: { value: string; mimeType?: string } }
-        ).source;
+        const source = (result as { source: { value: string; mimeType?: string } }).source;
         expect(source.mimeType).toBe("audio/wav");
         const wav = Buffer.from(source.value, "base64");
         expect(wav.toString("ascii", 0, 4)).toBe("RIFF");
@@ -240,15 +234,11 @@ describe("audioPartToMediaData", () => {
     });
 
     it("returns null for a tool call", () => {
-      expect(
-        audioPartToMediaData({ type: "tool_call", toolName: "x", args: "{}" }),
-      ).toBeNull();
+      expect(audioPartToMediaData({ type: "tool_call", toolName: "x", args: "{}" })).toBeNull();
     });
 
     it("returns null for a tool result", () => {
-      expect(
-        audioPartToMediaData({ type: "tool_result", result: "x" }),
-      ).toBeNull();
+      expect(audioPartToMediaData({ type: "tool_result", result: "x" })).toBeNull();
     });
 
     it("returns null for an image_url", () => {
@@ -270,10 +260,7 @@ describe("collectAudioParts", () => {
 
   describe("given a bare content-part array", () => {
     it("finds the audio part among text siblings", () => {
-      const parts = collectAudioParts([
-        audioPart,
-        { type: "text", text: "hi" },
-      ]);
+      const parts = collectAudioParts([audioPart, { type: "text", text: "hi" }]);
       expect(parts).toHaveLength(1);
       expect(parts[0]).toMatchObject({ type: "audio" });
     });
@@ -317,9 +304,7 @@ describe("collectAudioParts", () => {
     it("returns an empty array", () => {
       expect(collectAudioParts("hello there")).toEqual([]);
       expect(collectAudioParts([{ type: "text", text: "hi" }])).toEqual([]);
-      expect(
-        collectAudioParts({ messages: [{ role: "user", content: "hi" }] }),
-      ).toEqual([]);
+      expect(collectAudioParts({ messages: [{ role: "user", content: "hi" }] })).toEqual([]);
     });
   });
 });
@@ -351,9 +336,7 @@ describe("mediaPartToMediaData", () => {
     });
 
     it("returns null for a binary with no payload at all", () => {
-      expect(
-        mediaPartToMediaData({ type: "binary", mimeType: "application/pdf" }),
-      ).toBeNull();
+      expect(mediaPartToMediaData({ type: "binary", mimeType: "application/pdf" })).toBeNull();
     });
   });
 
@@ -500,9 +483,7 @@ describe("collectMediaParts", () => {
     });
 
     it("ignores prose that merely mentions a reference", () => {
-      expect(
-        collectMediaParts("see the file at /api/files/p1/obj1 for details"),
-      ).toEqual([]);
+      expect(collectMediaParts("see the file at /api/files/p1/obj1 for details")).toEqual([]);
     });
   });
 

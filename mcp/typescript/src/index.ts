@@ -67,9 +67,7 @@ if (argv.http) {
   // double-bracketed when the operator already wrote it that way.
   const displayHost = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
   console.log(`LangWatch MCP server listening on http://${displayHost}:${port}/mcp`);
-  console.log(
-    "Clients must provide their API key via Authorization: Bearer <key> header",
-  );
+  console.log("Clients must provide their API key via Authorization: Bearer <key> header");
   if (!isLoopbackHost(host)) {
     console.warn(
       `Warning: bound to ${host}, so the server is reachable from other machines. ` +

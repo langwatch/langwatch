@@ -7,10 +7,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import { scenarioDeferredComputeRunMetricsJob } from "@langwatch/scenario-server";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**

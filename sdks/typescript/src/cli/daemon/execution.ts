@@ -113,8 +113,7 @@ export class ExecutionContext {
     // its own; the chunk goes through the stream's StringDecoder so a
     // multibyte character split across writes is reassembled, not corrupted.
     const held = this.pendingEscape[stream];
-    let text =
-      (held === null ? "" : held.toString("utf8")) + this.decoders[stream].write(chunk);
+    let text = (held === null ? "" : held.toString("utf8")) + this.decoders[stream].write(chunk);
     this.pendingEscape[stream] = null;
 
     const partial = PARTIAL_SGR_AT_END.exec(text);
@@ -200,23 +199,16 @@ export function installProcessInterceptors(): () => void {
     ): boolean => {
       const context = storage.getStore();
       if (!context) {
-        return (real as (...args: unknown[]) => boolean)(
-          chunk,
-          encodingOrCallback,
-          callback,
-        );
+        return (real as (...args: unknown[]) => boolean)(chunk, encodingOrCallback, callback);
       }
 
-      const encoding =
-        typeof encodingOrCallback === "string" ? encodingOrCallback : "utf8";
-      const buffer =
-        typeof chunk === "string" ? Buffer.from(chunk, encoding) : Buffer.from(chunk);
+      const encoding = typeof encodingOrCallback === "string" ? encodingOrCallback : "utf8";
+      const buffer = typeof chunk === "string" ? Buffer.from(chunk, encoding) : Buffer.from(chunk);
       context.write(stream, buffer);
 
       // Honour whichever of the two overloads the caller used, or the stream
       // contract (a write callback must always fire) is broken.
-      const done =
-        typeof encodingOrCallback === "function" ? encodingOrCallback : callback;
+      const done = typeof encodingOrCallback === "function" ? encodingOrCallback : callback;
       done?.();
       return true;
     }) as typeof realStdoutWrite;
@@ -253,9 +245,7 @@ export interface WindowRequest {
 }
 
 function windowKey(request: WindowRequest): string {
-  const entries = Object.entries(request.env).sort(([a], [b]) =>
-    a < b ? -1 : a > b ? 1 : 0,
-  );
+  const entries = Object.entries(request.env).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   return JSON.stringify([request.cwd, request.colorLevel, entries]);
 }
 

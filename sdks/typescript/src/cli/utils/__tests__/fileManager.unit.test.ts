@@ -10,9 +10,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
 
   beforeEach(() => {
     originalCwd = process.cwd();
-    scratchRoot = fs.realpathSync(
-      fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-fm-")),
-    );
+    scratchRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-fm-")));
     FileManager._resetProjectRootCache();
   });
 
@@ -43,9 +41,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
       fs.mkdirSync(sub, { recursive: true });
       process.chdir(sub);
 
-      expect(FileManager.getPromptsConfigPath()).toBe(
-        path.join(scratchRoot, "prompts.json"),
-      );
+      expect(FileManager.getPromptsConfigPath()).toBe(path.join(scratchRoot, "prompts.json"));
     });
   });
 
@@ -101,9 +97,7 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
         expect(FileManager.getPromptsConfigPath()).toBe(path.join(first, "prompts.json"));
 
         process.chdir(second);
-        expect(FileManager.getPromptsConfigPath()).toBe(
-          path.join(second, "prompts.json"),
-        );
+        expect(FileManager.getPromptsConfigPath()).toBe(path.join(second, "prompts.json"));
       });
     });
 

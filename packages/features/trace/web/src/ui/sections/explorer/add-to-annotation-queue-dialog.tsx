@@ -82,13 +82,7 @@ function destinationFor({
 }
 
 /** What actually happened, in the sender's terms. */
-function sentDescription({
-  created,
-  skipped,
-}: {
-  created: number;
-  skipped: number;
-}): string {
+function sentDescription({ created, skipped }: { created: number; skipped: number }): string {
   const sent = `${created} ${created === 1 ? "trace" : "traces"} sent for annotation`;
   if (skipped === 0) return sent;
   const reason =
@@ -182,9 +176,7 @@ export function AddToAnnotationQueueDialog({
         annotators,
         projectSlug: project?.slug,
         sessionUserId: session?.user?.id,
-        queueSlugById: new Map(
-          (queues.data ?? []).map((queue) => [queue.id, queue.slug]),
-        ),
+        queueSlugById: new Map((queues.data ?? []).map((queue) => [queue.id, queue.slug])),
       });
 
       setAnnotators([]);

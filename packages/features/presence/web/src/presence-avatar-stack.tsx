@@ -13,11 +13,7 @@ export interface PresenceAvatarStackProps {
  * avatars, collapsing the tail into a "+N" badge once the count exceeds
  * {@link PresenceAvatarStackProps.max}.
  */
-export function PresenceAvatarStack({
-  sessions,
-  max = 4,
-  size = "2xs",
-}: PresenceAvatarStackProps) {
+export function PresenceAvatarStack({ sessions, max = 4, size = "2xs" }: PresenceAvatarStackProps) {
   if (sessions.length === 0) return null;
 
   const visible = sessions.slice(0, max);

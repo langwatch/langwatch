@@ -33,12 +33,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  collectSSE,
-  hasGo,
-  type NlpgoSubprocess,
-  startNlpgoSubprocess,
-} from "../nlpgo-subprocess";
+import { collectSSE, hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "../nlpgo-subprocess";
 
 // Unique port alongside the other nlpgo subprocess integration tests
 // (55610 / 55611 / 55612 / 55620 — see CLAUDE.md). 55613 is this test's.
@@ -127,8 +122,7 @@ describe.skipIf(!hasGo())(
       // without them the eval-v3 result cell has nothing to populate.
       expect(
         componentEvents.length,
-        "nlpgo emitted no component_state_change frames for the " +
-          "execute_component request",
+        "nlpgo emitted no component_state_change frames for the " + "execute_component request",
       ).toBeGreaterThan(0);
 
       // CORE ASSERTION — the field eval-v3's TargetCell reads

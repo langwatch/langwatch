@@ -107,12 +107,12 @@ The DSL is defined in `langwatch_nlp/langwatch_nlp/studio/types/dsl.py`. Go stru
 
 Server-Sent Events. Event shapes match `langwatch_nlp.studio.types.events.StudioServerEvent`:
 
-| event                    | data                                                                                                                       |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `is_alive_response`      | `{}` — heartbeat every `NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS` (default 15). Matches Python `IsAliveResponse.type`.        |
-| `execution_state_change` | `{ trace_id, state: { status, nodes: { <node_id>: { status, inputs, outputs, error?, cost?, duration_ms? } } } }` |
-| `done`                   | `{ trace_id, status: "success" \| "error", result }`                                                              |
-| `error`                  | `{ trace_id, payload: { stack?, message } }`                                                                      |
+| event                    | data                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `is_alive_response`      | `{}` — heartbeat every `NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS` (default 15). Matches Python `IsAliveResponse.type`. |
+| `execution_state_change` | `{ trace_id, state: { status, nodes: { <node_id>: { status, inputs, outputs, error?, cost?, duration_ms? } } } }`   |
+| `done`                   | `{ trace_id, status: "success" \| "error", result }`                                                                |
+| `error`                  | `{ trace_id, payload: { stack?, message } }`                                                                        |
 
 - Idle timeout = `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS` (default 720). It is a **silence budget, not a wall clock**: every event emitted restarts it, so a long run that keeps reporting progress is never cut off. On timeout the handler emits a terminal `error` frame carrying `idle_timeout` and closes; the frame carries the code rather than a 504 because the SSE headers are committed before the first event drains. Enforced in the drain loop of `adapters/httpapi/handlers.go` (`sseStream.drain` / `writeIdleTimeout`) — `app/engine/stream.go` defers idle detection to the handler because only the handler observes whether a frame reached the client.
 - Client cancellation: closing the connection MUST cancel in-flight node executions (cooperative; nodes check ctx).
@@ -348,24 +348,24 @@ This section is the complete list. A variable not named here is read by nothing 
 
 Two engine knobs additionally accept a bare **deployed alias**, resolved in `services/nlpgo/cmd/root.go`. The aliases are not legacy debt to clean up: they are the names live deployments set, and removing either one breaks a running deployment.
 
-| Prefixed knob | Deployed alias | Who sets the alias | Precedence |
-|---|---|---|---|
-| `NLPGO_ENGINE_LANGWATCH_BASE_URL` | `LANGWATCH_ENDPOINT` | `charts/.../langwatch_nlp/deployment.yaml`, and terraform on every Lambda | prefixed wins; alias is trailing-slash-trimmed |
-| `NLPGO_ENGINE_SANDBOX_PYTHON` | `SANDBOX_PYTHON` | `infra/docker/Dockerfile.langwatch_nlp` | prefixed wins; a blank alias is not an interpreter |
+| Prefixed knob                     | Deployed alias       | Who sets the alias                                                        | Precedence                                         |
+| --------------------------------- | -------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- |
+| `NLPGO_ENGINE_LANGWATCH_BASE_URL` | `LANGWATCH_ENDPOINT` | `charts/.../langwatch_nlp/deployment.yaml`, and terraform on every Lambda | prefixed wins; alias is trailing-slash-trimmed     |
+| `NLPGO_ENGINE_SANDBOX_PYTHON`     | `SANDBOX_PYTHON`     | `infra/docker/Dockerfile.langwatch_nlp`                                   | prefixed wins; a blank alias is not an interpreter |
 
 ### Root knobs (bare names)
 
-| Variable | Default | Read at |
-|---|---|---|
-| `ENVIRONMENT` | `local` | `cmd/root.go` → `contexts.ServiceInfo.Environment` |
-| `BLOCK_LOCAL_HTTP_CALLS` | `false` | `cmd/root.go` → `httpblock.SSRFOptions.AllowLocal` **and** `dispatcher.Options` |
-| `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | `cmd/root.go` → `dispatcher.Options` |
-| `ALLOWED_PROXY_HOSTS` | empty | `cmd/root.go` → SSRF allow-list (comma-separated) |
-| `SERVER_ADDR` | `:5562` | `serve.go` → `http.Server.Addr` |
-| `SERVER_GRACEFUL_SECONDS` | `10` | `serve.go` → `lifecycle.WithGraceful` |
-| `SERVER_MAX_REQUEST_BODY_BYTES` | 32 MiB | `serve.go` → `httpapi.RouterDeps.MaxRequestBodyBytes` |
-| `LOG_LEVEL`, `LOG_FORMAT`, `LOG_CONSOLE_LEVEL`, `LOG_OTEL_LEVEL` | see `pkg/clog` | `deps.go` → `clog.New` |
-| `OTEL_*` (the `pkg/config.OTel` set) | see `pkg/config/otel.go` | `deps.go` → `configureNLPGoOTel` |
+| Variable                                                         | Default                  | Read at                                                                         |
+| ---------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------- |
+| `ENVIRONMENT`                                                    | `local`                  | `cmd/root.go` → `contexts.ServiceInfo.Environment`                              |
+| `BLOCK_LOCAL_HTTP_CALLS`                                         | `false`                  | `cmd/root.go` → `httpblock.SSRFOptions.AllowLocal` **and** `dispatcher.Options` |
+| `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                                 | `false`                  | `cmd/root.go` → `dispatcher.Options`                                            |
+| `ALLOWED_PROXY_HOSTS`                                            | empty                    | `cmd/root.go` → SSRF allow-list (comma-separated)                               |
+| `SERVER_ADDR`                                                    | `:5562`                  | `serve.go` → `http.Server.Addr`                                                 |
+| `SERVER_GRACEFUL_SECONDS`                                        | `10`                     | `serve.go` → `lifecycle.WithGraceful`                                           |
+| `SERVER_MAX_REQUEST_BODY_BYTES`                                  | 32 MiB                   | `serve.go` → `httpapi.RouterDeps.MaxRequestBodyBytes`                           |
+| `LOG_LEVEL`, `LOG_FORMAT`, `LOG_CONSOLE_LEVEL`, `LOG_OTEL_LEVEL` | see `pkg/clog`           | `deps.go` → `clog.New`                                                          |
+| `OTEL_*` (the `pkg/config.OTel` set)                             | see `pkg/config/otel.go` | `deps.go` → `configureNLPGoOTel`                                                |
 
 `SERVER_DRAIN_DELAY_SECONDS` exists on the shared `pkg/config.Server` struct but nlpgo never calls `lifecycle.WithDrainDelay`, so setting it here does nothing. It is left in place because the field is shared, not nlpgo's to remove.
 
@@ -373,18 +373,18 @@ Two further variables are read straight from the process environment rather than
 
 ### Engine knobs (`NLPGO_ENGINE_` prefix)
 
-| Variable | Default | Read at |
-|---|---|---|
-| `NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS` | `15` | `serve.go` `resolveStreamHeartbeat` → `httpapi.RouterDeps.StreamHeartbeat` |
-| `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS` | `720` | `serve.go` `resolveStreamIdleTimeout` → `httpapi.RouterDeps.StreamIdleTimeout` |
-| `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `600` | `cmd/root.go` `newCodeExecutor` → `codeblock.Options.DefaultTimeout` |
-| `NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS` | `720` | `cmd/root.go` `newHTTPExecutor` → `httpblock.Options.DefaultTimeout` |
-| `NLPGO_ENGINE_AGENT_WORKFLOW_TIMEOUT_SECONDS` | `720` | `cmd/root.go` `newAgentWorkflowRunner` → `agentblock.WorkflowRunnerOptions.DefaultTimeout` |
-| `NLPGO_ENGINE_EVALUATOR_TIMEOUT_SECONDS` | `720` | `cmd/root.go` `newEvaluatorExecutor` → `evaluatorblock.Options.DefaultTimeout` |
-| `NLPGO_ENGINE_ALLOWED_PROXY_HOSTS` | empty | `cmd/root.go` — fallback used only when the bare `ALLOWED_PROXY_HOSTS` is empty |
-| `NLPGO_ENGINE_EGRESS_STRICT_PUBLIC_ONLY` | `false` | `cmd/root.go` → `httpblock.SSRFOptions.StrictPublicOnly` |
-| `NLPGO_ENGINE_SANDBOX_PYTHON` | `python3` | `cmd/root.go` `resolveSandboxPython` → `codeblock.Options.Python` |
-| `NLPGO_ENGINE_LANGWATCH_BASE_URL` | empty | `cmd/root.go` `resolveLangWatchBaseURL` → engine callbacks + code-block sandbox endpoint |
+| Variable                                      | Default   | Read at                                                                                    |
+| --------------------------------------------- | --------- | ------------------------------------------------------------------------------------------ |
+| `NLPGO_ENGINE_STREAM_HEARTBEAT_SECONDS`       | `15`      | `serve.go` `resolveStreamHeartbeat` → `httpapi.RouterDeps.StreamHeartbeat`                 |
+| `NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`    | `720`     | `serve.go` `resolveStreamIdleTimeout` → `httpapi.RouterDeps.StreamIdleTimeout`             |
+| `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`     | `600`     | `cmd/root.go` `newCodeExecutor` → `codeblock.Options.DefaultTimeout`                       |
+| `NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS`     | `720`     | `cmd/root.go` `newHTTPExecutor` → `httpblock.Options.DefaultTimeout`                       |
+| `NLPGO_ENGINE_AGENT_WORKFLOW_TIMEOUT_SECONDS` | `720`     | `cmd/root.go` `newAgentWorkflowRunner` → `agentblock.WorkflowRunnerOptions.DefaultTimeout` |
+| `NLPGO_ENGINE_EVALUATOR_TIMEOUT_SECONDS`      | `720`     | `cmd/root.go` `newEvaluatorExecutor` → `evaluatorblock.Options.DefaultTimeout`             |
+| `NLPGO_ENGINE_ALLOWED_PROXY_HOSTS`            | empty     | `cmd/root.go` — fallback used only when the bare `ALLOWED_PROXY_HOSTS` is empty            |
+| `NLPGO_ENGINE_EGRESS_STRICT_PUBLIC_ONLY`      | `false`   | `cmd/root.go` → `httpblock.SSRFOptions.StrictPublicOnly`                                   |
+| `NLPGO_ENGINE_SANDBOX_PYTHON`                 | `python3` | `cmd/root.go` `resolveSandboxPython` → `codeblock.Options.Python`                          |
+| `NLPGO_ENGINE_LANGWATCH_BASE_URL`             | empty     | `cmd/root.go` `resolveLangWatchBaseURL` → engine callbacks + code-block sandbox endpoint   |
 
 ### The four block-timeout knobs are ceilings
 
@@ -392,6 +392,6 @@ Two further variables are read straight from the process environment rather than
 
 ### The platform holds a companion ceiling of its own
 
-`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` bounds how long the agent's Python may run. It does not bound how long the *caller* is willing to hold the HTTP request open, and the LangWatch platform's scenario worker keeps its own bound for that: `NLP_FETCH_MAX_TIMEOUT_MS` (default `900000`, i.e. 15 minutes), read per call by `resolveMaxFetchTimeoutMs` in `platform/app/src/server/nlpgo/timeouts.ts` and forwarded into the scenario child process by `buildChildProcessEnv` in `platform/app/src/server/scenarios/execution/child-environment.ts`. It is a platform variable, not an engine one — nothing in `services/nlpgo/` reads it — and it follows the same clamp-never-reject contract as the engine knobs: unset / empty / non-numeric / non-finite / zero / negative all fall back to the default rather than failing the run.
+`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` bounds how long the agent's Python may run. It does not bound how long the _caller_ is willing to hold the HTTP request open, and the LangWatch platform's scenario worker keeps its own bound for that: `NLP_FETCH_MAX_TIMEOUT_MS` (default `900000`, i.e. 15 minutes), read per call by `resolveMaxFetchTimeoutMs` in `platform/app/src/server/nlpgo/timeouts.ts` and forwarded into the scenario child process by `buildChildProcessEnv` in `platform/app/src/server/scenarios/execution/child-environment.ts`. It is a platform variable, not an engine one — nothing in `services/nlpgo/` reads it — and it follows the same clamp-never-reject contract as the engine knobs: unset / empty / non-numeric / non-finite / zero / negative all fall back to the default rather than failing the run.
 
 **Raising the engine ceiling past 15 minutes means raising this one too.** The shipped defaults happen to order correctly (900s platform > 720s engine family), so the engine gets to enforce and report its own timeout first, but nothing enforces that ordering. An operator who raises `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` above `NLP_FETCH_MAX_TIMEOUT_MS` gets the platform aborting the fetch first, and the caller sees a generic fetch-side timeout instead of the engine's diagnosis.

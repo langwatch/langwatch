@@ -1,8 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -67,11 +64,7 @@ export class TestSuitesApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(
-    operation: string,
-    error: unknown,
-    response?: Response,
-  ): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const status = response?.status ?? extractStatusFromResponse(error);
     const message = formatApiErrorForOperation({
       operation,
@@ -84,54 +77,45 @@ export class TestSuitesApiService {
 
   /** The project's test suites. Archived suites are left out unless asked for. */
   async list(options?: { includeArchived?: boolean }): Promise<TestSuite[]> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/test-suites",
-      {
-        ...(options?.includeArchived
-          ? { params: { query: { includeArchived: "true" } } }
-          : {}),
-      },
-    );
+    const { data, error, response } = await this.apiClient.GET("/api/v1/test-suites", {
+      ...(options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {}),
+    });
     if (error) this.handleApiError("list test suites", error, response);
     return data as unknown as TestSuite[];
   }
 
   async create(params: CreateTestSuiteBody): Promise<TestSuite> {
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/test-suites",
-      { body: params },
-    );
+    const { data, error, response } = await this.apiClient.POST("/api/v1/test-suites", {
+      body: params,
+    });
     if (error) this.handleApiError("create test suite", error, response);
     return data as unknown as TestSuite;
   }
 
   async get(id: string): Promise<TestSuiteDetail> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/test-suites/{id}",
-      { params: { path: { id } } },
-    );
+    const { data, error, response } = await this.apiClient.GET("/api/v1/test-suites/{id}", {
+      params: { path: { id } },
+    });
     if (error) this.handleApiError(`get test suite "${id}"`, error, response);
     return data as unknown as TestSuiteDetail;
   }
 
   /** Renames a suite. The slug is kept, so links and run history stay put. */
   async rename(id: string, params: RenameTestSuiteBody): Promise<TestSuite> {
-    const { data, error, response } = await this.apiClient.PATCH(
-      "/api/v1/test-suites/{id}",
-      { params: { path: { id } }, body: params },
-    );
+    const { data, error, response } = await this.apiClient.PATCH("/api/v1/test-suites/{id}", {
+      params: { path: { id } },
+      body: params,
+    });
     if (error) this.handleApiError(`rename test suite "${id}"`, error, response);
     return data as unknown as TestSuite;
   }
 
   /** Archives a suite. The scenarios filed in it are archived with it. */
   async archive(id: string): Promise<{ id: string; archived: true }> {
-    const { data, error, response } = await this.apiClient.DELETE(
-      "/api/v1/test-suites/{id}",
-      { params: { path: { id } } },
-    );
-    if (error)
-      this.handleApiError(`archive test suite "${id}"`, error, response);
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/test-suites/{id}", {
+      params: { path: { id } },
+    });
+    if (error) this.handleApiError(`archive test suite "${id}"`, error, response);
     return data as unknown as { id: string; archived: true };
   }
 
@@ -142,13 +126,10 @@ export class TestSuitesApiService {
   async run(id: string, body: RunTestSuiteBody): Promise<TestSuiteRunResult> {
     const note = body.note?.trim();
     const { note: _dropped, ...rest } = body;
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/test-suites/{id}/run",
-      {
-        params: { path: { id } },
-        body: note ? { ...rest, note } : rest,
-      },
-    );
+    const { data, error, response } = await this.apiClient.POST("/api/v1/test-suites/{id}/run", {
+      params: { path: { id } },
+      body: note ? { ...rest, note } : rest,
+    });
     if (error) this.handleApiError(`run test suite "${id}"`, error, response);
     return data as unknown as TestSuiteRunResult;
   }

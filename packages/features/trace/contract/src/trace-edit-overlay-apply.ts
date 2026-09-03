@@ -82,9 +82,7 @@ export function countRemovedSpans({
  * one correction across a whole page of spans builds the index once instead of
  * once per span.
  */
-export function indexSpanPatches(
-  patch: TraceEditOverlayPatch,
-): Map<string, TraceEditSpanPatch> {
+export function indexSpanPatches(patch: TraceEditOverlayPatch): Map<string, TraceEditSpanPatch> {
   const bySpanId = new Map<string, TraceEditSpanPatch>();
   for (const spanPatch of patch.spans) bySpanId.set(spanPatch.spanId, spanPatch);
   return bySpanId;
@@ -96,13 +94,7 @@ export function indexSpanPatches(
  * discriminant. Every editable field is named identically on both sides, which
  * is what lets one loop carry all six.
  */
-function applySpanPatch({
-  span,
-  spanPatch,
-}: {
-  span: Span;
-  spanPatch: TraceEditSpanPatch;
-}): Span {
+function applySpanPatch({ span, spanPatch }: { span: Span; spanPatch: TraceEditSpanPatch }): Span {
   const next = { ...span } as Span;
   const draft = next as unknown as Record<TraceEditSpanField, unknown>;
   let changed = false;
@@ -206,8 +198,7 @@ export function applyOverlayToTrace({
   const output = patch.trace?.output ?? trace.output;
   const metadata = correctedMetadata({ trace, patch });
 
-  const unchanged =
-    !spans && !metadata && input === trace.input && output === trace.output;
+  const unchanged = !spans && !metadata && input === trace.input && output === trace.output;
   if (unchanged) return trace;
   return {
     ...trace,

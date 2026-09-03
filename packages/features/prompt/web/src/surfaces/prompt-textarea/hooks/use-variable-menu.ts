@@ -15,11 +15,7 @@ type UseVariableMenuProps = {
   onCreateVariable?: (variable: Variable) => void;
   onSetVariableMapping?: (identifier: string, sourceId: string, field: string) => void;
   otherNodesFields: Record<string, string[]>;
-  onAddEdge?: (
-    nodeId: string,
-    field: string,
-    content: PromptTextAreaOnAddMention,
-  ) => string | void;
+  onAddEdge?: (nodeId: string, field: string, content: PromptTextAreaOnAddMention) => string | void;
   /** Shared caret position ref (owned by parent, shared across menus) */
   caretPositionRef: React.RefObject<CaretPosition | null>;
   /** Shared last user cursor position ref (owned by parent, shared across menus) */
@@ -127,12 +123,7 @@ export const useVariableMenu = ({
 
   // Insert variable at current position (undo-able via Ctrl+Z)
   const insertVariable = useCallback(
-    (
-      fieldName: string,
-      fieldType: FieldType,
-      sourceId: string,
-      isOtherNodeField: boolean,
-    ) => {
+    (fieldName: string, fieldType: FieldType, sourceId: string, isOtherNodeField: boolean) => {
       if (triggerStart === null) return;
 
       const nativeTextarea = containerRef.current?.querySelector("textarea");
@@ -229,12 +220,7 @@ export const useVariableMenu = ({
         otherNodesFields,
         option.source.id,
       );
-      insertVariable(
-        option.field.name,
-        option.field.type,
-        option.source.id,
-        isOtherNodeField,
-      );
+      insertVariable(option.field.name, option.field.type, option.source.id, isOtherNodeField);
     } else if (option.type === "create" && onCreateVariable) {
       const normalizedName = option.name.replace(/ /g, "_").toLowerCase();
       if (triggerStart === null) return;
@@ -352,9 +338,7 @@ export const useVariableMenu = ({
       setMenuPosition({ top: rect.bottom + 4, left: rect.left });
 
       const cursorPos =
-        lastUserCursorPosRef.current >= 0
-          ? lastUserCursorPosRef.current
-          : localValue.length;
+        lastUserCursorPosRef.current >= 0 ? lastUserCursorPosRef.current : localValue.length;
       setTriggerStart(cursorPos);
 
       setMenuQuery("");

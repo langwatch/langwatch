@@ -12,10 +12,7 @@ const REAP_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export interface LangySessionKeyReapDeps {
   /** Revokes every elapsed, unrevoked Langy session key; returns the count. */
   reap: () => Promise<number>;
-  deleteDispatchedBefore: (params: {
-    processName: string;
-    before: number;
-  }) => Promise<number>;
+  deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
   now?: () => number;
 }
 

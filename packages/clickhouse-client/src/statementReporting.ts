@@ -158,13 +158,7 @@ export class StatementReporter {
    * observation — was already recorded when the query resolved. Observing a
    * second duration for the same statement would double-count it.
    */
-  count({
-    queryType,
-    outcome,
-  }: {
-    queryType: VendorQueryType;
-    outcome: StatementOutcome;
-  }): void {
+  count({ queryType, outcome }: { queryType: VendorQueryType; outcome: StatementOutcome }): void {
     this.metrics.incrementCount({ queryType, outcome });
   }
 

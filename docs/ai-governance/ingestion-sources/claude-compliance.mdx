@@ -5,9 +5,9 @@ sidebarTitle: Anthropic Compliance
 ---
 
 <Info>
-  **Pairs with:** [AI Gateway → Anthropic provider](/ai-gateway/providers/anthropic).
-  Direct Anthropic API traffic flows through the gateway data plane; Anthropic Enterprise
-  Compliance API exports are a separate bulk feed routed through this ingestion source.
+  **Pairs with:** [AI Gateway → Anthropic provider](/ai-gateway/providers/anthropic). Direct
+  Anthropic API traffic flows through the gateway data plane; Anthropic Enterprise Compliance API
+  exports are a separate bulk feed routed through this ingestion source.
 </Info>
 
 `claude_compliance` polls Anthropic's compliance API with a workspace API key. Today the source can be created and the workspace API key is persisted server-side, but the cron worker that calls Anthropic hasn't shipped, events do not flow yet.

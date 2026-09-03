@@ -14,9 +14,7 @@ export type StrictPortBaselineCheck = {
 
 const strictPortPathSchema = z
   .string()
-  .regex(
-    /^packages\/(?:enterprise\/)?features\/[^/]+\/server\/src\/ports\/.+\.port\.ts$/,
-  );
+  .regex(/^packages\/(?:enterprise\/)?features\/[^/]+\/server\/src\/ports\/.+\.port\.ts$/);
 
 const strictPortBaselineSchema = z
   .object({
@@ -205,8 +203,7 @@ export function lintStrictPortModules(
             policy: "strict-port-baseline",
             file,
             message: "Strict port baseline entry is stale.",
-            allowed:
-              "Delete the entry after converting the port to an abstract Port class.",
+            allowed: "Delete the entry after converting the port to an abstract Port class.",
           });
         }
         continue;
@@ -238,10 +235,7 @@ export function lintStrictPortModules(
 }
 
 /** Collects the exact legacy port modules that still need nominal classes. */
-export function collectStrictPortBaseline(
-  root: string,
-  packages: ClassifiedPackage[],
-): string[] {
+export function collectStrictPortBaseline(root: string, packages: ClassifiedPackage[]): string[] {
   return packages
     .filter((pkg) => pkg.kind === "server" && pkg.layoutVersion === 0)
     .flatMap((pkg) => walkFiles(pkg.root, isStrictPort))

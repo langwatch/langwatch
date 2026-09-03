@@ -100,9 +100,7 @@ describe("selectLangySuggestions", () => {
       const chosen = selectLangySuggestions({ reach: EVERYTHING });
 
       expect(chosen[0]?.requires).toBe("experiments");
-      expect(chosen.some((s) => SETUP_SUGGESTIONS.some((x) => x.label === s.label))).toBe(
-        false,
-      );
+      expect(chosen.some((s) => SETUP_SUGGESTIONS.some((x) => x.label === s.label))).toBe(false);
     });
 
     it("never invents an ask the panel does not itself offer", () => {

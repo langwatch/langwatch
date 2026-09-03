@@ -12,9 +12,7 @@ import {
   usePresenceStore,
 } from "../presence-store";
 
-function session(
-  overrides: Partial<PresenceSession> & { sessionId: string },
-): PresenceSession {
+function session(overrides: Partial<PresenceSession> & { sessionId: string }): PresenceSession {
   return {
     projectId: "project-1",
     user: { id: overrides.sessionId, name: "Someone", image: null },

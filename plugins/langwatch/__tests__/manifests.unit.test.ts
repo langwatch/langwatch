@@ -27,10 +27,7 @@ import { describe, expect, it } from "vitest";
 const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const readJson = (...segments: string[]): Record<string, unknown> =>
-  JSON.parse(readFileSync(join(pluginRoot, ...segments), "utf8")) as Record<
-    string,
-    unknown
-  >;
+  JSON.parse(readFileSync(join(pluginRoot, ...segments), "utf8")) as Record<string, unknown>;
 
 /** The only top-level fields Agent Plugins 1.0.0 permits in `plugin.json`. */
 const PORTABLE_MANIFEST_KEYS = [
@@ -165,24 +162,18 @@ describe("the plugin hook configuration", () => {
       >;
 
       const commandsOf = (event: string): string[] =>
-        (events[event] ?? []).flatMap((group) =>
-          group.hooks.map((hook) => hook.command),
-        );
+        (events[event] ?? []).flatMap((group) => group.hooks.map((hook) => hook.command));
 
       const guidance = commandsOf("SessionStart").filter((command) =>
         command.includes("session-guidance.mjs"),
       );
       expect(guidance).toHaveLength(1);
-      expect(guidance[0]).toContain(
-        '"${CLAUDE_PLUGIN_ROOT}/scripts/session-guidance.mjs"',
-      );
+      expect(guidance[0]).toContain('"${CLAUDE_PLUGIN_ROOT}/scripts/session-guidance.mjs"');
       // Guidance is context for the session's start; the Stop hook stays a
       // single-purpose context reporter.
-      expect(
-        commandsOf("Stop").some((command) =>
-          command.includes("session-guidance.mjs"),
-        ),
-      ).toBe(false);
+      expect(commandsOf("Stop").some((command) => command.includes("session-guidance.mjs"))).toBe(
+        false,
+      );
     });
   });
 });

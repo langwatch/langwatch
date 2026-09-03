@@ -43,7 +43,10 @@ import {
   type SsoConnectionFoldState,
   SsoConnectionStateFoldProjection,
 } from "../projections/sso-connection-state.projection";
-import { SSO_CONNECTION_AGGREGATE_TYPE, SSO_CONNECTION_PIPELINE_NAME } from "@langwatch/identity-contract";
+import {
+  SSO_CONNECTION_AGGREGATE_TYPE,
+  SSO_CONNECTION_PIPELINE_NAME,
+} from "@langwatch/identity-contract";
 
 export {
   type SsoConnectionEvent,

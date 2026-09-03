@@ -47,7 +47,11 @@ vi.mock("../../../../errors", () => ({
   showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
-import { useAnnotationSessionStore, useDrawerStore, useTraceEditStore } from "../../../../../../index";
+import {
+  useAnnotationSessionStore,
+  useDrawerStore,
+  useTraceEditStore,
+} from "../../../../../../index";
 import { EditModeBar } from "../edit-mode-bar";
 
 function renderBar() {
@@ -326,9 +330,7 @@ describe("EditModeBar", () => {
           }),
         );
         expect(useDrawerStore.getState().isEditing).toBe(true);
-        expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe(
-          "search the web",
-        );
+        expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe("search the web");
       });
     });
 
@@ -356,9 +358,7 @@ describe("EditModeBar", () => {
         fireEvent.click(await screen.findByRole("button", { name: "Keep annotating" }));
 
         expect(useDrawerStore.getState().isEditing).toBe(true);
-        expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe(
-          "search the web",
-        );
+        expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe("search the web");
       });
 
       /** @scenario "Discarding drops the changes and leaves edit mode" */
@@ -366,9 +366,7 @@ describe("EditModeBar", () => {
         renderBar();
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
-        fireEvent.click(
-          await screen.findByRole("button", { name: "Discard corrections" }),
-        );
+        fireEvent.click(await screen.findByRole("button", { name: "Discard corrections" }));
 
         expect(useDrawerStore.getState().isEditing).toBe(false);
         expect(useTraceEditStore.getState().spanDrafts).toEqual({});

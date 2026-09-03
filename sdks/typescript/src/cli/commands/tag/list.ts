@@ -16,9 +16,7 @@ export const tagListCommand = async (): Promise<CommandResult | void> => {
     data: tags,
     table: () => {
       if (tags.length === 0) {
-        console.log(
-          chalk.gray("No custom tags found. The 'latest' tag is always available."),
-        );
+        console.log(chalk.gray("No custom tags found. The 'latest' tag is always available."));
         return;
       }
 

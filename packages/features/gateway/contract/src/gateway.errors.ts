@@ -119,11 +119,11 @@ export class GatewayScopeOrgMismatchError extends HandledError {
   declare readonly code: "gateway_scope_org_mismatch";
 
   constructor(scopeType: string) {
-    super(
-      "gateway_scope_org_mismatch",
-      "That scope does not belong to this organization",
-      { meta: { scope_type: scopeType }, httpStatus: 400, fault: "customer" },
-    );
+    super("gateway_scope_org_mismatch", "That scope does not belong to this organization", {
+      meta: { scope_type: scopeType },
+      httpStatus: 400,
+      fault: "customer",
+    });
     this.name = "GatewayScopeOrgMismatchError";
   }
 }
@@ -133,11 +133,10 @@ export class GatewayGuardrailProjectMismatchError extends HandledError {
   declare readonly code: "gateway_guardrail_project_mismatch";
 
   constructor() {
-    super(
-      "gateway_guardrail_project_mismatch",
-      "That guardrail belongs to a different project",
-      { httpStatus: 400, fault: "customer" },
-    );
+    super("gateway_guardrail_project_mismatch", "That guardrail belongs to a different project", {
+      httpStatus: 400,
+      fault: "customer",
+    });
     this.name = "GatewayGuardrailProjectMismatchError";
   }
 }
@@ -209,9 +208,7 @@ const EXTERNAL_ID_INDEX_FIELD = "externalId";
  */
 function namesExternalIdIndex(target: unknown): boolean {
   if (Array.isArray(target)) {
-    return target.some(
-      (field) => typeof field === "string" && field === EXTERNAL_ID_INDEX_FIELD,
-    );
+    return target.some((field) => typeof field === "string" && field === EXTERNAL_ID_INDEX_FIELD);
   }
   return typeof target === "string" && target.includes(EXTERNAL_ID_INDEX_FIELD);
 }
@@ -399,10 +396,7 @@ export class GatewayBudgetScopeUnreachableError extends HandledError {
       {
         meta: {
           scope_type: scopeType,
-          reachable_project_ids: reachableProjectIds.slice(
-            0,
-            REACHABLE_PROJECT_HINT_LIMIT,
-          ),
+          reachable_project_ids: reachableProjectIds.slice(0, REACHABLE_PROJECT_HINT_LIMIT),
           reachable_project_count: reachableProjectIds.length,
         },
         httpStatus: 400,

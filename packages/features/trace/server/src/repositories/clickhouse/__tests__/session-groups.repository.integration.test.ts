@@ -20,7 +20,10 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SessionGroupsClickHouseRepository } from "../session-groups.repository";
 import type { SessionGroupsQuery } from "../../session-groups.repository";
-import { createTestClickHouseClient, testClickHouseUrl } from "./support/clickhouse-endpoint.support";
+import {
+  createTestClickHouseClient,
+  testClickHouseUrl,
+} from "./support/clickhouse-endpoint.support";
 
 const clickHouseUrl = testClickHouseUrl();
 const integration = describe.skipIf(clickHouseUrl === null);
@@ -152,7 +155,11 @@ async function insertSessionLog({
   body: string;
   timeMs: number;
 }) {
-  const recordId = `${tag}-${nanoid()}`.padEnd(64, "0").slice(0, 64).toLowerCase().replace(/[^a-f0-9]/g, "0");
+  const recordId = `${tag}-${nanoid()}`
+    .padEnd(64, "0")
+    .slice(0, 64)
+    .toLowerCase()
+    .replace(/[^a-f0-9]/g, "0");
   await ch.insert({
     table: "log_records",
     values: [

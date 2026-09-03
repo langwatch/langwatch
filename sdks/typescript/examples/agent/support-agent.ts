@@ -53,6 +53,8 @@ export const supportAgent = connectAgent(
 // The wrapped function is directly callable, so a plain run answers one
 // question locally while the connection stays open for simulations.
 if (process.argv[2]) {
-  const reply = await supportAgent({ messages: [{ role: "user", content: process.argv.slice(2).join(" ") }] });
+  const reply = await supportAgent({
+    messages: [{ role: "user", content: process.argv.slice(2).join(" ") }],
+  });
   console.log(reply.output);
 }

@@ -20,8 +20,7 @@ import { useProjectHomeHost } from "../../../../model/project-home-host";
  * typed, no caret blink.
  */
 
-const SERIF =
-  'var(--langy-font-serif, "Sentient", "Charter", "Source Serif Pro", Georgia, serif)';
+const SERIF = 'var(--langy-font-serif, "Sentient", "Charter", "Source Serif Pro", Georgia, serif)';
 
 /** Where the primary "send your first trace" lands: the same trace surface the
  *  onboarding checklist points at, which teaches the integration when empty. */
@@ -117,11 +116,7 @@ export function QuietHeadline() {
   // the browser: intercept ONLY an unmodified primary click, so open-in-a-tab
   // keeps working on these real links.
   const isPlainLeftClick = (event: MouseEvent<HTMLAnchorElement>) =>
-    event.button === 0 &&
-    !event.metaKey &&
-    !event.ctrlKey &&
-    !event.shiftKey &&
-    !event.altKey;
+    event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 
   // Primary: send your first trace, on the client router.
   const onSendTrace = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -208,9 +203,7 @@ export function QuietHeadline() {
         <chakra.button
           type="button"
           onClick={onPhrase}
-          aria-label={
-            canAsk ? `Ask Langy: ${action.phrase}` : `Learn more: ${action.phrase}`
-          }
+          aria-label={canAsk ? `Ask Langy: ${action.phrase}` : `Learn more: ${action.phrase}`}
           fontFamily="mono"
           fontSize="12px"
           color="orange.fg"

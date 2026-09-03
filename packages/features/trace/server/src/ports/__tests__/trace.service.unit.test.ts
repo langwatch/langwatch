@@ -6,11 +6,7 @@ import {
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
 } from "../query-field-values.port";
-import {
-  TraceRepository,
-  type TraceSpanSummaryRecord,
-  type TraceSpanPage,
-} from "../trace.port";
+import { TraceRepository, type TraceSpanSummaryRecord, type TraceSpanPage } from "../trace.port";
 import { TraceSummaryReaderPort } from "../trace-summary-reader.port";
 import { TraceService } from "../../services/trace.service";
 import { TraceFullRecordPort } from "../trace-full-record.port";

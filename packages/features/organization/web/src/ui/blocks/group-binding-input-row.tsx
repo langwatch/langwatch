@@ -1,21 +1,9 @@
-import {
-  Badge,
-  Box,
-  Button,
-  createListCollection,
-  HStack,
-  Input,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, createListCollection, HStack, Input, Text } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "../../model/prisma-types";
+import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "../../model/prisma-types";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { api } from "../../behavior/organization-api";
 import {
@@ -100,9 +88,7 @@ function roleItemsForSeat({
   return items.filter((item) =>
     isBindingRoleAllowedForOrganizationRole({
       organizationRole,
-      role: (item.customRoleId
-        ? `custom:${item.customRoleId}`
-        : item.value) as TeamRoleValue,
+      role: (item.customRoleId ? `custom:${item.customRoleId}` : item.value) as TeamRoleValue,
     }),
   );
 }
@@ -134,8 +120,7 @@ function scopeNameFor({
   teamItems: Array<{ label: string; value: string }>;
   projectItems: Array<{ label: string; value: string }>;
 }): string | undefined {
-  if (scopeType === RoleBindingScopeType.ORGANIZATION)
-    return organizationName ?? "Organization";
+  if (scopeType === RoleBindingScopeType.ORGANIZATION) return organizationName ?? "Organization";
   if (scopeType === RoleBindingScopeType.TEAM)
     return teamItems.find((t) => t.value === scopeId)?.label;
   return projectItems.find((p) => p.value === scopeId)?.label;
@@ -213,9 +198,7 @@ export const BindingInputRow = forwardRef<
 ) {
   const defaultRoleValue = defaultRoleValueFor(organizationRole);
 
-  const [scopeType, setScopeType] = useState<RoleBindingScopeType>(
-    RoleBindingScopeType.TEAM,
-  );
+  const [scopeType, setScopeType] = useState<RoleBindingScopeType>(RoleBindingScopeType.TEAM);
   const [scopeId, setScopeId] = useState("");
   const [roleValue, setRoleValue] = useState(defaultRoleValue);
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
@@ -238,15 +221,9 @@ export const BindingInputRow = forwardRef<
       }),
     [customRoles.data, organizationRole],
   );
-  const roleCollection = useMemo(
-    () => createListCollection({ items: roleItems }),
-    [roleItems],
-  );
+  const roleCollection = useMemo(() => createListCollection({ items: roleItems }), [roleItems]);
 
-  const scopeTypeItems = useMemo(
-    () => scopeTypeItemsForSeat(organizationRole),
-    [organizationRole],
-  );
+  const scopeTypeItems = useMemo(() => scopeTypeItemsForSeat(organizationRole), [organizationRole]);
   const scopeTypeCollection = useMemo(
     () => createListCollection({ items: scopeTypeItems }),
     [scopeTypeItems],
@@ -276,16 +253,11 @@ export const BindingInputRow = forwardRef<
   const teamItems = useMemo(
     () =>
       teamSearch
-        ? allTeamItems.filter((t) =>
-            t.label.toLowerCase().includes(teamSearch.toLowerCase()),
-          )
+        ? allTeamItems.filter((t) => t.label.toLowerCase().includes(teamSearch.toLowerCase()))
         : allTeamItems,
     [allTeamItems, teamSearch],
   );
-  const teamCollection = useMemo(
-    () => createListCollection({ items: teamItems }),
-    [teamItems],
-  );
+  const teamCollection = useMemo(() => createListCollection({ items: teamItems }), [teamItems]);
 
   // For project cascade: teams that have at least one project
   const allProjectTeamItems = useMemo(
@@ -320,9 +292,7 @@ export const BindingInputRow = forwardRef<
   const projectItems = useMemo(
     () =>
       projectSearch
-        ? allProjectItems.filter((p) =>
-            p.label.toLowerCase().includes(projectSearch.toLowerCase()),
-          )
+        ? allProjectItems.filter((p) => p.label.toLowerCase().includes(projectSearch.toLowerCase()))
         : allProjectItems,
     [allProjectItems, projectSearch],
   );
@@ -331,8 +301,7 @@ export const BindingInputRow = forwardRef<
     [projectItems],
   );
 
-  const isReady =
-    isDirty && (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
+  const isReady = isDirty && (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
 
   useEffect(() => {
     onReadyChange?.(isReady);
@@ -458,11 +427,7 @@ export const BindingInputRow = forwardRef<
           </Select.Trigger>
           <Select.Content>
             <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
-              <InputGroup
-                startElement={<Search size={14} />}
-                startOffset="2px"
-                width="full"
-              >
+              <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
                 <Input
                   size="sm"
                   placeholder="Search teams..."
@@ -505,11 +470,7 @@ export const BindingInputRow = forwardRef<
             </Select.Trigger>
             <Select.Content>
               <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
-                <InputGroup
-                  startElement={<Search size={14} />}
-                  startOffset="2px"
-                  width="full"
-                >
+                <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
                   <Input
                     size="sm"
                     placeholder="Search teams..."
@@ -543,11 +504,7 @@ export const BindingInputRow = forwardRef<
               </Select.Trigger>
               <Select.Content>
                 <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
-                  <InputGroup
-                    startElement={<Search size={14} />}
-                    startOffset="2px"
-                    width="full"
-                  >
+                  <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
                     <Input
                       size="sm"
                       placeholder="Search projects..."
@@ -599,8 +556,7 @@ export function AddBindingForm({
       toaster.create({ title: "Binding added", type: "success" });
       onAdded();
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't add the binding" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't add the binding" }),
   });
 
   return (

@@ -12,22 +12,18 @@ It does three things at once:
 
 <CardGroup cols={3}>
   <Card title="Personal IDE keys" icon="user" href="/ai-gateway/governance/personal-keys">
-    Devs sign in via your company SSO. Their CLIs (Claude Code, Codex, Cursor, Gemini CLI)
-    talk to the gateway with a per-user virtual key. Per-user attribution, per-user
-    budgets, one revoke kills it everywhere.
+    Devs sign in via your company SSO. Their CLIs (Claude Code, Codex, Cursor, Gemini CLI) talk to
+    the gateway with a per-user virtual key. Per-user attribution, per-user budgets, one revoke
+    kills it everywhere.
   </Card>
-  <Card
-    title="Admin policy plane"
-    icon="shield-halved"
-    href="/ai-gateway/governance/admin-setup"
-  >
-    Connect providers once, publish routing policies once, define budgets once. Users
-    inherit it all without picking a model provider, an order, or a fallback chain.
+  <Card title="Admin policy plane" icon="shield-halved" href="/ai-gateway/governance/admin-setup">
+    Connect providers once, publish routing policies once, define budgets once. Users inherit it all
+    without picking a model provider, an order, or a fallback chain.
   </Card>
   <Card title="LangWatch CLI" icon="terminal" href="/ai-gateway/cli/overview">
-    The <code>langwatch</code> binary wraps every coding-assistant CLI.{" "}
-    <code>langwatch login</code> handles SSO; <code>langwatch claude</code> exec's Claude
-    Code with the right env vars pre-injected.
+    The <code>langwatch</code> binary wraps every coding-assistant CLI. <code>langwatch login</code>{" "}
+    handles SSO; <code>langwatch claude</code> exec's Claude Code with the right env vars
+    pre-injected.
   </Card>
 </CardGroup>
 

@@ -29,9 +29,7 @@ describe("ConcurrencyLimiter", () => {
         (maxQueued) => {
           // `waiting.length >= NaN` is false forever, so an unvalidated NaN
           // unbounds the queue and removes the only thing this module is for.
-          expect(() => new ConcurrencyLimiter({ maxConcurrent: 1, maxQueued })).toThrow(
-            RangeError,
-          );
+          expect(() => new ConcurrencyLimiter({ maxConcurrent: 1, maxQueued })).toThrow(RangeError);
         },
       );
     });

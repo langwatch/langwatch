@@ -73,10 +73,7 @@ export class TracesApiService {
     return data;
   }
 
-  async get(
-    traceId: string,
-    options?: { format?: "digest" | "json" },
-  ): Promise<TraceGetResponse> {
+  async get(traceId: string, options?: { format?: "digest" | "json" }): Promise<TraceGetResponse> {
     const { data, error, response } = await this.apiClient.GET("/api/traces/{traceId}", {
       params: {
         path: { traceId },

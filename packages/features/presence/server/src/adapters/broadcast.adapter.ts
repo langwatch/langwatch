@@ -82,10 +82,7 @@ export class BroadcastService {
         this.logger.error({ error: err }, "Failed to subscribe to SSE channels");
         return;
       }
-      this.logger.debug(
-        { subscriberCount: count, channels },
-        "Subscribed to SSE channels",
-      );
+      this.logger.debug({ subscriberCount: count, channels }, "Subscribed to SSE channels");
     });
 
     this.subscriber.on("message", (channel, message) => {
@@ -94,10 +91,7 @@ export class BroadcastService {
 
       try {
         const { tenantId, event } = JSON.parse(message);
-        this.logger.debug(
-          { tenantId, event, eventType },
-          "Received SSE broadcast via Redis",
-        );
+        this.logger.debug({ tenantId, event, eventType }, "Received SSE broadcast via Redis");
 
         const tier = this.classifyEventTier(event);
         if (!this.subscriberRateLimiter.tryConsume(tenantId, tier)) return;
@@ -232,10 +226,7 @@ export class BroadcastService {
     if (!emitter || listenerCount === 0) return 0;
 
     const data = { event, timestamp: Date.now() };
-    this.logger.debug(
-      { tenantId, event, listenerCount, eventType },
-      "Emitting SSE event locally",
-    );
+    this.logger.debug({ tenantId, event, listenerCount, eventType }, "Emitting SSE event locally");
     emitter.emit(eventType, data);
     return listenerCount;
   }

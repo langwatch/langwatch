@@ -207,8 +207,7 @@ describe("the window the Results tab reads", () => {
     render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
 
     const push = mockRouterPush.mock.calls.find(
-      (call) =>
-        (call[0] as { query?: Record<string, string> }).query?.startDate,
+      (call) => (call[0] as { query?: Record<string, string> }).query?.startDate,
     );
     expect(push).toBeDefined();
     const query = (push![0] as { query: Record<string, string> }).query;
@@ -233,8 +232,7 @@ describe("the window the Results tab reads", () => {
 
     expect(
       mockRouterPush.mock.calls.filter(
-        (call) =>
-          (call[0] as { query?: Record<string, string> }).query?.startDate,
+        (call) => (call[0] as { query?: Record<string, string> }).query?.startDate,
       ),
     ).toHaveLength(0);
   });

@@ -183,9 +183,7 @@ function resolveTarget({
     // list, fall back to the default WITHOUT persisting, so setUserLenses
     // can still restore it once it arrives (see viewStore).
     const restoredId =
-      persistedLensId && allLenses.some((l) => l.id === persistedLensId)
-        ? persistedLensId
-        : null;
+      persistedLensId && allLenses.some((l) => l.id === persistedLensId) ? persistedLensId : null;
     return {
       lensId: restoredId ?? DEFAULT_LENS_ID,
       persistLens: restoredId !== null && restoredId !== DEFAULT_LENS_ID,

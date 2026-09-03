@@ -8,7 +8,11 @@ import { useFindMatchCycling } from "../../behavior/find-match-cycling";
 import { FindMatchCounter } from "../elements/find-match-counter";
 import { FindMatchHighlight } from "../elements/find-match-highlight";
 import { useFindScrollTraceIntoView } from "../../behavior/find-scroll-trace-into-view";
-import { MIN_QUERY_LENGTH, useTraceSearchIndex, type TraceSearchItem } from "../../behavior/find-search-index";
+import {
+  MIN_QUERY_LENGTH,
+  useTraceSearchIndex,
+  type TraceSearchItem,
+} from "../../behavior/find-search-index";
 
 type TraceFindBarProps = {
   traces: TraceSearchItem[];

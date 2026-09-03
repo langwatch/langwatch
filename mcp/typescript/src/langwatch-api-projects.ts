@@ -39,10 +39,7 @@ export async function listProjects(params?: {
 }
 
 export async function getProject(id: string): Promise<ProjectSummary> {
-  return makeRequest(
-    "GET",
-    `/api/projects/${encodeURIComponent(id)}`,
-  ) as Promise<ProjectSummary>;
+  return makeRequest("GET", `/api/projects/${encodeURIComponent(id)}`) as Promise<ProjectSummary>;
 }
 
 export async function createProject(data: {

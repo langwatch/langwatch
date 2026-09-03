@@ -5,7 +5,11 @@ import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
 import { RenderedMarkdown } from "../../blocks/markdown/rendered-markdown";
 import { asMarkdownBody, withBlockKeys } from "../../../behavior/transcript/parsing";
 import { ContextDisclosure } from "../../blocks/transcript/context-disclosure";
-import { itemBlockKey, pairToolBlocks, type StackItem } from "../../../model/transcript/block-stack-items";
+import {
+  itemBlockKey,
+  pairToolBlocks,
+  type StackItem,
+} from "../../../model/transcript/block-stack-items";
 import { reparseTextBlock } from "../../../behavior/transcript/reparse-text-block";
 import { ReasoningBlock } from "../../blocks/transcript/reasoning-block";
 import { OpenAIToolCallCard, ToolPairCard } from "./tool-blocks";

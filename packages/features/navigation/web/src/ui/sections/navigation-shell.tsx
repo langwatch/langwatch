@@ -174,10 +174,7 @@ function ShellContentRow({
       gap={0}
       minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
     >
-      <ProductSidebar
-        surface={activeProductId ?? "settings"}
-        isCompact={isCompactSidebar}
-      />
+      <ProductSidebar surface={activeProductId ?? "settings"} isCompact={isCompactSidebar} />
 
       <Box
         data-testid="shell-content-column"

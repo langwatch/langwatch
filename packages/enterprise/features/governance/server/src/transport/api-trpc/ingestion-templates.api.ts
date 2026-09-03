@@ -15,11 +15,7 @@
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 export type IngestionTemplatesTrpcContext = Readonly<{
@@ -101,12 +97,11 @@ export class IngestionTemplatesTrpcApi {
        * probes collapse to NOT_FOUND (no enumeration vector). Powers the
        * install drawer's metadata fetch when a user clicks a tile.
        */
-      get: policy("aiTools:view")(procedure.input(idAndOrg)).query(
-        async ({ ctx, input }) =>
-          ctx.app.governance.templateGetByIdForOrg({
-            id: input.id,
-            organizationId: input.organizationId,
-          }),
+      get: policy("aiTools:view")(procedure.input(idAndOrg)).query(async ({ ctx, input }) =>
+        ctx.app.governance.templateGetByIdForOrg({
+          id: input.id,
+          organizationId: input.organizationId,
+        }),
       ),
 
       /**
@@ -128,9 +123,7 @@ export class IngestionTemplatesTrpcApi {
             description: input.description ?? null,
             iconAsset: input.iconAsset ?? null,
             credentialSchema:
-              input.credentialSchema === "otlp_token"
-                ? null
-                : (input.credentialSchema ?? null),
+              input.credentialSchema === "otlp_token" ? null : (input.credentialSchema ?? null),
             ottlRules: input.ottlRules,
             surface: "trpc",
           }),
@@ -141,16 +134,15 @@ export class IngestionTemplatesTrpcApi {
        * refuse. Audit-logged with line counts pre/post for the forensic
        * trail.
        */
-      updateOttlRules: policy("aiTools:manage")(
-        procedure.input(updateOttlRulesSchema),
-      ).mutation(async ({ ctx, input }) =>
-        ctx.app.governance.templateUpdateOttlRules({
-          organizationId: input.organizationId,
-          callerUserId: ctx.actor().id,
-          id: input.id,
-          ottlRules: input.ottlRules,
-          surface: "trpc",
-        }),
+      updateOttlRules: policy("aiTools:manage")(procedure.input(updateOttlRulesSchema)).mutation(
+        async ({ ctx, input }) =>
+          ctx.app.governance.templateUpdateOttlRules({
+            organizationId: input.organizationId,
+            callerUserId: ctx.actor().id,
+            id: input.id,
+            ottlRules: input.ottlRules,
+            surface: "trpc",
+          }),
       ),
 
       /** Soft-archive an org-authored template. Platform rows refuse. */

@@ -28,11 +28,7 @@
  * the ceremonies' own better-auth suite.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type {
-  AuthUnderTest,
-  IdentityStack,
-  MemoryDB,
-} from "./support/storage-adapter-stack";
+import type { AuthUnderTest, IdentityStack, MemoryDB } from "./support/storage-adapter-stack";
 import {
   identityStack,
   NEW_PASSWORD,
@@ -80,8 +76,7 @@ async function walk({ auth, db }: Stack): Promise<Transcript> {
   // two stacks is that it still IS the user's id.
   const accountsListed = listed.map((account) => ({
     providerId: account.providerId,
-    accountId:
-      account.accountId === userId ? "<the user's own id>" : account.accountId,
+    accountId: account.accountId === userId ? "<the user's own id>" : account.accountId,
   }));
 
   await auth.api.changePassword({

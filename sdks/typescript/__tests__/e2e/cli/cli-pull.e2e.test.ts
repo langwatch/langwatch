@@ -94,9 +94,9 @@ describe("CLI E2E", () => {
         const pullResult = cli.run("prompt pull");
         expectCliResultSuccess(pullResult);
 
-        expect(
-          materializedPromptFileManagement.getPromptFileContent(promptHandle),
-        ).toContain("gpt-4-turbo");
+        expect(materializedPromptFileManagement.getPromptFileContent(promptHandle)).toContain(
+          "gpt-4-turbo",
+        );
 
         const lock = lockFileManager.readLockFile();
         expect(lock).not.toBeNull();
@@ -118,9 +118,9 @@ describe("CLI E2E", () => {
           const pull2 = cli.run("prompt pull");
           expectCliResultSuccess(pull2);
 
-          expect(
-            materializedPromptFileManagement.getPromptFileContent(promptHandle),
-          ).toContain("Updated system message.");
+          expect(materializedPromptFileManagement.getPromptFileContent(promptHandle)).toContain(
+            "Updated system message.",
+          );
         });
       });
     });

@@ -31,10 +31,7 @@ export abstract class WorkflowService {
     projectId: string;
     includeVersion?: boolean;
   }): Promise<WorkflowWithVersion>;
-  abstract assertInProject(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<void>;
+  abstract assertInProject(input: { workflowId: string; projectId: string }): Promise<void>;
   abstract getFields(input: {
     workflowId: string;
     projectId: string;
@@ -70,10 +67,7 @@ export abstract class WorkflowService {
   abstract copy(
     input: CopyWorkflowCommand,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
-  abstract getCopies(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<Workflow[]>;
+  abstract getCopies(input: { workflowId: string; projectId: string }): Promise<Workflow[]>;
   abstract pushToCopies(input: {
     workflowId: string;
     projectId: string;

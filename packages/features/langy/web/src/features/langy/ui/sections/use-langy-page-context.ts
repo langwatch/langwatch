@@ -123,10 +123,7 @@ export function useLangyPageContext(): {
     ],
   );
 
-  const chips = useMemo(
-    () => selectVisibleChips(candidates, chosen),
-    [candidates, chosen],
-  );
+  const chips = useMemo(() => selectVisibleChips(candidates, chosen), [candidates, chosen]);
 
   // Tell the page which chips are live, so a registered target can render as
   // "already in context". `setActiveChipIds` no-ops when the membership is
@@ -212,10 +209,7 @@ function routeChips(pathname: string): LangyContextChip[] {
  * a resource the agent can act on but that never appears here is a resource the
  * user has to describe in prose instead of naming.
  */
-const SIMPLE_ROUTE_CHIPS: Record<
-  string,
-  { kind: LangyContextChip["kind"]; noun: string }
-> = {
+const SIMPLE_ROUTE_CHIPS: Record<string, { kind: LangyContextChip["kind"]; noun: string }> = {
   prompts: { kind: "prompt", noun: "prompt" },
   evaluations: { kind: "evaluation", noun: "evaluation" },
   evaluators: { kind: "evaluation", noun: "evaluator" },

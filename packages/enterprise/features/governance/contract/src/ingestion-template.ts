@@ -1,9 +1,6 @@
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
-import {
-  DEFAULT_GOVERNANCE_SURFACE,
-  governanceCallSurfaceSchema,
-} from "./governance-audit";
+import { DEFAULT_GOVERNANCE_SURFACE, governanceCallSurfaceSchema } from "./governance-audit";
 
 export const ingestionTemplateSchema = z
   .object({
@@ -37,9 +34,7 @@ export const createIngestionTemplateInputSchema = z
     surface: governanceCallSurfaceSchema.optional(),
   })
   .strict();
-export type CreateIngestionTemplateInput = z.infer<
-  typeof createIngestionTemplateInputSchema
->;
+export type CreateIngestionTemplateInput = z.infer<typeof createIngestionTemplateInputSchema>;
 
 export const updateIngestionTemplateOttlInputSchema = z
   .object({
@@ -62,9 +57,7 @@ export const archiveIngestionTemplateInputSchema = z
     surface: governanceCallSurfaceSchema.optional(),
   })
   .strict();
-export type ArchiveIngestionTemplateInput = z.infer<
-  typeof archiveIngestionTemplateInputSchema
->;
+export type ArchiveIngestionTemplateInput = z.infer<typeof archiveIngestionTemplateInputSchema>;
 
 export const cloneIngestionTemplateInputSchema = z
   .object({
@@ -74,9 +67,7 @@ export const cloneIngestionTemplateInputSchema = z
     surface: governanceCallSurfaceSchema.optional(),
   })
   .strict();
-export type CloneIngestionTemplateInput = z.infer<
-  typeof cloneIngestionTemplateInputSchema
->;
+export type CloneIngestionTemplateInput = z.infer<typeof cloneIngestionTemplateInputSchema>;
 
 export const platformIngestionTemplateSeedSchema = z
   .object({
@@ -89,9 +80,7 @@ export const platformIngestionTemplateSeedSchema = z
     ottlRules: z.string(),
   })
   .strict();
-export type PlatformIngestionTemplateSeed = z.infer<
-  typeof platformIngestionTemplateSeedSchema
->;
+export type PlatformIngestionTemplateSeed = z.infer<typeof platformIngestionTemplateSeedSchema>;
 
 export const platformIngestionTemplateSyncResultSchema = z
   .object({
@@ -138,8 +127,7 @@ export class TemplateNotFoundError extends NotFoundError {
 
 export class InvalidSourceTypeError extends ValidationError {
   constructor() {
-    const complaint =
-      "sourceType must be lowercase letters / digits / underscores, max 40 chars.";
+    const complaint = "sourceType must be lowercase letters / digits / underscores, max 40 chars.";
     super(complaint, { meta: { formErrors: [complaint] } });
     this.name = "InvalidSourceTypeError";
   }

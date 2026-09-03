@@ -26,18 +26,9 @@ interface ContainerProps extends ChakraContainerProps {
  * @param props - The props to pass to the container
  * @returns A container component with a max width based on the sidebar width
  */
-function Container({
-  children,
-  sidebarWidth = 200,
-  ...props
-}: PropsWithChildren<ContainerProps>) {
+function Container({ children, sidebarWidth = 200, ...props }: PropsWithChildren<ContainerProps>) {
   return (
-    <ChakraContainer
-      maxW={`calc(100vw - ${sidebarWidth}px)`}
-      paddingX={6}
-      paddingY={3}
-      {...props}
-    >
+    <ChakraContainer maxW={`calc(100vw - ${sidebarWidth}px)`} paddingX={6} paddingY={3} {...props}>
       {children}
     </ChakraContainer>
   );
@@ -48,11 +39,7 @@ interface HeaderProps extends ChakraStackProps {
   withBorder?: boolean;
 }
 
-function Header({
-  children,
-  withBorder = true,
-  ...props
-}: PropsWithChildren<HeaderProps>) {
+function Header({ children, withBorder = true, ...props }: PropsWithChildren<HeaderProps>) {
   return (
     <HStack
       height="48px"

@@ -153,13 +153,9 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
         apply,
         options: { refoldOnStoreMiss: true },
       });
-      foldDef.eventLoaderUpTo = vi
-        .fn()
-        .mockRejectedValue(new Error("event_log unavailable"));
+      foldDef.eventLoaderUpTo = vi.fn().mockRejectedValue(new Error("event_log unavailable"));
 
-      await expect(executor.execute(foldDef, e1, context)).rejects.toThrow(
-        "event_log unavailable",
-      );
+      await expect(executor.execute(foldDef, e1, context)).rejects.toThrow("event_log unavailable");
       expect(store.store).not.toHaveBeenCalled();
     });
   });
@@ -256,11 +252,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       });
       foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([e1, e2, e3]);
 
-      const result = (await executor.executeBatch(
-        foldDef,
-        [e2, e3],
-        context,
-      )) as CountState;
+      const result = (await executor.executeBatch(foldDef, [e2, e3], context)) as CountState;
 
       expect(foldDef.eventLoaderUpTo).toHaveBeenCalledTimes(1);
       expect(foldDef.eventLoaderUpTo).toHaveBeenCalledWith({
@@ -291,11 +283,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       // The history read lags on e2 only — it must NOT be applied last.
       foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([e1, e3]);
 
-      const result = (await executor.executeBatch(
-        foldDef,
-        [e1, e2, e3],
-        context,
-      )) as CountState;
+      const result = (await executor.executeBatch(foldDef, [e1, e2, e3], context)) as CountState;
 
       expect(result.ids).toEqual(["e1", "e2", "e3"]);
     });
@@ -336,8 +324,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
     return (
       snapshot.values.find(
         (value) =>
-          value.labels.projection_name === projectionName &&
-          value.labels.outcome === outcome,
+          value.labels.projection_name === projectionName && value.labels.outcome === outcome,
       )?.value ?? 0
     );
   }

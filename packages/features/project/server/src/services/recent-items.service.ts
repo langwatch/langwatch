@@ -21,10 +21,7 @@ export class RecentItemsService {
     const auditLogs = await this.repository.getRecentAuditLogEntries(params);
 
     // Process audit logs to extract unique entity references
-    const entityMap = new Map<
-      string,
-      { type: RecentItemType; id: string; timestamp: Date }
-    >();
+    const entityMap = new Map<string, { type: RecentItemType; id: string; timestamp: Date }>();
 
     for (const log of auditLogs) {
       const type = this.getTypeFromAction(log.action);

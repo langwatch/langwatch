@@ -14,10 +14,7 @@ import {
 } from "@langwatch/ops-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { SchedulerAuditSink } from "../ports/scheduler-audit.sink";
-import type {
-  SchedulerOpsRepository,
-  ScheduledJobRecord,
-} from "../ports/scheduler-ops.repository";
+import type { SchedulerOpsRepository, ScheduledJobRecord } from "../ports/scheduler-ops.repository";
 import { SchedulerWakeService } from "../ports/scheduler-wake.service";
 
 const logger = createLogger("langwatch:ops:scheduler");
@@ -37,19 +34,10 @@ export class SchedulerOpsService {
     wake: SchedulerWakeService;
     projects: ProjectService;
   }): SchedulerOpsService {
-    return new SchedulerOpsService(
-      input.repository,
-      input.audit,
-      input.wake,
-      input.projects,
-    );
+    return new SchedulerOpsService(input.repository, input.audit, input.wake, input.projects);
   }
 
-  async listScheduledJobs({
-    limit = 200,
-  }: {
-    limit?: number;
-  }): Promise<OpsScheduledJob[]> {
+  async listScheduledJobs({ limit = 200 }: { limit?: number }): Promise<OpsScheduledJob[]> {
     const rows = await this.repository.listForOps({
       limit: Math.min(Math.max(limit, 1), 500),
     });
@@ -88,11 +76,7 @@ export class SchedulerOpsService {
   }
 
   /** Recent operator actions, newest first. Empty when nothing is recorded. */
-  async listRecentActions({
-    limit = 20,
-  }: {
-    limit?: number;
-  }): Promise<SchedulerAuditEntryView[]> {
+  async listRecentActions({ limit = 20 }: { limit?: number }): Promise<SchedulerAuditEntryView[]> {
     return this.audit.listRecent({ limit: Math.min(Math.max(limit, 1), 100) });
   }
 

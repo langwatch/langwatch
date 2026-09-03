@@ -16,8 +16,7 @@ vi.mock("../langy-token-buffer", () => ({
   },
 }));
 
-const { awaitTurnSettlement } =
-  await import("../langy-turn-settlement-waiter");
+const { awaitTurnSettlement } = await import("../langy-turn-settlement-waiter");
 
 const emptyPage = {
   events: [],

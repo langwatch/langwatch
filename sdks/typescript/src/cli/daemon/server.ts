@@ -215,10 +215,7 @@ function identifyFile(filePath: string): FileIdentity | null {
  * idle minutes) in which the file genuinely does change hands; what is left is
  * the microseconds between the stat and the unlink.
  */
-export function unlinkIfSameFile(
-  filePath: string,
-  expected: FileIdentity | null,
-): boolean {
+export function unlinkIfSameFile(filePath: string, expected: FileIdentity | null): boolean {
   if (expected === null) return false;
 
   const current = identifyFile(filePath);
@@ -267,9 +264,7 @@ export async function cleanStaleSocket(socketPath: string): Promise<boolean> {
  * that a shared path is only ever approved when this one fits as well.
  */
 export function stagingSocketPath(socketPath: string, pid: number): string {
-  const base = socketPath.endsWith(".sock")
-    ? socketPath.slice(0, -".sock".length)
-    : socketPath;
+  const base = socketPath.endsWith(".sock") ? socketPath.slice(0, -".sock".length) : socketPath;
   return `${base}.${pid}`;
 }
 
@@ -479,9 +474,8 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
         // write buffer, which would throw away the very frame being sent. The
         // callback fires once it is flushed, and destroying there bounds the
         // teardown instead of leaving a half-closed socket holding the loop open.
-        connection.end(
-          encodeFrame({ t: "fallback", reason: "shutting-down-mid-command" }),
-          () => connection.destroy(),
+        connection.end(encodeFrame({ t: "fallback", reason: "shutting-down-mid-command" }), () =>
+          connection.destroy(),
         );
       }
       connections.clear();

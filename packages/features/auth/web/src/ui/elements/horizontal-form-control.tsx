@@ -1,11 +1,4 @@
-import {
-  Box,
-  Field,
-  HStack,
-  Spacer,
-  type SystemStyleObject,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Field, HStack, Spacer, type SystemStyleObject, VStack } from "@chakra-ui/react";
 import type { PropsWithChildren, ReactNode } from "react";
 import { Info } from "react-feather";
 import type { FieldErrors } from "react-hook-form";
@@ -55,18 +48,11 @@ export function HorizontalFormControl({
     >
       <HStack
         width="full"
-        flexDirection={
-          direction === "horizontal" ? ["column", "column", "row"] : "column"
-        }
+        flexDirection={direction === "horizontal" ? ["column", "column", "row"] : "column"}
         align={align}
         gap={direction === "horizontal" ? 4 : 2}
       >
-        <VStack
-          align="start"
-          gap={size === "sm" ? 0 : 1}
-          width="full"
-          minWidth={minWidth}
-        >
+        <VStack align="start" gap={size === "sm" ? 0 : 1} width="full" minWidth={minWidth}>
           <Field.Label
             margin={0}
             {...(size === "sm" && {
@@ -95,11 +81,7 @@ export function HorizontalFormControl({
           </Field.HelperText>
         </VStack>
         {direction === "horizontal" && <Spacer />}
-        <Box
-          minWidth={
-            direction === "vertical" ? "full" : ["full", "full", inputWidth ?? "50%"]
-          }
-        >
+        <Box minWidth={direction === "vertical" ? "full" : ["full", "full", inputWidth ?? "50%"]}>
           {children}
           {/*
             Under the field it belongs to, not beside it. As a sibling of this

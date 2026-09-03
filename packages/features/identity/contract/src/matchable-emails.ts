@@ -23,11 +23,7 @@ export interface MatchableEmail {
  *
  * Sorted by identifier id so every pod answers identically.
  */
-export function matchableEmailsOf({
-  heads,
-}: {
-  heads: IdentityHeads;
-}): MatchableEmail[] {
+export function matchableEmailsOf({ heads }: { heads: IdentityHeads }): MatchableEmail[] {
   return Object.values(heads.identifiers)
     .filter(
       (identifier): identifier is IdentifierFact & { value: string } =>

@@ -3,7 +3,11 @@ import type React from "react";
 import { useEffect, useMemo } from "react";
 import { removeNodeAtLocation, swapOperatorAtLocation } from "@langwatch/trace-contract";
 import { useFacetValueLabelResolver } from "../hooks/use-facet-value-labels";
-import { buildDecorationPlan, chipOverlayLabel, type TokenRef } from "../../../../behavior/explorer/search-bar/filter-highlight";
+import {
+  buildDecorationPlan,
+  chipOverlayLabel,
+  type TokenRef,
+} from "../../../../behavior/explorer/search-bar/filter-highlight";
 
 /**
  * The search bar's at-rest invitation, parameterised on who answers the ask —
@@ -141,9 +145,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
       const target = event.target;
       if (
         target instanceof HTMLElement &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
       ) {
         return;
       }
@@ -295,9 +297,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                   onMouseDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    const rect = (
-                      event.currentTarget as HTMLElement
-                    ).getBoundingClientRect();
+                    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
                     onTokenClick({
                       rect,
                       field: tok.field,

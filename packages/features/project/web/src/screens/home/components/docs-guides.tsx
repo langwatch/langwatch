@@ -10,11 +10,7 @@ import {
   LuSquareCode,
 } from "react-icons/lu";
 import { HomeCard } from "./home-card";
-import {
-  HOME_SECTION_GAP,
-  HOME_SECTION_PADDING,
-  HomeSectionHeader,
-} from "./home-section-header";
+import { HOME_SECTION_GAP, HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header";
 
 /**
  * Docs & guides, said out loud: a card of four first-class guide links (not

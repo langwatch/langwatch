@@ -94,8 +94,7 @@ vi.mock("../../../trace-api", () => ({
 // barrel keeps the rest of the package real for the hook under test.
 vi.mock("../../../../../behavior/drawer.store", () => ({
   useDrawerStore: Object.assign(
-    (selector: (s: unknown) => unknown) =>
-      selector({ traceId: null, occurredAtMs: null }),
+    (selector: (s: unknown) => unknown) => selector({ traceId: null, occurredAtMs: null }),
     { getState: () => ({ traceId: null, occurredAtMs: null }) },
   ),
 }));

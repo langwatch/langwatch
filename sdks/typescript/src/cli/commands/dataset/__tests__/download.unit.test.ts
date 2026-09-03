@@ -76,10 +76,7 @@ describe("toCsv()", () => {
 
   describe("when records have different keys", () => {
     it("produces union of all keys as headers", () => {
-      const records = [
-        makeRecord({ input: "a" }),
-        makeRecord({ input: "b", extra: "c" }),
-      ];
+      const records = [makeRecord({ input: "a" }), makeRecord({ input: "b", extra: "c" })];
 
       const result = toCsv(records);
       const lines = result.split("\n");

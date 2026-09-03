@@ -145,9 +145,7 @@ describe("VariablesSection", () => {
       await user.click(screen.getByText("question"));
       // Get the edit input (not the value input)
       const inputs = screen.getAllByRole("textbox");
-      const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question",
-      )!;
+      const editInput = inputs.find((input) => (input as HTMLInputElement).value === "question")!;
       await user.clear(editInput);
       await user.type(editInput, "new_name");
       fireEvent.blur(editInput);
@@ -163,9 +161,7 @@ describe("VariablesSection", () => {
 
       await user.click(screen.getByText("question"));
       const inputs = screen.getAllByRole("textbox");
-      const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question",
-      )!;
+      const editInput = inputs.find((input) => (input as HTMLInputElement).value === "question")!;
       await user.clear(editInput);
       await user.type(editInput, "my variable");
       fireEvent.blur(editInput);
@@ -181,9 +177,7 @@ describe("VariablesSection", () => {
 
       await user.click(screen.getByText("question"));
       const inputs = screen.getAllByRole("textbox");
-      const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question",
-      )!;
+      const editInput = inputs.find((input) => (input as HTMLInputElement).value === "question")!;
       await user.clear(editInput);
       await user.type(editInput, "MyVariable");
       fireEvent.blur(editInput);
@@ -199,17 +193,13 @@ describe("VariablesSection", () => {
 
       await user.click(screen.getByText("question"));
       const inputs = screen.getAllByRole("textbox");
-      const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question",
-      )!;
+      const editInput = inputs.find((input) => (input as HTMLInputElement).value === "question")!;
       await user.clear(editInput);
       await user.type(editInput, "my-custom-score");
       fireEvent.blur(editInput);
 
       // Dashes should be removed
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "mycustomscore", type: "str" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "mycustomscore", type: "str" }]);
     });
 
     it("removes special characters from identifier", async () => {
@@ -220,17 +210,13 @@ describe("VariablesSection", () => {
 
       await user.click(screen.getByText("question"));
       const inputs = screen.getAllByRole("textbox");
-      const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question",
-      )!;
+      const editInput = inputs.find((input) => (input as HTMLInputElement).value === "question")!;
       await user.clear(editInput);
       await user.type(editInput, "my@score!test#123");
       fireEvent.blur(editInput);
 
       // Special characters should be removed
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "myscoretest123", type: "str" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "myscoretest123", type: "str" }]);
     });
 
     it("preserves underscores in identifier", async () => {
@@ -241,17 +227,13 @@ describe("VariablesSection", () => {
 
       await user.click(screen.getByText("question"));
       const inputs = screen.getAllByRole("textbox");
-      const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question",
-      )!;
+      const editInput = inputs.find((input) => (input as HTMLInputElement).value === "question")!;
       await user.clear(editInput);
       await user.type(editInput, "my_custom_score");
       fireEvent.blur(editInput);
 
       // Underscores should be preserved
-      expect(onChange).toHaveBeenCalledWith([
-        { identifier: "my_custom_score", type: "str" },
-      ]);
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "my_custom_score", type: "str" }]);
     });
 
     it("does not allow duplicate identifiers", async () => {
@@ -267,9 +249,7 @@ describe("VariablesSection", () => {
       await user.click(screen.getByText("answer"));
       const inputs = screen.getAllByRole("textbox");
       // Find the edit input (value "answer")
-      const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "answer",
-      )!;
+      const editInput = inputs.find((input) => (input as HTMLInputElement).value === "answer")!;
       await user.clear(editInput);
       await user.type(editInput, "question"); // Try to rename to existing name
       fireEvent.blur(editInput);
@@ -280,8 +260,7 @@ describe("VariablesSection", () => {
       if (lastCall) {
         const updatedVariables = lastCall[0];
         const hasQuestionTwice =
-          updatedVariables.filter((v: Variable) => v.identifier === "question").length >
-          1;
+          updatedVariables.filter((v: Variable) => v.identifier === "question").length > 1;
         expect(hasQuestionTwice).toBe(false);
       }
     });
@@ -444,9 +423,7 @@ describe("VariablesSection", () => {
       });
 
       const inputs = screen.getAllByRole("textbox");
-      const valueInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "test value",
-      );
+      const valueInput = inputs.find((input) => (input as HTMLInputElement).value === "test value");
       expect(valueInput).toBeInTheDocument();
     });
 
@@ -489,12 +466,8 @@ describe("VariablesSection", () => {
       });
 
       const inputs = screen.getAllByRole("textbox");
-      const helloInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "hello",
-      );
-      const countInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "42",
-      );
+      const helloInput = inputs.find((input) => (input as HTMLInputElement).value === "hello");
+      const countInput = inputs.find((input) => (input as HTMLInputElement).value === "42");
 
       expect(helloInput).toBeInTheDocument();
       expect(countInput).toBeInTheDocument();

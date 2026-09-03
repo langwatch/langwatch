@@ -38,15 +38,11 @@ export class ModelProviderQueryService {
       ...saved
         .filter((provider) => this.shouldKeep(provider, system))
         .map((provider) => this.toSummary(provider)),
-      ...system.filter(
-        (provider) => provider.enabled && !savedProviders.has(provider.provider),
-      ),
+      ...system.filter((provider) => provider.enabled && !savedProviders.has(provider.provider)),
     ].map((provider) => modelProviderSummarySchema.parse(provider));
   }
 
-  async listForOrganization(input: {
-    organizationId: string;
-  }): Promise<ModelProviderSummary[]> {
+  async listForOrganization(input: { organizationId: string }): Promise<ModelProviderSummary[]> {
     const parsed = modelProviderListOrganizationInputSchema.parse(input);
     const [saved, referenceCreatedAt] = await Promise.all([
       this.options.repository.listForOrganization(parsed.organizationId),
@@ -64,9 +60,7 @@ export class ModelProviderQueryService {
       ...saved
         .filter((provider) => this.shouldKeep(provider, system))
         .map((provider) => this.toSummary(provider)),
-      ...system.filter(
-        (provider) => provider.enabled && !savedProviders.has(provider.provider),
-      ),
+      ...system.filter((provider) => provider.enabled && !savedProviders.has(provider.provider)),
     ].map((provider) => modelProviderSummarySchema.parse(provider));
   }
 
@@ -188,9 +182,7 @@ export class ModelProviderQueryService {
       return true;
     }
 
-    const defaultProvider = system.find(
-      (candidate) => candidate.provider === provider.provider,
-    );
+    const defaultProvider = system.find((candidate) => candidate.provider === provider.provider);
     if (provider.enabled !== defaultProvider?.enabled) {
       return true;
     }
@@ -208,8 +200,7 @@ export class ModelProviderQueryService {
       extraHeaders: this.options.credentialPolicy.maskHeaders(provider.extraHeaders),
       isSystem: false,
       embeddingsUnsupported:
-        provider.customEmbeddingsModels.length === 0 &&
-        metadata.embeddingsModels.length === 0,
+        provider.customEmbeddingsModels.length === 0 && metadata.embeddingsModels.length === 0,
     };
   }
 
@@ -223,8 +214,7 @@ export class ModelProviderQueryService {
       embeddingsModels: metadata.embeddingsModels,
       isSystem: false,
       embeddingsUnsupported:
-        provider.customEmbeddingsModels.length === 0 &&
-        metadata.embeddingsModels.length === 0,
+        provider.customEmbeddingsModels.length === 0 && metadata.embeddingsModels.length === 0,
     });
   }
 
@@ -272,10 +262,7 @@ export class ModelProviderQueryService {
     return candidate.createdAt.getTime() - current.createdAt.getTime();
   }
 
-  private scopeSpecificity(
-    scopes: ModelDefaultScope[],
-    chain: ModelDefaultScope[],
-  ): number {
+  private scopeSpecificity(scopes: ModelDefaultScope[], chain: ModelDefaultScope[]): number {
     let specificity = 0;
     for (const scope of scopes) {
       const isVisible = chain.some(

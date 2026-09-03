@@ -43,10 +43,7 @@ export function useTraceListEvents({
         .join(","),
     [rows],
   );
-  const traceIds = useMemo(
-    () => (traceIdsKey === "" ? [] : traceIdsKey.split(",")),
-    [traceIdsKey],
-  );
+  const traceIds = useMemo(() => (traceIdsKey === "" ? [] : traceIdsKey.split(",")), [traceIdsKey]);
 
   const enabled = !!project?.id && !isSamplePreview && needsEvents && traceIds.length > 0;
   const query = api.tracesV2.listEvents.useQuery(

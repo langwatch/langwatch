@@ -106,7 +106,11 @@ describe("boundary edge baseline (R8)", () => {
 
   it("rejects growth against a merge-base reference: a later expiry or a new edge", () => {
     const root = mkdtempSync(join(tmpdir(), "boundary-edge-growth-"));
-    const secondEdge = { kind: "private-runtime-export" as const, from: "packages/features/new/server/src/index.ts", to: "./repositories/prisma/new.repository" };
+    const secondEdge = {
+      kind: "private-runtime-export" as const,
+      from: "packages/features/new/server/src/index.ts",
+      to: "./repositories/prisma/new.repository",
+    };
     writeBaselineFile(root, {
       version: 0,
       edges: [
@@ -160,11 +164,7 @@ describe("boundary edge baseline (R8)", () => {
       }),
     );
 
-    const check = lintBoundaryEdgeBaseline(
-      root,
-      [edge],
-      "reference/boundary-edge-baseline.json",
-    );
+    const check = lintBoundaryEdgeBaseline(root, [edge], "reference/boundary-edge-baseline.json");
 
     expect(check.violations).toEqual([]);
   });
@@ -182,8 +182,16 @@ describe("boundary edge baseline (R8)", () => {
   it("extracts only cross-feature and private-runtime-export edges", () => {
     const edges = boundaryEdgesFromViolations([
       { policy: "cross-feature", file: edge.from, specifier: edge.to, message: "x" },
-      { policy: "feature-source-layout", file: "packages/features/x/server/src/y.ts", message: "x" },
-      { policy: "private-runtime-export", file: "packages/features/x/server/src/index.ts", message: "x" },
+      {
+        policy: "feature-source-layout",
+        file: "packages/features/x/server/src/y.ts",
+        message: "x",
+      },
+      {
+        policy: "private-runtime-export",
+        file: "packages/features/x/server/src/index.ts",
+        message: "x",
+      },
     ]);
 
     expect(edges).toEqual([{ kind: "cross-feature", from: edge.from, to: edge.to }]);

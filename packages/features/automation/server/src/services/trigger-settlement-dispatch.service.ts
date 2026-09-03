@@ -1,8 +1,6 @@
-
 import type { IntentContext } from "@langwatch/eventing";
 import { isDispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-
 
 import type {
   LogOverflowIntent,

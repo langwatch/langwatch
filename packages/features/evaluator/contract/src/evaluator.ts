@@ -92,8 +92,7 @@ export const evaluatorDisplayNames: Readonly<Record<string, string>> = {
   "Azure Prompt Shield": "Prompt Injection Detection",
 };
 
-export const evaluatorDisplayName = (name: string): string =>
-  evaluatorDisplayNames[name] ?? name;
+export const evaluatorDisplayName = (name: string): string => evaluatorDisplayNames[name] ?? name;
 
 export const fieldType = (fieldName: string): string =>
   ({

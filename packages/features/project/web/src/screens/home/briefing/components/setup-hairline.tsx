@@ -81,12 +81,7 @@ export function SetupHairline() {
               <Text fontFamily="mono" fontSize="12.5px" color="fg.muted">
                 Setup · {done} of {steps.length} done
               </Text>
-              <Text
-                marginLeft="auto"
-                fontFamily="mono"
-                fontSize="12.5px"
-                color="orange.fg"
-              >
+              <Text marginLeft="auto" fontFamily="mono" fontSize="12.5px" color="orange.fg">
                 {open ? "Hide" : "Finish setup"}
               </Text>
               <Box

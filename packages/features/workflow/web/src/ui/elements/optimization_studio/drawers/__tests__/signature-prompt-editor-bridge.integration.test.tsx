@@ -35,19 +35,16 @@ vi.mock("@langwatch/prompt-web/components/prompts/PromptEditorDrawer", () => ({
   },
 }));
 
-
 vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => mockUpdateNodeInternals,
 }));
-
 
 vi.mock("zustand/react/shallow", () => ({
   useShallow: (fn: any) => fn,
 }));
 
 vi.mock("@langwatch/prompt-web/prompts/utils/llmPromptConfigUtils", () => ({
-  nodeDataToLocalPromptConfig: (...args: any[]) =>
-    mockNodeDataToLocalPromptConfig(...args),
+  nodeDataToLocalPromptConfig: (...args: any[]) => mockNodeDataToLocalPromptConfig(...args),
 }));
 
 // ---- Helpers ----

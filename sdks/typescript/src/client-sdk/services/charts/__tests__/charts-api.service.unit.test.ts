@@ -161,10 +161,7 @@ describe("ChartsApiService", () => {
       // The caller's own client is what runs the delegated call — the
       // factory is never asked to build a second, freshly-scoped one.
       expect(createLangWatchApiClientMock).not.toHaveBeenCalled();
-      expect(suppliedClient.GET).toHaveBeenCalledWith(
-        "/api/v1/query/schema",
-        {},
-      );
+      expect(suppliedClient.GET).toHaveBeenCalledWith("/api/v1/query/schema", {});
       expect(result).toEqual(schemaResult);
     });
   });

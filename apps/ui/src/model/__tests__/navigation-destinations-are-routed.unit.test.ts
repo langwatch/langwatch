@@ -48,7 +48,13 @@ function ownsSubtree({ resolved, declared }: { resolved: string; declared: strin
 }
 
 /** The pattern that would win for `pathname`, or null if nothing matched. */
-function resolvedPattern({ pathname, patterns }: { pathname: string; patterns: string[] }): string | null {
+function resolvedPattern({
+  pathname,
+  patterns,
+}: {
+  pathname: string;
+  patterns: string[];
+}): string | null {
   const matches = matchRoutes(
     patterns.map((pattern) => ({ path: pattern })),
     pathname,

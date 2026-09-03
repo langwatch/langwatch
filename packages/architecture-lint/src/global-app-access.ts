@@ -41,9 +41,7 @@ const baselineEntrySchema = z.tuple([
   z.enum(["import", "reference"]),
   z.string().regex(/^[0-9a-f]{16}$/),
 ]);
-const baselineSchema = z
-  .object({ version: z.literal(1), accesses: z.array(z.unknown()) })
-  .strict();
+const baselineSchema = z.object({ version: z.literal(1), accesses: z.array(z.unknown()) }).strict();
 
 function workspacePath(root: string, file: string): string {
   return relative(root, file).split(sep).join("/");
@@ -131,8 +129,7 @@ function moduleSpecifier(node: ts.Expression): string | undefined {
   )
     return;
   if (expression.expression.kind === ts.SyntaxKind.ImportKeyword) return argument.text;
-  return ts.isIdentifier(expression.expression) &&
-    expression.expression.text === "require"
+  return ts.isIdentifier(expression.expression) && expression.expression.text === "require"
     ? argument.text
     : void 0;
 }
@@ -168,10 +165,7 @@ function accessFingerprint(
     !ts.isImportDeclaration(context.parent)
   )
     context = context.parent;
-  if (
-    context.parent &&
-    (ts.isStatement(context.parent) || ts.isImportDeclaration(context.parent))
-  )
+  if (context.parent && (ts.isStatement(context.parent) || ts.isImportDeclaration(context.parent)))
     context = context.parent;
   const normalized = context.getText(source).replace(/\s+/g, " ").trim();
   const prefix = source.text
@@ -276,11 +270,7 @@ function sourceFiles(root: string): string[] {
   }
 }
 
-function collectFileAccesses(
-  root: string,
-  file: string,
-  sourceText: string,
-): GlobalAppAccess[] {
+function collectFileAccesses(root: string, file: string, sourceText: string): GlobalAppAccess[] {
   if (workspacePath(root, file) === ACCESSOR_FILE) return [];
   const source = ts.createSourceFile(
     file,
@@ -311,20 +301,13 @@ function collectFileAccesses(
       fingerprint: occurrenceFingerprint(baseFingerprint, ordinal),
     });
   };
-  const addDestructuredBindings = (
-    name: ts.BindingName,
-    initializer: ts.Expression,
-  ): void => {
+  const addDestructuredBindings = (name: ts.BindingName, initializer: ts.Expression): void => {
     const specifier = moduleSpecifier(initializer);
     const expression = unwrap(initializer);
-    const namespace = ts.isIdentifier(expression)
-      ? namespaces.get(expression.text)
-      : void 0;
+    const namespace = ts.isIdentifier(expression) ? namespaces.get(expression.text) : void 0;
     const fromAccessor =
       (specifier !== void 0 && isAccessorModule(root, file, specifier)) ||
-      (ts.isIdentifier(expression) &&
-        namespace !== void 0 &&
-        !isShadowed(expression, namespace));
+      (ts.isIdentifier(expression) && namespace !== void 0 && !isShadowed(expression, namespace));
     if (!fromAccessor) return;
     if (ts.isIdentifier(name)) {
       namespaces.set(name.text, { symbol: "getApp", declaration: name });
@@ -400,17 +383,10 @@ function collectFileAccesses(
       const symbol = propertySymbol(node);
       const expression = unwrap(node.expression);
       const specifier = moduleSpecifier(expression);
-      const namespace = ts.isIdentifier(expression)
-        ? namespaces.get(expression.text)
-        : void 0;
+      const namespace = ts.isIdentifier(expression) ? namespaces.get(expression.text) : void 0;
       const isNamespaceAccess =
-        ts.isIdentifier(expression) &&
-        namespace !== void 0 &&
-        !isShadowed(expression, namespace);
-      if (
-        symbol &&
-        ((specifier && isAccessorModule(root, file, specifier)) || isNamespaceAccess)
-      )
+        ts.isIdentifier(expression) && namespace !== void 0 && !isShadowed(expression, namespace);
+      if (symbol && ((specifier && isAccessorModule(root, file, specifier)) || isNamespaceAccess))
         add(node, symbol, "reference", node.getText(source));
     }
     if (ts.isIdentifier(node) && !isPropertyName(node) && !isBindingName(node)) {
@@ -445,12 +421,8 @@ function key(entry: BaselineEntry): string {
   return entry.join("\0");
 }
 
-export function formatGlobalAppAccessBaseline(
-  accesses: readonly GlobalAppAccess[],
-): string {
-  const entries = accesses
-    .map(entry)
-    .sort((left, right) => key(left).localeCompare(key(right)));
+export function formatGlobalAppAccessBaseline(accesses: readonly GlobalAppAccess[]): string {
+  const entries = accesses.map(entry).sort((left, right) => key(left).localeCompare(key(right)));
   return `${JSON.stringify({ version: 1, accesses: entries }, null, 2)}\n`;
 }
 
@@ -483,8 +455,7 @@ function readBaseline(root: string): {
         {
           policy: "global-app-access-baseline",
           file,
-          message:
-            "Global app access baseline must contain version 1 and an accesses array.",
+          message: "Global app access baseline must contain version 1 and an accesses array.",
         },
       ],
     };

@@ -16,5 +16,4 @@ export const ADMIN_PASSWORD = process.env.LANGY_ADMIN_PASSWORD ?? "LocalHavenAdm
 // LW_BASE_URL was set by hand. Default it to APP_BASE so a bare
 // `npx vitest run` against the local haven stack Just Works.
 export const LW_BASE_URL = process.env.LW_BASE_URL ?? APP_BASE;
-export const LANGWATCH_API_KEY =
-  process.env.LANGWATCH_API_KEY ?? "sk-lw-local-development-key";
+export const LANGWATCH_API_KEY = process.env.LANGWATCH_API_KEY ?? "sk-lw-local-development-key";

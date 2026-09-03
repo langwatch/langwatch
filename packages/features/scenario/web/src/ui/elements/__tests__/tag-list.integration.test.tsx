@@ -118,9 +118,7 @@ describe("<TagList/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.getByRole("button", { name: "Remove alpha tag" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove alpha tag" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Remove beta tag" })).toBeInTheDocument();
     });
 

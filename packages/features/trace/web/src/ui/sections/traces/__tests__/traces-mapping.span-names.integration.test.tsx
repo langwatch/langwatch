@@ -162,9 +162,7 @@ describe("TracesMapping spans dropdown (integration)", () => {
       renderSpansMapping();
       await openKeyDropdown(user);
 
-      await user.click(
-        await screen.findByRole("option", { name: "Research.aexecute_stream" }),
-      );
+      await user.click(await screen.findByRole("option", { name: "Research.aexecute_stream" }));
 
       // Scope the subfield assertions to the span subkey <select> (identified by
       // its "* (full span object)" option) so they don't collide with the
@@ -176,9 +174,7 @@ describe("TracesMapping spans dropdown (integration)", () => {
       expect(subkeySelect).not.toBeNull();
 
       for (const subfield of ["input", "output", "params", "contexts"]) {
-        expect(
-          within(subkeySelect!).getByRole("option", { name: subfield }),
-        ).toBeInTheDocument();
+        expect(within(subkeySelect!).getByRole("option", { name: subfield })).toBeInTheDocument();
       }
     });
   });

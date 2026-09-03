@@ -14,12 +14,7 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
   const sidebarW = compact ? "260px" : "300px";
 
   return (
-    <Grid
-      h="full"
-      w="full"
-      templateColumns={`${sidebarW} minmax(0, 1fr)`}
-      overflow="hidden"
-    >
+    <Grid h="full" w="full" templateColumns={`${sidebarW} minmax(0, 1fr)`} overflow="hidden">
       {/* Left sidebar — fixed width, scrolls independently */}
       <GridItem overflow="auto" borderRight="1px solid" borderColor="border">
         <Flex direction="column" minH="full">
@@ -55,13 +50,7 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
           // skipped until first opened, then kept mounted.
           lazyMount
         >
-          <Tabs.List
-            borderBottom="1px solid"
-            borderColor="border"
-            px={3}
-            gap={0}
-            flexShrink={0}
-          >
+          <Tabs.List borderBottom="1px solid" borderColor="border" px={3} gap={0} flexShrink={0}>
             <Tabs.Trigger
               value="editor"
               fontSize="xs"

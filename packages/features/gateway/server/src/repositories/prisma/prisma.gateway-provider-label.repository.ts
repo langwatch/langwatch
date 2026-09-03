@@ -11,9 +11,7 @@ export async function resolveProviderLabels(args: {
   budgets: Array<{ providerKey: string | null }>;
 }): Promise<Map<string, string>> {
   const ids = [
-    ...new Set(
-      args.budgets.map((b) => b.providerKey).filter((k): k is string => Boolean(k)),
-    ),
+    ...new Set(args.budgets.map((b) => b.providerKey).filter((k): k is string => Boolean(k))),
   ];
   if (ids.length === 0) return new Map();
   const rows = await args.prisma.modelProvider.findMany({

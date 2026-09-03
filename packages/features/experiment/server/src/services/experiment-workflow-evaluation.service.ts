@@ -99,13 +99,9 @@ export type WorkflowEvaluationDependencies = {
 };
 
 export class WorkflowEvaluationService {
-  private constructor(
-    private readonly dependencies: WorkflowEvaluationDependencies,
-  ) {}
+  private constructor(private readonly dependencies: WorkflowEvaluationDependencies) {}
 
-  static create(
-    dependencies: WorkflowEvaluationDependencies,
-  ): WorkflowEvaluationService {
+  static create(dependencies: WorkflowEvaluationDependencies): WorkflowEvaluationService {
     return new WorkflowEvaluationService(dependencies);
   }
 

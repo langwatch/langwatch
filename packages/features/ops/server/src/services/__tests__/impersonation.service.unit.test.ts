@@ -106,9 +106,7 @@ describe("ImpersonationService", () => {
     ).rejects.toBeInstanceOf(UserToImpersonateNotFoundError);
     await expect(
       serviceFor(
-        new InMemoryImpersonationRepository(
-          target({ deactivatedAt: new Date("2025-01-01") }),
-        ),
+        new InMemoryImpersonationRepository(target({ deactivatedAt: new Date("2025-01-01") })),
       ).service.start(input),
     ).rejects.toBeInstanceOf(CannotImpersonateDeactivatedUserError);
     await expect(

@@ -93,20 +93,17 @@ export function ChangeHandleDialog({
           }}
         >
           <Dialog.Header>
-            <Dialog.Title>
-              {currentHandle ? "Change Prompt Handle" : "Save Prompt"}
-            </Dialog.Title>
+            <Dialog.Title>{currentHandle ? "Change Prompt Handle" : "Save Prompt"}</Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />
           <Dialog.Body>
             <VStack width="full" gap={4}>
               {currentHandle && (
                 <Text color="red.fg" fontSize="12px" fontWeight="medium" mb={2}>
-                  ⚠ Warning: Changing the prompt identifier or scope may break any
-                  existing integrations, API calls, or workflows that use &quot;
+                  ⚠ Warning: Changing the prompt identifier or scope may break any existing
+                  integrations, API calls, or workflows that use &quot;
                   {currentHandle}
-                  &quot;. Make sure to update all references in your codebase and
-                  documentation.
+                  &quot;. Make sure to update all references in your codebase and documentation.
                 </Text>
               )}
               <Field.Root invalid={!!errors.handle}>
@@ -154,10 +151,7 @@ export function ChangeHandleDialog({
                     </Button>
                   </Menu.Trigger>
                   <Menu.Content portalled={false}>
-                    <Menu.Item
-                      value="project"
-                      onClick={() => field.onChange(PromptScope.PROJECT)}
-                    >
+                    <Menu.Item value="project" onClick={() => field.onChange(PromptScope.PROJECT)}>
                       <HStack gap={2}>
                         <Users size={14} />
                         <Text>Project</Text>

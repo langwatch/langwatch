@@ -246,9 +246,7 @@ describe("LangyConversationTurnFoldProjection", () => {
         // A stop is its own terminal: the partial stays, it renders distinctly
         // from a clean completion, and it is never a red error (ADR-078).
         expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.STOPPED);
-        expect(state.AnswerParts).toEqual([
-          { type: "text", text: "here is what I had so f" },
-        ]);
+        expect(state.AnswerParts).toEqual([{ type: "text", text: "here is what I had so f" }]);
         expect(state.EndedAt).toBe(2000);
         expect(state.Error).toBeNull();
       });
@@ -274,16 +272,8 @@ describe("LangyConversationTurnFoldProjection", () => {
   });
 
   describe("given the agent updates its plan", () => {
-    const planUpdated = (
-      items: Array<{ content: string; status: string }>,
-      occurredAt: number,
-    ) =>
-      event(
-        "PLAN_UPDATED",
-        LANGY_CONVERSATION_EVENT_VERSIONS.PLAN_UPDATED,
-        { items },
-        occurredAt,
-      );
+    const planUpdated = (items: Array<{ content: string; status: string }>, occurredAt: number) =>
+      event("PLAN_UPDATED", LANGY_CONVERSATION_EVENT_VERSIONS.PLAN_UPDATED, { items }, occurredAt);
 
     it("starts with no plan", () => {
       expect(fold.init().Plan).toBeNull();

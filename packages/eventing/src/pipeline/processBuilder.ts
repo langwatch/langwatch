@@ -34,9 +34,7 @@ export interface ProcessManagerStateStage<E extends Event, State> {
   ): ProcessManagerIntentStage<E, State, Record<Name, IntentSpec<Schema>>>;
   schedule(options: { everyMs: number }): ProcessManagerScheduledStage<E, State>;
   /** Enter the handler stage without declaring an outbox intent. */
-  keyBy(
-    resolve: (event: E) => string,
-  ): ProcessManagerIntentStage<E, State, Record<never, never>>;
+  keyBy(resolve: (event: E) => string): ProcessManagerIntentStage<E, State, Record<never, never>>;
 }
 
 export interface ProcessManagerScheduledStage<
@@ -79,9 +77,7 @@ export interface ProcessManagerIntentStage<
     schema: Schema,
     handle: SignalHandler<State, z.output<Schema>, Intents>,
   ): ProcessManagerHandledStage<E, State, Intents>;
-  onWake(
-    handle: WakeHandler<State, Intents>,
-  ): ProcessManagerHandledStage<E, State, Intents>;
+  onWake(handle: WakeHandler<State, Intents>): ProcessManagerHandledStage<E, State, Intents>;
   keyBy(resolve: (event: E) => string): ProcessManagerIntentStage<E, State, Intents>;
   schedule(options: { everyMs: number }): ProcessManagerIntentStage<E, State, Intents>;
   outbox(options: OutboxOptions): ProcessManagerIntentStage<E, State, Intents>;
@@ -105,9 +101,7 @@ export interface ProcessManagerHandledStage<
     schema: Schema,
     handle: SignalHandler<State, z.output<Schema>, Intents>,
   ): ProcessManagerHandledStage<E, State, Intents>;
-  onWake(
-    handle: WakeHandler<State, Intents>,
-  ): ProcessManagerHandledStage<E, State, Intents>;
+  onWake(handle: WakeHandler<State, Intents>): ProcessManagerHandledStage<E, State, Intents>;
   keyBy(resolve: (event: E) => string): ProcessManagerHandledStage<E, State, Intents>;
   schedule(options: { everyMs: number }): ProcessManagerHandledStage<E, State, Intents>;
   outbox(options: OutboxOptions): ProcessManagerHandledStage<E, State, Intents>;

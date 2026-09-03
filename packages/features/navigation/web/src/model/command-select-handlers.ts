@@ -1,9 +1,4 @@
-import type {
-  Command,
-  CommandDrawerName,
-  RecentItem,
-  SearchResult,
-} from "./command-bar-types";
+import type { Command, CommandDrawerName, RecentItem, SearchResult } from "./command-bar-types";
 
 /**
  * Navigation helper type for handling tab behavior.
@@ -23,10 +18,7 @@ export type AddRecentItem = (item: Omit<RecentItem, "accessedAt">) => void;
 /**
  * Drawer opening helper.
  */
-export type OpenDrawer = (
-  drawer: CommandDrawerName,
-  params?: Record<string, string>,
-) => void;
+export type OpenDrawer = (drawer: CommandDrawerName, params?: Record<string, string>) => void;
 
 /**
  * Create a navigation helper that handles tab behavior.

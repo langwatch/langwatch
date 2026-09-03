@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  HandledError,
-  handledErrorFromHerr,
-  NotFoundError,
-  setTraceUrlProvider,
-} from "./index";
+import { HandledError, handledErrorFromHerr, NotFoundError, setTraceUrlProvider } from "./index";
 
 class TestError extends HandledError {
   declare readonly code: "test_error";
@@ -222,9 +217,7 @@ describe("HandledError.isHandled", () => {
 
     const error = new TestError("boom", { traceId: "trace-1" });
 
-    expect(HandledError.serializeTrusted(error).traceUrl).toBe(
-      "https://traces.example/trace-1",
-    );
+    expect(HandledError.serializeTrusted(error).traceUrl).toBe("https://traces.example/trace-1");
     setTraceUrlProvider(() => void 0);
   });
 
@@ -269,10 +262,7 @@ describe("HandledError.is", () => {
 
 describe("HandledError.toUserMessage", () => {
   it("forwards the message of a duplicated HandledError", async () => {
-    const duplicate = await duplicatedHandledError(
-      "span_not_found",
-      "That span no longer exists",
-    );
+    const duplicate = await duplicatedHandledError("span_not_found", "That span no longer exists");
     expect(HandledError.toUserMessage(duplicate)).toBe("That span no longer exists");
   });
 

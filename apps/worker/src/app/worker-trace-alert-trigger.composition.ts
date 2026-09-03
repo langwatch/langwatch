@@ -3,7 +3,10 @@ import type {
   TriggerAction,
   TriggerSummary,
 } from "@langwatch/automation-contract";
-import { triggerFiltersNeedEvaluation, NOTIFY_TRIGGER_ACTIONS } from "@langwatch/automation-contract";
+import {
+  triggerFiltersNeedEvaluation,
+  NOTIFY_TRIGGER_ACTIONS,
+} from "@langwatch/automation-contract";
 import {
   AutomationTraceTriggerCataloguePort,
   type AutomationTriggerMatchRecorderPort,
@@ -69,7 +72,8 @@ export function createWorkerTraceAlertTriggerHandler(options: {
     metrics: OtelTraceAlertMetricsAdapter.create(),
   });
 
-  return (event, context) => subscriber.handle(event, context as TriggerContext<GovernanceTraceSummary>);
+  return (event, context) =>
+    subscriber.handle(event, context as TriggerContext<GovernanceTraceSummary>);
 }
 
 /**

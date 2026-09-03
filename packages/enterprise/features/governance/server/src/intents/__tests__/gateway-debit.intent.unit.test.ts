@@ -63,7 +63,12 @@ function harness({
     emitBudgetUpdated,
   } as unknown as GatewayDebitPort;
 
-  return { intent: GatewayDebitIntent.create(port), emitBudgetUpdated, insert, shouldEmit: port.shouldEmitBudgetUpdated };
+  return {
+    intent: GatewayDebitIntent.create(port),
+    emitBudgetUpdated,
+    insert,
+    shouldEmit: port.shouldEmitBudgetUpdated,
+  };
 }
 
 describe("BUDGET_UPDATED change events from the gateway debit writer", () => {
@@ -109,7 +114,11 @@ describe("BUDGET_UPDATED change events from the gateway debit writer", () => {
       /** @scenario "Repeat updates for a warn-only budget collapse into one" */
       it("suppresses the redundant emission", async () => {
         const shouldEmit = vi.fn().mockResolvedValue(false);
-        const { intent, emitBudgetUpdated, shouldEmit: shouldEmitPort } = harness({
+        const {
+          intent,
+          emitBudgetUpdated,
+          shouldEmit: shouldEmitPort,
+        } = harness({
           budgets: [budget("WARN")],
           shouldEmit,
         });

@@ -230,11 +230,7 @@ export function assertNames(names: LangWatchQLNames): LangWatchQLNames {
  * `database.table`, both validated. Exported for `./postgres-mapping.ts`, which
  * qualifies its engine tables into the same LangWatchQL database.
  */
-export function qualified(
-  names: LangWatchQLNames,
-  table: string,
-  database?: string,
-): string {
+export function qualified(names: LangWatchQLNames, table: string, database?: string): string {
   const owner = database ?? names.database;
   return `${assertIdentifier(owner, "database")}.${assertIdentifier(table, "table")}`;
 }
@@ -403,11 +399,7 @@ function keyMapPolicyName(keyMapTable: string): string {
  * own hash matches, so it can neither enumerate other tenants' hashes nor
  * confirm a guessed one.
  */
-export function lwqlKeyMapRowPolicyStatement({
-  names,
-}: {
-  names: LangWatchQLNames;
-}): string {
+export function lwqlKeyMapRowPolicyStatement({ names }: { names: LangWatchQLNames }): string {
   assertNames(names);
   return (
     `CREATE ROW POLICY OR REPLACE ${keyMapPolicyName(names.keyMapTable)} ` +
@@ -490,9 +482,7 @@ export function lwqlClickHouseSetupStatements({
     lwqlSettingsProfileStatement({ names, limits }),
     lwqlRestrictedUserStatement({ names, password }),
     lwqlGrantStatement({ names, table: names.keyMapTable }),
-    ...lwqlTables.map((lwqlTable) =>
-      lwqlGrantStatement({ names, table: lwqlTable.table }),
-    ),
+    ...lwqlTables.map((lwqlTable) => lwqlGrantStatement({ names, table: lwqlTable.table })),
     lwqlKeyMapRowPolicyStatement({ names }),
     ...lwqlTables.map((lwqlTable) => lwqlRowPolicyStatement({ names, lwqlTable })),
   ];

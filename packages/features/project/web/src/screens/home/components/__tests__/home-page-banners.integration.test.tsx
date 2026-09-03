@@ -88,8 +88,7 @@ const VOICE_KEY = "langwatch:voice-agents-home-banner-dismissed:v1:project-1";
 const AUTOMATIONS_KEY = "langwatch:automations-home-banner-dismissed:v1:project-1";
 
 /** The pill row next to a slide's heading — where the "New" badge lives. */
-const headingRow = (name: string) =>
-  within(screen.getByRole("heading", { name }).parentElement!);
+const headingRow = (name: string) => within(screen.getByRole("heading", { name }).parentElement!);
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(

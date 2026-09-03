@@ -37,9 +37,7 @@ export function useTraceListAnnotations({
   isSamplePreview?: boolean;
 }): TraceListItem[] {
   const { project, hasPermission } = useOrganizationTeamProject();
-  const needsAnnotations = useViewStore((state) =>
-    state.columnOrder.includes("annotations"),
-  );
+  const needsAnnotations = useViewStore((state) => state.columnOrder.includes("annotations"));
   const canRead = hasPermission("annotations:view");
 
   // Sorted so two renders of the same page share a query key regardless of the
@@ -52,10 +50,7 @@ export function useTraceListAnnotations({
         .join(","),
     [rows],
   );
-  const traceIds = useMemo(
-    () => (traceIdsKey === "" ? [] : traceIdsKey.split(",")),
-    [traceIdsKey],
-  );
+  const traceIds = useMemo(() => (traceIdsKey === "" ? [] : traceIdsKey.split(",")), [traceIdsKey]);
 
   const asked = needsAnnotations && !isSamplePreview && traceIds.length > 0;
   const enabled = asked && canRead && !!project?.id;

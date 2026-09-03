@@ -9,8 +9,5 @@ export abstract class LangyCredentialRepository {
 
   abstract tryFindEgressAllowlist(projectId: string): Promise<unknown | null>;
 
-  abstract saveEgressAllowlist(
-    projectId: string,
-    allowlist: string[] | null,
-  ): Promise<void>;
+  abstract saveEgressAllowlist(projectId: string, allowlist: string[] | null): Promise<void>;
 }

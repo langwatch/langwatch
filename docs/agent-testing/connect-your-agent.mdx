@@ -407,29 +407,29 @@ If the endpoint creates its own conversation and returns its id, add `"sessionPa
 
 The body template renders as a Liquid template on every turn. The URL and header values render the same variables:
 
-| Variable | Value |
-|---|---|
-| `{{ messages }}` | The whole conversation as a raw JSON array of `{role, content}` messages |
-| `{{ input }}` | The text of the last user message |
-| `{{ threadId }}` | A conversation id, the same on every turn of a run |
-| `{{ params.NAME }}` | A run parameter the scenario declares |
+| Variable                             | Value                                                                                                                         |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `{{ messages }}`                     | The whole conversation as a raw JSON array of `{role, content}` messages                                                      |
+| `{{ input }}`                        | The text of the last user message                                                                                             |
+| `{{ threadId }}`                     | A conversation id, the same on every turn of a run                                                                            |
+| `{{ params.NAME }}`                  | A run parameter the scenario declares                                                                                         |
 | `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, for systems that read them from the body or a custom header instead of the `traceparent` header |
 
 Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise unchanged.
 
 ## Common Failures
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `langwatch agent list` shows no row for the agent | The process started without an API key, so the SDK opened no connection. | Set `LANGWATCH_API_KEY` in the process environment and restart the process. |
-| The row reads `Offline` | The process stopped, or its outbound connection is blocked. | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http`; the SDK then registers over HTTP long polling. |
+| Symptom                                                                                                  | Cause                                                                                                                                                             | Fix                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `langwatch agent list` shows no row for the agent                                                        | The process started without an API key, so the SDK opened no connection.                                                                                          | Set `LANGWATCH_API_KEY` in the process environment and restart the process.                                                                                                                 |
+| The row reads `Offline`                                                                                  | The process stopped, or its outbound connection is blocked.                                                                                                       | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http`; the SDK then registers over HTTP long polling.                                              |
 | The process logs `timed out during opening handshake` on every attempt while `curl` reaches the endpoint | The host resolves the endpoint to an IPv6 address it cannot reach, most often behind a VPN tunnel that drops IPv6, and an older SDK waited on that address alone. | Update the `langwatch` package to the latest release: it moves on to the next address after 0.25 s (`LANGWATCH_AGENT_HAPPY_EYEBALLS_DELAY` tunes it). Disconnecting the VPN also clears it. |
-| `langwatch agent get` lists a parameter without `options`, or does not list it at all | The annotation is not a `Literal`, an `Enum` or a `z.enum`, or the parameter has no default and the platform reads it as required. | Change the annotation or add the default, then restart the process. |
-| The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process and run again. |
-| The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so only its owner can run it. | Run it as the owner, or register it under a shared environment name such as `dev-shared`. |
-| The run is refused with `scenario_parameter_option_invalid` | A value is outside the closed option list the agent declares. | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code. |
-| A turn fails with `agent_call_timeout` | The call took longer than the agent's timeout. | Raise `timeout` on the connect function (up to 300 seconds), or make the agent answer faster. |
-| Trace-dependent criteria come back inconclusive | The agent reports its traces to a different LangWatch project, or it reports none at all. | Point the agent's tracing at the same project's API key. Set it up with the `tracing` skill. |
+| `langwatch agent get` lists a parameter without `options`, or does not list it at all                    | The annotation is not a `Literal`, an `Enum` or a `z.enum`, or the parameter has no default and the platform reads it as required.                                | Change the annotation or add the default, then restart the process.                                                                                                                         |
+| The run is refused with `agent_offline`                                                                  | No instance was connected when the run started.                                                                                                                   | Start the agent process and run again.                                                                                                                                                      |
+| The run is refused with `agent_owner_only`                                                               | The agent registered under `development` with a personal key, so only its owner can run it.                                                                       | Run it as the owner, or register it under a shared environment name such as `dev-shared`.                                                                                                   |
+| The run is refused with `scenario_parameter_option_invalid`                                              | A value is outside the closed option list the agent declares.                                                                                                     | Use one of the listed options, or widen the `Literal` (Python) or `z.enum` (TypeScript) list in the code.                                                                                   |
+| A turn fails with `agent_call_timeout`                                                                   | The call took longer than the agent's timeout.                                                                                                                    | Raise `timeout` on the connect function (up to 300 seconds), or make the agent answer faster.                                                                                               |
+| Trace-dependent criteria come back inconclusive                                                          | The agent reports its traces to a different LangWatch project, or it reports none at all.                                                                         | Point the agent's tracing at the same project's API key. Set it up with the `tracing` skill.                                                                                                |
 
 ## Common Mistakes
 
@@ -476,6 +476,7 @@ The steps below are the same setup by hand, and what to check when the skill's r
     ```
 
     The agent entry point is Node only. It is a separate export, `langwatch/agent`. `zod` declares the run parameters. Install it if the project does not have it yet.
+
   </Tab>
 </Tabs>
 
@@ -507,6 +508,7 @@ Write a small function beside the code that starts your service. This is the ada
     `model` is a run parameter, so a run can select it. `messages` and `thread_id` are turn fields that LangWatch sends. See [What the agent receives](#what-the-agent-receives) and [Run parameters](#run-parameters) below.
 
     A synchronous function works the same way. It runs in a worker thread, so the connection stays responsive.
+
   </Tab>
   <Tab title="TypeScript">
     ```typescript
@@ -537,6 +539,7 @@ Write a small function beside the code that starts your service. This is the ada
     The zod schema declares the run parameters, and it types `params` in the handler. See [Run parameters](#run-parameters) below for what each part of the schema does. An agent whose tests vary no value takes `parameters` away and keeps the rest.
 
     `connectAgent` returns the function, so a code-first scenario run and a unit test can call it directly.
+
   </Tab>
 </Tabs>
 
@@ -547,15 +550,16 @@ Then start your service the way you always start it. The start command does not 
 <Note>
   **No long-running service?** When the agent is a library with no process of its own, put the connect function in a small script and keep the script alive.
 
-  In Python, call `langwatch.agent.serve()` at the end of the script. It blocks until Ctrl-C.
+In Python, call `langwatch.agent.serve()` at the end of the script. It blocks until Ctrl-C.
 
-  In TypeScript, keep the script alive yourself. An open WebSocket holds the event loop while it is connected, but the HTTP fallback and the reconnect wait use unreferenced timers, so a script with no server of its own can exit between polls.
+In TypeScript, keep the script alive yourself. An open WebSocket holds the event loop while it is connected, but the HTTP fallback and the reconnect wait use unreferenced timers, so a script with no server of its own can exit between polls.
 
-  ```typescript
-  setInterval(() => {}, 1 << 30);
-  ```
+```typescript
+setInterval(() => {}, 1 << 30);
+```
 
-  Run the script with whatever runner the project uses, for example `tsx agent.ts`.
+Run the script with whatever runner the project uses, for example `tsx agent.ts`.
+
 </Note>
 
 ## 3. Confirm it is online
@@ -578,13 +582,13 @@ langwatch test-suite run 'Smoke' --target connected:support-agent@development --
 
 The platform sends the same fields on every call. They describe the turn, and they are never run parameters.
 
-| Python | TypeScript | Value |
-|---|---|---|
-| `messages` | `messages` | The whole conversation so far, as OpenAI-style messages |
-| `new_messages` | `newMessages` | The messages added since the previous turn |
-| `thread_id` | `threadId` | The platform's conversation id, the same on every turn of one run |
-| `session` | `session` | What the function returned as `session` on the previous turn, empty on the first |
-| `trace_id` | `traceId` | The id of the turn's trace |
+| Python         | TypeScript    | Value                                                                            |
+| -------------- | ------------- | -------------------------------------------------------------------------------- |
+| `messages`     | `messages`    | The whole conversation so far, as OpenAI-style messages                          |
+| `new_messages` | `newMessages` | The messages added since the previous turn                                       |
+| `thread_id`    | `threadId`    | The platform's conversation id, the same on every turn of one run                |
+| `session`      | `session`     | What the function returned as `session` on the previous turn, empty on the first |
+| `trace_id`     | `traceId`     | The id of the turn's trace                                                       |
 
 In Python the SDK reads the signature once, at decoration, and passes exactly the names the function declares. A function that declares `messages` and `thread_id` receives those two. A function that declares `**kwargs` receives all of them. A first parameter annotated `langwatch.AgentCall` receives one object with every field and the parameter values:
 
@@ -631,6 +635,7 @@ A run parameter is a value a run supplies, so one scenario covers several condit
     | `Annotated[T, langwatch.Param(...)]` | A description, an options list, or a type that overrides the annotation |
 
     An annotation the SDK does not map falls back to the type's JSON schema and is offered as text. `parameters={...}` on the decorator replaces what the signature declares.
+
   </Tab>
   <Tab title="TypeScript">
     Declare the parameters with a zod schema. The schema types `params` in the handler, and the SDK validates the values a run supplies against it:
@@ -677,6 +682,7 @@ A run parameter is a value a run supplies, so one scenario covers several condit
     ```
 
     Or a plain JSON Schema object, `{ type: "object", properties: { ... } }`. All three forms reach the platform as the same declaration.
+
   </Tab>
 </Tabs>
 
@@ -729,6 +735,7 @@ To keep the state in your own process instead, use an in-memory map. Key it by `
         conversation_id = SESSIONS.setdefault(thread_id, my_agent.create_conversation())
         return await my_agent.send(conversation_id, messages[-1]["content"])
     ```
+
   </Tab>
   <Tab title="TypeScript">
     ```typescript
@@ -746,6 +753,7 @@ To keep the state in your own process instead, use an in-memory map. Key it by `
       },
     );
     ```
+
   </Tab>
 </Tabs>
 
@@ -778,12 +786,12 @@ See [Environments and personal agents](/agent-testing/environments) for the full
 
 One deployment with several pods is one row and several instances. The platform dispatches each call to one live instance and reports the instance that served each run.
 
-| Setting | What it does |
-|---|---|
-| `concurrency` | How many calls one instance takes at the same time. Default 1 in `development`, 4 elsewhere. When every instance is full, the platform waits and retries within the call's deadline. |
-| `instance_label` (`instanceLabel`) | A name for this instance in the instances table, for example the pod name. Also read from `LANGWATCH_AGENT_INSTANCE_LABEL`. |
-| `enabled` | Whether this process connects. It takes any boolean, so one expression decides which deployments connect: `enabled=os.environ.get("APP_ENV") != "production" and not os.environ.get("CI")` connects everywhere but production and CI. Without the argument the default is true, and false when `CI` is set. An `enabled` argument replaces that rule, so keep the `CI` half unless a CI job is deliberately the target. |
-| `LANGWATCH_AGENT_CONNECT=0` | Turns the connection off for a deployment without a code change. |
+| Setting                            | What it does                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `concurrency`                      | How many calls one instance takes at the same time. Default 1 in `development`, 4 elsewhere. When every instance is full, the platform waits and retries within the call's deadline.                                                                                                                                                                                                                                    |
+| `instance_label` (`instanceLabel`) | A name for this instance in the instances table, for example the pod name. Also read from `LANGWATCH_AGENT_INSTANCE_LABEL`.                                                                                                                                                                                                                                                                                             |
+| `enabled`                          | Whether this process connects. It takes any boolean, so one expression decides which deployments connect: `enabled=os.environ.get("APP_ENV") != "production" and not os.environ.get("CI")` connects everywhere but production and CI. Without the argument the default is true, and false when `CI` is set. An `enabled` argument replaces that rule, so keep the `CI` half unless a CI job is deliberately the target. |
+| `LANGWATCH_AGENT_CONNECT=0`        | Turns the connection off for a deployment without a code change.                                                                                                                                                                                                                                                                                                                                                        |
 
 The platform delivers each call at most once. The SDK confirms a call when the function starts, and the platform never sends a confirmed call to a second instance, so a turn with side effects runs one time.
 
@@ -821,16 +829,16 @@ Declare parameters with their types and their options, and do not pass a raw par
 
 The decorator never stops the application from starting. Every problem is one warning line on stdout with the fix, and the process runs on.
 
-| Warning | Fix |
-|---|---|
-| `LANGWATCH_API_KEY` is missing | Set the project API key in the process environment. Without it the SDK opens no connection. |
-| The key reaches several projects and no project is named | Set `LANGWATCH_PROJECT_ID`, or pass `project_id`. The warning lists the projects the key reaches. |
-| The key is not valid | Read the key from **Settings > API Keys** of the project that runs the suites. |
-| The key is of the wrong type | An ingestion key cannot connect. Use a project or personal API key. |
-| The key has no `scenarios:manage` permission | Give the key that permission, or use a key that has it. |
-| The endpoint is unreachable | Check `LANGWATCH_ENDPOINT` and the outbound path to it. The SDK keeps reconnecting with a growing wait, so the agent appears as soon as the path opens. |
-| A parameter was refused | The name breaks the parameter name grammar, or the agent declares more than 20. The warning includes the parameter name. |
-| The environment name was refused | Use lower-case letters, digits, dashes and underscores, up to 32 characters. |
+| Warning                                                  | Fix                                                                                                                                                     |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LANGWATCH_API_KEY` is missing                           | Set the project API key in the process environment. Without it the SDK opens no connection.                                                             |
+| The key reaches several projects and no project is named | Set `LANGWATCH_PROJECT_ID`, or pass `project_id`. The warning lists the projects the key reaches.                                                       |
+| The key is not valid                                     | Read the key from **Settings > API Keys** of the project that runs the suites.                                                                          |
+| The key is of the wrong type                             | An ingestion key cannot connect. Use a project or personal API key.                                                                                     |
+| The key has no `scenarios:manage` permission             | Give the key that permission, or use a key that has it.                                                                                                 |
+| The endpoint is unreachable                              | Check `LANGWATCH_ENDPOINT` and the outbound path to it. The SDK keeps reconnecting with a growing wait, so the agent appears as soon as the path opens. |
+| A parameter was refused                                  | The name breaks the parameter name grammar, or the agent declares more than 20. The warning includes the parameter name.                                |
+| The environment name was refused                         | Use lower-case letters, digits, dashes and underscores, up to 32 characters.                                                                            |
 
 ## Options reference
 
@@ -853,6 +861,7 @@ The decorator never stops the application from starting. Every problem is one wa
     | `project_id` | none | The project, for a key that covers more than one. |
 
     `langwatch.agent.serve()` blocks the current thread while the connection runs. `langwatch.Param(description=..., options=[...], type=...)` annotates one parameter. `langwatch.AgentReply(output, session=...)` returns a reply with a session value.
+
   </Tab>
   <Tab title="TypeScript">
     `connectAgent(options, handler)` from `langwatch/agent`
@@ -872,54 +881,71 @@ The decorator never stops the application from starting. Every problem is one wa
     | `projectId` | none | The project, for a key that covers more than one. |
 
     The returned function calls the handler directly and exposes `.disconnect()`, which closes the connection and drops the agent from the presence list.
+
   </Tab>
 </Tabs>
 
 Environment variables, read by both SDKs:
 
-| Variable | Effect |
-|---|---|
-| `LANGWATCH_API_KEY` | The project key. Without it, the process does not connect. |
-| `LANGWATCH_ENDPOINT` | The LangWatch instance, for a self-hosted deployment. |
-| `LANGWATCH_AGENT_ENVIRONMENT` | The environment to register under. |
-| `LANGWATCH_AGENT_CONNECT` | `0` or `false` stops this process from connecting. |
-| `LANGWATCH_AGENT_INSTANCE_LABEL` | The instance name shown in the instances table. |
+| Variable                         | Effect                                                     |
+| -------------------------------- | ---------------------------------------------------------- |
+| `LANGWATCH_API_KEY`              | The project key. Without it, the process does not connect. |
+| `LANGWATCH_ENDPOINT`             | The LangWatch instance, for a self-hosted deployment.      |
+| `LANGWATCH_AGENT_ENVIRONMENT`    | The environment to register under.                         |
+| `LANGWATCH_AGENT_CONNECT`        | `0` or `false` stops this process from connecting.         |
+| `LANGWATCH_AGENT_INSTANCE_LABEL` | The instance name shown in the instances table.            |
 
 ## Read the first run
 
 Open the run in **Agent Testing > Results**. A connected setup shows the conversation transcript, a trace link on each turn, and judge reasoning that cites what the agent did.
 
 <Frame>
-<img className="block" src="/images/agent-testing/run-detail-conversation.png" alt="The run detail with the conversation transcript and a View trace link on the turn" />
+  <img
+    className="block"
+    src="/images/agent-testing/run-detail-conversation.png"
+    alt="The run detail with the conversation transcript and a View trace link on the turn"
+  />
 </Frame>
 
 <Frame>
-<img className="block" src="/images/agent-testing/run-detail-verdict.png" alt="The run results with the verdict and the judge reasoning citing a tool call span from the trace" />
+  <img
+    className="block"
+    src="/images/agent-testing/run-detail-verdict.png"
+    alt="The run results with the verdict and the judge reasoning citing a tool call span from the trace"
+  />
 </Frame>
 
 The trace link on a turn opens the full trace: the simulation's own steps first, then your agent's spans for that turn. This is the evidence the judge reads:
 
 <Frame>
-<img className="block" src="/images/agent-testing/run-trace.png" alt="The trace waterfall with the simulation spans and the agent's own spans in one trace" />
+  <img
+    className="block"
+    src="/images/agent-testing/run-trace.png"
+    alt="The trace waterfall with the simulation spans and the agent's own spans in one trace"
+  />
 </Frame>
 
 The run settings also record which instance served each run, so a result from a deployment with several pods shows which instance served it.
 
 ## Common failures
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| The row reads **Offline** | The process stopped, or its outbound connection is blocked by a proxy or a firewall. | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http`, see [Behind a proxy that blocks WebSockets](#behind-a-proxy-that-blocks-websockets). |
-| The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process, then run again. |
-| The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so it belongs to one person. | Run it as its owner, or register it under a shared environment name. |
-| A turn fails with `agent_call_timeout` | The function took longer than the agent's timeout. | Raise `timeout`, up to 300 seconds, or make the agent answer faster. |
-| A turn fails with `agent_busy` | Every instance was already running as many calls as it accepts. | Raise `concurrency`, or start more instances. |
-| Trace-dependent criteria come back inconclusive | The agent reports its traces to a different project, or it reports none at all. | Point the agent's tracing at the project that runs the scenarios. |
+| Symptom                                         | Cause                                                                                      | Fix                                                                                                                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The row reads **Offline**                       | The process stopped, or its outbound connection is blocked by a proxy or a firewall.       | Restart the process. On a network that blocks WebSockets, set `LANGWATCH_AGENT_TRANSPORT=http`, see [Behind a proxy that blocks WebSockets](#behind-a-proxy-that-blocks-websockets). |
+| The run is refused with `agent_offline`         | No instance was connected when the run started.                                            | Start the agent process, then run again.                                                                                                                                             |
+| The run is refused with `agent_owner_only`      | The agent registered under `development` with a personal key, so it belongs to one person. | Run it as its owner, or register it under a shared environment name.                                                                                                                 |
+| A turn fails with `agent_call_timeout`          | The function took longer than the agent's timeout.                                         | Raise `timeout`, up to 300 seconds, or make the agent answer faster.                                                                                                                 |
+| A turn fails with `agent_busy`                  | Every instance was already running as many calls as it accepts.                            | Raise `concurrency`, or start more instances.                                                                                                                                        |
+| Trace-dependent criteria come back inconclusive | The agent reports its traces to a different project, or it reports none at all.            | Point the agent's tracing at the project that runs the scenarios.                                                                                                                    |
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Environments and personal agents" icon="laptop-code" href="/agent-testing/environments">
+  <Card
+    title="Environments and personal agents"
+    icon="laptop-code"
+    href="/agent-testing/environments"
+  >
     Your machine, staging and production as separate targets
   </Card>
   <Card title="Run parameters" icon="sliders" href="/agent-testing/run-parameters">
@@ -928,7 +954,11 @@ The run settings also record which instance served each run, so a result from a 
   <Card title="Other ways to connect" icon="plug" href="/agent-testing/other-ways-to-connect">
     HTTP agents, the local tunnel, and code agents
   </Card>
-  <Card title="Linking your traces" icon="diagram-project" href="/agent-testing/linking-your-traces">
+  <Card
+    title="Linking your traces"
+    icon="diagram-project"
+    href="/agent-testing/linking-your-traces"
+  >
     What the judge reads from your agent's own spans
   </Card>
 </CardGroup>

@@ -6,18 +6,19 @@ and the run dialog.
 ## Source Feature Files
 
 These tests implement scenarios from:
+
 - `specs/features/agent-testing/page-structure.feature`
 - `specs/features/agent-testing/cases-table.feature`
 - `specs/features/agent-testing/run-dialog.feature`
 
 ## Test Files
 
-| File | Feature | Tests |
-|------|---------|-------|
-| `steps.ts` | - | Shared Gherkin-style step definitions |
-| `scenario-library.spec.ts` | Page structure | Title and tabs, the scenarios panel, the redirect from a saved `/simulations` address |
-| `scenario-editor.spec.ts` | Scenario editor | Create, edit, workflow lifecycle, criteria |
-| `scenario-execution.spec.ts` | Run dialog | Results tab, Save & Run |
+| File                         | Feature         | Tests                                                                                 |
+| ---------------------------- | --------------- | ------------------------------------------------------------------------------------- |
+| `steps.ts`                   | -               | Shared Gherkin-style step definitions                                                 |
+| `scenario-library.spec.ts`   | Page structure  | Title and tabs, the scenarios panel, the redirect from a saved `/simulations` address |
+| `scenario-editor.spec.ts`    | Scenario editor | Create, edit, workflow lifecycle, criteria                                            |
+| `scenario-execution.spec.ts` | Run dialog      | Results tab, Save & Run                                                               |
 
 ## Architecture
 
@@ -94,13 +95,16 @@ waits for the run to show in the drawer.
 ## Troubleshooting
 
 ### "strict mode violation: resolved to N elements"
+
 Chakra renders duplicates. Use `.first()` or `.last()`.
 
 ### Save does not close the drawer
+
 The drawer closes itself after the "Scenario created" or "Scenario updated"
 toast. Wait for the toast, then for the Title field to disappear, as
 `whenIClickSave` does.
 
 ### The test creates an agent or a suite that already exists
+
 The day zero steps act only when the matching empty state is visible. A
 project that already holds an agent and a suite skips both.

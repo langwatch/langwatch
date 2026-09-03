@@ -63,10 +63,7 @@ describe("validateLangWatchQL", () => {
         "an inline window function",
         "SELECT Model, avg(Duration) OVER (PARTITION BY Model ORDER BY StartedAt) AS rolling FROM traces",
       ],
-      [
-        "a named window",
-        "SELECT sum(Cost) OVER w FROM traces WINDOW w AS (PARTITION BY Model)",
-      ],
+      ["a named window", "SELECT sum(Cost) OVER w FROM traces WINDOW w AS (PARTITION BY Model)"],
       ["a UNION ALL", "SELECT TraceId FROM traces UNION ALL SELECT TraceId FROM spans"],
       [
         "a join on an equality key",
@@ -76,14 +73,8 @@ describe("validateLangWatchQL", () => {
         "a scalar subquery",
         "SELECT TraceId, (SELECT max(Duration) FROM spans) AS slowest FROM traces",
       ],
-      [
-        "an IN subquery",
-        "SELECT TraceId FROM traces WHERE TraceId IN (SELECT TraceId FROM spans)",
-      ],
-      [
-        "an EXISTS subquery",
-        "SELECT TraceId FROM traces WHERE EXISTS (SELECT 1 FROM spans)",
-      ],
+      ["an IN subquery", "SELECT TraceId FROM traces WHERE TraceId IN (SELECT TraceId FROM spans)"],
+      ["an EXISTS subquery", "SELECT TraceId FROM traces WHERE EXISTS (SELECT 1 FROM spans)"],
       [
         "array, map and JSON access",
         "SELECT Tags[1], Attributes['model'], JSONExtractString(Metadata, 'k') FROM traces",
@@ -160,9 +151,9 @@ describe("validateLangWatchQL", () => {
     });
 
     it("refuses two statements in one submission", () => {
-      expect(
-        codesOf(validate("SELECT TraceId FROM traces; SELECT TraceId FROM spans")),
-      ).toEqual(["MULTIPLE_STATEMENTS"]);
+      expect(codesOf(validate("SELECT TraceId FROM traces; SELECT TraceId FROM spans"))).toEqual([
+        "MULTIPLE_STATEMENTS",
+      ]);
     });
 
     it("refuses text that is not SQL, and says where it stopped", () => {
@@ -294,11 +285,7 @@ describe("validateLangWatchQL", () => {
         "SELECT TraceId, count() AS n FROM traces GROUP BY TraceId HAVING max(body) != ''",
         "having",
       ],
-      [
-        "join",
-        "SELECT t.TraceId FROM traces AS t JOIN spans AS s ON t.body = s.TraceId",
-        "join",
-      ],
+      ["join", "SELECT t.TraceId FROM traces AS t JOIN spans AS s ON t.body = s.TraceId", "join"],
       ["window", "SELECT count() OVER (PARTITION BY body) FROM traces", "window"],
       [
         "subquery",
@@ -319,9 +306,7 @@ describe("validateLangWatchQL", () => {
     });
 
     it("refuses one reached through a table alias", () => {
-      expect(codesOf(validate("SELECT t.body FROM traces AS t"))).toContain(
-        "GATED_COLUMN",
-      );
+      expect(codesOf(validate("SELECT t.body FROM traces AS t"))).toContain("GATED_COLUMN");
     });
 
     /**
@@ -355,15 +340,10 @@ describe("validateLangWatchQL", () => {
       "refuses a parameter standing in for the withheld column %s",
       (gated) => {
         const bound = codesOf(validate("SELECT {c:Identifier} FROM traces"));
-        expect(
-          bound,
-          "a bound identifier reached the column position ungated",
-        ).not.toEqual([]);
+        expect(bound, "a bound identifier reached the column position ungated").not.toEqual([]);
         // The literal spelling is the control: if this stopped being refused,
         // the case above would pass for the wrong reason.
-        expect(codesOf(validate(`SELECT ${gated} FROM traces`))).toContain(
-          "GATED_COLUMN",
-        );
+        expect(codesOf(validate(`SELECT ${gated} FROM traces`))).toContain("GATED_COLUMN");
       },
     );
 
@@ -510,9 +490,9 @@ describe("validateLangWatchQL", () => {
     });
 
     it("records a USING join as the same column on both sides", () => {
-      expect(
-        blocksOf("SELECT TraceId FROM traces JOIN spans USING (TraceId)")[0]?.joins,
-      ).toEqual([{ left: "TraceId", right: "TraceId" }]);
+      expect(blocksOf("SELECT TraceId FROM traces JOIN spans USING (TraceId)")[0]?.joins).toEqual([
+        { left: "TraceId", right: "TraceId" },
+      ]);
     });
 
     /**
@@ -576,9 +556,7 @@ describe("validateLangWatchQL", () => {
     });
 
     it("gives every SELECT its own block, outermost first", () => {
-      const blocks = blocksOf(
-        "SELECT TraceId FROM (SELECT TraceId FROM traces GROUP BY TraceId)",
-      );
+      const blocks = blocksOf("SELECT TraceId FROM (SELECT TraceId FROM traces GROUP BY TraceId)");
 
       expect(blocks).toHaveLength(2);
       expect(blocks[0]).toMatchObject({ tables: [], hasGroupBy: false });
@@ -604,9 +582,7 @@ describe("validateLangWatchQL", () => {
     });
 
     it("gives each branch of a UNION its own block", () => {
-      const blocks = blocksOf(
-        "SELECT TraceId FROM traces UNION ALL SELECT count() FROM spans",
-      );
+      const blocks = blocksOf("SELECT TraceId FROM traces UNION ALL SELECT count() FROM spans");
 
       expect(blocks.map((block) => block.isAggregated)).toEqual([false, true]);
     });

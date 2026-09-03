@@ -184,14 +184,9 @@ describe("<SuiteRunConfirmationDialog/>", () => {
 
   describe("when using singular forms", () => {
     it("displays singular nouns for count of 1", () => {
-      render(
-        <SuiteRunConfirmationDialog
-          {...defaultProps}
-          scenarioCount={1}
-          targetCount={1}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteRunConfirmationDialog {...defaultProps} scenarioCount={1} targetCount={1} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("scenario")).toBeInTheDocument();
       expect(screen.getByText("target")).toBeInTheDocument();

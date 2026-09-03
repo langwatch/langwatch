@@ -10,7 +10,10 @@ import type {
   SessionGroupsQuery,
   SessionGroupsRepository,
 } from "../../repositories/session-groups.repository";
-import { decodeSessionGroupsCursor, encodeSessionGroupsCursor } from "../trace-session-groups-cursor.service";
+import {
+  decodeSessionGroupsCursor,
+  encodeSessionGroupsCursor,
+} from "../trace-session-groups-cursor.service";
 import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
 import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
 import { SessionGroupsService } from "../trace-session-groups.service";

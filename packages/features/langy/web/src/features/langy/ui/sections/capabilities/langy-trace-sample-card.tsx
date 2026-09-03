@@ -74,12 +74,7 @@ interface SampledTrace {
   isError: boolean;
 }
 
-export function LangyTraceSampleCard({
-  input,
-  output,
-  digest,
-  projectSlug,
-}: CapabilityCardInput) {
+export function LangyTraceSampleCard({ input, output, digest, projectSlug }: CapabilityCardInput) {
   const parsed = parseTraceSearch(output);
   const search = readTraceSearchQuery(input);
   const explorerHref = buildTraceExplorerHref({
@@ -138,10 +133,7 @@ export function LangyTraceSampleCard({
       {sample.length > 0 ? (
         <>
           {sample.map((trace) => (
-            <LangyContextTarget
-              key={trace.id}
-              target={traceContextChip(trace.id, trace.input)}
-            >
+            <LangyContextTarget key={trace.id} target={traceContextChip(trace.id, trace.input)}>
               <CapabilityRow
                 // Straight to the trace's drawer — the same URL-routed drawer the
                 // trace table opens, so a row here and a row there land in the
@@ -247,11 +239,7 @@ function HydratedTraceSampleCard({
     return (
       <TraceSampleShell
         {...shell}
-        title={
-          total !== null
-            ? headline({ total, shown: Math.min(expected, total) })
-            : "Traces"
-        }
+        title={total !== null ? headline({ total, shown: Math.min(expected, total) }) : "Traces"}
       >
         <LangyObservationState compact />
         <CapabilityRowSkeletons count={Math.max(expected, 1)} />
@@ -291,10 +279,7 @@ function HydratedTraceSampleCard({
   }
 
   return (
-    <TraceSampleShell
-      {...shell}
-      title={headline({ total, shown: hydration.rows.length })}
-    >
+    <TraceSampleShell {...shell} title={headline({ total, shown: hydration.rows.length })}>
       {hydration.rows.map((row) => (
         <LangyContextTarget key={row.id} target={traceContextChip(row.id, row.primary)}>
           <CapabilityRow

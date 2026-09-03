@@ -143,9 +143,7 @@ describe("replayMarkers", () => {
         aggKeys: ["t1:trace:a1"],
       });
 
-      expect(redis._ttls.get("projection-replay:cutoff:traceSummary")).toBe(
-        7 * 24 * 3600,
-      );
+      expect(redis._ttls.get("projection-replay:cutoff:traceSummary")).toBe(7 * 24 * 3600);
     });
 
     describe("when aggKeys is empty", () => {
@@ -401,9 +399,7 @@ describe("replayMarkers", () => {
 
         expect(entries).toHaveLength(1);
         expect(entries[0]).toMatchObject({ step: "error" });
-        expect(entries[0]!.error).toContain(
-          "failed to clear replay markers for failed batch",
-        );
+        expect(entries[0]!.error).toContain("failed to clear replay markers for failed batch");
         expect(entries[0]!.error).toContain("redis connection lost");
       });
     });

@@ -1,8 +1,7 @@
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
 import type { TeamRoleValue } from "./member-role-constraints";
 
-export const LITE_MEMBER_VIEWER_ONLY_ERROR =
-  "Lite Member users can only have Viewer team role";
+export const LITE_MEMBER_VIEWER_ONLY_ERROR = "Lite Member users can only have Viewer team role";
 
 export interface TeamRoleUpdate {
   teamId: string;
@@ -78,9 +77,7 @@ export function computeEffectiveTeamRoleUpdates(params: {
     return [
       ...requested,
       ...correctTo(
-        currentMemberships.filter(
-          (membership) => !requestedTeamIdSet.has(membership.teamId),
-        ),
+        currentMemberships.filter((membership) => !requestedTeamIdSet.has(membership.teamId)),
         TeamUserRole.VIEWER,
       ),
     ];

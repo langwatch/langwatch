@@ -19,10 +19,7 @@ import {
   OrganizationTrpcApi,
   type OrganizationTrpcPorts,
 } from "../../transport/api-trpc/organization.api";
-import {
-  OrganizationApp,
-  type OrganizationAppDependencies,
-} from "../organization.app";
+import { OrganizationApp, type OrganizationAppDependencies } from "../organization.app";
 
 type TestContext = {
   app: { organizations: OrganizationApp };

@@ -38,44 +38,44 @@ const {
 }));
 
 const mockApi = {
-    useUtils: () => ({
-      organization: {
-        getAll: {
-          invalidate: mockInvalidate,
-        },
+  useUtils: () => ({
+    organization: {
+      getAll: {
+        invalidate: mockInvalidate,
       },
-      modelProvider: {
-        getAllForProject: { invalidate: vi.fn() },
-        getAllForProjectForFrontend: { invalidate: vi.fn() },
-        listAllForProjectForFrontend: { invalidate: vi.fn() },
-        listAllForOrganizationForFrontend: {
-          invalidate: mockListAllForOrgInvalidate,
-        },
-        getResolvedDefault: { invalidate: vi.fn() },
-        getDefaultModelsForProject: {
-          invalidate: mockDefaultModelsInvalidate,
-        },
-      },
-    }),
+    },
     modelProvider: {
-      update: {
-        useMutation: () => ({
-          mutateAsync: mockUpdateMutateAsync,
-        }),
+      getAllForProject: { invalidate: vi.fn() },
+      getAllForProjectForFrontend: { invalidate: vi.fn() },
+      listAllForProjectForFrontend: { invalidate: vi.fn() },
+      listAllForOrganizationForFrontend: {
+        invalidate: mockListAllForOrgInvalidate,
       },
-      setRoleAssignmentForScope: {
-        useMutation: () => ({
-          mutateAsync: mockSetRoleAssignmentMutateAsync,
-        }),
-      },
-    },
-    project: {
-      updateProjectDefaultModels: {
-        useMutation: () => ({
-          mutateAsync: mockUpdateProjectDefaultModelsMutateAsync,
-        }),
+      getResolvedDefault: { invalidate: vi.fn() },
+      getDefaultModelsForProject: {
+        invalidate: mockDefaultModelsInvalidate,
       },
     },
+  }),
+  modelProvider: {
+    update: {
+      useMutation: () => ({
+        mutateAsync: mockUpdateMutateAsync,
+      }),
+    },
+    setRoleAssignmentForScope: {
+      useMutation: () => ({
+        mutateAsync: mockSetRoleAssignmentMutateAsync,
+      }),
+    },
+  },
+  project: {
+    updateProjectDefaultModels: {
+      useMutation: () => ({
+        mutateAsync: mockUpdateProjectDefaultModelsMutateAsync,
+      }),
+    },
+  },
 };
 
 // Getters, so the factory reads the map after this module has initialised it:
@@ -147,9 +147,7 @@ function renderSubmitHook({
   getAdvancedPayload,
 }: {
   snapshot: FormSnapshot;
-  getAdvancedPayload?: Parameters<
-    typeof useProviderFormSubmit
-  >[0]["getAdvancedPayload"];
+  getAdvancedPayload?: Parameters<typeof useProviderFormSubmit>[0]["getAdvancedPayload"];
 }) {
   return renderHook(() =>
     useProviderFormSubmit({
@@ -181,9 +179,7 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(
-          mockUpdateProjectDefaultModelsMutateAsync,
-        ).not.toHaveBeenCalled();
+        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
       });
 
       it("creates an error toast", async () => {
@@ -197,9 +193,7 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(mockToasterCreate).toHaveBeenCalledWith(
-          expect.objectContaining({ type: "error" }),
-        );
+        expect(mockToasterCreate).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
       });
     });
 
@@ -215,9 +209,7 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(
-          mockUpdateProjectDefaultModelsMutateAsync,
-        ).not.toHaveBeenCalled();
+        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
       });
 
       it("creates an error toast", async () => {
@@ -231,9 +223,7 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(mockToasterCreate).toHaveBeenCalledWith(
-          expect.objectContaining({ type: "error" }),
-        );
+        expect(mockToasterCreate).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
       });
     });
 
@@ -256,9 +246,7 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(
-          mockUpdateProjectDefaultModelsMutateAsync,
-        ).not.toHaveBeenCalled();
+        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
       });
     });
   });
@@ -605,9 +593,7 @@ describe("useProviderFormSubmit()", () => {
 
         const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
         expect(payload?.customKeys).toBeUndefined();
-        expect(payload?.extraHeaders).toEqual([
-          { key: "api-key", value: "header-secret" },
-        ]);
+        expect(payload?.extraHeaders).toEqual([{ key: "api-key", value: "header-secret" }]);
       });
     });
 

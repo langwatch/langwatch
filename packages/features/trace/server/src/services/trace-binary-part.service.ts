@@ -30,8 +30,7 @@ export const binaryInputPartSchema = z
       return present === 1;
     },
     {
-      message:
-        "binary part must carry exactly one of data, url, or id (got zero or more than one)",
+      message: "binary part must carry exactly one of data, url, or id (got zero or more than one)",
     },
   );
 

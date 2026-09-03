@@ -65,9 +65,7 @@ describe("BillableEventsMeterClickHouseRepository", () => {
     describe("when a billable event is inserted", () => {
       it("propagates the error", async () => {
         resolveClient.mockResolvedValue({ insert: mockClickHouseInsert });
-        mockClickHouseInsert.mockRejectedValue(
-          new Error("ClickHouse connection timeout"),
-        );
+        mockClickHouseInsert.mockRejectedValue(new Error("ClickHouse connection timeout"));
         const repository = BillableEventsMeterClickHouseRepository.create({ resolveClient });
 
         await expect(

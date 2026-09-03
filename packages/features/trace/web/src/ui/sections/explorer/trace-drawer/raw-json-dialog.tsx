@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Icon,
-  Input,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { LuCheck, LuCopy, LuMinus, LuSearch, LuWrapText, LuX } from "react-icons/lu";
 import { useColorMode } from "@langwatch/design-system/color-mode";
@@ -62,13 +53,9 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
     setSearch("");
   }, [tab]);
 
-  const traceJson = useMemo(
-    () => JSON.stringify(trace, null, pretty ? 2 : 0),
-    [trace, pretty],
-  );
+  const traceJson = useMemo(() => JSON.stringify(trace, null, pretty ? 2 : 0), [trace, pretty]);
   const spansJson = useMemo(
-    () =>
-      spansQuery.data ? JSON.stringify(spansQuery.data, null, pretty ? 2 : 0) : null,
+    () => (spansQuery.data ? JSON.stringify(spansQuery.data, null, pretty ? 2 : 0) : null),
     [spansQuery.data, pretty],
   );
 
@@ -94,8 +81,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
   const charCount = useMemo(() => fullPayload.length, [fullPayload]);
   const lineCount = useMemo(() => fullPayload.split("\n").length, [fullPayload]);
   const matchedLines = useMemo(
-    () =>
-      search ? (visiblePayload === "" ? 0 : visiblePayload.split("\n").length) : null,
+    () => (search ? (visiblePayload === "" ? 0 : visiblePayload.split("\n").length) : null),
     [visiblePayload, search],
   );
 
@@ -187,13 +173,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
           </VStack>
           <Dialog.CloseTrigger />
         </Dialog.Header>
-        <Dialog.Body
-          padding={0}
-          overflow="hidden"
-          display="flex"
-          flexDirection="column"
-          flex={1}
-        >
+        <Dialog.Body padding={0} overflow="hidden" display="flex" flexDirection="column" flex={1}>
           {tab === "spans" && spansQuery.isLoading ? (
             <VStack gap={2} paddingY={8} flex={1} justify="center">
               <Spinner size="sm" color="blue.fg" />
@@ -206,11 +186,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
               <Text textStyle="xs" color="fg.muted">
                 Failed to load spans
               </Text>
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => void spansQuery.refetch()}
-              >
+              <Button size="xs" variant="outline" onClick={() => void spansQuery.refetch()}>
                 Retry
               </Button>
             </VStack>
@@ -245,12 +221,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
                     }
               }
             >
-              <ShikiCodeBlock
-                code={visiblePayload}
-                language="json"
-                colorMode={colorMode}
-                flush
-              />
+              <ShikiCodeBlock code={visiblePayload} language="json" colorMode={colorMode} flush />
             </Box>
           )}
         </Dialog.Body>
@@ -335,11 +306,7 @@ function CopyButton({ payload, disabled }: { payload: string; disabled?: boolean
       aria-label="Copy raw JSON"
       gap={1.5}
     >
-      <Icon
-        as={copied ? LuCheck : LuCopy}
-        boxSize={3}
-        color={copied ? "green.fg" : "fg.subtle"}
-      />
+      <Icon as={copied ? LuCheck : LuCopy} boxSize={3} color={copied ? "green.fg" : "fg.subtle"} />
       <Text textStyle="2xs" color="fg.muted">
         {copied ? "Copied" : "Copy"}
       </Text>

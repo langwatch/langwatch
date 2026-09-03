@@ -162,8 +162,7 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
   const handleInputMappingsChange = useCallback(
     (identifier: string, mapping: FieldMapping | undefined) => {
       const workflow = getWorkflow();
-      const currentInputs =
-        workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+      const currentInputs = workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
       const result = applyMappingChange({
         nodeId: node.id,
         identifier,

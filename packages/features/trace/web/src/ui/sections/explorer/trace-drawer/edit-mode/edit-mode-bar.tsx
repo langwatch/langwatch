@@ -139,9 +139,7 @@ function useSaveTraceEdit({ traceId }: { traceId: string }) {
           { staleTime: 0 },
         );
         if (latest?.patch) {
-          useTraceEditStore
-            .getState()
-            .rebaseBasePatch({ traceId, basePatch: latest.patch });
+          useTraceEditStore.getState().rebaseBasePatch({ traceId, basePatch: latest.patch });
         }
         return true;
       } catch (error) {
@@ -316,8 +314,8 @@ function DiscardTraceEditsDialog({
         </Dialog.Header>
         <Dialog.Body>
           <Text textStyle="sm" color="fg.muted">
-            Your corrections to this trace have not been saved. Comments are saved as you
-            write them and are not discarded.
+            Your corrections to this trace have not been saved. Comments are saved as you write them
+            and are not discarded.
           </Text>
         </Dialog.Body>
         <Dialog.Footer>

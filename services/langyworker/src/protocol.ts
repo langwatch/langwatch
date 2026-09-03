@@ -23,11 +23,7 @@ export type AbortCommand = { type: "abort"; turnId: string };
 export type ShutdownImminentCommand = { type: "shutdown_imminent"; deadlineMs: number };
 export type PingCommand = { type: "ping" };
 
-export type ManagerCommand =
-  | TurnCommand
-  | AbortCommand
-  | ShutdownImminentCommand
-  | PingCommand;
+export type ManagerCommand = TurnCommand | AbortCommand | ShutdownImminentCommand | PingCommand;
 
 /**
  * Parse one stdin line into a command. Returns undefined for unparseable or
@@ -45,11 +41,7 @@ export function parseCommand(line: string): ManagerCommand | undefined {
   const cmd = value as Record<string, unknown>;
   switch (cmd.type) {
     case "turn":
-      if (
-        typeof cmd.turnId !== "string" ||
-        cmd.turnId === "" ||
-        typeof cmd.prompt !== "string"
-      ) {
+      if (typeof cmd.turnId !== "string" || cmd.turnId === "" || typeof cmd.prompt !== "string") {
         return undefined;
       }
       return {
@@ -182,13 +174,7 @@ export function boundJsonValue({
 }
 
 /** Byte-accurate truncation that never splits a code point. */
-export function truncateToBytes({
-  text,
-  maxBytes,
-}: {
-  text: string;
-  maxBytes: number;
-}): string {
+export function truncateToBytes({ text, maxBytes }: { text: string; maxBytes: number }): string {
   if (maxBytes <= 0) return "";
   const buffer = Buffer.from(text, "utf8");
   if (buffer.byteLength <= maxBytes) return text;

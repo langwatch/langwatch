@@ -40,8 +40,7 @@ const BASE = process.env.BASE_URL ?? "http://localhost:5560";
 const EMAIL = process.env.DOGFOOD_USER_EMAIL ?? "dogfood@langwatch.local";
 const PASSWORD = process.env.DOGFOOD_PASSWORD ?? "DogfoodPassword!2026";
 const OUT = resolve(
-  process.env.OUT_DIR ??
-    resolve(__dirname, "../../../.claude/dogfood-evidence/trace-walkthrough"),
+  process.env.OUT_DIR ?? resolve(__dirname, "../../../.claude/dogfood-evidence/trace-walkthrough"),
 );
 mkdirSync(OUT, { recursive: true });
 
@@ -135,10 +134,7 @@ async function login(page) {
           await page.waitForTimeout(2000);
           await shot(page, `21-${idx}-trace-detail-attrs-${tid.slice(0, 8)}`);
           await page.screenshot({
-            path: resolve(
-              OUT,
-              `21-${idx}-trace-detail-attrs-${tid.slice(0, 8)}-full.png`,
-            ),
+            path: resolve(OUT, `21-${idx}-trace-detail-attrs-${tid.slice(0, 8)}-full.png`),
             fullPage: true,
           });
         } catch (e) {

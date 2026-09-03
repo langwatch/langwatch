@@ -65,9 +65,7 @@ describe("the turn projection in the store", () => {
     });
 
     it("never clobbers a tab that is mid-send on its own turn", () => {
-      useLangyStore
-        .getState()
-        .beginTurn({ conversationId: "conv-1", turnId: "turn-mine" });
+      useLangyStore.getState().beginTurn({ conversationId: "conv-1", turnId: "turn-mine" });
       useLangyStore.getState().seedTurnProjection({
         cursor: { acceptedAt: 100, eventId: "e1" },
         currentTurnId: "turn-other",
@@ -96,9 +94,7 @@ describe("the turn projection in the store", () => {
     it("confirms the phase and adopts the turn id", () => {
       useLangyStore
         .getState()
-        .applyTurnEvents([
-          accepted({ id: "e1", createdAt: 100, turnId: "turn-foreign" }),
-        ]);
+        .applyTurnEvents([accepted({ id: "e1", createdAt: 100, turnId: "turn-foreign" })]);
       const state = useLangyStore.getState();
       expect(state.turnPhase).toBe("active");
       expect(state.activeTurnId).toBe("turn-foreign");
@@ -117,9 +113,7 @@ describe("the turn projection in the store", () => {
       // Another tab (or a re-drive) starts a different turn afterwards.
       useLangyStore
         .getState()
-        .applyTurnEvents([
-          accepted({ id: "e3", createdAt: 300, turnId: "turn-foreign" }),
-        ]);
+        .applyTurnEvents([accepted({ id: "e3", createdAt: 300, turnId: "turn-foreign" })]);
       const state = useLangyStore.getState();
       expect(state.turnPhase).toBe("active");
       expect(state.activeTurnId).toBe("turn-foreign");

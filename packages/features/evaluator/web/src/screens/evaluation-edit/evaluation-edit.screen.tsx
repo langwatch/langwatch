@@ -172,9 +172,7 @@ export default function EditTraceCheck() {
           ) : check.isError ? (
             <Alert.Root status="error">
               <Alert.Indicator />
-              <Alert.Content>
-                An error has occurred trying to load the check configs
-              </Alert.Content>
+              <Alert.Content>An error has occurred trying to load the check configs</Alert.Content>
             </Alert.Root>
           ) : (
             <CheckConfigForm

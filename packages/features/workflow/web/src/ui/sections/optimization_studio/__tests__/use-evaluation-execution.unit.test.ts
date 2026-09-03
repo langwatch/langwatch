@@ -39,7 +39,6 @@ vi.mock("../use-post-event", () => ({
   }),
 }));
 
-
 vi.mock("../../../../behavior/studio-host/toaster", () => ({
   toaster: { create: vi.fn() },
 }));

@@ -100,10 +100,7 @@ interface InstallReport {
   env_block: string[];
 }
 
-export async function installCommand(
-  toolArg: string,
-  options: InstallOptions = {},
-): Promise<void> {
+export async function installCommand(toolArg: string, options: InstallOptions = {}): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
     process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
@@ -113,9 +110,7 @@ export async function installCommand(
 
   const tool = normaliseTool(toolArg);
   if (!tool) {
-    process.stderr.write(
-      `Unknown tool '${toolArg}'. Supported: ${SUPPORTED_TOOLS.join(", ")}.\n`,
-    );
+    process.stderr.write(`Unknown tool '${toolArg}'. Supported: ${SUPPORTED_TOOLS.join(", ")}.\n`);
     process.exit(1);
     return;
   }
@@ -135,9 +130,7 @@ export async function installCommand(
 
 function normaliseTool(raw: string): SupportedTool | null {
   const slug = raw.trim().toLowerCase().replace(/-/g, "_");
-  return (SUPPORTED_TOOLS as readonly string[]).includes(slug)
-    ? (slug as SupportedTool)
-    : null;
+  return (SUPPORTED_TOOLS as readonly string[]).includes(slug) ? (slug as SupportedTool) : null;
 }
 
 async function runInstall(
@@ -153,12 +146,13 @@ async function runInstall(
   // fresh. The SupportedTool slug doubles as the source_type the mint route
   // expects (claude_code / codex / gemini / opencode); the config keys the
   // pin by CLI tool slug, so read that back off the source type.
-  const { token, prefix, endpoint, minted, scope, projectLabel } =
-    await resolveIngestionCredential({
+  const { token, prefix, endpoint, minted, scope, projectLabel } = await resolveIngestionCredential(
+    {
       cfg,
       tool: TOOL_BY_SOURCE_TYPE[tool] ?? tool,
       sourceType: tool,
-    });
+    },
+  );
   const envBlock = buildEnvBlock(tool, endpoint, token);
 
   // A fresh mint revokes the tool's previous key, so the config cache is now
@@ -328,9 +322,7 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
 }
 
 function renderHumanReport(report: InstallReport): void {
-  process.stdout.write(
-    `${chalk.green("✓")} Minted ingestion key for ${chalk.bold(report.tool)}\n`,
-  );
+  process.stdout.write(`${chalk.green("✓")} Minted ingestion key for ${chalk.bold(report.tool)}\n`);
   process.stdout.write(`  endpoint: ${report.endpoint}\n`);
   process.stdout.write(`  token:    ${report.ingestion_token}\n`);
 
@@ -350,9 +342,7 @@ function renderHumanReport(report: InstallReport): void {
   ) {
     const pluginVerb =
       report.claude_plugin_action === "installed" ? "installed" : "already up to date";
-    process.stdout.write(
-      `${chalk.green("✓")} LangWatch Claude Code plugin ${pluginVerb}\n`,
-    );
+    process.stdout.write(`${chalk.green("✓")} LangWatch Claude Code plugin ${pluginVerb}\n`);
   }
 
   if (report.codex_turn_harvest_action === "installed") {
@@ -369,9 +359,7 @@ function renderHumanReport(report: InstallReport): void {
         ? "already up to date"
         : report.session_hooks_action;
     const what = report.tool === "opencode" ? "session plugin" : "session hooks";
-    process.stdout.write(
-      `${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`,
-    );
+    process.stdout.write(`${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`);
   }
 
   process.stdout.write("\nAdd to your shell rc (or run in this shell):\n");

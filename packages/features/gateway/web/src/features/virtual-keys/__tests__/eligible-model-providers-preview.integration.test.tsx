@@ -40,9 +40,7 @@ const TEAM_ID = "team-platform";
 const PROJECT_ID = "project-doc-chat";
 
 const availableTeams = [{ id: TEAM_ID, name: "developers" }];
-const availableProjects = [
-  { id: PROJECT_ID, name: "Doc Chat · developers", teamId: TEAM_ID },
-];
+const availableProjects = [{ id: PROJECT_ID, name: "Doc Chat · developers", teamId: TEAM_ID }];
 const projectScope = [{ scopeType: "PROJECT" as const, scopeId: PROJECT_ID }];
 
 const orgProvider: OrgModelProvider = {
@@ -219,10 +217,7 @@ describe("given the eligible model providers summary at a project scope", () => 
   describe("when a withdrawn provider is in scope", () => {
     /** @scenario A provider an admin turned off is not offered to a new key */
     it("leaves it out of the count", () => {
-      const { container } = renderSummary([
-        orgProvider,
-        { ...projectProvider, enabled: false },
-      ]);
+      const { container } = renderSummary([orgProvider, { ...projectProvider, enabled: false }]);
 
       expect(container.textContent).toContain("1 provider");
       expect(container.textContent).not.toContain("2 providers");

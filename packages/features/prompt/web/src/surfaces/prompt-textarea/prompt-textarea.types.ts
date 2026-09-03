@@ -39,11 +39,7 @@ export type PromptTextAreaWithVariablesProps = {
    * Called when a user selects a field from another node (otherNodesFields).
    * Returns the new handle name that was created (may differ from field if handle already exists).
    */
-  onAddEdge?: (
-    nodeId: string,
-    field: string,
-    content: PromptTextAreaOnAddMention,
-  ) => string | void;
+  onAddEdge?: (nodeId: string, field: string, content: PromptTextAreaOnAddMention) => string | void;
   /**
    * Legacy: fields from other nodes in optimization studio.
    * Each key is a nodeId, value is array of field names.

@@ -93,9 +93,7 @@ describe("ProjectionRouter subscriber dispatch over a coalesced batch", () => {
     router.registerSubscriber("counter", subscriber);
     router.initializeFoldQueues();
 
-    const initialize = queueManager.initializeProjectionQueues as ReturnType<
-      typeof vi.fn
-    >;
+    const initialize = queueManager.initializeProjectionQueues as ReturnType<typeof vi.fn>;
     const onEventBatch = initialize.mock.calls[0]?.[2] as (
       projectionName: string,
       events: Event[],

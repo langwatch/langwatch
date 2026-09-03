@@ -69,9 +69,7 @@ export const buildAuthHeaders = ({
     if (resolvedProjectId) {
       // Basic Auth is the canonical carrier — the server extracts both
       // the project and the token from one header.
-      const encoded = Buffer.from(`${resolvedProjectId}:${apiKey}`, "utf-8").toString(
-        "base64",
-      );
+      const encoded = Buffer.from(`${resolvedProjectId}:${apiKey}`, "utf-8").toString("base64");
       return { authorization: `Basic ${encoded}` };
     }
 

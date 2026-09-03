@@ -54,8 +54,8 @@ describe("DatasetService", () => {
       repository: new Repo(),
       records: new Records(),
     });
-    await expect(
-      service.getBySlugOrId({ projectId: "p1", slugOrId: "d1" }),
-    ).resolves.toMatchObject({ id: "d1" });
+    await expect(service.getBySlugOrId({ projectId: "p1", slugOrId: "d1" })).resolves.toMatchObject(
+      { id: "d1" },
+    );
   });
 });

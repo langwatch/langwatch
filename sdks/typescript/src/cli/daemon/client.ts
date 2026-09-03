@@ -115,9 +115,7 @@ interface PendingChunk {
  * stale socket, a refused handshake, a daemon that died mid-command before
  * committing output. The caller runs the command in-process in all of them.
  */
-export async function execViaDaemon(
-  options: DaemonExecOptions,
-): Promise<DaemonExecOutcome> {
+export async function execViaDaemon(options: DaemonExecOptions): Promise<DaemonExecOutcome> {
   const stdout = options.stdout ?? process.stdout;
   const stderr = options.stderr ?? process.stderr;
   const maxBufferBytes = options.maxBufferBytes ?? DEFAULT_MAX_BUFFER_BYTES;

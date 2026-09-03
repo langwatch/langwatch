@@ -42,17 +42,10 @@ export type RunMergePlan =
 
 type MergePlan = Extract<RunMergePlan, { mode: "merge" }>;
 
-const cellKey = ({
-  rowIndex,
-  targetId,
-}: {
-  rowIndex: number;
-  targetId: string;
-}): string => `${rowIndex}:${targetId}`;
+const cellKey = ({ rowIndex, targetId }: { rowIndex: number; targetId: string }): string =>
+  `${rowIndex}:${targetId}`;
 
-const parseCellKey = (
-  key: string,
-): { rowIndex: number; targetId: string } | null => {
+const parseCellKey = (key: string): { rowIndex: number; targetId: string } | null => {
   const separator = key.indexOf(":");
   if (separator < 0) return null;
   const rowIndex = Number(key.slice(0, separator));
@@ -175,8 +168,7 @@ const applyTargetResult = ({
     // The failure, not the sentence: the engine's raw string in `errors` and
     // the failure's code beside it, exactly as a browser run stores it. The
     // cell derives what the customer reads from the code.
-    rowsOf(draft.errors, event.targetId)[event.rowIndex] =
-      event.error ?? UNNAMED_FAILURE;
+    rowsOf(draft.errors, event.targetId)[event.rowIndex] = event.error ?? UNNAMED_FAILURE;
     metadata[event.rowIndex] = {
       ...(metadata[event.rowIndex] ?? {}),
       ...(event.domainError ? { domainError: event.domainError } : {}),
@@ -224,9 +216,7 @@ const cloneRows = <T>(rows: Record<string, T[]> | undefined) => {
   return copy;
 };
 
-const cloneEvaluatorRows = (
-  rows: Record<string, Record<string, unknown[]>> | undefined,
-) => {
+const cloneEvaluatorRows = (rows: Record<string, Record<string, unknown[]>> | undefined) => {
   const copy: Record<string, Record<string, unknown[]>> = {};
   for (const [targetId, byEvaluator] of Object.entries(rows ?? {})) {
     copy[targetId] = cloneRows(byEvaluator);
@@ -240,10 +230,7 @@ const cloneEvaluatorRows = (
  * Only the row indexes the run filled are copied: a row array is sparse by
  * design, and a run of two rows must not blank the rest of the column.
  */
-const overlayRows = <T>(
-  into: Record<string, T[]>,
-  from: Record<string, T[]>,
-): void => {
+const overlayRows = <T>(into: Record<string, T[]>, from: Record<string, T[]>): void => {
   for (const [key, rows] of Object.entries(from)) {
     const target = rowsOf(into, key);
     for (const index of Object.keys(rows)) {
@@ -314,10 +301,7 @@ const clearCoveredCell = ({
  * Refuses a cell the run covers itself: that cell is about to be produced, and
  * a carried copy of it would be the stale half of the same position.
  */
-type OpenCarriedCell = (args: {
-  rowIndex: number;
-  targetId: string;
-}) => CarriedOverCell | null;
+type OpenCarriedCell = (args: { rowIndex: number; targetId: string }) => CarriedOverCell | null;
 
 const carryOutputs = ({
   results,
@@ -358,9 +342,7 @@ const carryVerdicts = ({
   results: PersistedResults;
   openCell: OpenCarriedCell;
 }): void => {
-  for (const [targetId, byEvaluator] of Object.entries(
-    results.evaluatorResults,
-  )) {
+  for (const [targetId, byEvaluator] of Object.entries(results.evaluatorResults)) {
     for (const [evaluatorId, verdicts] of Object.entries(byEvaluator)) {
       verdicts.forEach((result, rowIndex) => {
         if (result === undefined || result === null) return;
@@ -467,9 +449,7 @@ export const mergeRunResults = ({
   const runId = draft.runId ?? existing?.runId;
   const identity = {
     ...(runId !== undefined ? { runId } : {}),
-    ...(existing?.versionId !== undefined
-      ? { versionId: existing.versionId }
-      : {}),
+    ...(existing?.versionId !== undefined ? { versionId: existing.versionId } : {}),
   };
 
   if (plan.mode === "replace") {
@@ -495,9 +475,7 @@ export const mergeRunResults = ({
   overlayRows(merged.targetOutputs, draft.targetOutputs);
   overlayRows(merged.targetMetadata, draft.targetMetadata);
   overlayRows(merged.errors, draft.errors);
-  for (const [targetId, byEvaluator] of Object.entries(
-    draft.evaluatorResults,
-  )) {
+  for (const [targetId, byEvaluator] of Object.entries(draft.evaluatorResults)) {
     const target = merged.evaluatorResults[targetId] ?? {};
     merged.evaluatorResults[targetId] = target;
     overlayRows(target, byEvaluator);

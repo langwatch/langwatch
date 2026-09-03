@@ -74,18 +74,14 @@ export const setModelDefaultCommand = async (
   await resolveCredentials();
 
   const service = new ModelDefaultsApiService();
-  const spinner = createSpinner(
-    `Setting ${chalk.cyan(key)} → ${chalk.green(model)}...`,
-  ).start();
+  const spinner = createSpinner(`Setting ${chalk.cyan(key)} → ${chalk.green(model)}...`).start();
 
   try {
     const snapshot = await service.getSnapshot();
     const target = resolveScope(options, snapshot.scope);
 
     const existing = snapshot.configs
-      .filter((c) =>
-        c.scopes.some((s) => s.type === target.scopeType && s.id === target.scopeId),
-      )
+      .filter((c) => c.scopes.some((s) => s.type === target.scopeType && s.id === target.scopeId))
       .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
 
     const current = existing[0];

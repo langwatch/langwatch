@@ -75,10 +75,9 @@ def main():
 LangWatch computes TTFT as `first_token_at - started_at`. You don't need to set `started_at` or `finished_at`, those fall back to the span's own start and end times.
 
 <Warning>
-  Assigning to the dict directly, e.g.
-  `langwatch.get_current_span().timestamps["first_token_at"] = ...`, does **not** work.
-  The timestamps are only exported to the underlying OpenTelemetry span when they go
-  through `update(timestamps=...)`.
+  Assigning to the dict directly, e.g. `langwatch.get_current_span().timestamps["first_token_at"] =
+  ...`, does **not** work. The timestamps are only exported to the underlying OpenTelemetry span
+  when they go through `update(timestamps=...)`.
 </Warning>
 
 ### If you already have the duration
@@ -118,10 +117,7 @@ If you send spans through the [REST API](/integration/rest-api) instead of the S
 On the Traces page, open the columns picker (the columns icon in the toolbar) and enable **TTFT**. The column behaves like the Duration column: each cell shows the value plus an inline bar scaled to the 95th percentile of the visible page, so one slow outlier doesn't flatten every other row. Rows at or above the page's TTFT p95 render a full red bar.
 
 <Frame>
-  <img
-    src="/images/ttft/ttft-enable-column.png"
-    alt="Columns picker with the TTFT column"
-  />
+  <img src="/images/ttft/ttft-enable-column.png" alt="Columns picker with the TTFT column" />
 </Frame>
 
 Hovering a cell shows how that trace compares against the page's TTFT p95:
@@ -140,10 +136,7 @@ The column is sortable, so you can order by TTFT to chase your slowest streaming
 The trace drawer shows a TTFT pill in the header next to duration, cost, and tokens:
 
 <Frame>
-  <img
-    src="/images/ttft/ttft-drawer.png"
-    alt="Trace drawer header showing the TTFT pill"
-  />
+  <img src="/images/ttft/ttft-drawer.png" alt="Trace drawer header showing the TTFT pill" />
 </Frame>
 
 ### Analytics

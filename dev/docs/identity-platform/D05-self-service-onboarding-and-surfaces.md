@@ -92,7 +92,7 @@ them re-opened by the implementation:
      all — the only thing left that needs them is somebody completing a test
      sign-in, which is the entire point of a test sign-in. Attestation is a
      D04 amendment (below). This is the bulk of the value: it is what makes
-     cloud onboarding easy for *us*, and it is the safety net that ends DB
+     cloud onboarding easy for _us_, and it is the safety net that ends DB
      surgery.
    - **Tier 2 — self-hosted self-serve, licence-gated.** A self-hosted
      customer cannot reach our operators at all, so they self-serve or they

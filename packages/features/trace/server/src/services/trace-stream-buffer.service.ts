@@ -20,10 +20,7 @@ export class StreamTooLargeError extends Error {
  * letting an oversized object exhaust memory. Omit it only when the source is
  * already size-bounded upstream.
  */
-export async function streamToBuffer(
-  stream: Readable,
-  maxBytes?: number,
-): Promise<Buffer> {
+export async function streamToBuffer(stream: Readable, maxBytes?: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of stream) {

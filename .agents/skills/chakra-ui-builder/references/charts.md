@@ -16,8 +16,8 @@ yarn add @chakra-ui/charts recharts
 Imports come from `@chakra-ui/charts`, not `@chakra-ui/react`:
 
 ```ts
-import { BarList, BarSegment, Chart, useChart } from "@chakra-ui/charts"
-import type { BarListData, BarSegmentData } from "@chakra-ui/charts"
+import { BarList, BarSegment, Chart, useChart } from "@chakra-ui/charts";
+import type { BarListData, BarSegmentData } from "@chakra-ui/charts";
 ```
 
 ---
@@ -60,22 +60,22 @@ const chart = useChart({
 **Color type** — accepts any Chakra color token or CSS color:
 
 ```ts
-type ChartColor = Tokens["colors"] | CSSProperties["color"]
+type ChartColor = Tokens["colors"] | CSSProperties["color"];
 // "teal.solid" | "blue.subtle" | "red.500" | "#FF0000" | "hsl(...)"
 ```
 
 **Useful return values:**
 
 ```ts
-chart.data // sorted data array
-chart.series // resolved series config
-chart.color("teal.solid") // resolves token → CSS color
-chart.key("revenue") // safe key accessor
-chart.formatNumber({ notation: "compact" })(1234567) // "1.2M"
-chart.formatDate({ month: "short" })("2024-01-15") // locale-aware
-chart.getTotal("revenue") // sum all values
-chart.getMin("revenue") / chart.getMax("revenue")
-chart.getValuePercent("revenue", value) // % of total
+chart.data; // sorted data array
+chart.series; // resolved series config
+chart.color("teal.solid"); // resolves token → CSS color
+chart.key("revenue"); // safe key accessor
+chart.formatNumber({ notation: "compact" })(1234567); // "1.2M"
+chart.formatDate({ month: "short" })("2024-01-15"); // locale-aware
+chart.getTotal("revenue"); // sum all values
+chart.getMin("revenue") / chart.getMax("revenue");
+chart.getValuePercent("revenue", value); // % of total
 ```
 
 ---
@@ -89,16 +89,16 @@ sources, top items.
 
 ```ts
 interface BarListData {
-  name: string // label shown on the bar
-  value: number // determines bar width
-  href?: string // optional link
+  name: string; // label shown on the bar
+  value: number; // determines bar width
+  href?: string; // optional link
 }
 ```
 
 **Basic example:**
 
 ```tsx
-import { BarList, type BarListData, useChart } from "@chakra-ui/charts"
+import { BarList, type BarListData, useChart } from "@chakra-ui/charts";
 
 const chart = useChart<BarListData>({
   data: [
@@ -109,7 +109,7 @@ const chart = useChart<BarListData>({
   ],
   sort: { by: "value", direction: "desc" },
   series: [{ name: "name", color: "teal.subtle" }],
-})
+});
 
 return (
   <BarList.Root chart={chart}>
@@ -122,7 +122,7 @@ return (
       </BarList.Label>
     </BarList.Content>
   </BarList.Root>
-)
+);
 ```
 
 **With a custom value formatter:**
@@ -157,16 +157,16 @@ is split across categories (budget, traffic, inventory).
 
 ```ts
 interface BarSegmentData {
-  name: string // segment label
-  value: number // determines segment width
-  color: string // Chakra color token for this segment
+  name: string; // segment label
+  value: number; // determines segment width
+  color: string; // Chakra color token for this segment
 }
 ```
 
 **Basic example:**
 
 ```tsx
-import { BarSegment, useChart } from "@chakra-ui/charts"
+import { BarSegment, useChart } from "@chakra-ui/charts";
 
 const chart = useChart({
   data: [
@@ -176,7 +176,7 @@ const chart = useChart({
     { name: "LinkedIn", value: 50_000, color: "orange.solid" },
   ],
   sort: { by: "value", direction: "desc" },
-})
+});
 
 return (
   <BarSegment.Root chart={chart}>
@@ -187,7 +187,7 @@ return (
     </BarSegment.Content>
     <BarSegment.Legend showPercent showValue />
   </BarSegment.Root>
-)
+);
 ```
 
 **With a reference line (e.g. target):**
@@ -209,16 +209,8 @@ components — `BarChart`, `AreaChart`, `LineChart`, `PieChart`, etc.
 ### Bar chart
 
 ```tsx
-import { Chart, useChart } from "@chakra-ui/charts"
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+import { Chart, useChart } from "@chakra-ui/charts";
+import { Bar, BarChart, CartesianGrid, Legend, Tooltip, XAxis, YAxis } from "recharts";
 
 const chart = useChart({
   data: [
@@ -230,7 +222,7 @@ const chart = useChart({
     { name: "revenue", color: "teal.solid" },
     { name: "expenses", color: "orange.solid" },
   ],
-})
+});
 
 return (
   <Chart.Root maxH="sm" chart={chart}>
@@ -250,13 +242,13 @@ return (
       ))}
     </BarChart>
   </Chart.Root>
-)
+);
 ```
 
 ### Area chart
 
 ```tsx
-import { Area, AreaChart, CartesianGrid, Tooltip, XAxis } from "recharts"
+import { Area, AreaChart, CartesianGrid, Tooltip, XAxis } from "recharts";
 
 return (
   <Chart.Root maxH="sm" chart={chart}>
@@ -287,13 +279,13 @@ return (
       ))}
     </AreaChart>
   </Chart.Root>
-)
+);
 ```
 
 ### Pie / donut chart
 
 ```tsx
-import { Pie, PieChart, Tooltip } from "recharts"
+import { Pie, PieChart, Tooltip } from "recharts";
 
 const chart = useChart({
   data: [
@@ -303,7 +295,7 @@ const chart = useChart({
     { browser: "Edge", visitors: 80, color: "purple.solid" },
   ],
   series: [{ name: "visitors" }],
-})
+});
 
 return (
   <Chart.Root maxH="sm" chart={chart}>
@@ -333,7 +325,7 @@ return (
       </Pie>
     </PieChart>
   </Chart.Root>
-)
+);
 ```
 
 ---
@@ -398,13 +390,7 @@ Centers a title + description inside a pie or donut chart:
 
 ```tsx
 <Label
-  content={
-    <Chart.RadialText
-      viewBox={undefined}
-      title="$1.2M"
-      description="Total revenue"
-    />
-  }
+  content={<Chart.RadialText viewBox={undefined} title="$1.2M" description="Total revenue" />}
   position="center"
 />
 ```
@@ -417,16 +403,16 @@ All chart colors accept Chakra token strings or plain CSS colors:
 
 ```ts
 // Chakra semantic tokens — respond to light/dark mode
-color: "teal.solid"
-color: "blue.subtle"
-color: "border.muted" // useful for grid lines
+color: "teal.solid";
+color: "blue.subtle";
+color: "border.muted"; // useful for grid lines
 
 // Palette steps
-color: "blue.500"
+color: "blue.500";
 
 // Raw CSS
-color: "#3b82f6"
-color: "hsl(210, 100%, 56%)"
+color: "#3b82f6";
+color: "hsl(210, 100%, 56%)";
 ```
 
 Use `chart.color(token)` to resolve a token to a CSS value wherever Recharts
@@ -441,7 +427,7 @@ series: [
   { name: "c", color: "purple.solid" },
   { name: "d", color: "orange.solid" },
   { name: "e", color: "red.solid" },
-]
+];
 ```
 
 ---

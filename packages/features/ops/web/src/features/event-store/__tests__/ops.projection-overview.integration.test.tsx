@@ -54,9 +54,7 @@ describe("projection overview presentation", () => {
           state: "completed",
         }}
         onOpenReplay={onOpenReplay}
-        renderRunLink={(runId, content) => (
-          <span data-testid={`run-link-${runId}`}>{content}</span>
-        )}
+        renderRunLink={(runId, content) => <span data-testid={`run-link-${runId}`}>{content}</span>}
       />,
     );
 

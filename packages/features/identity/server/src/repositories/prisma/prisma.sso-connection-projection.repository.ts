@@ -32,9 +32,7 @@ export type PrismaSsoConnectionProjectionDatabase = Pick<PrismaClient, "ssoConne
  * configuration change, it is a value the next event or the next replay
  * overwrites — which is exactly why the backoffice goes through commands.
  */
-export class PrismaSsoConnectionProjectionRepository
-  implements StateProjectionStore<SsoConnectionFoldState>
-{
+export class PrismaSsoConnectionProjectionRepository implements StateProjectionStore<SsoConnectionFoldState> {
   static create(
     database: PrismaSsoConnectionProjectionDatabase,
   ): PrismaSsoConnectionProjectionRepository {
@@ -87,8 +85,7 @@ export class PrismaSsoConnectionProjectionRepository
       // boundary. `rowToConnection` asserts it back on the way out, and both
       // sides name `SsoDomainVerification` — the reducer is what actually
       // decides the shape.
-      domainVerifications:
-        state.domainVerifications as unknown as Prisma.InputJsonValue,
+      domainVerifications: state.domainVerifications as unknown as Prisma.InputJsonValue,
       pendingVerification: state.pendingVerification ?? undefined,
       idpMetadata: state.idpMetadata,
       allowsJit: state.allowsJit,
@@ -96,8 +93,7 @@ export class PrismaSsoConnectionProjectionRepository
       testLoginAccountId: state.testLoginAccountId,
       rejection: state.rejection ?? undefined,
       createdBy: state.createdBy,
-      tearDownAfter:
-        state.tearDownAfterMs === null ? null : new Date(state.tearDownAfterMs),
+      tearDownAfter: state.tearDownAfterMs === null ? null : new Date(state.tearDownAfterMs),
       occurredAt: new Date(projection.occurredAt),
       lastEventId: projection.cursor.eventId,
       acceptedAt: new Date(projection.cursor.acceptedAt),

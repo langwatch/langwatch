@@ -105,17 +105,14 @@ describe("BillingSubscriptionService", () => {
   let stripe: ReturnType<typeof createMockStripe>;
   let repository: ReturnType<typeof createMockRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
-  let organizationRepository: ReturnType<
-    typeof createMockOrganizationRepository
-  >;
+  let organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
   let service: BillingSubscriptionService;
 
   describe("interface conformance", () => {
     /** @scenario "New class implements the same interface as old factory" */
     it("implements the SubscriptionService app-layer interface", () => {
       const localService = BillingSubscriptionService.create({
-        repository:
-          createMockRepository() as unknown as BillingSubscriptionRepository,
+        repository: createMockRepository() as unknown as BillingSubscriptionRepository,
         organizationRepository:
           createMockOrganizationRepository() as unknown as BillingOrganizationPort,
         stripe: createMockStripe() as unknown as Stripe,
@@ -126,9 +123,7 @@ describe("BillingSubscriptionService", () => {
       expect(typeof localService.updateSubscriptionItems).toBe("function");
       expect(typeof localService.createOrUpdateSubscription).toBe("function");
       expect(typeof localService.createBillingPortalSession).toBe("function");
-      expect(typeof localService.getLastNonCancelledSubscription).toBe(
-        "function",
-      );
+      expect(typeof localService.getLastNonCancelledSubscription).toBe("function");
       expect(typeof localService.notifyProspective).toBe("function");
     });
   });
@@ -141,8 +136,7 @@ describe("BillingSubscriptionService", () => {
     organizationRepository = createMockOrganizationRepository();
     service = BillingSubscriptionService.create({
       repository: repository as unknown as BillingSubscriptionRepository,
-      organizationRepository:
-        organizationRepository as unknown as BillingOrganizationPort,
+      organizationRepository: organizationRepository as unknown as BillingOrganizationPort,
       stripe: stripe as unknown as Stripe,
       itemCalculator: itemCalculator as unknown as SubscriptionItemCalculatorService,
       notifier: createMockNotifier(),
@@ -162,9 +156,7 @@ describe("BillingSubscriptionService", () => {
         stripe.subscriptions.retrieve.mockResolvedValue({
           items: { data: [{ id: "si_1", price: { id: "price_launch" } }] },
         });
-        itemCalculator.getItemsToUpdate.mockReturnValue([
-          { id: "si_1", quantity: 1 },
-        ]);
+        itemCalculator.getItemsToUpdate.mockReturnValue([{ id: "si_1", quantity: 1 }]);
         stripe.subscriptions.update.mockResolvedValue({});
 
         const result = await service.updateSubscriptionItems({
@@ -177,10 +169,9 @@ describe("BillingSubscriptionService", () => {
         });
 
         expect(result).toEqual({ success: true });
-        expect(stripe.subscriptions.update).toHaveBeenCalledWith(
-          "sub_stripe_1",
-          { items: [{ id: "si_1", quantity: 1 }] },
-        );
+        expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
+          items: [{ id: "si_1", quantity: 1 }],
+        });
       });
     });
 
@@ -315,9 +306,7 @@ describe("BillingSubscriptionService", () => {
           customerId: "cus_123",
         });
 
-        expect(result.url).toBe(
-          "https://app.test/settings/subscription?success",
-        );
+        expect(result.url).toBe("https://app.test/settings/subscription?success");
         expect(repository.updatePlan).toHaveBeenCalledWith({
           id: "sub_db_1",
           plan: PlanTypes.ACCELERATE,
@@ -392,9 +381,7 @@ describe("BillingSubscriptionService", () => {
       it("propagates the error", async () => {
         repository.tryFindLastNonCancelled.mockResolvedValue(null);
         repository.createPending.mockResolvedValue({ id: "sub_new" });
-        stripe.checkout.sessions.create.mockRejectedValue(
-          new Error("Stripe checkout failed"),
-        );
+        stripe.checkout.sessions.create.mockRejectedValue(new Error("Stripe checkout failed"));
 
         await expect(
           service.createOrUpdateSubscription({
@@ -417,9 +404,7 @@ describe("BillingSubscriptionService", () => {
         stripe.subscriptions.retrieve.mockResolvedValue({
           items: { data: [] },
         });
-        stripe.subscriptions.update.mockRejectedValue(
-          new Error("Stripe update failed"),
-        );
+        stripe.subscriptions.update.mockRejectedValue(new Error("Stripe update failed"));
 
         await expect(
           service.createOrUpdateSubscription({
@@ -441,9 +426,7 @@ describe("BillingSubscriptionService", () => {
           stripeSubscriptionId: "sub_stripe_1",
           status: SubscriptionStatus.ACTIVE,
         });
-        stripe.subscriptions.cancel.mockRejectedValue(
-          new Error("Stripe cancel failed"),
-        );
+        stripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe cancel failed"));
 
         await expect(
           service.createOrUpdateSubscription({
@@ -491,9 +474,7 @@ describe("BillingSubscriptionService", () => {
         const result = await service.getLastNonCancelledSubscription("org_123");
 
         expect(result).toEqual(mockSub);
-        expect(repository.tryFindLastNonCancelled).toHaveBeenCalledWith(
-          "org_123",
-        );
+        expect(repository.tryFindLastNonCancelled).toHaveBeenCalledWith("org_123");
       });
     });
   });
@@ -571,13 +552,10 @@ describe("BillingSubscriptionService", () => {
         });
 
         organizationRepository.tryFindFirstTeamId.mockResolvedValue("team_1");
-        organizationRepository.tryGetPricingModel.mockResolvedValue(
-          "SEAT_EVENT",
-        );
-        (seatEventService.createSeatEventCheckout as ReturnType<typeof vi.fn>)
-          .mockResolvedValue({
-            url: "https://checkout.stripe.com/seat-session",
-          });
+        organizationRepository.tryGetPricingModel.mockResolvedValue("SEAT_EVENT");
+        (seatEventService.createSeatEventCheckout as ReturnType<typeof vi.fn>).mockResolvedValue({
+          url: "https://checkout.stripe.com/seat-session",
+        });
 
         const result = await svcWithSeats.createSubscriptionWithInvites({
           organizationId: "org_123",
@@ -634,8 +612,9 @@ describe("BillingSubscriptionService", () => {
           formattedRecurringTotal: "$50.00",
           billingInterval: "month",
         };
-        (seatEventService.previewProration as ReturnType<typeof vi.fn>)
-          .mockResolvedValue(mockResult);
+        (seatEventService.previewProration as ReturnType<typeof vi.fn>).mockResolvedValue(
+          mockResult,
+        );
 
         const result = await svcWithSeats.previewProration({
           organizationId: "org_123",
@@ -679,9 +658,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when the provider rate-limits the invoice list", () => {
       it("fails with a retryable provider-unavailable error", async () => {
-        organizationRepository.tryGetStripeCustomerId.mockResolvedValue(
-          "cus_123",
-        );
+        organizationRepository.tryGetStripeCustomerId.mockResolvedValue("cus_123");
         stripe.invoices.list.mockRejectedValue(
           new Stripe.errors.StripeRateLimitError({
             message: "slow down",
@@ -697,9 +674,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when the provider is unreachable for the invoice list", () => {
       it("fails with the same retryable provider-unavailable error", async () => {
-        organizationRepository.tryGetStripeCustomerId.mockResolvedValue(
-          "cus_123",
-        );
+        organizationRepository.tryGetStripeCustomerId.mockResolvedValue("cus_123");
         stripe.invoices.list.mockRejectedValue(
           new Stripe.errors.StripeConnectionError({
             message: "network down",
@@ -716,9 +691,7 @@ describe("BillingSubscriptionService", () => {
     describe("when the invoice list fails for a reason we cannot name", () => {
       it("lets the original error through rather than dressing it as handled", async () => {
         const providerError = new Error("No such customer");
-        organizationRepository.tryGetStripeCustomerId.mockResolvedValue(
-          "cus_123",
-        );
+        organizationRepository.tryGetStripeCustomerId.mockResolvedValue("cus_123");
         stripe.invoices.list.mockRejectedValue(providerError);
 
         const error = await service
@@ -732,9 +705,7 @@ describe("BillingSubscriptionService", () => {
 
     describe("when organization has a stripeCustomerId", () => {
       it("returns mapped invoices excluding drafts", async () => {
-        organizationRepository.tryGetStripeCustomerId.mockResolvedValue(
-          "cus_123",
-        );
+        organizationRepository.tryGetStripeCustomerId.mockResolvedValue("cus_123");
 
         stripe.invoices.list.mockResolvedValue({
           data: [

@@ -40,8 +40,7 @@ describe("BlobSweeper", () => {
     await redis.sadd(holderKey(hash), LEGACY_HOLDER_LEASE_GUARD, holderId);
   };
 
-  const sweepOnce = (dryRun = false) =>
-    sweeper.sweepQueue({ queueName: QUEUE_NAME, dryRun });
+  const sweepOnce = (dryRun = false) => sweeper.sweepQueue({ queueName: QUEUE_NAME, dryRun });
 
   /** Bytes on the full backstop, no lease and no holder: the shape repair acts on. */
   const giveBackstopBlobs = async (hashes: string[]) => {
@@ -67,10 +66,7 @@ describe("BlobSweeper", () => {
     await filler.exec();
   };
 
-  const sweepRepeatedly = async (
-    sweeperUnderTest: BlobSweeper,
-    ticks: number,
-  ) => {
+  const sweepRepeatedly = async (sweeperUnderTest: BlobSweeper, ticks: number) => {
     for (let tick = 0; tick < ticks; tick++) {
       await sweeperUnderTest.sweepQueue({ queueName: QUEUE_NAME });
     }
@@ -108,19 +104,13 @@ describe("BlobSweeper", () => {
         await redis.set(blobKey(), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
         // No lease member: the holder's deadline already lapsed. But its mirrored
         // token survives, because only a clean release ever removes one.
-        await redis.sadd(
-          holderKey(),
-          LEGACY_HOLDER_LEASE_GUARD,
-          "died-mid-flight",
-        );
+        await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD, "died-mid-flight");
 
         const tally = await sweepOnce();
 
         expect(tally.repaired).toBe(1);
         expect(await redis.exists(blobKey())).toBe(1);
-        expect(await redis.ttl(blobKey())).toBeLessThanOrEqual(
-          BLOB_RELEASE_GRACE_TTL_SECONDS,
-        );
+        expect(await redis.ttl(blobKey())).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
         expect(await redis.ttl(blobKey())).toBeGreaterThan(0);
       });
     });
@@ -137,9 +127,7 @@ describe("BlobSweeper", () => {
 
         expect(tally.leased).toBe(1);
         expect(tally.reclaimed).toBe(0);
-        expect(await redis.ttl(blobKey())).toBeGreaterThan(
-          BLOB_RELEASE_GRACE_TTL_SECONDS,
-        );
+        expect(await redis.ttl(blobKey())).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
       });
     });
   });
@@ -164,18 +152,9 @@ describe("BlobSweeper", () => {
     describe("when the runner sweeps", () => {
       /** @scenario "A blob whose grace window has been running past the safety margin is destroyed" */
       it("destroys the bytes and their bookkeeping together", async () => {
-        await redis.set(
-          blobKey(),
-          "body",
-          "EX",
-          BLOB_RECLAIM_TTL_THRESHOLD_SECONDS - 1,
-        );
+        await redis.set(blobKey(), "body", "EX", BLOB_RECLAIM_TTL_THRESHOLD_SECONDS - 1);
         await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD);
-        await redis.zadd(
-          leaseKey(),
-          (await redisNowMs()) - 1,
-          "expired-holder",
-        );
+        await redis.zadd(leaseKey(), (await redisNowMs()) - 1, "expired-holder");
 
         const tally = await sweepOnce();
 
@@ -191,12 +170,7 @@ describe("BlobSweeper", () => {
     describe("when the runner sweeps in dry-run mode", () => {
       /** @scenario "A dry run reports what it would reclaim without deleting anything" */
       it("reports the reclaim without performing it", async () => {
-        await redis.set(
-          blobKey(),
-          "body",
-          "EX",
-          BLOB_RECLAIM_TTL_THRESHOLD_SECONDS - 1,
-        );
+        await redis.set(blobKey(), "body", "EX", BLOB_RECLAIM_TTL_THRESHOLD_SECONDS - 1);
 
         const tally = await sweepOnce(true);
 
@@ -261,12 +235,7 @@ describe("BlobSweeper", () => {
 
         // A blob written after that cycle finished is still found next tick,
         // which only holds if the exhausted cursor rewound to "0".
-        await redis.set(
-          blobKey("later"),
-          "body",
-          "EX",
-          BLOB_BACKSTOP_TTL_SECONDS,
-        );
+        await redis.set(blobKey("later"), "body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
         await roomySweeper.sweepQueue({ queueName: QUEUE_NAME });
 
         const ttl = await redis.ttl(blobKey("later"));

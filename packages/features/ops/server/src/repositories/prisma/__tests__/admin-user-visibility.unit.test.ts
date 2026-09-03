@@ -101,14 +101,10 @@ describe("mapUserToBackofficeRow", () => {
       const team = buildTeam({ projects: [project] });
       const org = buildOrg({ teams: [team] });
 
-      const row = mapUserToBackofficeRow(
-        buildUser({ orgMemberships: [{ organization: org }] }),
-      );
+      const row = mapUserToBackofficeRow(buildUser({ orgMemberships: [{ organization: org }] }));
 
       expect(row.organizations).toEqual([{ id: org.id, name: org.name }]);
-      expect(row.projects).toEqual([
-        { id: project.id, name: project.name, slug: project.slug },
-      ]);
+      expect(row.projects).toEqual([{ id: project.id, name: project.name, slug: project.slug }]);
     });
   });
 
@@ -161,9 +157,7 @@ describe("mapUserToBackofficeRow", () => {
         teams: [buildTeam({ projects: [] })],
       });
 
-      const row = mapUserToBackofficeRow(
-        buildUser({ orgMemberships: [{ organization: org }] }),
-      );
+      const row = mapUserToBackofficeRow(buildUser({ orgMemberships: [{ organization: org }] }));
 
       expect(row.projects).toEqual([]);
       expect(row.organizations).toHaveLength(1);
@@ -181,9 +175,7 @@ describe("mapUserToBackofficeRow", () => {
         teams: [buildTeam({ projects: [alive] })],
       });
 
-      const row = mapUserToBackofficeRow(
-        buildUser({ orgMemberships: [{ organization: org }] }),
-      );
+      const row = mapUserToBackofficeRow(buildUser({ orgMemberships: [{ organization: org }] }));
 
       expect(row.projects.map((p) => p.id)).toEqual(["p_alive"]);
     });

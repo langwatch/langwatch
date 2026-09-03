@@ -12,11 +12,7 @@ export class GithubPullRequestNotMappedError extends NotFoundError {
   declare readonly code: "github_pr_not_mapped";
 
   constructor(input: { repositoryFullName: string; prNumber: number }) {
-    super(
-      "github_pr_not_mapped",
-      "pull request",
-      `${input.repositoryFullName}#${input.prNumber}`,
-    );
+    super("github_pr_not_mapped", "pull request", `${input.repositoryFullName}#${input.prNumber}`);
   }
 }
 
@@ -42,10 +38,7 @@ export class GithubInstallationConflictError extends Error {
 export class GithubInstallationSuspendedError extends HandledError {
   declare readonly code: "github_installation_suspended";
 
-  constructor(
-    input: { accountLogin: string },
-    options: { reasons?: readonly Error[] } = {},
-  ) {
+  constructor(input: { accountLogin: string }, options: { reasons?: readonly Error[] } = {}) {
     super("github_installation_suspended", "The GitHub installation is suspended.", {
       meta: { accountLogin: input.accountLogin },
       httpStatus: 409,
@@ -58,10 +51,7 @@ export class GithubInstallationSuspendedError extends HandledError {
 export class GithubRepositoryNotAccessibleError extends HandledError {
   declare readonly code: "github_repo_not_accessible";
 
-  constructor(
-    input: { repositoryFullName: string },
-    options: { reasons?: readonly Error[] } = {},
-  ) {
+  constructor(input: { repositoryFullName: string }, options: { reasons?: readonly Error[] } = {}) {
     super("github_repo_not_accessible", "The GitHub App cannot reach that repository.", {
       meta: { repositoryFullName: input.repositoryFullName },
       httpStatus: 403,
@@ -78,8 +68,7 @@ export class GithubApiRateLimitedError extends HandledError {
     input: { retryAfterSec: number | null } = { retryAfterSec: null },
     options: { reasons?: readonly Error[] } = {},
   ) {
-    const meta =
-      input.retryAfterSec === null ? {} : { retryAfterSec: input.retryAfterSec };
+    const meta = input.retryAfterSec === null ? {} : { retryAfterSec: input.retryAfterSec };
     super("github_rate_limited", "GitHub is rate limiting requests.", {
       meta,
       httpStatus: 429,

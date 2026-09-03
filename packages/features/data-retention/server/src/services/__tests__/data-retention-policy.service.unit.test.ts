@@ -14,7 +14,10 @@ import {
   type RetentionProjectLineage,
 } from "../../ports/data-retention-directory.port";
 import { DataRetentionPermissionsPort } from "../../ports/data-retention-permissions.port";
-import { DataRetentionPlanPort, type DataRetentionPlan } from "../../ports/data-retention-plan.port";
+import {
+  DataRetentionPlanPort,
+  type DataRetentionPlan,
+} from "../../ports/data-retention-plan.port";
 import {
   DataRetentionPolicyService,
   assertPlanAllowsRetentionValue,
@@ -95,7 +98,7 @@ function policy(options: {
 }) {
   return DataRetentionPolicyService.create({
     directory: new StubDirectory(
-      "organizationId" in options ? options.organizationId ?? null : "org_1",
+      "organizationId" in options ? (options.organizationId ?? null) : "org_1",
     ),
     permissions: new StubPermissions(options.allow ?? true),
     plans: new StubPlans(options.plan ?? { free: false, uncapped: false }),
@@ -166,7 +169,9 @@ describe("given a value a plan may or may not persist", () => {
     const capped = { free: false, uncapped: false };
     expect(() => assertPlanAllowsRetentionValue(capped, 35)).not.toThrow();
     expect(() => assertPlanAllowsRetentionValue(capped, 63)).not.toThrow();
-    expect(() => assertPlanAllowsRetentionValue(capped, 98)).toThrow(/isn't available on your plan/);
+    expect(() => assertPlanAllowsRetentionValue(capped, 98)).toThrow(
+      /isn't available on your plan/,
+    );
   });
 
   it("allows any whole-week value at or above the floor on an uncapped plan", () => {

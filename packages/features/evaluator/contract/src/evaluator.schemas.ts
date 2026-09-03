@@ -97,9 +97,7 @@ export type EvaluatorApiPushToCopiesInput = z.infer<typeof evaluatorApiPushToCop
  * the browser never mints a required field, the way `UpdateAgentCommand` in
  * `@langwatch/agent-contract` already does for its own defaulted keys.
  */
-export type EvaluatorApiCreateInput = z.input<
-  ReturnType<typeof evaluatorApiCreateInputSchema>
->;
+export type EvaluatorApiCreateInput = z.input<ReturnType<typeof evaluatorApiCreateInputSchema>>;
 
 /**
  * What the five reads and writes the studio borrows answer.

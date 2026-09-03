@@ -98,9 +98,7 @@ describe("HTTP transport", () => {
         headers: { Origin: "http://localhost:5173" },
       });
 
-      expect(response.headers.get("access-control-allow-origin")).toBe(
-        "http://localhost:5173",
-      );
+      expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
       expect(response.headers.get("vary")).toContain("Origin");
     });
 
@@ -111,9 +109,7 @@ describe("HTTP transport", () => {
 
       expect(response.status).toBe(204);
       expect(response.headers.get("access-control-allow-methods")).toContain("POST");
-      expect(response.headers.get("access-control-allow-headers")).toContain(
-        "mcp-session-id",
-      );
+      expect(response.headers.get("access-control-allow-headers")).toContain("mcp-session-id");
     });
 
     it("includes Authorization in allowed headers for CORS", async () => {
@@ -121,9 +117,7 @@ describe("HTTP transport", () => {
         method: "OPTIONS",
       });
 
-      expect(response.headers.get("access-control-allow-headers")).toContain(
-        "Authorization",
-      );
+      expect(response.headers.get("access-control-allow-headers")).toContain("Authorization");
     });
   });
 

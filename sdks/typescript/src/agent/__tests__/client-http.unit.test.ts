@@ -43,10 +43,16 @@ class FakeHttpPlatform {
   private readonly waitingPolls: Array<(frames: Json[]) => void> = [];
   private readonly queuedFrames: Json[] = [];
   private readonly heldFrames: ServerResponse[] = [];
-  private readonly requestWaiters: Array<{ match: (seen: Seen) => boolean; resolve: (seen: Seen) => void }> = [];
+  private readonly requestWaiters: Array<{
+    match: (seen: Seen) => boolean;
+    resolve: (seen: Seen) => void;
+  }> = [];
   private nextToken = 1;
 
-  private constructor(readonly server: Server, readonly port: number) {}
+  private constructor(
+    readonly server: Server,
+    readonly port: number,
+  ) {}
 
   static start(): Promise<FakeHttpPlatform> {
     return new Promise((resolve) => {
@@ -148,7 +154,12 @@ class FakeHttpPlatform {
     if (seen.path.startsWith("/api/v1/agents/connect/poll")) {
       this.polls += 1;
       if (this.pollStatus !== 200) {
-        answer(this.pollStatus, this.pollStatusFrame ? { frame: this.pollStatusFrame } : { error: "agent_session_unknown" });
+        answer(
+          this.pollStatus,
+          this.pollStatusFrame
+            ? { frame: this.pollStatusFrame }
+            : { error: "agent_session_unknown" },
+        );
         return;
       }
       if (this.queuedFrames.length > 0) {
@@ -200,7 +211,12 @@ const recordingLogger = () => {
   const log = (level: string) => (message: string) => {
     calls.push([level, message]);
   };
-  const logger: Logger = { debug: log("debug"), info: log("info"), warn: log("warn"), error: log("error") };
+  const logger: Logger = {
+    debug: log("debug"),
+    info: log("info"),
+    warn: log("warn"),
+    error: log("error"),
+  };
   return {
     logger,
     lines: (level: string, pattern = /./) =>
@@ -291,7 +307,9 @@ describe("the agent client over HTTP long polling, given a fake platform", () =>
       platform.deliver(callFrame());
       const ack = await platform.nextFrame("ack");
       expect(ack.headers["x-agent-instance-token"]).toBe("ait_1");
-      expect(ack.body?.frames).toEqual([{ type: "ack", protocol: PROTOCOL_VERSION, callId: "call_1" }]);
+      expect(ack.body?.frames).toEqual([
+        { type: "ack", protocol: PROTOCOL_VERSION, callId: "call_1" },
+      ]);
       const result = await platform.nextFrame("result");
       expect(result.body?.frames).toEqual([
         { type: "result", protocol: PROTOCOL_VERSION, callId: "call_1", output: "hello" },
@@ -351,7 +369,9 @@ describe("the agent client over HTTP long polling, given a fake platform", () =>
       platform.pollStatus = 410;
       const again = await platform.nextRegister();
 
-      expect((again.body as unknown as RegisterFrame).instance.inFlightCallIds).toEqual(["call_slow"]);
+      expect((again.body as unknown as RegisterFrame).instance.inFlightCallIds).toEqual([
+        "call_slow",
+      ]);
       platform.pollStatus = 200;
       release();
       await platform.nextFrame("result");
@@ -374,7 +394,11 @@ describe("the agent client over HTTP long polling, given a fake platform", () =>
     /** @scenario "A poll answered with a status and a frame that is not a refusal ends the connection" */
     it("ends the connection so the client registers again", async () => {
       platform.pollStatus = 500;
-      platform.pollStatusFrame = { type: "cancel", protocol: PROTOCOL_VERSION, callId: "call_gone" };
+      platform.pollStatusFrame = {
+        type: "cancel",
+        protocol: PROTOCOL_VERSION,
+        callId: "call_gone",
+      };
       define(async () => "hello", { transport: "http" });
 
       await platform.nextRegister();
@@ -415,7 +439,9 @@ describe("the agent client over HTTP long polling, given a fake platform", () =>
       define(async () => "ok too", { transport: "http", name: "second" });
 
       const again = await platform.nextRegister(2000);
-      expect((again.body as unknown as RegisterFrame).agents.map((agent) => agent.name)).toContain("second");
+      expect((again.body as unknown as RegisterFrame).agents.map((agent) => agent.name)).toContain(
+        "second",
+      );
     });
   });
 
@@ -431,9 +457,13 @@ describe("the agent client over HTTP long polling, given a fake platform", () =>
 
       const deregister = await platform.nextFrame("deregister");
       expect(deregister.body?.frames).toEqual([{ type: "deregister", protocol: PROTOCOL_VERSION }]);
-      const pollsBefore = platform.requests.filter((seen) => seen.path.startsWith("/api/v1/agents/connect/poll")).length;
+      const pollsBefore = platform.requests.filter((seen) =>
+        seen.path.startsWith("/api/v1/agents/connect/poll"),
+      ).length;
       await wait(POLL_WAIT_MS * 2);
-      const pollsAfter = platform.requests.filter((seen) => seen.path.startsWith("/api/v1/agents/connect/poll")).length;
+      const pollsAfter = platform.requests.filter((seen) =>
+        seen.path.startsWith("/api/v1/agents/connect/poll"),
+      ).length;
       expect(pollsAfter).toBe(pollsBefore);
       expect(sharedClientForTests()?.isRetrying).toBe(false);
     });

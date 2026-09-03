@@ -156,11 +156,7 @@ function mixNumber(from: number, to: number, t: number): number {
 }
 
 /** Part-way between two turns. */
-export function mixGroundShift(
-  from: GroundShift,
-  to: GroundShift,
-  t: number,
-): GroundShift {
+export function mixGroundShift(from: GroundShift, to: GroundShift, t: number): GroundShift {
   return {
     rotation: mixNumber(from.rotation, to.rotation, t),
     offsetX: mixNumber(from.offsetX, to.offsetX, t),

@@ -109,10 +109,7 @@ describe("reconcileEnvFile", () => {
       const { envPath } = await scaffoldAt(5560);
       writeFileSync(
         envPath,
-        readFileSync(envPath, "utf8").replace(
-          "OPENAI_API_KEY=",
-          "OPENAI_API_KEY=sk-test-123",
-        ),
+        readFileSync(envPath, "utf8").replace("OPENAI_API_KEY=", "OPENAI_API_KEY=sk-test-123"),
       );
       const before = readFileSync(envPath, "utf8").split("\n");
       const reconciled = reconcileEnvFile({
@@ -169,9 +166,7 @@ describe("reconcileEnvFile", () => {
         path: envPath,
       });
       expect(untouched.reconciledKeys).toEqual([]);
-      expect(readFileSync(envPath, "utf8")).toContain(
-        "REDIS_URL=redis://localhost:6581/0",
-      );
+      expect(readFileSync(envPath, "utf8")).toContain("REDIS_URL=redis://localhost:6581/0");
 
       const asked = scaffoldEnvFile({
         ports: allocatePorts(5560),
@@ -179,9 +174,7 @@ describe("reconcileEnvFile", () => {
         shouldReconcilePorts: true,
       });
       expect(asked.reconciledKeys).toContain("REDIS_URL");
-      expect(readFileSync(envPath, "utf8")).toContain(
-        "REDIS_URL=redis://localhost:6561/0",
-      );
+      expect(readFileSync(envPath, "utf8")).toContain("REDIS_URL=redis://localhost:6561/0");
     });
   });
 

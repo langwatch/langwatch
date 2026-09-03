@@ -23,25 +23,18 @@ export function isNodeDirectlyPaused(nodePath: string, pausedKeys: Set<string>):
   return pausedKeys.has(nodePath);
 }
 
-export function filterTree(
-  nodes: OpsPipelineNode[],
-  query: string,
-): OpsPipelineNode[] | null {
+export function filterTree(nodes: OpsPipelineNode[], query: string): OpsPipelineNode[] | null {
   if (!query.trim()) return nodes;
   const lower = query.toLowerCase();
 
   function prune(node: OpsPipelineNode): OpsPipelineNode | null {
     if (node.name.toLowerCase().includes(lower)) return node;
-    const filtered = node.children
-      .map(prune)
-      .filter((c): c is OpsPipelineNode => c !== null);
+    const filtered = node.children.map(prune).filter((c): c is OpsPipelineNode => c !== null);
     if (filtered.length > 0) return { ...node, children: filtered };
     return null;
   }
 
-  const result = nodes
-    .map(prune)
-    .filter((node): node is OpsPipelineNode => node !== null);
+  const result = nodes.map(prune).filter((node): node is OpsPipelineNode => node !== null);
   return result.length > 0 ? result : null;
 }
 
@@ -51,14 +44,7 @@ export function isOverdue(ms: number | null): boolean {
   return Date.now() - ms > 5 * 60 * 1000;
 }
 
-export type GroupState =
-  | "blocked"
-  | "stale"
-  | "retrying"
-  | "active"
-  | "due"
-  | "scheduled"
-  | "idle";
+export type GroupState = "blocked" | "stale" | "retrying" | "active" | "due" | "scheduled" | "idle";
 
 export interface GroupClassification {
   state: GroupState;
@@ -106,13 +92,10 @@ export function classifyGroup(g: OpsQueueGroup, now = Date.now()): GroupClassifi
 
   if (g.isStaleBlock) return classified("stale");
   if (g.isBlocked) return classified("blocked");
-  if (attempt > 0 && deferredUntilMs !== null)
-    return classified("retrying", deferredUntilMs);
+  if (attempt > 0 && deferredUntilMs !== null) return classified("retrying", deferredUntilMs);
   if (g.hasActiveJob) return classified("active");
   if (g.pendingJobs > 0)
-    return deferredUntilMs !== null
-      ? classified("scheduled", deferredUntilMs)
-      : classified("due");
+    return deferredUntilMs !== null ? classified("scheduled", deferredUntilMs) : classified("due");
   return classified("idle");
 }
 
@@ -131,14 +114,10 @@ const STATE_SEVERITY: Record<GroupState, number> = {
  * Trouble first, then depth. The server orders by pending count alone, which
  * buries one blocked group under two hundred healthy fan-out rows.
  */
-export function sortGroupsBySeverity<T extends OpsQueueGroup>(
-  groups: T[],
-  now = Date.now(),
-): T[] {
+export function sortGroupsBySeverity<T extends OpsQueueGroup>(groups: T[], now = Date.now()): T[] {
   return [...groups].sort((a, b) => {
     const severityDelta =
-      STATE_SEVERITY[classifyGroup(a, now).state] -
-      STATE_SEVERITY[classifyGroup(b, now).state];
+      STATE_SEVERITY[classifyGroup(a, now).state] - STATE_SEVERITY[classifyGroup(b, now).state];
     if (severityDelta !== 0) return severityDelta;
     if (b.pendingJobs !== a.pendingJobs) return b.pendingJobs - a.pendingJobs;
     return a.groupId.localeCompare(b.groupId);
@@ -175,9 +154,7 @@ export function matchesStatusFilter(
   const { state, isFailing } = classifyGroup(g, now);
   switch (filter) {
     case "ok":
-      return (
-        !isFailing && state !== "blocked" && state !== "stale" && state !== "retrying"
-      );
+      return !isFailing && state !== "blocked" && state !== "stale" && state !== "retrying";
     case "blocked":
       return state === "blocked";
     case "stale":
@@ -185,9 +162,7 @@ export function matchesStatusFilter(
     // "Retrying" as the operator means it: anything failing that has not yet
     // been given up on, whether it is waiting out backoff or mid-reattempt.
     case "retrying":
-      return (
-        state === "retrying" || (isFailing && state !== "blocked" && state !== "stale")
-      );
+      return state === "retrying" || (isFailing && state !== "blocked" && state !== "stale");
     case "active":
       return state === "active";
   }

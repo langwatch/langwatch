@@ -8,9 +8,7 @@ export const INGESTION_PULL_EVENT_TYPES = {
   RUN_COMPLETED: "lw.obs.ingestion_pull.run_completed",
   RUN_FAILED: "lw.obs.ingestion_pull.run_failed",
 } as const;
-export const INGESTION_PULL_PROCESSING_EVENT_TYPES = Object.values(
-  INGESTION_PULL_EVENT_TYPES,
-);
+export const INGESTION_PULL_PROCESSING_EVENT_TYPES = Object.values(INGESTION_PULL_EVENT_TYPES);
 export const INGESTION_PULL_EVENT_VERSIONS = {
   CONFIGURED: "2026-07-17",
   DISABLED: "2026-07-17",
@@ -138,16 +136,10 @@ export const ingestionPullProcessingEventSchema = z.discriminatedUnion("type", [
 export type IngestionPullConfiguredEventData = z.infer<
   typeof ingestionPullConfiguredEventDataSchema
 >;
-export type IngestionPullDisabledEventData = z.infer<
-  typeof ingestionPullDisabledEventDataSchema
->;
+export type IngestionPullDisabledEventData = z.infer<typeof ingestionPullDisabledEventDataSchema>;
 export type IngestionPullRunCompletedEventData = z.infer<
   typeof ingestionPullRunCompletedEventDataSchema
 >;
-export type IngestionPullRunFailedEventData = z.infer<
-  typeof ingestionPullRunFailedEventDataSchema
->;
-export type IngestionPullProcessingEvent = z.infer<
-  typeof ingestionPullProcessingEventSchema
->;
+export type IngestionPullRunFailedEventData = z.infer<typeof ingestionPullRunFailedEventDataSchema>;
+export type IngestionPullProcessingEvent = z.infer<typeof ingestionPullProcessingEventSchema>;
 export type IngestionPullProcessingEventType = IngestionPullProcessingEvent["type"];

@@ -4,9 +4,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = resolve(fileURLToPath(import.meta.url), "..");
-const serverPackage = JSON.parse(
-  readFileSync(resolve(__dirname, "../package.json"), "utf8"),
-);
+const serverPackage = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf8"));
 
 await build({
   entryPoints: [resolve(__dirname, "../src/cli.ts")],

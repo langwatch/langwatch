@@ -74,13 +74,7 @@ function findBalancedEnd({ text, start }: { text: string; start: number }): numb
  * the last lines of a big result) can leave such an item fully balanced, and a
  * nested value must never be promoted to the whole command's result.
  */
-function startsAtDocumentBoundary({
-  text,
-  start,
-}: {
-  text: string;
-  start: number;
-}): boolean {
+function startsAtDocumentBoundary({ text, start }: { text: string; start: number }): boolean {
   if (start === 0) return true;
   const previous = text[start - 1];
   return previous === "\n" || previous === "\r";

@@ -20,10 +20,7 @@ import type {
   Prisma,
 } from "@langwatch/prisma-client/generated";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import {
-  EMPTY_SPEND_USAGE,
-  type SpendUsage,
-} from "../processes/gateway-spend-commands.process";
+import { EMPTY_SPEND_USAGE, type SpendUsage } from "../processes/gateway-spend-commands.process";
 import type { GatewaySpanIngestionPort } from "../ports/gateway-span-ingestion.port";
 import type { GatewaySpendConfirmationPort } from "../ports/gateway-spend-confirmation.port";
 import type { GatewaySpendRatingPort } from "../ports/gateway-spend-rating.port";

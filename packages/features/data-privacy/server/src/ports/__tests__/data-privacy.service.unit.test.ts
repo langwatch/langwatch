@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  type DataPrivacyPolicy,
-  type DataPrivacyScope,
-} from "@langwatch/data-privacy-contract";
+import { type DataPrivacyPolicy, type DataPrivacyScope } from "@langwatch/data-privacy-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { DataPrivacyPolicyRepository } from "../data-privacy.repository";
@@ -14,9 +11,7 @@ class MemoryDataPrivacyRepository extends DataPrivacyPolicyRepository {
     return [];
   }
   async findAllInOrganization(input: { organizationId: string }) {
-    return this.policies.filter(
-      (policy) => policy.organizationId === input.organizationId,
-    );
+    return this.policies.filter((policy) => policy.organizationId === input.organizationId);
   }
   async upsertForScope(input: {
     organizationId: string;

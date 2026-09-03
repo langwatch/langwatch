@@ -65,9 +65,7 @@ const noExperiments = {
 };
 
 /** A budget row with sane defaults — override just the field under test. */
-const budgetFixture = (
-  overrides: Record<string, unknown> = {},
-): Record<string, unknown> => ({
+const budgetFixture = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: "bud_1",
   organization_id: "org_1",
   scope_type: "project",
@@ -238,11 +236,7 @@ describe("statusCommand", () => {
       expect(doc.attention.runningExperiments).toBeNull();
       expect(doc.attention.budgetsAtRisk).toBeNull();
       expect(Object.keys(doc.attention.errors)).toEqual(
-        expect.arrayContaining([
-          "erroredTraces24h",
-          "runningExperiments",
-          "budgetsAtRisk",
-        ]),
+        expect.arrayContaining(["erroredTraces24h", "runningExperiments", "budgetsAtRisk"]),
       );
     });
   });
@@ -645,9 +639,7 @@ describe("statusCommand", () => {
         mockAllSuccess();
         // A limit of 0 admits no spend at all: maximally breached, not 0%.
         global.fetch = mockGatewayFetch({
-          budgets: [
-            budgetFixture({ limit_usd: "0", spent_usd: "0", on_breach: "block" }),
-          ],
+          budgets: [budgetFixture({ limit_usd: "0", spent_usd: "0", on_breach: "block" })],
         });
 
         await statusCommand();

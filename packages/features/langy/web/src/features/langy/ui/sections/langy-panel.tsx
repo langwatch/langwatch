@@ -127,7 +127,10 @@ import {
   readLangyTrpcError,
   resolveLiveTurnError,
 } from "../../behavior/logic/langy-error-explainer";
-import { type MakeDefaultWritePlan, makeDefaultOffer } from "../../model/logic/langy-make-default-offer";
+import {
+  type MakeDefaultWritePlan,
+  makeDefaultOffer,
+} from "../../model/logic/langy-make-default-offer";
 import { langyToolNarrator } from "../../model/adapters/langy-tool-narrator.adapter";
 import { buildTimeTravelView } from "../../behavior/logic/langy-time-travel";
 import { isInternalHref } from "../../behavior/logic/spa-link";

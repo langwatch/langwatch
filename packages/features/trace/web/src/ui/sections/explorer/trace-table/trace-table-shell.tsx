@@ -22,7 +22,12 @@ import { useEffect, useRef } from "react";
 import { COLUMN_DRAG_THRESHOLD_PX, useColumnEducationStore } from "../../../../index";
 import { ColumnResizeGrip } from "../../../elements/explorer/trace-table/column-resize-grip";
 import { SELECT_COLUMN_ID } from "./registry/cells/select-cells";
-import { Table as TableEl, Th, Thead, Tr } from "../../../elements/explorer/trace-table/table-primitives";
+import {
+  Table as TableEl,
+  Th,
+  Thead,
+  Tr,
+} from "../../../elements/explorer/trace-table/table-primitives";
 
 type Color = NonNullable<SystemStyleObject["color"]>;
 

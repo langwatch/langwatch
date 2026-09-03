@@ -43,7 +43,5 @@ export const easterEggs: EasterEgg[] = [
 
 export function findEasterEgg(query: string): EasterEgg | null {
   const lower = query.toLowerCase().trim();
-  return (
-    easterEggs.find((egg) => egg.triggers.some((t) => t.toLowerCase() === lower)) ?? null
-  );
+  return easterEggs.find((egg) => egg.triggers.some((t) => t.toLowerCase() === lower)) ?? null;
 }

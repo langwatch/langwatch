@@ -95,10 +95,7 @@ import type { EnterpriseBillingTrpcContext } from "../../features/enterprise/ent
 import type { EnterpriseGovernanceMountContext } from "../../features/enterprise/enterprise-governance-trpc.mount";
 import type { GovernanceHomeTrpcContext } from "../../features/enterprise/governance-home.mount";
 import type { GatewayTrpcContext } from "../../features/gateway/gateway-trpc.mount";
-import {
-  createAppTrpcFeatures,
-  type AppTrpcFeaturePorts,
-} from "../app-trpc.features";
+import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
 import type { DataRetentionTrpcContext } from "@langwatch/data-retention-server";
 import type { MonitorTrpcContext } from "@langwatch/monitor-server";
 import type { StoredObjectTrpcContext } from "@langwatch/stored-object-server";

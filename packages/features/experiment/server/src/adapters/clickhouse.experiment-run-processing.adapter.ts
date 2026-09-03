@@ -75,9 +75,7 @@ export class ClickHouseExperimentRunProcessingAdapter {
     return new ClickHouseExperimentRunProcessingAdapter(options);
   }
 
-  private constructor(
-    private readonly options: ClickHouseExperimentRunProcessingAdapterOptions,
-  ) {}
+  private constructor(private readonly options: ClickHouseExperimentRunProcessingAdapterOptions) {}
 
   buildProcessing(): ExperimentRunProcessingPipeline {
     const clickHouse = ExperimentClickHouseAdapter.create(this.options.resolveClient);
@@ -85,10 +83,7 @@ export class ClickHouseExperimentRunProcessingAdapter {
     return createExperimentRunProcessingPipeline({
       experimentRunStateFoldStore: new RedisCachedFoldStore<ExperimentRunStateData>(
         createExperimentRunStateFoldStore(
-          new ExperimentRunStateRepositoryClickHouse(
-            clickHouse,
-            this.options.defaultRetentionDays,
-          ),
+          new ExperimentRunStateRepositoryClickHouse(clickHouse, this.options.defaultRetentionDays),
         ),
         this.options.redis,
         {

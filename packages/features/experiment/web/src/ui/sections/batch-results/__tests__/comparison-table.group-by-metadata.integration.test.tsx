@@ -119,21 +119,16 @@ const TWO_RUN_FIXTURE: ComparisonRunData[] = [
 type TableProps = React.ComponentProps<typeof ComparisonTable>;
 
 const renderTable = (props: Partial<TableProps> = {}) =>
-  render(
-    <ComparisonTable comparisonData={TWO_RUN_FIXTURE} disableVirtualization {...props} />,
-    { wrapper: Wrapper },
-  );
+  render(<ComparisonTable comparisonData={TWO_RUN_FIXTURE} disableVirtualization {...props} />, {
+    wrapper: Wrapper,
+  });
 
 /**
  * The same wiring BatchEvaluationResults does — discover the keys, hand
  * them to the toolbar button, hand the button's selection to the table —
  * minus the router and tRPC that only the URL half needs.
  */
-const GroupableComparison = ({
-  comparisonData,
-}: {
-  comparisonData: ComparisonRunData[];
-}) => {
+const GroupableComparison = ({ comparisonData }: { comparisonData: ComparisonRunData[] }) => {
   const [groupBy, setGroupBy] = useState<string | null>(null);
   const { availableKeys } = useResultsGrouping({
     source: "dataset-entry",
@@ -141,16 +136,8 @@ const GroupableComparison = ({
   });
   return (
     <>
-      <GroupRowsButton
-        availableKeys={availableKeys}
-        value={groupBy}
-        onChange={setGroupBy}
-      />
-      <ComparisonTable
-        comparisonData={comparisonData}
-        disableVirtualization
-        groupBy={groupBy}
-      />
+      <GroupRowsButton availableKeys={availableKeys} value={groupBy} onChange={setGroupBy} />
+      <ComparisonTable comparisonData={comparisonData} disableVirtualization groupBy={groupBy} />
     </>
   );
 };
@@ -175,15 +162,9 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
         await user.click(screen.getByTestId("group-by-row-button"));
 
         const dropdown = screen.getByTestId("group-by-row-dropdown");
-        expect(
-          within(dropdown).getByTestId("group-by-row-option-none"),
-        ).toBeInTheDocument();
-        expect(
-          within(dropdown).getByTestId("group-by-row-option-city"),
-        ).toBeInTheDocument();
-        expect(
-          within(dropdown).getByTestId("group-by-row-option-difficulty"),
-        ).toBeInTheDocument();
+        expect(within(dropdown).getByTestId("group-by-row-option-none")).toBeInTheDocument();
+        expect(within(dropdown).getByTestId("group-by-row-option-city")).toBeInTheDocument();
+        expect(within(dropdown).getByTestId("group-by-row-option-difficulty")).toBeInTheDocument();
       });
 
       /** @scenario "Dropdown only offers keys present on the current runs' dataset entries" */
@@ -194,15 +175,12 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
         const dropdown = screen.getByTestId("group-by-row-dropdown");
         // 'input' is a column but a row-unique payload, not a slicing dimension.
         // Discovery must include only fields with repeat values across rows.
-        expect(
-          within(dropdown).queryByTestId("group-by-row-option-input"),
-        ).not.toBeInTheDocument();
+        expect(within(dropdown).queryByTestId("group-by-row-option-input")).not.toBeInTheDocument();
       });
     });
 
     describe("when the user picks city as the grouping field", () => {
-      const renderGroupedByCity = () =>
-        renderTable({ groupBy: "city" } as Partial<TableProps>);
+      const renderGroupedByCity = () => renderTable({ groupBy: "city" } as Partial<TableProps>);
 
       /** @scenario "Rows group under metadata-value headers" */
       it("renders one header per distinct city value", () => {
@@ -231,20 +209,12 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
         renderGroupedByCity();
         // Berlin means:  run-1 = (0.9 + 0.8)/2 = 0.85
         //                run-2 = (0.7 + 0.6)/2 = 0.65
-        expect(screen.getByTestId("group-mean-Berlin-run-1-accuracy")).toHaveTextContent(
-          /0\.85/,
-        );
-        expect(screen.getByTestId("group-mean-Berlin-run-2-accuracy")).toHaveTextContent(
-          /0\.65/,
-        );
+        expect(screen.getByTestId("group-mean-Berlin-run-1-accuracy")).toHaveTextContent(/0\.85/);
+        expect(screen.getByTestId("group-mean-Berlin-run-2-accuracy")).toHaveTextContent(/0\.65/);
         // Lisbon means: run-1 = (0.5 + 0.4)/2 = 0.45
         //               run-2 = (0.3 + 0.2)/2 = 0.25
-        expect(screen.getByTestId("group-mean-Lisbon-run-1-accuracy")).toHaveTextContent(
-          /0\.45/,
-        );
-        expect(screen.getByTestId("group-mean-Lisbon-run-2-accuracy")).toHaveTextContent(
-          /0\.25/,
-        );
+        expect(screen.getByTestId("group-mean-Lisbon-run-1-accuracy")).toHaveTextContent(/0\.45/);
+        expect(screen.getByTestId("group-mean-Lisbon-run-2-accuracy")).toHaveTextContent(/0\.25/);
       });
     });
 
@@ -318,11 +288,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
       /** @scenario "Rows with no value for the selected field fall into an Unspecified group" */
       it("collects missing-city rows under an Unspecified header at the end", () => {
         render(
-          <ComparisonTable
-            comparisonData={PARTIAL_FIXTURE}
-            disableVirtualization
-            groupBy="city"
-          />,
+          <ComparisonTable comparisonData={PARTIAL_FIXTURE} disableVirtualization groupBy="city" />,
           { wrapper: Wrapper },
         );
 
@@ -330,9 +296,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
         // row) so we only collect the section header rows themselves.
         const headers = screen
           .getAllByTestId(/^group-header-/)
-          .filter(
-            (el) => !el.getAttribute("data-testid")?.startsWith("group-header-toggle-"),
-          );
+          .filter((el) => !el.getAttribute("data-testid")?.startsWith("group-header-toggle-"));
         const ids = headers.map((h) => h.getAttribute("data-testid"));
         expect(ids).toContain("group-header-Unspecified");
         // Unspecified comes last so users notice it as the catch-all.

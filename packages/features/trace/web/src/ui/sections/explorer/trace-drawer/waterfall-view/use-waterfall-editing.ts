@@ -57,10 +57,7 @@ export function useWaterfallEditing(spans: SpanTreeNode[]): {
     const roots = spans
       .map((span) => span.spanId)
       .filter((spanId) =>
-        selectIsSpanDeleted(
-          { basePatch, deletedSpanIds: sessionDeleted, restoredSpanIds },
-          spanId,
-        ),
+        selectIsSpanDeleted({ basePatch, deletedSpanIds: sessionDeleted, restoredSpanIds }, spanId),
       );
     return expandDeletedSpanIds({
       links: spans.map((span) => ({

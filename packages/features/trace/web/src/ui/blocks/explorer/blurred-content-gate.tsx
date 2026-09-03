@@ -60,12 +60,7 @@ export const BlurredContentGate = memo(function BlurredContentGate({
       {/* Progressive backdrop blur over the container: top stays readable,
           bottom dissolves. Masked so the blur ramps instead of cutting. */}
       {/* Uniform blur over the whole gated container. */}
-      <Box
-        position="absolute"
-        inset={0}
-        pointerEvents="none"
-        backdropFilter="blur(2px)"
-      />
+      <Box position="absolute" inset={0} pointerEvents="none" backdropFilter="blur(2px)" />
       {/* Soft wash so the deepest section reads as locked, not broken. */}
       <Box
         position="absolute"
@@ -94,13 +89,7 @@ export const BlurredContentGate = memo(function BlurredContentGate({
           boxShadow="lg"
           pointerEvents="auto"
         >
-          <Text
-            fontSize="sm"
-            fontWeight="semibold"
-            display="flex"
-            alignItems="center"
-            gap={1.5}
-          >
+          <Text fontSize="sm" fontWeight="semibold" display="flex" alignItems="center" gap={1.5}>
             <Box
               as="span"
               display="inline-flex"

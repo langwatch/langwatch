@@ -50,10 +50,10 @@ model_reasoning_effort = "low"
 ```
 
 <Note>
-  Pin to a Bifrost-registered model name. Codex's default `gpt-5.4` (and aliases like
-  `gpt-5-mini` without a date suffix) currently resolve to "provider is required" via the
-  gateway because Bifrost's model registry only matches concrete names. `gpt-4o-mini`
-  works today; `gpt-5` family pins like `gpt-5-2025-08-07` work as Bifrost adds them.
+  Pin to a Bifrost-registered model name. Codex's default `gpt-5.4` (and aliases like `gpt-5-mini`
+  without a date suffix) currently resolve to "provider is required" via the gateway because
+  Bifrost's model registry only matches concrete names. `gpt-4o-mini` works today; `gpt-5` family
+  pins like `gpt-5-2025-08-07` work as Bifrost adds them.
 </Note>
 
 ### Cross-provider routing (Anthropic via /v1/messages, Gemini via /v1/beta)
@@ -110,8 +110,8 @@ codex exec "benchmark"
 
 <Note>
   OpenAI CLI, SDK support for custom headers varies; the header-injection method above is
-  pseudo-code for illustration. Practical override: add `cache.mode: disable` to a
-  dedicated "cold-benchmark" VK.
+  pseudo-code for illustration. Practical override: add `cache.mode: disable` to a dedicated
+  "cold-benchmark" VK.
 </Note>
 
 ### Team-scoped daily budget

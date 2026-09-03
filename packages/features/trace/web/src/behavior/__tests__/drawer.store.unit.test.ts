@@ -46,9 +46,7 @@ describe("drawerStore.setWidthPx", () => {
       it("persists to localStorage", () => {
         useDrawerStore.getState().setWidthPx(900);
         expect(useDrawerStore.getState().widthPx).toBe(900);
-        expect(localStorage.getItem("langwatch:traces-v2:drawer-width-px:v1")).toBe(
-          "900",
-        );
+        expect(localStorage.getItem("langwatch:traces-v2:drawer-width-px:v1")).toBe("900");
       });
     });
   });
@@ -119,9 +117,7 @@ describe("drawerStore pane controls", () => {
       it("flips the collapsed flag and persists to localStorage", () => {
         useDrawerStore.getState().togglePaneCollapsed("visualization");
         expect(useDrawerStore.getState().paneState.visualization.collapsed).toBe(true);
-        expect(
-          localStorage.getItem("langwatch:traces-v2:drawer-pane-state:v2"),
-        ).not.toBeNull();
+        expect(localStorage.getItem("langwatch:traces-v2:drawer-pane-state:v2")).not.toBeNull();
       });
     });
   });

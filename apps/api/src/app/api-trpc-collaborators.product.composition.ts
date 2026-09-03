@@ -452,7 +452,12 @@ function composeTraceExistence(options: ApiProductCollaboratorsOptions): TraceEx
 }
 
 /** The marker a comment leaves on the trace it was left on. */
-type TraceAnnotationMarker = Readonly<{ tenantId: string; traceId: string; annotationId: string; occurredAt: number }>;
+type TraceAnnotationMarker = Readonly<{
+  tenantId: string;
+  traceId: string;
+  annotationId: string;
+  occurredAt: number;
+}>;
 
 /**
  * The trace-side commands this process PRODUCES, sent on the SAME
@@ -563,10 +568,7 @@ class ApiDataPrivacyPermissions extends DataPrivacyPermissionsPort {
     super();
   }
 
-  canManageOrganization(input: {
-    userId: string;
-    organizationId: string;
-  }): Promise<boolean> {
+  canManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean> {
     return this.authz.hasPermission({
       userId: input.userId,
       permission: "organization:manage",
@@ -601,15 +603,16 @@ class ApiDataPrivacyPermissions extends DataPrivacyPermissionsPort {
     // never longer than one.
     if (!input.organizationId) {
       const decided = await Promise.all(
-        input.projectIds.map(async (projectId) =>
-          [
-            projectId,
-            await this.authz.hasPermission({
-              userId: input.userId,
-              permission: "project:update",
+        input.projectIds.map(
+          async (projectId) =>
+            [
               projectId,
-            }),
-          ] as const,
+              await this.authz.hasPermission({
+                userId: input.userId,
+                permission: "project:update",
+                projectId,
+              }),
+            ] as const,
         ),
       );
       return new Map(decided);

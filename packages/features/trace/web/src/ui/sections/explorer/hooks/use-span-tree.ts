@@ -75,8 +75,7 @@ export function useSpanTreeCanonical() {
       // MAX_LIGHT_SPAN_READ_ROWS, i.e. exactly the unbounded fetch paging
       // exists to avoid. Until the walk lands, the main query is the source of
       // truth (and its retries have no high-water mark to poll from anyway).
-      enabled:
-        isReady && isLive && !shared && tree !== undefined && !treeQuery.isFetching,
+      enabled: isReady && isLive && !shared && tree !== undefined && !treeQuery.isFetching,
       // Only when SSE can't push. With SSE up, `useTraceFreshness` invalidates
       // this query per `span.stored` batch, which refetches it on the spot.
       refetchInterval: sseConnected ? false : LIVE_REFETCH_MS,
@@ -117,15 +116,7 @@ export function useSpanTreeCanonical() {
       projectId: queryArgs.projectId,
       traceId: queryArgs.traceId,
     });
-  }, [
-    sseConnected,
-    isReady,
-    isLive,
-    shared,
-    utils,
-    queryArgs.projectId,
-    queryArgs.traceId,
-  ]);
+  }, [sseConnected, isReady, isLive, shared, utils, queryArgs.projectId, queryArgs.traceId]);
 
   if (shared) {
     return asSharedQueryResult(shared.spanTree) as unknown as typeof treeQuery;
@@ -163,10 +154,7 @@ export function useSpanTreeWithCaptured() {
   // struck through. It is what the correction did, not what the trace now is,
   // so it never stands in for `corrected`.
   const displayData = useMemo(
-    () =>
-      nodes
-        ? applyOverlayToSpanTreeNodes({ nodes, patch, shouldKeepDeleted: true })
-        : nodes,
+    () => (nodes ? applyOverlayToSpanTreeNodes({ nodes, patch, shouldKeepDeleted: true }) : nodes),
     [nodes, patch],
   );
 
@@ -175,10 +163,7 @@ export function useSpanTreeWithCaptured() {
     [captured, displayData, nodes],
   );
 
-  return useMemo(
-    () => ({ captured, corrected, display }),
-    [captured, corrected, display],
-  );
+  return useMemo(() => ({ captured, corrected, display }), [captured, corrected, display]);
 }
 
 /**

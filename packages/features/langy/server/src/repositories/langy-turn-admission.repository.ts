@@ -64,10 +64,7 @@ export abstract class LangyTurnAdmissionRepository {
 
 /** Tests and deliberately disabled apps still need the same application seam. */
 export class NullLangyTurnAdmissionRepository extends LangyTurnAdmissionRepository {
-  async claim(input: {
-    conversationId: string;
-    turnId: string;
-  }): Promise<LangyTurnAdmissionClaim> {
+  async claim(input: { conversationId: string; turnId: string }): Promise<LangyTurnAdmissionClaim> {
     return {
       kind: "claimed",
       claimToken: crypto.randomUUID(),

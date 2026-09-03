@@ -35,9 +35,7 @@ describe("RedisConfigService", () => {
     });
 
     it("ignores blank entries and surrounding whitespace", () => {
-      expect(
-        config.resolve({ clusterEndpoints: " one:6379 , ,two:6380 " }),
-      ).toMatchObject({
+      expect(config.resolve({ clusterEndpoints: " one:6379 , ,two:6380 " })).toMatchObject({
         endpoints: [
           { host: "one", port: 6379 },
           { host: "two", port: 6380 },
@@ -89,9 +87,9 @@ describe("RedisConfigService", () => {
     });
 
     it("accepts the highest valid database index", () => {
-      expect(
-        config.resolve({ url: "redis://localhost:6379", dbIndex: 15 }),
-      ).toMatchObject({ db: 15 });
+      expect(config.resolve({ url: "redis://localhost:6379", dbIndex: 15 })).toMatchObject({
+        db: 15,
+      });
     });
 
     /** @scenario "A database index outside the valid range falls back to zero" */

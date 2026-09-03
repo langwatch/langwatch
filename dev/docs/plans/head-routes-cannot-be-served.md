@@ -23,12 +23,12 @@ documents HEAD operations that resolve through a different route than it says.
 HEAD is handled **before routing**. The request is re-dispatched as `GET`, and
 the response is rebuilt with a null body. Consequences, all measured:
 
-| | |
-| --- | --- |
-| `.on("HEAD", path, h)` then a HEAD request | **404** — nothing HEAD-shaped is ever matched |
-| `.get(path, h)` then a HEAD request | 200, empty body — correct HTTP |
-| both registered, HEAD request | the **GET** handler runs; the HEAD one is shadowed |
-| `c.req.method` inside the handler on a HEAD request | reads **`"GET"`** |
+|                                                     |                                                    |
+| --------------------------------------------------- | -------------------------------------------------- |
+| `.on("HEAD", path, h)` then a HEAD request          | **404** — nothing HEAD-shaped is ever matched      |
+| `.get(path, h)` then a HEAD request                 | 200, empty body — correct HTTP                     |
+| both registered, HEAD request                       | the **GET** handler runs; the HEAD one is shadowed |
+| `c.req.method` inside the handler on a HEAD request | reads **`"GET"`**                                  |
 
 That last row is the one that closes the door: a handler cannot detect that it
 is serving a HEAD, so the work cannot be skipped from inside the GET route

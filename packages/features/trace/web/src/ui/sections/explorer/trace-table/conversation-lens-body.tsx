@@ -107,8 +107,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
 
   if (!isLoading && groups.length === 0) return <NoConversationsMessage />;
 
-  const toggleExpanded = (id: string) =>
-    setExpandedKey((prev) => (prev === id ? null : id));
+  const toggleExpanded = (id: string) => setExpandedKey((prev) => (prev === id ? null : id));
 
   return (
     <TraceTableShell table={table} minWidth={CONVERSATION_MIN_WIDTH} stickyFirstColumn>

@@ -79,8 +79,7 @@ const ANNOTATIONS: LangWatchQLViewDefinition = {
     approvedView: "lwql_annotations",
     tenantSourceColumn: "projectId",
   },
-  description:
-    "One row per human annotation of a trace, with the reviewer's thumbs verdict.",
+  description: "One row per human annotation of a trace, with the reviewer's thumbs verdict.",
   gates: [],
   grain: "one row per AnnotationId",
   joinKeys: ["TenantId", "TraceId"],
@@ -198,8 +197,7 @@ const PROMPTS: LangWatchQLViewDefinition = {
     approvedView: "lwql_prompts",
     tenantSourceColumn: "projectId",
   },
-  description:
-    "One row per prompt configuration, with the name its versions are known by.",
+  description: "One row per prompt configuration, with the name its versions are known by.",
   gates: [],
   grain: "one row per PromptId",
   joinKeys: ["TenantId", "PromptId"],
@@ -268,8 +266,7 @@ const PROMPT_VERSIONS: LangWatchQLViewDefinition = {
     approvedView: "lwql_prompt_versions",
     tenantSourceColumn: "projectId",
   },
-  description:
-    "One row per version of a prompt, carrying the version number a trace records.",
+  description: "One row per version of a prompt, carrying the version number a trace records.",
   gates: [],
   grain: "one row per PromptVersionId",
   joinKeys: ["TenantId", "PromptVersionId", "PromptId"],
@@ -343,8 +340,7 @@ const EXPERIMENTS: LangWatchQLViewDefinition = {
     {
       name: "ExperimentId",
       type: "String",
-      description:
-        "Experiment identifier, as carried by the fact tables that reference it.",
+      description: "Experiment identifier, as carried by the fact tables that reference it.",
       gates: [],
       sourceColumns: ["id"],
     },

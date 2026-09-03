@@ -196,9 +196,7 @@ function fanoutForPair({
     if (seen.has(key)) continue;
     seen.add(key);
 
-    diagnostics.push(
-      fanoutDiagnostic({ multiplied, multiplier, unmatched, block, pair }),
-    );
+    diagnostics.push(fanoutDiagnostic({ multiplied, multiplier, unmatched, block, pair }));
   }
   return diagnostics;
 }
@@ -282,9 +280,7 @@ function fanoutDiagnostic({
  * repeats it. The catalog's `unit` is what says which is which.
  */
 function measureColumns(view: LangWatchQLViewDefinition): readonly string[] {
-  return view.columns
-    .filter((column) => column.unit !== undefined)
-    .map((column) => column.name);
+  return view.columns.filter((column) => column.unit !== undefined).map((column) => column.name);
 }
 
 /**
@@ -317,8 +313,7 @@ function joinedPairs({
 
   const pairs = new Map<string, JoinedPair>();
   const pairFor = (leftIndex: number, rightIndex: number): JoinedPair => {
-    const [low, high] =
-      leftIndex < rightIndex ? [leftIndex, rightIndex] : [rightIndex, leftIndex];
+    const [low, high] = leftIndex < rightIndex ? [leftIndex, rightIndex] : [rightIndex, leftIndex];
     const key = `${low}:${high}`;
     const existing = pairs.get(key);
     if (existing) return existing;
@@ -404,10 +399,8 @@ function applyQualifiedEquality({
   byQualifier: ReadonlyMap<string, number>;
   pairFor: PairLookup;
 }): void {
-  const leftIndex =
-    left.qualifier === undefined ? undefined : byQualifier.get(left.qualifier);
-  const rightIndex =
-    right.qualifier === undefined ? undefined : byQualifier.get(right.qualifier);
+  const leftIndex = left.qualifier === undefined ? undefined : byQualifier.get(left.qualifier);
+  const rightIndex = right.qualifier === undefined ? undefined : byQualifier.get(right.qualifier);
   if (leftIndex === undefined || rightIndex === undefined) return;
   if (leftIndex === rightIndex) return;
 
@@ -531,16 +524,12 @@ const MIN_BUCKETS_FOR_GAP_DETECTION = 3;
  */
 const BUCKET_ALIGNMENT_TOLERANCE = 0.15;
 
-function timeBucketDiagnostics(
-  input: LangWatchQLDiagnosticsInput,
-): LangWatchQLDiagnostic[] {
+function timeBucketDiagnostics(input: LangWatchQLDiagnosticsInput): LangWatchQLDiagnostic[] {
   const axis = timeBucketAxis(input);
   if (!axis) return [];
 
   const { column, buckets } = axis;
-  const width = Math.min(
-    ...buckets.slice(1).map((value, index) => value - buckets[index]!),
-  );
+  const width = Math.min(...buckets.slice(1).map((value, index) => value - buckets[index]!));
   if (!Number.isFinite(width) || width <= 0) return [];
 
   return [
@@ -685,9 +674,7 @@ function isWholeMultiple(value: number, unit: number): boolean {
   // periods are unequal lengths" while the truth is "two months are missing" —
   // and `missingBucketDiagnostics` skips the same gap, so the count of absent
   // buckets comes back zero.
-  return (
-    Math.abs(multiple - nearest) <= BUCKET_ALIGNMENT_TOLERANCE * Math.max(1, nearest)
-  );
+  return Math.abs(multiple - nearest) <= BUCKET_ALIGNMENT_TOLERANCE * Math.max(1, nearest);
 }
 
 // ---------------------------------------------------------------------------
@@ -712,8 +699,7 @@ function isTemporalType(type: string): boolean {
 }
 
 /** `2026-02-20`, `2026-02-20 12:00:00`, `2026-02-20 12:00:00.000`. */
-const CLICKHOUSE_TIMESTAMP =
-  /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?))?$/;
+const CLICKHOUSE_TIMESTAMP = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?))?$/;
 
 /**
  * A temporal value as milliseconds, or `null` for anything else.

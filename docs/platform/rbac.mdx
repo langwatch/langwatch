@@ -6,11 +6,11 @@ keywords: rbac, langwatch, llm, ai, rbac, role-based access control
 ---
 
 <Note>
-  **Custom roles are available on Enterprise plans.** The built-in organization, team and
-  project roles below work on every plan. Creating custom roles and assigning them needs
-  an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Calls to
-  the [Roles API](/api-reference/roles/overview) without one are refused with HTTP 402 and
-  the error code `enterprise_plan_required`. To enable it, reach out to
+  **Custom roles are available on Enterprise plans.** The built-in organization, team and project
+  roles below work on every plan. Creating custom roles and assigning them needs an Enterprise plan,
+  and a self-hosted deployment needs an Enterprise license. Calls to the [Roles
+  API](/api-reference/roles/overview) without one are refused with HTTP 402 and the error code
+  `enterprise_plan_required`. To enable it, reach out to
   [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
@@ -235,9 +235,9 @@ Roles in LangWatch are assigned via **role bindings**: a binding links a princip
 Role bindings can be assigned to users directly from **Settings → Members**, or to groups from **Settings → Groups**. Users inherit all bindings assigned to groups they belong to.
 
 <Tip>
-  Use group bindings (especially SCIM groups from your IdP) to manage access at scale,
-  assigning a binding to a group is equivalent to assigning it to every member of that
-  group. See [SCIM Groups](/platform/scim-groups).
+  Use group bindings (especially SCIM groups from your IdP) to manage access at scale, assigning a
+  binding to a group is equivalent to assigning it to every member of that group. See [SCIM
+  Groups](/platform/scim-groups).
 </Tip>
 
 ---

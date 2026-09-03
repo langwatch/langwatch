@@ -93,12 +93,8 @@ async function ensureNodeModules(
   // primary path. resolvePnpm(paths) prefers the bundled <bin>/pnpm
   // installed by the pnpm predep.
   const pnpm = await resolvePnpm(ctx.paths);
-  await execa(
-    pnpm.command,
-    [...pnpm.args, "install", "--prod=false", "--frozen-lockfile"],
-    {
-      cwd: langwatchDir,
-      stdio: "inherit",
-    },
-  );
+  await execa(pnpm.command, [...pnpm.args, "install", "--prod=false", "--frozen-lockfile"], {
+    cwd: langwatchDir,
+    stdio: "inherit",
+  });
 }

@@ -222,10 +222,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     describe("and settings.json already carries every OTEL key", () => {
       beforeEach(() => {
         fs.mkdirSync(path.dirname(claudeSettingsPath()), { recursive: true });
-        fs.writeFileSync(
-          claudeSettingsPath(),
-          JSON.stringify({ env: otelVars }, null, 2),
-        );
+        fs.writeFileSync(claudeSettingsPath(), JSON.stringify({ env: otelVars }, null, 2));
       });
 
       it("does not prompt again or rewrite the exports", async () => {
@@ -276,9 +273,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           vars: otelVars,
         });
         const written = JSON.parse(fs.readFileSync(claudeSettingsPath(), "utf8"));
-        expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-          "http://app.example.com/api/otel",
-        );
+        expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
         expect(written.env.OTEL_TRACES_EXPORTER).toBe("otlp");
       });
     });
@@ -416,9 +411,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         expect(rc).toContain("# >>> langwatch opencode begin >>>");
         expect(rc).toContain("opencode() {");
         expect(rc).toContain('command opencode "$@"');
-        expect(rc).toContain(
-          "OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
-        );
+        expect(rc).toContain("OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel");
         // NOT a bare global export — that's the leak we're avoiding.
         expect(rc).not.toContain("export OTEL_TRACES_EXPORTER");
         // Claude Code settings file untouched.

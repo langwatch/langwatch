@@ -4,10 +4,7 @@ import type {
   AutomationRunawayTrigger,
 } from "@langwatch/automation-contract";
 import { AutomationRunawayPort } from "../../ports/automation-runaway.port";
-import {
-  RunawayContainmentService,
-  RUNAWAY_PAUSE_REASON,
-} from "../runaway-containment.service";
+import { RunawayContainmentService, RUNAWAY_PAUSE_REASON } from "../runaway-containment.service";
 
 class TestRunawayPort extends AutomationRunawayPort {
   readonly paused = vi.fn();
@@ -113,7 +110,10 @@ describe("runaway containment policy", () => {
   /** @scenario "Persist-cap containment pauses a condition-less automation once" */
   it("claims the containment check first and mails once for the UTC day", async () => {
     const { port, service } = runtime();
-    const check = { key: "automation-containment-check:trigger-1", token: "automation-containment-check:trigger-1" };
+    const check = {
+      key: "automation-containment-check:trigger-1",
+      token: "automation-containment-check:trigger-1",
+    };
     const pause = { key: "automation-pause:trigger-1", token: "automation-pause:trigger-1" };
 
     await service.handle(breach());
@@ -138,7 +138,10 @@ describe("runaway containment policy", () => {
         count: 899,
         skipped: 799,
       });
-    const check = { key: "automation-containment-check:trigger-1", token: "automation-containment-check:trigger-1" };
+    const check = {
+      key: "automation-containment-check:trigger-1",
+      token: "automation-containment-check:trigger-1",
+    };
 
     await service.handle(filtered());
     await port.releaseClaim(check);

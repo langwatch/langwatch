@@ -126,10 +126,7 @@ async function main() {
   try {
     // First message in conversation
     console.log("User: What is the capital of France?\n");
-    const response1 = await handleUserMessage(
-      "What is the capital of France?",
-      userContext,
-    );
+    const response1 = await handleUserMessage("What is the capital of France?", userContext);
     console.log(`Assistant: ${response1}\n`);
 
     // Second message in same conversation (same conversation ID)

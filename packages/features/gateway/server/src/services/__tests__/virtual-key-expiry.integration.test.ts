@@ -142,14 +142,13 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
   describe("when the date given has already passed", () => {
     /** @scenario "An expiration date in the past is refused" */
     it("refuses the create, naming the expiration field", async () => {
-      const error = await mintKey(
-        "born-dead",
-        new Date(Date.now() - 1_000),
-      ).catch((err: unknown) => err);
+      const error = await mintKey("born-dead", new Date(Date.now() - 1_000)).catch(
+        (err: unknown) => err,
+      );
       expect(codeOf(error)).toBe("virtual_key_expiry_in_past");
       expect(
-        (error as { meta?: { fieldErrors?: Record<string, string[]> } }).meta
-          ?.fieldErrors?.expiresAt,
+        (error as { meta?: { fieldErrors?: Record<string, string[]> } }).meta?.fieldErrors
+          ?.expiresAt,
       ).toEqual(["Pick a date in the future"]);
     });
 

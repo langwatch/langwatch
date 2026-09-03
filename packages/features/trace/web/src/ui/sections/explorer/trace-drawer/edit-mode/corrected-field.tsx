@@ -184,11 +184,7 @@ export function CorrectedScalar({
 }) {
   return (
     <Tooltip content={`Original: ${original}`} positioning={{ placement: "top" }}>
-      <HStack
-        gap={1.5}
-        aria-label={`${label}, edited. Original: ${original}`}
-        cursor="help"
-      >
+      <HStack gap={1.5} aria-label={`${label}, edited. Original: ${original}`} cursor="help">
         {children}
         <EditedPill />
       </HStack>

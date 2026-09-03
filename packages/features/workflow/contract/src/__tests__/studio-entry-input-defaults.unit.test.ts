@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Field, StudioWorkflow } from "../studio-workflow";
-import {
-  applyEntryInputDefaults,
-  entryInlineWithDefaults,
-} from "../studio-entry-input-defaults";
+import { applyEntryInputDefaults, entryInlineWithDefaults } from "../studio-entry-input-defaults";
 
 const inline = (records: Record<string, unknown[]>) => ({
   records,
@@ -34,10 +31,7 @@ describe("entryInlineWithDefaults", () => {
     it("fills only the null/undefined cells and leaves provided values", () => {
       const fields: Field[] = [{ identifier: "lang", type: "str", value: "en" }];
 
-      const result = entryInlineWithDefaults(
-        inline({ lang: ["fr", null, void 0, ""] }),
-        fields,
-      );
+      const result = entryInlineWithDefaults(inline({ lang: ["fr", null, void 0, ""] }), fields);
 
       // provided "fr" and explicit "" are kept; null/undefined get the default
       expect(result.records.lang).toEqual(["fr", "en", "en", ""]);

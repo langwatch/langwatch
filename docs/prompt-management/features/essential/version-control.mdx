@@ -21,9 +21,8 @@ Prompts have two scope levels that affect version management and conflict resolu
 - **ORGANIZATION scope** - Prompts are shared across all projects in the organization. Changes can affect other projects and may require conflict resolution.
 
 <Warning>
-  **Scope Conflicts**: When updating an organization-scoped prompt, conflicts may arise if
-  other projects have made changes. The system provides conflict information to help
-  resolve differences.
+  **Scope Conflicts**: When updating an organization-scoped prompt, conflicts may arise if other
+  projects have made changes. The system provides conflict information to help resolve differences.
 </Warning>
 
 ## Managing Versions
@@ -121,10 +120,10 @@ curl --request GET \
 The SDK provides CRUD operations for managing prompts programmatically:
 
 <Note>
-  **Field Structure**: All examples show the essential fields. Additional optional fields
-  like `temperature`, `maxTokens`, `responseFormat`, `inputs`, `outputs`,
-  `demonstrations`, and `promptingTechnique` can also be set. See the [Data
-  Model](/prompt-management/data-model) page for complete field documentation.
+  **Field Structure**: All examples show the essential fields. Additional optional fields like
+  `temperature`, `maxTokens`, `responseFormat`, `inputs`, `outputs`, `demonstrations`, and
+  `promptingTechnique` can also be set. See the [Data Model](/prompt-management/data-model) page for
+  complete field documentation.
 </Note>
 
 ### Create Prompts
@@ -132,16 +131,14 @@ The SDK provides CRUD operations for managing prompts programmatically:
 Create new prompts with templates and variables:
 
 <Warning>
-  **System Message Conflict**: You cannot set both a `prompt` (system message) and
-  `messages` array with a system role in the same operation. Choose one approach to avoid
-  errors.
+  **System Message Conflict**: You cannot set both a `prompt` (system message) and `messages` array
+  with a system role in the same operation. Choose one approach to avoid errors.
 </Warning>
 
 <Note>
-  The two SDKs do not take the same fields. `model`, `temperature` and
-  `maxTokens` go through the TypeScript SDK and the REST API; the Python SDK's
-  `create` and `update` do not accept them yet, so set them from the UI or over
-  REST. See the [REST reference](/api-reference/prompts/overview).
+  The two SDKs do not take the same fields. `model`, `temperature` and `maxTokens` go through the
+  TypeScript SDK and the REST API; the Python SDK's `create` and `update` do not accept them yet, so
+  set them from the UI or over REST. See the [REST reference](/api-reference/prompts/overview).
 </Note>
 
 <Tabs>
@@ -189,8 +186,8 @@ Create new prompts with templates and variables:
 Modify existing prompts while maintaining version history:
 
 <Warning>
-  **System Message Conflict**: Same rule applies - you cannot set both a `prompt` and
-  `messages` array with a system role in the same operation.
+  **System Message Conflict**: Same rule applies - you cannot set both a `prompt` and `messages`
+  array with a system role in the same operation.
 </Warning>
 
 <Note>You must include at least one field to update the prompt.</Note>
@@ -237,8 +234,8 @@ Modify existing prompts while maintaining version history:
 Remove entire prompts and all their versions:
 
 <Warning>
-  **Permanent Deletion**: Deleting a prompt removes ALL versions permanently. This action
-  cannot be undone.
+  **Permanent Deletion**: Deleting a prompt removes ALL versions permanently. This action cannot be
+  undone.
 </Warning>
 
 <Tabs>
@@ -268,8 +265,8 @@ Remove entire prompts and all their versions:
 ### System Message Conflicts
 
 <Warning>
-  **Critical**: You cannot set both a `prompt` field and a `messages` array containing a
-  system role in the same operation. This will throw an error.
+  **Critical**: You cannot set both a `prompt` field and a `messages` array containing a system role
+  in the same operation. This will throw an error.
 </Warning>
 
 **Valid approaches:**
@@ -305,8 +302,8 @@ Beyond basic prompt creation, LangWatch provides these features for optimizing a
 - **Model Selection**: Choose the best model for your specific use case
 
 <Tip>
-  Combine these advanced features with LangWatch's optimization studio, where you can A/B
-  test different configurations and measure their impact on performance metrics.
+  Combine these advanced features with LangWatch's optimization studio, where you can A/B test
+  different configurations and measure their impact on performance metrics.
 </Tip>
 
 ### Optimization Studio Integration
@@ -319,11 +316,7 @@ The optimization studio uses these advanced prompt capabilities to help you:
 - **Version Management**: Track which configurations perform best over time
 - **Team Collaboration**: Share optimized prompts across your organization
 
-<Card
-  title="Explore Optimization Studio"
-  icon="rocket"
-  href="/optimization-studio/overview"
->
+<Card title="Explore Optimization Studio" icon="rocket" href="/optimization-studio/overview">
   Learn how to use advanced prompt features to improve your AI application performance.
 </Card>
 

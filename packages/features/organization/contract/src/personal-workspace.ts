@@ -46,12 +46,7 @@ export const ensuredPersonalWorkspaceSchema = personalWorkspaceSchema.extend({
 });
 export type EnsuredPersonalWorkspace = z.infer<typeof ensuredPersonalWorkspaceSchema>;
 
-export const PERSONAL_FEATURES = [
-  "evaluations",
-  "datasets",
-  "annotations",
-  "automations",
-] as const;
+export const PERSONAL_FEATURES = ["evaluations", "datasets", "annotations", "automations"] as const;
 export const personalFeatureSchema = z.enum(PERSONAL_FEATURES);
 export type PersonalFeature = z.infer<typeof personalFeatureSchema>;
 
@@ -71,18 +66,11 @@ export const personalWorkspaceFeaturesInputSchema = z
     callerUserId: z.string().min(1),
   })
   .strict();
-export type PersonalWorkspaceFeaturesInput = z.infer<
-  typeof personalWorkspaceFeaturesInputSchema
->;
+export type PersonalWorkspaceFeaturesInput = z.infer<typeof personalWorkspaceFeaturesInputSchema>;
 
-export function personalFeatureEnabled(
-  stored: unknown,
-  feature: PersonalFeature,
-): boolean {
+export function personalFeatureEnabled(stored: unknown, feature: PersonalFeature): boolean {
   return Boolean(
-    stored &&
-    typeof stored === "object" &&
-    (stored as Record<string, unknown>)[feature] === true,
+    stored && typeof stored === "object" && (stored as Record<string, unknown>)[feature] === true,
   );
 }
 

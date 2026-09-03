@@ -25,9 +25,7 @@ export const deleteProjectCommand = async (id: string): Promise<CommandResult | 
       table: () => {
         console.log();
         console.log(chalk.gray("Project has been archived (soft-deleted)."));
-        console.log(
-          chalk.gray("Archived at: ") + new Date(result.archivedAt).toLocaleString(),
-        );
+        console.log(chalk.gray("Archived at: ") + new Date(result.archivedAt).toLocaleString());
         console.log();
       },
     };

@@ -18,9 +18,7 @@ describe("resolveExperimentVerdictLabel", () => {
     const variants = ["target-a"];
 
     expect(resolveExperimentVerdictLabel({ label: "tie", variants })).toBe("tie");
-    expect(resolveExperimentVerdictLabel({ label: "target-c", variants })).toBe(
-      "target-c",
-    );
+    expect(resolveExperimentVerdictLabel({ label: "target-c", variants })).toBe("target-c");
     expect(resolveExperimentVerdictLabel({ label: "B", variants })).toBe("B");
   });
 });

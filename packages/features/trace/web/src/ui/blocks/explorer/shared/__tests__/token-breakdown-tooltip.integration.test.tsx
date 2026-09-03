@@ -10,9 +10,7 @@ import { TokenBreakdownTooltipContent } from "../token-breakdown-tooltip";
 // document-scoped assertions (RTL auto-cleanup isn't wired in this project).
 afterEach(cleanup);
 
-function renderBreakdown(
-  props: Partial<Parameters<typeof TokenBreakdownTooltipContent>[0]> = {},
-) {
+function renderBreakdown(props: Partial<Parameters<typeof TokenBreakdownTooltipContent>[0]> = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <TokenBreakdownTooltipContent

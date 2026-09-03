@@ -42,9 +42,7 @@ export class AnalyticsApiService {
     throw new AnalyticsApiError(message, operation, error);
   }
 
-  async timeseries(
-    params: AnalyticsTimeseriesBody,
-  ): Promise<AnalyticsTimeseriesResponse> {
+  async timeseries(params: AnalyticsTimeseriesBody): Promise<AnalyticsTimeseriesResponse> {
     const { data, error } = await this.apiClient.POST("/api/analytics/timeseries", {
       body: params,
     });

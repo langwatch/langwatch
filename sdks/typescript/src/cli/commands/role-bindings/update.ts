@@ -5,12 +5,7 @@ import {
 } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
 import { parseRole } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import {
-  orDash,
-  printFacts,
-  runManagement,
-  withParsedFlags,
-} from "../management/_shared";
+import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";
 
 export interface UpdateRoleBindingOptions {
   role: string;

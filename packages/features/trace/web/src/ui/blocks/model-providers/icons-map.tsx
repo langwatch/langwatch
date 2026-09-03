@@ -66,11 +66,5 @@ export function ProviderIconGlyph({
 }) {
   const icon = modelProviderIcons[provider];
   if (!icon) return null;
-  return (
-    <IconGlyph
-      icon={icon}
-      monochrome={MONOCHROME_PROVIDER_ICONS.has(provider)}
-      size={size}
-    />
-  );
+  return <IconGlyph icon={icon} monochrome={MONOCHROME_PROVIDER_ICONS.has(provider)} size={size} />;
 }

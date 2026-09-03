@@ -149,9 +149,7 @@ describe("the skills installer, given a temp install root", () => {
     editBody(managed);
 
     expect(planUninstall({ skill: skill("tracing"), root }).action).toBe("skipped");
-    expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe(
-      "removed",
-    );
+    expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe("removed");
   });
 
   it("updates only managed files whose content drifted from the bundle", () => {
@@ -267,12 +265,8 @@ describe("the skills installer, given a temp install root", () => {
       const { path: managed } = installSkill({ skill: skill("tracing"), root });
       fs.appendFileSync(managed, "\nuser notes\n", "utf8");
 
-      expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe(
-        "skipped",
-      );
-      expect(updateSkill({ skill: skill("tracing"), root, force: true }).action).toBe(
-        "skipped",
-      );
+      expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe("skipped");
+      expect(updateSkill({ skill: skill("tracing"), root, force: true }).action).toBe("skipped");
       expect(fs.readFileSync(managed, "utf8")).toContain("user notes");
     });
 
@@ -280,9 +274,7 @@ describe("the skills installer, given a temp install root", () => {
       const { path: managed } = installSkill({ skill: skill("tracing"), root });
       fs.appendFileSync(managed, "\n\n", "utf8");
 
-      expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe(
-        "removed",
-      );
+      expect(planUninstall({ skill: skill("tracing"), root, yes: true }).action).toBe("removed");
     });
   });
 
@@ -449,9 +441,7 @@ describe("the skills installer, given a temp install root", () => {
         ...skill("tracing"),
         slug: "../../../etc/evil",
       };
-      expect(() => skillFilePath({ root, skill: traversal })).toThrow(
-        /single path segment/,
-      );
+      expect(() => skillFilePath({ root, skill: traversal })).toThrow(/single path segment/);
 
       const nested: BundledSkill = { ...skill("tracing"), slug: "a/b" };
       expect(() => skillFilePath({ root, skill: nested })).toThrow(/single path segment/);

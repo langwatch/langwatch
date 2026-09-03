@@ -47,9 +47,7 @@ describe("splitLangyModels", () => {
 
     it("keeps every model reachable across the two lists", () => {
       const { suggested, more } = splitLangyModels({ items: CATALOGUE });
-      expect([...values(suggested), ...values(more)].sort()).toEqual(
-        values(CATALOGUE).sort(),
-      );
+      expect([...values(suggested), ...values(more)].sort()).toEqual(values(CATALOGUE).sort());
     });
   });
 

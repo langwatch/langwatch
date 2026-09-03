@@ -216,17 +216,13 @@ export function unknownIdentifierFromError(error: unknown): string | undefined {
  * Anything else passes through untouched: an unmapped error is genuinely
  * unhandled and must degrade to "unknown" at the boundary (ADR-045).
  */
-export function translateClickHouseQueryError(
-  error: unknown,
-  durationMs: number,
-): unknown {
+export function translateClickHouseQueryError(error: unknown, durationMs: number): unknown {
   if (!(error instanceof Error)) return error;
 
   // When no code form is present the matchers simply do not fire and the
   // error degrades to "unknown", which is the documented safe outcome
   // (ADR-045). Matching rules live on `raisedServerError`.
-  const raised = (...variants: ServerError[]): boolean =>
-    raisedServerError({ error, variants });
+  const raised = (...variants: ServerError[]): boolean => raisedServerError({ error, variants });
 
   if (raised(MEMORY_LIMIT_EXCEEDED)) {
     return new QueryMemoryExceededError({ reasons: [toError(error)] });
@@ -242,8 +238,7 @@ export function translateClickHouseQueryError(
 
   const errno = String((error as { code?: unknown }).code ?? "");
   const status =
-    (error as { statusCode?: number }).statusCode ??
-    (error as { status?: number }).status;
+    (error as { statusCode?: number }).statusCode ?? (error as { status?: number }).status;
   if (TRANSIENT_NETWORK_CODES.has(errno) || status === 502 || status === 503) {
     return new ClickHouseUnavailableError({ reasons: [toError(error)] });
   }

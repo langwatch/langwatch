@@ -11,9 +11,7 @@ import { reportCommandError } from "@/cli/utils/errorOutput";
  * boolean shape that drives the MainMenu Governance entry promotion
  * in the web UI.
  */
-export async function governanceStatusCommand(options: {
-  json?: boolean;
-}): Promise<void> {
+export async function governanceStatusCommand(options: { json?: boolean }): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
     process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");

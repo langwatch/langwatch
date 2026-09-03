@@ -13,10 +13,9 @@ LangWatch RBAC has two layers, two surfaces, and one stitching mechanism:
 The pre-built roles cover the common cases. You only land here when you need to delegate `aiTools:manage` without granting full `organization:manage`, or when an audit asks "who can read the audit log" and you want a screen instead of a Slack thread.
 
 <Info>
-  **Pairs with:** [Members & invites](/ai-governance/members-and-invites) (assigning roles
-  when inviting), [Audit log](/ai-governance/audit-log) (every role binding mutation
-  records a row), and [AI Gateway → RBAC](/ai-gateway/rbac) (the gateway-side enforcement
-  of permissions).
+  **Pairs with:** [Members & invites](/ai-governance/members-and-invites) (assigning roles when
+  inviting), [Audit log](/ai-governance/audit-log) (every role binding mutation records a row), and
+  [AI Gateway → RBAC](/ai-gateway/rbac) (the gateway-side enforcement of permissions).
 </Info>
 
 ## Organization roles
@@ -61,8 +60,8 @@ Annotations are the exception: on the built-in lite role a member can leave and 
 These are permissions, not screens, so they hold wherever the data is reached. A lite member using the [MCP server](/integration/mcp) with their own account, or the API with their own credentials, sees exactly what they see in the app.
 
 <Note>
-  Trace **viewing** is included in a lite seat. If you want someone who cannot open a
-  trace at all, build a custom role that withholds `traces:view` and bind it to them.
+  Trace **viewing** is included in a lite seat. If you want someone who cannot open a trace at all,
+  build a custom role that withholds `traces:view` and bind it to them.
 </Note>
 
 ### Choosing between them

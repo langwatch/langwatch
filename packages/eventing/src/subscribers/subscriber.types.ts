@@ -60,10 +60,7 @@ export interface SubscriberDispatchOptions {
  *
  * See the package reaction contract in `REACTIONS.md`.
  */
-export interface SubscriberDispatchDefinition<
-  E extends Event = Event,
-  FoldState = unknown,
-> {
+export interface SubscriberDispatchDefinition<E extends Event = Event, FoldState = unknown> {
   /** Unique name for this subscriber */
   name: string;
   /**

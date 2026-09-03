@@ -161,9 +161,7 @@ describe("waitForBatchRun()", () => {
   describe("when the status endpoint keeps failing", () => {
     /** @scenario "A dead status endpoint still emits the machine-readable document" */
     it("gives up after five reads in a row and answers with the poll failure outcome", async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockRejectedValue(new Error("endpoint down"));
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("endpoint down"));
 
       const answer = await wait({ advanceMs: 5 * 3000 });
 

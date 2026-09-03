@@ -98,13 +98,7 @@ function grow({ scroller, to }: { scroller: HTMLElement; to: number }) {
  * it caused. The wheel points the way the column is about to go, because that
  * is the only thing that makes it the cause — see `wheel` and `layoutScrollTo`.
  */
-function userScrollTo({
-  scroller,
-  top,
-}: {
-  scroller: HTMLElement;
-  top: number;
-}) {
+function userScrollTo({ scroller, top }: { scroller: HTMLElement; top: number }) {
   act(() => {
     wheel({ scroller, direction: top < scroller.scrollTop ? "up" : "down" });
     scroller.scrollTop = top;
@@ -113,16 +107,8 @@ function userScrollTo({
 }
 
 /** One notch of the wheel, in the direction a reader turned it. */
-function wheel({
-  scroller,
-  direction,
-}: {
-  scroller: HTMLElement;
-  direction: "up" | "down";
-}) {
-  scroller.dispatchEvent(
-    new WheelEvent("wheel", { deltaY: direction === "up" ? -120 : 120 }),
-  );
+function wheel({ scroller, direction }: { scroller: HTMLElement; direction: "up" | "down" }) {
+  scroller.dispatchEvent(new WheelEvent("wheel", { deltaY: direction === "up" ? -120 : 120 }));
 }
 
 /**
@@ -176,13 +162,7 @@ function pointer({
  * clamped the scroll position down to the new maximum, and nobody touched an
  * input device. Identical geometry to `userScrollTo`, opposite meaning.
  */
-function layoutScrollTo({
-  scroller,
-  top,
-}: {
-  scroller: HTMLElement;
-  top: number;
-}) {
+function layoutScrollTo({ scroller, top }: { scroller: HTMLElement; top: number }) {
   act(() => {
     scroller.scrollTop = top;
     scroller.dispatchEvent(new Event("scroll"));

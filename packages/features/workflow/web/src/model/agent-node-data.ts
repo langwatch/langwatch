@@ -180,10 +180,7 @@ export function buildAgentNodeData(agent: TypedAgent): Partial<AgentComponent> {
   };
 }
 
-function readParameter(
-  data: Pick<AgentComponent, "parameters">,
-  identifier: string,
-): unknown {
+function readParameter(data: Pick<AgentComponent, "parameters">, identifier: string): unknown {
   return data.parameters?.find((p) => p.identifier === identifier)?.value;
 }
 
@@ -192,9 +189,7 @@ function readParameter(
  * DSL snapshot. Undefined when the node carries no snapshot (callers
  * decide the fallback - never silently the starter template).
  */
-export function readCodeSnapshot(
-  data: Pick<AgentComponent, "parameters">,
-): string | undefined {
+export function readCodeSnapshot(data: Pick<AgentComponent, "parameters">): string | undefined {
   const value = readParameter(data, "code");
   return typeof value === "string" ? value : void 0;
 }

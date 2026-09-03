@@ -79,9 +79,7 @@ export async function runApp(): Promise<void> {
             break;
           case "turn":
             void runner.submitTurn(command).catch((error) => {
-              warn(
-                `turn crashed: ${error instanceof Error ? error.message : String(error)}`,
-              );
+              warn(`turn crashed: ${error instanceof Error ? error.message : String(error)}`);
             });
             break;
           case "abort":

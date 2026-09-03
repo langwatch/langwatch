@@ -4,10 +4,7 @@ import { getNodeDisplayName } from "../ui/sections/workflow-nodes";
 
 describe("getNodeDisplayName", () => {
   it.each([
-    [
-      { localConfig: { name: "Local Name" }, name: "DB Name", cls: "SomeClass" },
-      "Local Name",
-    ],
+    [{ localConfig: { name: "Local Name" }, name: "DB Name", cls: "SomeClass" }, "Local Name"],
     [{ name: "Node Name", cls: "SomeClass" }, "Node Name"],
     [{ cls: "SomeClass" }, "SomeClass"],
     [{}, "node-1"],

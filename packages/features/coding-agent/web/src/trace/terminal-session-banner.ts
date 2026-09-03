@@ -51,8 +51,7 @@ function detectBannerAgent({
 
   for (const span of spans) {
     if (span.name.startsWith("claude_code.")) return "claude_code";
-    if (span.name.startsWith("opencode.") || span.name.startsWith("ai.stream"))
-      return "opencode";
+    if (span.name.startsWith("opencode.") || span.name.startsWith("ai.stream")) return "opencode";
     if (span.name === "session_task.turn") return "codex";
     if (span.name === "llm_call") return "gemini_cli";
     // Copilot's call span is "chat <model>" — the only agent naming this way.

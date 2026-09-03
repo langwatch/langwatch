@@ -5,10 +5,7 @@ import type {
   AnomalyRuleStatus,
 } from "@langwatch/enterprise-governance-contract";
 
-export type NewAnomalyRule = Omit<
-  AnomalyRule,
-  "id" | "archivedAt" | "createdAt" | "updatedAt"
->;
+export type NewAnomalyRule = Omit<AnomalyRule, "id" | "archivedAt" | "createdAt" | "updatedAt">;
 
 export type AnomalyRuleChanges = Partial<
   Pick<

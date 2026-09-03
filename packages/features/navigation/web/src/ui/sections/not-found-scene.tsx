@@ -367,11 +367,7 @@ export function NotFoundScene() {
                 step={10}
                 onChange={(v) => updateParam("gridStep", v)}
               />
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => setParams(defaultGridParams)}
-              >
+              <Button size="xs" variant="outline" onClick={() => setParams(defaultGridParams)}>
                 Reset
               </Button>
               <Button
@@ -398,8 +394,7 @@ export function NotFoundScene() {
           position="relative"
           userSelect="none"
           css={{
-            textShadow:
-              "0 0 60px rgba(100, 160, 255, 0.12), 0 4px 20px rgba(0, 0, 0, 0.25)",
+            textShadow: "0 0 60px rgba(100, 160, 255, 0.12), 0 4px 20px rgba(0, 0, 0, 0.25)",
           }}
         >
           <Text
@@ -479,12 +474,7 @@ export function NotFoundScene() {
             <ArrowLeft size={14} />
             Go back
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            color="fg.muted"
-            onClick={() => host.navigate("/")}
-          >
+          <Button size="sm" variant="ghost" color="fg.muted" onClick={() => host.navigate("/")}>
             <Home size={14} />
             Home
           </Button>

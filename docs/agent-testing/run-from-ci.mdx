@@ -70,7 +70,8 @@ The response has the values the CI job needs:
 To run a configuration of your own instead of a whole test suite, `POST /api/v1/run-plans/run` takes a `config` object with the scope, the targets, the repeat count and the two models. The scope is one of `{ "mode": "all" }`, `{ "mode": "test_suites", "testSuiteIds": [...] }`, `{ "mode": "labels", "labels": [...] }`, or `{ "mode": "scenarios" }` with `scenarioIds` beside it. `GET /api/v1/run-plans` lists the plans, and `POST /api/v1/run-plans/{id}/run` runs one again with its stored configuration.
 
 <Note>
-  The `/api/suites` family still answers and is deprecated. Move CI jobs to `/api/v1/test-suites` and `/api/v1/run-plans`.
+  The `/api/suites` family still answers and is deprecated. Move CI jobs to `/api/v1/test-suites`
+  and `/api/v1/run-plans`.
 </Note>
 
 ## From Python
@@ -170,12 +171,12 @@ curl "https://app.langwatch.ai/api/simulation-runs/batches/batch_xyz789" \
 }
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `totalCount` | Runs in the batch now. |
-| `runningCount` | Runs that are queued or in progress. |
+| Field          | Meaning                                                                                      |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| `totalCount`   | Runs in the batch now.                                                                       |
+| `runningCount` | Runs that are queued or in progress.                                                         |
 | `settledCount` | Runs that are neither queued nor in progress: passed, failed, errored, cancelled or stalled. |
-| `isComplete` | True when `settledCount` equals `totalCount`. |
+| `isComplete`   | True when `settledCount` equals `totalCount`.                                                |
 
 Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCount`. The two conditions go together: the platform creates the runs asynchronously, so a batch read right after the trigger can have fewer runs than `jobCount`, and a batch of two created runs out of six reports itself complete.
 

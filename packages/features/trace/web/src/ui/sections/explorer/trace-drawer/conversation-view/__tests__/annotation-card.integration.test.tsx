@@ -68,9 +68,7 @@ describe("given an annotation with a comment", () => {
 
     expect(screen.getByText("Ada")).toBeInTheDocument();
     expect(screen.getByText("the model invented a policy number")).toBeInTheDocument();
-    expect(
-      screen.getByText(new Date("2026-08-01T10:30:00Z").toLocaleString()),
-    ).toBeInTheDocument();
+    expect(screen.getByText(new Date("2026-08-01T10:30:00Z").toLocaleString())).toBeInTheDocument();
   });
 });
 
@@ -221,9 +219,7 @@ describe("given an annotation about one part of the trace", () => {
       }),
     });
 
-    expect(screen.getByTestId("annotation-anchor")).toHaveTextContent(
-      "Span span-7 · Output",
-    );
+    expect(screen.getByTestId("annotation-anchor")).toHaveTextContent("Span span-7 · Output");
   });
 
   it("names the trace's own field rather than a span when that is what it is on", () => {

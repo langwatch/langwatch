@@ -59,8 +59,7 @@ export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
   }): Promise<AnomalyAlertDispatchRecord> {
     const detail = {
       baselineSpendUsd: input.result.baselineSpendUsd,
-      windowSec:
-        (input.result.windowEnd.getTime() - input.result.windowStart.getTime()) / 1_000,
+      windowSec: (input.result.windowEnd.getTime() - input.result.windowStart.getTime()) / 1_000,
       reason: input.result.reason,
       dispatch: "pending",
     };
@@ -90,10 +89,7 @@ export class PrismaSpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     };
   }
 
-  async recordDispatch(input: {
-    alertId: string;
-    detail: Record<string, unknown>;
-  }): Promise<void> {
+  async recordDispatch(input: { alertId: string; detail: Record<string, unknown> }): Promise<void> {
     await this.prisma.anomalyAlert.update({
       where: { id: input.alertId },
       data: { detail: input.detail as Prisma.InputJsonValue },

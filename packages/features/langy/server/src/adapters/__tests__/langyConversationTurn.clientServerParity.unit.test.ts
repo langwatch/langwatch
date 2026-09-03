@@ -147,9 +147,7 @@ function asWireEvent(step: RecordedStep) {
  * `LastEventOccurredAt`; none of them is a fold decision, and the shared
  * `LangyConversationTurnFoldState` type omits all three by construction.
  */
-function foldOwnedFields(
-  state: LangyConversationTurnData,
-): LangyConversationTurnFoldState {
+function foldOwnedFields(state: LangyConversationTurnData): LangyConversationTurnFoldState {
   const { CreatedAt, UpdatedAt, LastEventOccurredAt, ...folded } = state;
   return folded;
 }
@@ -178,9 +176,7 @@ describe("given the recorded steps of a completed turn", () => {
       // Guards the assertion above: two blank documents would also be equal.
       expect(backendState.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.COMPLETED);
       expect(backendState.ToolCalls).toHaveLength(1);
-      expect(backendState.ToolCalls[0]?.status).toBe(
-        LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,
-      );
+      expect(backendState.ToolCalls[0]?.status).toBe(LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED);
       expect(backendState.Plan).toHaveLength(2);
       expect(backendState.AnswerParts).toHaveLength(1);
       expect(backendState.QuestionParts).toHaveLength(1);

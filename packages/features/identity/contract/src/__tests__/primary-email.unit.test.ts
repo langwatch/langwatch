@@ -104,9 +104,7 @@ describe("primaryEmailOf", () => {
 
   describe("given a verified non-email identifier", () => {
     it("ignores it: the legacy column holds an email, not a subject", () => {
-      const heads = headsOf(
-        identifier({ identifierId: "idf_sso", provider: "saml" }),
-      );
+      const heads = headsOf(identifier({ identifierId: "idf_sso", provider: "saml" }));
 
       expect(primaryEmailOf({ heads })).toBeNull();
     });

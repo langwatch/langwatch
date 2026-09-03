@@ -80,9 +80,7 @@ function loadState(): PersistedState {
         ? parsed.sectionOrder.filter((k): k is string => typeof k === "string")
         : [],
       sectionOpen:
-        parsed.sectionOpen && typeof parsed.sectionOpen === "object"
-          ? parsed.sectionOpen
-          : {},
+        parsed.sectionOpen && typeof parsed.sectionOpen === "object" ? parsed.sectionOpen : {},
     };
     return {
       lens,
@@ -159,10 +157,7 @@ export const useFacetLensStore = create<FacetLensState>((set) => {
  * Keys present in the lens render in lens order; new/unknown keys append
  * in their natural (registry) order.
  */
-export function applyLensOrder(
-  allKeys: readonly string[],
-  lensOrder: readonly string[],
-): string[] {
+export function applyLensOrder(allKeys: readonly string[], lensOrder: readonly string[]): string[] {
   const present = new Set(allKeys);
   const inLens = lensOrder.filter((k) => present.has(k));
   const seen = new Set(inLens);

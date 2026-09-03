@@ -83,10 +83,9 @@ describe("sync publishes self-contained skills", () => {
     for (const file of listMarkdown(tmpDir)) {
       // Strip fenced code blocks so we don't trip on Python/TS imports in examples.
       const content = stripCode(fs.readFileSync(file, "utf8"));
-      expect(
-        content,
-        `${path.relative(tmpDir, file)} still contains an ESM import`,
-      ).not.toMatch(/^import\s+\w+\s+from\s+['"][^'"]+\.mdx?['"]/m);
+      expect(content, `${path.relative(tmpDir, file)} still contains an ESM import`).not.toMatch(
+        /^import\s+\w+\s+from\s+['"][^'"]+\.mdx?['"]/m,
+      );
       // Block-level JSX self-closing element like `<Component />` on its own line.
       expect(
         content,

@@ -77,12 +77,8 @@ const useVersionRestore = ({
   const { project } = useOrganizationTeamProject();
   const utils = api.useUtils();
   const loadState = useEvaluationsV3Store((state) => state.loadState);
-  const setWorkbenchVersion = useEvaluationsV3Store(
-    (state) => state.setWorkbenchVersion,
-  );
-  const setStaleWorkbench = useEvaluationsV3Store(
-    (state) => state.setStaleWorkbench,
-  );
+  const setWorkbenchVersion = useEvaluationsV3Store((state) => state.setWorkbenchVersion);
+  const setStaleWorkbench = useEvaluationsV3Store((state) => state.setStaleWorkbench);
   const restoreVersion = api.experiments.restoreWorkbenchVersion.useMutation();
   const [restoringVersion, setRestoringVersion] = useState<number | null>(null);
 
@@ -118,9 +114,7 @@ const useVersionRestore = ({
       });
 
       toaster.create({
-        title: entry.autoSaved
-          ? "Restored the autosave"
-          : `Restored version ${version}`,
+        title: entry.autoSaved ? "Restored the autosave" : `Restored version ${version}`,
         type: "success",
       });
       onRestored();
@@ -195,12 +189,7 @@ function VersionRow({
               >
                 Confirm restore
               </Button>
-              <Button
-                size="xs"
-                variant="ghost"
-                disabled={isRestoring}
-                onClick={onCancelRestore}
-              >
+              <Button size="xs" variant="ghost" disabled={isRestoring} onClick={onCancelRestore}>
                 Cancel
               </Button>
             </>
@@ -231,12 +220,8 @@ export function VersionList({
    * the composing application already resolved, so the call sites read the same.
    */
   const can = hasPermission;
-  const [confirmingVersion, setConfirmingVersion] = useState<number | null>(
-    null,
-  );
-  const workbenchVersion = useEvaluationsV3Store(
-    (state) => state.workbenchVersion,
-  );
+  const [confirmingVersion, setConfirmingVersion] = useState<number | null>(null);
+  const workbenchVersion = useEvaluationsV3Store((state) => state.workbenchVersion);
   const { restore, restoringVersion } = useVersionRestore({
     experimentId,
     experimentSlug,
@@ -299,8 +284,7 @@ export function VersionList({
         ))}
       </VStack>
       <Text color="fg.muted" fontSize="xs" paddingTop={4}>
-        A restore writes the old setup forward as a new version, so nothing in
-        this list is lost.
+        A restore writes the old setup forward as a new version, so nothing in this list is lost.
       </Text>
     </>
   );

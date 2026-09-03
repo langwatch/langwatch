@@ -17,16 +17,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
 import { ScenarioMessageRenderer } from "../scenario-message-renderer";
 
@@ -53,18 +44,9 @@ const playCalls: LwEl[] = [];
 const pauseCalls: LwEl[] = [];
 
 // Save originals so afterAll can restore them.
-const origPlay = Object.getOwnPropertyDescriptor(
-  HTMLMediaElement.prototype,
-  "play",
-);
-const origPause = Object.getOwnPropertyDescriptor(
-  HTMLMediaElement.prototype,
-  "pause",
-);
-const origPaused = Object.getOwnPropertyDescriptor(
-  HTMLMediaElement.prototype,
-  "paused",
-);
+const origPlay = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "play");
+const origPause = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "pause");
+const origPaused = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "paused");
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -155,17 +137,10 @@ function textMsg(
   } as SimulationMessage;
 }
 
-function renderMessages(
-  messages: SimulationMessage[],
-  opts?: { container?: HTMLElement },
-) {
+function renderMessages(messages: SimulationMessage[], opts?: { container?: HTMLElement }) {
   return render(
     <Wrapper>
-      <ScenarioMessageRenderer
-        messages={messages}
-        variant="drawer"
-        projectId={PROJECT_ID}
-      />
+      <ScenarioMessageRenderer messages={messages} variant="drawer" projectId={PROJECT_ID} />
     </Wrapper>,
     opts,
   );
@@ -285,8 +260,7 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
       it("plays the third audio, not the first", async () => {
         renderMessages([audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]);
 
-        const [, audioB, audioC] =
-          document.querySelectorAll<HTMLAudioElement>("audio");
+        const [, audioB, audioC] = document.querySelectorAll<HTMLAudioElement>("audio");
 
         playCalls.length = 0;
         fireAudioEvent(audioB!, "ended");
@@ -402,8 +376,7 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
           </ChakraProvider>,
         );
 
-        const [, audioB, audioC] =
-          document.querySelectorAll<HTMLAudioElement>("audio");
+        const [, audioB, audioC] = document.querySelectorAll<HTMLAudioElement>("audio");
         expect(audioC).toBeDefined();
 
         playCalls.length = 0;

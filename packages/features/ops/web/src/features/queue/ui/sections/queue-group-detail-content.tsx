@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Box,
-  Card,
-  Center,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Card, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { GroupInfo, OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import type { ReactNode } from "react";
 import { formatTimeAgo } from "../../../../model/ops-formatters";
@@ -60,10 +51,7 @@ function GroupStatusRow({
         </DetailField>
       )}
       <DetailField label="Next run">
-        <Text
-          textStyle="sm"
-          color={classification.state === "retrying" ? "orange.500" : undefined}
-        >
+        <Text textStyle="sm" color={classification.state === "retrying" ? "orange.500" : undefined}>
           {describeNextRun(classification, now)}
         </Text>
       </DetailField>
@@ -117,12 +105,7 @@ function GroupErrorSection({ detail, now }: { detail: GroupInfo; now: number }) 
       </HStack>
       <Card.Root borderColor="red.500/20">
         <Card.Body padding={3}>
-          <Text
-            textStyle="xs"
-            color="red.500"
-            whiteSpace="pre-wrap"
-            wordBreak="break-word"
-          >
+          <Text textStyle="xs" color="red.500" whiteSpace="pre-wrap" wordBreak="break-word">
             {detail.errorMessage}
           </Text>
           {detail.errorStack && (
@@ -193,9 +176,8 @@ export function GroupDetailContent({
   if (!detail) {
     return (
       <Text textStyle="sm" color="fg.muted" data-testid="group-detail-missing">
-        This group no longer exists — its jobs completed and it was cleaned up, or it was
-        drained. The table refreshes every few seconds, so a finished group can linger
-        there briefly.
+        This group no longer exists — its jobs completed and it was cleaned up, or it was drained.
+        The table refreshes every few seconds, so a finished group can linger there briefly.
       </Text>
     );
   }

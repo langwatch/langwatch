@@ -8,13 +8,7 @@ import type { SourceEventRowData } from "./source-events-table";
  * to the raw payload as ingested. Rendered as a full-width row directly
  * under the event it belongs to.
  */
-export function EventDetailRow({
-  event,
-  colSpan,
-}: {
-  event: SourceEventRowData;
-  colSpan: number;
-}) {
+export function EventDetailRow({ event, colSpan }: { event: SourceEventRowData; colSpan: number }) {
   return (
     <Table.Row>
       <Table.Cell colSpan={colSpan} bg="bg.subtle">
@@ -87,8 +81,8 @@ function RawPanel({ event }: { event: SourceEventRowData }) {
         </Code>
       ) : (
         <Text fontSize="xs" color="fg.muted">
-          The raw body is not stored for this source type — pushed events are normalised
-          at the edge and only the normalised record is kept.
+          The raw body is not stored for this source type — pushed events are normalised at the edge
+          and only the normalised record is kept.
         </Text>
       )}
     </Box>

@@ -5,19 +5,17 @@ const MAX_DOCUMENTATION_BYTES = 2 * 1024 * 1024;
 const DOCUMENTATION_TIMEOUT_MS = 30_000;
 const DOCUMENTATION_CONTENT_TYPES = new Set(["text/markdown", "text/plain"]);
 
-const DOCUMENTATION_CONFIG: Record<
-  DocumentationKind,
-  { defaultPath: string; namespace: string }
-> = {
-  langwatch: {
-    defaultPath: "/docs/llms.txt",
-    namespace: "/docs",
-  },
-  scenario: {
-    defaultPath: "/scenario/llms.txt",
-    namespace: "/scenario",
-  },
-};
+const DOCUMENTATION_CONFIG: Record<DocumentationKind, { defaultPath: string; namespace: string }> =
+  {
+    langwatch: {
+      defaultPath: "/docs/llms.txt",
+      namespace: "/docs",
+    },
+    scenario: {
+      defaultPath: "/scenario/llms.txt",
+      namespace: "/scenario",
+    },
+  };
 
 function documentationUrlError(namespace: string): Error {
   return new Error(
@@ -81,8 +79,7 @@ export async function fetchDocumentation(
     throw new Error(`Documentation request failed with status ${response.status}`);
   }
 
-  const contentType =
-    response.headers.get("content-type")?.split(";", 1)[0]?.trim() ?? "";
+  const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim() ?? "";
   if (!DOCUMENTATION_CONTENT_TYPES.has(contentType)) {
     throw new Error("Documentation response has an unexpected content type");
   }

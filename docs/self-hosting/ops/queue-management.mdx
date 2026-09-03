@@ -28,8 +28,8 @@ Each error cluster shows:
 | **Drain**          | Permanently discards all jobs in an error cluster, use when jobs are unrecoverable                                                              |
 
 <Warning>
-  **Drain is irreversible.** Drained jobs cannot be recovered. Always prefer moving to DLQ
-  first if there's any chance the jobs can be reprocessed later.
+  **Drain is irreversible.** Drained jobs cannot be recovered. Always prefer moving to DLQ first if
+  there's any chance the jobs can be reprocessed later.
 </Warning>
 
 ## Dead Letter Queue (DLQ)
@@ -52,9 +52,8 @@ Each DLQ entry shows:
 | **Canary Redrive**  | Test-replays a small random sample (default 5, configurable up to 100) before committing to a full redrive |
 
 <Tip>
-  **Use canary redrives after deploying a fix.** If the fix works for the canary batch,
-  replay the rest. If it doesn't, the canary groups return to the DLQ and you haven't made
-  the problem worse.
+  **Use canary redrives after deploying a fix.** If the fix works for the canary batch, replay the
+  rest. If it doesn't, the canary groups return to the DLQ and you haven't made the problem worse.
 </Tip>
 
 ## Groups Table

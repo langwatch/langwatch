@@ -24,8 +24,7 @@ const POLICY = {
   defaultDatabase: "analytics",
 };
 
-const BASE_SQL =
-  "SELECT TraceId FROM traces WHERE Cost > 1 UNION ALL SELECT TraceId FROM traces";
+const BASE_SQL = "SELECT TraceId FROM traces WHERE Cost > 1 UNION ALL SELECT TraceId FROM traces";
 
 /** A parser that hands back a tree someone else built. */
 function parserOf(statements: readonly SqlAstNode[]): LangWatchQLParser {
@@ -192,9 +191,9 @@ describe("the default-deny walk", () => {
     it("refuses when the parser reports failure", () => {
       const refusing: LangWatchQLParser = { parse: () => ({ ok: false }) };
 
-      expect(
-        codesOf(validateLangWatchQL({ sql: BASE_SQL, parser: refusing, ...POLICY })),
-      ).toEqual(["PARSE_FAILED"]);
+      expect(codesOf(validateLangWatchQL({ sql: BASE_SQL, parser: refusing, ...POLICY }))).toEqual([
+        "PARSE_FAILED",
+      ]);
     });
   });
 

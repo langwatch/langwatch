@@ -16,15 +16,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  GripVertical,
-  MoreVertical,
-  PackageOpen,
-  Pencil,
-  Plus,
-  Power,
-  Trash2,
-} from "lucide-react";
+import { GripVertical, MoreVertical, PackageOpen, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import type { AiToolEntry } from "../../model/ai-tool-tile";
@@ -81,8 +73,7 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
       void utils.aiTools.adminList.invalidate({ organizationId });
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't update tile" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't update tile" }),
   });
 
   const removeMutation = api.aiTools.remove.useMutation({
@@ -92,16 +83,14 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
       toaster.create({ title: "Tile deleted", type: "success" });
       setPendingDelete(null);
     },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't delete tile" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't delete tile" }),
   });
 
   const reorderMutation = api.aiTools.reorder.useMutation({
     onSuccess: () => {
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tiles" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tiles" }),
   });
 
   const importStarterPackMutation = api.aiTools.importStarterPack.useMutation({
@@ -241,9 +230,7 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
             </Box>
             <VStack align="start" gap={2} flex={1} minWidth={0}>
               <Text fontSize="sm" fontWeight="semibold">
-                {isCatalogEmpty
-                  ? "Publish a starter pack to get going"
-                  : "Import starter pack"}
+                {isCatalogEmpty ? "Publish a starter pack to get going" : "Import starter pack"}
               </Text>
               <Text fontSize="xs" color="fg.muted">
                 {isCatalogEmpty
@@ -310,12 +297,7 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
               <Heading as="h3" size="sm">
                 {SECTION_LABELS[type]} ({items.length})
               </Heading>
-              <Button
-                size="xs"
-                variant="outline"
-                marginLeft="auto"
-                onClick={() => onAddTile(type)}
-              >
+              <Button size="xs" variant="outline" marginLeft="auto" onClick={() => onAddTile(type)}>
                 <Plus size={14} /> Add tile
               </Button>
             </HStack>
@@ -348,9 +330,7 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
                 }
                 onDelete={(entry) => setPendingDelete(entry)}
                 togglePendingId={
-                  setEnabledMutation.isPending
-                    ? setEnabledMutation.variables?.id
-                    : undefined
+                  setEnabledMutation.isPending ? setEnabledMutation.variables?.id : undefined
                 }
               />
             )}
@@ -373,9 +353,9 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
             </Dialog.Header>
             <Dialog.Body>
               <Text fontSize="sm" color="fg.muted">
-                This permanently removes the tile from the catalog and from every
-                member&apos;s /me portal. It cannot be undone. To hide it without losing
-                its configuration, use Disable instead.
+                This permanently removes the tile from the catalog and from every member&apos;s /me
+                portal. It cannot be undone. To hide it without losing its configuration, use
+                Disable instead.
               </Text>
             </Dialog.Body>
             <Dialog.Footer>
@@ -419,20 +399,11 @@ function SortableSection({
   onDelete: (entry: AiToolEntry) => void;
   togglePendingId?: string;
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={onDragEnd}
-    >
-      <SortableContext
-        items={items.map((e) => e.id)}
-        strategy={verticalListSortingStrategy}
-      >
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <SortableContext items={items.map((e) => e.id)} strategy={verticalListSortingStrategy}>
         <VStack align="stretch" gap={1}>
           {items.map((entry) => (
             <SortableCatalogRow
@@ -466,8 +437,9 @@ function SortableCatalogRow({
   onDelete: () => void;
   isPending: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: entry.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: entry.id,
+  });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),

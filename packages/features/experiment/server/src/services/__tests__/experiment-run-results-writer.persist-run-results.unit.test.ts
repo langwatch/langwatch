@@ -61,8 +61,10 @@ const persistenceFor = ({
     version: 4,
     state: { results: savedResults ?? {} },
   });
-  const experiments = { getWorkbenchState, recordWorkbenchRunResults } as unknown as
-    ExperimentService;
+  const experiments = {
+    getWorkbenchState,
+    recordWorkbenchRunResults,
+  } as unknown as ExperimentService;
   return { experiments, recordWorkbenchRunResults };
 };
 

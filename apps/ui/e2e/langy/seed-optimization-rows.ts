@@ -51,8 +51,7 @@ export const FREE_TEXT_ROWS: SeedRow[] = [
   },
   {
     input: "is there a student discount",
-    expected:
-      "No student discount, but the newsletter gives 10 percent off the first order.",
+    expected: "No student discount, but the newsletter gives 10 percent off the first order.",
   },
   {
     input: "cancel my order NOW, i ordered by mistake",

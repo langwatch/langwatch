@@ -68,9 +68,7 @@ export class ScimSyncGuards {
    * token for a connection already syncing states nothing, because the sync
    * is what the fact is about and it already exists.
    */
-  async issueScimToken(
-    data: IssueScimTokenCommandData,
-  ): Promise<ScimSyncFactInput[]> {
+  async issueScimToken(data: IssueScimTokenCommandData): Promise<ScimSyncFactInput[]> {
     const state = await this.load(data);
     if (state && state.state !== "REVOKED") return [];
     return [
@@ -87,9 +85,7 @@ export class ScimSyncGuards {
     ];
   }
 
-  async recordScimUserPush(
-    data: RecordScimUserPushCommandData,
-  ): Promise<ScimSyncFactInput[]> {
+  async recordScimUserPush(data: RecordScimUserPushCommandData): Promise<ScimSyncFactInput[]> {
     const state = await this.load(data);
     if (state?.state === "REVOKED") return [];
     return [
@@ -174,9 +170,7 @@ export class ScimSyncGuards {
   }
 
   /** The connection's sync ends. Idempotent: a second revoke states nothing. */
-  async revokeScimSync(
-    data: RevokeScimSyncCommandData,
-  ): Promise<ScimSyncFactInput[]> {
+  async revokeScimSync(data: RevokeScimSyncCommandData): Promise<ScimSyncFactInput[]> {
     const state = await this.load(data);
     if (state?.state === "REVOKED") return [];
     return [

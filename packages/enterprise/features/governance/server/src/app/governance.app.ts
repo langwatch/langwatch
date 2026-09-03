@@ -74,11 +74,10 @@ export class PersonalVirtualKeyLabelTakenError extends HandledError {
   declare readonly code: "personal_virtual_key_label_taken";
 
   constructor(label: string) {
-    super(
-      "personal_virtual_key_label_taken",
-      "A personal key with this label already exists",
-      { httpStatus: 409, meta: { label } },
-    );
+    super("personal_virtual_key_label_taken", "A personal key with this label already exists", {
+      httpStatus: 409,
+      meta: { label },
+    });
     this.name = "PersonalVirtualKeyLabelTakenError";
   }
 }
@@ -95,11 +94,10 @@ export class NoEligibleModelProvidersError extends HandledError {
   declare readonly code: "no_eligible_model_providers";
 
   constructor(organizationId: string) {
-    super(
-      "no_eligible_model_providers",
-      "The organization has no usable model provider",
-      { httpStatus: 409, meta: { organizationId } },
-    );
+    super("no_eligible_model_providers", "The organization has no usable model provider", {
+      httpStatus: 409,
+      meta: { organizationId },
+    });
     this.name = "NoEligibleModelProvidersError";
   }
 }
@@ -112,11 +110,10 @@ export class RoutingPolicyEmptyError extends HandledError {
   declare readonly code: "routing_policy_has_no_providers";
 
   constructor(routingPolicyId: string, routingPolicyName: string) {
-    super(
-      "routing_policy_has_no_providers",
-      "That routing policy has no providers on it",
-      { httpStatus: 422, meta: { routingPolicyId, routingPolicyName } },
-    );
+    super("routing_policy_has_no_providers", "That routing policy has no providers on it", {
+      httpStatus: 422,
+      meta: { routingPolicyId, routingPolicyName },
+    });
     this.name = "RoutingPolicyEmptyError";
   }
 }
@@ -139,11 +136,9 @@ export class RoutingPolicyProviderRequiredError extends HandledError {
   declare readonly code: "routing_policy_must_have_provider";
 
   constructor() {
-    super(
-      "routing_policy_must_have_provider",
-      "A routing policy needs at least one provider",
-      { httpStatus: 422 },
-    );
+    super("routing_policy_must_have_provider", "A routing policy needs at least one provider", {
+      httpStatus: 422,
+    });
     this.name = "RoutingPolicyProviderRequiredError";
   }
 }
@@ -153,11 +148,9 @@ export class RoutingPolicyScopeRequiredError extends HandledError {
   declare readonly code: "routing_policy_must_have_scope";
 
   constructor() {
-    super(
-      "routing_policy_must_have_scope",
-      "A routing policy needs at least one scope",
-      { httpStatus: 422 },
-    );
+    super("routing_policy_must_have_scope", "A routing policy needs at least one scope", {
+      httpStatus: 422,
+    });
     this.name = "RoutingPolicyScopeRequiredError";
   }
 }
@@ -188,10 +181,7 @@ export class RoutingPolicyModelNotConcreteError extends HandledError {
  */
 export interface GovernancePersonalVirtualKeyPorts {
   /** Whether the caller belongs to this organization at all. */
-  isOrganizationMember(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<boolean>;
+  isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
   /** Whether this user already has an unrevoked personal key under this label. */
   hasActivePersonalKeyLabelled(input: {
     organizationId: string;
@@ -299,18 +289,13 @@ export class GovernanceApp {
   }
 
   /** The same union, with the canonical OTTL source on every row. */
-  async listIngestionTemplatesForAdmin(scope: {
-    projectId: string;
-  }): Promise<IngestionTemplate[]> {
+  async listIngestionTemplatesForAdmin(scope: { projectId: string }): Promise<IngestionTemplate[]> {
     const organizationId = await this.organizationOf(scope.projectId);
     return this.dependencies.governance.templateListForOrgAdmin({ organizationId });
   }
 
   /** One template, scoped to the project's organization. */
-  async getIngestionTemplate(input: {
-    projectId: string;
-    id: string;
-  }): Promise<IngestionTemplate> {
+  async getIngestionTemplate(input: { projectId: string; id: string }): Promise<IngestionTemplate> {
     const organizationId = await this.organizationOf(input.projectId);
     return this.dependencies.governance.templateGetByIdForOrg({
       id: input.id,

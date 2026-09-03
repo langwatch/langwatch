@@ -82,12 +82,7 @@ export const LensNamePopover: React.FC<LensNamePopoverProps> = ({
                   else if (e.key === "Escape") reset();
                 }}
               />
-              <Button
-                size="sm"
-                colorPalette="blue"
-                onClick={submit}
-                disabled={!name.trim()}
-              >
+              <Button size="sm" colorPalette="blue" onClick={submit} disabled={!name.trim()}>
                 Create
               </Button>
             </HStack>

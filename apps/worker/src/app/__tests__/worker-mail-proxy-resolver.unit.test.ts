@@ -41,9 +41,7 @@ describe("WorkerMailProxyResolver", () => {
         noProxy: "email.eu-central-1.amazonaws.com",
       });
 
-      expect(
-        resolver.tryResolveForHost("email.eu-central-1.amazonaws.com"),
-      ).toBeUndefined();
+      expect(resolver.tryResolveForHost("email.eu-central-1.amazonaws.com")).toBeUndefined();
     });
 
     it("resolves no proxy when a parent domain is listed", () => {
@@ -52,9 +50,7 @@ describe("WorkerMailProxyResolver", () => {
         noProxy: ".amazonaws.com",
       });
 
-      expect(
-        resolver.tryResolveForHost("email.eu-central-1.amazonaws.com"),
-      ).toBeUndefined();
+      expect(resolver.tryResolveForHost("email.eu-central-1.amazonaws.com")).toBeUndefined();
     });
 
     it("resolves no proxy when proxying is disabled with a wildcard", () => {
@@ -63,9 +59,7 @@ describe("WorkerMailProxyResolver", () => {
         noProxy: "*",
       });
 
-      expect(
-        resolver.tryResolveForHost("email.eu-central-1.amazonaws.com"),
-      ).toBeUndefined();
+      expect(resolver.tryResolveForHost("email.eu-central-1.amazonaws.com")).toBeUndefined();
     });
 
     it("still proxies hosts that are not excluded", () => {

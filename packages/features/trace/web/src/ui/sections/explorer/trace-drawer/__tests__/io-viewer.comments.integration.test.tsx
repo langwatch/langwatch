@@ -169,10 +169,9 @@ describe("given a reader on a span's output", () => {
 describe("given a reader on the trace's own input", () => {
   /** @scenario "A suggestion on the trace's own input becomes the corrected trace input" */
   it("offers the correction the trace input carries alongside a comment", () => {
-    render(
-      <IOViewer label="Input" content="check on shipment 4417" traceId={TRACE_ID} />,
-      { wrapper },
-    );
+    render(<IOViewer label="Input" content="check on shipment 4417" traceId={TRACE_ID} />, {
+      wrapper,
+    });
 
     expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Suggest edit" })).toBeInTheDocument();

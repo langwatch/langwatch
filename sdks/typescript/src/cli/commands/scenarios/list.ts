@@ -51,8 +51,7 @@ export const listScenariosCommand = async (): Promise<CommandResult | void> => {
           Name: scenario.name,
           ID: scenario.id,
           "Test suite": scenario.testSuiteId
-            ? (testSuiteNameById.get(scenario.testSuiteId) ??
-              scenario.testSuiteId)
+            ? (testSuiteNameById.get(scenario.testSuiteId) ?? scenario.testSuiteId)
             : chalk.gray(UNFILED),
           Labels: scenario.labels.length > 0 ? scenario.labels.join(", ") : chalk.gray("—"),
           Criteria: `${scenario.criteria.length}`,

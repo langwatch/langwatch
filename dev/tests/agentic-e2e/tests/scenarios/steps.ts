@@ -75,9 +75,7 @@ export async function whenIOpenTheSimulationsScenariosAddress(page: Page) {
  */
 export async function thenISeeTheAgentTestingPage(page: Page) {
   await expect(page).toHaveURL(/\/agent-testing/);
-  await expect(page.getByTestId("agent-testing-title")).toHaveText(
-    /agent testing/i,
-  );
+  await expect(page.getByTestId("agent-testing-title")).toHaveText(/agent testing/i);
   await expect(page.getByRole("tab", { name: /scenarios/i })).toBeVisible();
   await expect(page.getByRole("tab", { name: /results/i })).toBeVisible();
 }
@@ -164,9 +162,7 @@ export async function givenICanWriteAScenario(page: Page) {
  * Then I see a "New scenario" button
  */
 export async function thenISeeNewScenarioButton(page: Page) {
-  await expect(
-    page.getByRole("button", { name: /new scenario/i }).first(),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /new scenario/i }).first()).toBeVisible();
 }
 
 /**
@@ -176,7 +172,10 @@ export async function thenISeeNewScenarioButton(page: Page) {
  */
 export async function whenIClickNewScenario(page: Page) {
   await givenICanWriteAScenario(page);
-  await page.getByRole("button", { name: /new scenario/i }).first().click();
+  await page
+    .getByRole("button", { name: /new scenario/i })
+    .first()
+    .click();
 }
 
 /** The Title field of the scenario editor drawer. */
@@ -189,9 +188,7 @@ function titleField(page: Page) {
  * Then I see an empty scenario form
  */
 export async function thenISeeTheScenarioEditor(page: Page) {
-  await expect(
-    page.getByRole("heading", { name: /^new scenario$/i }).last(),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^new scenario$/i }).last()).toBeVisible();
   await expect(titleField(page)).toHaveValue("");
 }
 
@@ -229,9 +226,7 @@ export async function whenIWriteCriteria(page: Page, criteria: string[]) {
  * Then the criteria field holds every line
  */
 export async function thenCriteriaFieldHolds(page: Page, criteria: string[]) {
-  await expect(page.getByLabel("Criteria").last()).toHaveValue(
-    criteria.join("\n"),
-  );
+  await expect(page.getByLabel("Criteria").last()).toHaveValue(criteria.join("\n"));
 }
 
 /**
@@ -272,9 +267,7 @@ export async function whenIClickSaveAndRun(page: Page) {
  */
 export async function whenIClickOnScenarioInList(page: Page, title: string) {
   await page.getByTestId(`case-row-${title}`).first().click();
-  await expect(
-    page.getByRole("heading", { name: /^edit scenario$/i }).last(),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^edit scenario$/i }).last()).toBeVisible();
 }
 
 /**

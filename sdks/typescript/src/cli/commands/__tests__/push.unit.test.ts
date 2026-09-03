@@ -227,9 +227,7 @@ describe("pushPrompts", () => {
       const syncCall = mockSync.mock.calls[0]![0];
 
       // Default output type should be str
-      expect(syncCall.configData.outputs).toEqual([
-        { identifier: "output", type: "str" },
-      ]);
+      expect(syncCall.configData.outputs).toEqual([{ identifier: "output", type: "str" }]);
 
       // No response_format should be set
       expect(syncCall.configData.response_format).toBeUndefined();
@@ -266,9 +264,7 @@ describe("pushPrompts", () => {
       const syncCall = mockSync.mock.calls[0]![0];
 
       // Without schema, outputs fall back to default str
-      expect(syncCall.configData.outputs).toEqual([
-        { identifier: "output", type: "str" },
-      ]);
+      expect(syncCall.configData.outputs).toEqual([{ identifier: "output", type: "str" }]);
 
       // No response_format sent
       expect(syncCall.configData.response_format).toBeUndefined();

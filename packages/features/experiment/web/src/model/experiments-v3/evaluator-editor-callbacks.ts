@@ -42,10 +42,7 @@ export type CreateEvaluatorEditorCallbacksParams = {
       localEvaluatorConfig?: LocalEvaluatorConfig;
     },
   ) => void;
-  onMappingChange?: (
-    identifier: string,
-    mapping: UIFieldMapping | undefined,
-  ) => void;
+  onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
   /**
    * Comparison evaluator config sink. When present, the drawer renders
    * ComparisonConfigForm instead of the generic per-row field mappings — a
@@ -66,10 +63,7 @@ export type CreateEvaluatorEditorCallbacksParams = {
  */
 export type EvaluatorEditorCallbacksForTarget = {
   onLocalConfigChange?: (localConfig: LocalEvaluatorConfig | undefined) => void;
-  onMappingChange?: (
-    identifier: string,
-    mapping: UIFieldMapping | undefined,
-  ) => void;
+  onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
   onComparisonChange?: (config: ComparisonEvaluatorConfig) => void;
   onSave?: (evaluator: {
     id: string;

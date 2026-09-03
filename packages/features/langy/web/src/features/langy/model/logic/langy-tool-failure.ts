@@ -97,9 +97,7 @@ function safeHttpUrl(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:"
-      ? url.toString()
-      : undefined;
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
   } catch {
     return undefined;
   }
@@ -207,8 +205,7 @@ const ACCESS_DENIAL_CODES = new Set([
  */
 const PLAN_LIMIT_CODES = new Set(["resource_limit_exceeded"]);
 
-const normalizedCode = (domain: CliHandledError): string =>
-  domain.code.trim().toLowerCase();
+const normalizedCode = (domain: CliHandledError): string => domain.code.trim().toLowerCase();
 
 const isAccessDenial = (domain: CliHandledError): boolean =>
   ACCESS_DENIAL_CODES.has(normalizedCode(domain));
@@ -221,10 +218,7 @@ function limitLabel(limitType: unknown): string | undefined {
   if (typeof limitType !== "string" || limitType.trim().length === 0) {
     return undefined;
   }
-  return (
-    LIMIT_TYPE_LABELS[limitType as keyof typeof LIMIT_TYPE_LABELS] ??
-    humanResource(limitType)
-  );
+  return LIMIT_TYPE_LABELS[limitType as keyof typeof LIMIT_TYPE_LABELS] ?? humanResource(limitType);
 }
 
 /** The plan allowance behind a failure, or null when it was not one. */
@@ -386,9 +380,7 @@ export function presentLangyToolError({
     // here, sitting on a card that was already saying enough. A field arriving
     // on the wire is not a reason to render it; whether it helps the person
     // reading THIS surface is.
-    ...(remediationApplies && domain.suggestions?.length
-      ? { tips: domain.suggestions }
-      : {}),
+    ...(remediationApplies && domain.suggestions?.length ? { tips: domain.suggestions } : {}),
     ...(remediationApplies && docsUrl ? { docsUrl } : {}),
     ...(traceId ? { traceId } : {}),
     ...(traceUrl ? { traceUrl } : {}),

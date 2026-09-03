@@ -107,9 +107,9 @@ describe("IngestionPullLifecycleService", () => {
       reconciled: 1,
       failed: 1,
     });
-    expect(diagnostics.warn).toHaveBeenCalledWith(
-      expect.stringContaining("next boot retries"),
-      { sourceId: "source-failed", error: "pipeline unavailable" },
-    );
+    expect(diagnostics.warn).toHaveBeenCalledWith(expect.stringContaining("next boot retries"), {
+      sourceId: "source-failed",
+      error: "pipeline unavailable",
+    });
   });
 });

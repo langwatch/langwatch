@@ -20,10 +20,7 @@ export type EntitlementServiceOptions = {
   authorization?: AuthorizationContextResolver;
 };
 
-export class EntitlementService
-  extends EntitlementServiceContract
-  implements PlanProvider
-{
+export class EntitlementService extends EntitlementServiceContract implements PlanProvider {
   static create(options: EntitlementServiceOptions): EntitlementService {
     return new EntitlementService(options);
   }
@@ -73,10 +70,7 @@ export class EntitlementService
     return resolved;
   }
 
-  private async applyEnrichers(
-    initialPlan: Plan,
-    input: ResolvePlanInput,
-  ): Promise<Plan> {
+  private async applyEnrichers(initialPlan: Plan, input: ResolvePlanInput): Promise<Plan> {
     let plan = initialPlan;
     for (const enricher of this.options.enrichers ?? []) {
       plan = await enricher.enrich(plan, input);

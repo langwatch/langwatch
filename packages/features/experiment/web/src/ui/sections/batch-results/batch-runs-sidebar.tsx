@@ -148,12 +148,8 @@ export function BatchRunsSidebar({
   // Sort runs newest-first for display, and build a chronological index map
   // so "Run #N" numbering stays stable (Run #1 = oldest, Run #N = newest)
   const { sortedRuns, chronologicalIndexMap } = useMemo(() => {
-    const sorted = [...runs].sort(
-      (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
-    );
-    const chronological = [...runs].sort(
-      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
-    );
+    const sorted = [...runs].sort((a, b) => b.timestamps.createdAt - a.timestamps.createdAt);
+    const chronological = [...runs].sort((a, b) => a.timestamps.createdAt - b.timestamps.createdAt);
     const indexMap = new Map<string, number>();
     chronological.forEach((run, i) => void indexMap.set(run.runId, i));
     return { sortedRuns: sorted, chronologicalIndexMap: indexMap };
@@ -276,8 +272,7 @@ export function BatchRunsSidebar({
           sortedRuns.map((run) => {
             const isSelected = selectedRunId === run.runId;
             const isFinished = isRunFinished(run.timestamps);
-            const _runCost =
-              (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
+            const _runCost = (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
 
             const chronologicalIndex = chronologicalIndexMap.get(run.runId) ?? 0;
             const runName = getRunDisplayName({
@@ -323,11 +318,7 @@ export function BatchRunsSidebar({
                       : "transparent"
                 }
                 color={
-                  compareMode && isSelectedForComparison
-                    ? "blue.fg"
-                    : isSelected
-                      ? "blue.fg"
-                      : "fg"
+                  compareMode && isSelectedForComparison ? "blue.fg" : isSelected ? "blue.fg" : "fg"
                 }
                 borderRadius="md"
                 _hover={{
@@ -359,11 +350,7 @@ export function BatchRunsSidebar({
                 <VStack align="start" gap={0} flex={1} minWidth={0}>
                   {/* Line 1: Name + version badge + spinner */}
                   <HStack gap={1} width="100%">
-                    <Tooltip
-                      content={runName}
-                      positioning={{ placement: "top" }}
-                      openDelay={500}
-                    >
+                    <Tooltip content={runName} positioning={{ placement: "top" }} openDelay={500}>
                       <HStack gap={1} flex={1} minWidth={0} width="100%">
                         {/* Small color indicator square */}
                         <Box
@@ -390,12 +377,7 @@ export function BatchRunsSidebar({
                       </HStack>
                     </Tooltip>
                     {run.workflowVersion?.version && (
-                      <Text
-                        fontSize="10px"
-                        fontWeight="600"
-                        color="fg.muted"
-                        flexShrink={0}
-                      >
+                      <Text fontSize="10px" fontWeight="600" color="fg.muted" flexShrink={0}>
                         v{run.workflowVersion.version}
                       </Text>
                     )}
@@ -404,9 +386,7 @@ export function BatchRunsSidebar({
 
                   {/* Line 2: Time ago + status */}
                   <Text color="fg.muted" fontSize="12px">
-                    {run.timestamps.createdAt
-                      ? formatTimeAgo(run.timestamps.createdAt)
-                      : "..."}
+                    {run.timestamps.createdAt ? formatTimeAgo(run.timestamps.createdAt) : "..."}
                     {run.timestamps.stoppedAt && " · stopped"}
                     {interrupted && " · interrupted"}
                   </Text>

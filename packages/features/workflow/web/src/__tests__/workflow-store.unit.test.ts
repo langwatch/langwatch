@@ -487,9 +487,7 @@ describe("workflowStoreCore", () => {
         expect(params.find((p) => p.identifier === "some_param")?.value).toEqual({
           ref: "new_name",
         });
-        expect(params.find((p) => p.identifier === "other_param")?.value).toBe(
-          "plain_value",
-        );
+        expect(params.find((p) => p.identifier === "other_param")?.value).toBe("plain_value");
       });
     });
   });
@@ -531,9 +529,7 @@ describe("workflowStoreCore", () => {
     // torch/dspy's `forward`, but legacy customer code with `forward`
     // must keep working — silently rewriting `forward` to `__call__`
     // on field-add would surprise users and pollute their diffs.
-    const codeParam = (value: string) => [
-      { identifier: "code", type: "code" as const, value },
-    ];
+    const codeParam = (value: string) => [{ identifier: "code", type: "code" as const, value }];
 
     it("rewrites __call__ signature when the new default is in use", () => {
       const result = updateInputFields(

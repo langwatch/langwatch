@@ -7,17 +7,8 @@ export type TagDefinition = {
   id?: string;
 };
 
-export function usePromptTags({
-  projectId,
-  enabled,
-}: {
-  projectId: string;
-  enabled: boolean;
-}) {
-  const query = api.promptTags.getAll.useQuery(
-    { projectId },
-    { enabled: enabled && !!projectId },
-  );
+export function usePromptTags({ projectId, enabled }: { projectId: string; enabled: boolean }) {
+  const query = api.promptTags.getAll.useQuery({ projectId }, { enabled: enabled && !!projectId });
 
   // Memoized because callers put this array in effect dependencies. Mapping on
   // every render hands them a new reference each time, so an effect that reads

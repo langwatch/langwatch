@@ -14,10 +14,7 @@
  * that one is the collision guard's — see below.
  */
 export interface IdentityUsersRepository {
-  storeUserHashKeyIfMissing(args: {
-    userId: string;
-    userHashKey: string;
-  }): Promise<void>;
+  storeUserHashKeyIfMissing(args: { userId: string; userHashKey: string }): Promise<void>;
   /** The user's current email, or null — including for a user that is gone. */
   findEmail(args: { userId: string }): Promise<string | null>;
   /**
@@ -40,7 +37,5 @@ export interface IdentityUsersRepository {
    * have let those two rows coexist as well — so this closes the collision
    * the database would have failed on, and nothing wider.
    */
-  findUserIdByEmail(args: {
-    normalizedValue: string;
-  }): Promise<string | null>;
+  findUserIdByEmail(args: { normalizedValue: string }): Promise<string | null>;
 }

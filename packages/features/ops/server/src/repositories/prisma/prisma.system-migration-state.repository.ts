@@ -53,8 +53,7 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     // error report attached to the finalized row that replaced it. The
     // no-report case has to be written, and for a nullable Json column
     // that means the DbNull sentinel rather than a bare null.
-    const report =
-      record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
+    const report = record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
     // The transition's own business time, stamped by the writer. It is what
     // the grants-ledger projection orders folded transitions against, and it
     // has to be written here too: a direct write that left the column alone
@@ -92,8 +91,7 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
    * the pin standing and answered `false`.
    */
   async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
-    const report =
-      record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
+    const report = record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
     const occurredAt = new Date();
     const updated = await this.prisma.systemMigrationTenantState.updateMany({
       where: {
@@ -116,10 +114,7 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
       });
       return true;
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         // The row exists and the guarded update matched nothing: the stored
         // status is `rolled_back`, and the pin wins.
         return false;
@@ -133,11 +128,7 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
    * global short-circuit. `findFirst` stops at the first matching row rather
    * than counting them all.
    */
-  async hasFinalizedTenant({
-    migrationName,
-  }: {
-    migrationName: string;
-  }): Promise<boolean> {
+  async hasFinalizedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     const row = await this.prisma.systemMigrationTenantState.findFirst({
       where: { migrationName, status: "finalized" },
       select: { tenantId: true },

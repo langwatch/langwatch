@@ -43,10 +43,7 @@ export type ParameterRowProps = {
 /**
  * Format a parameter value for display
  */
-function formatParameterValue(
-  value: number | string | undefined,
-  config: ParameterConfig,
-): string {
+function formatParameterValue(value: number | string | undefined, config: ParameterConfig): string {
   const displayValue = value ?? config.default;
 
   // Handle undefined/null values early

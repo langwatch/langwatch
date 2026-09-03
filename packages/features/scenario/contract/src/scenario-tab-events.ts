@@ -19,9 +19,7 @@ export interface ScenarioTabNavigatePayload {
   url: string;
 }
 
-export function isScenarioTabNavigatePayload(
-  value: unknown,
-): value is ScenarioTabNavigatePayload {
+export function isScenarioTabNavigatePayload(value: unknown): value is ScenarioTabNavigatePayload {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Partial<ScenarioTabNavigatePayload>;
   return (

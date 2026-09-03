@@ -19,9 +19,7 @@ test("Update Demonstrations", async ({ page }) => {
     .filter({ hasText: /^Inputs$/ })
     .getByRole("button")
     .click();
-  await page
-    .locator('input[name="version\\.configData\\.inputs\\.1\\.identifier"]')
-    .click();
+  await page.locator('input[name="version\\.configData\\.inputs\\.1\\.identifier"]').click();
   await page
     .locator('input[name="version\\.configData\\.inputs\\.1\\.identifier"]')
     .fill("new_input");
@@ -30,9 +28,7 @@ test("Update Demonstrations", async ({ page }) => {
     .filter({ hasText: /^Outputs$/ })
     .getByRole("button")
     .click();
-  await page
-    .locator('input[name="version\\.configData\\.outputs\\.1\\.identifier"]')
-    .click();
+  await page.locator('input[name="version\\.configData\\.outputs\\.1\\.identifier"]').click();
   await page
     .locator('input[name="version\\.configData\\.outputs\\.1\\.identifier"]')
     .fill("new_output");

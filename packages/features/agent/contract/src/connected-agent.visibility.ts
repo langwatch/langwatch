@@ -38,7 +38,5 @@ export function isConnectedAgentStale({
   now?: Date;
 }): boolean {
   if (!lastSeenAt) return false;
-  return (
-    new Date(lastSeenAt).getTime() < connectedAgentSeenCutoff(now).getTime()
-  );
+  return new Date(lastSeenAt).getTime() < connectedAgentSeenCutoff(now).getTime();
 }

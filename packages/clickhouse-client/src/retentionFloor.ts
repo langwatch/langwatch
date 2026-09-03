@@ -230,15 +230,7 @@ export class RetentionFloorService {
     return days;
   }
 
-  private remember({
-    key,
-    days,
-    nowMs,
-  }: {
-    key: string;
-    days: number;
-    nowMs: number;
-  }): void {
+  private remember({ key, days, nowMs }: { key: string; days: number; nowMs: number }): void {
     // Refresh insertion order so an entry being rewritten is not also the
     // next one evicted.
     this.cache.delete(key);

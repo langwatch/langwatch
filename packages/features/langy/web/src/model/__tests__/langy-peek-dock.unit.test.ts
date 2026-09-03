@@ -102,12 +102,8 @@ describe("langyPeekDock proximity", () => {
     describe("when a drawer holds the corner and the peek dodged left", () => {
       it("the zone follows it to the bottom-left", () => {
         const dodged = { ...base, dodgeLeft: true };
-        expect(resolvePeekProximity({ ...dodged, pointerX: 60, pointerY: 890 })).toBe(
-          true,
-        );
-        expect(resolvePeekProximity({ ...dodged, pointerX: 1400, pointerY: 890 })).toBe(
-          false,
-        );
+        expect(resolvePeekProximity({ ...dodged, pointerX: 60, pointerY: 890 })).toBe(true);
+        expect(resolvePeekProximity({ ...dodged, pointerX: 1400, pointerY: 890 })).toBe(false);
       });
     });
 
@@ -118,9 +114,7 @@ describe("langyPeekDock proximity", () => {
         // edge instead silently loses the sliver's own height, and lands the
         // pointer exactly ON the enter radius the moment that height changes.
         const betweenY =
-          900 -
-          FLOATING_PEEK_REST_PX -
-          (PEEK_PROXIMITY_ENTER_PX + PEEK_PROXIMITY_EXIT_PX) / 2;
+          900 - FLOATING_PEEK_REST_PX - (PEEK_PROXIMITY_ENTER_PX + PEEK_PROXIMITY_EXIT_PX) / 2;
         const between = { ...base, pointerX: 1200, pointerY: betweenY };
         // Approaching from afar: not yet near.
         expect(resolvePeekProximity({ ...between, wasNear: false })).toBe(false);

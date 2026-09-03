@@ -19,10 +19,9 @@ Until a gateway is configured, those messages are not sent, and the places that 
 SMTP is the one to reach for when nothing else fits. Any gateway that speaks it works.
 
 <Note>
-  `EMAIL_PROVIDER` decides which gateway runs, and no other gateway is tried if it fails.
-  Leave it unset and the gateway is inferred from whichever credentials are present,
-  `USE_AWS_SES` first and then `SENDGRID_API_KEY`. `smtp` and `resend` are only ever used
-  when named.
+  `EMAIL_PROVIDER` decides which gateway runs, and no other gateway is tried if it fails. Leave it
+  unset and the gateway is inferred from whichever credentials are present, `USE_AWS_SES` first and
+  then `SENDGRID_API_KEY`. `smtp` and `resend` are only ever used when named.
 </Note>
 
 ## Sender Address
@@ -96,8 +95,8 @@ app:
 Credentials come from the standard AWS chain, so a pod with an IRSA role needs no keys in the chart. If you are not using a role, supply `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` through both `app.extraEnvs` and `workers.extraEnvs`, since each Deployment reads only its own extra environment and both send mail.
 
 <Note>
-  A SES account still in the sandbox can only send to verified addresses, which includes
-  the address alerts are delivered to. Request production access before relying on it.
+  A SES account still in the sandbox can only send to verified addresses, which includes the address
+  alerts are delivered to. Request production access before relying on it.
 </Note>
 
 ### SendGrid

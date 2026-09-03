@@ -25,30 +25,28 @@ vi.mock("@langwatch/observability", () => ({
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 class OrganizationsStub extends UsageStatsOrganizationRepository {
-  readonly listForUsageStats = vi.fn<() => Promise<UsageStatsOrganization[]>>(
-    async () => [],
-  );
+  readonly listForUsageStats = vi.fn<() => Promise<UsageStatsOrganization[]>>(async () => []);
 }
 
 class UsageStatsStub implements UsageStatsCollector {
-  readonly collect = vi.fn<
-    (input: { organizationId: string }) => Promise<UsageStatsReport>
-  >(async () => ({
-    totalTraces: 0,
-    totalScenarioEvents: 0,
-    annotations: 0,
-    annotationQueues: 0,
-    annotationQueueItems: 0,
-    annotationScores: 0,
-    batchEvaluations: 0,
-    customGraphs: 0,
-    datasets: 0,
-    datasetRecords: 0,
-    experiments: 0,
-    triggers: 0,
-    workflows: 0,
-    timestamp: "2026-08-25T00:00:00.000Z",
-  }));
+  readonly collect = vi.fn<(input: { organizationId: string }) => Promise<UsageStatsReport>>(
+    async () => ({
+      totalTraces: 0,
+      totalScenarioEvents: 0,
+      annotations: 0,
+      annotationQueues: 0,
+      annotationQueueItems: 0,
+      annotationScores: 0,
+      batchEvaluations: 0,
+      customGraphs: 0,
+      datasets: 0,
+      datasetRecords: 0,
+      experiments: 0,
+      triggers: 0,
+      workflows: 0,
+      timestamp: "2026-08-25T00:00:00.000Z",
+    }),
+  );
 }
 
 function usageStatsReport(overrides: Partial<UsageStatsReport> = {}): UsageStatsReport {
@@ -160,8 +158,7 @@ describe("Ops worker contributions", () => {
   });
 
   it("reports one organization failure and continues with the next organization", async () => {
-    const { worker, organizations, usageStats, telemetry, errors } =
-      createUsageStatsWorker();
+    const { worker, organizations, usageStats, telemetry, errors } = createUsageStatsWorker();
     organizations.listForUsageStats.mockResolvedValue([
       { id: "org_1", name: "Acme" },
       { id: "org_2", name: "Baker" },
@@ -184,9 +181,7 @@ describe("Ops worker contributions", () => {
   it("warns with the original error and retries a failed usage-stat tick", async () => {
     const { worker, organizations } = createUsageStatsWorker();
     const failure = new Error("database unavailable");
-    organizations.listForUsageStats
-      .mockRejectedValueOnce(failure)
-      .mockResolvedValueOnce([]);
+    organizations.listForUsageStats.mockRejectedValueOnce(failure).mockResolvedValueOnce([]);
     const handle = worker.start();
 
     await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);

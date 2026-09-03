@@ -73,9 +73,7 @@ describe("continuation forwarding", () => {
   describe("when the router's batch callback receives a continuation context", () => {
     it("commits with the applied set extended rather than replaced", async () => {
       const queueManager = createMockQueueManager();
-      const initializeSpy = queueManager.initializeProjectionQueues as ReturnType<
-        typeof vi.fn
-      >;
+      const initializeSpy = queueManager.initializeProjectionQueues as ReturnType<typeof vi.fn>;
 
       const router = new ProjectionRouter(
         TEST_CONSTANTS.AGGREGATE_TYPE,

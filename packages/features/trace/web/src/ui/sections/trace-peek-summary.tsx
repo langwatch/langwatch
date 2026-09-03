@@ -1,5 +1,9 @@
 import { Box, Circle, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { formatCost, formatDuration, formatTokens } from "@langwatch/design-system/display-formatters";
+import {
+  formatCost,
+  formatDuration,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";
 import { STATUS_COLORS } from "../../model/display-formatters";
 import { useTraceHeader } from "./use-trace-header";
 

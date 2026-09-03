@@ -132,9 +132,7 @@ describe("installSessionContextHooks", () => {
         env: { MY_OWN: "keep" },
         hooks: {
           SessionStart: [userEntry],
-          PreToolUse: [
-            { matcher: "Bash", hooks: [{ type: "command", command: "audit" }] },
-          ],
+          PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "audit" }] }],
         },
       });
     });
@@ -153,10 +151,7 @@ describe("installSessionContextHooks", () => {
     it("leaves the user's own entry first and adds ours beside it", () => {
       install();
 
-      expect(readSettings().hooks.SessionStart).toEqual([
-        userEntry,
-        ourSessionStartEntry,
-      ]);
+      expect(readSettings().hooks.SessionStart).toEqual([userEntry, ourSessionStartEntry]);
       expect(readSettings().hooks.Stop).toEqual([ourEntry]);
     });
   });
@@ -175,10 +170,7 @@ describe("installSessionContextHooks", () => {
       });
 
       expect(install().action).toBe("updated");
-      expect(readSettings().hooks.SessionStart).toEqual([
-        userEntry,
-        ourSessionStartEntry,
-      ]);
+      expect(readSettings().hooks.SessionStart).toEqual([userEntry, ourSessionStartEntry]);
     });
   });
 
@@ -225,9 +217,7 @@ describe("installSessionContextHooks", () => {
       expect(sessionContextHooksTarget("codex").path).toBe(
         path.join(tmpHome, "elsewhere", "hooks.json"),
       );
-      expect(install({ tool: "codex" }).path).toBe(
-        path.join(tmpHome, "elsewhere", "hooks.json"),
-      );
+      expect(install({ tool: "codex" }).path).toBe(path.join(tmpHome, "elsewhere", "hooks.json"));
     });
 
     it("keeps hooks the user already declared in the same file", () => {

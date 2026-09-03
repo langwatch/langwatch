@@ -74,9 +74,7 @@ describe("redactStringNative", () => {
     it("redacts both a secret and an email", () => {
       const p = policy({});
       expect(redactStringNative({ text: SECRET, policy: p }).text).toContain("[SECRET]");
-      expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(
-        "mail [EMAIL_ADDRESS] end",
-      );
+      expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe("mail [EMAIL_ADDRESS] end");
     });
   });
 
@@ -101,9 +99,7 @@ describe("redactStringNative", () => {
   describe("given the strict PII level", () => {
     it("runs essential PII natively as a floor and still scrubs secrets (strict names/locations are batched elsewhere)", () => {
       const p = policy({ piiLevel: "strict" });
-      expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe(
-        "mail [EMAIL_ADDRESS] end",
-      );
+      expect(redactStringNative({ text: EMAIL, policy: p }).text).toBe("mail [EMAIL_ADDRESS] end");
       expect(redactStringNative({ text: SECRET, policy: p }).text).toContain("[SECRET]");
     });
   });
@@ -156,17 +152,17 @@ describe("redactAttributeNative", () => {
     // The rule reads the END of the name. `identifier` and a segment after
     // `.id` both say something other than "this holds an id", so the
     // deny-list keeps its hold on them.
-    it.each([
-      "langwatch.api_key.id.extra",
-      "langwatch.api_key.identifier",
-    ])("nukes %s by name", (key) => {
-      const { text } = redactAttributeNative({
-        key,
-        value: "not even a secret shape",
-        policy: policy({}),
-      });
-      expect(text).toBe("[SECRET]");
-    });
+    it.each(["langwatch.api_key.id.extra", "langwatch.api_key.identifier"])(
+      "nukes %s by name",
+      (key) => {
+        const { text } = redactAttributeNative({
+          key,
+          value: "not even a secret shape",
+          policy: policy({}),
+        });
+        expect(text).toBe("[SECRET]");
+      },
+    );
   });
 
   describe("given any other api_key-named attribute", () => {
@@ -215,38 +211,36 @@ describe("redactAttributeNative", () => {
       });
 
       /** @scenario "The shape rules still run on an attribute that is not an identifier" */
-      it.each([
-        "langwatch.input",
-        "langwatch.output",
-        "gen_ai.prompt",
-        "scenario.run_name",
-      ])("replaces it under %s", (key) => {
-        expect(
-          redactAttributeNative({
-            key,
-            value: SHAPED_TOKEN,
-            policy: policy({}),
-          }).text,
-        ).toBe("[SECRET]");
-      });
+      it.each(["langwatch.input", "langwatch.output", "gen_ai.prompt", "scenario.run_name"])(
+        "replaces it under %s",
+        (key) => {
+          expect(
+            redactAttributeNative({
+              key,
+              value: SHAPED_TOKEN,
+              policy: policy({}),
+            }).text,
+          ).toBe("[SECRET]");
+        },
+      );
 
       // `langwatch.input` and `langwatch.output` are the reason the rule reads
       // the name and never a namespace: they carry the chat content itself, so
       // a `langwatch.*` rule would take the shape rules off the largest
       // customer text in the product.
       /** @scenario "The shape rules still run on an attribute that is not an identifier" */
-      it.each([
-        "langwatch.input",
-        "langwatch.output",
-      ])("replaces a vendor key sent inside %s", (key) => {
-        const { text } = redactAttributeNative({
-          key,
-          value: `here is the key sk-ant-${"A".repeat(40)} use it`,
-          policy: policy({}),
-        });
-        expect(text).toContain("[SECRET]");
-        expect(text).not.toContain("sk-ant-");
-      });
+      it.each(["langwatch.input", "langwatch.output"])(
+        "replaces a vendor key sent inside %s",
+        (key) => {
+          const { text } = redactAttributeNative({
+            key,
+            value: `here is the key sk-ant-${"A".repeat(40)} use it`,
+            policy: policy({}),
+          });
+          expect(text).toContain("[SECRET]");
+          expect(text).not.toContain("sk-ant-");
+        },
+      );
     });
 
     describe("when the value is a credential a vendor minted", () => {
@@ -263,16 +257,8 @@ describe("redactAttributeNative", () => {
         ["a provider key", `sk-ant-${"A".repeat(40)}`],
         ["a GitHub token", `ghp_${"b".repeat(38)}`],
         ["an AWS access key id", `AKIA${"C".repeat(16)}`],
-        [
-          "a JWT",
-          ["eyJhbGciOiJIUzI1NiJ9", "eyJzdWIiOiJhY21lIn0", "c2lnbmF0dXJl"].join(
-            ".",
-          ),
-        ],
-        [
-          "a connection URL password",
-          "postgres://user:hunter2abc@db.internal/x",
-        ],
+        ["a JWT", ["eyJhbGciOiJIUzI1NiJ9", "eyJzdWIiOiJhY21lIn0", "c2lnbmF0dXJl"].join(".")],
+        ["a connection URL password", "postgres://user:hunter2abc@db.internal/x"],
       ])("still redacts %s under every identifier name", (_label, value) => {
         const kept = IDENTIFIER_NAMES.filter(
           (key) =>
@@ -306,53 +292,50 @@ describe("redactAttributeNative", () => {
       // is replaced and the field that says which key produced a trace is
       // gone. The credential itself keeps the deny-list.
       /** @scenario "The identifier of a credential keeps its value while the credential does not" */
-      it.each([
-        "langwatch.api_key.id",
-        "gateway.token_id",
-        "vault.password_id",
-      ])("keeps the row id under %s", (key) => {
-        expect(
-          redactAttributeNative({
-            key,
-            value: "apikey_2bTxYq4NfPzR7WcJ1mHdKsVgL",
-            policy: policy({}),
-          }).text,
-        ).toBe("apikey_2bTxYq4NfPzR7WcJ1mHdKsVgL");
-      });
+      it.each(["langwatch.api_key.id", "gateway.token_id", "vault.password_id"])(
+        "keeps the row id under %s",
+        (key) => {
+          expect(
+            redactAttributeNative({
+              key,
+              value: "apikey_2bTxYq4NfPzR7WcJ1mHdKsVgL",
+              policy: policy({}),
+            }).text,
+          ).toBe("apikey_2bTxYq4NfPzR7WcJ1mHdKsVgL");
+        },
+      );
 
       /** @scenario "The identifier of a credential keeps its value while the credential does not" */
-      it.each([
-        "api_key",
-        "authorization",
-        "langwatch.api_key",
-      ])("still replaces the whole value under %s", (key) => {
-        expect(
-          redactAttributeNative({
-            key,
-            value: "ordinary text",
-            policy: policy({}),
-          }).text,
-        ).toBe("[SECRET]");
-      });
+      it.each(["api_key", "authorization", "langwatch.api_key"])(
+        "still replaces the whole value under %s",
+        (key) => {
+          expect(
+            redactAttributeNative({
+              key,
+              value: "ordinary text",
+              policy: policy({}),
+            }).text,
+          ).toBe("[SECRET]");
+        },
+      );
     });
 
     describe("when the name only resembles an identifier name", () => {
       // The rule reads the END of the name. A name that puts a character after
       // `_id` says something else, so it keeps every rule.
       /** @scenario "A name that only resembles an identifier name keeps the shape rules" */
-      it.each([
-        "scenario.run_idx",
-        "scenario.run_id.extra",
-        "scenario.ident",
-      ])("treats %s as ordinary content", (key) => {
-        expect(
-          redactAttributeNative({
-            key,
-            value: SHAPED_TOKEN,
-            policy: policy({}),
-          }).text,
-        ).toBe("[SECRET]");
-      });
+      it.each(["scenario.run_idx", "scenario.run_id.extra", "scenario.ident"])(
+        "treats %s as ordinary content",
+        (key) => {
+          expect(
+            redactAttributeNative({
+              key,
+              value: SHAPED_TOKEN,
+              policy: policy({}),
+            }).text,
+          ).toBe("[SECRET]");
+        },
+      );
     });
 
     describe("when the value is personal data", () => {
@@ -378,20 +361,12 @@ describe("redactAttributeNative", () => {
     /** @scenario "A prompt handle and a version number survive redaction" */
     it.each([
       ["langwatch.prompt.handle", "customer-support-triage-assistant-v2"],
-      [
-        "langwatch.prompt.handle",
-        "acme-platform/customer-support-triage-assistant",
-      ],
-      [
-        "langwatch.prompt.handle",
-        "release_2026_08_25_experimental_router_prompt",
-      ],
+      ["langwatch.prompt.handle", "acme-platform/customer-support-triage-assistant"],
+      ["langwatch.prompt.handle", "release_2026_08_25_experimental_router_prompt"],
       ["langwatch.prompt.handle", "prompt_V1StGXR8Z5jdHi6BmyT"],
       ["langwatch.prompt.version.number", "128"],
     ])("keeps %s holding %s", (key, value) => {
-      expect(
-        redactAttributeNative({ key, value, policy: policy({}) }).text,
-      ).toBe(value);
+      expect(redactAttributeNative({ key, value, policy: policy({}) }).text).toBe(value);
     });
   });
 

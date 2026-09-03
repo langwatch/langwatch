@@ -20,8 +20,8 @@ async function waitFor(condition: () => boolean, timeoutMs = 2_000): Promise<voi
 }
 
 function subscriber(messages: CancellationMessage[]) {
-  return RedisCancellationSubscriberAdapter.create(connection.duplicate()).subscribe(
-    (message) => messages.push(message),
+  return RedisCancellationSubscriberAdapter.create(connection.duplicate()).subscribe((message) =>
+    messages.push(message),
   );
 }
 

@@ -68,8 +68,9 @@ export const CONTENT_ATTRIBUTE_KEYS: readonly string[] = [
  * out, so a key added to the data-privacy catalog brings its exploded form with
  * it.
  */
-export const CONTENT_ATTRIBUTE_KEY_PREFIXES: readonly string[] =
-  CONTENT_ATTRIBUTE_KEYS.map((key) => `${key}.`);
+export const CONTENT_ATTRIBUTE_KEY_PREFIXES: readonly string[] = CONTENT_ATTRIBUTE_KEYS.map(
+  (key) => `${key}.`,
+);
 
 /** The gate governing a content category, per {@link CATEGORY_GATE}. */
 export function gateForContentCategory(category: ContentCategory): FieldProtection {

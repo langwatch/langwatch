@@ -109,11 +109,10 @@ export class PromptNotACopyError extends HandledError {
   declare readonly code: "prompt_not_a_copy";
 
   constructor() {
-    super(
-      "prompt_not_a_copy",
-      "This prompt is not a copy and has no source to sync from",
-      { httpStatus: 400, fault: "customer" },
-    );
+    super("prompt_not_a_copy", "This prompt is not a copy and has no source to sync from", {
+      httpStatus: 400,
+      fault: "customer",
+    });
     this.name = "PromptNotACopyError";
   }
 }
@@ -256,10 +255,7 @@ export class PromptApp {
   }
 
   /** Creates a prompt and its first version, attributed to its caller. */
-  create(
-    input: Omit<CreatePromptCommand, "authorId">,
-    by: PromptCaller,
-  ): Promise<VersionedPrompt> {
+  create(input: Omit<CreatePromptCommand, "authorId">, by: PromptCaller): Promise<VersionedPrompt> {
     return this.dependencies.prompts.createPrompt({ ...input, authorId: by.id });
   }
 
@@ -431,10 +427,7 @@ export class PromptApp {
   }
 
   /** Every tag currently assigned to one prompt's versions. */
-  getTagsForConfig(input: {
-    configId: string;
-    projectId: string;
-  }): Promise<PromptTagAssignment[]> {
+  getTagsForConfig(input: { configId: string; projectId: string }): Promise<PromptTagAssignment[]> {
     return this.dependencies.prompts.getTagsForConfig(input);
   }
 

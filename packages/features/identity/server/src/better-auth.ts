@@ -41,10 +41,7 @@ export {
   runWithIdentityBirth,
   wasBornInThisRequest,
 } from "./better-auth/identity-birth";
-export {
-  bridgeAccountCeremonies,
-  IdentityCeremonies,
-} from "./better-auth/identity-ceremonies";
+export { bridgeAccountCeremonies, IdentityCeremonies } from "./better-auth/identity-ceremonies";
 export {
   createIdentityStorageAdapter,
   type IdentityStorageAdapterDeps,

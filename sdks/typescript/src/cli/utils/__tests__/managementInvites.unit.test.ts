@@ -65,9 +65,9 @@ describe("composeInvitesFromFlags", () => {
 
   describe("when the batch is missing a team to land on", () => {
     it("refuses it, naming the flag that carries one", () => {
-      expect(() =>
-        composeInvitesFromFlags({ email: ["a@example.com"], role: ["MEMBER"] }),
-      ).toThrow(/--team teamId:role/);
+      expect(() => composeInvitesFromFlags({ email: ["a@example.com"], role: ["MEMBER"] })).toThrow(
+        /--team teamId:role/,
+      );
     });
   });
 
@@ -130,9 +130,7 @@ describe("parseInvitesJson", () => {
       expect(() => parseInvitesJson("[]")).toThrow(/empty/);
       expect(() => parseInvitesJson('[{"role":"MEMBER"}]')).toThrow(/no email/);
       expect(() => parseInvitesJson('[{"email":"a@b.c"}]')).toThrow(/no role/);
-      expect(() => parseInvitesJson('[{"email":"a@b.c","role":"MEMBER"}]')).toThrow(
-        /no teams/,
-      );
+      expect(() => parseInvitesJson('[{"email":"a@b.c","role":"MEMBER"}]')).toThrow(/no teams/);
     });
   });
 
@@ -147,9 +145,7 @@ describe("parseInvitesJson", () => {
       const document = JSON.stringify([invite("a@example.com"), invite("not-an-email")]);
 
       expect(() => parseInvitesJson(document)).toThrow(ManagementFlagError);
-      expect(() => parseInvitesJson(document)).toThrow(
-        /Invalid email "not-an-email" in invite 2/,
-      );
+      expect(() => parseInvitesJson(document)).toThrow(/Invalid email "not-an-email" in invite 2/);
     });
   });
 
@@ -165,9 +161,7 @@ describe("parseInvitesJson", () => {
         ]);
 
       for (const malformed of [42, {}, [], "", "   "]) {
-        expect(() => parseInvitesJson(withCustomRoleId(malformed))).toThrow(
-          ManagementFlagError,
-        );
+        expect(() => parseInvitesJson(withCustomRoleId(malformed))).toThrow(ManagementFlagError);
         expect(() => parseInvitesJson(withCustomRoleId(malformed))).toThrow(
           /customRoleId that is not a role id/,
         );

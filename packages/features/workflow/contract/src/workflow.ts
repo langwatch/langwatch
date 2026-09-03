@@ -68,11 +68,7 @@ export const workflowVersionSchema = z.object({
 
 export type WorkflowVersion = z.infer<typeof workflowVersionSchema>;
 
-export const workflowVersionHistoryModeSchema = z.enum([
-  "metadata",
-  "allDsl",
-  "previousDsl",
-]);
+export const workflowVersionHistoryModeSchema = z.enum(["metadata", "allDsl", "previousDsl"]);
 
 export type WorkflowVersionHistoryMode = z.infer<typeof workflowVersionHistoryModeSchema>;
 
@@ -91,18 +87,14 @@ export const workflowVersionHistoryEntrySchema = z.object({
     })
     .nullable()
     .optional(),
-  author: z
-    .object({ name: z.string().nullable(), image: z.string().nullable() })
-    .nullable(),
+  author: z.object({ name: z.string().nullable(), image: z.string().nullable() }).nullable(),
   isCurrentVersion: z.literal(true).optional(),
   isLatestVersion: z.literal(true).optional(),
   isPublishedVersion: z.literal(true).optional(),
   isPreviousVersion: z.literal(true).optional(),
 });
 
-export type WorkflowVersionHistoryEntry = z.infer<
-  typeof workflowVersionHistoryEntrySchema
->;
+export type WorkflowVersionHistoryEntry = z.infer<typeof workflowVersionHistoryEntrySchema>;
 
 export type WorkflowWithVersion = Workflow & {
   currentVersion?: WorkflowVersion | null;

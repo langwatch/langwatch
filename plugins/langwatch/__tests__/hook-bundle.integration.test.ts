@@ -348,9 +348,7 @@ describe("the bundled session guidance hook", () => {
         };
       };
       expect(parsed.hookSpecificOutput.hookEventName).toBe("SessionStart");
-      expect(parsed.hookSpecificOutput.additionalContext).toContain(
-        "langwatch ingest context",
-      );
+      expect(parsed.hookSpecificOutput.additionalContext).toContain("langwatch ingest context");
     });
   });
 

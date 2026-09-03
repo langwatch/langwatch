@@ -22,10 +22,7 @@ import {
   TraceSpanPiiRedactionPort,
   TraceSpanTokenEstimationPort,
 } from "../trace-span-preparation.port";
-import {
-  TraceSpanSpoolPort,
-  type TraceSpanSpoolIdentity,
-} from "../trace-span-spool.port";
+import { TraceSpanSpoolPort, type TraceSpanSpoolIdentity } from "../trace-span-spool.port";
 
 class PiiRedactionFake extends TraceSpanPiiRedactionPort {
   readonly redact = vi.fn(

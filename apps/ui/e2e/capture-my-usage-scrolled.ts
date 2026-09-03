@@ -72,9 +72,7 @@ void (async () => {
   const byToolCount = await page.locator("text=/By tool/i").count();
   const recentCount = await page.locator("text=/Recent activity/i").count();
   console.log(`[diagnostic] 'By tool' rendered: ${byToolCount > 0 ? "YES" : "NO"}`);
-  console.log(
-    `[diagnostic] 'Recent activity' rendered: ${recentCount > 0 ? "YES" : "NO"}`,
-  );
+  console.log(`[diagnostic] 'Recent activity' rendered: ${recentCount > 0 ? "YES" : "NO"}`);
 
   await browser.close();
   console.log("done");

@@ -19,9 +19,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeTraceData(
-  overrides: Partial<PreconditionTraceData> = {},
-): PreconditionTraceData {
+function makeTraceData(overrides: Partial<PreconditionTraceData> = {}): PreconditionTraceData {
   return {
     input: "",
     output: "",
@@ -1172,9 +1170,7 @@ describe("evaluatePreconditions()", () => {
               },
             ],
           },
-          preconditions: [
-            { field: "events.event_type", rule: "is", value: "thumbs_up_down" },
-          ],
+          preconditions: [{ field: "events.event_type", rule: "is", value: "thumbs_up_down" }],
         }),
       ).toBe(true);
     });
@@ -1183,13 +1179,9 @@ describe("evaluatePreconditions()", () => {
       expect(
         evaluatePreconditions({
           traceData: {
-            events: [
-              { event_type: "purchase", metrics: [], event_details: [] },
-            ],
+            events: [{ event_type: "purchase", metrics: [], event_details: [] }],
           },
-          preconditions: [
-            { field: "events.event_type", rule: "is", value: "thumbs_up_down" },
-          ],
+          preconditions: [{ field: "events.event_type", rule: "is", value: "thumbs_up_down" }],
         }),
       ).toBe(false);
     });
@@ -1198,9 +1190,7 @@ describe("evaluatePreconditions()", () => {
       expect(
         evaluatePreconditions({
           traceData: { events: null },
-          preconditions: [
-            { field: "events.event_type", rule: "is", value: "thumbs_up_down" },
-          ],
+          preconditions: [{ field: "events.event_type", rule: "is", value: "thumbs_up_down" }],
         }),
       ).toBe(false);
     });
@@ -1334,9 +1324,7 @@ describe("evaluatePreconditions()", () => {
         evaluatePreconditions({
           traceData: {
             input: "hello",
-            events: [
-              { event_type: "purchase", metrics: [], event_details: [] },
-            ],
+            events: [{ event_type: "purchase", metrics: [], event_details: [] }],
           },
           preconditions: [
             { field: "input", rule: "contains", value: "hello" },

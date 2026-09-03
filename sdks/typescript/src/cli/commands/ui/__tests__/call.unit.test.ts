@@ -46,8 +46,7 @@ describe("the ui call command", () => {
   describe("given the page applies the action", () => {
     it("sends the dispatch with a deadline on it", async () => {
       const fetchMock = vi.fn(
-        async (_url: string, _init?: RequestInit) =>
-          new Response('{"executedVia":"browser"}'),
+        async (_url: string, _init?: RequestInit) => new Response('{"executedVia":"browser"}'),
       );
       vi.stubGlobal("fetch", fetchMock);
 
@@ -107,9 +106,7 @@ describe("the ui call command", () => {
         }),
       );
 
-      await expect(uiCallCommand("workbench.getState", {})).rejects.toThrow(
-        "fetch failed",
-      );
+      await expect(uiCallCommand("workbench.getState", {})).rejects.toThrow("fetch failed");
     });
   });
 
@@ -141,8 +138,7 @@ describe("the ui call command", () => {
       await writeFile(file, JSON.stringify(AWKWARD), "utf8");
 
       const fetchMock = vi.fn(
-        async (_url: string, _init?: RequestInit) =>
-          new Response('{"executedVia":"browser"}'),
+        async (_url: string, _init?: RequestInit) => new Response('{"executedVia":"browser"}'),
       );
       vi.stubGlobal("fetch", fetchMock);
 
@@ -161,8 +157,7 @@ describe("the ui call command", () => {
       );
 
       const fetchMock = vi.fn(
-        async (_url: string, _init?: RequestInit) =>
-          new Response('{"executedVia":"browser"}'),
+        async (_url: string, _init?: RequestInit) => new Response('{"executedVia":"browser"}'),
       );
       vi.stubGlobal("fetch", fetchMock);
 
@@ -230,8 +225,7 @@ describe("the ui call command", () => {
       const document = readCliErrorDocument(stdout.join("\n"));
       expect(document).toMatchObject({
         code: "langy_ui_payload_invalid",
-        message:
-          'The payload for "workbench.setTargetPrompt" does not match the action\'s schema.',
+        message: 'The payload for "workbench.setTargetPrompt" does not match the action\'s schema.',
       });
     });
   });

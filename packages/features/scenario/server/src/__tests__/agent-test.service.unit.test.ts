@@ -6,7 +6,11 @@
  *
  * @see specs/agents/agent-test-run.feature
  */
-import { AgentOwnerOnlyError, type AgentService, type AgentWithFields } from "@langwatch/agent-contract";
+import {
+  AgentOwnerOnlyError,
+  type AgentService,
+  type AgentWithFields,
+} from "@langwatch/agent-contract";
 import type { AgentTestOwnershipPort } from "../ports/agent-test-ownership.port";
 import { AGENT_TEST_SCENARIO_ID } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -59,9 +63,9 @@ function httpAgent(overrides: Partial<AgentWithFields> = {}): AgentWithFields {
 
 function fakeAgents(namesById: Record<string, string> = {}): AgentService {
   return {
-    getNamesByIds: vi.fn().mockResolvedValue(
-      Object.entries(namesById).map(([id, name]) => ({ id, name })),
-    ),
+    getNamesByIds: vi
+      .fn()
+      .mockResolvedValue(Object.entries(namesById).map(([id, name]) => ({ id, name }))),
   } as unknown as AgentService;
 }
 
@@ -70,7 +74,9 @@ function fakeOwnership(namesById: Record<string, string>): AgentTestOwnershipPor
     assertRunnable: async ({ agents, actor }) => {
       const foreign = agents.find(
         (agent) =>
-          agent.type === "connected" && agent.ownerUserId != null && agent.ownerUserId !== actor?.id,
+          agent.type === "connected" &&
+          agent.ownerUserId != null &&
+          agent.ownerUserId !== actor?.id,
       );
       if (!foreign?.ownerUserId) return;
       throw new AgentOwnerOnlyError({
@@ -83,7 +89,10 @@ function fakeOwnership(namesById: Record<string, string>): AgentTestOwnershipPor
   };
 }
 
-function serviceFor(options: { queueRun?: ReturnType<typeof vi.fn>; namesById?: Record<string, string> }) {
+function serviceFor(options: {
+  queueRun?: ReturnType<typeof vi.fn>;
+  namesById?: Record<string, string>;
+}) {
   const queueRun = options.queueRun ?? vi.fn().mockResolvedValue(undefined);
   const service = AgentTestService.create({
     agents: fakeAgents(options.namesById),

@@ -153,15 +153,7 @@ describe("LangWatchCallbackHandler", () => {
         thread_id: "thread",
         checkpoint_ns: "ns",
       };
-      await handler.handleChatModelStart(
-        {} as any,
-        [],
-        "run",
-        undefined,
-        {},
-        [],
-        metadata,
-      );
+      await handler.handleChatModelStart({} as any, [], "run", undefined, {}, [], metadata);
       await handler.handleLLMEnd({ generations: [[]] } as any, "run");
       // If we reached here, it means building attributes didn't throw and filtering worked
       expect(true).toBe(true);
@@ -565,11 +557,7 @@ describe("Helper Functions", () => {
             langgraph_node: "validate",
             langgraph_step: 3,
             langgraph_path: ["input", "validate"],
-            langgraph_triggers: [
-              "condition:valid",
-              "branch:to:process",
-              "branch:to:retry",
-            ],
+            langgraph_triggers: ["condition:valid", "branch:to:process", "branch:to:retry"],
           },
         });
         // Should prioritize router over node
@@ -638,11 +626,7 @@ describe("Helper Functions", () => {
           runType: "chain",
           metadata: {
             langgraph_path: ["start", "validate"],
-            langgraph_triggers: [
-              "condition:true",
-              "branch:to:success",
-              "branch:to:retry",
-            ],
+            langgraph_triggers: ["condition:true", "branch:to:success", "branch:to:retry"],
           },
         });
         expect(result.name).toBe("Route: validate → success");
@@ -987,9 +971,7 @@ describe("Helper Functions", () => {
 
       // Should contain other keys
       expect(result["langwatch.langchain.run.metadata.custom_key"]).toBe("custom_value");
-      expect(result["langwatch.langchain.run.metadata.another_key"]).toBe(
-        "another_value",
-      );
+      expect(result["langwatch.langchain.run.metadata.another_key"]).toBe("another_value");
     });
 
     it("handles empty metadata", () => {
@@ -1021,10 +1003,7 @@ describe("Helper Functions", () => {
       expect(span.setAttribute).toHaveBeenCalledWith("gen_ai.system", "OpenAI");
       expect(span.setAttribute).toHaveBeenCalledWith("gen_ai.request.model", "gpt-4");
       expect(span.setAttribute).toHaveBeenCalledWith("gen_ai.request.temperature", 0.7);
-      expect(span.setAttribute).toHaveBeenCalledWith(
-        "gen_ai.response.model",
-        "gpt-4-0613",
-      );
+      expect(span.setAttribute).toHaveBeenCalledWith("gen_ai.response.model", "gpt-4-0613");
     });
 
     it("handles missing metadata gracefully", () => {
@@ -1047,10 +1026,7 @@ describe("Helper Functions", () => {
 
       applyGenAIAttrs(span, metadata, extraParams);
 
-      expect(span.setAttribute).toHaveBeenCalledWith(
-        "gen_ai.request.model",
-        "gpt-3.5-turbo",
-      );
+      expect(span.setAttribute).toHaveBeenCalledWith("gen_ai.request.model", "gpt-3.5-turbo");
       expect(span.setAttribute).toHaveBeenCalledWith("gen_ai.request.temperature", 0.5);
     });
   });

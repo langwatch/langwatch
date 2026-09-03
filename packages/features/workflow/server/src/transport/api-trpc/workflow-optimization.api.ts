@@ -30,11 +30,7 @@
  * Spec: packages/features/workflow/specs/workflow-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { WorkflowApp } from "#app/workflow.app";
 
@@ -169,56 +165,56 @@ export class WorkflowOptimizationTrpcApi {
        * rather than an error: a workflow becomes a component before it has a
        * published version.
        */
-      getPublishedWorkflow: policy("workflows:view")(
-        procedure.input(workflowScopeSchema),
-      ).query(async ({ ctx, input }) => {
-        const workflow = await ports.tryGetWorkflow(ctx, {
-          workflowId: input.workflowId,
-          projectId: input.projectId,
-        });
-        const publishedWorkflow = await ports.tryGetWorkflowVersion(ctx, {
-          versionId: workflow?.publishedId ?? "",
-          projectId: input.projectId,
-        });
+      getPublishedWorkflow: policy("workflows:view")(procedure.input(workflowScopeSchema)).query(
+        async ({ ctx, input }) => {
+          const workflow = await ports.tryGetWorkflow(ctx, {
+            workflowId: input.workflowId,
+            projectId: input.projectId,
+          });
+          const publishedWorkflow = await ports.tryGetWorkflowVersion(ctx, {
+            versionId: workflow?.publishedId ?? "",
+            projectId: input.projectId,
+          });
 
-        if (!publishedWorkflow) {
-          return null;
-        }
+          if (!publishedWorkflow) {
+            return null;
+          }
 
-        return {
-          ...publishedWorkflow,
-          isComponent: workflow?.isComponent,
-          isEvaluator: workflow?.isEvaluator,
-        };
-      }),
+          return {
+            ...publishedWorkflow,
+            isComponent: workflow?.isComponent,
+            isEvaluator: workflow?.isEvaluator,
+          };
+        },
+      ),
 
-      disableAsComponent: policy("workflows:update")(
-        procedure.input(workflowScopeSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ports.setWorkflowFlags(ctx, {
-          workflowId: input.workflowId,
-          projectId: input.projectId,
-          isComponent: false,
-        });
+      disableAsComponent: policy("workflows:update")(procedure.input(workflowScopeSchema)).mutation(
+        async ({ ctx, input }) => {
+          await ports.setWorkflowFlags(ctx, {
+            workflowId: input.workflowId,
+            projectId: input.projectId,
+            isComponent: false,
+          });
 
-        return { success: true };
-      }),
+          return { success: true };
+        },
+      ),
 
       /**
        * Archives the evaluator this workflow was published as, so nothing keeps
        * an evaluator pointing at a workflow that no longer offers itself.
        */
-      disableAsEvaluator: policy("workflows:update")(
-        procedure.input(workflowScopeSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const { workflowId, projectId } = input;
+      disableAsEvaluator: policy("workflows:update")(procedure.input(workflowScopeSchema)).mutation(
+        async ({ ctx, input }) => {
+          const { workflowId, projectId } = input;
 
-        await ports.setWorkflowFlags(ctx, { workflowId, projectId, isEvaluator: false });
+          await ports.setWorkflowFlags(ctx, { workflowId, projectId, isEvaluator: false });
 
-        await ctx.app.workflows.unlinkEvaluatorFromWorkflow({ workflowId, projectId });
+          await ctx.app.workflows.unlinkEvaluatorFromWorkflow({ workflowId, projectId });
 
-        return { success: true };
-      }),
+          return { success: true };
+        },
+      ),
 
       /** A workflow is a component or an evaluator, never both. */
       toggleSaveAsComponent: policy("workflows:update")(

@@ -33,10 +33,7 @@ const system = createDesignSystem(frontDoorThemeConfig);
 
 // getTokenCss() emits `{"@layer tokens": {"<selector>": {--var: value}}}`.
 const tokenCss = () =>
-  system.getTokenCss() as Record<
-    string,
-    Record<string, Record<string, string>>
-  >;
+  system.getTokenCss() as Record<string, Record<string, Record<string, string>>>;
 
 const layer = () => tokenCss()["@layer tokens"] ?? {};
 
@@ -96,8 +93,7 @@ describe("given the front door's theme tokens", () => {
     it("touches no token any other surface reads", () => {
       const foreign = [...allVariables()].filter(
         (name) =>
-          name.startsWith("--chakra-colors-front-door-") === false &&
-          name.includes("front-door"),
+          name.startsWith("--chakra-colors-front-door-") === false && name.includes("front-door"),
       );
 
       expect(foreign).toEqual([]);

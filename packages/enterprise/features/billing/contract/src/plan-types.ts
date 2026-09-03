@@ -56,8 +56,7 @@ export const SubscriptionStatus = {
   CANCELLED: "CANCELLED",
 } as const;
 
-export type SubscriptionStatus =
-  (typeof SubscriptionStatus)[keyof typeof SubscriptionStatus];
+export type SubscriptionStatus = (typeof SubscriptionStatus)[keyof typeof SubscriptionStatus];
 
 /**
  * How plan resolution picks among an organization's active subscriptions:
@@ -69,10 +68,7 @@ export type SubscriptionStatus =
  * restating it. `compareBySubscriptionOrder` is the in-memory reading of this
  * same list, for callers holding rows rather than issuing a query.
  */
-export const ACTIVE_SUBSCRIPTION_ORDER_BY = [
-  { createdAt: "desc" },
-  { id: "desc" },
-] as const;
+export const ACTIVE_SUBSCRIPTION_ORDER_BY = [{ createdAt: "desc" }, { id: "desc" }] as const;
 
 /**
  * Orders already-fetched rows the way the database would.

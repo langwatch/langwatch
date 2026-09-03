@@ -189,11 +189,7 @@ describe("<SpanDetails/>", () => {
 
       render(
         <TestWrapper>
-          <SpanDetails
-            project={project}
-            span={llmSpan}
-            allSpans={[parentSpan, llmSpan]}
-          />
+          <SpanDetails project={project} span={llmSpan} allSpans={[parentSpan, llmSpan]} />
         </TestWrapper>,
       );
 
@@ -229,11 +225,7 @@ describe("<SpanDetails/>", () => {
 
       render(
         <TestWrapper>
-          <SpanDetails
-            project={project}
-            span={llmSpan}
-            allSpans={[grandparent, parent, llmSpan]}
-          />
+          <SpanDetails project={project} span={llmSpan} allSpans={[grandparent, parent, llmSpan]} />
         </TestWrapper>,
       );
 
@@ -257,11 +249,7 @@ describe("<SpanDetails/>", () => {
 
       render(
         <TestWrapper>
-          <SpanDetails
-            project={project}
-            span={llmSpan}
-            allSpans={[parentSpan, llmSpan]}
-          />
+          <SpanDetails project={project} span={llmSpan} allSpans={[parentSpan, llmSpan]} />
         </TestWrapper>,
       );
 
@@ -379,11 +367,7 @@ describe("<SpanDetails/>", () => {
 
       render(
         <TestWrapper>
-          <SpanDetails
-            project={project}
-            span={llmSpan}
-            allSpans={[parentSpan, llmSpan]}
-          />
+          <SpanDetails project={project} span={llmSpan} allSpans={[parentSpan, llmSpan]} />
         </TestWrapper>,
       );
 

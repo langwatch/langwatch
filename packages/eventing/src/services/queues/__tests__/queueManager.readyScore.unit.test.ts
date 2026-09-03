@@ -85,9 +85,7 @@ describe("QueueManager ready scores", () => {
       const entry = registry.get("test-pipeline:job:deferredCheck");
 
       expect(entry?.scoreFn({ tenantId: "t1" })).toBe(NOW);
-      expect(entry?.scoreFn({ tenantId: "t1", occurredAt: NOW - 30_000 })).toBe(
-        NOW - 30_000,
-      );
+      expect(entry?.scoreFn({ tenantId: "t1", occurredAt: NOW - 30_000 })).toBe(NOW - 30_000);
     });
 
     /**
@@ -120,9 +118,7 @@ describe("QueueManager ready scores", () => {
         scoreFn: () => NOW - 1_000,
       });
 
-      expect(registry.get("test-pipeline:job:customScore")?.scoreFn({})).toBe(
-        NOW - 1_000,
-      );
+      expect(registry.get("test-pipeline:job:customScore")?.scoreFn({})).toBe(NOW - 1_000);
     });
   });
 

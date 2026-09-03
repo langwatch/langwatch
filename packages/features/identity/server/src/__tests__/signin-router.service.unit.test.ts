@@ -4,10 +4,7 @@ import type {
   SignInMethodPolicy,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  type SignInRoutingRecord,
-  SignInRouterService,
-} from "../signin-router.service";
+import { type SignInRoutingRecord, SignInRouterService } from "../signin-router.service";
 
 const PASSWORD: SignInMethod = {
   id: "password",
@@ -62,8 +59,9 @@ function build({
 describe("SignInRouterService", () => {
   describe("when an address is submitted", () => {
     it("asks the domain port about the normalized domain only", async () => {
-      const { service, tryFindConnectionForDomain, listActiveConnections } =
-        build({ byDomain: ACME });
+      const { service, tryFindConnectionForDomain, listActiveConnections } = build({
+        byDomain: ACME,
+      });
 
       const decision = await service.route({
         identifier: "Sam.J+news@Acme.com",
@@ -108,8 +106,9 @@ describe("SignInRouterService", () => {
 
   describe("when no address has been asked for yet", () => {
     it("asks the domain port for the connections it could auto-redirect to", async () => {
-      const { service, tryFindConnectionForDomain, listActiveConnections } =
-        build({ active: [ACME] });
+      const { service, tryFindConnectionForDomain, listActiveConnections } = build({
+        active: [ACME],
+      });
 
       const decision = await service.route({ identifier: null });
 
@@ -122,8 +121,9 @@ describe("SignInRouterService", () => {
   describe("when the break-glass parameter is used", () => {
     /** @scenario "The break-glass path always reaches a local sign-in" */
     it("answers the local method set without reading the connection store", async () => {
-      const { service, tryFindConnectionForDomain, listActiveConnections } =
-        build({ active: [ACME] });
+      const { service, tryFindConnectionForDomain, listActiveConnections } = build({
+        active: [ACME],
+      });
 
       const decision = await service.route({
         identifier: null,

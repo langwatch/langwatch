@@ -77,9 +77,7 @@ function makeFold({
   return { fold, store, eventLoaderUpTo };
 }
 
-const trustedMetric = incrementEsFoldAbsentMissTrustedTotal as unknown as ReturnType<
-  typeof vi.fn
->;
+const trustedMetric = incrementEsFoldAbsentMissTrustedTotal as unknown as ReturnType<typeof vi.fn>;
 const fallbackMetric = incrementEsFoldReadWindowFallbackTotal as unknown as ReturnType<
   typeof vi.fn
 >;

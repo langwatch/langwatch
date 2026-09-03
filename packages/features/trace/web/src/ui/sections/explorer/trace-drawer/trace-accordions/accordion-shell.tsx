@@ -176,11 +176,7 @@ export function Section({
             </Text>
           )}
           {trackPresence ? (
-            <SectionPresenceDot
-              traceId={presenceTraceId!}
-              tab={presenceTab!}
-              section={value}
-            />
+            <SectionPresenceDot traceId={presenceTraceId!} tab={presenceTab!} section={value} />
           ) : null}
         </HStack>
         {/* Custom indicator at a fixed 12px so it matches the close /

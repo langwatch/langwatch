@@ -117,8 +117,7 @@ describe("pollUntilHealthy", () => {
       const result = await pollUntilHealthy({
         check: async () => {
           attempts += 1;
-          if (attempts < 3)
-            return { ok: false, durationMs: 0, reason: `attempt ${attempts}` };
+          if (attempts < 3) return { ok: false, durationMs: 0, reason: `attempt ${attempts}` };
           return { ok: true, durationMs: 0 };
         },
         timeoutMs: 5000,

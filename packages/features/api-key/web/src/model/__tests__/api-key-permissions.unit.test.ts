@@ -676,9 +676,7 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when an org-level MEMBER binding covers a team scope", () => {
     it("returns nothing: no org-exclusive permission is grantable there", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [
-          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
-        ],
+        myBindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" }],
         scopeType: "TEAM",
         scopeId: "team-1",
         organizationId: "org-1",
@@ -693,9 +691,7 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when an org-level MEMBER binding is checked at org scope", () => {
     it("returns the org-member bag", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [
-          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" },
-        ],
+        myBindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" }],
         scopeType: "ORGANIZATION",
         scopeId: "org-1",
         organizationId: "org-1",
@@ -710,9 +706,7 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when an org-level VIEWER binding is checked at org scope", () => {
     it("returns the org-member bag, mirroring the resolver's non-ADMIN branch", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [
-          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "VIEWER" },
-        ],
+        myBindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "VIEWER" }],
         scopeType: "ORGANIZATION",
         scopeId: "org-1",
         organizationId: "org-1",
@@ -727,9 +721,7 @@ describe("getUserPermissionsAtScope()", () => {
   describe("when an org-level CUSTOM binding is checked at org scope", () => {
     it("keeps the injected role bag (custom roles resolve their own permissions)", () => {
       const result = getUserPermissionsAtScope({
-        myBindings: [
-          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "CUSTOM" },
-        ],
+        myBindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "CUSTOM" }],
         scopeType: "ORGANIZATION",
         scopeId: "org-1",
         organizationId: "org-1",

@@ -43,10 +43,7 @@ describe("given a workflow that filters the pull-request trigger by path", () =>
   describe("when a gate filter names a path on.paths does not cover", () => {
     /** @scenario "A path filter covers every path the workflow's gate consults" */
     it("reports R1, because that job would silently never run", () => {
-      const source = gated(
-        ["pkg/**"],
-        ["pkg/ssrf/address.go", "charts/gateway/values.yaml"],
-      );
+      const source = gated(["pkg/**"], ["pkg/ssrf/address.go", "charts/gateway/values.yaml"]);
       const issues = inspect("example.yml", source);
       assert.equal(issues.length, 1);
       assert.equal(issues[0]?.rule, "R1");
@@ -206,9 +203,7 @@ describe("stripComment", () => {
 describe("pullRequestFilter", () => {
   describe("when the trigger key is quoted", () => {
     it('still finds the filter, because YAML 1.1 makes "on" a common spelling', () => {
-      const source = ['"on":', "  pull_request:", "    paths:", '      - "pkg/**"'].join(
-        "\n",
-      );
+      const source = ['"on":', "  pull_request:", "    paths:", '      - "pkg/**"'].join("\n");
       assert.deepEqual(pullRequestFilter(source), {
         kind: "filtered",
         entries: ["pkg/**"],
@@ -218,9 +213,7 @@ describe("pullRequestFilter", () => {
 
   describe("when paths uses flow style", () => {
     it("reads the entries", () => {
-      const source = ["on:", "  pull_request:", '    paths: ["pkg/**", go.mod]'].join(
-        "\n",
-      );
+      const source = ["on:", "  pull_request:", '    paths: ["pkg/**", go.mod]'].join("\n");
       assert.deepEqual(pullRequestFilter(source), {
         kind: "filtered",
         entries: ["pkg/**", "go.mod"],
@@ -230,9 +223,7 @@ describe("pullRequestFilter", () => {
 
   describe("when the workflow uses pull_request_target", () => {
     it("is filtered just the same", () => {
-      const source = ["on:", "  pull_request_target:", "    paths:", "      - a/**"].join(
-        "\n",
-      );
+      const source = ["on:", "  pull_request_target:", "    paths:", "      - a/**"].join("\n");
       assert.deepEqual(pullRequestFilter(source), {
         kind: "filtered",
         entries: ["a/**"],
@@ -282,14 +273,8 @@ describe("covers", () => {
   });
 
   it("matches a middle single-star without crossing a separator", () => {
-    assert.equal(
-      covers(["platform/*/prisma/**"], "platform/app/prisma/schema.prisma"),
-      true,
-    );
-    assert.equal(
-      covers(["platform/*/prisma/**"], "platform/a/b/prisma/schema.prisma"),
-      false,
-    );
+    assert.equal(covers(["platform/*/prisma/**"], "platform/app/prisma/schema.prisma"), true);
+    assert.equal(covers(["platform/*/prisma/**"], "platform/a/b/prisma/schema.prisma"), false);
   });
 
   it("requires an exact match for a literal", () => {

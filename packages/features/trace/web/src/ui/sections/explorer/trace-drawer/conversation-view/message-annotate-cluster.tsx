@@ -4,11 +4,11 @@ import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dia
 import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate";
 import { showErrorToast } from "../../../errors";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
+import { isSameAnnotationTarget, useAnnotationDraftStore } from "../../../../../index";
 import {
-  isSameAnnotationTarget,
-  useAnnotationDraftStore,
-} from "../../../../../index";
-import { HoverActionButton, HoverActionCluster } from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster";
+  HoverActionButton,
+  HoverActionCluster,
+} from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster";
 
 const logger = createLogger("MessageAnnotateCluster");
 
@@ -125,10 +125,7 @@ function AnnotateActions({
   };
 
   return (
-    <HoverActionCluster
-      label={copy.cluster}
-      isHeld={isComposing || isTranslationHeld(translation)}
-    >
+    <HoverActionCluster label={copy.cluster} isHeld={isComposing || isTranslationHeld(translation)}>
       {translation && <TranslateAction target={target} translation={translation} />}
       <HoverActionButton
         icon={Edit3}
@@ -161,16 +158,10 @@ function TranslateAction({
     <HoverActionButton
       icon={Languages}
       label={
-        translation.isLoading
-          ? "Translating…"
-          : translation.isActive
-            ? "Original"
-            : "Translate"
+        translation.isLoading ? "Translating…" : translation.isActive ? "Original" : "Translate"
       }
       tooltip={
-        translation.isActive
-          ? "Show the original text"
-          : ACTION_COPY[target.anchorPath].translate
+        translation.isActive ? "Show the original text" : ACTION_COPY[target.anchorPath].translate
       }
       isActive={translation.isActive}
       isDisabled={translation.isLoading}

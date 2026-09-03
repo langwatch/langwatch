@@ -70,11 +70,7 @@ export interface LangWatchTracer extends Tracer {
    * }
    * ```
    */
-  startSpan(
-    name: string,
-    options?: LangWatchSpanOptions,
-    context?: Context,
-  ): LangWatchSpan;
+  startSpan(name: string, options?: LangWatchSpanOptions, context?: Context): LangWatchSpan;
 
   /**
    * Starts a new active LangWatchSpan and executes the provided function within its context.
@@ -108,10 +104,7 @@ export interface LangWatchTracer extends Tracer {
    * });
    * ```
    */
-  startActiveSpan<F extends (span: LangWatchSpan) => unknown>(
-    name: string,
-    fn: F,
-  ): ReturnType<F>;
+  startActiveSpan<F extends (span: LangWatchSpan) => unknown>(name: string, fn: F): ReturnType<F>;
 
   /**
    * Starts a new active LangWatchSpan with options and executes the provided function.
@@ -219,10 +212,7 @@ export interface LangWatchTracer extends Tracer {
    * });
    * ```
    */
-  withActiveSpan<F extends (span: LangWatchSpan) => unknown>(
-    name: string,
-    fn: F,
-  ): ReturnType<F>;
+  withActiveSpan<F extends (span: LangWatchSpan) => unknown>(name: string, fn: F): ReturnType<F>;
 
   /**
    * Creates and manages a span with options and automatic lifecycle management.

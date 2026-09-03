@@ -76,6 +76,4 @@ export const langyConversationTurnEventSchema = z.discriminatedUnion("type", [
     data: langyAgentRespondedEventDataSchema,
   }),
 ]);
-export type LangyConversationTurnWireEvent = z.infer<
-  typeof langyConversationTurnEventSchema
->;
+export type LangyConversationTurnWireEvent = z.infer<typeof langyConversationTurnEventSchema>;

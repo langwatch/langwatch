@@ -52,11 +52,7 @@ export const CollapsibleMenuGroup = ({
 
   return (
     <VStack width="full" gap={0} align="start">
-      <Collapsible.Root
-        open={isExpanded && showLabel}
-        onOpenChange={handleToggle}
-        width="full"
-      >
+      <Collapsible.Root open={isExpanded && showLabel} onOpenChange={handleToggle} width="full">
         {/* Parent item - toggle button */}
         <Collapsible.Trigger asChild>
           <Box
@@ -124,11 +120,7 @@ export const CollapsibleMenuGroup = ({
         <Collapsible.Content>
           <VStack width="full" gap={0.5} align="start" paddingLeft={4} paddingTop={0.5}>
             {children.map((child) => (
-              <CollapsibleMenuChildItem
-                key={child.label}
-                {...child}
-                showLabel={showLabel}
-              />
+              <CollapsibleMenuChildItem key={child.label} {...child} showLabel={showLabel} />
             ))}
           </VStack>
         </Collapsible.Content>

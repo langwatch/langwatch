@@ -257,11 +257,14 @@ function governanceHomePorts(
     },
 
     governanceUiEnabled: ({ organizationId, userId }) =>
-      options.featureFlags.isEnabled(GOVERNANCE_UI_FLAG as never, {
-        kind: "organization",
-        userId,
-        organizationId,
-      } as never),
+      options.featureFlags.isEnabled(
+        GOVERNANCE_UI_FLAG as never,
+        {
+          kind: "organization",
+          userId,
+          organizationId,
+        } as never,
+      ),
 
     tryGetPrimaryIntent: async ({ organizationId }) => {
       const organization = await prisma.organization.findUnique({
@@ -317,10 +320,7 @@ function githubPorts(
 function enterpriseGovernanceApplication(
   options: ApiGatewayGroupCollaboratorsOptions,
   logger: Logger,
-): Pick<
-  ApiTrpcFeatureApplication,
-  "governance" | "governanceApp" | "sessionPolicy" | "webhooks"
-> {
+): Pick<ApiTrpcFeatureApplication, "governance" | "governanceApp" | "sessionPolicy" | "webhooks"> {
   const governance = options.enterprise?.governance;
   if (governance) return governance;
 
@@ -355,4 +355,3 @@ function enterpriseGovernanceApplication(
     "governance" | "governanceApp" | "sessionPolicy" | "webhooks"
   >;
 }
-

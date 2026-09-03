@@ -19,9 +19,7 @@ export class NotificationService extends NotificationServiceContract {
   }
 
   listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]> {
-    return this.repository.listRecentByOrganization(
-      notificationRecentQuerySchema.parse(input),
-    );
+    return this.repository.listRecentByOrganization(notificationRecentQuerySchema.parse(input));
   }
 
   create(input: CreateNotificationCommand): Promise<Notification> {

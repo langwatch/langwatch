@@ -53,10 +53,7 @@ export function useTraceDrawerNavigation() {
        */
       persistViewMode?: boolean;
     }) => {
-      if (
-        fromTraceId === toTraceId &&
-        (toViewMode == null || toViewMode === fromViewMode)
-      ) {
+      if (fromTraceId === toTraceId && (toViewMode == null || toViewMode === fromViewMode)) {
         return;
       }
       // Moving to another trace leaves the correction behind, so an unsaved
@@ -92,14 +89,10 @@ export function useTraceDrawerNavigation() {
       const previous = popTraceHistory();
       if (!previous) return;
       setViewMode(previous.viewMode);
-      useDrawerStore
-        .getState()
-        .openTrace(previous.traceId, previous.occurredAtMs ?? null);
+      useDrawerStore.getState().openTrace(previous.traceId, previous.occurredAtMs ?? null);
       openDrawer("traceV2Details", {
         traceId: previous.traceId,
-        ...(previous.occurredAtMs !== undefined
-          ? { t: String(previous.occurredAtMs) }
-          : {}),
+        ...(previous.occurredAtMs !== undefined ? { t: String(previous.occurredAtMs) } : {}),
       });
     });
   }, [openDrawer, popTraceHistory, setViewMode]);
@@ -113,9 +106,7 @@ export function useTraceDrawerNavigation() {
         useDrawerStore.getState().openTrace(target.traceId, target.occurredAtMs ?? null);
         openDrawer("traceV2Details", {
           traceId: target.traceId,
-          ...(target.occurredAtMs !== undefined
-            ? { t: String(target.occurredAtMs) }
-            : {}),
+          ...(target.occurredAtMs !== undefined ? { t: String(target.occurredAtMs) } : {}),
         });
       });
     },

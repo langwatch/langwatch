@@ -93,12 +93,7 @@ export class DatasetService {
     // Nothing is lost at the surface that matters: `DatasetApiError` keeps the
     // raw body on `originalError`, so the CLI still reads the platform's `kind`
     // back off it and still prints a typed `--format json` document.
-    throw new DatasetApiError(
-      `Failed to ${operation}: ${errorMessage}`,
-      status,
-      operation,
-      error,
-    );
+    throw new DatasetApiError(`Failed to ${operation}: ${errorMessage}`, status, operation, error);
   }
 
   /**
@@ -117,9 +112,7 @@ export class DatasetService {
     path: string,
     options?: Record<string, unknown>,
   ) {
-    return this.asResponseEnvelope(
-      (this.config.langwatchApiClient[method] as any)(path, options),
-    );
+    return this.asResponseEnvelope((this.config.langwatchApiClient[method] as any)(path, options));
   }
 
   /**
@@ -205,9 +198,7 @@ export class DatasetService {
       updatedAt: item.updatedAt,
     }));
 
-    this.config.logger.debug(
-      `Fetched dataset ${slugOrId} with ${entries.length} entries`,
-    );
+    this.config.logger.debug(`Fetched dataset ${slugOrId} with ${entries.length} entries`);
 
     return {
       id: data.id,
@@ -251,19 +242,13 @@ export class DatasetService {
       },
     });
 
-    return this.unwrapResponse<DatasetMetadata>(
-      response,
-      `create dataset "${options.name}"`,
-    );
+    return this.unwrapResponse<DatasetMetadata>(response, `create dataset "${options.name}"`);
   }
 
   /**
    * Updates a dataset by its slug or ID.
    */
-  async updateDataset(
-    slugOrId: string,
-    options: UpdateDatasetOptions,
-  ): Promise<DatasetMetadata> {
+  async updateDataset(slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> {
     this.config.logger.debug(`Updating dataset: ${slugOrId}`);
 
     const response = await this.untypedRequest("PATCH", "/api/dataset/{slugOrId}", {
@@ -273,11 +258,7 @@ export class DatasetService {
       body: options,
     });
 
-    return this.unwrapResponse<DatasetMetadata>(
-      response,
-      `update dataset "${slugOrId}"`,
-      slugOrId,
-    );
+    return this.unwrapResponse<DatasetMetadata>(response, `update dataset "${slugOrId}"`, slugOrId);
   }
 
   /**
@@ -292,11 +273,7 @@ export class DatasetService {
       },
     });
 
-    return this.unwrapResponse<DatasetMetadata>(
-      response,
-      `delete dataset "${slugOrId}"`,
-      slugOrId,
-    );
+    return this.unwrapResponse<DatasetMetadata>(response, `delete dataset "${slugOrId}"`, slugOrId);
   }
 
   /**
@@ -306,20 +283,14 @@ export class DatasetService {
     slugOrId: string,
     entries: Record<string, unknown>[],
   ): Promise<BatchCreateRecordsResponse> {
-    this.config.logger.debug(
-      `Creating ${entries.length} records in dataset: ${slugOrId}`,
-    );
+    this.config.logger.debug(`Creating ${entries.length} records in dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest(
-      "POST",
-      "/api/dataset/{slugOrId}/records",
-      {
-        params: {
-          path: { slugOrId },
-        },
-        body: { entries },
+    const response = await this.untypedRequest("POST", "/api/dataset/{slugOrId}/records", {
+      params: {
+        path: { slugOrId },
       },
-    );
+      body: { entries },
+    });
 
     return this.unwrapResponse<BatchCreateRecordsResponse>(
       response,
@@ -359,24 +330,15 @@ export class DatasetService {
   /**
    * Deletes records from a dataset by IDs.
    */
-  async deleteRecords(
-    slugOrId: string,
-    recordIds: string[],
-  ): Promise<DeleteRecordsResponse> {
-    this.config.logger.debug(
-      `Deleting ${recordIds.length} records from dataset: ${slugOrId}`,
-    );
+  async deleteRecords(slugOrId: string, recordIds: string[]): Promise<DeleteRecordsResponse> {
+    this.config.logger.debug(`Deleting ${recordIds.length} records from dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest(
-      "DELETE",
-      "/api/dataset/{slugOrId}/records",
-      {
-        params: {
-          path: { slugOrId },
-        },
-        body: { recordIds },
+    const response = await this.untypedRequest("DELETE", "/api/dataset/{slugOrId}/records", {
+      params: {
+        path: { slugOrId },
       },
-    );
+      body: { recordIds },
+    });
 
     return this.unwrapResponse<DeleteRecordsResponse>(
       response,
@@ -524,17 +486,12 @@ export class DatasetService {
   /**
    * Append strategy: try uploading to existing dataset; if not found, create from file.
    */
-  private async _uploadAppend(
-    slugOrId: string,
-    file: File | Blob,
-  ): Promise<UploadResponse> {
+  private async _uploadAppend(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
     try {
       return await this.uploadFile(slugOrId, file);
     } catch (error) {
       if (error instanceof DatasetNotFoundError) {
-        return this.toUploadResponse(
-          await this.createDatasetFromUpload({ name: slugOrId, file }),
-        );
+        return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
       }
       throw error;
     }
@@ -543,19 +500,14 @@ export class DatasetService {
   /**
    * Replace strategy: if dataset exists, delete all records then upload; if not found, create from file.
    */
-  private async _uploadReplace(
-    slugOrId: string,
-    file: File | Blob,
-  ): Promise<UploadResponse> {
+  private async _uploadReplace(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
     try {
       await this.getDataset(slugOrId);
       await this._deleteAllRecords(slugOrId);
       return await this.uploadFile(slugOrId, file);
     } catch (error) {
       if (error instanceof DatasetNotFoundError) {
-        return this.toUploadResponse(
-          await this.createDatasetFromUpload({ name: slugOrId, file }),
-        );
+        return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
       }
       throw error;
     }
@@ -564,10 +516,7 @@ export class DatasetService {
   /**
    * Error strategy: if dataset exists, throw 409; if not found, create from file.
    */
-  private async _uploadError(
-    slugOrId: string,
-    file: File | Blob,
-  ): Promise<UploadResponse> {
+  private async _uploadError(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
     let datasetExists = false;
     try {
       await this.getDataset(slugOrId);
@@ -582,9 +531,7 @@ export class DatasetService {
       throw new DatasetApiError(`Dataset already exists: ${slugOrId}`, 409, "upload");
     }
 
-    return this.toUploadResponse(
-      await this.createDatasetFromUpload({ name: slugOrId, file }),
-    );
+    return this.toUploadResponse(await this.createDatasetFromUpload({ name: slugOrId, file }));
   }
 
   /**

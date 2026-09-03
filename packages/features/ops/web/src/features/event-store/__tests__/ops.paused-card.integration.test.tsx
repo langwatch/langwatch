@@ -46,9 +46,7 @@ const pausedSchedulesResult = (
 ) => ({ data: { schedules, total }, isLoading: false });
 
 const renderCard = (
-  props: Partial<
-    Pick<DashboardData, "parkedTenants" | "parkedTenantsBound" | "pausedKeys">
-  > = {},
+  props: Partial<Pick<DashboardData, "parkedTenants" | "parkedTenantsBound" | "pausedKeys">> = {},
 ) =>
   (() => {
     const schedulesResult = mockPausedSchedules();
@@ -103,9 +101,7 @@ describe("PausedCard", () => {
           pausedKeys: ["trace_processing", "metric_processing"],
         });
 
-        expect(
-          screen.getByText("1 parked tenant · 1 schedule · 2 subscribers"),
-        ).toBeTruthy();
+        expect(screen.getByText("1 parked tenant · 1 schedule · 2 subscribers")).toBeTruthy();
       });
     });
   });

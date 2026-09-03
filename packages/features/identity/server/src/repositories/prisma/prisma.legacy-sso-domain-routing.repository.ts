@@ -24,9 +24,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  *               in port terms, and its JIT allowance is today's behavior:
  *               an OAuth callback for an unknown person creates them.
  */
-export class LegacySsoDomainRoutingRepository
-  implements SignInDomainRoutingPort
-{
+export class LegacySsoDomainRoutingRepository implements SignInDomainRoutingPort {
   constructor(
     private readonly prisma: PrismaClient,
     /** The method this deployment actually mounted, or null in email mode.

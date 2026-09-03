@@ -5,7 +5,10 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { LLMConfigPopover } from "@langwatch/prompt-web/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMModelDisplay } from "@langwatch/prompt-web/components/llmPromptConfigs/LLMModelDisplay";
 import { toInternalKey } from "@langwatch/prompt-web/surfaces/llm-parameters";
-import { allModelOptions, useModelSelectionOptions } from "@langwatch/model-provider-web/components/ModelSelector";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "@langwatch/model-provider-web/components/ModelSelector";
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/components/NoModelsConfiguredCallout";
 import { Popover } from "@langwatch/design-system/popover";
 import type { LLMConfig } from "@langwatch/workflow-contract";
@@ -81,11 +84,7 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   // playground and workflow LLM-node pickers. While the providers
   // query is in flight, render a skeleton so the empty state doesn't
   // flash before the data resolves.
-  const { isEmpty, isLoading } = useModelSelectionOptions(
-    allModelOptions,
-    llmConfig.model,
-    "chat",
-  );
+  const { isEmpty, isLoading } = useModelSelectionOptions(allModelOptions, llmConfig.model, "chat");
   if (isLoading) {
     return <Skeleton width="full" height="40px" borderRadius="md" />;
   }

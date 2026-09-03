@@ -25,9 +25,7 @@ export const CheckboxHeaderFromMeta = ({
 
   return (
     <Checkbox.Root
-      checked={
-        meta.allSelected ? true : meta.someSelected ? "indeterminate" : false
-      }
+      checked={meta.allSelected ? true : meta.someSelected ? "indeterminate" : false}
       onCheckedChange={() => {
         if (meta.allSelected) {
           meta.clearRowSelection();
@@ -85,8 +83,7 @@ export const TargetHeaderFromMeta = ({
 
   // Check if THIS specific target has any cells being executed
   // Only show running state if there are cells for this target in executingCells
-  const isThisTargetRunning =
-    meta?.isExecutionRunning && meta?.isTargetExecuting?.(targetId);
+  const isThisTargetRunning = meta?.isExecutionRunning && meta?.isTargetExecuting?.(targetId);
 
   return (
     <TargetHeader
@@ -96,11 +93,7 @@ export const TargetHeaderFromMeta = ({
       onDuplicate={meta?.handleDuplicateTarget}
       onSwitch={meta?.handleSwitchTarget}
       onRemove={meta?.handleRemoveTarget}
-      onRun={
-        meta?.handleRunTarget
-          ? () => meta.handleRunTarget?.(targetId)
-          : undefined
-      }
+      onRun={meta?.handleRunTarget ? () => meta.handleRunTarget?.(targetId) : undefined}
       onStop={meta?.handleStopExecution}
       isRunning={isThisTargetRunning}
     />
@@ -139,20 +132,14 @@ export const TargetCellFromMeta = ({
   // output. A legacy pairwise column normalizes to two variants here.
   const comparison = toComparisonConfig(target);
   if (comparison) {
-    const variantTargets = comparison.variants.map((id) =>
-      tableMeta?.targetsMap.get(id),
-    );
+    const variantTargets = comparison.variants.map((id) => tableMeta?.targetsMap.get(id));
     return (
       <ComparisonCell
         result={data?.evaluators?.[target.id]}
-        isLoading={
-          tableMeta?.isCellExecuting?.(rowIndex, targetId) ?? data?.isLoading
-        }
+        isLoading={tableMeta?.isCellExecuting?.(rowIndex, targetId) ?? data?.isLoading}
         variantTargets={variantTargets}
         onRun={
-          tableMeta?.handleRunCell
-            ? () => tableMeta.handleRunCell?.(rowIndex, targetId)
-            : undefined
+          tableMeta?.handleRunCell ? () => tableMeta.handleRunCell?.(rowIndex, targetId) : undefined
         }
       />
     );
@@ -172,28 +159,23 @@ export const TargetCellFromMeta = ({
       isEvaluatorRunning={
         tableMeta?.isEvaluatorRunning
           ? (evaluatorId) =>
-              tableMeta.isEvaluatorRunning?.(rowIndex, targetId, evaluatorId) ??
-              false
+              tableMeta.isEvaluatorRunning?.(rowIndex, targetId, evaluatorId) ?? false
           : undefined
       }
       row={rowIndex}
       onAddEvaluator={tableMeta?.handleAddEvaluator}
       onRunCell={
-        tableMeta?.handleRunCell
-          ? () => tableMeta.handleRunCell?.(rowIndex, targetId)
-          : undefined
+        tableMeta?.handleRunCell ? () => tableMeta.handleRunCell?.(rowIndex, targetId) : undefined
       }
       onStopCell={tableMeta?.handleStopExecution}
       onRerunEvaluator={
         tableMeta?.handleRerunEvaluator
-          ? (evaluatorId) =>
-              tableMeta.handleRerunEvaluator?.(rowIndex, targetId, evaluatorId)
+          ? (evaluatorId) => tableMeta.handleRerunEvaluator?.(rowIndex, targetId, evaluatorId)
           : undefined
       }
       onRunEvaluatorOnAllRows={
         tableMeta?.handleRunEvaluatorOnAllRows
-          ? (evaluatorId) =>
-              tableMeta.handleRunEvaluatorOnAllRows?.(targetId, evaluatorId)
+          ? (evaluatorId) => tableMeta.handleRunEvaluatorOnAllRows?.(targetId, evaluatorId)
           : undefined
       }
       hasAnyTargetOutputs={tableMeta?.hasAnyTargetOutputs?.(targetId) ?? false}

@@ -1,10 +1,7 @@
 import { Button, Heading } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import {
-  LicenseGeneratorForm,
-  type LicenseGeneratorFormRef,
-} from "./license-generator-form";
+import { LicenseGeneratorForm, type LicenseGeneratorFormRef } from "./license-generator-form";
 
 interface LicenseGeneratorDrawerProps {
   open: boolean;
@@ -56,11 +53,7 @@ export function LicenseGeneratorDrawer({
           />
         </Drawer.Body>
         {!hasGeneratedLicense && (
-          <Drawer.Footer
-            borderTopWidth="1px"
-            borderColor="border"
-            justifyContent="flex-end"
-          >
+          <Drawer.Footer borderTopWidth="1px" borderColor="border" justifyContent="flex-end">
             <Button
               colorPalette="blue"
               onClick={handleGenerate}

@@ -53,7 +53,9 @@ export const HISTOGRAM_BOUNDARIES: Readonly<Record<string, readonly number[]>> =
   trace_span_count: [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100, 125, 150, 175, 200,
   ],
-  stored_object_size_bytes: [128, 1_024, 4_096, 16_384, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216],
+  stored_object_size_bytes: [
+    128, 1_024, 4_096, 16_384, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216,
+  ],
 
   // --- work ---
   job_processing_duration_milliseconds: JOB_MS,
@@ -76,9 +78,7 @@ export const HISTOGRAM_BOUNDARIES: Readonly<Record<string, readonly number[]>> =
   es_reactor_duration_milliseconds: EVENTING_SLOW_MS,
   // `es_fold_*` and `es_map_*` deliberately stop at 5s: a fold that takes
   // longer is a stall to alert on, not a latency to bucket.
-  es_fold_projection_duration_milliseconds: [
-    1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000,
-  ],
+  es_fold_projection_duration_milliseconds: [1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000],
   es_map_projection_duration_milliseconds: [1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000],
   es_fold_cache_get_duration_milliseconds: SUB_SECOND_MS,
   es_fold_cache_store_duration_milliseconds: SUB_SECOND_MS,

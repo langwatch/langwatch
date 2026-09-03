@@ -3,11 +3,7 @@ import type { TraceListItem } from "../../../types/trace";
 import type { ParsedTurn } from "../types";
 import { buildConversationMarkdownChunks, joinConversationMarkdown } from "../utils";
 
-function makeTurn(opts: {
-  output: string;
-  assistantText: string;
-  userText?: string;
-}): ParsedTurn {
+function makeTurn(opts: { output: string; assistantText: string; userText?: string }): ParsedTurn {
   return {
     turn: {
       traceId: "t1",
@@ -29,9 +25,8 @@ function makeTurn(opts: {
   };
 }
 
-const assistantChunkOf = (
-  chunks: { id: string; markdown: string }[],
-): string | undefined => chunks.find((c) => c.id.endsWith("-assistant"))?.markdown;
+const assistantChunkOf = (chunks: { id: string; markdown: string }[]): string | undefined =>
+  chunks.find((c) => c.id.endsWith("-assistant"))?.markdown;
 
 describe("buildConversationMarkdownChunks", () => {
   describe("when an assistant turn carries typed-block output", () => {

@@ -114,9 +114,7 @@ const host = fakeGatewayHost({
       {
         id: TEAM_ID,
         name: "platform",
-        projects: [
-          { id: PROJECT_ID, name: "web-app", slug: "web-app", teamId: TEAM_ID },
-        ],
+        projects: [{ id: PROJECT_ID, name: "web-app", slug: "web-app", teamId: TEAM_ID }],
       },
     ],
   },
@@ -194,9 +192,7 @@ describe("given the edit drawer for an existing key", () => {
 
       await waitFor(() => {
         expect(
-          screen
-            .getByTestId("vk-routing-fallback-all")
-            .querySelector("input[type=radio]"),
+          screen.getByTestId("vk-routing-fallback-all").querySelector("input[type=radio]"),
         ).toBeChecked();
       });
 
@@ -300,9 +296,7 @@ describe("given the edit drawer for an existing key", () => {
         screen.getByTestId("vk-provider-mp-openai").querySelector("input[type=checkbox]"),
       ).toBeChecked();
       expect(
-        screen
-          .getByTestId("vk-provider-mp-anthropic")
-          .querySelector("input[type=checkbox]"),
+        screen.getByTestId("vk-provider-mp-anthropic").querySelector("input[type=checkbox]"),
       ).not.toBeChecked();
 
       await userEvent.click(screen.getByTestId("vk-provider-mp-anthropic"));
@@ -344,9 +338,7 @@ describe("given the edit drawer for an existing key", () => {
     it("keeps the Deleted badge and offers no way to open its traces", async () => {
       renderDrawer({ traceProjectId: PROJECT_ID, traceProjectArchived: true });
 
-      await waitFor(() =>
-        expect(screen.getByTestId("vk-trace-destination-deleted")).toBeTruthy(),
-      );
+      await waitFor(() => expect(screen.getByTestId("vk-trace-destination-deleted")).toBeTruthy());
       expect(screen.queryByTestId("vk-view-traces")).toBeNull();
     });
   });
@@ -357,9 +349,9 @@ describe("given the edit drawer for an existing key", () => {
       renderDrawer({ expiresAt: "2030-08-20T09:15:00.000Z" });
 
       await waitFor(() =>
-        expect(
-          (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value,
-        ).toBe("custom"),
+        expect((screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value).toBe(
+          "custom",
+        ),
       );
       expect((screen.getByTestId("vk-expiration-date") as HTMLInputElement).value).toBe(
         "2030-08-20",
@@ -390,9 +382,7 @@ describe("given the edit drawer for an existing key", () => {
     it("clears the date when the choice moves back to Never", async () => {
       renderDrawer({ expiresAt: "2030-08-20T09:15:00.000Z" });
 
-      await waitFor(() =>
-        expect(screen.getByTestId("vk-expiration-preset")).toBeTruthy(),
-      );
+      await waitFor(() => expect(screen.getByTestId("vk-expiration-preset")).toBeTruthy());
       await userEvent.selectOptions(screen.getByTestId("vk-expiration-preset"), "");
       await save();
       expect(lastUpdateInput().expiresAt).toBeNull();
@@ -405,9 +395,7 @@ describe("given the edit drawer for an existing key", () => {
       await userEvent.clear(dateInput);
       await userEvent.type(dateInput, "2030-09-01");
       await save();
-      expect((lastUpdateInput().expiresAt as Date).toISOString()).toBe(
-        "2030-09-01T23:59:59.999Z",
-      );
+      expect((lastUpdateInput().expiresAt as Date).toISOString()).toBe("2030-09-01T23:59:59.999Z");
     });
   });
 
@@ -416,9 +404,7 @@ describe("given the edit drawer for an existing key", () => {
       renderDrawer({ expiresAt: null });
 
       await waitFor(() =>
-        expect(
-          (screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value,
-        ).toBe(""),
+        expect((screen.getByTestId("vk-expiration-preset") as HTMLSelectElement).value).toBe(""),
       );
       await save();
       expect("expiresAt" in lastUpdateInput()).toBe(false);

@@ -46,8 +46,7 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
     { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
   ]);
   const columns = useMemo(
-    () =>
-      groupBy ? [groupSelectColumnDef, ...buildGroupColumns(lens.columns, groupBy)] : [],
+    () => (groupBy ? [groupSelectColumnDef, ...buildGroupColumns(lens.columns, groupBy)] : []),
     [lens.columns, groupBy],
   );
 
@@ -98,9 +97,7 @@ export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
             status={row.original.worstStatus}
             hoverScope="split"
             isExpanded={!isLoading && openKeys.has(row.original.key)}
-            onToggleExpand={
-              isLoading ? undefined : () => toggleExpanded(row.original.key)
-            }
+            onToggleExpand={isLoading ? undefined : () => toggleExpanded(row.original.key)}
             isLoading={isLoading}
           />
         );

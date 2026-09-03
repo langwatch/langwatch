@@ -54,9 +54,7 @@ test.describe("Scenario Library", () => {
    * The flag is on by default, so the address an older SDK or a bookmark
    * still names lands on the Agent Testing page.
    */
-  test("redirects a saved simulations address to Agent Testing", async ({
-    page,
-  }) => {
+  test("redirects a saved simulations address to Agent Testing", async ({ page }) => {
     await whenIOpenTheSimulationsScenariosAddress(page);
 
     await thenISeeTheAgentTestingPage(page);

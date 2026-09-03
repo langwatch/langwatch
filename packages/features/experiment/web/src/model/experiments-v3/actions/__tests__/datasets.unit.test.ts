@@ -2,12 +2,7 @@
  * @see specs/experiments-v3/workbench-actions.feature
  */
 import { describe, expect, it } from "vitest";
-import {
-  addColumn,
-  addRows,
-  setCellValue,
-  TransformError,
-} from "../transforms";
+import { addColumn, addRows, setCellValue, TransformError } from "../transforms";
 import { baseState, refusalCode, savedDataset } from "./workbench-fixtures";
 
 describe("setCellValue", () => {
@@ -22,10 +17,7 @@ describe("setCellValue", () => {
       },
     });
 
-    expect(state.datasets[0]!.inline!.records.input).toEqual([
-      "first question",
-      "edited",
-    ]);
+    expect(state.datasets[0]!.inline!.records.input).toEqual(["first question", "edited"]);
   });
 
   it("pads a short column up to the row being written", () => {
@@ -140,10 +132,7 @@ describe("setCellValue", () => {
         }),
       );
 
-      expect(Object.keys(state.datasets[0]!.inline!.records)).toEqual([
-        "input",
-        "expected_output",
-      ]);
+      expect(Object.keys(state.datasets[0]!.inline!.records)).toEqual(["input", "expected_output"]);
     });
   });
 });
@@ -157,9 +146,7 @@ describe("addColumn", () => {
 
     expect(result?.columnId).toBe("context");
     expect(state.datasets[0]!.columns.map((c) => c.id)).toContain("context");
-    expect(state.datasets[0]!.inline!.columns.map((c) => c.id)).toContain(
-      "context",
-    );
+    expect(state.datasets[0]!.inline!.columns.map((c) => c.id)).toContain("context");
     expect(state.datasets[0]!.inline!.records.context).toEqual(["", ""]);
   });
 
@@ -204,12 +191,7 @@ describe("addRows", () => {
     });
 
     expect(state.datasets[0]!.inline!.records).toEqual({
-      input: [
-        "first question",
-        "second question",
-        "third question",
-        "fourth question",
-      ],
+      input: ["first question", "second question", "third question", "fourth question"],
       expected_output: ["first answer", "second answer", "third answer", ""],
     });
     expect(result).toEqual({ datasetId: "ds-1", addedRows: 2, rowCount: 4 });
@@ -224,11 +206,7 @@ describe("addRows", () => {
       payload: { datasetId: "ds-1", rows: [{ input: "third question" }] },
     });
 
-    expect(next.datasets[0]!.inline!.records.expected_output).toEqual([
-      "first answer",
-      "",
-      "",
-    ]);
+    expect(next.datasets[0]!.inline!.records.expected_output).toEqual(["first answer", "", ""]);
   });
 
   describe("given a column that only exists in the records", () => {
@@ -245,12 +223,7 @@ describe("addRows", () => {
         },
       });
 
-      expect(next.datasets[0]!.inline!.records.hidden).toEqual([
-        "kept",
-        "also kept",
-        "",
-        "",
-      ]);
+      expect(next.datasets[0]!.inline!.records.hidden).toEqual(["kept", "also kept", "", ""]);
       const lengths = Object.values(next.datasets[0]!.inline!.records).map(
         (values) => values.length,
       );

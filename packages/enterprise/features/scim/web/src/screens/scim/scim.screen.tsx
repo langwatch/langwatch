@@ -104,9 +104,9 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
           <Card.Body>
             <VStack gap={4} align="start">
               <Text>
-                SCIM (System for Cross-domain Identity Management) allows your identity
-                provider (Okta, Azure AD, etc.) to automatically provision and deprovision
-                users in LangWatch.
+                SCIM (System for Cross-domain Identity Management) allows your identity provider
+                (Okta, Azure AD, etc.) to automatically provision and deprovision users in
+                LangWatch.
               </Text>
 
               <VStack gap={2} align="start" width="full">
@@ -115,8 +115,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
               </VStack>
 
               <Text fontSize="sm" color="gray.500">
-                Use this URL and a bearer token below to configure SCIM in your identity
-                provider.
+                Use this URL and a bearer token below to configure SCIM in your identity provider.
               </Text>
             </VStack>
           </Card.Body>
@@ -160,9 +159,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
                         <Text>{token.description ?? "No description"}</Text>
                       </HStack>
                     </Table.Cell>
-                    <Table.Cell>
-                      {new Date(token.createdAt).toLocaleDateString()}
-                    </Table.Cell>
+                    <Table.Cell>{new Date(token.createdAt).toLocaleDateString()}</Table.Cell>
                     <Table.Cell>
                       {token.lastUsedAt ? (
                         new Date(token.lastUsedAt).toLocaleDateString()
@@ -210,8 +207,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
           <Dialog.Body paddingBottom={6}>
             <VStack gap={4} align="start">
               <Text>
-                This token will be used by your identity provider to authenticate SCIM
-                requests.
+                This token will be used by your identity provider to authenticate SCIM requests.
               </Text>
               <VStack gap={1} align="start" width="full">
                 <Text fontWeight="600" fontSize="sm">
@@ -223,11 +219,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </VStack>
-              <Button
-                width="full"
-                onClick={handleGenerate}
-                disabled={generateMutation.isPending}
-              >
+              <Button width="full" onClick={handleGenerate} disabled={generateMutation.isPending}>
                 Generate Token
               </Button>
             </VStack>
@@ -280,8 +272,8 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
           <Dialog.Body paddingBottom={6}>
             <VStack gap={4} align="start">
               <Text>
-                Are you sure you want to revoke this token? Any identity provider using it
-                will no longer be able to provision users.
+                Are you sure you want to revoke this token? Any identity provider using it will no
+                longer be able to provision users.
               </Text>
               <HStack width="full" justify="end" gap={2}>
                 <Button variant="outline" onClick={() => setTokenToRevoke(null)}>

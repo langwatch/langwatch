@@ -203,8 +203,8 @@ describe("SuiteExecutionService", () => {
 
       expect(commands.queueSimulationRun).toHaveBeenCalledTimes(2);
       const [unmerged, merged] = commands.queueSimulationRun.mock.calls.map(
-        (call) => (call[0] as { metadata: { parameters?: Record<string, unknown> } }).metadata
-          .parameters,
+        (call) =>
+          (call[0] as { metadata: { parameters?: Record<string, unknown> } }).metadata.parameters,
       );
       expect(unmerged).toEqual({ region: "us-east" });
       expect(merged).toEqual({ region: "us-east", account_tier: "silver" });

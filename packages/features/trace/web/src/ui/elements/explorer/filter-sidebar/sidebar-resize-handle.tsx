@@ -125,9 +125,7 @@ export function SidebarResizeHandle({
         // sidebar still has a visible right edge. Hover/drag lights blue
         // for the "grab me" affordance.
         background:
-          state === "idle"
-            ? "var(--chakra-colors-border)"
-            : "var(--chakra-colors-blue-solid)",
+          state === "idle" ? "var(--chakra-colors-border)" : "var(--chakra-colors-blue-solid)",
         transition: "background 100ms ease",
       }}
     />

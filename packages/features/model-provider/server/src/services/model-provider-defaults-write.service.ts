@@ -28,9 +28,7 @@ type ModelProviderDefaultsWriteOptions = {
 export class ModelProviderDefaultsWriteService {
   private constructor(private readonly options: ModelProviderDefaultsWriteOptions) {}
 
-  static create(
-    options: ModelProviderDefaultsWriteOptions,
-  ): ModelProviderDefaultsWriteService {
+  static create(options: ModelProviderDefaultsWriteOptions): ModelProviderDefaultsWriteService {
     return new ModelProviderDefaultsWriteService(options);
   }
 
@@ -40,21 +38,15 @@ export class ModelProviderDefaultsWriteService {
       [parsed.key]: parsed.model ?? "",
     });
     if (parsed.model !== null && !config[parsed.key]) {
-      throw new ModelProviderInvalidError(
-        `Model is not allowed for default key: ${parsed.key}`,
-      );
+      throw new ModelProviderInvalidError(`Model is not allowed for default key: ${parsed.key}`);
     }
 
     const actorId = parsed.actorId ?? parsed.authorId;
     if (actorId) {
-      await this.options.writeAuthorization.assertCanWriteDefault(actorId, [
-        parsed.scope,
-      ]);
+      await this.options.writeAuthorization.assertCanWriteDefault(actorId, [parsed.scope]);
     }
 
-    const organizationId = await this.options.scopes.getOrganizationIdForScope(
-      parsed.scope,
-    );
+    const organizationId = await this.options.scopes.getOrganizationIdForScope(parsed.scope);
     await this.options.defaults.set({
       id: this.options.ids.generate({ type: "default" }),
       organizationId,
@@ -117,19 +109,13 @@ export class ModelProviderDefaultsWriteService {
       throw new ModelDefaultNotFoundError();
     }
     if (input.actorId) {
-      await this.options.writeAuthorization.assertCanWriteDefault(
-        input.actorId,
-        existing.scopes,
-      );
+      await this.options.writeAuthorization.assertCanWriteDefault(input.actorId, existing.scopes);
     }
 
     await this.options.defaults.delete(input.id);
   }
 
-  private assertExistingConfig(
-    id: string | undefined,
-    existing: ModelDefaultConfig | null,
-  ): void {
+  private assertExistingConfig(id: string | undefined, existing: ModelDefaultConfig | null): void {
     if (id && !existing) {
       throw new ModelDefaultNotFoundError();
     }
@@ -146,10 +132,7 @@ export class ModelProviderDefaultsWriteService {
       throw new ModelDefaultNotFoundError();
     }
     if (actorId) {
-      await this.options.writeAuthorization.assertCanWriteDefault(
-        actorId,
-        existing.scopes,
-      );
+      await this.options.writeAuthorization.assertCanWriteDefault(actorId, existing.scopes);
     }
 
     await this.options.defaults.delete(existing.id);

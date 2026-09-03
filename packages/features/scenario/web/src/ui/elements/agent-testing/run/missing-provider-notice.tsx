@@ -26,13 +26,7 @@ export function MissingProviderNotice() {
       <Button
         size="xs"
         variant="outline"
-        onClick={() =>
-          window.open(
-            "/settings/model-providers",
-            "_blank",
-            "noopener,noreferrer",
-          )
-        }
+        onClick={() => window.open("/settings/model-providers", "_blank", "noopener,noreferrer")}
       >
         Open model provider settings
       </Button>

@@ -33,8 +33,7 @@ const CLI_PROGRAM_PATH = join(__dirname, "../program.ts");
  */
 function cliTopLevelCommands(): Set<string> {
   const source = readFileSync(CLI_PROGRAM_PATH, "utf-8");
-  const pattern =
-    /(?:const\s+\w+\s*=\s*)?\bprogram\s*(?:[\r\n]+\s*)?\.command\(\s*"([^"\s]+)/g;
+  const pattern = /(?:const\s+\w+\s*=\s*)?\bprogram\s*(?:[\r\n]+\s*)?\.command\(\s*"([^"\s]+)/g;
   const commands = new Set<string>();
   for (const match of source.matchAll(pattern)) {
     commands.add(match[1]!);
@@ -73,9 +72,7 @@ describe("the feature map, given the CLI's real command tree", () => {
     });
 
     it("excludes only commands the CLI actually has", () => {
-      const staleExclusions = [...PLUMBING_COMMANDS].filter(
-        (command) => !cliCommands.has(command),
-      );
+      const staleExclusions = [...PLUMBING_COMMANDS].filter((command) => !cliCommands.has(command));
       expect(
         staleExclusions,
         `Excluded commands the CLI no longer registers — remove them from PLUMBING_COMMANDS:\n  ${staleExclusions.join("\n  ")}`,

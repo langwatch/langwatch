@@ -223,12 +223,7 @@ function ErrorDetails({
             Reasons
           </Text>
           {flattenReasons(reasons!).map((kind, index) => (
-            <Text
-              key={`${kind}-${index}`}
-              textStyle="2xs"
-              color="fg.subtle"
-              fontFamily="mono"
-            >
+            <Text key={`${kind}-${index}`} textStyle="2xs" color="fg.subtle" fontFamily="mono">
               • {kind}
             </Text>
           ))}

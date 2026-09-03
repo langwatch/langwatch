@@ -3,7 +3,10 @@ import type { JoinRequestMailPort } from "../ports/join-request-mail.port";
 import { JoinRequestService } from "../join-request.service";
 import { PostgresJoinRequestNotificationAdapter } from "./postgres.join-request-notification.adapter";
 import type { EventSourcing, EventStore } from "@langwatch/eventing";
-import { createJoinRequestPipeline, type JoinRequestPipeline } from "./join-request-pipeline-definition.adapter";
+import {
+  createJoinRequestPipeline,
+  type JoinRequestPipeline,
+} from "./join-request-pipeline-definition.adapter";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
 import type { JoinRequestEvent } from "./join-request-pipeline-definition.adapter";
 import {

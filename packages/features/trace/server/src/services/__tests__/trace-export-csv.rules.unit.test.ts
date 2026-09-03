@@ -9,10 +9,7 @@ import Parse from "papaparse";
 import { describe, expect, it } from "vitest";
 import type { Evaluation, LLMSpan, RAGSpan, Span, Trace } from "@langwatch/trace-contract";
 import { stripCsvHeader } from "../trace-export.service";
-import {
-  serializeTracesToFullCsv,
-  serializeTracesToSummaryCsv,
-} from "../trace-export-csv.rules";
+import { serializeTracesToFullCsv, serializeTracesToSummaryCsv } from "../trace-export-csv.rules";
 
 // ---------------------------------------------------------------------------
 // Test data builders
@@ -569,10 +566,7 @@ describe("when an export spans several batches", () => {
     });
     const batch2 = stripCsvHeader(
       serializeTracesToSummaryCsv({
-        traces: [
-          buildTrace({ trace_id: "trace-3" }),
-          buildTrace({ trace_id: "trace-4" }),
-        ],
+        traces: [buildTrace({ trace_id: "trace-3" }), buildTrace({ trace_id: "trace-4" })],
         evaluatorNames,
       }),
     );
@@ -582,12 +576,7 @@ describe("when an export spans several batches", () => {
     // Before the fix this yielded 3 rows, with "trace-2" and "trace-3" fused
     // into one — the last row of a chunk glued onto the first of the next.
     expect(rows).toHaveLength(4);
-    expect(rows.map((r) => r.trace_id)).toEqual([
-      "trace-1",
-      "trace-2",
-      "trace-3",
-      "trace-4",
-    ]);
+    expect(rows.map((r) => r.trace_id)).toEqual(["trace-1", "trace-2", "trace-3", "trace-4"]);
   });
 
   it("writes exactly one header for the whole file", () => {

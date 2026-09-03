@@ -84,8 +84,6 @@ export async function handleExperimentList(params: { limit?: number }): Promise<
   }
 
   lines.push("");
-  lines.push(
-    "> Use `platform_experiment_list_runs` with one of these slugs to see its runs.",
-  );
+  lines.push("> Use `platform_experiment_list_runs` with one of these slugs to see its runs.");
   return lines.join("\n");
 }

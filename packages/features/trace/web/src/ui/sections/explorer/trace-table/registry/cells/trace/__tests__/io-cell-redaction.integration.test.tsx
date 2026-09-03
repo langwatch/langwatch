@@ -36,9 +36,7 @@ function row(over: Partial<TraceListItem>): TraceListItem {
 function renderInput(over: Partial<TraceListItem>) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      {InputCell.render({ row: row(over) } as unknown as Parameters<
-        typeof InputCell.render
-      >[0])}
+      {InputCell.render({ row: row(over) } as unknown as Parameters<typeof InputCell.render>[0])}
     </ChakraProvider>,
   );
 }
@@ -46,9 +44,7 @@ function renderInput(over: Partial<TraceListItem>) {
 function renderOutput(over: Partial<TraceListItem>) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      {OutputCell.render({ row: row(over) } as unknown as Parameters<
-        typeof OutputCell.render
-      >[0])}
+      {OutputCell.render({ row: row(over) } as unknown as Parameters<typeof OutputCell.render>[0])}
     </ChakraProvider>,
   );
 }

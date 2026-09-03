@@ -152,10 +152,7 @@ const host = fakeGatewayHost({
 import BudgetsPage from "../gateway-budgets.screen";
 
 function renderPage() {
-  return renderWithGatewayHost(
-    <BudgetsPage />,
-    { host },
-  );
+  return renderWithGatewayHost(<BudgetsPage />, { host });
 }
 
 function rowFor(name: string): HTMLElement {

@@ -79,9 +79,7 @@ export class EnvelopeBlobLifecycle {
       resolveDestination:
         resolveStorageDestination ??
         (async () => {
-          throw new Error(
-            "No durable storage destination resolver was configured for Group Queue",
-          );
+          throw new Error("No durable storage destination resolver was configured for Group Queue");
         }),
       queueName,
       logger,
@@ -180,9 +178,7 @@ export class EnvelopeBlobLifecycle {
             {
               projectId: lease.ref.projectId,
               blobHash: lease.ref.hash,
-              err: redactStorageUrisInText(
-                err instanceof Error ? err.message : String(err),
-              ),
+              err: redactStorageUrisInText(err instanceof Error ? err.message : String(err)),
             },
             "Blob lease renewal failed; relying on the blob backstop",
           );
@@ -229,13 +225,7 @@ export class EnvelopeBlobLifecycle {
    * Each value's release still degrades to a warn + the TTL backstop rather
    * than throwing — one bad value must not abort the rest of the batch.
    */
-  async releaseLease({
-    values,
-    groupId,
-  }: {
-    values: string[];
-    groupId: string;
-  }): Promise<void> {
+  async releaseLease({ values, groupId }: { values: string[]; groupId: string }): Promise<void> {
     const expected = this.projectIdFor(groupId);
     await Promise.all(
       values.map(async (value) => {
@@ -275,9 +265,7 @@ export class EnvelopeBlobLifecycle {
                 projectId: lease.ref.projectId,
                 blobHash: lease.ref.hash,
                 tier: lease.ref.tier,
-                err: redactStorageUrisInText(
-                  err instanceof Error ? err.message : String(err),
-                ),
+                err: redactStorageUrisInText(err instanceof Error ? err.message : String(err)),
               },
               "Blob lease release failed; relying on lease expiry",
             );
@@ -346,9 +334,7 @@ export class EnvelopeBlobLifecycle {
             refProjectId: newLease?.ref.projectId,
             blobHash: newLease?.ref.hash,
             groupId,
-            err: redactStorageUrisInText(
-              err instanceof Error ? err.message : String(err),
-            ),
+            err: redactStorageUrisInText(err instanceof Error ? err.message : String(err)),
           },
           "transfer fallback: acquire failed; skipping release to keep old blob alive under TTL",
         );

@@ -53,21 +53,14 @@ export const getGraphCommand = async (id: string): Promise<CommandResult | void>
         console.log();
         console.log(`  ${chalk.gray("ID:")}        ${chalk.green(graph.id)}`);
         console.log(`  ${chalk.gray("Name:")}      ${chalk.cyan(graph.name)}`);
-        console.log(
-          `  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`,
-        );
-        console.log(
-          `  ${chalk.gray("Position:")}  (${graph.gridColumn}, ${graph.gridRow})`,
-        );
+        console.log(`  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`);
+        console.log(`  ${chalk.gray("Position:")}  (${graph.gridColumn}, ${graph.gridRow})`);
         console.log(`  ${chalk.gray("Size:")}      ${graph.colSpan}x${graph.rowSpan}`);
         if (graph.graph) {
-          const graphType =
-            typeof graph.graph.type === "string" ? graph.graph.type : "custom";
+          const graphType = typeof graph.graph.type === "string" ? graph.graph.type : "custom";
           console.log(`  ${chalk.gray("Type:")}      ${graphType}`);
         }
-        console.log(
-          `  ${chalk.gray("Created:")}   ${new Date(graph.createdAt).toLocaleString()}`,
-        );
+        console.log(`  ${chalk.gray("Created:")}   ${new Date(graph.createdAt).toLocaleString()}`);
         console.log();
       },
     };

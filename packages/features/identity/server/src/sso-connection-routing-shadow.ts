@@ -70,9 +70,7 @@ export interface SsoConnectionRoutingShadowDeps {
   recorder?: SsoConnectionRoutingShadowRecorder;
 }
 
-export class ShadowComparingDomainRoutingRepository
-  implements SignInDomainRoutingPort
-{
+export class ShadowComparingDomainRoutingRepository implements SignInDomainRoutingPort {
   private readonly deciding: SignInDomainRoutingPort;
   private readonly shadow: SignInDomainRoutingPort;
   private readonly recorder: SsoConnectionRoutingShadowRecorder;
@@ -143,8 +141,6 @@ export class ShadowComparingDomainRoutingRepository
   }
 }
 
-function soleOf(
-  connections: readonly RoutableConnection[],
-): RoutableConnection | null {
+function soleOf(connections: readonly RoutableConnection[]): RoutableConnection | null {
   return connections.length === 1 ? (connections[0] ?? null) : null;
 }

@@ -53,9 +53,7 @@ interface FormatSelectProps<Value extends string> {
 }
 
 /** Accepts the string shorthand, which is an option with nothing but a value. */
-function normalizeOption<Value extends string>(
-  option: Option<Value>,
-): FormatOption<Value> {
+function normalizeOption<Value extends string>(option: Option<Value>): FormatOption<Value> {
   return typeof option === "string" ? { value: option } : option;
 }
 

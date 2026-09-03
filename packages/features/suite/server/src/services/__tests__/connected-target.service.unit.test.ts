@@ -15,7 +15,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { Agent, AgentReferenceState, AgentService } from "@langwatch/agent-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
-import { InvalidTargetReferencesError, type RunPlanConfigInput, type Suite } from "@langwatch/suite-contract";
+import {
+  InvalidTargetReferencesError,
+  type RunPlanConfigInput,
+  type Suite,
+} from "@langwatch/suite-contract";
 
 import { SuiteService } from "../suite.service";
 import type { SuiteExecutionPort } from "../../ports/suite-execution.port";
@@ -186,7 +190,12 @@ describe("running against a personal development agent", () => {
     /** @scenario "A teammate cannot target another person's personal agent" */
     it("refuses the run with agent_owner_only, naming the owner, and schedules nothing", async () => {
       const agents = connectedAgentService([
-        { id: "agent_support", name: "support-agent", environment: "development", ownerUserId: owner.id },
+        {
+          id: "agent_support",
+          name: "support-agent",
+          environment: "development",
+          ownerUserId: owner.id,
+        },
       ]);
       const { service, execute } = buildService(agents);
 
@@ -213,7 +222,12 @@ describe("running against a personal development agent", () => {
     /** @scenario "The owner can target their own personal agent" */
     it("schedules the run", async () => {
       const agents = connectedAgentService([
-        { id: "agent_support", name: "support-agent", environment: "development", ownerUserId: owner.id },
+        {
+          id: "agent_support",
+          name: "support-agent",
+          environment: "development",
+          ownerUserId: owner.id,
+        },
       ]);
       const { service, execute } = buildService(agents);
 
@@ -228,7 +242,12 @@ describe("running against a personal development agent", () => {
     /** @scenario "A legacy project key can never target a personal agent" */
     it("refuses the run with agent_owner_only", async () => {
       const agents = connectedAgentService([
-        { id: "agent_support", name: "support-agent", environment: "development", ownerUserId: owner.id },
+        {
+          id: "agent_support",
+          name: "support-agent",
+          environment: "development",
+          ownerUserId: owner.id,
+        },
       ]);
       const { service, execute } = buildService(agents);
 
@@ -245,7 +264,12 @@ describe("running against a personal development agent", () => {
     /** @scenario "A host-scoped development agent is runnable by the team" */
     it("schedules a teammate's run", async () => {
       const agents = connectedAgentService([
-        { id: "agent_support", name: "support-agent", environment: "development", ownerUserId: null },
+        {
+          id: "agent_support",
+          name: "support-agent",
+          environment: "development",
+          ownerUserId: null,
+        },
       ]);
       const { service, execute } = buildService(agents);
 
@@ -269,7 +293,9 @@ describe("addressing a connected agent by name and environment", () => {
       await runAgainst({ service, referenceId: "support-agent@production", actor: teammate });
 
       expect(execute).toHaveBeenCalledTimes(1);
-      const call = execute.mock.calls[0]?.[0] as { activeTargets: { type: string; referenceId: string }[] };
+      const call = execute.mock.calls[0]?.[0] as {
+        activeTargets: { type: string; referenceId: string }[];
+      };
       expect(call.activeTargets).toEqual([{ type: "connected", referenceId: "agent_prod" }]);
     });
   });

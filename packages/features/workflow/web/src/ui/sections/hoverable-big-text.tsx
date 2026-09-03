@@ -37,12 +37,7 @@ export function ExpandedTextDialog({
           </HStack>
         </Dialog.Header>
         <Dialog.CloseTrigger />
-        <Dialog.Body
-          paddingY={6}
-          paddingX={8}
-          overflow="auto"
-          maxHeight="calc(100vh - 200px)"
-        >
+        <Dialog.Body paddingY={6} paddingX={8} overflow="auto" maxHeight="calc(100vh - 200px)">
           {open && textExpanded && isFormatted ? (
             isJson(textExpanded) ? (
               <RenderInputOutput value={textExpanded} showTools={"copy-only"} />
@@ -113,8 +108,7 @@ export function HoverableBigText({
             <Box whiteSpace="pre-wrap">
               <center></center>
               {typeof expandedVersion_ === "string"
-                ? expandedVersion_.slice(0, 2000) +
-                  (expandedVersion_.length > 2000 ? "..." : "")
+                ? expandedVersion_.slice(0, 2000) + (expandedVersion_.length > 2000 ? "..." : "")
                 : expandedVersion_}
             </Box>
           </VStack>
@@ -140,9 +134,7 @@ export function HoverableBigText({
       </Tooltip>
       <ExpandedTextDialog
         open={!!textExpanded}
-        onOpenChange={(open) =>
-          setTextExpanded(open ? (expandedVersion_ as string) : undefined)
-        }
+        onOpenChange={(open) => setTextExpanded(open ? (expandedVersion_ as string) : undefined)}
         textExpanded={textExpanded}
       />
     </>

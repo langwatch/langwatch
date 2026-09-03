@@ -57,9 +57,7 @@ describe("config.ts", () => {
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
     const result = config.getObservabilitySdkConfig({ throwOnUninitialized: false });
-    expect(result.logger).toBeInstanceOf(
-      (await import("../../logger/index.js")).NoOpLogger,
-    );
+    expect(result.logger).toBeInstanceOf((await import("../../logger/index.js")).NoOpLogger);
   });
 
   it("getObservabilitySdkConfig returns actual config when initialized", async () => {
@@ -92,9 +90,7 @@ describe("config.ts", () => {
       config.resetObservabilitySdkConfig();
 
       const result = config.getObservabilitySdkConfig({ throwOnUninitialized: false });
-      expect(result.logger).toBeInstanceOf(
-        (await import("../../logger/index.js")).NoOpLogger,
-      );
+      expect(result.logger).toBeInstanceOf((await import("../../logger/index.js")).NoOpLogger);
     });
 
     // Regression: `langwatch prompt push` crashed with "Please call

@@ -46,11 +46,7 @@ function delivery(id: string) {
 function renderDrawer() {
   render(
     <ChakraProvider value={defaultSystem}>
-      <WebhookDeliveriesDrawer
-        organizationId="org_1"
-        endpoint={endpoint}
-        onClose={vi.fn()}
-      />
+      <WebhookDeliveriesDrawer organizationId="org_1" endpoint={endpoint} onClose={vi.fn()} />
     </ChakraProvider>,
   );
 }

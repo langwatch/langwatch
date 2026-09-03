@@ -69,11 +69,7 @@ void (async () => {
   let capturedToken: string | null = null;
   page.on("response", async (resp) => {
     const url = resp.url();
-    if (
-      url.includes("/api/trpc/") &&
-      resp.request().method() === "POST" &&
-      resp.status() === 200
-    ) {
+    if (url.includes("/api/trpc/") && resp.request().method() === "POST" && resp.status() === 200) {
       const body = await resp.text().catch(() => "");
       const m = body.match(/"token":"(sk-lw-[A-Za-z0-9_]+)"/);
       if (m?.[1]) {
@@ -97,10 +93,9 @@ void (async () => {
   console.log("[click] Issue binding token button");
   // Wait for the tRPC mutation response, then capture
   const respPromise = page
-    .waitForResponse(
-      (r) => r.url().includes("ingestion") && r.request().method() === "POST",
-      { timeout: 10_000 },
-    )
+    .waitForResponse((r) => r.url().includes("ingestion") && r.request().method() === "POST", {
+      timeout: 10_000,
+    })
     .catch(() => null);
   await installBtn.click({ force: true });
   const resp = await respPromise;
@@ -109,10 +104,7 @@ void (async () => {
   await shoot(page, "03-install-drawer-after-click");
 
   // Capture endpoint from page (the visible field)
-  const endpointSpan = page
-    .locator('div[role="dialog"]')
-    .locator("text=/\\/api\\/otel/")
-    .first();
+  const endpointSpan = page.locator('div[role="dialog"]').locator("text=/\\/api\\/otel/").first();
   if ((await endpointSpan.count()) > 0) {
     const endpointText = await endpointSpan.innerText();
     console.log(`ENDPOINT=${endpointText.trim()}`);
@@ -124,10 +116,7 @@ void (async () => {
     console.log("[fail] no token captured from tRPC response");
   }
   // Click "Show" to reveal the secret + screenshot for evidence
-  const showBtn = page
-    .locator('div[role="dialog"]')
-    .locator('button:has-text("Show")')
-    .first();
+  const showBtn = page.locator('div[role="dialog"]').locator('button:has-text("Show")').first();
   if ((await showBtn.count()) > 0) {
     await showBtn.click().catch(() => {});
     await page.waitForTimeout(500);

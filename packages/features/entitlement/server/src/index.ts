@@ -1,7 +1,4 @@
-export {
-  EntitlementService,
-  type EntitlementServiceOptions,
-} from "./services/entitlement.service";
+export { EntitlementService, type EntitlementServiceOptions } from "./services/entitlement.service";
 export { PlanTrpcApi, type PlanTrpcContext } from "./transport/api-trpc/plan.api";
 export {
   LimitsTrpcApi,
@@ -13,11 +10,7 @@ export {
   type CostTrpcContext,
   type CostTrpcPorts,
 } from "./transport/api-trpc/cost.api";
-export {
-  USAGE_UNKNOWN,
-  UsageCounterPort,
-  type UsageCount,
-} from "./ports/usage-counter.port";
+export { USAGE_UNKNOWN, UsageCounterPort, type UsageCount } from "./ports/usage-counter.port";
 export { UsageMembershipPort } from "./ports/usage-membership.port";
 export { PrismaUsageMembershipRepository } from "./repositories/prisma/prisma.usage-membership.repository";
 export {

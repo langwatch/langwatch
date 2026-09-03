@@ -50,9 +50,7 @@ export function splitIndexedSuffix(groupId: string): {
   return { stem: groupId.slice(0, lastColon), index: suffix };
 }
 
-export function clusterGroups<T extends ClusterableGroup>(
-  groups: T[],
-): GroupCluster<T>[] {
+export function clusterGroups<T extends ClusterableGroup>(groups: T[]): GroupCluster<T>[] {
   const byKey = new Map<string, GroupCluster<T>>();
 
   for (const group of groups) {
@@ -60,9 +58,7 @@ export function clusterGroups<T extends ClusterableGroup>(
     // A group with no index suffix is its own cluster. Keying it by the queue
     // as well keeps two queues' identically-named groups apart.
     const key =
-      index === null
-        ? `${group.queueName}::${group.groupId}`
-        : `${group.queueName}::${stem}`;
+      index === null ? `${group.queueName}::${group.groupId}` : `${group.queueName}::${stem}`;
 
     const existing = byKey.get(key);
     if (existing) {
@@ -85,9 +81,7 @@ export function clusterGroups<T extends ClusterableGroup>(
     });
   }
 
-  return Array.from(byKey.values()).sort(
-    (a, b) => b.totalPendingJobs - a.totalPendingJobs,
-  );
+  return Array.from(byKey.values()).sort((a, b) => b.totalPendingJobs - a.totalPendingJobs);
 }
 
 /** Lower timestamp = longer wait. Nulls never win over a real timestamp. */

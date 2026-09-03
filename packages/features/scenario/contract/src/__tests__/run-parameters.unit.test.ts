@@ -309,9 +309,7 @@ describe("resolveRunParameters", () => {
 
   describe("given the scenario and the target declare different names", () => {
     const targetDefinitions: ScenarioParameterDefinition[] = [{ name: "model" }];
-    const scenarios = [
-      scenario({ parameters: [{ name: "tenant", defaultValue: "acme" }] }),
-    ];
+    const scenarios = [scenario({ parameters: [{ name: "tenant", defaultValue: "acme" }] })];
 
     /** @scenario "Unknown parameter names are checked per target against its agent" */
     it("accepts the target's name and refuses one neither declares", async () => {
@@ -356,9 +354,7 @@ describe("resolveRunParameters", () => {
     /** @scenario "Scenario defaults win over agent defaults" */
     it("reads the scenario's default", async () => {
       const resolved = await resolveRunParameters({
-        scenarios: [
-          scenario({ parameters: [{ name: "model", defaultValue: "gpt-5" }] }),
-        ],
+        scenarios: [scenario({ parameters: [{ name: "model", defaultValue: "gpt-5" }] })],
         targetDefinitions: [{ name: "model", defaultValue: "gpt-5-mini" }],
       });
 

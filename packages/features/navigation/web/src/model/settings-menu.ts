@@ -141,9 +141,7 @@ function organizationGroup({
       // Keys sit here rather than in Access, where four enterprise entries
       // came first and left a page most readers use at the bottom of a group
       // they cannot open.
-      ...(!isLiteMember
-        ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }]
-        : []),
+      ...(!isLiteMember ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }] : []),
       {
         label: "Authentication",
         href: "/settings/authentication",
@@ -178,10 +176,7 @@ function organizationGroup({
   };
 }
 
-function accessGroup({
-  showEnterpriseNav,
-  isLiteMember,
-}: SettingsMenuGates): SettingsMenuGroup {
+function accessGroup({ showEnterpriseNav, isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
     label: "Access",
@@ -242,9 +237,7 @@ function aiInfrastructureGroup({ isLiteMember }: SettingsMenuGates): SettingsMen
         icon: Brain,
       },
       { label: "Model Costs", href: "/settings/model-costs", icon: Coins },
-      ...(!isLiteMember
-        ? [{ label: "Secrets", href: "/settings/secrets", icon: Lock }]
-        : []),
+      ...(!isLiteMember ? [{ label: "Secrets", href: "/settings/secrets", icon: Lock }] : []),
     ],
   };
 }
@@ -339,12 +332,7 @@ export function opsGroup(): SettingsMenuGroup {
         // drawer that address redirects to. Naming them here is what keeps
         // this entry lit while the reader is inside the workspace, and what
         // tells the reachability test the addresses have an owner.
-        alsoActiveAt: [
-          "/ops/scheduler",
-          "/ops/projections",
-          "/ops/blobs",
-          "/ops/dejaview",
-        ],
+        alsoActiveAt: ["/ops/scheduler", "/ops/projections", "/ops/blobs", "/ops/dejaview"],
         icon: Workflow,
       },
       // Projection replay, the payload store and Deja View are not here:

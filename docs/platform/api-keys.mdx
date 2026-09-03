@@ -32,10 +32,10 @@ Because an ingestion key is genuinely write-only, it's safe to drop into an agen
 | **Requires `LANGWATCH_PROJECT_ID`** | Yes                                                        | Yes                                             |
 
 <Info>
-  **Legacy project keys** (the `LANGWATCH_API_KEY` shown on the project setup page) still
-  work and will continue to be supported. They have the project context built in, so they
-  don't require `LANGWATCH_PROJECT_ID`. New users should prefer creating keys from
-  **Settings → API Keys** for better security and access control.
+  **Legacy project keys** (the `LANGWATCH_API_KEY` shown on the project setup page) still work and
+  will continue to be supported. They have the project context built in, so they don't require
+  `LANGWATCH_PROJECT_ID`. New users should prefer creating keys from **Settings → API Keys** for
+  better security and access control.
 </Info>
 
 ## Creating a Personal API Key
@@ -47,17 +47,14 @@ Personal keys are ideal for local development, connecting your AI coding assista
     Navigate to [Settings → API Keys](https://app.langwatch.ai/settings/api-keys) in your LangWatch dashboard.
   </Step>
 
-<Step title="Click Create API Key">
-  Click the **Create API Key** button in the top right.
-</Step>
+<Step title="Click Create API Key">Click the **Create API Key** button in the top right.</Step>
 
 <Step title="Configure the key">
-  - **Type**: Select **Personal** - **Name**: Give it a descriptive name (e.g., "My MCP
-  key", "Local dev") - **Scope**: Select which projects, teams, or the whole organization
-  the key can access - **Expiration**: Optionally set an expiration date -
-  **Permissions**: Choose a permission mode: - **All**: inherits your full permissions at
-  each scope - **Restricted**: fine-grained control over individual permission categories
-  (see [Permission Categories](#permission-categories))
+  - **Type**: Select **Personal** - **Name**: Give it a descriptive name (e.g., "My MCP key", "Local
+  dev") - **Scope**: Select which projects, teams, or the whole organization the key can access -
+  **Expiration**: Optionally set an expiration date - **Permissions**: Choose a permission mode: -
+  **All**: inherits your full permissions at each scope - **Restricted**: fine-grained control over
+  individual permission categories (see [Permission Categories](#permission-categories))
 </Step>
 
   <Step title="Copy your key">
@@ -90,9 +87,7 @@ Service keys are designed for automated systems: CI/CD pipelines, production ser
     Navigate to [Settings → API Keys](https://app.langwatch.ai/settings/api-keys) in your LangWatch dashboard.
   </Step>
 
-<Step title="Click Create API Key">
-  Click the **Create API Key** button in the top right.
-</Step>
+<Step title="Click Create API Key">Click the **Create API Key** button in the top right.</Step>
 
   <Step title="Configure the key">
     - **Type**: Select **Service**
@@ -236,6 +231,6 @@ From the **Settings → API Keys** page you can:
 - **Revoke a key**: immediately disables the key (cannot be undone)
 
 <Tip>
-  Rotate keys regularly and revoke any that are no longer in use. Set expiration dates on
-  keys used for temporary workflows.
+  Rotate keys regularly and revoke any that are no longer in use. Set expiration dates on keys used
+  for temporary workflows.
 </Tip>

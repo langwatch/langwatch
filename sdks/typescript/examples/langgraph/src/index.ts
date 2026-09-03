@@ -138,9 +138,7 @@ async function main() {
     `;
 
     const result = await chatModel.invoke([
-      new SystemMessage(
-        "You are a helpful assistant. Provide clear, comprehensive answers.",
-      ),
+      new SystemMessage("You are a helpful assistant. Provide clear, comprehensive answers."),
       new HumanMessage(prompt),
     ]);
 

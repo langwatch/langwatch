@@ -51,11 +51,7 @@ export const SystemPromptBanner: React.FC<{ text: string }> = ({ text }) => {
         </Text>
         <Box flex={1} />
         {isLong && (
-          <Icon
-            as={expanded ? ChevronDown : ChevronRight}
-            boxSize="13px"
-            color="fg.subtle"
-          />
+          <Icon as={expanded ? ChevronDown : ChevronRight} boxSize="13px" color="fg.subtle" />
         )}
       </HStack>
       <Box

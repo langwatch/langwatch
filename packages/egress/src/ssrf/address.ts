@@ -1,5 +1,5 @@
 /**
-  * Canonical SSRF address-classification rules (`@langwatch/egress`, `src/ssrf/address.ts`).
+ * Canonical SSRF address-classification rules (`@langwatch/egress`, `src/ssrf/address.ts`).
  *
  * This is the TypeScript half of a two-language contract. The Go half lives in
  * `pkg/ssrf` (package ssrf); both are held to the identical behavior by the
@@ -294,13 +294,7 @@ export function isPublicAddress(ip: string): boolean {
  * Metadata is always refused; other special ranges are refused only when
  * blockLocal is set. Mirrors Go's ssrf.Blocked.
  */
-export function blocked({
-  ip,
-  blockLocal,
-}: {
-  ip: string;
-  blockLocal: boolean;
-}): boolean {
+export function blocked({ ip, blockLocal }: { ip: string; blockLocal: boolean }): boolean {
   switch (classify(ip)) {
     case "metadata":
       return true;

@@ -169,107 +169,104 @@ beforeEach(() => {
   cleanup();
 });
 
-describe.each(["thread", "bubbles"] as const)(
-  "given a turn read in %s layout",
-  (layout) => {
-    describe("when the reviewer reads what a message offers", () => {
-      /** @scenario "Each message offers Translate, Annotate and Suggest on hover" */
-      it("reads Translate, Annotate and Suggest in that order on both messages", () => {
-        renderTurn({ layout });
+describe.each(["thread", "bubbles"] as const)("given a turn read in %s layout", (layout) => {
+  describe("when the reviewer reads what a message offers", () => {
+    /** @scenario "Each message offers Translate, Annotate and Suggest on hover" */
+    it("reads Translate, Annotate and Suggest in that order on both messages", () => {
+      renderTurn({ layout });
 
-        for (const side of ["message", "reply"] as const) {
-          expect(
-            within(cluster(side))
-              .getAllByRole("button")
-              .map((button) => button.textContent),
-          ).toEqual(["Translate", "Annotate", "Suggest"]);
-        }
-      });
-
-      /** @scenario "Either side of a turn takes a comment and a correction" */
-      it("offers a comment and a correction on either side", () => {
-        renderTurn({ layout });
-
-        expect(annotateOn("message")).toBeInTheDocument();
-        expect(suggestOn("message")).toBeInTheDocument();
-        expect(annotateOn("reply")).toBeInTheDocument();
-        expect(suggestOn("reply")).toBeInTheDocument();
-      });
+      for (const side of ["message", "reply"] as const) {
+        expect(
+          within(cluster(side))
+            .getAllByRole("button")
+            .map((button) => button.textContent),
+        ).toEqual(["Translate", "Annotate", "Suggest"]);
+      }
     });
 
-    describe("when the reviewer comments on the message the user sent", () => {
-      /** @scenario "Commenting on one side of a turn records which side it was left on" */
-      it("records the comment as being about the turn's input", async () => {
-        renderTurn({ layout });
+    /** @scenario "Either side of a turn takes a comment and a correction" */
+    it("offers a comment and a correction on either side", () => {
+      renderTurn({ layout });
 
-        fireEvent.click(annotateOn("message"));
-
-        await vi.waitFor(() =>
-          expect(draft()).toMatchObject({
-            traceId: TRACE_ID,
-            mode: "annotate",
-            anchorKind: "field",
-            anchorId: TRACE_ID,
-            anchorPath: "input",
-          }),
-        );
-      });
+      expect(annotateOn("message")).toBeInTheDocument();
+      expect(suggestOn("message")).toBeInTheDocument();
+      expect(annotateOn("reply")).toBeInTheDocument();
+      expect(suggestOn("reply")).toBeInTheDocument();
     });
+  });
 
-    describe("when the reviewer comments on the reply", () => {
-      /** @scenario "Commenting on one side of a turn records which side it was left on" */
-      it("records the comment as being about the turn's output", async () => {
-        renderTurn({ layout });
+  describe("when the reviewer comments on the message the user sent", () => {
+    /** @scenario "Commenting on one side of a turn records which side it was left on" */
+    it("records the comment as being about the turn's input", async () => {
+      renderTurn({ layout });
 
-        fireEvent.click(annotateOn("reply"));
+      fireEvent.click(annotateOn("message"));
 
-        await vi.waitFor(() =>
-          expect(draft()).toMatchObject({
-            anchorKind: "field",
-            anchorId: TRACE_ID,
-            anchorPath: "output",
-          }),
-        );
-      });
+      await vi.waitFor(() =>
+        expect(draft()).toMatchObject({
+          traceId: TRACE_ID,
+          mode: "annotate",
+          anchorKind: "field",
+          anchorId: TRACE_ID,
+          anchorPath: "input",
+        }),
+      );
     });
+  });
 
-    describe("when the reviewer suggests what the user message should have been", () => {
-      /** @scenario "Suggest on the user message pre-fills the message text" */
-      it("opens on the turn's input, pre-filled with what it said", async () => {
-        renderTurn({ layout });
+  describe("when the reviewer comments on the reply", () => {
+    /** @scenario "Commenting on one side of a turn records which side it was left on" */
+    it("records the comment as being about the turn's output", async () => {
+      renderTurn({ layout });
 
-        fireEvent.click(suggestOn("message"));
+      fireEvent.click(annotateOn("reply"));
 
-        await vi.waitFor(() =>
-          expect(draft()).toMatchObject({
-            mode: "suggest",
-            anchorKind: "field",
-            anchorId: TRACE_ID,
-            anchorPath: "input",
-            expectedOutput: "a question",
-          }),
-        );
-      });
+      await vi.waitFor(() =>
+        expect(draft()).toMatchObject({
+          anchorKind: "field",
+          anchorId: TRACE_ID,
+          anchorPath: "output",
+        }),
+      );
     });
+  });
 
-    describe("when the reviewer suggests what the reply should have said", () => {
-      /** @scenario "Either side of a turn takes a comment and a correction" */
-      it("opens on the turn's output, pre-filled with what it said", async () => {
-        renderTurn({ layout });
+  describe("when the reviewer suggests what the user message should have been", () => {
+    /** @scenario "Suggest on the user message pre-fills the message text" */
+    it("opens on the turn's input, pre-filled with what it said", async () => {
+      renderTurn({ layout });
 
-        fireEvent.click(suggestOn("reply"));
+      fireEvent.click(suggestOn("message"));
 
-        await vi.waitFor(() =>
-          expect(draft()).toMatchObject({
-            mode: "suggest",
-            anchorPath: "output",
-            expectedOutput: "the original answer",
-          }),
-        );
-      });
+      await vi.waitFor(() =>
+        expect(draft()).toMatchObject({
+          mode: "suggest",
+          anchorKind: "field",
+          anchorId: TRACE_ID,
+          anchorPath: "input",
+          expectedOutput: "a question",
+        }),
+      );
     });
-  },
-);
+  });
+
+  describe("when the reviewer suggests what the reply should have said", () => {
+    /** @scenario "Either side of a turn takes a comment and a correction" */
+    it("opens on the turn's output, pre-filled with what it said", async () => {
+      renderTurn({ layout });
+
+      fireEvent.click(suggestOn("reply"));
+
+      await vi.waitFor(() =>
+        expect(draft()).toMatchObject({
+          mode: "suggest",
+          anchorPath: "output",
+          expectedOutput: "the original answer",
+        }),
+      );
+    });
+  });
+});
 
 describe("given a turn whose input a privacy rule hid", () => {
   /** @scenario "A side of a turn a privacy rule hid offers nothing to comment on" */
@@ -279,9 +276,7 @@ describe("given a turn whose input a privacy rule hid", () => {
       userText: "",
     });
 
-    expect(
-      screen.queryByRole("group", { name: CLUSTER_LABEL.message }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: CLUSTER_LABEL.message })).not.toBeInTheDocument();
     expect(annotateOn("reply")).toBeInTheDocument();
   });
 });
@@ -295,12 +290,8 @@ describe("given a reviewer who may read annotations but not write them", () => {
   it("offers no message any way to be commented on or corrected", () => {
     renderTurn();
 
-    expect(
-      screen.queryByRole("button", { name: /^Annotate this/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^Suggest what this/ }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Annotate this/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Suggest what this/ })).not.toBeInTheDocument();
   });
 
   /** @scenario "Each action asks for the permission its own work needs" */

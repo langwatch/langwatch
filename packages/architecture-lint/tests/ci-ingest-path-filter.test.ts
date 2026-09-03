@@ -32,10 +32,7 @@ interface WorkflowStep {
   with?: { filters?: string };
 }
 interface Workflow {
-  jobs: Record<
-    string,
-    { if?: string; outputs?: Record<string, string>; steps?: WorkflowStep[] }
-  >;
+  jobs: Record<string, { if?: string; outputs?: Record<string, string>; steps?: WorkflowStep[] }>;
 }
 interface Detector {
   outputs: Record<string, { value: string }>;
@@ -98,8 +95,7 @@ function holdsAtLeastOneFile(dir: string): boolean {
   if (!existsSync(dir) || !statSync(dir).isDirectory()) return false;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isFile()) return true;
-    if (entry.isDirectory() && holdsAtLeastOneFile(path.join(dir, entry.name)))
-      return true;
+    if (entry.isDirectory() && holdsAtLeastOneFile(path.join(dir, entry.name))) return true;
   }
   return false;
 }
@@ -108,9 +104,7 @@ function holdsAtLeastOneFile(dir: string): boolean {
 function isLive(pattern: string): boolean {
   const target = path.join(
     REPO_ROOT,
-    isDirectoryPrefix(pattern)
-      ? pattern.slice(0, -DIRECTORY_PREFIX_SUFFIX.length)
-      : pattern,
+    isDirectoryPrefix(pattern) ? pattern.slice(0, -DIRECTORY_PREFIX_SUFFIX.length) : pattern,
   );
   return isDirectoryPrefix(pattern)
     ? holdsAtLeastOneFile(target)
@@ -218,20 +212,14 @@ describe("the sdk-javascript-ci path filters", () => {
         it("matches the ingest filter", () => {
           expect(change.files.length).toBeGreaterThan(0);
           expect(filterMatches("ingest", change.files)).toBe(true);
-          expect(workflow.jobs.e2e!.if).toContain(
-            "needs.changes.outputs.ingest == 'true'",
-          );
-          expect(workflow.jobs.e2e!.if).toContain(
-            "needs.changes.outputs.relevant == 'true'",
-          );
+          expect(workflow.jobs.e2e!.if).toContain("needs.changes.outputs.ingest == 'true'");
+          expect(workflow.jobs.e2e!.if).toContain("needs.changes.outputs.relevant == 'true'");
         });
 
         /** @scenario "A change to the app's HTTP ingest spine does not run the paid SDK test job" */
         it("misses the relevant filter, which is what gates the job that spends model budget", () => {
           expect(filterMatches("relevant", change.files)).toBe(false);
-          expect(workflow.jobs.ci!.if).toContain(
-            "needs.changes.outputs.relevant == 'true'",
-          );
+          expect(workflow.jobs.ci!.if).toContain("needs.changes.outputs.relevant == 'true'");
           expect(workflow.jobs.ci!.if).not.toContain("ingest");
         });
       });
@@ -251,9 +239,7 @@ describe("the sdk-javascript-ci path filters", () => {
         expect(detector.outputs[key]!.value).toContain(`steps.filter.outputs.${key}`);
         expect(detector.outputs[key]!.value).toContain(`steps.force.outputs.${key}`);
         expect(forceRun).toContain(`${key}=true`);
-        expect(workflow.jobs.changes!.outputs?.[key]).toContain(
-          `steps.detect.outputs.${key}`,
-        );
+        expect(workflow.jobs.changes!.outputs?.[key]).toContain(`steps.detect.outputs.${key}`);
       }
     });
   });

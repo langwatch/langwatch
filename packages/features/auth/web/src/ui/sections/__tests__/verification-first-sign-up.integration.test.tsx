@@ -114,14 +114,7 @@ vi.mock("../../../behavior/use-route", () => ({
 }));
 
 vi.mock("../../elements/router-link", () => ({
-  default: ({
-    href,
-    children,
-    ...props
-  }: {
-    href: string;
-    children: ReactNode;
-  }) => (
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -186,20 +179,13 @@ describe("given the sign-up screen", () => {
     it("asks for a password next, and sends nothing on the way", async () => {
       const { container } = renderScreen();
 
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
       await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
       // The password step, with the address named on it and a way back.
-      expect(await screen.findByTestId("signup-identifier")).toHaveTextContent(
-        /sam@acme\.com/,
-      );
+      expect(await screen.findByTestId("signup-identifier")).toHaveTextContent(/sam@acme\.com/);
       await waitFor(() => {
-        expect(
-          container.querySelector('input[type="password"]'),
-        ).not.toBeNull();
+        expect(container.querySelector('input[type="password"]')).not.toBeNull();
       });
       // Nothing has been created and nothing sent: an address typed here
       // costs nobody an email until they finish.
@@ -214,17 +200,12 @@ describe("given the sign-up screen", () => {
       signInMock.mockResolvedValue({});
 
       const { container } = renderScreen();
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
       await userEvent.click(screen.getByRole("button", { name: "Continue" }));
       await screen.findByTestId("signup-identifier");
 
       await fillPasswordPair(container, "a-good-password");
-      await userEvent.click(
-        screen.getByRole("button", { name: /create|continue|sign up/i }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: /create|continue|sign up/i }));
 
       await waitFor(() => {
         expect(registerMock).toHaveBeenCalledWith({
@@ -252,9 +233,7 @@ describe("given the sign-up screen", () => {
 
       // Nothing to choose: sign-up already made the account, and this link is
       // the address catching up with it.
-      expect(await screen.findByTestId("account-ready")).toHaveTextContent(
-        /sam@acme\.com/,
-      );
+      expect(await screen.findByTestId("account-ready")).toHaveTextContent(/sam@acme\.com/);
       expect(screen.queryByTestId("method-picker")).toBeNull();
     });
   });
@@ -271,14 +250,10 @@ describe("given the sign-up screen", () => {
 
       const { container } = renderScreen();
 
-      expect(await screen.findByTestId("verified-address")).toHaveTextContent(
-        /sam@acme\.com/,
-      );
+      expect(await screen.findByTestId("verified-address")).toHaveTextContent(/sam@acme\.com/);
       expect(await screen.findByTestId("method-picker")).toBeTruthy();
       await waitFor(() => {
-        expect(
-          container.querySelector('input[type="password"]'),
-        ).not.toBeNull();
+        expect(container.querySelector('input[type="password"]')).not.toBeNull();
       });
       expect(routeMock).toHaveBeenCalledWith({
         identifier: "sam@acme.com",
@@ -295,12 +270,8 @@ describe("given the sign-up screen", () => {
 
       const { container } = renderScreen();
 
-      expect(
-        await screen.findByText(/that verification link has expired/i),
-      ).toBeTruthy();
-      expect(
-        screen.getByRole("button", { name: /send a new link/i }),
-      ).toBeTruthy();
+      expect(await screen.findByText(/that verification link has expired/i)).toBeTruthy();
+      expect(screen.getByRole("button", { name: /send a new link/i })).toBeTruthy();
 
       // Nothing was confirmed: no address is held, no method is offered, and
       // the token was spent exactly once against the server.
@@ -329,30 +300,19 @@ describe("given the sign-up screen", () => {
 
       const { container } = renderScreen();
 
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
-      await userEvent.click(
-        screen.getByRole("button", { name: /^continue$/i }),
-      );
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: /^continue$/i }));
       await screen.findByTestId("signup-identifier");
 
       await fillPasswordPair(container, "a-good-password");
-      await userEvent.click(
-        screen.getByRole("button", { name: /create|continue|sign up/i }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: /create|continue|sign up/i }));
 
       // The page quietly becomes the log-in step: same address, same methods,
       // and the door back into a half-created account beside it.
       expect(await screen.findByTestId("method-picker")).toBeTruthy();
-      expect(screen.getByTestId("routed-identifier")).toHaveTextContent(
-        "sam@acme.com",
-      );
+      expect(screen.getByTestId("routed-identifier")).toHaveTextContent("sam@acme.com");
       expect(screen.getByRole("button", { name: /^log in$/i })).toBeTruthy();
-      expect(
-        screen.getByRole("link", { name: /forgot password/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("link", { name: /forgot password/i })).toBeTruthy();
       expect(container.querySelector('input[type="email"]')).toBeNull();
       expect(screen.queryByTestId("verification-sent")).toBeNull();
 
@@ -392,17 +352,10 @@ describe("given the sign-up screen", () => {
       await screen.findByTestId("method-picker");
 
       await userEvent.type(screen.getByLabelText(/^password$/i), "shortish");
-      await userEvent.type(
-        screen.getByLabelText(/confirm password/i),
-        "shortish",
-      );
-      await userEvent.click(
-        screen.getByRole("button", { name: /create account/i }),
-      );
+      await userEvent.type(screen.getByLabelText(/confirm password/i), "shortish");
+      await userEvent.click(screen.getByRole("button", { name: /create account/i }));
 
-      expect(
-        await screen.findByText(/use at least 8 characters/i),
-      ).toBeTruthy();
+      expect(await screen.findByText(/use at least 8 characters/i)).toBeTruthy();
       expect(signInMock).not.toHaveBeenCalled();
     });
 
@@ -421,9 +374,7 @@ describe("given the sign-up screen", () => {
       await userEvent.type(screen.getByLabelText(/^password$/i), "short");
       await userEvent.tab();
 
-      expect(
-        await screen.findByText(/use at least 8 characters/i),
-      ).toBeTruthy();
+      expect(await screen.findByText(/use at least 8 characters/i)).toBeTruthy();
       expect(registerMock).not.toHaveBeenCalled();
     });
   });
@@ -445,9 +396,7 @@ describe("given the sign-up screen", () => {
       expect(carriedEmail?.getAttribute("value")).toBe("sam@acme.com");
       expect(carriedEmail?.getAttribute("autocomplete")).toBe("username");
 
-      for (const field of container.querySelectorAll(
-        'input[type="password"]',
-      )) {
+      for (const field of container.querySelectorAll('input[type="password"]')) {
         expect(field.getAttribute("autocomplete")).toBe("new-password");
       }
     });
@@ -457,10 +406,7 @@ describe("given the sign-up screen", () => {
     /** Reaches the credential step with an address typed on the one before. */
     const reachCredentialStep = async () => {
       const rendered = renderScreen();
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
       await userEvent.click(screen.getByRole("button", { name: "Continue" }));
       await screen.findByTestId("signup-identifier");
       return rendered;
@@ -475,9 +421,7 @@ describe("given the sign-up screen", () => {
 
       expect(await screen.findByTestId("passkey-sign-up")).toBeTruthy();
       await waitFor(() => {
-        expect(
-          container.querySelector('input[type="password"]'),
-        ).not.toBeNull();
+        expect(container.querySelector('input[type="password"]')).not.toBeNull();
       });
     });
 
@@ -532,10 +476,7 @@ describe("given the sign-up screen", () => {
   describe("when this deployment never mounted passkeys", () => {
     it("offers no passkey, because there is no endpoint behind one", async () => {
       renderScreen();
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
       await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
       await screen.findByTestId("signup-identifier");

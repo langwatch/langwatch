@@ -13,10 +13,7 @@ import { useSignInRouting } from "../../behavior/use-sign-in-routing";
 import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email";
 import type { FrontDoorDepth } from "../../model/ground-palette";
 import { usePublishFrontDoorStage } from "../../model/ground-stage";
-import {
-  readLastUsedMethodId,
-  rememberPendingMethod,
-} from "../../model/last-used-method";
+import { readLastUsedMethodId, rememberPendingMethod } from "../../model/last-used-method";
 import { CheckYourEmail } from "../elements/check-your-email";
 import { CredentialSignInForm } from "./credential-sign-in-form";
 import { FrontDoorFinePrint } from "../elements/front-door-fine-print";
@@ -67,10 +64,8 @@ export function VerificationFirstSignUp() {
   const [carriedEmail] = useState(readCarriedEmail);
   useEffect(forgetCarriedEmail, []);
 
-  const requestVerification =
-    api.frontDoor.requestSignUpVerification.useMutation();
-  const completeVerification =
-    api.frontDoor.completeSignUpVerification.useMutation();
+  const requestVerification = api.frontDoor.requestSignUpVerification.useMutation();
+  const completeVerification = api.frontDoor.completeSignUpVerification.useMutation();
   const routing = useSignInRouting();
   const { decide } = routing;
 
@@ -81,9 +76,7 @@ export function VerificationFirstSignUp() {
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
   const [accountIsReady, setAccountIsReady] = useState(false);
   const [welcomeBackEmail, setWelcomeBackEmail] = useState<string | null>(null);
-  const [instanceMethods, setInstanceMethods] = useState<
-    readonly SignInMethod[]
-  >([]);
+  const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
   // Every failure this card can have shows in one place, at the top. A
   // passkey is refused from a button part-way down the rail of methods, and
@@ -181,10 +174,7 @@ export function VerificationFirstSignUp() {
 
   if (verifiedEmail && accountIsReady) {
     return (
-      <AccountIsReady
-        email={verifiedEmail}
-        callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
-      />
+      <AccountIsReady email={verifiedEmail} callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH} />
     );
   }
 
@@ -228,10 +218,7 @@ export function VerificationFirstSignUp() {
   // answers. Confirming the address happens after it and gates nothing.
   if (signingUpEmail) {
     return (
-      <AuthCard
-        title="Choose how to sign in"
-        finePrint={<FrontDoorFinePrint />}
-      >
+      <AuthCard title="Choose how to sign in" finePrint={<FrontDoorFinePrint />}>
         <SignUpCredentialForm
           email={signingUpEmail}
           callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
@@ -247,10 +234,7 @@ export function VerificationFirstSignUp() {
   }
 
   return (
-    <AuthCard
-      title="Create your LangWatch account"
-      finePrint={<FrontDoorFinePrint />}
-    >
+    <AuthCard title="Create your LangWatch account" finePrint={<FrontDoorFinePrint />}>
       {requestVerification.error ? (
         <HandledErrorAlert
           error={requestVerification.error}
@@ -274,12 +258,7 @@ export function VerificationFirstSignUp() {
           setSigningUpEmail(email);
           return Promise.resolve();
         }}
-        footer={
-          <LogInLink
-            callbackUrl={callbackUrl}
-            label="Already have an account? Log in"
-          />
-        }
+        footer={<LogInLink callbackUrl={callbackUrl} label="Already have an account? Log in" />}
         alternatives={
           hasAlternativeMethods(instanceMethods) ? (
             <AlternativeMethods
@@ -358,13 +337,7 @@ function WelcomeBack({
  * account exists. All that is left is the log-in it was always going to be,
  * with the address in place and the password the browser has just saved.
  */
-function AccountIsReady({
-  email,
-  callbackUrl,
-}: {
-  email: string;
-  callbackUrl: string;
-}) {
+function AccountIsReady({ email, callbackUrl }: { email: string; callbackUrl: string }) {
   return (
     <AuthCard title="Your account is ready">
       <HStack gap={3}>
@@ -399,10 +372,7 @@ function LinkNoLongerWorks({
       title="Create your LangWatch account"
       intro="Enter your email and we will send a new confirmation link."
     >
-      <HandledErrorAlert
-        error={error}
-        fallbackTitle="That confirmation link no longer works"
-      />
+      <HandledErrorAlert error={error} fallbackTitle="That confirmation link no longer works" />
       <IdentifierStepForm
         submitLabel="Send a new link"
         isSubmitting={isSending}
@@ -431,11 +401,7 @@ function signUpDepth({
   signingUpEmail: string | null;
 }): FrontDoorDepth {
   if (verifiedEmail && accountIsReady) return "settled";
-  if (
-    verifiedEmail !== null ||
-    welcomeBackEmail !== null ||
-    signingUpEmail !== null
-  ) {
+  if (verifiedEmail !== null || welcomeBackEmail !== null || signingUpEmail !== null) {
     return "credential";
   }
   if (sentTo !== null) return "sent";
@@ -468,9 +434,7 @@ function MethodChoice({
     <AuthCard title="Choose how to sign in">
       <HStack gap={3}>
         <SuccessPulse label="Email address confirmed" />
-        <Text data-testid="verified-address">
-          {verifiedEmail} is confirmed.
-        </Text>
+        <Text data-testid="verified-address">{verifiedEmail} is confirmed.</Text>
       </HStack>
       {decision ? (
         <SignInMethodPicker
@@ -478,9 +442,7 @@ function MethodChoice({
           // being made: there is no credential on this device to find yet, so
           // the ceremony would open a prompt with nothing in it. A passkey
           // becomes an offer once there is one to enrol (D07).
-          methodSet={decision.methodSet.filter(
-            (method) => method.kind !== "passkey",
-          )}
+          methodSet={decision.methodSet.filter((method) => method.kind !== "passkey")}
           reasonCode={decision.reasonCode}
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={onFederatedMethodChosen}
@@ -507,13 +469,7 @@ function MethodChoice({
   );
 }
 
-function LogInLink({
-  callbackUrl,
-  label,
-}: {
-  callbackUrl: string | undefined;
-  label: string;
-}) {
+function LogInLink({ callbackUrl, label }: { callbackUrl: string | undefined; label: string }) {
   const href = `/auth/signin${
     callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""
   }`;

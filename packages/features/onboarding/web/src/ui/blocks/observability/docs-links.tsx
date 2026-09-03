@@ -15,14 +15,7 @@ export function DocsLinks({ docs, label }: DocsLinksProps): React.ReactElement |
   if (!docs || (!docs.internal && !docs.external)) return null;
 
   return (
-    <HStack
-      gap={3}
-      color="fg.muted"
-      fontSize="xs"
-      justify="flex-start"
-      align="center"
-      pt={1}
-    >
+    <HStack gap={3} color="fg.muted" fontSize="xs" justify="flex-start" align="center" pt={1}>
       {docs.internal && (
         <Link href={`https://docs.langwatch.ai${docs.internal}`} isExternal>
           <HStack gap={1} _hover={{ color: "fg" }} transition="color 0.2s">

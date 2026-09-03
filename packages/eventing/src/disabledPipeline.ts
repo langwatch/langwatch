@@ -56,10 +56,7 @@ class DisabledEventSourcingService {
   constructor(private readonly pipelineName: string) {}
 
   async storeEvents(): Promise<void> {
-    logger.warn(
-      { pipeline: this.pipelineName },
-      "storeEvents ignored: event sourcing is disabled",
-    );
+    logger.warn({ pipeline: this.pipelineName }, "storeEvents ignored: event sourcing is disabled");
   }
 
   getCommandQueues() {
@@ -89,9 +86,10 @@ export class DisabledPipeline<
     this.name = name;
     this.aggregateType = aggregateType;
     this.metadata = metadata;
-    this.service = new DisabledEventSourcingService(
-      name,
-    ) as unknown as EventSourcingService<EventType, ProjectionTypes>;
+    this.service = new DisabledEventSourcingService(name) as unknown as EventSourcingService<
+      EventType,
+      ProjectionTypes
+    >;
 
     // Create a proxy that returns DisabledQueueProcessor for any command
     this.commands = new Proxy({} as Record<string, EventSourcedQueueProcessor<any>>, {

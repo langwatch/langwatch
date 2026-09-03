@@ -18,10 +18,7 @@ interface DialogContentProps extends ChakraDialog.ContentProps {
    * need a coloured backdrop, you don't — change the dialog surface
    * instead.
    */
-  backdropProps?: Omit<
-    ChakraDialog.BackdropProps,
-    "bg" | "background" | "backgroundColor"
-  >;
+  backdropProps?: Omit<ChakraDialog.BackdropProps, "bg" | "background" | "backgroundColor">;
   /** Props passed to the positioner (e.g. style for --layer-index). */
   positionerProps?: ChakraDialog.PositionerProps;
   /**
@@ -93,13 +90,7 @@ export const DialogCloseTrigger = React.forwardRef<
   ChakraDialog.CloseTriggerProps
 >(function DialogCloseTrigger(props, ref) {
   return (
-    <ChakraDialog.CloseTrigger
-      position="absolute"
-      top="2"
-      insetEnd="2"
-      {...props}
-      asChild
-    >
+    <ChakraDialog.CloseTrigger position="absolute" top="2" insetEnd="2" {...props} asChild>
       <CloseButton size="sm" ref={ref}>
         {props.children}
       </CloseButton>
@@ -125,8 +116,7 @@ function stripBackdropBg(
   props: DialogContentProps["backdropProps"] | undefined,
 ): DialogContentProps["backdropProps"] | undefined {
   if (!props) return props;
-  const { bg, background, backgroundColor, style, ...rest } =
-    props as ChakraDialog.BackdropProps;
+  const { bg, background, backgroundColor, style, ...rest } = props as ChakraDialog.BackdropProps;
   const safeStyle = style
     ? { ...style, background: "transparent", backgroundColor: "transparent" }
     : undefined;

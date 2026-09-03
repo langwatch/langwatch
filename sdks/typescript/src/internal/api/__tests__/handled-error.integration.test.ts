@@ -15,10 +15,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
-import {
-  TracesApiService,
-  TracesApiError,
-} from "@/client-sdk/services/traces/traces-api.service";
+import { TracesApiService, TracesApiError } from "@/client-sdk/services/traces/traces-api.service";
 import { createLangWatchApiClient } from "../client";
 import { LangWatchHandledError, isLangWatchHandledError } from "../errors";
 
@@ -57,9 +54,7 @@ describe("given the API returns a handled domain error", () => {
     });
 
     it("throws a typed domain error rather than a generic HTTP error", async () => {
-      await expect(getTrace(serviceWithApiKey())).rejects.toBeInstanceOf(
-        LangWatchHandledError,
-      );
+      await expect(getTrace(serviceWithApiKey())).rejects.toBeInstanceOf(LangWatchHandledError);
     });
 
     it("carries the platform's kind, status and meta", async () => {
@@ -148,10 +143,7 @@ describe("given the API fails WITHOUT naming a domain error", () => {
     beforeEach(() => {
       server.use(
         http.get(`${TEST_ENDPOINT}/api/traces/:traceId`, () =>
-          HttpResponse.json(
-            { error: "Internal server error", message: "boom" },
-            { status: 500 },
-          ),
+          HttpResponse.json({ error: "Internal server error", message: "boom" }, { status: 500 }),
         ),
       );
     });

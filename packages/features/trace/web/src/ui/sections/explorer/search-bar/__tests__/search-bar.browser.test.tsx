@@ -41,8 +41,7 @@ vi.mock("@langwatch/langy-web", async (importOriginal) => {
     openPanel: () => undefined,
     attachContext: () => undefined,
   });
-  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
-    selector(state());
+  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) => selector(state());
   useLangyStore.getState = state;
   return { ...actual, useLangyStore };
 });
@@ -120,15 +119,11 @@ describe("SearchBar wiring in real Chromium", () => {
       });
 
       // The clear button is a "ghost" Chakra Button labelled "Clear".
-      const buttons = Array.from(
-        document.querySelectorAll("button"),
-      ) as HTMLButtonElement[];
+      const buttons = Array.from(document.querySelectorAll("button")) as HTMLButtonElement[];
       const clearBtn = buttons.find((b) => b.textContent?.trim() === "Clear");
       expect(clearBtn).toBeTruthy();
       // mouseDown matches the component's onMouseDown handler.
-      clearBtn!.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true, cancelable: true }),
-      );
+      clearBtn!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
 
       await waitFor(() => {
         expect(useFilterStore.getState().queryText).toBe("");

@@ -56,8 +56,7 @@ vi.mock("@langwatch/langy-web", async (importOriginal) => {
     draft: langyMock.draft,
     setDraft: langyMock.setDraft,
   });
-  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
-    selector(state());
+  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) => selector(state());
   useLangyStore.getState = state;
   return { ...actual, useLangyStore };
 });

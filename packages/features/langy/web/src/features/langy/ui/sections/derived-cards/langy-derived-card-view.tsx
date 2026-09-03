@@ -9,18 +9,13 @@ import { TimeseriesPlot } from "../capabilities/langy-timeseries-card";
 import { LangySpaAnchor } from "../langy-spa-anchor";
 import { useChoicesRefRows } from "../../../behavior/derived-cards/use-choices-ref-rows";
 
-export type LangyDerivedCardViewProps = ComponentProps<
-  typeof LangyDerivedCardViewPresentation
->;
+export type LangyDerivedCardViewProps = ComponentProps<typeof LangyDerivedCardViewPresentation>;
 
 /**
  * App composition adapter: the renderer is package-owned; routing and the
  * analytics chart remain application capabilities.
  */
-export function LangyDerivedCardView({
-  projectSlug,
-  ...props
-}: LangyDerivedCardViewProps) {
+export function LangyDerivedCardView({ projectSlug, ...props }: LangyDerivedCardViewProps) {
   const choiceOptions = props.card.kind === "choices" ? props.card.options : [];
   const choiceRefRows = useChoicesRefRows(choiceOptions);
 

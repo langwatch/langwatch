@@ -44,14 +44,7 @@ export function DejaViewCenterPanel({
 
   if (selectedProjection) {
     return (
-      <Box
-        flex={1}
-        minW={0}
-        overflow="hidden"
-        display="flex"
-        flexDirection="column"
-        bg="bg.subtle"
-      >
+      <Box flex={1} minW={0} overflow="hidden" display="flex" flexDirection="column" bg="bg.subtle">
         <HStack
           paddingX={4}
           paddingY={2}
@@ -89,8 +82,8 @@ export function DejaViewCenterPanel({
             />
           ) : (
             <Text textStyle="xs" color="fg.muted">
-              No projection state computed. This projection may not handle the events for
-              this aggregate.
+              No projection state computed. This projection may not handle the events for this
+              aggregate.
             </Text>
           )}
         </Box>
@@ -123,19 +116,12 @@ export function DejaViewCenterPanel({
         >
           Diff {showDiff ? "on" : "off"}
         </Button>
-        <Badge
-          size="sm"
-          colorPalette={hashEventTypeColor(currentEvent.eventType)}
-          variant="subtle"
-        >
+        <Badge size="sm" colorPalette={hashEventTypeColor(currentEvent.eventType)} variant="subtle">
           {currentEvent.eventType}
         </Badge>
       </HStack>
       <Box flex={1} overflow="auto">
-        <EventDetail
-          event={currentEvent}
-          previousEvent={showDiff ? previousEvent : null}
-        />
+        <EventDetail event={currentEvent} previousEvent={showDiff ? previousEvent : null} />
       </Box>
     </Box>
   );

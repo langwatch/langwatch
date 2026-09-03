@@ -209,13 +209,7 @@ export const TreeRow = memo(function TreeRow({
           actually reported usage — or a cost, so spans with an explicit
           cost but no token counts still surface it in the tooltip. */}
       {(totalTokens > 0 || (span.cost ?? 0) > 0) && (
-        <Box
-          marginTop={1.5}
-          display="grid"
-          gridTemplateColumns="auto 1fr"
-          gap={0.5}
-          columnGap={3}
-        >
+        <Box marginTop={1.5} display="grid" gridTemplateColumns="auto 1fr" gap={0.5} columnGap={3}>
           {span.inputTokens != null && (
             <TipCell label="Input" value={span.inputTokens.toLocaleString()} />
           )}
@@ -226,30 +220,16 @@ export const TreeRow = memo(function TreeRow({
             <TipCell label="Cache read" value={span.cacheReadTokens.toLocaleString()} />
           )}
           {span.cacheCreationTokens != null && (
-            <TipCell
-              label="Cache write"
-              value={span.cacheCreationTokens.toLocaleString()}
-            />
+            <TipCell label="Cache write" value={span.cacheCreationTokens.toLocaleString()} />
           )}
-          {totalTokens > 0 && (
-            <TipCell label="Total" value={totalTokens.toLocaleString()} />
-          )}
+          {totalTokens > 0 && <TipCell label="Total" value={totalTokens.toLocaleString()} />}
           {span.cost != null && span.cost > 0 && (
             <TipCell label="Cost" value={formatCost(span.cost)} />
           )}
         </Box>
       )}
-      <Box
-        marginTop={1.5}
-        display="grid"
-        gridTemplateColumns="auto 1fr"
-        gap={0.5}
-        columnGap={3}
-      >
-        <TipCell
-          label="Duration"
-          value={isZeroDuration ? "<1ms" : formatDuration(duration)}
-        />
+      <Box marginTop={1.5} display="grid" gridTemplateColumns="auto 1fr" gap={0.5} columnGap={3}>
+        <TipCell label="Duration" value={isZeroDuration ? "<1ms" : formatDuration(duration)} />
         {sharePct > 0 && <TipCell label="Of trace" value={`${sharePct}%`} />}
         <TipCell label="Offset" value={`+${formatDuration(offsetMs)}`} />
         {isCollapsed && hiddenDescendantCount > 0 && (
@@ -344,9 +324,7 @@ export const TreeRow = memo(function TreeRow({
           // Edge tick on a corrected row so a change is spottable while
           // scanning the tree, not only once the row is read.
           boxShadow={
-            showsCorrectedTint
-              ? "inset 2px 0 0 var(--chakra-colors-green-solid)"
-              : undefined
+            showsCorrectedTint ? "inset 2px 0 0 var(--chakra-colors-green-solid)" : undefined
           }
           // Dark mode keeps the pre-PR behaviour of fading non-selected
           // rows when one is picked — the dark theme depends on that
@@ -379,9 +357,7 @@ export const TreeRow = memo(function TreeRow({
           flexShrink={0}
           transition="all 0.1s ease"
           borderLeftWidth={isSelected ? "2px" : "0px"}
-          borderLeftColor={
-            isSelected ? { base: "fg.muted", _dark: "blue.solid" } : "transparent"
-          }
+          borderLeftColor={isSelected ? { base: "fg.muted", _dark: "blue.solid" } : "transparent"}
         >
           {/* Chevron */}
           <Flex
@@ -401,11 +377,7 @@ export const TreeRow = memo(function TreeRow({
             borderRadius="xs"
             _hover={hasChildren ? { bg: "bg.emphasized" } : undefined}
           >
-            <Icon
-              as={isCollapsed ? LuChevronRight : LuChevronDown}
-              boxSize={3}
-              color="fg.muted"
-            />
+            <Icon as={isCollapsed ? LuChevronRight : LuChevronDown} boxSize={3} color="fg.muted" />
           </Flex>
 
           {/* Type icon — rendered inside a colored chip so the span type
@@ -562,13 +534,7 @@ export const TreeRow = memo(function TreeRow({
 
           {/* Error indicator */}
           {isError && (
-            <Icon
-              as={LuTriangleAlert}
-              boxSize={3}
-              color="red.fg"
-              flexShrink={0}
-              marginLeft={1}
-            />
+            <Icon as={LuTriangleAlert} boxSize={3} color="red.fg" flexShrink={0} marginLeft={1} />
           )}
 
           <RowMarks
@@ -824,9 +790,7 @@ function DeleteSpanAction({
         // Named after the span it acts on: every row carries one of these, and
         // "Delete span" on all of them tells a screen reader user nothing about
         // which one they are on.
-        aria-label={
-          isDraftDeleted ? `Restore span ${displayName}` : `Delete span ${displayName}`
-        }
+        aria-label={isDraftDeleted ? `Restore span ${displayName}` : `Delete span ${displayName}`}
       >
         <Icon as={isDraftDeleted ? LuRotateCcw : LuTrash2} boxSize={3} />
       </Flex>

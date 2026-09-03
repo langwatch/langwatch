@@ -3,10 +3,7 @@ import {
   CURSOR_WALK_PAGE_SIZE,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
-import {
-  mutationInit,
-  type MutationOptions,
-} from "@/client-sdk/services/_shared/mutation-options";
+import { mutationInit, type MutationOptions } from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -325,11 +322,7 @@ export class SpendEventsApiService {
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
-  private async request<T>(
-    operation: string,
-    path: string,
-    init?: RequestInit,
-  ): Promise<T> {
+  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
       // A hung control plane must fail the command, not freeze it.
@@ -416,10 +409,7 @@ export class SpendEventsApiService {
       startCursor: options.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
-        new SpendEventsApiError(
-          `Failed to list spend events: ${reason}.`,
-          "list spend events",
-        ),
+        new SpendEventsApiError(`Failed to list spend events: ${reason}.`, "list spend events"),
       fetchPage: (cursor) =>
         this.listPage({
           ...options,

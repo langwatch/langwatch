@@ -12,10 +12,7 @@ export {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "./services/__tests__/testHelpers";
-export {
-  processCommand,
-  processCommandBatch,
-} from "./services/commands/commandDispatcher";
+export { processCommand, processCommandBatch } from "./services/commands/commandDispatcher";
 export type {
   ProcessCommandBatchParams,
   ProcessCommandParams,

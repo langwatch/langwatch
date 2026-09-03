@@ -118,13 +118,7 @@ export const GAP = { section: 3, card: 3.5, row: 2 } as const;
  * spend the amber accent — a wall of warm cards would read as noise, so the two
  * lower-weight receipts stay on the quiet neutral hairline.
  */
-export const CARD_INTENTS = [
-  "activity",
-  "progress",
-  "change",
-  "ask",
-  "spotlight",
-] as const;
+export const CARD_INTENTS = ["activity", "progress", "change", "ask", "spotlight"] as const;
 
 export type LangyCardIntent = (typeof CARD_INTENTS)[number];
 

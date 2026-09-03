@@ -48,10 +48,7 @@ function repository(): PrismaGithubInstallationsRepository {
   return PrismaGithubInstallationsRepository.create(database());
 }
 
-function input(
-  installationId: string,
-  organizationId: string,
-): UpsertGithubInstallationInput {
+function input(installationId: string, organizationId: string): UpsertGithubInstallationInput {
   return {
     installationId,
     organizationId,
@@ -87,84 +84,77 @@ afterAll(async () => {
   await connection?.closeOnce();
 });
 
-describe.skipIf(!databaseUrl)(
-  "PrismaGithubInstallationsRepository.insertOrGetExisting",
-  () => {
-    describe("when the installation id is fresh", () => {
-      it("inserts and reports wasInserted: true", async () => {
-        const installationId = `${namespace}-fresh`;
-        const orgId = `${namespace}-org-a`;
+describe.skipIf(!databaseUrl)("PrismaGithubInstallationsRepository.insertOrGetExisting", () => {
+  describe("when the installation id is fresh", () => {
+    it("inserts and reports wasInserted: true", async () => {
+      const installationId = `${namespace}-fresh`;
+      const orgId = `${namespace}-org-a`;
 
-        const result = await repository().insertOrGetExisting(
-          input(installationId, orgId),
-        );
+      const result = await repository().insertOrGetExisting(input(installationId, orgId));
 
-        expect(result.wasInserted).toBe(true);
-        expect(result.row.organizationId).toBe(orgId);
-      });
+      expect(result.wasInserted).toBe(true);
+      expect(result.row.organizationId).toBe(orgId);
     });
+  });
 
-    describe("when two organizations race for the same fresh installation id", () => {
-      it("lets Postgres's unique constraint pick exactly one winner", async () => {
-        const installationId = `${namespace}-race`;
-        const orgA = `${namespace}-org-a`;
-        const orgB = `${namespace}-org-b`;
+  describe("when two organizations race for the same fresh installation id", () => {
+    it("lets Postgres's unique constraint pick exactly one winner", async () => {
+      const installationId = `${namespace}-race`;
+      const orgA = `${namespace}-org-a`;
+      const orgB = `${namespace}-org-b`;
 
-        const [resultA, resultB] = await Promise.all([
-          repository().insertOrGetExisting(input(installationId, orgA)),
-          repository().insertOrGetExisting(input(installationId, orgB)),
-        ]);
+      const [resultA, resultB] = await Promise.all([
+        repository().insertOrGetExisting(input(installationId, orgA)),
+        repository().insertOrGetExisting(input(installationId, orgB)),
+      ]);
 
-        const inserted = [resultA, resultB].filter((r) => r.wasInserted);
-        const conflicted = [resultA, resultB].filter((r) => !r.wasInserted);
-        expect(inserted).toHaveLength(1);
-        expect(conflicted).toHaveLength(1);
-        // The loser's "existing" read is the winner's committed row — never a
-        // stale/absent value — proving the unique index, not call ordering,
-        // resolved the race.
-        expect(conflicted[0]!.row.organizationId).toBe(inserted[0]!.row.organizationId);
+      const inserted = [resultA, resultB].filter((r) => r.wasInserted);
+      const conflicted = [resultA, resultB].filter((r) => !r.wasInserted);
+      expect(inserted).toHaveLength(1);
+      expect(conflicted).toHaveLength(1);
+      // The loser's "existing" read is the winner's committed row — never a
+      // stale/absent value — proving the unique index, not call ordering,
+      // resolved the race.
+      expect(conflicted[0]!.row.organizationId).toBe(inserted[0]!.row.organizationId);
 
-        const stored = await database().githubInstallation.findUnique({
-          where: { installationId },
-        });
-        expect(stored?.organizationId).toBe(inserted[0]!.row.organizationId);
+      const stored = await database().githubInstallation.findUnique({
+        where: { installationId },
       });
+      expect(stored?.organizationId).toBe(inserted[0]!.row.organizationId);
     });
+  });
 
-    describe("when one organization connects a second GitHub account", () => {
-      /** @scenario "A single installation id is unique but an org may have many" */
-      it("keeps both installations, each id appearing once", async () => {
-        const orgId = `${namespace}-org-a`;
+  describe("when one organization connects a second GitHub account", () => {
+    /** @scenario "A single installation id is unique but an org may have many" */
+    it("keeps both installations, each id appearing once", async () => {
+      const orgId = `${namespace}-org-a`;
 
-        await repository().insertOrGetExisting(input(`${namespace}-first`, orgId));
-        await repository().insertOrGetExisting(input(`${namespace}-second`, orgId));
+      await repository().insertOrGetExisting(input(`${namespace}-first`, orgId));
+      await repository().insertOrGetExisting(input(`${namespace}-second`, orgId));
 
-        const stored = await repository().findAllForOrganization(orgId);
-        const ids = stored.map((r) => r.installationId);
-        expect(ids).toEqual([`${namespace}-first`, `${namespace}-second`]);
-        expect(new Set(ids).size).toBe(ids.length);
+      const stored = await repository().findAllForOrganization(orgId);
+      const ids = stored.map((r) => r.installationId);
+      expect(ids).toEqual([`${namespace}-first`, `${namespace}-second`]);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+  });
+
+  describe("when the installation id already exists", () => {
+    /** @scenario "A single installation id is unique but an org may have many" */
+    it("reports wasInserted: false with the existing row, and never overwrites it", async () => {
+      const installationId = `${namespace}-existing`;
+      const orgA = `${namespace}-org-a`;
+      const orgB = `${namespace}-org-b`;
+      await repository().insertOrGetExisting(input(installationId, orgA));
+
+      const result = await repository().insertOrGetExisting(input(installationId, orgB));
+
+      expect(result.wasInserted).toBe(false);
+      expect(result.row.organizationId).toBe(orgA);
+      const stored = await database().githubInstallation.findUnique({
+        where: { installationId },
       });
+      expect(stored?.organizationId).toBe(orgA);
     });
-
-    describe("when the installation id already exists", () => {
-      /** @scenario "A single installation id is unique but an org may have many" */
-      it("reports wasInserted: false with the existing row, and never overwrites it", async () => {
-        const installationId = `${namespace}-existing`;
-        const orgA = `${namespace}-org-a`;
-        const orgB = `${namespace}-org-b`;
-        await repository().insertOrGetExisting(input(installationId, orgA));
-
-        const result = await repository().insertOrGetExisting(
-          input(installationId, orgB),
-        );
-
-        expect(result.wasInserted).toBe(false);
-        expect(result.row.organizationId).toBe(orgA);
-        const stored = await database().githubInstallation.findUnique({
-          where: { installationId },
-        });
-        expect(stored?.organizationId).toBe(orgA);
-      });
-    });
-  },
-);
+  });
+});

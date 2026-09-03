@@ -68,8 +68,7 @@ export default function GroupsScreen() {
       void queryClient.group.listAll.invalidate();
       setGroupToDelete(null);
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't delete the group" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't delete the group" }),
   });
 
   const groups = api.group.listAll.useQuery(
@@ -107,8 +106,8 @@ export default function GroupsScreen() {
           <VStack align="start" gap={1}>
             <Heading as="h2">Groups</Heading>
             <Text color="fg.muted" fontSize="sm">
-              Assign access to many people at once. SCIM-synced groups are managed by your
-              identity provider.
+              Assign access to many people at once. SCIM-synced groups are managed by your identity
+              provider.
             </Text>
           </VStack>
         </HStack>

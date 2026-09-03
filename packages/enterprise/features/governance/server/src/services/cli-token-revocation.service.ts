@@ -12,17 +12,13 @@ export class DefaultGovernanceCliTokenRevocationService {
   private constructor(
     private readonly store: CliTokenStorePort | undefined,
     private readonly diagnostics: GovernanceDiagnosticsPort | undefined,
-  ) {
-  }
+  ) {}
 
   static create(options: {
     store?: CliTokenStorePort;
     diagnostics?: GovernanceDiagnosticsPort;
   }): DefaultGovernanceCliTokenRevocationService {
-    return new DefaultGovernanceCliTokenRevocationService(
-      options.store,
-      options.diagnostics,
-    );
+    return new DefaultGovernanceCliTokenRevocationService(options.store, options.diagnostics);
   }
 
   static userTokensIndexKey = cliUserTokensIndexKey;
@@ -32,10 +28,9 @@ export class DefaultGovernanceCliTokenRevocationService {
   async revokeForUser(input: CliUserInput): Promise<{ revokedCount: number }> {
     const parsed = cliUserInputSchema.parse(input);
     if (!this.store) {
-      this.diagnostics?.warn(
-        "CLI token store is unavailable — skipping token revocation",
-        { userId: parsed.userId },
-      );
+      this.diagnostics?.warn("CLI token store is unavailable — skipping token revocation", {
+        userId: parsed.userId,
+      });
       return { revokedCount: 0 };
     }
 

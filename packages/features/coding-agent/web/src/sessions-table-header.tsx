@@ -16,12 +16,7 @@ export const SessionsTableHeader: React.FC<{
 }> = ({ sort, onSort }) => (
   <Table.Header>
     <Table.Row>
-      <SortableColumnHeader
-        label="Session"
-        column="session"
-        sort={sort}
-        onSort={onSort}
-      />
+      <SortableColumnHeader label="Session" column="session" sort={sort} onSort={onSort} />
       {/* Shrink-to-fit with a floor: the label and timestamp columns grow
           with their widest cell and never drop below a width that keeps
           clear air before the next column, and the width they free goes to
@@ -49,12 +44,7 @@ export const SessionsTableHeader: React.FC<{
         onSort={onSort}
         align="end"
       />
-      <SortableColumnHeader
-        label="Compactions"
-        column="compactions"
-        sort={sort}
-        onSort={onSort}
-      />
+      <SortableColumnHeader label="Compactions" column="compactions" sort={sort} onSort={onSort} />
       <SortableColumnHeader
         label="Active and waiting"
         column="activeTime"

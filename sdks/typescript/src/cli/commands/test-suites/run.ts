@@ -54,13 +54,9 @@ export const runTestSuiteCommand = async ({
       targets,
       ...(options.name ? { name: options.name } : {}),
       ...(repeatCount !== undefined ? { repeatCount } : {}),
-      ...(options.simulatorModel
-        ? { simulatorModel: options.simulatorModel }
-        : {}),
+      ...(options.simulatorModel ? { simulatorModel: options.simulatorModel } : {}),
       ...(options.judgeModel ? { judgeModel: options.judgeModel } : {}),
-      ...(options.idempotencyKey
-        ? { idempotencyKey: options.idempotencyKey }
-        : {}),
+      ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
       ...(parameters ? { parameters } : {}),
       ...(note ? { note } : {}),
     };

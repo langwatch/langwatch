@@ -15,9 +15,9 @@ describe("resolveProxyForHost", () => {
     });
 
     it("falls back to HTTP_PROXY when HTTPS_PROXY is absent", () => {
-      expect(
-        resolveProxyForHost({ httpProxy: "http://fallback.corp:3128" }, "some.host"),
-      ).toBe("http://fallback.corp:3128");
+      expect(resolveProxyForHost({ httpProxy: "http://fallback.corp:3128" }, "some.host")).toBe(
+        "http://fallback.corp:3128",
+      );
     });
   });
 
@@ -56,9 +56,9 @@ describe("isProxyBypassed", () => {
   });
 
   it("leaves hosts that are not listed to be proxied", () => {
-    expect(
-      isProxyBypassed({ noProxy: "internal.corp,.example.com" }, "not-excluded.corp"),
-    ).toBe(false);
+    expect(isProxyBypassed({ noProxy: "internal.corp,.example.com" }, "not-excluded.corp")).toBe(
+      false,
+    );
   });
 
   it("reports no bypass when NO_PROXY is unset", () => {

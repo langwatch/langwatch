@@ -49,13 +49,7 @@ const AGENT_MARKERS: Record<string, readonly string[]> = {
 const normalize = (tool: string): string => tool.trim().toLowerCase().replace(/-/g, "_");
 
 /** Whether this process is running inside the agent it was told to report as. */
-function runningInsideAgent({
-  tool,
-  env,
-}: {
-  tool: string;
-  env: NodeJS.ProcessEnv;
-}): boolean {
+function runningInsideAgent({ tool, env }: { tool: string; env: NodeJS.ProcessEnv }): boolean {
   const markers = AGENT_MARKERS[normalize(tool)];
   if (!markers) return true;
   return markers.some((marker) => (env[marker]?.trim() ?? "") !== "");

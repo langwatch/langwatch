@@ -1,7 +1,4 @@
-import {
-  GROUP_QUEUE_REGISTRY_KEY,
-  GroupStagingScripts,
-} from "@langwatch/group-queue/operational";
+import { GROUP_QUEUE_REGISTRY_KEY, GroupStagingScripts } from "@langwatch/group-queue/operational";
 import { describe, expect, it, vi } from "vitest";
 import { QueueRedisRepository } from "../queue.repository";
 
@@ -25,10 +22,7 @@ describe("group queue discovery", () => {
 
       await scripts.registerQueue();
 
-      expect(redis.sadd).toHaveBeenCalledWith(
-        GROUP_QUEUE_REGISTRY_KEY,
-        "{event-sourcing/jobs}",
-      );
+      expect(redis.sadd).toHaveBeenCalledWith(GROUP_QUEUE_REGISTRY_KEY, "{event-sourcing/jobs}");
     });
   });
 
@@ -55,10 +49,7 @@ describe("group queue discovery", () => {
         smembers: vi.fn().mockResolvedValue([]),
         scan: vi
           .fn()
-          .mockResolvedValue([
-            "0",
-            ["{event-sourcing/jobs}:gq:ready"],
-          ] satisfies ScanPage),
+          .mockResolvedValue(["0", ["{event-sourcing/jobs}:gq:ready"]] satisfies ScanPage),
       });
       const repo = new QueueRedisRepository(redis as never);
 
@@ -66,10 +57,7 @@ describe("group queue discovery", () => {
 
       expect(names).toEqual(["{event-sourcing/jobs}"]);
       expect(redis.scan).toHaveBeenCalledTimes(1);
-      expect(redis.sadd).toHaveBeenCalledWith(
-        GROUP_QUEUE_REGISTRY_KEY,
-        "{event-sourcing/jobs}",
-      );
+      expect(redis.sadd).toHaveBeenCalledWith(GROUP_QUEUE_REGISTRY_KEY, "{event-sourcing/jobs}");
     });
   });
 

@@ -11,8 +11,7 @@ import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../coding-agent-activ
 
 const NOW = new Date("2026-08-16T12:00:00.000Z");
 
-const daysBefore = (days: number): Date =>
-  new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000);
+const daysBefore = (days: number): Date => new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000);
 
 describe("withinDays", () => {
   describe("given a moment inside the window", () => {

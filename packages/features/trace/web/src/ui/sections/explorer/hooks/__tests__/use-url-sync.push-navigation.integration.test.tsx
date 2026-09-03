@@ -39,8 +39,7 @@ function Harness() {
 function Mounted() {
   useURLSync();
   const navigate = useNavigate();
-  pushHash = (hash: string) =>
-    navigate(`${window.location.pathname}${hash}`, { replace: false });
+  pushHash = (hash: string) => navigate(`${window.location.pathname}${hash}`, { replace: false });
   return null;
 }
 

@@ -55,9 +55,7 @@ export const SSO_CONNECTION_STATES = [
   "TORN_DOWN",
 ] as const;
 export const ssoConnectionStateSchema = z.enum(SSO_CONNECTION_STATES);
-export type SsoConnectionLifecycleState = z.infer<
-  typeof ssoConnectionStateSchema
->;
+export type SsoConnectionLifecycleState = z.infer<typeof ssoConnectionStateSchema>;
 
 /**
  * How a domain claim is proved. Self-hosted installations that cannot
@@ -85,16 +83,9 @@ export const SSO_VERIFICATION_METHODS = [
 export const ssoVerificationMethodSchema = z.enum(SSO_VERIFICATION_METHODS);
 export type SsoVerificationMethod = z.infer<typeof ssoVerificationMethodSchema>;
 
-export const SSO_VERIFICATION_CEREMONY_METHODS = [
-  "dns-txt",
-  "license-token",
-] as const;
-export const ssoVerificationCeremonyMethodSchema = z.enum(
-  SSO_VERIFICATION_CEREMONY_METHODS,
-);
-export type SsoVerificationCeremonyMethod = z.infer<
-  typeof ssoVerificationCeremonyMethodSchema
->;
+export const SSO_VERIFICATION_CEREMONY_METHODS = ["dns-txt", "license-token"] as const;
+export const ssoVerificationCeremonyMethodSchema = z.enum(SSO_VERIFICATION_CEREMONY_METHODS);
+export type SsoVerificationCeremonyMethod = z.infer<typeof ssoVerificationCeremonyMethodSchema>;
 
 /**
  * Where a connection came from. `legacy-grandfathered` is stamped on every
@@ -102,10 +93,7 @@ export type SsoVerificationCeremonyMethod = z.infer<
  * connection's history can always tell which ones a human configured and
  * which the migration inferred from two string columns.
  */
-export const SSO_CONNECTION_SOURCES = [
-  "self-serve",
-  "legacy-grandfathered",
-] as const;
+export const SSO_CONNECTION_SOURCES = ["self-serve", "legacy-grandfathered"] as const;
 export const ssoConnectionSourceSchema = z.enum(SSO_CONNECTION_SOURCES);
 export type SsoConnectionSource = z.infer<typeof ssoConnectionSourceSchema>;
 
@@ -126,31 +114,19 @@ export type SsoIdpMetadata = z.infer<typeof ssoIdpMetadataSchema>;
 
 // ---- events --------------------------------------------------------------
 
-export const CONNECTION_REGISTERED_EVENT_TYPE =
-  "lw.identity.connection_registered" as const;
+export const CONNECTION_REGISTERED_EVENT_TYPE = "lw.identity.connection_registered" as const;
 export const DOMAIN_CLAIMED_EVENT_TYPE = "lw.identity.domain_claimed" as const;
-export const DOMAIN_CLAIM_APPROVED_EVENT_TYPE =
-  "lw.identity.domain_claim_approved" as const;
-export const DOMAIN_CLAIM_REJECTED_EVENT_TYPE =
-  "lw.identity.domain_claim_rejected" as const;
-export const CONNECTION_DISCARDED_EVENT_TYPE =
-  "lw.identity.connection_discarded" as const;
-export const VERIFICATION_REQUESTED_EVENT_TYPE =
-  "lw.identity.verification_requested" as const;
-export const DOMAIN_ATTESTED_EVENT_TYPE =
-  "lw.identity.domain_attested" as const;
-export const DOMAIN_VERIFIED_EVENT_TYPE =
-  "lw.identity.domain_verified" as const;
-export const CONNECTION_ACTIVATED_EVENT_TYPE =
-  "lw.identity.connection_activated" as const;
-export const CONNECTION_SUSPENDED_EVENT_TYPE =
-  "lw.identity.connection_suspended" as const;
-export const CONNECTION_RESUMED_EVENT_TYPE =
-  "lw.identity.connection_resumed" as const;
-export const TEARDOWN_REQUESTED_EVENT_TYPE =
-  "lw.identity.teardown_requested" as const;
-export const CONNECTION_TORN_DOWN_EVENT_TYPE =
-  "lw.identity.connection_torn_down" as const;
+export const DOMAIN_CLAIM_APPROVED_EVENT_TYPE = "lw.identity.domain_claim_approved" as const;
+export const DOMAIN_CLAIM_REJECTED_EVENT_TYPE = "lw.identity.domain_claim_rejected" as const;
+export const CONNECTION_DISCARDED_EVENT_TYPE = "lw.identity.connection_discarded" as const;
+export const VERIFICATION_REQUESTED_EVENT_TYPE = "lw.identity.verification_requested" as const;
+export const DOMAIN_ATTESTED_EVENT_TYPE = "lw.identity.domain_attested" as const;
+export const DOMAIN_VERIFIED_EVENT_TYPE = "lw.identity.domain_verified" as const;
+export const CONNECTION_ACTIVATED_EVENT_TYPE = "lw.identity.connection_activated" as const;
+export const CONNECTION_SUSPENDED_EVENT_TYPE = "lw.identity.connection_suspended" as const;
+export const CONNECTION_RESUMED_EVENT_TYPE = "lw.identity.connection_resumed" as const;
+export const TEARDOWN_REQUESTED_EVENT_TYPE = "lw.identity.teardown_requested" as const;
+export const CONNECTION_TORN_DOWN_EVENT_TYPE = "lw.identity.connection_torn_down" as const;
 
 export const SSO_CONNECTION_EVENT_TYPES = [
   CONNECTION_REGISTERED_EVENT_TYPE,
@@ -167,8 +143,7 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   TEARDOWN_REQUESTED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
 ] as const;
-export type SsoConnectionEventType =
-  (typeof SSO_CONNECTION_EVENT_TYPES)[number];
+export type SsoConnectionEventType = (typeof SSO_CONNECTION_EVENT_TYPES)[number];
 
 export const SSO_CONNECTION_EVENT_VERSION_LATEST = "2026-08-24" as const;
 
@@ -359,9 +334,7 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
     data: connectionTornDownPayloadSchema,
   }),
 ]);
-export type SsoConnectionFactInput = z.infer<
-  typeof ssoConnectionFactInputSchema
->;
+export type SsoConnectionFactInput = z.infer<typeof ssoConnectionFactInputSchema>;
 
 /** A fact with its business time — what the reducer folds. */
 export type SsoConnectionFact = SsoConnectionFactInput & { occurredAt: number };
@@ -430,11 +403,7 @@ const EMPTY_IDP: SsoIdpMetadata = {
   certRefs: [],
 };
 
-export function emptySsoConnection({
-  connectionId,
-}: {
-  connectionId: string;
-}): SsoConnectionState {
+export function emptySsoConnection({ connectionId }: { connectionId: string }): SsoConnectionState {
   return {
     connectionId,
     organizationId: "",
@@ -595,9 +564,7 @@ export function reduceSsoConnection({
  * ACTIVE connection serves traffic; SUSPENDED is the paused state the
  * guidance screens name; everything else is simply not a door.
  */
-export function routingStateOf(
-  state: SsoConnectionLifecycleState,
-): RoutableConnection["state"] {
+export function routingStateOf(state: SsoConnectionLifecycleState): RoutableConnection["state"] {
   if (state === "ACTIVE") return "ACTIVE";
   if (state === "SUSPENDED") return "SUSPENDED";
   return "INACTIVE";
@@ -622,9 +589,7 @@ export interface ConnectionRoutingFacts {
   allowsJit: boolean | null;
 }
 
-export function routingFactsOf(
-  connection: RoutableConnection | null,
-): ConnectionRoutingFacts {
+export function routingFactsOf(connection: RoutableConnection | null): ConnectionRoutingFacts {
   if (!connection) {
     return {
       routes: false,

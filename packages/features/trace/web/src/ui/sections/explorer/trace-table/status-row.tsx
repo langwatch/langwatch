@@ -197,13 +197,7 @@ export const StatusDot: React.FC<{ status: TraceStatus; size?: string }> = ({
   status,
   size = "7px",
 }) => (
-  <Box
-    width={size}
-    height={size}
-    borderRadius="full"
-    bg={STATUS_COLORS[status]}
-    flexShrink={0}
-  />
+  <Box width={size} height={size} borderRadius="full" bg={STATUS_COLORS[status]} flexShrink={0} />
 );
 
 const STATUS_LABELS: Record<TraceStatus, string> = {

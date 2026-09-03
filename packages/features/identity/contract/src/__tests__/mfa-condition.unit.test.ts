@@ -36,9 +36,7 @@ describe("an organization's second-factor membership condition", () => {
   describe("given the organization does not require one", () => {
     it("lets everybody through whatever they proved", () => {
       expect(reach({ mfaRequired: false, amr: null }).satisfied).toBe(true);
-      expect(reach({ mfaRequired: false, amr: PASSWORD_ONLY }).by).toBe(
-        "not_required",
-      );
+      expect(reach({ mfaRequired: false, amr: PASSWORD_ONLY }).by).toBe("not_required");
     });
   });
 
@@ -149,9 +147,7 @@ describe("an organization's second-factor membership condition", () => {
       expect(isMfaChallengeMethod(PHISHING_RESISTANT_AMR)).toBe(false);
       expect(isMfaChallengeMethod("passkey")).toBe(false);
       expect(MFA_CHALLENGE_METHODS.every(isMfaChallengeMethod)).toBe(true);
-      expect(
-        MFA_CHALLENGE_METHODS.some((method) => assertsSecondFactor(method)),
-      ).toBe(false);
+      expect(MFA_CHALLENGE_METHODS.some((method) => assertsSecondFactor(method))).toBe(false);
     });
   });
 
@@ -167,10 +163,7 @@ describe("an organization's second-factor membership condition", () => {
     });
 
     it("reports the recognized factors in order, without repeating one", () => {
-      expect(secondFactorsIn(["pwd", "otp", "otp", "phw"])).toEqual([
-        "otp",
-        "phw",
-      ]);
+      expect(secondFactorsIn(["pwd", "otp", "otp", "phw"])).toEqual(["otp", "phw"]);
       expect(secondFactorsIn(null)).toEqual([]);
     });
   });

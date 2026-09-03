@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { PLATFORM_TOOL_POLICY_DEFAULTS } from "@langwatch/enterprise-governance-contract";
-import {
-  CliAdminContactPort,
-  CliBudgetOverviewPort,
-} from "../cli-bootstrap.port";
+import { CliAdminContactPort, CliBudgetOverviewPort } from "../cli-bootstrap.port";
 import { DefaultGovernanceCliBootstrapService } from "../../services/cli-bootstrap.service";
 
 class MemoryCatalog {

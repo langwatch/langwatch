@@ -19,9 +19,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // The real openapi-fetch client keeps its header config private, so capture
 // what the factory hands it: the Authorization the transport would send is
 // exactly what these tests need to observe.
-const createClientCalls = vi.hoisted(
-  () => [] as Array<{ headers?: Record<string, string> }>,
-);
+const createClientCalls = vi.hoisted(() => [] as Array<{ headers?: Record<string, string> }>);
 vi.mock("openapi-fetch", () => ({
   default: (config: { headers?: Record<string, string> }) => {
     createClientCalls.push(config);

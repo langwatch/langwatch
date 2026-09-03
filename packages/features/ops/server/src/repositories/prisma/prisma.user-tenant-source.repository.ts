@@ -36,13 +36,7 @@ export class PrismaOrganizationMemberTenantSource implements TenantSource {
   private readonly prisma: PrismaClient;
   private readonly organizationId: string;
 
-  constructor({
-    prisma,
-    organizationId,
-  }: {
-    prisma: PrismaClient;
-    organizationId: string;
-  }) {
+  constructor({ prisma, organizationId }: { prisma: PrismaClient; organizationId: string }) {
     this.prisma = prisma;
     this.organizationId = organizationId;
   }

@@ -132,8 +132,7 @@ export function toWire(state: CacheRuleFormState): {
       .map((t) => t.trim())
       .filter(Boolean);
   }
-  if (state.matchPrincipalId.trim())
-    matchers.principal_id = state.matchPrincipalId.trim();
+  if (state.matchPrincipalId.trim()) matchers.principal_id = state.matchPrincipalId.trim();
   if (state.matchModel.trim()) matchers.model = state.matchModel.trim();
   if (state.matchMetadataKey.trim() && state.matchMetadataValue.trim()) {
     matchers.request_metadata = {
@@ -189,9 +188,7 @@ export function fromWire(rule: {
     matchMetadataKey: firstMetadataKey,
     matchMetadataValue: firstMetadataKey ? (metadataObj[firstMetadataKey] ?? "") : "",
     actionMode:
-      a.mode === "force" || a.mode === "disable" || a.mode === "respect"
-        ? a.mode
-        : "respect",
+      a.mode === "force" || a.mode === "disable" || a.mode === "respect" ? a.mode : "respect",
     actionTtlSeconds: typeof a.ttl === "number" ? String(a.ttl) : "",
     actionSalt: typeof a.salt === "string" ? a.salt : "",
   };
@@ -209,10 +206,8 @@ type FormProps = {
 };
 
 export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
-  const set = <K extends keyof CacheRuleFormState>(
-    key: K,
-    value: CacheRuleFormState[K],
-  ) => onChange({ ...state, [key]: value });
+  const set = <K extends keyof CacheRuleFormState>(key: K, value: CacheRuleFormState[K]) =>
+    onChange({ ...state, [key]: value });
 
   /** The complaint about this input, if the submit was rejected over it. */
   const complaintFor = (key: keyof CacheRuleFormState): string | null =>
@@ -234,9 +229,7 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
           placeholder="e.g. force-cache-on-enterprise"
           maxLength={128}
         />
-        {complaintFor("name") && (
-          <Field.ErrorText>{complaintFor("name")}</Field.ErrorText>
-        )}
+        {complaintFor("name") && <Field.ErrorText>{complaintFor("name")}</Field.ErrorText>}
       </Field.Root>
       <Field.Root>
         <Field.Label>Description</Field.Label>
@@ -281,9 +274,7 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
             <Switch.HiddenInput />
             <Switch.Control />
           </Switch.Root>
-          <Field.HelperText>
-            Disabled rules stay in the list but never match.
-          </Field.HelperText>
+          <Field.HelperText>Disabled rules stay in the list but never match.</Field.HelperText>
         </Field.Root>
       </HStack>
 
@@ -410,10 +401,9 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
             </NativeSelect.Root>
             <Field.HelperText>
               Force injects cache_control: ephemeral on Anthropic (system[-1] +
-              messages[-1].content[-1], no-double-inject if already present). OpenAI/Azure
-              caching is automatic — force is a wire no-op but still attributes + bumps
-              the rule-hit counter. Gemini force WARNs + passes through today (v1.1 will
-              wire /cachedContents).
+              messages[-1].content[-1], no-double-inject if already present). OpenAI/Azure caching
+              is automatic — force is a wire no-op but still attributes + bumps the rule-hit
+              counter. Gemini force WARNs + passes through today (v1.1 will wire /cachedContents).
             </Field.HelperText>
           </Field.Root>
           {state.actionMode === "force" && (
@@ -437,8 +427,8 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
                 <Field.ErrorText>{complaintFor("actionTtlSeconds")}</Field.ErrorText>
               ) : (
                 <Field.HelperText>
-                  Clamped to [0, 86400]. Providers without explicit TTL support treat this
-                  as a best-effort hint.
+                  Clamped to [0, 86400]. Providers without explicit TTL support treat this as a
+                  best-effort hint.
                 </Field.HelperText>
               )}
             </Field.Root>

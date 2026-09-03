@@ -1,9 +1,6 @@
 import type { AppendStore } from "@langwatch/eventing";
 import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
-import {
-  type LangyMessageProjectionRecord,
-  mapLangyMessageEvent,
-} from "@langwatch/langy-contract";
+import { type LangyMessageProjectionRecord, mapLangyMessageEvent } from "@langwatch/langy-contract";
 import {
   type LangyAgentRespondedEvent,
   LangyAgentRespondedEventSchema,

@@ -12,9 +12,7 @@ import type {
  * costs no schema of its own. The identifier the service writes is
  * namespaced, so a token minted here can only ever be spent here.
  */
-export class PrismaSignUpVerificationTokenStore
-  implements SignUpVerificationTokenStore
-{
+export class PrismaSignUpVerificationTokenStore implements SignUpVerificationTokenStore {
   constructor(private readonly prisma: PrismaClient) {}
 
   async issue({

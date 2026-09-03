@@ -2,9 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { getProjectSlug } from "../helpers";
 
-test("experiment creation keeps the SDK workflow discoverable", async ({
-  page,
-}, testInfo) => {
+test("experiment creation keeps the SDK workflow discoverable", async ({ page }, testInfo) => {
   const projectSlug = await getProjectSlug(page);
 
   await page.goto(`/${projectSlug}/evaluations`);
@@ -27,12 +25,11 @@ test("experiment creation keeps the SDK workflow discoverable", async ({
     "background-color",
     "rgb(255, 255, 255)",
   );
-  await expect(
-    page.getByRole("button", { name: "New Online Evaluation" }).first(),
-  ).toHaveCSS("background-color", "rgb(255, 255, 255)");
-  await expect(
-    page.getByRole("heading", { name: "No online evaluations yet" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "New Online Evaluation" }).first()).toHaveCSS(
+    "background-color",
+    "rgb(255, 255, 255)",
+  );
+  await expect(page.getByRole("heading", { name: "No online evaluations yet" })).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("online-evaluation-header-actions.png"),
   });

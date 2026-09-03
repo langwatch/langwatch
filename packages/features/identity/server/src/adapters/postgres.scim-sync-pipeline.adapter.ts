@@ -1,5 +1,8 @@
 import { ScimSyncGuards } from "../scim-sync-guards";
-import { createScimSyncPipeline, type ScimSyncPipeline } from "./scim-sync-pipeline-definition.adapter";
+import {
+  createScimSyncPipeline,
+  type ScimSyncPipeline,
+} from "./scim-sync-pipeline-definition.adapter";
 import { PrismaScimSyncProjectionRepository } from "../repositories/prisma/prisma.scim-sync-projection.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 

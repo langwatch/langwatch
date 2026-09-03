@@ -6,12 +6,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 import { config } from "dotenv";
-import {
-  expectations,
-  CliRunner,
-  PROMPT_NAME_PREFIX,
-  PromptFileManager,
-} from "./helpers";
+import { expectations, CliRunner, PROMPT_NAME_PREFIX, PromptFileManager } from "./helpers";
 import { LangWatch } from "../../../dist";
 import { ApiHelpers } from "./helpers/api-helpers";
 

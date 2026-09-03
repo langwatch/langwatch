@@ -15,10 +15,7 @@ export function createExperimentRunStateFoldStore(
   repository: ExperimentRunStateRepository,
 ): FoldProjectionStore<ExperimentRunStateData> {
   return {
-    async store(
-      state: ExperimentRunStateData,
-      context: ProjectionStoreContext,
-    ): Promise<void> {
+    async store(state: ExperimentRunStateData, context: ProjectionStoreContext): Promise<void> {
       // Extract raw experimentId and runId from the composite aggregate key
       // so that RunId and ExperimentId are always populated consistently,
       // even before the "started" event sets them via apply().

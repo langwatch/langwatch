@@ -77,9 +77,7 @@ export interface IdentityAccountsPort {
   /** The user's live sign-in methods — the account-list read. */
   findByUser(args: { userId: string }): Promise<IdentityAccountRow[]>;
   /** By pinned account id — the id better-auth already holds for a row. */
-  findByAccountIds(args: {
-    accountIds: readonly string[];
-  }): Promise<IdentityAccountRow[]>;
+  findByAccountIds(args: { accountIds: readonly string[] }): Promise<IdentityAccountRow[]>;
   /**
    * The IdP callback's lookup, once resolution has named the user.
    *
@@ -133,9 +131,7 @@ export interface IdentityAccountsPort {
    * credential for a sign-in method the customer just removed. Deleted with
    * the table in Phase 3, like the mirror itself.
    */
-  deleteBridgeAccounts(args: {
-    accountIds: readonly string[];
-  }): Promise<number>;
+  deleteBridgeAccounts(args: { accountIds: readonly string[] }): Promise<number>;
 }
 
 /** A user the identity tables can name, with the one status that lets the

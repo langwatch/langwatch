@@ -96,9 +96,7 @@ export const AddParticipants = ({
           multiple
           value={selectedValues}
           onValueChange={(newValues) => {
-            const selectedOptions = options.filter((opt) =>
-              newValues.value.includes(opt.value),
-            );
+            const selectedOptions = options.filter((opt) => newValues.value.includes(opt.value));
             setAnnotators(
               selectedOptions.map((v) => ({
                 id: v.value,
@@ -121,11 +119,7 @@ export const AddParticipants = ({
                         background="bg.muted"
                       >
                         {item.value.startsWith("user-") ? (
-                          <RandomColorAvatar
-                            size="2xs"
-                            name={item.label}
-                            image={item.image}
-                          />
+                          <RandomColorAvatar size="2xs" name={item.label} image={item.image} />
                         ) : (
                           <Box padding={1}>
                             <Users size={18} />
@@ -164,11 +158,7 @@ export const AddParticipants = ({
                   <VStack align="start">
                     <HStack>
                       {item.value.startsWith("user-") ? (
-                        <RandomColorAvatar
-                          size="2xs"
-                          name={item.label}
-                          image={item.image}
-                        />
+                        <RandomColorAvatar size="2xs" name={item.label} image={item.image} />
                       ) : (
                         <Box padding={1}>
                           <Users size={18} />

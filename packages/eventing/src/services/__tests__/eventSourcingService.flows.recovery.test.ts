@@ -156,9 +156,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       await expect(service.storeEvents([event1], context)).resolves.not.toThrow();
 
       // Fix map (bug fixed)
-      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation(
-        (event: Event) => event,
-      );
+      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation((event: Event) => event);
 
       // Reprocess event - map succeeds this time
       await service.storeEvents([event1], context);
@@ -263,9 +261,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       expect(eventsAfter).toHaveLength(2);
 
       // Fix map
-      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation(
-        (event: Event) => event,
-      );
+      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation((event: Event) => event);
 
       // Reprocess event1 - just re-dispatch
       await service.storeEvents([event1], context);

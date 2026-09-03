@@ -5,14 +5,7 @@
  * and a Group-by selector on the right.
  */
 
-import {
-  Button,
-  HStack,
-  IconButton,
-  NativeSelect,
-  Spinner,
-  Text,
-} from "@chakra-ui/react";
+import { Button, HStack, IconButton, NativeSelect, Spinner, Text } from "@chakra-ui/react";
 import { Download, LayoutGrid, List, X } from "lucide-react";
 import { RUN_GROUP_TYPES, type RunGroupType } from "./run-history-transforms";
 import type { ViewMode } from "./use-run-history-store";
@@ -92,9 +85,7 @@ export function RunHistoryFilters({
         <NativeSelect.Root size="sm" width="auto" minWidth="120px">
           <NativeSelect.Field
             value={filters.passFailStatus}
-            onChange={(e) =>
-              onFiltersChange({ ...filters, passFailStatus: e.target.value })
-            }
+            onChange={(e) => onFiltersChange({ ...filters, passFailStatus: e.target.value })}
             aria-label="Filter by pass/fail status"
           >
             <option value="">All Statuses</option>
@@ -125,12 +116,7 @@ export function RunHistoryFilters({
           </HStack>
         )}
         {onExport && !isExporting && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onExport}
-            disabled={isExportDisabled}
-          >
+          <Button size="sm" variant="outline" onClick={onExport} disabled={isExportDisabled}>
             <Download size={14} />
             Export CSV
           </Button>

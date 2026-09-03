@@ -72,13 +72,7 @@ function EvalHistoryRow({
         : "—";
   const canJump = !!entry.spanId && !!onSelectSpan;
   return (
-    <HStack
-      gap={2}
-      paddingX={2}
-      paddingY={1}
-      borderRadius="sm"
-      _hover={{ bg: "bg.muted" }}
-    >
+    <HStack gap={2} paddingX={2} paddingY={1} borderRadius="sm" _hover={{ bg: "bg.muted" }}>
       <Circle size="6px" bg={status.color} flexShrink={0} />
       <Text textStyle="2xs" color={status.fg} fontWeight="medium" flexShrink={0}>
         {status.label}

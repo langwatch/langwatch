@@ -116,9 +116,7 @@ async function main() {
   const gatewayPort = Number(process.argv[2]);
   const expectedControlPlaneUrl = process.argv[3];
   if (!gatewayPort || !expectedControlPlaneUrl) {
-    console.error(
-      "usage: check-gateway-control-plane.ts <gatewayPort> <expectedControlPlaneUrl>",
-    );
+    console.error("usage: check-gateway-control-plane.ts <gatewayPort> <expectedControlPlaneUrl>");
     // Never block pnpm dev startup over a usage error in this guard.
     return;
   }
@@ -134,8 +132,7 @@ async function main() {
   }
 }
 
-const isMainModule =
-  process.argv[1] != null && import.meta.url === `file://${process.argv[1]}`;
+const isMainModule = process.argv[1] != null && import.meta.url === `file://${process.argv[1]}`;
 if (isMainModule) {
   void main();
 }

@@ -9,10 +9,7 @@ import {
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/experiments-v3/utils/mappingValidation";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { useProjectSpanNames } from "@langwatch/trace-web/hooks/useProjectSpanNames";
-import {
-  getThreadAvailableSources,
-  getTraceAvailableSources,
-} from "@langwatch/trace-contract";
+import { getThreadAvailableSources, getTraceAvailableSources } from "@langwatch/trace-contract";
 
 const logger = createLogger("EvaluatorMappingsSection");
 

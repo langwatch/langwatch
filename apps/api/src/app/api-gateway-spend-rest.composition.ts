@@ -123,8 +123,7 @@ export function composeApiGatewaySpendRest(
     // have to answer the same bytes, so the mapping ARRIVES rather than being
     // restated here.
     spendEventEnvelope: (row) => envelopes.fromSpendRow(row),
-    endpointAcceptsEvent: ({ enabledEvents, eventType }) =>
-      eventMatches(enabledEvents, eventType),
+    endpointAcceptsEvent: ({ enabledEvents, eventType }) => eventMatches(enabledEvents, eventType),
     settlementPolicy: FixedGatewaySettlementPolicy.create(options.settlementGraceMs),
     resolveSpendScope: (input) =>
       GatewaySpendScopeAdapter.create({ database: prisma }).resolveSpendScope(input),

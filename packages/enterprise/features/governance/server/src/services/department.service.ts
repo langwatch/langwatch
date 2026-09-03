@@ -29,18 +29,11 @@ export class DepartmentService {
     return this.repository.create(input);
   }
 
-  resolveByNameOrCreate(input: {
-    organizationId: string;
-    name: string;
-  }): Promise<Department> {
+  resolveByNameOrCreate(input: { organizationId: string; name: string }): Promise<Department> {
     return this.repository.resolveByNameOrCreate(input);
   }
 
-  async rename(input: {
-    id: string;
-    organizationId: string;
-    name: string;
-  }): Promise<Department> {
+  async rename(input: { id: string; organizationId: string; name: string }): Promise<Department> {
     if (!(await this.repository.rename(input))) {
       throw new DepartmentNotFoundError();
     }
@@ -97,10 +90,7 @@ export class DepartmentService {
     });
   }
 
-  private async getDepartment(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<Department> {
+  private async getDepartment(input: { id: string; organizationId: string }): Promise<Department> {
     const department = await this.repository.tryGetById(input);
     if (!department) throw new DepartmentNotFoundError();
     return department;

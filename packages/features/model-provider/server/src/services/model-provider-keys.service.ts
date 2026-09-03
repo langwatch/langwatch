@@ -40,9 +40,7 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
     stored: Record<string, unknown> | null;
   }): Record<string, unknown> {
     const edited = Object.fromEntries(
-      Object.entries(input.incoming ?? {}).filter(
-        ([, value]) => value !== MASKED_KEY_PLACEHOLDER,
-      ),
+      Object.entries(input.incoming ?? {}).filter(([, value]) => value !== MASKED_KEY_PLACEHOLDER),
     );
     if (!input.stored) {
       return edited;
@@ -74,8 +72,7 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
 
   hasUsableReplacement(value: Record<string, unknown> | null): boolean {
     return Object.values(value ?? {}).some(
-      (field) =>
-        typeof field === "string" && field.length > 0 && field !== MASKED_KEY_PLACEHOLDER,
+      (field) => typeof field === "string" && field.length > 0 && field !== MASKED_KEY_PLACEHOLDER,
     );
   }
 
@@ -102,9 +99,7 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
       return;
     }
 
-    const incomingCredentials = Object.keys(input.incoming ?? {}).filter((key) =>
-      keys.has(key),
-    );
+    const incomingCredentials = Object.keys(input.incoming ?? {}).filter((key) => keys.has(key));
     if (incomingCredentials.length > 0) {
       return;
     }
@@ -134,9 +129,7 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
       const positionIsAvailable =
         storedAtPosition !== void 0 && !incomingKeys.has(storedAtPosition.key);
 
-      return positionIsAvailable
-        ? [{ key: header.key, value: storedAtPosition.value }]
-        : [];
+      return positionIsAvailable ? [{ key: header.key, value: storedAtPosition.value }] : [];
     });
   }
 

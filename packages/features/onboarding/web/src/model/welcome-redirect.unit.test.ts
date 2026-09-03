@@ -51,9 +51,7 @@ describe("resolveWelcomeRedirect", () => {
     it("does not count it as a project and never targets its slug", () => {
       const result = resolveWelcomeRedirect({
         organizations: [
-          org("AGENT_GOVERNANCE", [
-            { isPersonal: true, projects: [{ slug: "personal-abc" }] },
-          ]),
+          org("AGENT_GOVERNANCE", [{ isPersonal: true, projects: [{ slug: "personal-abc" }] }]),
         ],
         currentProjectSlug: null,
       });
@@ -79,9 +77,7 @@ describe("resolveWelcomeRedirect", () => {
     it("prefers the currently selected project slug", () => {
       expect(
         resolveWelcomeRedirect({
-          organizations: [
-            org(null, [{ isPersonal: false, projects: [{ slug: "first" }] }]),
-          ],
+          organizations: [org(null, [{ isPersonal: false, projects: [{ slug: "first" }] }])],
           currentProjectSlug: "selected",
         }),
       ).toEqual({ kind: "project", slug: "selected" });
@@ -108,9 +104,7 @@ describe("resolveWelcomeRedirect", () => {
     it("sends them home when their only team is their own workspace", () => {
       expect(
         resolveWelcomeRedirect({
-          organizations: [
-            org(null, [{ isPersonal: true, projects: [{ slug: "personal-abc" }] }]),
-          ],
+          organizations: [org(null, [{ isPersonal: true, projects: [{ slug: "personal-abc" }] }])],
           currentProjectSlug: null,
         }),
       ).toEqual({ kind: "home" });

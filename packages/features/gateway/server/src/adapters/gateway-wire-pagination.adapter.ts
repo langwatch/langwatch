@@ -40,9 +40,7 @@ export function encodePageCursor(values: Array<string | number>): string {
  */
 export function decodePageCursor(encoded: string, arity: number): string[] | null {
   try {
-    const parts = Buffer.from(encoded, "base64url")
-      .toString("utf8")
-      .split(CURSOR_SEPARATOR);
+    const parts = Buffer.from(encoded, "base64url").toString("utf8").split(CURSOR_SEPARATOR);
     if (parts.length !== arity || parts.some((p) => p.length === 0)) {
       return null;
     }
@@ -67,8 +65,7 @@ export function keysetAfter(columns: KeysetColumn[]): Array<Record<string, unkno
     for (const earlier of columns.slice(0, index)) {
       branch[earlier.name] = earlier.value;
     }
-    branch[column.name] =
-      column.direction === "desc" ? { lt: column.value } : { gt: column.value };
+    branch[column.name] = column.direction === "desc" ? { lt: column.value } : { gt: column.value };
     return branch;
   });
 }

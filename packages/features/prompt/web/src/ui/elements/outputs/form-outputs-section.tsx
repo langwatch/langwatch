@@ -98,8 +98,7 @@ export const FormOutputsSection = ({
             currentField &&
             (newOutput.identifier !== currentField.identifier ||
               newOutput.type !== currentField.type ||
-              JSON.stringify(newOutput.json_schema) !==
-                JSON.stringify(currentField.json_schema))
+              JSON.stringify(newOutput.json_schema) !== JSON.stringify(currentField.json_schema))
           ) {
             update(i, {
               identifier: newOutput.identifier,

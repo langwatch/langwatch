@@ -65,7 +65,6 @@ const host = fakeGatewayHost({
   currentUser: { id: USER_ID, name: "Ada", email: "ada@acme.test" },
 });
 
-
 describe("given an organization with no projects", () => {
   afterEach(() => cleanup());
 

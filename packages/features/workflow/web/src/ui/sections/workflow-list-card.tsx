@@ -24,7 +24,11 @@ import { useCallback, useState, type ComponentProps, type ReactNode } from "reac
 import { workflowApi, type WorkflowListRow } from "../../behavior/workflow-api";
 import { formatTimeAgo } from "../../model/format-time-ago";
 import { useWorkflowHost } from "../../model/workflow-host";
-import { WorkflowCardActions, WorkflowCardBase, WorkflowCardDisplay } from "../elements/workflow-card";
+import {
+  WorkflowCardActions,
+  WorkflowCardBase,
+  WorkflowCardDisplay,
+} from "../elements/workflow-card";
 import { WorkflowCascadeArchiveDialog } from "../blocks/workflow-cascade-archive-dialog";
 import { WorkflowPushToCopiesDialog } from "./workflow-push-to-copies-dialog";
 import { WorkflowReplicateDialog } from "./workflow-replicate-dialog";
@@ -164,7 +168,9 @@ export function WorkflowListCard({
         name={name}
         icon={icon}
         {...(description ? { description } : {})}
-        updatedAtLabel={formatTimeAgo(workflow?.updatedAt ? new Date(workflow.updatedAt).getTime() : 0)}
+        updatedAtLabel={formatTimeAgo(
+          workflow?.updatedAt ? new Date(workflow.updatedAt).getTime() : 0,
+        )}
         action={
           workflowId ? (
             <WorkflowCardActions

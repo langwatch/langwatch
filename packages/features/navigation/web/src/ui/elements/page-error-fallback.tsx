@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Center,
-  Code,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Center, Code, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Check, Copy, Home, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { useNavigationHost } from "../../model/navigation-host";
@@ -46,8 +37,8 @@ export function PageErrorFallback({
             Something went wrong
           </Heading>
           <Text textStyle="sm" color="fg.muted" textAlign="center" maxWidth="400px">
-            Sorry about that — our team has been notified and is looking into it. You can
-            try again, or head back to the home page.
+            Sorry about that — our team has been notified and is looking into it. You can try again,
+            or head back to the home page.
           </Text>
         </VStack>
 
@@ -115,12 +106,7 @@ export function PageErrorFallback({
             <RotateCcw size={14} />
             Try again
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            color="fg.muted"
-            onClick={() => host.navigate("/")}
-          >
+          <Button size="sm" variant="ghost" color="fg.muted" onClick={() => host.navigate("/")}>
             <Home size={14} />
             Home
           </Button>

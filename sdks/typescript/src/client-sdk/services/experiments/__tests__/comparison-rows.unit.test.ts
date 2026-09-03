@@ -23,11 +23,7 @@ describe("Experiment.compare", () => {
   });
 
   describe("given a run over several rows, each with its own answer", () => {
-    const CITIES = [
-      { answer: "Amsterdam" },
-      { answer: "Rotterdam" },
-      { answer: "Utrecht" },
-    ];
+    const CITIES = [{ answer: "Amsterdam" }, { answer: "Rotterdam" }, { answer: "Utrecht" }];
 
     /** Both targets answer with the row's own city, so a verdict about the
      * wrong row is visible in the candidates the judge was shown. */
@@ -52,9 +48,9 @@ describe("Experiment.compare", () => {
         );
 
         expect(harness.judgeRequests).toHaveLength(3);
-        expect(
-          harness.judgeRequests.map((request) => request.data.row_index).sort(),
-        ).toEqual([0, 1, 2]);
+        expect(harness.judgeRequests.map((request) => request.data.row_index).sort()).toEqual([
+          0, 1, 2,
+        ]);
         for (const request of harness.judgeRequests) {
           const city = CITIES[request.data.row_index!]!.answer;
           for (const candidate of request.data.candidates) {

@@ -45,9 +45,7 @@ export function signUpHref({
 
   const queryPart = query.toString();
   const fragmentPart = fragment.toString();
-  return `/auth/signup${queryPart ? `?${queryPart}` : ""}${
-    fragmentPart ? `#${fragmentPart}` : ""
-  }`;
+  return `/auth/signup${queryPart ? `?${queryPart}` : ""}${fragmentPart ? `#${fragmentPart}` : ""}`;
 }
 
 /** The address the fragment carries, if this browser arrived holding one. */

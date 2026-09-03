@@ -6,10 +6,7 @@ import {
   ExecutionInputPanel,
   type InputField,
 } from "../../../elements/executable-panel/execution-input-panel";
-import {
-  getInputsForExecution,
-  useComponentExecution,
-} from "../use-component-execution";
+import { getInputsForExecution, useComponentExecution } from "../use-component-execution";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { Component } from "@langwatch/workflow-contract";
 
@@ -86,13 +83,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
 
     setTriggerValidation(false);
     return () => clearTimeout(timer);
-  }, [
-    animationFinished,
-    inputFields,
-    onExecute,
-    setTriggerValidation,
-    triggerValidation,
-  ]);
+  }, [animationFinished, inputFields, onExecute, setTriggerValidation, triggerValidation]);
 
   return (
     <Box

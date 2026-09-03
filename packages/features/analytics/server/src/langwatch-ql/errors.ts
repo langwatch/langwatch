@@ -29,7 +29,6 @@
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 
-
 /**
  * The LangWatchQL surface is switched off for this project.
  *
@@ -215,18 +214,14 @@ export class LangWatchQLReservedParameterSuppliedError extends HandledError {
     /** The reserved names the request carried. Sorted. */
     supplied: readonly string[],
   ) {
-    super(
-      "lwql_reserved_parameter_supplied",
-      suppliedParameterSentence(supplied),
-      {
-        httpStatus: 400,
-        fault: "customer",
-        // Named consumer: the parameter editor, which lists the rows to remove,
-        // and an agent repairing a request it composed.
-        meta: { parameters: supplied },
-        ...remediation("lwql_reserved_parameter_supplied"),
-      },
-    );
+    super("lwql_reserved_parameter_supplied", suppliedParameterSentence(supplied), {
+      httpStatus: 400,
+      fault: "customer",
+      // Named consumer: the parameter editor, which lists the rows to remove,
+      // and an agent repairing a request it composed.
+      meta: { parameters: supplied },
+      ...remediation("lwql_reserved_parameter_supplied"),
+    });
     this.name = "LangWatchQLReservedParameterSuppliedError";
   }
 }

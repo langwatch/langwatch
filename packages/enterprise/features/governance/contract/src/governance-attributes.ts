@@ -13,8 +13,6 @@ export const governanceAttributeKeySchema = z.enum(GOVERNANCE_ATTR);
 export type GovernanceAttributeKey = z.infer<typeof governanceAttributeKeySchema>;
 export type GovernanceAttrKey = GovernanceAttributeKey;
 
-export function isGovernanceOriginTrace(
-  attributes: Record<string, string> | undefined,
-): boolean {
+export function isGovernanceOriginTrace(attributes: Record<string, string> | undefined): boolean {
   return attributes?.[GOVERNANCE_ATTR.ORIGIN_KIND] === GOVERNANCE_ORIGIN_KIND_VALUE;
 }

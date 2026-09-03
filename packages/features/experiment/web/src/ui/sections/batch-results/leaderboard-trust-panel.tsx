@@ -61,8 +61,7 @@ export type TrustCheck = {
   tone: TrustTone;
 };
 
-const nameOf = (id: string, variantNames: Record<string, string>): string =>
-  variantNames[id] ?? id;
+const nameOf = (id: string, variantNames: Record<string, string>): string => variantNames[id] ?? id;
 
 const joinNames = (names: string[]): string =>
   names.length <= 1
@@ -180,10 +179,7 @@ const buildMarginsCheck = (leaderboard: BTLeaderboard): TrustCheck[] => {
 const buildDeclinedRowsCheck = ({
   leaderboard,
   rowsWithoutVerdict,
-}: Pick<
-  LeaderboardTrustPanelProps,
-  "leaderboard" | "rowsWithoutVerdict"
->): TrustCheck[] => {
+}: Pick<LeaderboardTrustPanelProps, "leaderboard" | "rowsWithoutVerdict">): TrustCheck[] => {
   if (rowsWithoutVerdict === undefined) return [];
 
   const judged = leaderboard.comparisonCount;
@@ -226,8 +222,7 @@ export const buildTrustChecks = ({
 }: LeaderboardTrustPanelProps): TrustCheck[] => {
   // The top variant the fit is entitled to rank — degenerates are excluded
   // from every claim, so one of them is not a leader.
-  const leaderId =
-    leaderboard.entries.find((entry) => !entry.isDegenerate)?.variantId ?? null;
+  const leaderId = leaderboard.entries.find((entry) => !entry.isDegenerate)?.variantId ?? null;
 
   return [
     buildSampleSizeCheck({ leaderboard, warnThreshold }),

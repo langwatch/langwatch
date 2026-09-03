@@ -6,10 +6,7 @@ import {
   runtimeParametersSchema,
   scopeSchema,
 } from "@langwatch/prompt-contract";
-import {
-  FALLBACK_MAX_TOKENS,
-  MIN_MAX_TOKENS,
-} from "../token-limits";
+import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "../token-limits";
 import { versionMetadataSchema } from "./version-metadata.schemas";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
@@ -55,8 +52,7 @@ const baseFormSchema = z.object({
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
       llm: llmSchema,
       demonstrations: latestConfigVersionSchema.shape.configData.shape.demonstrations,
-      promptingTechnique:
-        latestConfigVersionSchema.shape.configData.shape.prompting_technique,
+      promptingTechnique: latestConfigVersionSchema.shape.configData.shape.prompting_technique,
       responseFormat: latestConfigVersionSchema.shape.configData.shape.response_format,
     }),
   }),
@@ -149,8 +145,7 @@ export const hasNonEmptySystemMessage = (
   messages: readonly { role?: string; content?: string }[] | undefined | null,
 ): boolean =>
   !!messages?.some(
-    (m) =>
-      m?.role === "system" && typeof m?.content === "string" && m.content.trim() !== "",
+    (m) => m?.role === "system" && typeof m?.content === "string" && m.content.trim() !== "",
   );
 
 /**
@@ -161,8 +156,8 @@ export const hasNonEmptySystemMessage = (
  */
 function withSystemPromptRequired<T extends z.ZodTypeAny>(schema: T) {
   return schema.superRefine((values, ctx) => {
-    const messages = (values as { version?: { configData?: { messages?: unknown } } })
-      .version?.configData?.messages;
+    const messages = (values as { version?: { configData?: { messages?: unknown } } }).version
+      ?.configData?.messages;
     if (
       !hasNonEmptySystemMessage(
         messages as readonly { role: string; content: string }[] | undefined | null,

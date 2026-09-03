@@ -9,16 +9,15 @@ A **department** is an accounting label for spend. You name departments (Enginee
 Departments answer a question the team and per-user views cannot: _"are Marketing people spending more than Engineering people, including their personal AI use?"_. Teams are a many-to-many access construct (a person can be in several), so they are a poor single attribution key, and RBAC roles answer authorization, not accounting. A department is single-valued per person per org, so every dollar lands in exactly one bucket.
 
 <Info>
-  **Pairs with:** [Governance dashboard](/ai-governance/governance-dashboard) for the
-  **Spend by department** card, [Members & invites](/ai-governance/members-and-invites)
-  and [Workspaces & access](/ai-governance/workspaces) for where you assign them, and
-  [Roles & permissions](/ai-governance/roles-and-permissions) for why departments are
-  *not* access control.
+  **Pairs with:** [Governance dashboard](/ai-governance/governance-dashboard) for the **Spend by
+  department** card, [Members & invites](/ai-governance/members-and-invites) and [Workspaces &
+  access](/ai-governance/workspaces) for where you assign them, and [Roles &
+  permissions](/ai-governance/roles-and-permissions) for why departments are *not* access control.
 </Info>
 
 <Note>
-  **Departments are pure accounting.** They never grant or restrict access. Assigning
-  someone to "Engineering" changes how their spend is attributed, nothing else.
+  **Departments are pure accounting.** They never grant or restrict access. Assigning someone to
+  "Engineering" changes how their spend is attributed, nothing else.
 </Note>
 
 ## How spend is attributed
@@ -45,8 +44,7 @@ An org can have tens of thousands of members, so assignment lives on the pages t
 The **departments page** itself only creates, renames, and archives departments, and links out to those surfaces. It never renders a per-person assignment list, so it stays usable in a large org.
 
 <Frame caption="On the members page each person carries a Department column. The picker assigns that member's spend, including their personal AI use, to a department.">
-  ![Members department
-  assignment](/images/ai-governance/departments/members-assignment.png)
+  ![Members department assignment](/images/ai-governance/departments/members-assignment.png)
 </Frame>
 
 <Frame caption="On the teams page each team row carries the same picker. A team's department is the default its members and projects inherit when they have none of their own.">

@@ -31,8 +31,8 @@ export function ParkedGroupsView({
   if (isError) {
     return (
       <Text textStyle="xs" color="red.500" paddingX={6} paddingY={3}>
-        Could not load this tenant's parked groups. The count above still stands — do not
-        read this as cleared.
+        Could not load this tenant's parked groups. The count above still stands — do not read this
+        as cleared.
       </Text>
     );
   }

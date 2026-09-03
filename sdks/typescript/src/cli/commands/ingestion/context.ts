@@ -34,16 +34,8 @@
 import { loadConfig } from "@/cli/utils/governance/config";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
-import {
-  type CliTelemetryConfig,
-  postSessionContext,
-  resolveTarget,
-} from "./hook";
-import {
-  type GitRunner,
-  readSessionContext,
-  runGitCommand,
-} from "./git-context";
+import { type CliTelemetryConfig, postSessionContext, resolveTarget } from "./hook";
+import { type GitRunner, readSessionContext, runGitCommand } from "./git-context";
 import {
   defaultStateDir,
   readFingerprint,
@@ -69,10 +61,7 @@ import {
 import { defaultCodexSessionsRoot } from "@/cli/utils/governance/codex-rollout-otlp";
 import type { AncestorProbe } from "@/cli/utils/governance/codex-ancestor-session";
 
-import {
-  type ResolvedSession,
-  resolveSession,
-} from "./context-session";
+import { type ResolvedSession, resolveSession } from "./context-session";
 
 export interface ContextCommandOptions {
   /** Declare for this session instead of resolving the live one. */
@@ -155,10 +144,7 @@ async function declare({
   readCliConfig,
   writeLine,
 }: Required<
-  Omit<
-    ContextCommandOptions,
-    "sessionId" | "agent" | "claudeRegistryDir" | "ancestorProbe"
-  >
+  Omit<ContextCommandOptions, "sessionId" | "agent" | "claudeRegistryDir" | "ancestorProbe">
 > &
   Pick<
     ContextCommandOptions,
@@ -208,15 +194,14 @@ async function declare({
       ? normalizeSessionName(
           readClaudeSessionName({
             sessionId: session.sessionId,
-            registryDir:
-              claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
+            registryDir: claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
           }),
         )
       : session.agent === "codex"
         ? normalizeSessionName(
-            (
-              await readCodexThreadNames(codexSessionIndexPath(codexSessionsRoot))
-            ).get(session.sessionId),
+            (await readCodexThreadNames(codexSessionIndexPath(codexSessionsRoot))).get(
+              session.sessionId,
+            ),
           )
         : null;
 
@@ -259,9 +244,7 @@ async function declare({
         payload,
         now,
       });
-      writeLine(
-        `Queued ${declared}; it will be sent when this session next reports.`,
-      );
+      writeLine(`Queued ${declared}; it will be sent when this session next reports.`);
     } catch (error) {
       writeLine(
         `LangWatch did not accept the declaration and it could not be queued: ${(error as Error).message}`,

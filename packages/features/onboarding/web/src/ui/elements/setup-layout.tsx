@@ -20,13 +20,7 @@ export const SetupLayout = ({
 }: PropsWithChildren<{ maxWidth?: string }>) => {
   const host = useOnboardingHost();
   return (
-    <Box
-      width="full"
-      height="full"
-      minHeight="100vh"
-      backgroundColor="gray.300"
-      paddingTop={16}
-    >
+    <Box width="full" height="full" minHeight="100vh" backgroundColor="gray.300" paddingTop={16}>
       <HStack position="fixed" top={2} right={2} zIndex={99}>
         <Spacer />
         <Button variant="ghost" onClick={() => host.signOut()}>

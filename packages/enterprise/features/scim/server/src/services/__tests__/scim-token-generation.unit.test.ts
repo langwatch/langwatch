@@ -5,7 +5,10 @@
  * that belongs to a different organization.
  */
 import { describe, expect, it, vi } from "vitest";
-import { ScimConnectionNotFoundError, ScimConnectionRequiredError } from "@langwatch/enterprise-scim-contract";
+import {
+  ScimConnectionNotFoundError,
+  ScimConnectionRequiredError,
+} from "@langwatch/enterprise-scim-contract";
 import { ScimService } from "../scim.service";
 import { EntitlementService } from "@langwatch/entitlement-contract";
 import type { ScimRepositoryPort } from "../../ports/scim-repository.port";

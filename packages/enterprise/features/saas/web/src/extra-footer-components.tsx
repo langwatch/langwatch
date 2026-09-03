@@ -93,13 +93,7 @@ export function SignedInExtraFooterComponents(
       project: props.project,
       environment: props.environment,
     });
-  }, [
-    props.analytics,
-    props.environment,
-    props.organization?.id,
-    props.project?.id,
-    props.user,
-  ]);
+  }, [props.analytics, props.environment, props.organization?.id, props.project?.id, props.user]);
 
   useEffect(() => {
     if (!props.user.impersonator) {

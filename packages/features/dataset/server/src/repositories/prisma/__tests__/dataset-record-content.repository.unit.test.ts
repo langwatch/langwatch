@@ -46,10 +46,7 @@ describe("DatasetRecordContentRepository", () => {
         } as never;
         const repo = DatasetRecordContentRepository.create(prisma);
 
-        await repo.findDatasetRecords(
-          { datasetId: "ds_1", projectId: "p1" },
-          { tx },
-        );
+        await repo.findDatasetRecords({ datasetId: "ds_1", projectId: "p1" }, { tx });
 
         expect(baseFindMany).not.toHaveBeenCalled();
         expect(txFindMany).toHaveBeenCalledWith({

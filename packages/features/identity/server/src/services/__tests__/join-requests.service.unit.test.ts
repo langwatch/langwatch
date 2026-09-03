@@ -11,11 +11,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * module the suite mocks out from under it. Same assertions, one fewer thing
  * that can be true of the mock and false of production.
  */
-const rateLimitMock = vi.fn(async (_input: {
-  key: string;
-  windowSeconds: number;
-  max: number;
-}) => ({ allowed: true, resetAt: Date.now() }));
+const rateLimitMock = vi.fn(
+  async (_input: { key: string; windowSeconds: number; max: number }) => ({
+    allowed: true,
+    resetAt: Date.now(),
+  }),
+);
 
 import {
   JOIN_REJECTION_COOLDOWN_MS,
@@ -122,9 +123,7 @@ function harness({
       findCandidateOrganizations: vi.fn(async () => candidates),
       tryFindCandidateOrganization: vi.fn(
         async ({ organizationId }: { organizationId: string }) =>
-          candidates.find(
-            (candidate) => candidate.organizationId === organizationId,
-          ) ?? null,
+          candidates.find((candidate) => candidate.organizationId === organizationId) ?? null,
       ),
     },
     membership,

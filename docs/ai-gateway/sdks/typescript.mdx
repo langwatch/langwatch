@@ -42,8 +42,8 @@ const openai = new OpenAI({
 `getGatewayHeaders()` reads the active LangWatch trace (via the SDK's AsyncLocalStorage context) and returns a header object with `traceparent`, `X-LangWatch-Trace-Id`, `X-LangWatch-Parent-Span-Id`, `X-LangWatch-Thread-Id`. The gateway uses these to parent its span under your trace, no duplicate cost.
 
 <Note>
-  `getGatewayHeaders()` ships in langwatch npm ≥ `v0.26.0` alongside the gateway GA. Check
-  with `npm ls langwatch`.
+  `getGatewayHeaders()` ships in langwatch npm ≥ `v0.26.0` alongside the gateway GA. Check with `npm
+  ls langwatch`.
 </Note>
 
 ### Response headers for correlation

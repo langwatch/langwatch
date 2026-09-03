@@ -37,12 +37,12 @@ a registry entry rather than an unaccounted-for endpoint.
 
 ## The nine procedures, and where each is served
 
-| Procedures | Mounted by | Proof |
-| --- | --- | --- |
-| `export.onExportProgress`, `export.onScenarioRunExportProgress` | the product half | `api-trpc-collaborators.product.integration.test.ts` |
-| `presence.onPresenceUpdate`, `presence.onPresenceCursor` | `@langwatch/presence-server` on apps/api | its own mount |
-| `traces.onTraceUpdate`, `tracesV2.onDiscoverUpdate` | the observability half | `api-trpc-collaborators.trace-group.integration.test.ts` |
-| `scenarios.onSimulationUpdate`, `langy.onConversationUpdate`, `langy.onTurnStream` | the agent half | `api-trpc-collaborators.agent-group.integration.test.ts` |
+| Procedures                                                                         | Mounted by                               | Proof                                                    |
+| ---------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------- |
+| `export.onExportProgress`, `export.onScenarioRunExportProgress`                    | the product half                         | `api-trpc-collaborators.product.integration.test.ts`     |
+| `presence.onPresenceUpdate`, `presence.onPresenceCursor`                           | `@langwatch/presence-server` on apps/api | its own mount                                            |
+| `traces.onTraceUpdate`, `tracesV2.onDiscoverUpdate`                                | the observability half                   | `api-trpc-collaborators.trace-group.integration.test.ts` |
+| `scenarios.onSimulationUpdate`, `langy.onConversationUpdate`, `langy.onTurnStream` | the agent half                           | `api-trpc-collaborators.agent-group.integration.test.ts` |
 
 Two of the last three stream off the same tenant emitter the trace group reads
 off the identity half, so a browser watching a simulation and a browser

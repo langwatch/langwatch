@@ -368,14 +368,14 @@ The `print_summary()` method:
 
 <Tabs>
   <Tab title="Platform Experiment">
-    ```yaml evaluate: stage: test image: python:3.11 script: - pip install langwatch -
-    python -c " import langwatch result = langwatch.experiment.run('my-experiment')
-    result.print_summary() " variables: LANGWATCH_API_KEY: $LANGWATCH_API_KEY ```
+    ```yaml evaluate: stage: test image: python:3.11 script: - pip install langwatch - python -c "
+    import langwatch result = langwatch.experiment.run('my-experiment') result.print_summary() "
+    variables: LANGWATCH_API_KEY: $LANGWATCH_API_KEY ```
   </Tab>
   <Tab title="via SDK">
-    ```yaml evaluate: stage: test image: python:3.11 script: - pip install langwatch
-    openai - python scripts/run_evaluation.py variables: LANGWATCH_API_KEY:
-    $LANGWATCH_API_KEY OPENAI_API_KEY: $OPENAI_API_KEY ```
+    ```yaml evaluate: stage: test image: python:3.11 script: - pip install langwatch openai - python
+    scripts/run_evaluation.py variables: LANGWATCH_API_KEY: $LANGWATCH_API_KEY OPENAI_API_KEY:
+    $OPENAI_API_KEY ```
   </Tab>
 </Tabs>
 

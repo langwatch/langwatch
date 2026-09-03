@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { CodexCanonicaliser } from "../codex.canonicaliser";
-import { createExtractorContext, createLogExtractorContext } from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
+import {
+  createExtractorContext,
+  createLogExtractorContext,
+} from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
 
 const SCOPE = "openai.codex"; // scope-agnostic; gating is on event.name
 

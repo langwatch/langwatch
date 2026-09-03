@@ -80,12 +80,10 @@ const baseState = (): WorkbenchState => ({
   evaluators: [evaluator()],
 });
 
-const utf8Bytes = (text: string): number =>
-  new TextEncoder().encode(text).length;
+const utf8Bytes = (text: string): number => new TextEncoder().encode(text).length;
 
 /** What the budget counts: the UTF-8 size of the serialized projection. */
-const serializedBytes = (value: unknown): number =>
-  utf8Bytes(JSON.stringify(value));
+const serializedBytes = (value: unknown): number => utf8Bytes(JSON.stringify(value));
 
 const results = (): EvaluationResults => ({
   runId: "run-1",
@@ -268,15 +266,10 @@ describe("projectWorkbenchState", () => {
       ];
 
       const projection = projectWorkbenchState({ state });
-      const compareColumn = projection.targets.find(
-        (entry) => entry.id === "target-compare",
-      );
+      const compareColumn = projection.targets.find((entry) => entry.id === "target-compare");
 
       expect(compareColumn?.targetEvaluatorId).toBe("db-compare-1");
-      expect(compareColumn?.comparison?.variants).toEqual([
-        "target-a",
-        "target-b",
-      ]);
+      expect(compareColumn?.comparison?.variants).toEqual(["target-a", "target-b"]);
       expect(compareColumn?.comparison?.hasGoldenAnswer).toBe(false);
     });
   });
@@ -379,37 +372,32 @@ describe("projectWorkbenchState", () => {
       expect(projection.datasets[0]!.sampleRows).toBeUndefined();
       // Mappings survive: only the free-text sample went.
       expect(projection.targets[0]!.mappings).toBeDefined();
-      expect(serializedBytes(projection)).toBeLessThanOrEqual(
-        PROJECTION_BUDGET_BYTES,
-      );
+      expect(serializedBytes(projection)).toBeLessThanOrEqual(PROJECTION_BUDGET_BYTES);
     });
 
     it("collapses mappings to counts when dropping samples is not enough", () => {
       const state = baseState();
       // Enough wiring that the mappings alone overflow the budget.
-      state.targets = Array.from(
-        { length: 400 },
-        (_, i): TargetConfig => ({
-          ...target(),
-          id: `target-${i}`,
-          mappings: {
-            "ds-1": {
-              input: {
-                type: "source",
-                source: "dataset",
-                sourceId: "ds-1",
-                sourceField: "input",
-              },
-              expected_output: {
-                type: "source",
-                source: "dataset",
-                sourceId: "ds-1",
-                sourceField: "expected_output",
-              },
+      state.targets = Array.from({ length: 400 }, (_, i): TargetConfig => ({
+        ...target(),
+        id: `target-${i}`,
+        mappings: {
+          "ds-1": {
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "ds-1",
+              sourceField: "input",
+            },
+            expected_output: {
+              type: "source",
+              source: "dataset",
+              sourceId: "ds-1",
+              sourceField: "expected_output",
             },
           },
-        }),
-      );
+        },
+      }));
 
       const projection = projectWorkbenchState({ state });
 
@@ -422,14 +410,11 @@ describe("projectWorkbenchState", () => {
     /** @scenario "The state an assistant reads says how the last run went" */
     it("drops the results detail before it drops whole columns", () => {
       const state = baseState();
-      state.targets = Array.from(
-        { length: 100 },
-        (_, index): TargetConfig => ({
-          ...target(),
-          id: `target-${index}`,
-          mappings: target().mappings,
-        }),
-      );
+      state.targets = Array.from({ length: 100 }, (_, index): TargetConfig => ({
+        ...target(),
+        id: `target-${index}`,
+        mappings: target().mappings,
+      }));
       const wide = results();
       wide.errors = {};
       wide.evaluatorResults = {};
@@ -453,24 +438,20 @@ describe("projectWorkbenchState", () => {
       // filled the board.
       expect(projection.results?.targets[0]?.totalRows).toBe(4);
       expect(projection.results?.omittedTargets).toBeUndefined();
-      expect(serializedBytes(projection)).toBeLessThanOrEqual(
-        PROJECTION_BUDGET_BYTES,
-      );
+      expect(serializedBytes(projection)).toBeLessThanOrEqual(PROJECTION_BUDGET_BYTES);
     });
 
     /** @scenario "The state an assistant reads never exceeds the budget" */
     it("drops whole entries when collapsing every detail is not enough", () => {
       const state = baseState();
-      state.targets = Array.from(
-        { length: 2_000 },
-        (_, index): TargetConfig => ({ ...target(), id: `target-${index}` }),
-      );
+      state.targets = Array.from({ length: 2_000 }, (_, index): TargetConfig => ({
+        ...target(),
+        id: `target-${index}`,
+      }));
 
       const projection = projectWorkbenchState({ state });
 
-      expect(serializedBytes(projection)).toBeLessThanOrEqual(
-        PROJECTION_BUDGET_BYTES,
-      );
+      expect(serializedBytes(projection)).toBeLessThanOrEqual(PROJECTION_BUDGET_BYTES);
       expect(projection.targets.length).toBeLessThan(2_000);
       expect(projection.omittedTargets).toBe(2_000 - projection.targets.length);
       // The entries that survive are the head of the list, so an agent can ask
@@ -500,9 +481,7 @@ describe("projectWorkbenchState", () => {
 
       expect(projection.truncated).toBe(true);
       expect(projection.omittedDatasets).toBeGreaterThan(0);
-      expect(serializedBytes(projection)).toBeLessThanOrEqual(
-        PROJECTION_BUDGET_BYTES,
-      );
+      expect(serializedBytes(projection)).toBeLessThanOrEqual(PROJECTION_BUDGET_BYTES);
     });
   });
 

@@ -37,10 +37,7 @@ vi.mock("ora", () => ({
 
 import { createCliScenariosService } from "../cli-scenarios-service";
 import { updateScenarioCommand } from "../update";
-import {
-  CLI_SURFACE_HEADER,
-  CLI_SURFACE_VALUE,
-} from "../../../utils/governance/surface";
+import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "../../../utils/governance/surface";
 
 const noop = () => {
   // intentionally empty, suppresses output during tests
@@ -51,10 +48,9 @@ const surfaceHeaderOf = (call: unknown): string | null => {
   const middleware = call as {
     onRequest: (arg: { request: Request }) => Request;
   };
-  const request = new Request(
-    "https://app.langwatch.ai/api/scenarios/scenario_abc123",
-    { method: "PUT" },
-  );
+  const request = new Request("https://app.langwatch.ai/api/scenarios/scenario_abc123", {
+    method: "PUT",
+  });
   return middleware.onRequest({ request }).headers.get(CLI_SURFACE_HEADER);
 };
 

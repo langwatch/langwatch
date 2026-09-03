@@ -60,9 +60,7 @@ describe("formSchemaForSave — system prompt required refinement (Issue #3196)"
 
         expect(result.success).toBe(false);
         if (result.success) return;
-        const messagesPath = result.error.issues.find(
-          (issue) => issue.path[2] === "messages",
-        );
+        const messagesPath = result.error.issues.find((issue) => issue.path[2] === "messages");
         expect(messagesPath?.message).toMatch(/system prompt is required/i);
       });
 
@@ -77,9 +75,7 @@ describe("formSchemaForSave — system prompt required refinement (Issue #3196)"
 
         expect(result.success).toBe(false);
         if (result.success) return;
-        const messagesPath = result.error.issues.find(
-          (issue) => issue.path[2] === "messages",
-        );
+        const messagesPath = result.error.issues.find((issue) => issue.path[2] === "messages");
         expect(messagesPath?.message).toMatch(/system prompt is required/i);
       });
     });

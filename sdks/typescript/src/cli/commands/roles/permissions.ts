@@ -32,9 +32,7 @@ export const rolePermissionsCommand = async (): Promise<CommandResult | void> =>
       });
       console.log();
       console.log(
-        chalk.gray(
-          "Use these as --permission resource:action when creating or updating a role.",
-        ),
+        chalk.gray("Use these as --permission resource:action when creating or updating a role."),
       );
       console.log();
     },

@@ -10,20 +10,18 @@ import type { ComponentType, PromptingTechnique } from "@langwatch/workflow-cont
 import { useWorkflowNodeHost } from "../elements/workflow-node.host";
 import { ComponentNode, selectionColor } from "./workflow-nodes";
 
-export const PromptingTechniqueDraggingNode = forwardRef(
-  function PromptingTechniqueDraggingNode(
-    props: NodeProps<Node<PromptingTechnique>>,
-    ref: Ref<HTMLDivElement>,
-  ) {
-    return (
-      <ComponentNode
-        ref={ref}
-        {...{ ...props, data: { ...props.data, name: props.data.cls } }}
-        hideOutputHandles
-      />
-    );
-  },
-);
+export const PromptingTechniqueDraggingNode = forwardRef(function PromptingTechniqueDraggingNode(
+  props: NodeProps<Node<PromptingTechnique>>,
+  ref: Ref<HTMLDivElement>,
+) {
+  return (
+    <ComponentNode
+      ref={ref}
+      {...{ ...props, data: { ...props.data, name: props.data.cls } }}
+      hideOutputHandles
+    />
+  );
+});
 
 export const PromptingTechniqueNode = forwardRef(function PromptingTechniqueNode(
   _props: NodeProps<Node<PromptingTechnique>>,
@@ -63,9 +61,7 @@ export function PromptingTechniqueWrapper({
 }) {
   const { ComponentIcon, useColorModeValue } = useWorkflowNodeHost();
   const { node, setNode, deleteNode, deselectAllNodes } = useWorkflowStore((state) => ({
-    node: decoratedBy?.ref
-      ? state.nodes.find((node) => node.id === decoratedBy.ref)
-      : void 0,
+    node: decoratedBy?.ref ? state.nodes.find((node) => node.id === decoratedBy.ref) : void 0,
     setNode: state.setNode,
     deleteNode: state.deleteNode,
     deselectAllNodes: state.deselectAllNodes,

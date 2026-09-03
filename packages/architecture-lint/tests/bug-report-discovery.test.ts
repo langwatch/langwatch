@@ -42,13 +42,9 @@ describe("agent report discovery notices", () => {
         "docs/integration/mcp.mdx",
       ];
       for (const page of entryPages) {
-        expect(read(page), `${page} lost the agent notice`).toContain(
-          "<AgentReportNotice />",
-        );
+        expect(read(page), `${page} lost the agent notice`).toContain("<AgentReportNotice />");
       }
-      expect(existsSync(join(REPO_ROOT, "docs/snippets/agent-report-notice.mdx"))).toBe(
-        true,
-      );
+      expect(existsSync(join(REPO_ROOT, "docs/snippets/agent-report-notice.mdx"))).toBe(true);
     });
   });
 
@@ -56,16 +52,12 @@ describe("agent report discovery notices", () => {
     /** @scenario "The attribution footer carries the report line on every page" */
     it("injects the agent report line above the Powered by note", () => {
       const script = read("docs/posthog.js");
-      expect(script, "posthog.js lost the footer injection").toContain(
-        "lw-agent-report",
-      );
+      expect(script, "posthog.js lost the footer injection").toContain("lw-agent-report");
       expect(script).toContain("npx langwatch report");
       expect(script).toContain('href="/support"');
 
       const css = read("docs/style.css");
-      expect(css, "style.css lost the report line style").toContain(
-        ".lw-agent-report",
-      );
+      expect(css, "style.css lost the report line style").toContain(".lw-agent-report");
     });
   });
 

@@ -88,7 +88,8 @@ export class ModelProviderWorkflowStudioDslAdapter extends WorkflowStudioDslPort
     dsl: StudioWorkflow;
   }): Promise<void> {
     const dsl = input.dsl as unknown as GraphLike;
-    const legacyDefault = dsl.default_llm && hasModel(dsl.default_llm) ? dsl.default_llm : undefined;
+    const legacyDefault =
+      dsl.default_llm && hasModel(dsl.default_llm) ? dsl.default_llm : undefined;
     delete dsl.default_llm;
 
     const modellessParameters = (dsl.nodes ?? [])

@@ -42,7 +42,10 @@ describe("given the organization graph is already in hand", () => {
 
     it("has none when the scope names none", () => {
       expect(
-        resolvePersonalWorkspaceOrganization({ organizationId: null, organizations: [ACME, OTHER] }),
+        resolvePersonalWorkspaceOrganization({
+          organizationId: null,
+          organizations: [ACME, OTHER],
+        }),
       ).toBeUndefined();
     });
   });

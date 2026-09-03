@@ -69,11 +69,7 @@ export function classifyMemberType(
   }
 
   // EXTERNAL role with non-view custom permissions is elevated to FullMember
-  if (
-    role === OrganizationUserRole.EXTERNAL &&
-    permissions &&
-    !isViewOnlyCustomRole(permissions)
-  ) {
+  if (role === OrganizationUserRole.EXTERNAL && permissions && !isViewOnlyCustomRole(permissions)) {
     return "FullMember";
   }
 

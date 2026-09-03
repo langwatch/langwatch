@@ -54,9 +54,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
       dbIndex: process.env.REDIS_DB_INDEX,
     });
     if (!connection) {
-      throw new Error(
-        "These tests need a real Redis; run them through the integration suite",
-      );
+      throw new Error("These tests need a real Redis; run them through the integration suite");
     }
     scenarioTabRegistry = ScenarioTabRegistryService.create({
       store: RedisScenarioTabStoreAdapter.create(connection),
@@ -88,9 +86,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
     const tabKey = `tab-${randomUUID()}`;
     track(projectId, tabKey);
 
-    await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey })).resolves.toBe(
-      false,
-    );
+    await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey })).resolves.toBe(false);
   });
 
   it("reports a live tab once one registers", async () => {
@@ -99,9 +95,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
 
     await scenarioTabRegistry.register({ projectId, tabKey, tabId: "tab-a" });
 
-    await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey })).resolves.toBe(
-      true,
-    );
+    await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey })).resolves.toBe(true);
   });
 
   it("gives the registration a TTL so a dead browser expires on its own", async () => {
@@ -232,9 +226,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
         now,
       });
 
-      await expect(
-        scenarioTabRegistry.hasLiveTab({ projectId, tabKey, now }),
-      ).resolves.toBe(false);
+      await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey, now })).resolves.toBe(false);
     });
 
     it("does not revive a tab that had already aged out", async () => {
@@ -277,9 +269,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
 
     await scenarioTabRegistry.unregister({ projectId, tabKey, tabId: "tab-a" });
 
-    await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey })).resolves.toBe(
-      true,
-    );
+    await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey })).resolves.toBe(true);
   });
 
   it("ages out a tab that stopped refreshing without saying goodbye", async () => {
@@ -329,9 +319,9 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
       tabId: "tab-a",
     });
 
-    await expect(
-      scenarioTabRegistry.hasLiveTab({ projectId, tabKey: theirs }),
-    ).resolves.toBe(false);
+    await expect(scenarioTabRegistry.hasLiveTab({ projectId, tabKey: theirs })).resolves.toBe(
+      false,
+    );
   });
 
   describe("parked handoffs", () => {
@@ -350,9 +340,9 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
         url: "https://app.langwatch.test/p/simulations/s/batch-1",
       });
 
-      await expect(
-        scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey }),
-      ).resolves.toBe("https://app.langwatch.test/p/simulations/s/batch-1");
+      await expect(scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey })).resolves.toBe(
+        "https://app.langwatch.test/p/simulations/s/batch-1",
+      );
     });
 
     it("hands it over only once", async () => {

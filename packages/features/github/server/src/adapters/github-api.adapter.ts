@@ -72,14 +72,11 @@ function tryReadRateLimit(response: Response): GithubRateLimitedError | null {
   const resetSec = resetHeader ? Number(resetHeader) : null;
   return new GithubRateLimitedError({
     retryAfterSec: hasRetryAfter ? retryAfterSec : null,
-    resetAt:
-      resetSec !== null && Number.isFinite(resetSec) ? new Date(resetSec * 1000) : null,
+    resetAt: resetSec !== null && Number.isFinite(resetSec) ? new Date(resetSec * 1000) : null,
   });
 }
 
-function toPullRequestSummary(
-  pull: z.infer<typeof pullRequestSchema>,
-): GithubPullRequestSummary {
+function toPullRequestSummary(pull: z.infer<typeof pullRequestSchema>): GithubPullRequestSummary {
   return {
     number: pull.number,
     htmlUrl: pull.html_url,
@@ -95,11 +92,7 @@ function toPullRequestSummary(
 }
 
 export class GithubApiAdapter extends GithubApiPort {
-  static create(
-    appId: string,
-    privateKey: string,
-    host: GithubHostPort,
-  ): GithubApiAdapter {
+  static create(appId: string, privateKey: string, host: GithubHostPort): GithubApiAdapter {
     return new GithubApiAdapter(appId, privateKey, host);
   }
 
@@ -153,9 +146,7 @@ export class GithubApiAdapter extends GithubApiPort {
     };
   }
 
-  async mintInstallationToken(
-    input: MintInstallationTokenInput,
-  ): Promise<GithubInstallationToken> {
+  async mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken> {
     const payload: Record<string, unknown> = {
       permissions: input.permissions,
     };
@@ -194,9 +185,7 @@ export class GithubApiAdapter extends GithubApiPort {
     return {
       token: body.token,
       expiresAt: body.expires_at,
-      ...(body.repository_selection
-        ? { repositorySelection: body.repository_selection }
-        : {}),
+      ...(body.repository_selection ? { repositorySelection: body.repository_selection } : {}),
     };
   }
 
@@ -212,9 +201,7 @@ export class GithubApiAdapter extends GithubApiPort {
         if (rateLimit) {
           throw rateLimit;
         }
-        throw new Error(
-          `GitHub GET /installation/repositories failed: ${response.status}`,
-        );
+        throw new Error(`GitHub GET /installation/repositories failed: ${response.status}`);
       }
 
       const body = repositoriesSchema.parse(await response.json());

@@ -43,23 +43,19 @@ describe("looksLikeMarkdown", () => {
 
     describe("when the text is plain (not Markdown)", () => {
       it("treats prose as plain", () => {
-        expect(looksLikeMarkdown("The quick brown fox jumps over the lazy dog.")).toBe(
-          false,
-        );
+        expect(looksLikeMarkdown("The quick brown fox jumps over the lazy dog.")).toBe(false);
       });
 
       it("treats a log dump as plain", () => {
         expect(
-          looksLikeMarkdown(
-            "2026-06-15 12:00:01 INFO started\n2026-06-15 12:00:02 WARN slow",
-          ),
+          looksLikeMarkdown("2026-06-15 12:00:01 INFO started\n2026-06-15 12:00:02 WARN slow"),
         ).toBe(false);
       });
 
       it("treats a stack trace as plain", () => {
-        expect(
-          looksLikeMarkdown("Error: boom\n    at foo (a.ts:1:2)\n    at bar (b.ts:3:4)"),
-        ).toBe(false);
+        expect(looksLikeMarkdown("Error: boom\n    at foo (a.ts:1:2)\n    at bar (b.ts:3:4)")).toBe(
+          false,
+        );
       });
 
       it("treats an empty string as plain", () => {

@@ -65,9 +65,7 @@ export abstract class StoredObjectService {
     input: CreateStoredObjectUploadInput,
   ): Promise<StoredObjectsCreateUploadOutput>;
 
-  abstract confirmUpload(
-    input: ConfirmStoredObjectUploadInput,
-  ): Promise<StoredObjectReference>;
+  abstract confirmUpload(input: ConfirmStoredObjectUploadInput): Promise<StoredObjectReference>;
 
   abstract getMetadata(input: {
     projectId: StoredObjectProjectId;

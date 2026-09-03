@@ -82,8 +82,7 @@ export function summaryCountNoun({
   groupBy: string[];
   bucket?: string;
 }): string {
-  const countsOneDimension =
-    groupBy.length === 1 && (bucket === undefined || bucket === "none");
+  const countsOneDimension = groupBy.length === 1 && (bucket === undefined || bucket === "none");
   if (!countsOneDimension) return "rows";
   return GROUP_LABELS[groupBy[0] ?? "virtual_key"] ?? "groups";
 }
@@ -104,9 +103,7 @@ function oneOf<T extends string>({
 }): T {
   if (!allowed.includes(value as T)) {
     console.error(
-      chalk.red(
-        `Invalid ${flag} value: ${value} (expected one of ${allowed.join(", ")})`,
-      ),
+      chalk.red(`Invalid ${flag} value: ${value} (expected one of ${allowed.join(", ")})`),
     );
     process.exit(1);
   }
@@ -131,9 +128,7 @@ export const spendSummaryCommand = async (options: {
   const apiKey = checkOrgApiKey();
   const groupBy = (options.groupBy ?? "virtual_key")
     .split(",")
-    .map((part) =>
-      oneOf({ value: part.trim(), allowed: GROUP_BY_VALUES, flag: "--group-by" }),
-    );
+    .map((part) => oneOf({ value: part.trim(), allowed: GROUP_BY_VALUES, flag: "--group-by" }));
   if (groupBy.length > 2) {
     console.error(chalk.red("--group-by takes at most two dimensions"));
     process.exit(1);
@@ -148,9 +143,7 @@ export const spendSummaryCommand = async (options: {
         });
   const now = Date.now();
   const fromMs =
-    options.from !== undefined
-      ? parseInstant(options.from, "--from")
-      : now - 24 * 60 * 60 * 1000;
+    options.from !== undefined ? parseInstant(options.from, "--from") : now - 24 * 60 * 60 * 1000;
   const toMs = options.to !== undefined ? parseInstant(options.to, "--to") : now;
   const service = new SpendEventsApiService({ apiKey });
   const spinner = createSpinner("Reading spend summaries...").start();
@@ -176,10 +169,7 @@ export const spendSummaryCommand = async (options: {
         pairs: options.metadata,
         flag: "--metadata",
       }),
-      limit:
-        options.limit !== undefined
-          ? parsePositiveInt(options.limit, "--limit")
-          : undefined,
+      limit: options.limit !== undefined ? parsePositiveInt(options.limit, "--limit") : undefined,
     })) {
       data.push(row);
     }
@@ -194,9 +184,7 @@ export const spendSummaryCommand = async (options: {
         console.log();
         for (const row of data) {
           const settledNote =
-            row.settled_count > 0
-              ? chalk.yellow(` (+${row.settled_count} settled, unpriced)`)
-              : "";
+            row.settled_count > 0 ? chalk.yellow(` (+${row.settled_count} settled, unpriced)`) : "";
           console.log(
             `${chalk.cyan(rowLabel(row))}  $${Number(row.cost.total_usd).toFixed(6)}  ${row.event_count} events${settledNote}  in ${row.usage.input_tokens} / out ${row.usage.output_tokens}`,
           );

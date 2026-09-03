@@ -1,8 +1,5 @@
 import { reportNurturingFailure, tryNurturingDatabase, tryNurturingSink } from "./nurturing-sink";
-import type {
-  CioOrgTraits,
-  CioPersonTraits,
-} from "@langwatch/enterprise-billing-contract";
+import type { CioOrgTraits, CioPersonTraits } from "@langwatch/enterprise-billing-contract";
 
 /**
  * Tracks which users have had a full CIO profile sync this process lifetime.

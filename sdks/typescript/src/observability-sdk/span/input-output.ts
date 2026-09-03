@@ -43,10 +43,7 @@ function createSafeFallbackValue(value: unknown): string {
 /**
  * Utility function to create a safe SpanInputOutput fallback
  */
-function createSafeSpanInputOutput(
-  type: "text" | "raw",
-  value: unknown,
-): SpanInputOutput {
+function createSafeSpanInputOutput(type: "text" | "raw", value: unknown): SpanInputOutput {
   const safeValue = createSafeFallbackValue(value);
   return { type, value: safeValue } as SpanInputOutput;
 }
@@ -66,15 +63,11 @@ function isChatMessage(value: unknown): value is ChatMessage | SimpleChatMessage
   if (!isObject(value)) return false;
   return (
     typeof value.role === "string" &&
-    (typeof value.content === "string" ||
-      value.content === null ||
-      value.content === undefined)
+    (typeof value.content === "string" || value.content === null || value.content === undefined)
   );
 }
 
-function isChatMessageArray(
-  value: unknown,
-): value is (ChatMessage | SimpleChatMessage)[] {
+function isChatMessageArray(value: unknown): value is (ChatMessage | SimpleChatMessage)[] {
   return Array.isArray(value) && value.every(isChatMessage);
 }
 
@@ -230,10 +223,7 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
  * @param value - The value when explicit type is provided
  * @returns A valid SpanInputOutput object ready for span storage
  */
-export function processSpanInputOutput(
-  typeOrValue: unknown,
-  value?: unknown,
-): SpanInputOutput {
+export function processSpanInputOutput(typeOrValue: unknown, value?: unknown): SpanInputOutput {
   try {
     // If explicit type is provided, prefer it over auto-detection
     if (typeof typeOrValue === "string" && value !== undefined) {
@@ -242,9 +232,7 @@ export function processSpanInputOutput(
 
       // Final validation with spanInputOutputSchema
       const result = spanInputOutputSchema.safeParse({ type, value: validatedValue });
-      return result.success
-        ? result.data
-        : createSafeSpanInputOutput("raw", validatedValue);
+      return result.success ? result.data : createSafeSpanInputOutput("raw", validatedValue);
     }
 
     // Auto-detect type when no explicit type is provided

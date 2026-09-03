@@ -34,9 +34,9 @@ describe("what one head cannot see", () => {
         // One head cannot check that, so it demotes and the person is left with
         // no PRIMARY — which the read fork answers from the most recently
         // VERIFIED identifier.
-        expect(
-          foldStream({ identifierId: "idf_personal", facts: history })?.state,
-        ).toBe("VERIFIED");
+        expect(foldStream({ identifierId: "idf_personal", facts: history })?.state).toBe(
+          "VERIFIED",
+        );
         expect(foldStream({ identifierId: "idf_work", facts: history })).toBeNull();
       });
     });
@@ -60,12 +60,8 @@ describe("what one head cannot see", () => {
         expect(perUser.identifiers.idf_personal?.state).toBe("VERIFIED");
         expect(perUser.identifiers.idf_work?.state).toBe("PRIMARY");
         // The fact is never routed to idf_personal, so its stream never hears.
-        expect(
-          foldStream({ identifierId: "idf_personal", facts: history })?.state,
-        ).toBe("PRIMARY");
-        expect(
-          foldStream({ identifierId: "idf_work", facts: history })?.state,
-        ).toBe("PRIMARY");
+        expect(foldStream({ identifierId: "idf_personal", facts: history })?.state).toBe("PRIMARY");
+        expect(foldStream({ identifierId: "idf_work", facts: history })?.state).toBe("PRIMARY");
       });
     });
 
@@ -85,12 +81,8 @@ describe("what one head cannot see", () => {
         expect(foldUser(history).identifiers.idf_b?.value).toBeNull();
         // One head only hears what the fact names — which is why the command
         // builds that list from a read of the whole person.
-        expect(
-          foldStream({ identifierId: "idf_b", facts: history })?.value,
-        ).toBe("sam@b.dev");
-        expect(
-          foldStream({ identifierId: "idf_a", facts: history })?.value,
-        ).toBeNull();
+        expect(foldStream({ identifierId: "idf_b", facts: history })?.value).toBe("sam@b.dev");
+        expect(foldStream({ identifierId: "idf_a", facts: history })?.value).toBeNull();
       });
     });
   });

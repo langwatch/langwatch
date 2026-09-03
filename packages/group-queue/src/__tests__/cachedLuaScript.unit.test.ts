@@ -56,9 +56,9 @@ describe("CachedLuaScript", () => {
       const evalFn = vi.fn();
       const script = new CachedLuaScript("return nil.x");
 
-      await expect(
-        script.run({ evalsha, eval: evalFn } as unknown as IORedis, 0),
-      ).rejects.toThrow("attempt to index a nil value");
+      await expect(script.run({ evalsha, eval: evalFn } as unknown as IORedis, 0)).rejects.toThrow(
+        "attempt to index a nil value",
+      );
       expect(evalFn).not.toHaveBeenCalled();
     });
   });

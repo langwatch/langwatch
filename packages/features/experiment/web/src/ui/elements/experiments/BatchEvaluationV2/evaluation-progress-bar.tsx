@@ -4,15 +4,12 @@ export function EvaluationProgressBar({
   evaluationState,
   size = "xs",
 }: {
-  evaluationState:
-    | { progress?: number | null; total?: number | null; status?: string }
-    | undefined;
+  evaluationState: { progress?: number | null; total?: number | null; status?: string } | undefined;
   size?: "xs" | "sm" | "md" | "lg";
 }) {
   const progress = evaluationState?.progress ?? 0;
   const total = evaluationState?.total ?? 100;
-  const isIndeterminate =
-    evaluationState?.status === "waiting" || !evaluationState?.total;
+  const isIndeterminate = evaluationState?.status === "waiting" || !evaluationState?.total;
 
   return (
     <HStack width="full" gap={4}>

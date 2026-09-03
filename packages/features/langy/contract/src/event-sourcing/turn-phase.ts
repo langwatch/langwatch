@@ -74,12 +74,8 @@ export function abandonStop(state: TurnPhaseState): TurnPhaseState {
  * goes idle. Never keyed on the client stream's flaky isBusy — that is exactly
  * how a premature second send used to slip through and 409 the in-flight turn.
  */
-export function observeBackendTurn(
-  state: TurnPhaseState,
-  inFlight: boolean,
-): TurnPhaseState {
-  const alreadySettled =
-    state.activeTurnId !== null && state.settledTurnId === state.activeTurnId;
+export function observeBackendTurn(state: TurnPhaseState, inFlight: boolean): TurnPhaseState {
+  const alreadySettled = state.activeTurnId !== null && state.settledTurnId === state.activeTurnId;
   if (inFlight) {
     // Ignore the fold re-asserting a turn the stream already ended (its
     // projection lags the end frame); otherwise adopt it, going active unless

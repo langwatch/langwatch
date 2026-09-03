@@ -105,9 +105,7 @@ export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
     // wrote it, so a job staged but never active during the pause must not
     // re-run and double-write it — but let anything newer process live.
     if (done) {
-      return isAtOrBeforeCutoffMarker(event.createdAt, event.id, done)
-        ? "skip"
-        : "process";
+      return isAtOrBeforeCutoffMarker(event.createdAt, event.id, done) ? "skip" : "process";
     }
 
     return "process";

@@ -19,10 +19,7 @@
  *     trade-off verdict would imply the run weighed things it never saw.
  */
 
-import type {
-  ParetoDominance,
-  TradeoffDimension,
-} from "./batch-evaluation-results.pareto";
+import type { ParetoDominance, TradeoffDimension } from "./batch-evaluation-results.pareto";
 
 export type TradeoffSummary = {
   headline: string;
@@ -87,12 +84,8 @@ export const formatTradeoffSummary = ({
     const loserId = droppableIds[0]!;
     // The best-ranked variant that beats it — the one a reader would move to.
     const winnerId = dominance.dominatedBy[loserId]![0]!;
-    const edge = dominance.edges.find(
-      (e) => e.loserId === loserId && e.winnerId === winnerId,
-    );
-    const wonOn = joinWords(
-      (edge?.strictlyBetterOn ?? []).map((d) => DIMENSION_WORDS[d]),
-    );
+    const edge = dominance.edges.find((e) => e.loserId === loserId && e.winnerId === winnerId);
+    const wonOn = joinWords((edge?.strictlyBetterOn ?? []).map((d) => DIMENSION_WORDS[d]));
 
     // "and no worse on the rest" is only true when there IS a rest. Appending
     // it unconditionally pointed the reader at dimensions that did not exist

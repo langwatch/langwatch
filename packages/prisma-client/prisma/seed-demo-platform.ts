@@ -1,8 +1,4 @@
-import {
-  ExperimentType,
-  type Prisma,
-  type PrismaClient,
-} from "../src/generated/client";
+import { ExperimentType, type Prisma, type PrismaClient } from "../src/generated/client";
 import {
   DEMO_HTTP_AGENT_CONFIG,
   DEMO_PLATFORM_IDS,

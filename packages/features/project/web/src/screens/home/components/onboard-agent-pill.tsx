@@ -1,7 +1,10 @@
 import { Box, chakra, HStack } from "@chakra-ui/react";
 import type React from "react";
 import { LuBot, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
-import { AgentActionsMenu, setupAgentPrompt } from "@langwatch/trace-web/components/SetupWithAgentButton";
+import {
+  AgentActionsMenu,
+  setupAgentPrompt,
+} from "@langwatch/trace-web/components/SetupWithAgentButton";
 import { selfHostedEndpoint } from "../../../model/self-hosted-endpoint";
 import { useProjectHomeHost } from "../../../model/project-home-host";
 

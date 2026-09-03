@@ -24,11 +24,7 @@ const TraceContent: React.FC<{
   // anchor at rest. Right of the name keeps it adjacent to the title
   // the avatar refers to.
   const presence = (
-    <TracePresenceAvatars
-      traceId={trace.traceId}
-      max={3}
-      size={comfortable ? "xs" : "2xs"}
-    />
+    <TracePresenceAvatars traceId={trace.traceId} max={3} size={comfortable ? "xs" : "2xs"} />
   );
 
   return (

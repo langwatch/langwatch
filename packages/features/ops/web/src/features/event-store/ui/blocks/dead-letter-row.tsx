@@ -123,9 +123,7 @@ export function DeadLetterRow({
               <HStack gap={4} flexWrap="wrap">
                 <Labelled label="Message key" value={message.messageKey} />
                 <Labelled label="Project" value={message.projectId} />
-                {message.traceId ? (
-                  <Labelled label="Trace" value={message.traceId} />
-                ) : null}
+                {message.traceId ? <Labelled label="Trace" value={message.traceId} /> : null}
               </HStack>
               {renderAttemptHistory?.(message)}
               <Box>

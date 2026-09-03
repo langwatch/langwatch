@@ -16,13 +16,9 @@ import { describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** Read relative to the package `src` root, so a file can move between layers. */
-const sourceOf = (path: string): string =>
-  readFileSync(join(here, "..", "..", "..", path), "utf8");
+const sourceOf = (path: string): string => readFileSync(join(here, "..", "..", "..", path), "utf8");
 
-const authCard = readFileSync(
-  join(here, "..", "..", "elements", "auth-card.tsx"),
-  "utf8",
-);
+const authCard = readFileSync(join(here, "..", "..", "elements", "auth-card.tsx"), "utf8");
 
 describe("given the front door on a small viewport", () => {
   describe("when the card is laid out", () => {
@@ -62,9 +58,7 @@ describe("given the front door on a small viewport", () => {
         "ui/sections/credential-sign-in-form.tsx",
         "ui/sections/sign-up-credential-form.tsx",
       ]) {
-        expect(sourceOf(file)).toMatch(
-          /width="full"[\s\S]{0,120}minHeight="44px"/,
-        );
+        expect(sourceOf(file)).toMatch(/width="full"[\s\S]{0,120}minHeight="44px"/);
       }
     });
   });
@@ -108,16 +102,12 @@ describe("given the front door in either colour mode", () => {
       const theme = sourceOf("model/front-door-theme.ts");
 
       for (const token of ["danger", "detail"]) {
-        const declaration = theme
-          .split(new RegExp(`\\b${token}: mode\\(`))[1]
-          ?.split(")")[0];
+        const declaration = theme.split(new RegExp(`\\b${token}: mode\\(`))[1]?.split(")")[0];
         expect(declaration).toBeTruthy();
 
         // The two grounds must not agree: a red that reads on white is the red
         // that fails on a dark ground, which is the whole reason for the pair.
-        const [light, dark] = (declaration ?? "")
-          .split(",")
-          .map((part) => part.trim());
+        const [light, dark] = (declaration ?? "").split(",").map((part) => part.trim());
         expect(light).toBeTruthy();
         expect(dark).toBeTruthy();
         expect(dark).not.toBe(light);
@@ -148,9 +138,7 @@ describe("given the hosted panel on a narrow viewport", () => {
       // Both the tagline and the trusted-by row are desktop-only: stacked
       // above a log-in form on a phone they are two screens of scrolling in
       // front of the thing the person came to do.
-      expect([
-        ...panel.matchAll(/display=\{\{ base: "none", md: "block" \}\}/g),
-      ]).toHaveLength(2);
+      expect([...panel.matchAll(/display=\{\{ base: "none", md: "block" \}\}/g)]).toHaveLength(2);
       expect(panel).toContain('width={{ base: "full", md: "50%" }}');
     });
   });
@@ -161,9 +149,8 @@ describe("given somebody who has asked for less motion", () => {
     it("declares every animation inside a no-preference query", () => {
       const styles = sourceOf("ui/elements/auth-front-door.css");
       const animations = [...styles.matchAll(/animation:/g)].length;
-      const guarded = [
-        ...styles.matchAll(/@media \(prefers-reduced-motion: no-preference\)/g),
-      ].length;
+      const guarded = [...styles.matchAll(/@media \(prefers-reduced-motion: no-preference\)/g)]
+        .length;
 
       expect(animations).toBeGreaterThan(0);
       expect(guarded).toBeGreaterThan(0);

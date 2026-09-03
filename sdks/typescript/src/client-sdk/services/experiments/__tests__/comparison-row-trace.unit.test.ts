@@ -103,8 +103,7 @@ describe("Experiment.compare", () => {
         .map((entry) => ({
           source,
           row: entry.row,
-          tracedToRow:
-            owners.get(entry.traceId ?? "") ?? "a trace no row of this run opened",
+          tracedToRow: owners.get(entry.traceId ?? "") ?? "a trace no row of this run opened",
         })),
     };
   };
@@ -127,10 +126,7 @@ describe("Experiment.compare", () => {
           async ({ item, index }) => {
             await Promise.all([
               experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
-              experiment.withTarget(
-                "claude-sonnet-5",
-                () => `The answer is ${item.answer}.`,
-              ),
+              experiment.withTarget("claude-sonnet-5", () => `The answer is ${item.answer}.`),
             ]);
 
             if (index === 0) await laterRowsCompared.promise;
@@ -195,10 +191,7 @@ describe("Experiment.compare", () => {
           async ({ item }) => {
             await Promise.all([
               experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
-              experiment.withTarget(
-                "claude-sonnet-5",
-                () => `The answer is ${item.answer}.`,
-              ),
+              experiment.withTarget("claude-sonnet-5", () => `The answer is ${item.answer}.`),
             ]);
 
             await experiment.compare({ input: item.question });
@@ -238,10 +231,7 @@ describe("Experiment.compare", () => {
           async ({ item, index }) => {
             await Promise.all([
               experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
-              experiment.withTarget(
-                "claude-sonnet-5",
-                () => `The answer is ${item.answer}.`,
-              ),
+              experiment.withTarget("claude-sonnet-5", () => `The answer is ${item.answer}.`),
             ]);
 
             if (index === 1) {

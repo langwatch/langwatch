@@ -31,11 +31,7 @@ export function ScenarioParametersDialog({
   const { parametersError, parameterRowErrors } = readParameterErrors(errors);
 
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(details) => onOpenChange(details.open)}
-      size="xl"
-    >
+    <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)} size="xl">
       <Dialog.Content bg="bg">
         <Dialog.Header>
           <HStack gap={0}>
@@ -93,14 +89,11 @@ function readParameterErrors(errors: FieldErrors<ScenarioFormData>): {
   const rows = Array.isArray(parameters) ? (parameters as unknown[]) : [];
   return {
     parametersError:
-      messageOf(parameters) ??
-      messageOf((parameters as { root?: unknown } | undefined)?.root),
+      messageOf(parameters) ?? messageOf((parameters as { root?: unknown } | undefined)?.root),
     parameterRowErrors: rows.map((row) => {
       const fields = (row ?? {}) as Record<string, unknown>;
       return (
-        messageOf(fields.name) ??
-        messageOf(fields.description) ??
-        messageOf(fields.defaultValue)
+        messageOf(fields.name) ?? messageOf(fields.description) ?? messageOf(fields.defaultValue)
       );
     }),
   };

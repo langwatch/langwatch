@@ -69,10 +69,7 @@ export class PrismaLangyConversationProjectionRepository implements StateProject
       AcceptedAt: projection.cursor.acceptedAt,
       LastEventId: projection.cursor.eventId,
       ProjectionVersion: projection.version,
-    } satisfies Omit<
-      Prisma.LangyConversationProjectionUncheckedCreateInput,
-      "id" | "projectId"
-    >;
+    } satisfies Omit<Prisma.LangyConversationProjectionUncheckedCreateInput, "id" | "projectId">;
 
     await this.prisma.langyConversationProjection.upsert({
       where: {

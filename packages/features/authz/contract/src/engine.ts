@@ -70,8 +70,7 @@ export class AuthzEngine {
       chain,
       chainBindings: grants.bindings.filter((binding) =>
         chain.some(
-          (link) =>
-            link.scopeType === binding.scopeType && link.scopeId === binding.scopeId,
+          (link) => link.scopeType === binding.scopeType && link.scopeId === binding.scopeId,
         ),
       ),
       base: {
@@ -163,18 +162,10 @@ export class AuthzEngine {
     return `  - ${label} — ${matched}`;
   }
 
-  explain({
-    decision,
-    grants,
-  }: {
-    decision: AuthzDecision;
-    grants: CollectedGrants;
-  }): string[] {
+  explain({ decision, grants }: { decision: AuthzDecision; grants: CollectedGrants }): string[] {
     const lines: string[] = [];
     const scopeLabel = `${decision.scope.type} ${decision.scope.id}`;
-    lines.push(
-      `${decision.allowed ? "GRANTED" : "DENIED"} ${decision.permission} @ ${scopeLabel}`,
-    );
+    lines.push(`${decision.allowed ? "GRANTED" : "DENIED"} ${decision.permission} @ ${scopeLabel}`);
 
     if (decision.via === "demo-project") {
       lines.push("granted: demo project (read-only demo-viewer set)");

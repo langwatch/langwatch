@@ -56,14 +56,10 @@ vi.mock("../../../behavior/model-provider-api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
       previewMatchingSpans: {
-        useQuery: (
-          input: Record<string, unknown>,
-          opts?: { enabled?: boolean },
-        ) => {
+        useQuery: (input: Record<string, unknown>, opts?: { enabled?: boolean }) => {
           mockPreviewQueryInputs.push({ input, enabled: opts?.enabled });
           return {
-            data:
-              opts?.enabled === false ? undefined : mockPreviewState.current,
+            data: opts?.enabled === false ? undefined : mockPreviewState.current,
             isLoading: false,
           };
         },
@@ -75,9 +71,7 @@ vi.mock("../../../behavior/model-provider-api", () => ({
 import { LLMModelCostDrawer } from "../llm-model-cost-drawer";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing";
 
-function renderDrawer(
-  props: { id?: string; prefillModel?: string; prefillRegex?: string } = {},
-) {
+function renderDrawer(props: { id?: string; prefillModel?: string; prefillRegex?: string } = {}) {
   const host = new FakeModelProviderHost({
     scope: {
       organizationId: "org-1",
@@ -137,9 +131,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
       expect(row).toHaveTextContent("1.0K");
       expect(row).toHaveTextContent("200");
       expect(row).toHaveTextContent("$0.0060");
-      expect(
-        screen.getByText("12 spans across 1 model in the last 7 days"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("12 spans across 1 model in the last 7 days")).toBeInTheDocument();
     });
 
     /** @scenario A span row opens the trace details drawer in a new tab */
@@ -190,14 +182,10 @@ describe("Feature: Model cost regex matching spans preview", () => {
     it("shows the recently seen models that did not match", () => {
       renderDrawer({ prefillRegex: "nothing-matches-this" });
 
-      expect(
-        screen.getByText("no matches in the last 7 days"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("no matches in the last 7 days")).toBeInTheDocument();
       const chips = screen.getAllByTestId("unmatched-model-chip");
       expect(chips).toHaveLength(2);
-      expect(chips[0]).toHaveTextContent(
-        "bedrock/eu.anthropic.claude-sonnet-4-6",
-      );
+      expect(chips[0]).toHaveTextContent("bedrock/eu.anthropic.claude-sonnet-4-6");
       expect(chips[0]).toHaveTextContent("42");
     });
 
@@ -207,9 +195,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
       fireEvent.click(screen.getAllByTestId("unmatched-model-chip")[0]!);
 
       expect(
-        screen.getByDisplayValue(
-          "^bedrock\\/eu\\.anthropic\\.claude-sonnet-4-6$",
-        ),
+        screen.getByDisplayValue("^bedrock\\/eu\\.anthropic\\.claude-sonnet-4-6$"),
       ).toBeInTheDocument();
       expect(
         screen.getByDisplayValue("bedrock/eu.anthropic.claude-sonnet-4-6"),
@@ -222,13 +208,9 @@ describe("Feature: Model cost regex matching spans preview", () => {
       renderDrawer({ prefillRegex: "(a+)+$" });
 
       expect(
-        screen.getByText(
-          "Enter a valid regular expression to preview the spans it would match.",
-        ),
+        screen.getByText("Enter a valid regular expression to preview the spans it would match."),
       ).toBeInTheDocument();
-      expect(
-        mockPreviewQueryInputs.every((call) => call.enabled === false),
-      ).toBe(true);
+      expect(mockPreviewQueryInputs.every((call) => call.enabled === false)).toBe(true);
     });
   });
 
@@ -240,9 +222,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
       });
 
       expect(screen.getByTestId("matching-span-row")).toBeInTheDocument();
-      expect(
-        mockPreviewQueryInputs.some((call) => call.enabled !== false),
-      ).toBe(true);
+      expect(mockPreviewQueryInputs.some((call) => call.enabled !== false)).toBe(true);
     });
   });
 
@@ -253,12 +233,8 @@ describe("Feature: Model cost regex matching spans preview", () => {
         prefillRegex: "^vertex_ai\\/gemini-3-pro-preview$",
       });
 
-      expect(
-        screen.getByDisplayValue("vertex_ai/gemini-3-pro-preview"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByDisplayValue("^vertex_ai\\/gemini-3-pro-preview$"),
-      ).toBeInTheDocument();
+      expect(screen.getByDisplayValue("vertex_ai/gemini-3-pro-preview")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("^vertex_ai\\/gemini-3-pro-preview$")).toBeInTheDocument();
     });
   });
 });

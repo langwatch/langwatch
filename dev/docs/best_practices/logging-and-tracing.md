@@ -62,10 +62,7 @@ await queue.add("process-trace", {
 ### Restoring Context in Workers
 
 ```typescript
-import {
-  createContextFromJobData,
-  runWithContext,
-} from "@langwatch/observability/context";
+import { createContextFromJobData, runWithContext } from "@langwatch/observability/context";
 
 worker.process(async (job) => {
   const ctx = createContextFromJobData(job.data.__context);

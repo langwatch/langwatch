@@ -13,14 +13,10 @@ export const experimentRunWorkflowVersionSchema = z
     id: z.string(),
     version: z.string(),
     commitMessage: z.string(),
-    author: z
-      .object({ name: z.string().nullable(), image: z.string().nullable() })
-      .nullable(),
+    author: z.object({ name: z.string().nullable(), image: z.string().nullable() }).nullable(),
   })
   .strict();
-export type ExperimentRunWorkflowVersion = z.infer<
-  typeof experimentRunWorkflowVersionSchema
->;
+export type ExperimentRunWorkflowVersion = z.infer<typeof experimentRunWorkflowVersionSchema>;
 
 export const experimentRunEvaluationSummarySchema = z
   .object({

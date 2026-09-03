@@ -1,6 +1,4 @@
 {
   "version": 0,
-  "dependencies": [
-    "ottl"
-  ]
+  "dependencies": ["ottl"]
 }

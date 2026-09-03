@@ -102,10 +102,7 @@ export interface GovernanceConfig {
    *
    * Unset until the wrapper's first auto-mint for that tool.
    */
-  default_personal_ingest_keys?: Record<
-    string,
-    { id?: string; secret?: string; prefix?: string }
-  >;
+  default_personal_ingest_keys?: Record<string, { id?: string; secret?: string; prefix?: string }>;
 
   /**
    * Per-tool project scope. Written by `langwatch instrument <tool>

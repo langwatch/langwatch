@@ -121,8 +121,7 @@ describe("Real LLM Interactions E2E", () => {
       };
 
       const finalResponse = {
-        content:
-          "Silicon minds think,\nPatterns emerge from vast data,\nFuture unfolds now.",
+        content: "Silicon minds think,\nPatterns emerge from vast data,\nFuture unfolds now.",
         chunks_received: 3,
         streaming_duration_ms: 150,
       };
@@ -276,9 +275,7 @@ describe("Real LLM Interactions E2E", () => {
         span.setOutput(errorResponse);
 
         // Record the error
-        const error = new Error(
-          `${errorResponse.error.type}: ${errorResponse.error.message}`,
-        );
+        const error = new Error(`${errorResponse.error.type}: ${errorResponse.error.message}`);
         span.recordException(error);
         span.setStatus({
           code: SpanStatusCode.ERROR,

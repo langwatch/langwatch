@@ -16,17 +16,9 @@ import type { SchedulerHandler } from "./scheduler.types";
 export class SchedulerRegistry {
   private readonly handlers = new Map<string, SchedulerHandler>();
 
-  register({
-    targetType,
-    handler,
-  }: {
-    targetType: string;
-    handler: SchedulerHandler;
-  }): void {
+  register({ targetType, handler }: { targetType: string; handler: SchedulerHandler }): void {
     if (this.handlers.has(targetType)) {
-      throw new Error(
-        `SchedulerRegistry: targetType "${targetType}" is already registered`,
-      );
+      throw new Error(`SchedulerRegistry: targetType "${targetType}" is already registered`);
     }
     this.handlers.set(targetType, handler);
   }

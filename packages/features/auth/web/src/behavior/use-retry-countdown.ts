@@ -22,9 +22,7 @@ export function useRetryCountdown(): {
       return;
     }
     const tick = setTimeout(() => {
-      setSecondsToWait((remaining) =>
-        remaining === null ? null : remaining - 1,
-      );
+      setSecondsToWait((remaining) => (remaining === null ? null : remaining - 1));
     }, 1000);
     return () => clearTimeout(tick);
   }, [secondsToWait]);

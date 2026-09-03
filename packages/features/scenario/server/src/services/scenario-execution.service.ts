@@ -41,9 +41,7 @@ export class ScenarioExecutionService extends ScenarioExecutionServiceContract {
     await this.options.cancellations.publish(input);
   }
 
-  prefetch(
-    input: ScenarioExecutionPrefetchInput,
-  ): Promise<ScenarioExecutionPrefetchResult> {
+  prefetch(input: ScenarioExecutionPrefetchInput): Promise<ScenarioExecutionPrefetchResult> {
     return this.options.prefetcher.prefetch(input);
   }
 

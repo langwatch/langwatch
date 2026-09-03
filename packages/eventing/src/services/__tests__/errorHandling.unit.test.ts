@@ -131,42 +131,22 @@ describe("Error classes", () => {
 
   describe("StoreError", () => {
     it("has correct name", () => {
-      const err = new StoreError(
-        "insert",
-        "clickhouse",
-        "timeout",
-        ErrorCategory.RECOVERABLE,
-      );
+      const err = new StoreError("insert", "clickhouse", "timeout", ErrorCategory.RECOVERABLE);
       expect(err.name).toBe("StoreError");
     });
 
     it("can be CRITICAL", () => {
-      const err = new StoreError(
-        "insert",
-        "clickhouse",
-        "corruption",
-        ErrorCategory.CRITICAL,
-      );
+      const err = new StoreError("insert", "clickhouse", "corruption", ErrorCategory.CRITICAL);
       expect(err.category).toBe(ErrorCategory.CRITICAL);
     });
 
     it("can be RECOVERABLE", () => {
-      const err = new StoreError(
-        "query",
-        "clickhouse",
-        "timeout",
-        ErrorCategory.RECOVERABLE,
-      );
+      const err = new StoreError("query", "clickhouse", "timeout", ErrorCategory.RECOVERABLE);
       expect(err.category).toBe(ErrorCategory.RECOVERABLE);
     });
 
     it("getLogContext() includes operation and store", () => {
-      const err = new StoreError(
-        "insert",
-        "clickhouse",
-        "fail",
-        ErrorCategory.RECOVERABLE,
-      );
+      const err = new StoreError("insert", "clickhouse", "fail", ErrorCategory.RECOVERABLE);
       const ctx = err.getLogContext();
       expect(ctx).toMatchObject({
         errorName: "StoreError",
@@ -296,9 +276,7 @@ describe("handleError", () => {
     it("logs error and does not throw when NON_CRITICAL with logger", () => {
       const logger = createMockLogger();
       const err = new Error("oops");
-      expect(() =>
-        handleError(err, ErrorCategory.NON_CRITICAL, logger as any),
-      ).not.toThrow();
+      expect(() => handleError(err, ErrorCategory.NON_CRITICAL, logger as any)).not.toThrow();
       expect(logger.error).toHaveBeenCalledOnce();
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ error: "oops", err }),
@@ -309,9 +287,7 @@ describe("handleError", () => {
     it("logs warning and does not throw when RECOVERABLE with logger", () => {
       const logger = createMockLogger();
       const err = new Error("transient");
-      expect(() =>
-        handleError(err, ErrorCategory.RECOVERABLE, logger as any),
-      ).not.toThrow();
+      expect(() => handleError(err, ErrorCategory.RECOVERABLE, logger as any)).not.toThrow();
       expect(logger.warn).toHaveBeenCalledOnce();
       expect(logger.warn).toHaveBeenCalledWith(
         expect.objectContaining({ error: "transient", err }),
@@ -344,21 +320,15 @@ describe("categorizeError", () => {
   });
 
   it("returns RECOVERABLE for QueueError", () => {
-    expect(categorizeError(new QueueError("q", "op", "msg"))).toBe(
-      ErrorCategory.RECOVERABLE,
-    );
+    expect(categorizeError(new QueueError("q", "op", "msg"))).toBe(ErrorCategory.RECOVERABLE);
   });
 
   it("returns NON_CRITICAL for HandlerError", () => {
-    expect(categorizeError(new HandlerError("h", "e", "msg"))).toBe(
-      ErrorCategory.NON_CRITICAL,
-    );
+    expect(categorizeError(new HandlerError("h", "e", "msg"))).toBe(ErrorCategory.NON_CRITICAL);
   });
 
   it("returns NON_CRITICAL for ProjectionError", () => {
-    expect(categorizeError(new ProjectionError("p", "e", "msg"))).toBe(
-      ErrorCategory.NON_CRITICAL,
-    );
+    expect(categorizeError(new ProjectionError("p", "e", "msg"))).toBe(ErrorCategory.NON_CRITICAL);
   });
 
   it("returns RECOVERABLE for plain Error", () => {
@@ -459,16 +429,14 @@ describe("classifyClickHouseError", () => {
   describe("when error message matches transient patterns", () => {
     it("returns RECOVERABLE for 'Too many simultaneous queries' message", () => {
       expect(
-        classifyClickHouseError(
-          new Error("Too many simultaneous queries. Maximum: 100. "),
-        ),
+        classifyClickHouseError(new Error("Too many simultaneous queries. Maximum: 100. ")),
       ).toBe(ErrorCategory.RECOVERABLE);
     });
 
     it("returns RECOVERABLE for connection refused", () => {
-      expect(
-        classifyClickHouseError(new Error("connect ECONNREFUSED 127.0.0.1:8123")),
-      ).toBe(ErrorCategory.RECOVERABLE);
+      expect(classifyClickHouseError(new Error("connect ECONNREFUSED 127.0.0.1:8123"))).toBe(
+        ErrorCategory.RECOVERABLE,
+      );
     });
 
     it("returns RECOVERABLE for connection timeout", () => {
@@ -490,9 +458,7 @@ describe("classifyClickHouseError", () => {
     it("returns RECOVERABLE for 'Query was cancelled' message (CH replica graceful shutdown)", () => {
       expect(
         classifyClickHouseError(
-          new Error(
-            "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)",
-          ),
+          new Error("Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)"),
         ),
       ).toBe(ErrorCategory.RECOVERABLE);
     });
@@ -510,9 +476,7 @@ describe("classifyClickHouseError", () => {
     it("returns RECOVERABLE for Coordination::Exception (KEEPER_EXCEPTION)", () => {
       expect(
         classifyClickHouseError(
-          new Error(
-            "Code: 999. Coordination::Exception: Session expired. (KEEPER_EXCEPTION)",
-          ),
+          new Error("Code: 999. Coordination::Exception: Session expired. (KEEPER_EXCEPTION)"),
         ),
       ).toBe(ErrorCategory.RECOVERABLE);
     });
@@ -520,9 +484,7 @@ describe("classifyClickHouseError", () => {
     it("returns RECOVERABLE for 'Connection loss' message (Keeper coordinator dropped)", () => {
       expect(
         classifyClickHouseError(
-          new Error(
-            "Code: 999. Coordination::Exception: Coordination error: Connection loss.",
-          ),
+          new Error("Code: 999. Coordination::Exception: Coordination error: Connection loss."),
         ),
       ).toBe(ErrorCategory.RECOVERABLE);
     });
@@ -551,9 +513,9 @@ describe("classifyClickHouseError", () => {
         "ENETUNREACH",
         "EAI_AGAIN",
       ])("returns RECOVERABLE for socket errno %s", (code) => {
-        expect(
-          classifyClickHouseError(Object.assign(new Error("request failed"), { code })),
-        ).toBe(ErrorCategory.RECOVERABLE);
+        expect(classifyClickHouseError(Object.assign(new Error("request failed"), { code }))).toBe(
+          ErrorCategory.RECOVERABLE,
+        );
       });
 
       // Both message forms, because they come from different layers: "socket
@@ -564,9 +526,7 @@ describe("classifyClickHouseError", () => {
       it.each(["socket hang up", "other side closed"])(
         "returns RECOVERABLE for a bare %j message with no code",
         (message) => {
-          expect(classifyClickHouseError(new Error(message))).toBe(
-            ErrorCategory.RECOVERABLE,
-          );
+          expect(classifyClickHouseError(new Error(message))).toBe(ErrorCategory.RECOVERABLE);
         },
       );
 

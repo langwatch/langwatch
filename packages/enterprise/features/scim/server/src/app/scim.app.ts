@@ -19,10 +19,7 @@
  * payload into four user-provisioning calls no other door reaches, and lifting
  * those onto this object is a separate move.
  */
-import type {
-  ScimService,
-  ScimTokenSummary,
-} from "@langwatch/enterprise-scim-contract";
+import type { ScimService, ScimTokenSummary } from "@langwatch/enterprise-scim-contract";
 
 /**
  * The plan the organization is on, as the process resolves it. Structural: the
@@ -74,10 +71,7 @@ export class ScimApp {
   }
 
   /** Retires one token. Idempotent from the caller's side. */
-  revokeToken(input: {
-    organizationId: string;
-    tokenId: string;
-  }): Promise<{ success: true }> {
+  revokeToken(input: { organizationId: string; tokenId: string }): Promise<{ success: true }> {
     return this.dependencies.scim.revokeToken(input);
   }
 

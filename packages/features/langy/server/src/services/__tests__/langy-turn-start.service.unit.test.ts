@@ -80,9 +80,7 @@ function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
   return { deps, ensureConversation, acceptTurn, dispatch, claim, commit, abort, mint };
 }
 
-const input = (
-  over: Partial<StartConversationTurnInput> = {},
-): StartConversationTurnInput => ({
+const input = (over: Partial<StartConversationTurnInput> = {}): StartConversationTurnInput => ({
   projectId: "project-1",
   idempotencyKey: "00000000-0000-4000-8000-000000000001",
   session: { user: { id: "user-1" } } as StartConversationTurnInput["session"],

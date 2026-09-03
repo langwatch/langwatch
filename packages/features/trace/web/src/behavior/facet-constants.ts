@@ -251,13 +251,7 @@ export const FACET_GROUPS: FacetGroupDef[] = [
   {
     id: "traces",
     label: "Traces",
-    keys: [
-      "origin",
-      "rootSpanType",
-      "traceName",
-      METADATA_SECTION_KEY,
-      ATTRIBUTES_SECTION_KEY,
-    ],
+    keys: ["origin", "rootSpanType", "traceName", METADATA_SECTION_KEY, ATTRIBUTES_SECTION_KEY],
   },
   // "What's broken?" — error + intervention signals.
   {

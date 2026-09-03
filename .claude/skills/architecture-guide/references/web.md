@@ -19,12 +19,12 @@ surfaces/<id>/index.ts      an embeddable piece other features may mount, public
 Allowed imports (`UI_LAYER_DEPENDENCIES` in
 `packages/architecture-lint/src/frontend-ui-boundaries.ts`):
 
-| from         | may import                                   |
-| ------------ | -------------------------------------------- |
-| behavior     | model, behavior                              |
-| ui/elements  | model, elements                              |
-| ui/blocks    | model, elements, blocks                      |
-| ui/sections  | model, behavior, elements, blocks, sections  |
+| from        | may import                                  |
+| ----------- | ------------------------------------------- |
+| behavior    | model, behavior                             |
+| ui/elements | model, elements                             |
+| ui/blocks   | model, elements, blocks                     |
+| ui/sections | model, behavior, elements, blocks, sections |
 
 Elements and blocks can never fetch: they cannot import behavior. Sections are where
 data meets layout. Screens and surfaces compose sections.
@@ -42,9 +42,9 @@ A screen export looks like:
 
 ```ts
 // screens/secret/index.ts
-export const secretScreens = { secrets: () => import("./secrets.screen") };  // the one
-export { secretApi } from "../../behavior/secret-api";                       // allowed
-export { SecretHostPort } from "../../model/secret-host";                     // lazy form
+export const secretScreens = { secrets: () => import("./secrets.screen") }; // the one
+export { secretApi } from "../../behavior/secret-api"; // allowed
+export { SecretHostPort } from "../../model/secret-host"; // lazy form
 ```
 
 (The lazy `import()` of a screen module inside `screens/*/index.ts` is how page loaders

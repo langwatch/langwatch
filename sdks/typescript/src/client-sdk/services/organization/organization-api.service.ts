@@ -231,9 +231,7 @@ export class OrganizationApiService {
   async getMemberAccess(userId: string): Promise<MemberAccessBreakdown> {
     return this.#request({
       operation: `fetch the access of member "${userId}"`,
-      path: managementPath(
-        `/api/organization/members/${encodeURIComponent(userId)}/access`,
-      ),
+      path: managementPath(`/api/organization/members/${encodeURIComponent(userId)}/access`),
     });
   }
 

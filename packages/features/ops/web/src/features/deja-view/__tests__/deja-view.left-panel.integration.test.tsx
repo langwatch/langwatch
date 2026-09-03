@@ -66,9 +66,7 @@ describe("LeftPanel", () => {
     describe("when the rail renders", () => {
       it("says so instead of showing an empty section", () => {
         renderPanel({ eventSubscribers: [] });
-        expect(
-          screen.getByText("No event subscribers for this aggregate type."),
-        ).toBeDefined();
+        expect(screen.getByText("No event subscribers for this aggregate type.")).toBeDefined();
       });
     });
   });

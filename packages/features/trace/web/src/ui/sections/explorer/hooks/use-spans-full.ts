@@ -1,10 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import {
-  expandDeletedSpanIds,
-  indexSpanPatches,
-} from "@langwatch/trace-contract";
+import { expandDeletedSpanIds, indexSpanPatches } from "@langwatch/trace-contract";
 import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { api } from "../../trace-api";
@@ -92,8 +89,5 @@ export function useSpansFull(enabled: boolean) {
     [spans, patch],
   );
 
-  return useMemo(
-    () => (data === spans ? query : { ...query, data }),
-    [query, data, spans],
-  );
+  return useMemo(() => (data === spans ? query : { ...query, data }), [query, data, spans]);
 }

@@ -40,19 +40,13 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId1,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1),
       ];
 
       // Context without tenantId should fail
       const invalidContext = {} as any;
 
-      await expect(service.storeEvents(events, invalidContext)).rejects.toThrow(
-        "tenantId",
-      );
+      await expect(service.storeEvents(events, invalidContext)).rejects.toThrow("tenantId");
     });
 
     it("tenantId is validated before operations", async () => {
@@ -65,19 +59,13 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId1,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1),
       ];
 
       // Empty tenantId should fail
       const invalidContext = { tenantId: "" } as any;
 
-      await expect(service.storeEvents(events, invalidContext)).rejects.toThrow(
-        "tenantId",
-      );
+      await expect(service.storeEvents(events, invalidContext)).rejects.toThrow("tenantId");
     });
 
     it("events are filtered by tenantId", async () => {
@@ -91,20 +79,12 @@ describe("EventSourcingService - Security Flows", () => {
 
       const context1 = createTestEventStoreReadContext(tenantId1);
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId1,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1),
       ];
 
       await service.storeEvents(events, context1);
 
-      expect(eventStore.storeEvents).toHaveBeenCalledWith(
-        events,
-        context1,
-        aggregateType,
-      );
+      expect(eventStore.storeEvents).toHaveBeenCalledWith(events, context1, aggregateType);
       // Verify tenantId is passed to store
       expect(eventStore.storeEvents).toHaveBeenCalledWith(
         expect.any(Array),
@@ -129,11 +109,7 @@ describe("EventSourcingService - Security Flows", () => {
         foldProjections: [foldDef],
       });
 
-      await service.getProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
-        context1,
-      );
+      await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context1);
 
       expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -156,16 +132,10 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId1,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1),
       ];
 
-      await expect(service.storeEvents(events, undefined as any)).rejects.toThrow(
-        "tenantId",
-      );
+      await expect(service.storeEvents(events, undefined as any)).rejects.toThrow("tenantId");
     });
 
     it("invalid tenantId causes errors", async () => {
@@ -178,11 +148,7 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId1,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1),
       ];
 
       const invalidContexts = [
@@ -217,11 +183,7 @@ describe("EventSourcingService - Security Flows", () => {
         foldProjections: [foldDef],
       });
 
-      await service.getProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
-        context,
-      );
+      await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context);
 
       expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -245,21 +207,13 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId1,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1),
       ];
       const context = createTestEventStoreReadContext(tenantId1);
 
       await service.storeEvents(events, context);
 
-      expect(eventStore.storeEvents).toHaveBeenCalledWith(
-        events,
-        context,
-        customAggregateType,
-      );
+      expect(eventStore.storeEvents).toHaveBeenCalledWith(events, context, customAggregateType);
     });
 
     it("aggregateType prevents cross-type contamination", async () => {
@@ -282,24 +236,14 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId1,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1),
       ];
       const context = createTestEventStoreReadContext(tenantId1);
 
       await service1.storeEvents(events, context);
-      await expect(service2.storeEvents(events, context)).rejects.toThrow(
-        /owns aggregate/,
-      );
+      await expect(service2.storeEvents(events, context)).rejects.toThrow(/owns aggregate/);
 
-      expect(eventStore.storeEvents).toHaveBeenCalledWith(
-        events,
-        context,
-        aggregateType1,
-      );
+      expect(eventStore.storeEvents).toHaveBeenCalledWith(events, context, aggregateType1);
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
     });
   });
@@ -317,18 +261,10 @@ describe("EventSourcingService - Security Flows", () => {
       const context1 = createTestEventStoreReadContext(tenantId1);
       const context2 = createTestEventStoreReadContext(tenantId2);
       const events1 = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId1,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1),
       ];
       const events2 = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId2,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId2),
       ];
 
       await service.storeEvents(events1, context1);
@@ -361,18 +297,12 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId1,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1),
       ];
       await service.storeEvents(events, context1);
 
       // Map should receive event with correct tenantId
-      expect(mapDef.map).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: tenantId1 }),
-      );
+      expect(mapDef.map).toHaveBeenCalledWith(expect.objectContaining({ tenantId: tenantId1 }));
     });
 
     it("fold projections are tenant-scoped", async () => {
@@ -392,16 +322,8 @@ describe("EventSourcingService - Security Flows", () => {
         foldProjections: [foldDef],
       });
 
-      await service.getProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
-        context1,
-      );
-      await service.getProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
-        context2,
-      );
+      await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context1);
+      await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context2);
 
       // Verify different tenantIds are passed to fold store
       expect(foldStore.get).toHaveBeenCalledWith(
@@ -429,36 +351,18 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const events1 = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId1,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1),
       ];
       const events2 = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId2,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId2),
       ];
 
       await service.storeEvents(events1, context1);
       await service.storeEvents(events2, context2);
 
       // Verify events are stored with correct tenant contexts
-      expect(eventStore.storeEvents).toHaveBeenNthCalledWith(
-        1,
-        events1,
-        context1,
-        aggregateType,
-      );
-      expect(eventStore.storeEvents).toHaveBeenNthCalledWith(
-        2,
-        events2,
-        context2,
-        aggregateType,
-      );
+      expect(eventStore.storeEvents).toHaveBeenNthCalledWith(1, events1, context1, aggregateType);
+      expect(eventStore.storeEvents).toHaveBeenNthCalledWith(2, events2, context2, aggregateType);
     });
   });
 });

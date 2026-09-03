@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildDecorationPlan,
-  buildDecorationSlots,
-  chipOverlayLabel,
-} from "../filter-highlight";
+import { buildDecorationPlan, buildDecorationSlots, chipOverlayLabel } from "../filter-highlight";
 
 describe("buildDecorationSlots", () => {
   describe("given an empty string", () => {
@@ -263,9 +259,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // AND so it doesn't suddenly un-bold mid-edit.
       const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
       expect(tokenSlots).toEqual([{ from: 0, to: 11, className: "filter-token" }]);
-      expect(plan.slots.some((s) => s.className.includes("filter-keyword-and"))).toBe(
-        true,
-      );
+      expect(plan.slots.some((s) => s.className.includes("filter-keyword-and"))).toBe(true);
       // The fallback emits a widget too — without it, breaking the parse
       // mid-edit (a trailing AND, an unmatched quote) would visually delete
       // every chip's X button until the user tidied the syntax.
@@ -468,12 +462,8 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       (input, expectedTokens, expectedWidgets) => {
         const plan = buildDecorationPlan(input);
         const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
-        expect(tokenSlots.length, `tokens for ${JSON.stringify(input)}`).toBe(
-          expectedTokens,
-        );
-        expect(plan.tokens.length, `widgets for ${JSON.stringify(input)}`).toBe(
-          expectedWidgets,
-        );
+        expect(tokenSlots.length, `tokens for ${JSON.stringify(input)}`).toBe(expectedTokens);
+        expect(plan.tokens.length, `widgets for ${JSON.stringify(input)}`).toBe(expectedWidgets);
       },
     );
 
@@ -672,9 +662,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         },
       ]);
       // AND is recognised as a keyword, not absorbed into a value.
-      expect(plan.slots.some((s) => s.className.includes("filter-keyword-and"))).toBe(
-        true,
-      );
+      expect(plan.slots.some((s) => s.className.includes("filter-keyword-and"))).toBe(true);
     });
   });
 
@@ -755,9 +743,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         },
       ]);
       // No AND keyword decoration — there is no boolean operator in the AST.
-      expect(plan.slots.some((s) => s.className.includes("filter-keyword-and"))).toBe(
-        false,
-      );
+      expect(plan.slots.some((s) => s.className.includes("filter-keyword-and"))).toBe(false);
     });
   });
 });
@@ -777,9 +763,7 @@ describe("chipOverlayLabel", () => {
 
   describe("when the label equals the raw value", () => {
     it("returns undefined so no overlay paints — nothing to humanise", () => {
-      expect(
-        chipOverlayLabel({ field: "status", value: "error", label: "error" }),
-      ).toBeUndefined();
+      expect(chipOverlayLabel({ field: "status", value: "error", label: "error" })).toBeUndefined();
     });
   });
 

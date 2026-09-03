@@ -29,8 +29,7 @@ const awsClientConfig = (input: AwsClientConfigInput): AwsClientConfig => ({
 
 const clientFor = (config: SqsDestinationConfig) => sqsClientFor(config, awsClientConfig);
 
-const QUEUE_URL =
-  "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-dev-billing-webhooks";
+const QUEUE_URL = "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-dev-billing-webhooks";
 
 const BATCH_BODY = JSON.stringify({
   batch: [
@@ -44,9 +43,7 @@ const BATCH_BODY = JSON.stringify({
   ],
 });
 
-function request(
-  overrides: Partial<WebhookDispatchRequest> = {},
-): WebhookDispatchRequest {
+function request(overrides: Partial<WebhookDispatchRequest> = {}): WebhookDispatchRequest {
   return {
     organizationId: "org_1",
     endpointId: "wh_1",
@@ -128,17 +125,10 @@ describe("sqsWebhookDestination", () => {
 
       await destination.send(request({ attempt: 3 }));
 
-      const attributes = sent[0]!.MessageAttributes as Record<
-        string,
-        { StringValue: string }
-      >;
+      const attributes = sent[0]!.MessageAttributes as Record<string, { StringValue: string }>;
       expect(Object.keys(attributes)).toContain(WEBHOOK_SIGNATURE_HEADER);
-      expect(attributes[WEBHOOK_SIGNATURE_HEADER]!.StringValue).toMatch(
-        /^t=\d+,v1=[0-9a-f]+/,
-      );
-      expect(attributes["X-LangWatch-Delivery-Id"]!.StringValue).toBe(
-        "wh_1:abc123",
-      );
+      expect(attributes[WEBHOOK_SIGNATURE_HEADER]!.StringValue).toMatch(/^t=\d+,v1=[0-9a-f]+/);
+      expect(attributes["X-LangWatch-Delivery-Id"]!.StringValue).toBe("wh_1:abc123");
       expect(attributes["X-LangWatch-Delivery-Attempt"]!.StringValue).toBe("3");
       // A consumer that routes test fires away from its ingest path reads this
       // attribute, so its absence on an ordinary delivery is the contract too.
@@ -161,10 +151,7 @@ describe("sqsWebhookDestination", () => {
 
       await destination.send(request({ isTestFire: true }));
 
-      const attributes = sent[0]!.MessageAttributes as Record<
-        string,
-        { StringValue: string }
-      >;
+      const attributes = sent[0]!.MessageAttributes as Record<string, { StringValue: string }>;
       expect(attributes["X-LangWatch-Test-Fire"]!.StringValue).toBe("true");
     });
 
@@ -283,10 +270,7 @@ describe("sqsWebhookDestination", () => {
       expect(result.verdict).toBe("success");
       expect(sent).toHaveLength(1);
       expect(limitMock).not.toHaveBeenCalled();
-      const attributes = sent[0]!.MessageAttributes as Record<
-        string,
-        { StringValue: string }
-      >;
+      const attributes = sent[0]!.MessageAttributes as Record<string, { StringValue: string }>;
       expect(attributes["X-LangWatch-Test-Fire"]!.StringValue).toBe("true");
     });
   });
@@ -299,44 +283,26 @@ describe("sqsWebhookDestination", () => {
           name: "AWS.SimpleQueueService.NonExistentQueue",
         }).verdict,
       ).toBe("terminal");
-      expect(classifySqsFailure({ name: "QueueDoesNotExist" }).verdict).toBe(
-        "terminal",
-      );
-      expect(classifySqsFailure({ name: "AccessDenied" }).verdict).toBe(
-        "terminal",
-      );
-      expect(
-        classifySqsFailure({ name: "AccessDeniedException" }).verdict,
-      ).toBe("terminal");
+      expect(classifySqsFailure({ name: "QueueDoesNotExist" }).verdict).toBe("terminal");
+      expect(classifySqsFailure({ name: "AccessDenied" }).verdict).toBe("terminal");
+      expect(classifySqsFailure({ name: "AccessDeniedException" }).verdict).toBe("terminal");
     });
 
     /** @scenario A missing or forbidden queue is terminal, a throttled one retries */
     it("classifies throttling, server errors and network failures as retryable", () => {
-      expect(classifySqsFailure({ name: "ThrottlingException" }).verdict).toBe(
-        "retryable",
-      );
-      expect(
-        classifySqsFailure({ $metadata: { httpStatusCode: 503 } }).verdict,
-      ).toBe("retryable");
-      expect(classifySqsFailure({ code: "ECONNRESET" }).verdict).toBe(
-        "retryable",
-      );
+      expect(classifySqsFailure({ name: "ThrottlingException" }).verdict).toBe("retryable");
+      expect(classifySqsFailure({ $metadata: { httpStatusCode: 503 } }).verdict).toBe("retryable");
+      expect(classifySqsFailure({ code: "ECONNRESET" }).verdict).toBe("retryable");
     });
 
     /** @scenario A missing or forbidden queue is terminal, a throttled one retries */
     it("keeps an expired credential retryable, so an expiring session is not a dead queue", () => {
-      expect(classifySqsFailure({ name: "ExpiredToken" }).verdict).toBe(
-        "retryable",
-      );
-      expect(
-        classifySqsFailure({ name: "ExpiredTokenException" }).verdict,
-      ).toBe("retryable");
+      expect(classifySqsFailure({ name: "ExpiredToken" }).verdict).toBe("retryable");
+      expect(classifySqsFailure({ name: "ExpiredTokenException" }).verdict).toBe("retryable");
     });
 
     it("treats a failure it has never seen as retryable, since the ladder gives up on its own", () => {
-      expect(classifySqsFailure({ name: "SomethingNewFromAws" }).verdict).toBe(
-        "retryable",
-      );
+      expect(classifySqsFailure({ name: "SomethingNewFromAws" }).verdict).toBe("retryable");
     });
 
     it("returns the classified verdict rather than throwing", async () => {
@@ -393,9 +359,12 @@ describe("sqsWebhookDestination", () => {
             name: "AccessDenied",
           }),
         });
-        await sqsWebhookDestination({ ...config, awsClientConfig, rateLimiter }, {
-          createClient: () => client as never,
-        }).send(request());
+        await sqsWebhookDestination(
+          { ...config, awsClientConfig, rateLimiter },
+          {
+            createClient: () => client as never,
+          },
+        ).send(request());
 
         expect(clientFor(config)).not.toBe(first);
       });
@@ -416,9 +385,12 @@ describe("sqsWebhookDestination", () => {
             name: "ThrottlingException",
           }),
         });
-        await sqsWebhookDestination({ ...config, awsClientConfig, rateLimiter }, {
-          createClient: () => client as never,
-        }).send(request());
+        await sqsWebhookDestination(
+          { ...config, awsClientConfig, rateLimiter },
+          {
+            createClient: () => client as never,
+          },
+        ).send(request());
 
         // Rebuilding on a throttle would re-assume the role on every delivery,
         // which is the cost the cache exists to avoid.
@@ -454,30 +426,22 @@ describe("queue URL admission", () => {
 
   it("tells a FIFO queue apart from an unrecognizable URL", () => {
     expect(
-      inspectSqsQueueUrl(
-        "https://sqs.eu-central-1.amazonaws.com/381491922238/orders.fifo",
-      ),
+      inspectSqsQueueUrl("https://sqs.eu-central-1.amazonaws.com/381491922238/orders.fifo"),
     ).toEqual({ ok: false, problem: "fifo" });
   });
 
   it("accepts the China partition spelling", () => {
-    const parsed = parseSqsQueueUrl(
-      "https://sqs.cn-north-1.amazonaws.com.cn/381491922238/events",
-    );
+    const parsed = parseSqsQueueUrl("https://sqs.cn-north-1.amazonaws.com.cn/381491922238/events");
     expect(parsed?.region).toBe("cn-north-1");
   });
 
   it("accepts the FIPS endpoints a regulated customer is required to use", () => {
-    const parsed = parseSqsQueueUrl(
-      "https://sqs-fips.us-east-1.amazonaws.com/381491922238/events",
-    );
+    const parsed = parseSqsQueueUrl("https://sqs-fips.us-east-1.amazonaws.com/381491922238/events");
     expect(parsed).toMatchObject({ region: "us-east-1", queueName: "events" });
   });
 
   it("accepts the legacy regional spelling older consoles hand out", () => {
-    const parsed = parseSqsQueueUrl(
-      "https://eu-central-1.queue.amazonaws.com/381491922238/events",
-    );
+    const parsed = parseSqsQueueUrl("https://eu-central-1.queue.amazonaws.com/381491922238/events");
     expect(parsed).toMatchObject({
       region: "eu-central-1",
       accountId: "381491922238",
@@ -488,9 +452,10 @@ describe("queue URL admission", () => {
   // this spelling has no region in it. Accepting it would mean guessing
   // us-east-1 and writing to whatever queue of that name lives there.
   it("refuses the region-less legacy spelling", () => {
-    expect(
-      inspectSqsQueueUrl("https://queue.amazonaws.com/381491922238/events"),
-    ).toEqual({ ok: false, problem: "shape" });
+    expect(inspectSqsQueueUrl("https://queue.amazonaws.com/381491922238/events")).toEqual({
+      ok: false,
+      problem: "shape",
+    });
   });
 });
 

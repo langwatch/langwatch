@@ -22,9 +22,7 @@ export const promptRestoreCommand = async (
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
-  const spinner = createSpinner(
-    `Restoring "${handle}" to version ${versionId}...`,
-  ).start();
+  const spinner = createSpinner(`Restoring "${handle}" to version ${versionId}...`).start();
 
   try {
     const response = await fetch(
@@ -60,12 +58,8 @@ export const promptRestoreCommand = async (
       data: restored,
       table: () => {
         console.log();
-        console.log(
-          `  ${chalk.gray("New version:")} ${chalk.cyan(`v${restored.version}`)}`,
-        );
-        console.log(
-          `  ${chalk.gray("Message:")}     ${restored.commitMessage ?? chalk.gray("—")}`,
-        );
+        console.log(`  ${chalk.gray("New version:")} ${chalk.cyan(`v${restored.version}`)}`);
+        console.log(`  ${chalk.gray("Message:")}     ${restored.commitMessage ?? chalk.gray("—")}`);
         console.log();
       },
     };

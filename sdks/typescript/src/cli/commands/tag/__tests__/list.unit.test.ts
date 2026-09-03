@@ -29,9 +29,7 @@ describe("tagListCommand", () => {
     vi.clearAllMocks();
     mockListTags = vi.fn();
     vi.mocked(PromptsApiService).mockImplementation(function () {
-      return { listTags: mockListTags } as unknown as InstanceType<
-        typeof PromptsApiService
-      >;
+      return { listTags: mockListTags } as unknown as InstanceType<typeof PromptsApiService>;
     });
   });
 
@@ -69,9 +67,7 @@ describe("tagListCommand", () => {
       const result = await tagListCommand();
       result?.table();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining("No custom tags found"),
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("No custom tags found"));
       expect(formatTable).not.toHaveBeenCalled();
     });
   });

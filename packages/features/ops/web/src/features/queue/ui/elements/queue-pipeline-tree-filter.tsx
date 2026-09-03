@@ -15,13 +15,7 @@ export function PipelineTreeFilter({
   return (
     <>
       <Box position="relative" width="200px">
-        <Box
-          position="absolute"
-          left={2.5}
-          top="50%"
-          transform="translateY(-50%)"
-          zIndex={1}
-        >
+        <Box position="absolute" left={2.5} top="50%" transform="translateY(-50%)" zIndex={1}>
           <Search size={11} color="var(--chakra-colors-fg-muted)" />
         </Box>
         <Input

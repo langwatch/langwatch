@@ -112,11 +112,9 @@ describe("collectGoBindings", () => {
       it("collects the binding", () => {
         expect(
           bindingsFor(
-            [
-              '/** @scenario "Top-level test func" */',
-              "func TestThing(t *testing.T) {",
-              "}",
-            ].join("\n"),
+            ['/** @scenario "Top-level test func" */', "func TestThing(t *testing.T) {", "}"].join(
+              "\n",
+            ),
           ),
         ).toEqual(["Top-level test func"]);
       });
@@ -218,9 +216,7 @@ describe("discoverFeatureFiles", () => {
         // Returning [] here is how a renamed spec directory reports every
         // scenario under it as bound: the files stop being discovered and the
         // check goes green.
-        expect(() => discoverFeatureFiles([join(root, "gone")])).toThrow(
-          /does not exist/,
-        );
+        expect(() => discoverFeatureFiles([join(root, "gone")])).toThrow(/does not exist/);
       });
     });
   });
@@ -284,8 +280,7 @@ describe("isInert", () => {
 });
 
 describe("findScenarioAnnotations", () => {
-  const titles = (src: string): string[] =>
-    findScenarioAnnotations(src).map((a) => a.title);
+  const titles = (src: string): string[] => findScenarioAnnotations(src).map((a) => a.title);
 
   describe("given the annotation opens no comment of its own", () => {
     // The prefix accepts zero markers so the Python SDK's docstring form keeps
@@ -293,11 +288,9 @@ describe("findScenarioAnnotations", () => {
     // the file in order can tell the two apart: the deciding context is on an
     // earlier line.
     it("binds from inside a python docstring, which is how the SDK writes it", () => {
-      expect(
-        titles(
-          'def test_it():\n    """\n    @scenario Docstring form\n    """\n',
-        ),
-      ).toEqual(["Docstring form"]);
+      expect(titles('def test_it():\n    """\n    @scenario Docstring form\n    """\n')).toEqual([
+        "Docstring form",
+      ]);
     });
 
     it("binds from inside a block comment that opened on an earlier line", () => {
@@ -311,23 +304,17 @@ describe("findScenarioAnnotations", () => {
     });
 
     it("does not bind from test data, where an annotation is a string not a binding", () => {
-      expect(
-        titles('const fixture = `\n@scenario "Quoted in a fixture"\n`;'),
-      ).toEqual([]);
+      expect(titles('const fixture = `\n@scenario "Quoted in a fixture"\n`;')).toEqual([]);
     });
 
     it("does not bind after the block comment it was inside has closed", () => {
-      expect(
-        titles('/* opened and closed */\n@scenario "After the comment"'),
-      ).toEqual([]);
+      expect(titles('/* opened and closed */\n@scenario "After the comment"')).toEqual([]);
     });
   });
 
   describe("given the annotation opens its comment", () => {
     it("reads a quoted title from a jsdoc block", () => {
-      expect(titles('/** @scenario "Quoted title" */')).toEqual([
-        "Quoted title",
-      ]);
+      expect(titles('/** @scenario "Quoted title" */')).toEqual(["Quoted title"]);
     });
 
     it("reads an indented quoted title", () => {
@@ -335,21 +322,15 @@ describe("findScenarioAnnotations", () => {
     });
 
     it("reads an unquoted title from a jsdoc continuation line", () => {
-      expect(titles(" * @scenario Unquoted continuation")).toEqual([
-        "Unquoted continuation",
-      ]);
+      expect(titles(" * @scenario Unquoted continuation")).toEqual(["Unquoted continuation"]);
     });
 
     it("reads a title from a line comment", () => {
-      expect(titles("  // @scenario Line comment form")).toEqual([
-        "Line comment form",
-      ]);
+      expect(titles("  // @scenario Line comment form")).toEqual(["Line comment form"]);
     });
 
     it("reads a title through a continuation that opens a nested block", () => {
-      expect(titles("  *   /** @scenario Nested marker */")).toEqual([
-        "Nested marker",
-      ]);
+      expect(titles("  *   /** @scenario Nested marker */")).toEqual(["Nested marker"]);
     });
 
     it("reads an unquoted title from a hash comment", () => {
@@ -358,9 +339,7 @@ describe("findScenarioAnnotations", () => {
       // markers this accepts and every unquoted hash binding in the repo goes
       // silently unbound, which the whole-repo run does not surface when the
       // same scenario is also bound from another language.
-      expect(titles("# @scenario Unquoted hash form")).toEqual([
-        "Unquoted hash form",
-      ]);
+      expect(titles("# @scenario Unquoted hash form")).toEqual(["Unquoted hash form"]);
     });
   });
 
@@ -377,9 +356,7 @@ describe("findScenarioAnnotations", () => {
     });
 
     it("reads a title from a python docstring", () => {
-      expect(titles('    """\n    @scenario Docstring form\n    """')).toEqual([
-        "Docstring form",
-      ]);
+      expect(titles('    """\n    @scenario Docstring form\n    """')).toEqual(["Docstring form"]);
     });
   });
 
@@ -419,24 +396,17 @@ describe("findScenarioAnnotations", () => {
     });
 
     it("binds nothing when the token is quoted inside prose", () => {
-      expect(
-        titles(" * individually via the `@scenario` token in prose"),
-      ).toEqual([]);
+      expect(titles(" * individually via the `@scenario` token in prose")).toEqual([]);
     });
 
     it("binds nothing when the token trails code on the same line", () => {
-      expect(
-        titles("const x = 1; // see @scenario Something for context"),
-      ).toEqual([]);
+      expect(titles("const x = 1; // see @scenario Something for context")).toEqual([]);
     });
   });
 
   describe("given several annotations in one source", () => {
     it("reports each one with an offset past its own match", () => {
-      const src = [
-        '/** @scenario "First" */',
-        '/** @scenario "Second" */',
-      ].join("\n");
+      const src = ['/** @scenario "First" */', '/** @scenario "Second" */'].join("\n");
       const found = findScenarioAnnotations(src);
 
       expect(found.map((a) => a.title)).toEqual(["First", "Second"]);
@@ -467,16 +437,13 @@ describe("formatFailureBanner", () => {
       // The whole point. Without this the reader sees `✓ all bound` next to
       // their own feature file and concludes the run passed, while the exit
       // code says otherwise.
-      expect(
-        formatFailureBanner(["1 unknown annotation(s)"]).join("\n"),
-      ).toContain("not that the run passed");
+      expect(formatFailureBanner(["1 unknown annotation(s)"]).join("\n")).toContain(
+        "not that the run passed",
+      );
     });
 
     it("carries every reason the exit code was built from", () => {
-      const reasons = [
-        "2 unbound scenario(s) in enforced files",
-        "1 unknown annotation(s)",
-      ];
+      const reasons = ["2 unbound scenario(s) in enforced files", "1 unknown annotation(s)"];
 
       const text = formatFailureBanner(reasons).join("\n");
 

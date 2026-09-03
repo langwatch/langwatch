@@ -1351,20 +1351,7 @@
           },
           "language_code": {
             "type": "string",
-            "enum": [
-              "en",
-              "es",
-              "fr",
-              "de",
-              "it",
-              "pt",
-              "ar",
-              "hi",
-              "ja",
-              "ko",
-              "zh",
-              "zh-TW"
-            ],
+            "enum": ["en", "es", "fr", "de", "it", "pt", "ar", "hi", "ja", "ko", "zh", "zh-TW"],
             "title": "Language Code",
             "description": "The language code of the input text for better PII detection, defaults to english.",
             "default": "en"
@@ -1619,10 +1606,7 @@
         "properties": {
           "input": { "type": "string", "title": "Input" },
           "contexts": {
-            "anyOf": [
-              { "items": { "type": "string" }, "type": "array" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "items": { "type": "string" }, "type": "array" }, { "type": "null" }],
             "title": "Contexts"
           }
         },
@@ -2015,10 +1999,7 @@
             "title": "Output"
           },
           "contexts": {
-            "anyOf": [
-              { "items": { "type": "string" }, "type": "array" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "items": { "type": "string" }, "type": "array" }, { "type": "null" }],
             "title": "Contexts"
           }
         },
@@ -2109,10 +2090,7 @@
             "title": "Output"
           },
           "contexts": {
-            "anyOf": [
-              { "items": { "type": "string" }, "type": "array" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "items": { "type": "string" }, "type": "array" }, { "type": "null" }],
             "title": "Contexts"
           }
         },
@@ -3379,10 +3357,7 @@
             "description": "List of entries to be evaluated, check the field type for the necessary keys"
           },
           "settings": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/CustomBasicSettings" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "$ref": "#/components/schemas/CustomBasicSettings" }, { "type": "null" }],
             "description": "Evaluator settings, check the field type for what settings this evaluator supports"
           },
           "env": {
@@ -3447,10 +3422,7 @@
             "description": "List of entries to be evaluated, check the field type for the necessary keys"
           },
           "settings": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/CompetitorLLMSettings" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "$ref": "#/components/schemas/CompetitorLLMSettings" }, { "type": "null" }],
             "description": "Evaluator settings, check the field type for what settings this evaluator supports"
           },
           "env": {
@@ -3583,10 +3555,7 @@
             "description": "List of entries to be evaluated, check the field type for the necessary keys"
           },
           "settings": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/OffTopicSettings" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "$ref": "#/components/schemas/OffTopicSettings" }, { "type": "null" }],
             "description": "Evaluator settings, check the field type for what settings this evaluator supports"
           },
           "env": {
@@ -3756,10 +3725,7 @@
             "description": "List of entries to be evaluated, check the field type for the necessary keys"
           },
           "settings": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/LlamaGuardSettings" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "$ref": "#/components/schemas/LlamaGuardSettings" }, { "type": "null" }],
             "description": "Evaluator settings, check the field type for what settings this evaluator supports"
           },
           "env": {
@@ -3863,10 +3829,7 @@
             "description": "List of entries to be evaluated, check the field type for the necessary keys"
           },
           "settings": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/RagasSettings" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "$ref": "#/components/schemas/RagasSettings" }, { "type": "null" }],
             "description": "Evaluator settings, check the field type for what settings this evaluator supports"
           },
           "env": {
@@ -3898,10 +3861,7 @@
             "description": "List of entries to be evaluated, check the field type for the necessary keys"
           },
           "settings": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/RagasSettings" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "$ref": "#/components/schemas/RagasSettings" }, { "type": "null" }],
             "description": "Evaluator settings, check the field type for what settings this evaluator supports"
           },
           "env": {
@@ -3931,10 +3891,7 @@
             "description": "List of entries to be evaluated, check the field type for the necessary keys"
           },
           "settings": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/RagasSettings" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "$ref": "#/components/schemas/RagasSettings" }, { "type": "null" }],
             "description": "Evaluator settings, check the field type for what settings this evaluator supports"
           },
           "env": {
@@ -3966,10 +3923,7 @@
             "description": "List of entries to be evaluated, check the field type for the necessary keys"
           },
           "settings": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/RagasSettings" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "$ref": "#/components/schemas/RagasSettings" }, { "type": "null" }],
             "description": "Evaluator settings, check the field type for what settings this evaluator supports"
           },
           "env": {
@@ -4001,10 +3955,7 @@
             "description": "List of entries to be evaluated, check the field type for the necessary keys"
           },
           "settings": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/RagasSettings" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "$ref": "#/components/schemas/RagasSettings" }, { "type": "null" }],
             "description": "Evaluator settings, check the field type for what settings this evaluator supports"
           },
           "env": {
@@ -4034,10 +3985,7 @@
             "description": "List of entries to be evaluated, check the field type for the necessary keys"
           },
           "settings": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/RagasSettings" },
-              { "type": "null" }
-            ],
+            "anyOf": [{ "$ref": "#/components/schemas/RagasSettings" }, { "type": "null" }],
             "description": "Evaluator settings, check the field type for what settings this evaluator supports"
           },
           "env": {

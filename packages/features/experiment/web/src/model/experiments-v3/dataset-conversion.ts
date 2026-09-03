@@ -36,10 +36,7 @@ export const convertInlineToRowRecords = (
   columns: DatasetColumn[],
   records: Record<string, string[]>,
 ): DatasetRowRecord[] => {
-  const rowCount = Math.max(
-    ...Object.values(records).map((arr) => arr.length),
-    0,
-  );
+  const rowCount = Math.max(...Object.values(records).map((arr) => arr.length), 0);
 
   const datasetRecords: DatasetRowRecord[] = [];
 

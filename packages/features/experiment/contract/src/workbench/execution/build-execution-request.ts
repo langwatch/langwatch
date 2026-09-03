@@ -1,10 +1,6 @@
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { carriedOverCells } from "./run-results";
-import type {
-  CarriedOverCell,
-  ExecutionRequest,
-  ExecutionScope,
-} from "./types";
+import type { CarriedOverCell, ExecutionRequest, ExecutionScope } from "./types";
 import type {
   DatasetReference,
   EvaluationResults,
@@ -29,10 +25,7 @@ export type SeedTargetOutputs = Record<
 >;
 
 /** The saved cells a run reads when it decides what it can reuse. */
-export type SeedableResults = Pick<
-  EvaluationResults,
-  "targetOutputs" | "targetMetadata"
->;
+export type SeedableResults = Pick<EvaluationResults, "targetOutputs" | "targetMetadata">;
 
 /** The saved cells a run reads when it carries the board in. */
 export type BoardResults = Pick<
@@ -125,9 +118,7 @@ export const comparisonDependencies = ({
   ];
 
   const dependencies = new Set(
-    carriers.flatMap(
-      (carrier) => toComparisonConfig(carrier)?.variants?.filter(Boolean) ?? [],
-    ),
+    carriers.flatMap((carrier) => toComparisonConfig(carrier)?.variants?.filter(Boolean) ?? []),
   );
   dependencies.delete(targetId);
   return [...dependencies];
@@ -164,9 +155,7 @@ export const planComparisonSeeding = ({
 
   const rows = rowsInScope({ scope, rowCount });
   const dependencies = new Set(
-    scoped.flatMap((targetId) =>
-      comparisonDependencies({ targets, evaluators, targetId }),
-    ),
+    scoped.flatMap((targetId) => comparisonDependencies({ targets, evaluators, targetId })),
   );
 
   for (const dependencyId of dependencies) {
@@ -226,10 +215,9 @@ const cellsCoveredByRun = ({
   extraCells: CellId[];
 }): Set<string> => {
   const covered = new Set(
-    [
-      ...computeExecutionCells({ scope, targetIds, datasetRows }),
-      ...extraCells,
-    ].map((cell) => `${cell.rowIndex}:${cell.targetId}`),
+    [...computeExecutionCells({ scope, targetIds, datasetRows }), ...extraCells].map(
+      (cell) => `${cell.rowIndex}:${cell.targetId}`,
+    ),
   );
   if (scope.type === "evaluator") {
     covered.add(`${scope.rowIndex}:${scope.targetId}`);
@@ -281,13 +269,10 @@ export const planBoardCarryOver = ({
 export const activeDatasetOf = (
   state: Pick<ExecutionRequestState, "datasets" | "activeDatasetId">,
 ): DatasetReference | undefined =>
-  state.datasets.find((dataset) => dataset.id === state.activeDatasetId) ??
-  state.datasets[0];
+  state.datasets.find((dataset) => dataset.id === state.activeDatasetId) ?? state.datasets[0];
 
 /** The active dataset's rows, whichever way the dataset stores them. */
-export const datasetRowsOf = (
-  dataset: DatasetReference,
-): Record<string, unknown>[] =>
+export const datasetRowsOf = (dataset: DatasetReference): Record<string, unknown>[] =>
   dataset.inline?.records
     ? transposeColumnsFirstToRowsFirstWithId(dataset.inline.records)
     : (dataset.savedRecords ?? []);
@@ -310,9 +295,7 @@ export const datasetRowsOf = (
  * through to a normal evaluator-target dispatch whose mappings have no per-row
  * candidate outputs, and the judge endpoint rejects the empty payload.
  */
-const targetOnTheWire = (
-  target: TargetConfig,
-): ExecutionRequest["targets"][number] => ({
+const targetOnTheWire = (target: TargetConfig): ExecutionRequest["targets"][number] => ({
   id: target.id,
   type: target.type,
   promptId: target.promptId,
@@ -410,8 +393,7 @@ export const buildExecutionRequest = ({
     evaluators: state.evaluators.map(evaluatorOnTheWire),
     scope,
     ...(concurrency !== undefined ? { concurrency } : {}),
-    seedTargetOutputs:
-      Object.keys(seedTargetOutputs).length > 0 ? seedTargetOutputs : undefined,
+    seedTargetOutputs: Object.keys(seedTargetOutputs).length > 0 ? seedTargetOutputs : undefined,
     carriedOverCells: carried.length > 0 ? carried : undefined,
   };
 

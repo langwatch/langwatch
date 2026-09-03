@@ -103,10 +103,7 @@ describe("strict feature ports", () => {
 
     expect(lint()).toEqual([]);
 
-    writeFileSync(
-      file,
-      "export abstract class ExamplePort { abstract load(): Promise<void>; }",
-    );
+    writeFileSync(file, "export abstract class ExamplePort { abstract load(): Promise<void>; }");
     expect(lint()).toMatchObject([{ policy: "strict-port-baseline" }]);
   });
 

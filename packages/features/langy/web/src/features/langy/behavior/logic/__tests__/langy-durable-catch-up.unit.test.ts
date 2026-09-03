@@ -140,10 +140,7 @@ describe("catchUpConversationFold", () => {
         currentTurnId: "turn-1",
       });
       const { utils, invalidate } = utilsWith({
-        events: [
-          accepted({ id: "e2", createdAt: 200 }),
-          responded({ id: "e3", createdAt: 300 }),
-        ],
+        events: [accepted({ id: "e2", createdAt: 200 }), responded({ id: "e3", createdAt: 300 })],
         cursor: { acceptedAt: 300, eventId: "e3" },
       });
 
@@ -212,10 +209,7 @@ describe("catchUpConversationFold", () => {
       fetch.mockImplementation(() => {
         useLangyStore.getState().selectConversation("conv-2");
         return Promise.resolve({
-          events: [
-            accepted({ id: "e2", createdAt: 200 }),
-            responded({ id: "e3", createdAt: 300 }),
-          ],
+          events: [accepted({ id: "e2", createdAt: 200 }), responded({ id: "e3", createdAt: 300 })],
           cursor: { acceptedAt: 300, eventId: "e3" },
           truncated: false,
         });

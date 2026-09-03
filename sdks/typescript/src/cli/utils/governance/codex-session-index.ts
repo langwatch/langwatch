@@ -26,9 +26,7 @@ export function codexSessionIndexPath(sessionsRoot: string): string {
 /**
  * Every session's current name, keyed by session id. Empty on any failure.
  */
-export async function readCodexThreadNames(
-  indexPath: string,
-): Promise<Map<string, string>> {
+export async function readCodexThreadNames(indexPath: string): Promise<Map<string, string>> {
   const names = new Map<string, string>();
   let raw: string;
   try {

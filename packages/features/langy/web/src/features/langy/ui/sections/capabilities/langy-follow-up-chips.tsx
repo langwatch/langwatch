@@ -36,13 +36,7 @@ export function LangyFollowUpChips({ chips }: { chips: FollowUpChip[] }) {
   if (chips.length === 0) return null;
 
   return (
-    <HStack
-      as="nav"
-      aria-label="Suggested next steps"
-      gap={1}
-      flexWrap="wrap"
-      paddingX={0.5}
-    >
+    <HStack as="nav" aria-label="Suggested next steps" gap={1} flexWrap="wrap" paddingX={0.5}>
       {chips.map((chip) => (
         <LangySpaAnchor
           key={chip.id}

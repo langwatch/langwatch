@@ -30,9 +30,7 @@ const mockSources: AvailableSource[] = [
   },
 ];
 
-const renderComponent = (
-  props: Partial<Parameters<typeof VariableInsertMenu>[0]> = {},
-) => {
+const renderComponent = (props: Partial<Parameters<typeof VariableInsertMenu>[0]> = {}) => {
   const defaultProps = {
     isOpen: true,
     position: { top: 100, left: 100 },
@@ -270,9 +268,7 @@ describe("VariableInsertMenu", () => {
       await user.click(inputField);
 
       // Should call onSelect with the field, not onCreateVariable
-      expect(onSelect).toHaveBeenCalledWith(
-        expect.objectContaining({ fieldName: "input" }),
-      );
+      expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ fieldName: "input" }));
       expect(onCreateVariable).not.toHaveBeenCalled();
     });
 
@@ -296,9 +292,7 @@ describe("VariableInsertMenu", () => {
       });
 
       expect(screen.getByText("No matching fields found")).toBeInTheDocument();
-      expect(
-        screen.getByText("Type a name to create a new variable"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Type a name to create a new variable")).toBeInTheDocument();
     });
   });
 

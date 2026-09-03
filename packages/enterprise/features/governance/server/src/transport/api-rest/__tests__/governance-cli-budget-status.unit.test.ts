@@ -11,10 +11,7 @@ import { createAppRestSecurity } from "@langwatch/api/rest";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createGovernanceCliRestApp,
-  type GovernanceCliRestPorts,
-} from "../governance-cli.api";
+import { createGovernanceCliRestApp, type GovernanceCliRestPorts } from "../governance-cli.api";
 
 describe("GET /api/auth/cli/budget/status", () => {
   describe("when the Bearer token is unknown to the access-token store", () => {

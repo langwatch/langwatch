@@ -179,7 +179,10 @@ export type WorkerModelProviderTenancy = Readonly<{
  * has configured several.
  */
 export function tryCreateWorkerModelProviders(
-  options: Omit<WorkerModelProviderCompositionOptions, "encryption" | "projects" | "organizations" | "authorization"> & {
+  options: Omit<
+    WorkerModelProviderCompositionOptions,
+    "encryption" | "projects" | "organizations" | "authorization"
+  > & {
     encryption: ModelProviderCredentialCipherPort | undefined;
     tenancy: WorkerModelProviderTenancy | undefined;
   },

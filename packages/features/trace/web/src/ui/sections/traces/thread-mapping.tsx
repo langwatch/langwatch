@@ -1,12 +1,4 @@
-import {
-  Box,
-  Grid,
-  GridItem,
-  HStack,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Grid, GridItem, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
 
 import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -42,10 +34,7 @@ export const THREAD_MAPPINGS = {
 export type ThreadMapping = Record<
   string,
   {
-    source:
-      | keyof typeof THREAD_MAPPINGS
-      | (typeof SERVER_ONLY_THREAD_SOURCES)[number]
-      | "";
+    source: keyof typeof THREAD_MAPPINGS | (typeof SERVER_ONLY_THREAD_SOURCES)[number] | "";
     selectedFields?: string[]; // Fields to include when source is 'traces'
   }
 >;
@@ -119,9 +108,7 @@ const mapThreadToDatasetEntry = (
 
       return [
         column,
-        typeof value !== "string" && typeof value !== "number"
-          ? JSON.stringify(value)
-          : value,
+        typeof value !== "string" && typeof value !== "number" ? JSON.stringify(value) : value,
       ];
     }),
   );
@@ -207,12 +194,9 @@ export const ThreadMapping = ({
       mapping: Object.fromEntries(
         targetFields.map((name) => {
           // Prefer existing mapping from threadMappingState, then currentMapping, then default
-          const existingMapping =
-            threadMappingState.mapping[name] ?? currentMapping.mapping[name];
+          const existingMapping = threadMappingState.mapping[name] ?? currentMapping.mapping[name];
           const defaultMapping = {
-            source: (name === "thread_id" ? "thread_id" : "") as
-              | keyof typeof THREAD_MAPPINGS
-              | "",
+            source: (name === "thread_id" ? "thread_id" : "") as keyof typeof THREAD_MAPPINGS | "",
             selectedFields: ["input", "output"],
           };
           return [name, existingMapping ?? defaultMapping];
@@ -230,8 +214,7 @@ export const ThreadMapping = ({
     if (
       !isInitializedRef.current ||
       fieldsChanged ||
-      JSON.stringify(threadMappingState) !==
-        JSON.stringify(threadMappingStateWithDefaults)
+      JSON.stringify(threadMappingState) !== JSON.stringify(threadMappingStateWithDefaults)
     ) {
       setThreadMappingState_(threadMappingStateWithDefaults);
       setThreadMapping?.(threadMappingStateWithDefaults);
@@ -250,9 +233,7 @@ export const ThreadMapping = ({
 
     // Identify columns mapped to server-only sources
     const serverOnlyColumns = Object.entries(mapping)
-      .filter(([, m]) =>
-        (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(m.source),
-      )
+      .filter(([, m]) => (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(m.source))
       .map(([col, m]) => ({ col, source: m.source }));
 
     for (const thread of threadData) {
@@ -291,177 +272,166 @@ export const ThreadMapping = ({
         gap={2}
       >
         {titles?.map((title, idx) => (
-          <GridItem
-            key={title}
-            colSpan={idx === titles.length - 1 ? 1 : 2}
-            paddingBottom={2}
-          >
+          <GridItem key={title} colSpan={idx === titles.length - 1 ? 1 : 2} paddingBottom={2}>
             <Text fontWeight="semibold">{title}</Text>
           </GridItem>
         ))}
-        {Object.entries(mapping).map(
-          ([targetField, { source, selectedFields }], index) => {
-            const targetHandle = `inputs.${targetField}`;
-            const currentSourceMapping = dsl?.targetEdges
-              ?.filter((edge) => edge.targetHandle === `inputs.${targetField}`)
-              .map((edge) => `${edge.source}.${edge.sourceHandle}`)[0];
+        {Object.entries(mapping).map(([targetField, { source, selectedFields }], index) => {
+          const targetHandle = `inputs.${targetField}`;
+          const currentSourceMapping = dsl?.targetEdges
+            ?.filter((edge) => edge.targetHandle === `inputs.${targetField}`)
+            .map((edge) => `${edge.source}.${edge.sourceHandle}`)[0];
 
-            return (
-              <React.Fragment key={index}>
-                {isThreeColumns && (
-                  <>
-                    <GridItem>
-                      <NativeSelect.Root width="full">
-                        <NativeSelect.Field
-                          value={currentSourceMapping ?? ""}
-                          onChange={(e) => {
-                            const [source, sourceGroup, sourceField] =
-                              e.target.value.split(".");
-
-                            dsl.setTargetEdges?.([
-                              ...(dsl.targetEdges?.filter(
-                                (edge) => edge.targetHandle !== targetHandle,
-                              ) ?? []),
-                              {
-                                id: `${Date.now()}-${index}`,
-                                source: source ?? "",
-                                target: dsl.targetId,
-                                sourceHandle: `${sourceGroup}.${sourceField}`,
-                                targetHandle: `inputs.${targetField}`,
-                                type: "default",
-                              },
-                            ]);
-                          }}
-                        >
-                          <option value=""></option>
-                          {Object.entries(dsl.sourceOptions).map(
-                            ([key, { label, fields }]) => {
-                              const options = fields.map((field) => (
-                                <option key={field} value={`${key}.outputs.${field}`}>
-                                  {field}
-                                </option>
-                              ));
-
-                              if (options.length === 0) {
-                                return null;
-                              }
-
-                              if (Object.keys(dsl.sourceOptions).length === 1) {
-                                return options;
-                              }
-
-                              return (
-                                <optgroup key={key} label={label}>
-                                  {options}
-                                </optgroup>
-                              );
-                            },
-                          )}
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                    </GridItem>
-                    <GridItem>
-                      <ArrowRight style={{ flexShrink: 0 }} />
-                    </GridItem>
-                  </>
-                )}
-                <GridItem>
-                  <VStack align="start" width="full" gap={2}>
+          return (
+            <React.Fragment key={index}>
+              {isThreeColumns && (
+                <>
+                  <GridItem>
                     <NativeSelect.Root width="full">
                       <NativeSelect.Field
+                        value={currentSourceMapping ?? ""}
                         onChange={(e) => {
+                          const [source, sourceGroup, sourceField] = e.target.value.split(".");
+
+                          dsl.setTargetEdges?.([
+                            ...(dsl.targetEdges?.filter(
+                              (edge) => edge.targetHandle !== targetHandle,
+                            ) ?? []),
+                            {
+                              id: `${Date.now()}-${index}`,
+                              source: source ?? "",
+                              target: dsl.targetId,
+                              sourceHandle: `${sourceGroup}.${sourceField}`,
+                              targetHandle: `inputs.${targetField}`,
+                              type: "default",
+                            },
+                          ]);
+                        }}
+                      >
+                        <option value=""></option>
+                        {Object.entries(dsl.sourceOptions).map(([key, { label, fields }]) => {
+                          const options = fields.map((field) => (
+                            <option key={field} value={`${key}.outputs.${field}`}>
+                              {field}
+                            </option>
+                          ));
+
+                          if (options.length === 0) {
+                            return null;
+                          }
+
+                          if (Object.keys(dsl.sourceOptions).length === 1) {
+                            return options;
+                          }
+
+                          return (
+                            <optgroup key={key} label={label}>
+                              {options}
+                            </optgroup>
+                          );
+                        })}
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
+                  </GridItem>
+                  <GridItem>
+                    <ArrowRight style={{ flexShrink: 0 }} />
+                  </GridItem>
+                </>
+              )}
+              <GridItem>
+                <VStack align="start" width="full" gap={2}>
+                  <NativeSelect.Root width="full">
+                    <NativeSelect.Field
+                      onChange={(e) => {
+                        setThreadMappingState((prev) => ({
+                          ...prev,
+                          mapping: {
+                            ...prev.mapping,
+                            [targetField]: {
+                              source: e.target.value as
+                                | keyof typeof THREAD_MAPPINGS
+                                | (typeof SERVER_ONLY_THREAD_SOURCES)[number]
+                                | "",
+                              selectedFields: prev.mapping[targetField]?.selectedFields ?? [],
+                            },
+                          },
+                        }));
+                      }}
+                      value={source}
+                    >
+                      <option value=""></option>
+                      {[...SERVER_ONLY_THREAD_SOURCES, ...Object.keys(THREAD_MAPPINGS)].map(
+                        (key) => (
+                          <option key={key} value={key}>
+                            {THREAD_MAPPING_LABELS[key] ?? key}
+                          </option>
+                        ),
+                      )}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                  {source === "traces" && (
+                    <HStack align="start" width="full">
+                      <Box
+                        width="16px"
+                        minWidth="16px"
+                        height="24px"
+                        border="2px solid"
+                        borderRadius="0 0 0 6px"
+                        borderColor="border.emphasized"
+                        borderTop={0}
+                        borderRight={0}
+                        marginLeft="12px"
+                      />
+                      <MultiSelect
+                        isMulti
+                        options={Object.keys(TRACE_MAPPINGS).map((key) => ({
+                          label: key,
+                          value: key,
+                        }))}
+                        value={(selectedFields ?? []).map((field) => ({
+                          label: field,
+                          value: field,
+                        }))}
+                        onChange={(newValue) => {
                           setThreadMappingState((prev) => ({
                             ...prev,
                             mapping: {
                               ...prev.mapping,
                               [targetField]: {
-                                source: e.target.value as
-                                  | keyof typeof THREAD_MAPPINGS
-                                  | (typeof SERVER_ONLY_THREAD_SOURCES)[number]
-                                  | "",
-                                selectedFields:
-                                  prev.mapping[targetField]?.selectedFields ?? [],
+                                source: prev.mapping[targetField]?.source ?? "",
+                                selectedFields: newValue.map((v) => v.value),
                               },
                             },
                           }));
                         }}
-                        value={source}
-                      >
-                        <option value=""></option>
-                        {[
-                          ...SERVER_ONLY_THREAD_SOURCES,
-                          ...Object.keys(THREAD_MAPPINGS),
-                        ].map((key) => (
-                          <option key={key} value={key}>
-                            {THREAD_MAPPING_LABELS[key] ?? key}
-                          </option>
-                        ))}
-                      </NativeSelect.Field>
-                      <NativeSelect.Indicator />
-                    </NativeSelect.Root>
-                    {source === "traces" && (
-                      <HStack align="start" width="full">
-                        <Box
-                          width="16px"
-                          minWidth="16px"
-                          height="24px"
-                          border="2px solid"
-                          borderRadius="0 0 0 6px"
-                          borderColor="border.emphasized"
-                          borderTop={0}
-                          borderRight={0}
-                          marginLeft="12px"
-                        />
-                        <MultiSelect
-                          isMulti
-                          options={Object.keys(TRACE_MAPPINGS).map((key) => ({
-                            label: key,
-                            value: key,
-                          }))}
-                          value={(selectedFields ?? []).map((field) => ({
-                            label: field,
-                            value: field,
-                          }))}
-                          onChange={(newValue) => {
-                            setThreadMappingState((prev) => ({
-                              ...prev,
-                              mapping: {
-                                ...prev.mapping,
-                                [targetField]: {
-                                  source: prev.mapping[targetField]?.source ?? "",
-                                  selectedFields: newValue.map((v) => v.value),
-                                },
-                              },
-                            }));
-                          }}
-                          placeholder="Select trace fields..."
-                          closeMenuOnSelect={false}
-                          hideSelectedOptions={false}
-                          chakraStyles={{
-                            container: (base) => ({
-                              ...base,
-                              width: "100%",
-                              minWidth: "150px",
-                            }),
-                          }}
-                        />
-                      </HStack>
-                    )}
-                  </VStack>
-                </GridItem>
-                <GridItem>
-                  <ArrowRight style={{ flexShrink: 0 }} />
-                </GridItem>
-                <GridItem>
-                  <Text flexShrink={0} whiteSpace="nowrap">
-                    {targetField}
-                  </Text>
-                </GridItem>
-              </React.Fragment>
-            );
-          },
-        )}
+                        placeholder="Select trace fields..."
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
+                        chakraStyles={{
+                          container: (base) => ({
+                            ...base,
+                            width: "100%",
+                            minWidth: "150px",
+                          }),
+                        }}
+                      />
+                    </HStack>
+                  )}
+                </VStack>
+              </GridItem>
+              <GridItem>
+                <ArrowRight style={{ flexShrink: 0 }} />
+              </GridItem>
+              <GridItem>
+                <Text flexShrink={0} whiteSpace="nowrap">
+                  {targetField}
+                </Text>
+              </GridItem>
+            </React.Fragment>
+          );
+        })}
       </Grid>
     </VStack>
   );

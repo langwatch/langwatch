@@ -39,7 +39,10 @@ import {
   type JoinRequestFoldState,
   JoinRequestStateFoldProjection,
 } from "../projections/join-request-state.projection";
-import { JOIN_REQUEST_AGGREGATE_TYPE, JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
+import {
+  JOIN_REQUEST_AGGREGATE_TYPE,
+  JOIN_REQUEST_PIPELINE_NAME,
+} from "@langwatch/identity-contract";
 
 export {
   type JoinRequestEvent,

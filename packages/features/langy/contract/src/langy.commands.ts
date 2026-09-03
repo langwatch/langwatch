@@ -134,10 +134,7 @@ function tokenize(command: string): string[] {
  */
 function isLangwatchProgram(token: string): boolean {
   return (
-    token === "langwatch" ||
-    token === "lw" ||
-    token.endsWith("/langwatch") ||
-    token.endsWith("/lw")
+    token === "langwatch" || token === "lw" || token.endsWith("/langwatch") || token.endsWith("/lw")
   );
 }
 
@@ -258,10 +255,7 @@ export class LangwatchCommandService {
         const takesValue = !flag.includes("=") && VALUE_TAKING_GLOBAL_FLAGS.has(name);
         const next = tokens[at + 1];
         at +=
-          takesValue &&
-          next !== undefined &&
-          !isFlagToken(next) &&
-          !COMMAND_SEPARATORS.has(next)
+          takesValue && next !== undefined && !isFlagToken(next) && !COMMAND_SEPARATORS.has(next)
             ? 2
             : 1;
       }
@@ -334,7 +328,5 @@ export class LangwatchCommandService {
 }
 
 export const parseLangwatchCommand = LangwatchCommandService.parseLangwatchCommand;
-export const parseAllLangwatchCommands =
-  LangwatchCommandService.parseAllLangwatchCommands;
-export const isSoleLangwatchInvocation =
-  LangwatchCommandService.isSoleLangwatchInvocation;
+export const parseAllLangwatchCommands = LangwatchCommandService.parseAllLangwatchCommands;
+export const isSoleLangwatchInvocation = LangwatchCommandService.isSoleLangwatchInvocation;

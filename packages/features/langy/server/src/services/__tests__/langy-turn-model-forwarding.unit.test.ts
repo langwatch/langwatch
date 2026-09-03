@@ -82,9 +82,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   return { deps, mocks: { dispatch, resolve, tryGetModelsAllowed } };
 }
 
-const input = (
-  over: Partial<StartConversationTurnInput> = {},
-): StartConversationTurnInput => ({
+const input = (over: Partial<StartConversationTurnInput> = {}): StartConversationTurnInput => ({
   projectId: "p1",
   idempotencyKey: "00000000-0000-4000-8000-000000000001",
   session: { user: { id: "user-1" } },

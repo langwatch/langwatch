@@ -150,8 +150,7 @@ function CurrentAddress() {
 }
 
 const loaders = {
-  "features/chrome/UiAppChrome": () =>
-    import("../src/features/chrome/ui/sections/ui-app-chrome"),
+  "features/chrome/UiAppChrome": () => import("../src/features/chrome/ui/sections/ui-app-chrome"),
   "pages/served-here": async () => ({
     default: () => (
       <div>

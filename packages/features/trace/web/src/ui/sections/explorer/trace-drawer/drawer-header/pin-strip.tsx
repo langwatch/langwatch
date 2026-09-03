@@ -106,13 +106,7 @@ export function renderPinPills(
         tone="blue"
         ariaLabel={`${overflowCustom.length} more pinned attributes`}
         popover={
-          <VStack
-            align="stretch"
-            gap={1.5}
-            padding={3}
-            maxHeight="320px"
-            overflowY="auto"
-          >
+          <VStack align="stretch" gap={1.5} padding={3} maxHeight="320px" overflowY="auto">
             {overflowCustom.map((p) => (
               <Box key={`${p.pin.source}:${p.pin.key}`}>{renderPinPill(p, onUnpin)}</Box>
             ))}
@@ -143,9 +137,7 @@ function renderPinPill(
   );
 }
 
-function bucketByCategory(
-  pins: CategorizedPin[],
-): Partial<Record<PinCategory, CategorizedPin[]>> {
+function bucketByCategory(pins: CategorizedPin[]): Partial<Record<PinCategory, CategorizedPin[]>> {
   const out: Partial<Record<PinCategory, CategorizedPin[]>> = {};
   for (const p of pins) {
     const list = out[p.category] ?? [];

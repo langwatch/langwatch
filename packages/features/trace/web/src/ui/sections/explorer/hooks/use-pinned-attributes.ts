@@ -15,9 +15,7 @@ interface UsePinnedAttributesResult {
   reorder: (fromIndex: number, toIndex: number) => void;
 }
 
-export function usePinnedAttributes(
-  projectId: string | undefined,
-): UsePinnedAttributesResult {
+export function usePinnedAttributes(projectId: string | undefined): UsePinnedAttributesResult {
   const pins = usePinnedAttributesStore((s) =>
     projectId ? (s.byProject[projectId] ?? EMPTY) : EMPTY,
   );

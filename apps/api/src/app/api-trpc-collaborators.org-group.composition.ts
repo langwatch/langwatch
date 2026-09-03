@@ -418,8 +418,7 @@ export function composeApiOrgGroupCollaborators(
       providers: {
         actionParamsSchemaFor: (action) => providers.actionParamsSchemaFor(action),
         persistActionParamsFor: (action, args) => providers.persistActionParamsFor(action, args),
-        redactActionParamsFor: (action, params) =>
-          providers.redactActionParamsFor(action, params),
+        redactActionParamsFor: (action, params) => providers.redactActionParamsFor(action, params),
         decryptSlackBotToken: (actionParams) => providers.decryptSlackBotToken(actionParams),
         decryptWebhookHeaders: (stored) => providers.decryptWebhookHeaders(stored),
         decryptWebhookSigningSecrets: (stored) => providers.decryptWebhookSigningSecrets(stored),
@@ -1244,4 +1243,3 @@ function maskAddress(email: string): string {
   const head = local.slice(0, 1);
   return `${head}${"*".repeat(Math.max(local.length - 1, 1))}@${domain}`;
 }
-

@@ -26,15 +26,14 @@ export function QuarantineFillAlert({
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Title>
-          {Math.round(stats.rate)} spans/min landing in quarantine — likely misconfigured
-          ingest
+          {Math.round(stats.rate)} spans/min landing in quarantine — likely misconfigured ingest
         </Alert.Title>
         <Alert.Description>
           <VStack align="start" gap={2}>
             <Text fontSize="sm">
-              Unrecognized traffic is being routed to the org-wide quarantine project
-              (admin-only). End users do not see this data. Configure the credential on
-              the source listed below to send traces to the right scope.
+              Unrecognized traffic is being routed to the org-wide quarantine project (admin-only).
+              End users do not see this data. Configure the credential on the source listed below to
+              send traces to the right scope.
             </Text>
             {stats.perSource.length > 0 && (
               <Box>
@@ -43,14 +42,8 @@ export function QuarantineFillAlert({
                 </Text>
                 <VStack align="start" gap={0.5} marginTop={1}>
                   {stats.perSource.slice(0, 5).map((row) => (
-                    <HStack
-                      key={row.ingestionSourceId ?? "unknown"}
-                      gap={2}
-                      fontSize="xs"
-                    >
-                      <Text fontFamily="mono">
-                        {row.ingestionSourceId ?? "unknown source"}
-                      </Text>
+                    <HStack key={row.ingestionSourceId ?? "unknown"} gap={2} fontSize="xs">
+                      <Text fontFamily="mono">{row.ingestionSourceId ?? "unknown source"}</Text>
                       <Text color="fg.muted">{row.spanCount} spans</Text>
                     </HStack>
                   ))}

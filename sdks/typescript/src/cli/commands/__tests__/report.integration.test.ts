@@ -3,16 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { reportCommand } from "../report";
 
 /**
@@ -66,18 +57,16 @@ describe("langwatch report", () => {
   describe("given the user did not approve sending", () => {
     /** @scenario "Sending without user approval is rejected with instructions" */
     it("refuses with instructions to ask the user first", async () => {
-      await expect(
-        reportCommand({ summary: "docs pointed to a 404 endpoint" }),
-      ).rejects.toThrow(/ask the user/i);
+      await expect(reportCommand({ summary: "docs pointed to a 404 endpoint" })).rejects.toThrow(
+        /ask the user/i,
+      );
       expect(received).toHaveLength(0);
     });
   });
 
   describe("given nothing to report", () => {
     it("explains what a good report contains", async () => {
-      await expect(reportCommand({ userApproved: true })).rejects.toThrow(
-        /Nothing to report/,
-      );
+      await expect(reportCommand({ userApproved: true })).rejects.toThrow(/Nothing to report/);
     });
   });
 
@@ -132,9 +121,7 @@ describe("langwatch report", () => {
         title: "confusing evaluator setup",
         summaryFile: notesPath,
       });
-      expect(received[0]?.body.summary).toBe(
-        "long write-up of the confusing evaluator setup",
-      );
+      expect(received[0]?.body.summary).toBe("long write-up of the confusing evaluator setup");
     });
 
     /** @scenario "Reports are linked to the project when an API key is present" */
@@ -145,9 +132,7 @@ describe("langwatch report", () => {
         endpoint,
         summary: "linked report",
       });
-      expect(received[0]?.headers.authorization).toBe(
-        "Bearer sk-lw-test-key-abcdef123456789012",
-      );
+      expect(received[0]?.headers.authorization).toBe("Bearer sk-lw-test-key-abcdef123456789012");
     });
   });
 

@@ -50,8 +50,7 @@ const serviceWith = (result: {
   data?: unknown;
   error?: unknown;
   response?: Response;
-}): QueryApiService =>
-  new QueryApiService({ langwatchApiClient: clientWith(result) });
+}): QueryApiService => new QueryApiService({ langwatchApiClient: clientWith(result) });
 
 describe("given a QueryApiService", () => {
   describe("when query() runs a LangWatchQL statement", () => {
@@ -94,8 +93,10 @@ describe("given a QueryApiService", () => {
         sql: "SELECT 1",
       });
 
-      const [, options] = (client.POST as ReturnType<typeof vi.fn>).mock
-        .calls[0] as [string, { body: Record<string, unknown> }];
+      const [, options] = (client.POST as ReturnType<typeof vi.fn>).mock.calls[0] as [
+        string,
+        { body: Record<string, unknown> },
+      ];
       expect(options.body).not.toHaveProperty("jsonrpc");
       expect(options.body).not.toHaveProperty("method");
       expect(options.body).not.toHaveProperty("params");
@@ -202,9 +203,7 @@ describe("given a QueryApiService", () => {
         httpStatus: 401,
         traceId: "1234567890abcdef1234567890abcdef",
       });
-      expect((thrown as Error).message).toContain(
-        "The provided API key is invalid.",
-      );
+      expect((thrown as Error).message).toContain("The provided API key is invalid.");
     });
   });
 });

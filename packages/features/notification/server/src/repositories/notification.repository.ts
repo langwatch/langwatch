@@ -6,9 +6,7 @@ import type {
 
 /** Private persistence port for durable Notification records. */
 export abstract class NotificationRepository {
-  abstract listRecentByOrganization(
-    input: NotificationRecentQuery,
-  ): Promise<Notification[]>;
+  abstract listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]>;
 
   abstract create(input: CreateNotificationCommand): Promise<Notification>;
 }

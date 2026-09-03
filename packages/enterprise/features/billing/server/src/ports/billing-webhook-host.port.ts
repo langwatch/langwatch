@@ -12,9 +12,7 @@ import type { SubscriptionNotificationPayload } from "@langwatch/enterprise-bill
  * it already took.
  */
 export abstract class BillingWebhookHostPort {
-  abstract sendSlackSubscriptionEvent(
-    payload: SubscriptionNotificationPayload,
-  ): Promise<void>;
+  abstract sendSlackSubscriptionEvent(payload: SubscriptionNotificationPayload): Promise<void>;
 
   abstract sendSlackBillingThresholdFailureAlert(input: {
     stripeSubscriptionId: string;

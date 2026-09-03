@@ -46,9 +46,7 @@ describe("EventSourcedQueueProcessorMemory", () => {
 
       const processor = new EventSourcedQueueProcessorMemory(definition);
 
-      await expect(processor.send({ id: "test-payload" })).rejects.toThrow(
-        "Processing error",
-      );
+      await expect(processor.send({ id: "test-payload" })).rejects.toThrow("Processing error");
       expect(processFn).toHaveBeenCalledWith({ id: "test-payload" });
     });
 

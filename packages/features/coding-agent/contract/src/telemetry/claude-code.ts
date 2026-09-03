@@ -10,7 +10,6 @@ import { type CodingAgentDefinition, signalSays } from "./coding-agent-definitio
  */
 export const claudeCodeAgent: CodingAgentDefinition = {
   id: "claude_code",
-  matches: (signal) =>
-    signalSays(signal, "claude_code") || signal.scope.includes("anthropic"),
+  matches: (signal) => signalSays(signal, "claude_code") || signal.scope.includes("anthropic"),
   namePrefixes: ["claude_code."],
 };

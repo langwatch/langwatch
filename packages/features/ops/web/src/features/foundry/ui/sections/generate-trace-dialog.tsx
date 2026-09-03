@@ -87,9 +87,7 @@ export function GenerateTraceDialog() {
                 type="number"
                 value={targetSpanCount}
                 onChange={(e) =>
-                  setTargetSpanCount(
-                    Math.max(10, Math.min(5000, parseInt(e.target.value) || 100)),
-                  )
+                  setTargetSpanCount(Math.max(10, Math.min(5000, parseInt(e.target.value) || 100)))
                 }
                 min={10}
                 max={5000}
@@ -219,10 +217,7 @@ export function GenerateTraceDialog() {
               colorPalette="orange"
               onClick={handleGenerate}
               w="full"
-              disabled={
-                useRealPrompts &&
-                (promptsQuery.isLoading || !promptsQuery.prompts?.length)
-              }
+              disabled={useRealPrompts && (promptsQuery.isLoading || !promptsQuery.prompts?.length)}
             >
               <Sparkles size={14} />
               Generate {targetSpanCount.toLocaleString()} spans

@@ -88,8 +88,7 @@ export function applyLangyTurnEvents(
       continue;
     }
     const isNewTurn = next.turnId !== event.data.turnId;
-    const base =
-      isNewTurn || next.turn === null ? initLangyConversationTurnState() : next.turn;
+    const base = isNewTurn || next.turn === null ? initLangyConversationTurnState() : next.turn;
     next = {
       cursor: at,
       turnId: event.data.turnId,

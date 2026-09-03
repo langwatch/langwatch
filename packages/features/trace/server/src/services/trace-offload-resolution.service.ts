@@ -23,14 +23,8 @@
  */
 import type { Logger as PinoLogger } from "@langwatch/observability";
 import type { BlobStore } from "./trace-blob-store.service";
-import {
-  BlobFieldNotFoundError,
-  BlobNotFoundError,
-} from "./trace-blob-store.service";
-import type {
-  ExtractedIO,
-  TraceIOExtractionService,
-} from "#services/trace-io-extraction.service";
+import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service";
+import type { ExtractedIO, TraceIOExtractionService } from "#services/trace-io-extraction.service";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { hasEventRefs, parseSpanEventRefs } from "./trace-eventref-parsing.service";
 
@@ -122,8 +116,7 @@ export async function resolveOffloadedTraces({
       }
 
       // Separate eventref keys from regular attributes (shared decoder).
-      const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
-        parseSpanEventRefs(attrs);
+      const { cleanedAttrs, eventrefEntries, missingEventIdKeys } = parseSpanEventRefs(attrs);
 
       // Eventref missing the embedded eventId can't resolve. The reserved
       // key is already stripped (kept out of cleanedAttrs) so the UI never

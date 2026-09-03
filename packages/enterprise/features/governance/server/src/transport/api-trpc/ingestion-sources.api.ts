@@ -30,11 +30,7 @@ import {
   OTTL_ENABLED_SOURCE_TYPES,
   type GovernanceService,
 } from "@langwatch/enterprise-governance-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import { hasPollerCursor } from "../../adapters/poller-cursor.adapter";
 
@@ -149,9 +145,7 @@ export function toIngestionSourceDto({
     pullSchedule: row.pullSchedule,
     status: row.status,
     traceProjectId: row.traceProjectId ?? null,
-    traceProjectArchived: row.traceProjectId
-      ? !liveTraceProjectIds.has(row.traceProjectId)
-      : false,
+    traceProjectArchived: row.traceProjectId ? !liveTraceProjectIds.has(row.traceProjectId) : false,
     lastEventAt: row.lastEventAt,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
@@ -194,8 +188,10 @@ export class IngestionSourcesTrpcApi {
       list: view(organizationScope).query(async ({ ctx, input }) => {
         const rows = await ctx.app.governance.ingestionSourceList(input.organizationId);
         // One destination query for the whole page rather than one per row.
-        const liveTraceProjectIds =
-          await ctx.app.governance.ingestionSourceLiveTraceProjectIds(rows, input.organizationId);
+        const liveTraceProjectIds = await ctx.app.governance.ingestionSourceLiveTraceProjectIds(
+          rows,
+          input.organizationId,
+        );
         return rows.map((row) => toIngestionSourceDto({ row, liveTraceProjectIds }));
       }),
 

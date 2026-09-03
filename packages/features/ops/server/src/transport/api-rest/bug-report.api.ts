@@ -74,16 +74,11 @@ const bugReportBodySchema = z
     contactEmail: z.string().max(320).optional(),
     cliVersion: z.string().max(50).optional(),
     metadata: z
-      .record(
-        z.string().max(200),
-        z.union([z.string().max(2000), z.number(), z.boolean()]),
-      )
+      .record(z.string().max(200), z.union([z.string().max(2000), z.number(), z.boolean()]))
       .optional(),
   })
   .refine(
-    (body) =>
-      (body.summary?.trim().length ?? 0) > 0 ||
-      (body.sessionData?.trim().length ?? 0) > 0,
+    (body) => (body.summary?.trim().length ?? 0) > 0 || (body.sessionData?.trim().length ?? 0) > 0,
     { message: "either summary or sessionData is required" },
   );
 

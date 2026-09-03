@@ -9,10 +9,7 @@ import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
 } from "../../projections/foldProjection.types";
-import type {
-  AppendStore,
-  MapProjectionDefinition,
-} from "../../projections/mapProjection.types";
+import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types";
 import type { EventStore, EventStoreReadContext } from "../../stores/eventStore.types";
 import type { QueueManager } from "../queues/queueManager";
 
@@ -183,8 +180,7 @@ export function createTestEvent(
   id?: string,
 ): Event {
   const uniqueId =
-    id ??
-    `${createdAt}:${tenantId}:${aggregateId}:${aggregateType}:${testEventIdCounter++}`;
+    id ?? `${createdAt}:${tenantId}:${aggregateId}:${aggregateType}:${testEventIdCounter++}`;
   return {
     id: uniqueId,
     aggregateId,

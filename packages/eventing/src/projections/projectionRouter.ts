@@ -21,11 +21,7 @@ import {
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { DeduplicationStrategy } from "../queues";
-import {
-  ConfigurationError,
-  categorizeError,
-  handleError,
-} from "../services/errorHandling";
+import { ConfigurationError, categorizeError, handleError } from "../services/errorHandling";
 import type { QueueManager } from "../services/queues/queueManager";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
 import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow";
@@ -110,38 +106,21 @@ export class ProjectionRouter<
   private readonly executionTarget?: ExecutionTarget;
   private readonly replayMarkerChecker?: ReplayMarkerChecker;
   private readonly retentionPolicyResolver?: RetentionPolicyResolver;
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.event-sourcing.projection-router",
-  );
+  private readonly tracer = getLangWatchTracer("langwatch.event-sourcing.projection-router");
   private readonly logger = createLogger("langwatch:event-sourcing:projection-router");
   private readonly foldExecutor = new FoldProjectionExecutor();
   private readonly stateProjectionExecutor = new StateProjectionExecutor();
   private readonly mapExecutor = new MapProjectionExecutor();
 
-  private readonly foldProjections = new Map<
-    string,
-    FoldProjectionDefinition<any, EventType>
-  >();
-  private readonly stateProjections = new Map<
-    string,
-    StateProjectionDefinition<any, EventType>
-  >();
-  private readonly mapProjections = new Map<
-    string,
-    MapProjectionDefinition<any, EventType>
-  >();
+  private readonly foldProjections = new Map<string, FoldProjectionDefinition<any, EventType>>();
+  private readonly stateProjections = new Map<string, StateProjectionDefinition<any, EventType>>();
+  private readonly mapProjections = new Map<string, MapProjectionDefinition<any, EventType>>();
   private readonly subscribersForFold = new Map<
     string,
     SubscriberDispatchDefinition<EventType>[]
   >();
-  private readonly subscribersForMap = new Map<
-    string,
-    SubscriberDispatchDefinition<EventType>[]
-  >();
-  private readonly eventSubscribers = new Map<
-    string,
-    EventSubscriberDefinition<EventType>
-  >();
+  private readonly subscribersForMap = new Map<string, SubscriberDispatchDefinition<EventType>[]>();
+  private readonly eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
 
   constructor(
     private readonly aggregateType: AggregateType,
@@ -219,12 +198,10 @@ export class ProjectionRouter<
     projection: FoldProjectionDefinition<any, EventType>,
   ): void {
     const hasDurableWatermark =
-      typeof (projection.store as { getWithApplied?: unknown }).getWithApplied ===
-      "function";
+      typeof (projection.store as { getWithApplied?: unknown }).getWithApplied === "function";
     if (!hasDurableWatermark) return;
 
-    const effectiveBatch =
-      projection.options?.coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH;
+    const effectiveBatch = projection.options?.coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH;
     if (effectiveBatch < MAX_APPLIED_EVENT_IDS) return;
 
     throw new ConfigurationError(
@@ -260,10 +237,7 @@ export class ProjectionRouter<
     this.mapProjections.set(projection.name, projection);
   }
 
-  registerSubscriber(
-    foldName: string,
-    subscriber: SubscriberDispatchDefinition<EventType>,
-  ): void {
+  registerSubscriber(foldName: string, subscriber: SubscriberDispatchDefinition<EventType>): void {
     if (!this.foldProjections.has(foldName)) {
       throw new ConfigurationError(
         "ProjectionRouter",
@@ -346,20 +320,17 @@ export class ProjectionRouter<
       };
     }
 
-    this.queueManager.initializeSubscriberQueues(
-      subscriberDefs,
-      async (subscriberName, event) => {
-        const subscriber = this.eventSubscribers.get(subscriberName);
-        if (!subscriber) {
-          throw new ConfigurationError(
-            "ProjectionRouter",
-            `Event subscriber "${subscriberName}" not found`,
-            { subscriberName },
-          );
-        }
-        await this.handleSubscriber(subscriber, event);
-      },
-    );
+    this.queueManager.initializeSubscriberQueues(subscriberDefs, async (subscriberName, event) => {
+      const subscriber = this.eventSubscribers.get(subscriberName);
+      if (!subscriber) {
+        throw new ConfigurationError(
+          "ProjectionRouter",
+          `Event subscriber "${subscriberName}" not found`,
+          { subscriberName },
+        );
+      }
+      await this.handleSubscriber(subscriber, event);
+    });
   }
 
   /**
@@ -533,12 +504,7 @@ export class ProjectionRouter<
             { projectionName },
           );
         }
-        await this.processStateProjectionEvents(
-          projectionName,
-          projection,
-          [event],
-          context,
-        );
+        await this.processStateProjectionEvents(projectionName, projection, [event], context);
       },
       async (projectionName, events, context) => {
         const projection = this.stateProjections.get(projectionName);
@@ -549,12 +515,7 @@ export class ProjectionRouter<
             { projectionName },
           );
         }
-        await this.processStateProjectionEvents(
-          projectionName,
-          projection,
-          events,
-          context,
-        );
+        await this.processStateProjectionEvents(projectionName, projection, events, context);
       },
     );
   }
@@ -582,9 +543,7 @@ export class ProjectionRouter<
         name,
         groupKeyFn: fold.key,
         scoreFn:
-          fold.options?.eventOrdering === "acceptedAt"
-            ? (event) => event.createdAt
-            : undefined,
+          fold.options?.eventOrdering === "acceptedAt" ? (event) => event.createdAt : undefined,
         // Coalesce a backed-up group's events into one fold load/apply/store
         // cycle. On for every fold (harmless at batch size 1 when the queue
         // keeps up). Safe for all folds because: the final folded state is
@@ -598,8 +557,7 @@ export class ProjectionRouter<
         // batch fold-state, which is the correct "current state" for a
         // react-after-fold side effect. A fold can opt out via
         // options.coalesceMaxBatch = 1.
-        coalesceMaxBatch:
-          fold.options?.coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH,
+        coalesceMaxBatch: fold.options?.coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH,
         options: fold.options,
       };
     }
@@ -909,10 +867,7 @@ export class ProjectionRouter<
         }
 
         if (errors.length > 0) {
-          throw new AggregateError(
-            errors,
-            `${errors.length} projection(s) failed during dispatch`,
-          );
+          throw new AggregateError(errors, `${errors.length} projection(s) failed during dispatch`);
         }
       },
     );
@@ -1186,10 +1141,7 @@ export class ProjectionRouter<
     }
 
     if (errors.length > 0) {
-      throw new AggregateError(
-        errors,
-        `${errors.length} map projection(s) failed during dispatch`,
-      );
+      throw new AggregateError(errors, `${errors.length} map projection(s) failed during dispatch`);
     }
   }
 
@@ -1927,9 +1879,7 @@ export class ProjectionRouter<
 
       const relevant: SubscriberDelivery<EventType>[] = [];
       for (const delivery of deliveries) {
-        if (
-          this.subscriberShouldDispatch(subscriber, delivery.event, delivery.foldState)
-        ) {
+        if (this.subscriberShouldDispatch(subscriber, delivery.event, delivery.foldState)) {
           relevant.push(delivery);
         } else {
           incrementEsReactorTotal(this.pipelineName, subscriber.name, "skipped");
@@ -1952,10 +1902,7 @@ export class ProjectionRouter<
     }
 
     if (errors.length > 0) {
-      throw new AggregateError(
-        errors,
-        `${errors.length} subscriber(s) failed during dispatch`,
-      );
+      throw new AggregateError(errors, `${errors.length} subscriber(s) failed during dispatch`);
     }
   }
 
@@ -1979,9 +1926,7 @@ export class ProjectionRouter<
     const hasSubscriberQueues = this.queueManager.hasProjectionSubscriberQueues();
 
     if (hasSubscriberQueues) {
-      const queueProcessor = this.queueManager.getProjectionSubscriberQueue(
-        subscriber.name,
-      );
+      const queueProcessor = this.queueManager.getProjectionSubscriberQueue(subscriber.name);
       if (queueProcessor) {
         try {
           await queueProcessor.send({ event, foldState });
@@ -2010,10 +1955,7 @@ export class ProjectionRouter<
         try {
           await withMetrics({
             fn: () =>
-              subscriber.handle(
-                event,
-                this.buildSubscriberDispatchContext({ event, foldState }),
-              ),
+              subscriber.handle(event, this.buildSubscriberDispatchContext({ event, foldState })),
             onComplete: (ms) => {
               incrementEsReactorTotal(this.pipelineName, subscriber.name, "completed");
               observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
@@ -2044,10 +1986,7 @@ export class ProjectionRouter<
       try {
         await withMetrics({
           fn: () =>
-            subscriber.handle(
-              event,
-              this.buildSubscriberDispatchContext({ event, foldState }),
-            ),
+            subscriber.handle(event, this.buildSubscriberDispatchContext({ event, foldState })),
           onComplete: (ms) => {
             incrementEsReactorTotal(this.pipelineName, subscriber.name, "completed");
             observeEsReactorDuration(this.pipelineName, subscriber.name, ms);
@@ -2156,9 +2095,7 @@ export class ProjectionRouter<
   }
 
   /** Returns true if the subscriber excludes the current execution target. */
-  private isSubscriberExcluded(
-    subscriber: SubscriberDispatchDefinition<EventType>,
-  ): boolean {
+  private isSubscriberExcluded(subscriber: SubscriberDispatchDefinition<EventType>): boolean {
     return !executionTargetMatches(subscriber.options?.runIn, this.executionTarget);
   }
 

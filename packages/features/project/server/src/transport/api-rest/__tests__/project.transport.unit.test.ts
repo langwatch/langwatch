@@ -160,10 +160,12 @@ function mintedServiceKey(): { token: string; apiKey: ApiKey } {
  * them could not tell an org-wide grant from a per-project one — which is the
  * whole subject of that route's policy.
  */
-function spine(options: {
-  granted?: readonly string[];
-  grantedOnProject?: Readonly<Record<string, readonly string[]>>;
-} = {}) {
+function spine(
+  options: {
+    granted?: readonly string[];
+    grantedOnProject?: Readonly<Record<string, readonly string[]>>;
+  } = {},
+) {
   const granted = new Set(
     options.granted ?? [
       "project:create",
@@ -501,12 +503,10 @@ describe("createProjectRestApp", () => {
       /** @scenario "project-scoped key gets a filtered list, not a refusal" */
       it("narrows the query to those projects and answers 200", async () => {
         const listByOrganization = vi.fn(async () => page([project()], 1));
-        const resolveVisibleProjects = vi.fn(
-          async (): Promise<ApiKeyVisibleProjects> => ({
-            kind: "some",
-            ids: ["project_1", "project_9"],
-          }),
-        );
+        const resolveVisibleProjects = vi.fn(async (): Promise<ApiKeyVisibleProjects> => ({
+          kind: "some",
+          ids: ["project_1", "project_9"],
+        }));
         const { send } = buildApi({
           projects: { listByOrganization },
           apiKeys: { resolveVisibleProjects },
@@ -533,9 +533,10 @@ describe("createProjectRestApp", () => {
         const { send } = buildApi({
           projects: { listByOrganization },
           apiKeys: {
-            resolveVisibleProjects: vi.fn(
-              async (): Promise<ApiKeyVisibleProjects> => ({ kind: "some", ids: [] }),
-            ),
+            resolveVisibleProjects: vi.fn(async (): Promise<ApiKeyVisibleProjects> => ({
+              kind: "some",
+              ids: [],
+            })),
           },
           granted: [],
         });

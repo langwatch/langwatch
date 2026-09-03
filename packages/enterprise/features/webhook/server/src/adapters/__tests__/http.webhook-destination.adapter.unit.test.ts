@@ -11,7 +11,8 @@ const egress = { send: mockedSend } as unknown as WebhookEgressService;
 
 const URL_UNDER_TEST = "https://receiver.example.com/webhooks/langwatch";
 
-const destination = () => httpWebhookDestination({ url: URL_UNDER_TEST, egress, allowInsecureLocal: false });
+const destination = () =>
+  httpWebhookDestination({ url: URL_UNDER_TEST, egress, allowInsecureLocal: false });
 
 function request(overrides: Partial<WebhookDispatchRequest> = {}): WebhookDispatchRequest {
   return {

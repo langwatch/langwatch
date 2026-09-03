@@ -16,7 +16,10 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { DRAWER_OPEN_PARAM } from "../src/features/drawers";
-import { DRAWER_AGENT_ID_PARAM, openAgentEditor } from "../src/features/agent/behavior/agent-editor";
+import {
+  DRAWER_AGENT_ID_PARAM,
+  openAgentEditor,
+} from "../src/features/agent/behavior/agent-editor";
 
 describe("given openAgentEditor", () => {
   describe("when the screen opens an editor for one agent", () => {

@@ -60,11 +60,7 @@ function flattenParams({
 
     const fullKey = prefix ? `${prefix}.${key}` : key;
 
-    if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean"
-    ) {
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
       attrs[fullKey] = value;
     } else if (Array.isArray(value)) {
       attrs[fullKey] = JSON.stringify(value);
@@ -121,8 +117,7 @@ function buildAttributes(span: Span): Attributes {
   if (span.params) {
     if (span.params.temperature != null)
       attrs["gen_ai.request.temperature"] = span.params.temperature;
-    if (span.params.max_tokens != null)
-      attrs["gen_ai.request.max_tokens"] = span.params.max_tokens;
+    if (span.params.max_tokens != null) attrs["gen_ai.request.max_tokens"] = span.params.max_tokens;
     if (span.params.top_p != null) attrs["gen_ai.request.top_p"] = span.params.top_p;
 
     flattenParams({ params: span.params, prefix: "", attrs });

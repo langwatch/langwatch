@@ -9,9 +9,9 @@ The management REST API is the same surface the `langwatch` CLI and LangWatch da
 Authentication uses existing LangWatch API tokens (`Authorization: Bearer lwp_...` or `X-Auth-Token: lwp_...`). No new token format.
 
 <Info>
-  The CLI (`langwatch virtual-keys ...`) is built on this API. If you're scripting from
-  Node or Python, consider using the CLI rather than calling the REST directly, it handles
-  pagination, JSON formatting, and error messages for you.
+  The CLI (`langwatch virtual-keys ...`) is built on this API. If you're scripting from Node or
+  Python, consider using the CLI rather than calling the REST directly, it handles pagination, JSON
+  formatting, and error messages for you.
 </Info>
 
 ## Base
@@ -49,11 +49,11 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
 Replay is what makes a lost create recoverable on the two routes that return a secret exactly once: replaying the original request returns the original `secret`.
 
 <Warning>
-  **The body has to be identical on the retry**, because the key is matched against a
-  fingerprint of it. A field computed fresh each attempt makes every retry a `409`:
-  `"cycle_anchor_at": new Date().toISOString()` is a different body every time. Derive
-  such values from something the first call already produced, for example the `created_at`
-  of the virtual key you just minted, rather than from the clock at retry time.
+  **The body has to be identical on the retry**, because the key is matched against a fingerprint of
+  it. A field computed fresh each attempt makes every retry a `409`: `"cycle_anchor_at": new
+  Date().toISOString()` is a different body every time. Derive such values from something the first
+  call already produced, for example the `created_at` of the virtual key you just minted, rather
+  than from the clock at retry time.
 </Warning>
 
 Keys are scoped to your project on the gateway routes and to your organization on the webhook routes, so two projects can use the same key text without colliding. Stored responses are encrypted at rest and expire after 24 hours.
@@ -232,9 +232,7 @@ Response `201`:
 }
 ```
 
-<Warning>
-  The `secret` field is returned **only this once**. Persist it immediately.
-</Warning>
+<Warning>The `secret` field is returned **only this once**. Persist it immediately.</Warning>
 
 ### Get
 

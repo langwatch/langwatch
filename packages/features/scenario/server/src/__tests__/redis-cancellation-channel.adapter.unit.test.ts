@@ -4,11 +4,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type {
-  CancellationMessage,
-  CancellationPublisher,
-  CancellationSubscriber,
-} from "../index";
+import type { CancellationMessage, CancellationPublisher, CancellationSubscriber } from "../index";
 import {
   CANCELLATION_CHANNEL,
   RedisCancellationPublisherAdapter,
@@ -40,10 +36,7 @@ describe("publishCancellation", () => {
 
     await RedisCancellationPublisherAdapter.create(publisher).publish(message);
 
-    expect(publisher.publish).toHaveBeenCalledWith(
-      CANCELLATION_CHANNEL,
-      JSON.stringify(message),
-    );
+    expect(publisher.publish).toHaveBeenCalledWith(CANCELLATION_CHANNEL, JSON.stringify(message));
   });
 });
 

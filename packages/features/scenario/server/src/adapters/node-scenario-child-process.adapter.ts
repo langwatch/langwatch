@@ -8,10 +8,7 @@ import {
   type ChildProcessJobData,
   type ScenarioExecutionResult,
 } from "@langwatch/scenario-contract";
-import {
-  encodeScenarioLogContext,
-  SCENARIO_LOG_CONTEXT_ENV,
-} from "./child-logger.adapter";
+import { encodeScenarioLogContext, SCENARIO_LOG_CONTEXT_ENV } from "./child-logger.adapter";
 import { resolveChildProcessSpawn } from "./child-process-spawn.adapter";
 import { resolveChildTlsEnv } from "./child-tls-env.adapter";
 import type { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service";
@@ -317,9 +314,7 @@ function buildChildEnvironmentValue(input: {
 function buildOtelResourceAttributesValue(labels: string[]): string {
   const parts = ["langwatch.origin.source=platform"];
   if (labels.length > 0) {
-    const escaped = labels.map((label) =>
-      label.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"),
-    );
+    const escaped = labels.map((label) => label.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"));
     parts.push(`scenario.labels=${escaped.join(",")}`);
   }
   return parts.join(",");

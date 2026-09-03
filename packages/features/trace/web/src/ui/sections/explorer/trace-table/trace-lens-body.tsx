@@ -77,14 +77,8 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     logicalColumnIds: lens.columns,
     evaluatorNames,
   });
-  const {
-    selectedTraceId,
-    focusedIndex,
-    expandedTraceId,
-    toggleTrace,
-    togglePeek,
-    handleKeyDown,
-  } = useTraceLensKeyboard({ traces });
+  const { selectedTraceId, focusedIndex, expandedTraceId, toggleTrace, togglePeek, handleKeyDown } =
+    useTraceLensKeyboard({ traces });
 
   const sortFromStore = useViewStore((s) => s.sort);
   const setSortInStore = useViewStore((s) => s.setSort);
@@ -93,10 +87,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   const sizingKey = getColumnSizingKey(lens.id, "trace");
   const persistedSizing = useColumnSizingStore((s) => s.byKey[sizingKey] ?? null);
   const setSizing = useColumnSizingStore((s) => s.setSizing);
-  const columnSizing = useMemo<ColumnSizingState>(
-    () => persistedSizing ?? {},
-    [persistedSizing],
-  );
+  const columnSizing = useMemo<ColumnSizingState>(() => persistedSizing ?? {}, [persistedSizing]);
   const handleColumnSizingChange = useCallback(
     (updater: Updater<ColumnSizingState>) => {
       const next = typeof updater === "function" ? updater(columnSizing) : updater;
@@ -234,9 +225,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                 isNew={!isLoading && newIds.has(row.original.traceId)}
                 rowDomId={row.original.traceId}
                 onSelect={isLoading ? undefined : () => toggleTrace(row.original)}
-                onTogglePeek={
-                  isLoading ? undefined : () => togglePeek(row.original.traceId)
-                }
+                onTogglePeek={isLoading ? undefined : () => togglePeek(row.original.traceId)}
                 isLoading={isLoading}
                 isFirstOfErrorRun={!isLoading && isFirstOfErrorRun[virtualItem.index]}
                 // A trace row IS a trace, so it offers itself to Langy like any

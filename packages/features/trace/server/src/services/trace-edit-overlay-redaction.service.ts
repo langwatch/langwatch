@@ -14,15 +14,14 @@ import { traceAttributeKeyForMetadata } from "@langwatch/trace-contract";
  * under `input` because it carries the request payload; `name`, `type` and
  * `error` are structural and belong to no category, so they are never withheld.
  */
-const SPAN_FIELD_CONTENT_CATEGORY: Record<TraceEditSpanField, "input" | "output" | null> =
-  {
-    name: null,
-    type: null,
-    error: null,
-    input: "input",
-    params: "input",
-    output: "output",
-  };
+const SPAN_FIELD_CONTENT_CATEGORY: Record<TraceEditSpanField, "input" | "output" | null> = {
+  name: null,
+  type: null,
+  error: null,
+  input: "input",
+  params: "input",
+  output: "output",
+};
 
 /**
  * Whether this viewer is denied each content category on this trace. Keyed by
@@ -241,9 +240,7 @@ export function redactPatchForViewer({
     protections,
     isWindowRedacted,
   });
-  const hiddenAttributes = isDeniedByCategory.input
-    ? void 0
-    : protections.hiddenAttributes;
+  const hiddenAttributes = isDeniedByCategory.input ? void 0 : protections.hiddenAttributes;
 
   const traceEdits = redactTraceEdits({
     traceEdits: patch.trace,

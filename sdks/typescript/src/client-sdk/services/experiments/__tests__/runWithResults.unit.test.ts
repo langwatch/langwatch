@@ -188,17 +188,15 @@ describe("ExperimentsFacade.runWithResults", () => {
   describe("given the run fails", () => {
     describe("when polling reports a failed status", () => {
       it("throws an ExperimentRunFailedError", async () => {
-        mockFetch
-          .mockResolvedValueOnce(jsonResponse(startResponse))
-          .mockResolvedValueOnce(
-            jsonResponse({
-              runId: "run_1",
-              status: "failed",
-              progress: 0,
-              total: 1,
-              error: "execution exploded",
-            }),
-          );
+        mockFetch.mockResolvedValueOnce(jsonResponse(startResponse)).mockResolvedValueOnce(
+          jsonResponse({
+            runId: "run_1",
+            status: "failed",
+            progress: 0,
+            total: 1,
+            error: "execution exploded",
+          }),
+        );
 
         const facade = makeFacade();
         const err = await facade
@@ -243,10 +241,7 @@ describe("ExperimentsFacade.runWithResults", () => {
           .mockResolvedValueOnce(jsonResponse(startResponse))
           .mockResolvedValueOnce(jsonResponse(completedStatus))
           .mockResolvedValueOnce(
-            jsonResponse(
-              { error: "Run not found or results not yet available" },
-              { status: 404 },
-            ),
+            jsonResponse({ error: "Run not found or results not yet available" }, { status: 404 }),
           )
           .mockResolvedValueOnce(jsonResponse(resultsResponse));
 
@@ -306,9 +301,7 @@ describe("ExperimentsFacade.run error compatibility", () => {
       jsonResponse({ error: "Experiment not found" }, { status: 404 }),
     );
 
-    await expect(makeFacade().run("missing-experiment")).rejects.toThrow(
-      ExperimentNotFoundError,
-    );
+    await expect(makeFacade().run("missing-experiment")).rejects.toThrow(ExperimentNotFoundError);
   });
 
   it("keeps the public API error for invalid credentials", async () => {

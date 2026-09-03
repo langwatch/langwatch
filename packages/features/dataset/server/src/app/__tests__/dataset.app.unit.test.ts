@@ -207,7 +207,9 @@ describe("DatasetApp", () => {
   describe("when a caller names its own byte budget for a whole-dataset read", () => {
     it("passes it through rather than substituting one of the application's", async () => {
       const { app, dataset } = harness({
-        dataset: { getDatasetWithRecords: vi.fn(async () => ({ dataset: replacing, records: [] })) },
+        dataset: {
+          getDatasetWithRecords: vi.fn(async () => ({ dataset: replacing, records: [] })),
+        },
       });
 
       await app.getDatasetWithRecords({

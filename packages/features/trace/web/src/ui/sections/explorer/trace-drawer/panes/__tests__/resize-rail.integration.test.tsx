@@ -130,9 +130,7 @@ describe("ResizeRail", () => {
         // Drag leftward 2000px → propose 2800px, clamp to viewport-edge.
         fireEvent.pointerMove(el, { clientX: -1000, pointerId: 1 });
 
-        expect(useDrawerStore.getState().widthPx).toBe(
-          VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX,
-        );
+        expect(useDrawerStore.getState().widthPx).toBe(VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX);
 
         fireEvent.pointerUp(el, { clientX: -1000, pointerId: 1 });
       });
@@ -147,9 +145,7 @@ describe("ResizeRail", () => {
         render(<ResizeRail />, { wrapper });
         const el = getRail();
         fireEvent.doubleClick(el);
-        expect(useDrawerStore.getState().widthPx).toBe(
-          VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX,
-        );
+        expect(useDrawerStore.getState().widthPx).toBe(VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX);
       });
     });
   });

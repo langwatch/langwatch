@@ -6,8 +6,7 @@
  * state both hold tenant data, and both surface parse failures into logs and
  * span attributes.
  */
-export const errText = (err: unknown): string =>
-  err instanceof Error ? err.message : String(err);
+export const errText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /**
  * A parse failure's message, with any echoed source text removed.

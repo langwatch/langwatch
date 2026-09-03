@@ -145,9 +145,7 @@ const renderEntry = (entry: TranscriptEntry): string => {
           (entry.costUsd != null ? ` $${entry.costUsd.toFixed(4)}` : ""),
       )}`;
     default: {
-      const label = [entry.kind, entry.name ?? entry.text ?? ""]
-        .filter(Boolean)
-        .join(" ");
+      const label = [entry.kind, entry.name ?? entry.text ?? ""].filter(Boolean).join(" ");
       return `${stamp} ${chalk.gray(`· ${label}`)}`;
     }
   }

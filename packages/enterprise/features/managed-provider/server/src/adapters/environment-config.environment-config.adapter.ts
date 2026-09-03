@@ -10,9 +10,7 @@ import {
 const PRIVATE_BEDROCK_ENV_PREFIX = "MANAGED_BEDROCK__";
 
 export class EnvironmentManagedProviderConfigurationAdapter extends ManagedProviderConfigurationPort {
-  private constructor(
-    private readonly configs: ReadonlyMap<string, ManagedBedrockConfig>,
-  ) {
+  private constructor(private readonly configs: ReadonlyMap<string, ManagedBedrockConfig>) {
     super();
   }
 
@@ -27,8 +25,7 @@ export class EnvironmentManagedProviderConfigurationAdapter extends ManagedProvi
 
       const suffix = key.slice(PRIVATE_BEDROCK_ENV_PREFIX.length);
       const lastSeparator = suffix.lastIndexOf("__");
-      const organizationId =
-        lastSeparator >= 0 ? suffix.slice(lastSeparator + 2) : suffix;
+      const organizationId = lastSeparator >= 0 ? suffix.slice(lastSeparator + 2) : suffix;
       if (!organizationId) continue;
 
       let parsed: unknown;

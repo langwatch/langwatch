@@ -115,9 +115,7 @@ export function buildScopeHierarchy(
  */
 function isRoutable(provider: OrgModelProvider): boolean {
   return (
-    provider.enabled === true &&
-    !provider.disabledAt &&
-    isDispatchableProvider(provider.provider)
+    provider.enabled === true && !provider.disabledAt && isDispatchableProvider(provider.provider)
   );
 }
 
@@ -194,10 +192,7 @@ export function resolveEligible({
     let definedAt: ModelProviderScopeEntry | undefined;
     for (const mpScope of provider.scopes) {
       if (!scopes.some((vkScope) => matchesScope(mpScope, vkScope))) continue;
-      if (
-        !definedAt ||
-        SCOPE_BREADTH[mpScope.scopeType] < SCOPE_BREADTH[definedAt.scopeType]
-      ) {
+      if (!definedAt || SCOPE_BREADTH[mpScope.scopeType] < SCOPE_BREADTH[definedAt.scopeType]) {
         definedAt = mpScope;
       }
     }

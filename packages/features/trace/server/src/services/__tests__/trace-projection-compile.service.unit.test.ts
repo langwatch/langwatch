@@ -215,9 +215,7 @@ describe("compileProjection", () => {
         });
         expect(compiled.plan.needsEvents).toBe(true);
         expect(compiled.project(sampleTrace())).toEqual({
-          events: [
-            { type: "thumbs_up_down", metrics: { vote: 1 }, timestamp: 2000 },
-          ],
+          events: [{ type: "thumbs_up_down", metrics: { vote: 1 }, timestamp: 2000 }],
         });
       });
     });
@@ -319,9 +317,9 @@ describe("compileProjection", () => {
           "events.metrics.__proto__",
           "annotations.scores.prototype",
         ]) {
-          expect(() =>
-            compileProjection({ select: [path], protections: fullAccess }),
-          ).toThrowError(ProjectionValidationError);
+          expect(() => compileProjection({ select: [path], protections: fullAccess })).toThrowError(
+            ProjectionValidationError,
+          );
         }
       });
     });
@@ -334,10 +332,7 @@ describe("compileProjection", () => {
           select: ["trace_id", "started_at", "trace_id"],
           protections: fullAccess,
         });
-        expect(compiled.schema.columns.map((c) => c.path)).toEqual([
-          "trace_id",
-          "started_at",
-        ]);
+        expect(compiled.schema.columns.map((c) => c.path)).toEqual(["trace_id", "started_at"]);
       });
     });
   });
@@ -393,9 +388,7 @@ describe("collection-path RBAC redaction", () => {
           },
         });
         expect(project(sampleTrace())).toEqual({
-          annotations: [
-            { is_thumbs_up: true, comment: null, expected_output: null },
-          ],
+          annotations: [{ is_thumbs_up: true, comment: null, expected_output: null }],
         });
       });
     });
@@ -407,9 +400,7 @@ describe("collection-path RBAC redaction", () => {
           protections: fullAccess,
         });
         expect(project(sampleTrace())).toEqual({
-          annotations: [
-            { is_thumbs_up: true, comment: "nice", expected_output: null },
-          ],
+          annotations: [{ is_thumbs_up: true, comment: "nice", expected_output: null }],
         });
       });
     });

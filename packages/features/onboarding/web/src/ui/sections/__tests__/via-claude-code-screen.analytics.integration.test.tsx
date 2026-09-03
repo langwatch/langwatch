@@ -285,9 +285,7 @@ describe("given the screen renders commands that embed the project API key", () 
     expect(copiedTexts.some((text) => text.includes(API_KEY))).toBe(true);
     expect(emittedAcrossTabs.length).toBeGreaterThan(0);
 
-    const payloads = emittedAcrossTabs.map(([, , properties]) =>
-      JSON.stringify(properties ?? {}),
-    );
+    const payloads = emittedAcrossTabs.map(([, , properties]) => JSON.stringify(properties ?? {}));
     expect(payloads.filter((p) => p.includes(API_KEY))).toEqual([]);
     expect(payloads.filter((p) => copiedTexts.some((t) => p.includes(t)))).toEqual([]);
   });

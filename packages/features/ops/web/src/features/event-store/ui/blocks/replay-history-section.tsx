@@ -42,17 +42,8 @@ export function ReplayHistorySection({
         {latestEntry ? (
           renderRunLink(
             latestEntry.runId,
-            <HStack
-              gap={3}
-              cursor="pointer"
-              _hover={{ opacity: 0.8 }}
-              transition="opacity 0.1s"
-            >
-              <Badge
-                size="sm"
-                variant="subtle"
-                colorPalette={replayStateColor(latestEntry.state)}
-              >
+            <HStack gap={3} cursor="pointer" _hover={{ opacity: 0.8 }} transition="opacity 0.1s">
+              <Badge size="sm" variant="subtle" colorPalette={replayStateColor(latestEntry.state)}>
                 {latestEntry.state}
               </Badge>
               <Text textStyle="xs" truncate maxWidth="240px">

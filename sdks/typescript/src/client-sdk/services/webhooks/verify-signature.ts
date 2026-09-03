@@ -181,17 +181,14 @@ function signedPayload(timestamp: number, body: string | Uint8Array): Buffer {
  * if the sender were at fault.
  */
 export function verifyWebhookSignature(options: VerifyWebhookSignatureOptions): void {
-  const secrets = (
-    typeof options.secret === "string" ? [options.secret] : options.secret
-  ).filter((secret) => typeof secret === "string" && secret.length > 0);
+  const secrets = (typeof options.secret === "string" ? [options.secret] : options.secret).filter(
+    (secret) => typeof secret === "string" && secret.length > 0,
+  );
   if (secrets.length === 0) {
-    throw new TypeError(
-      "verifyWebhookSignature needs at least one non-empty signing secret",
-    );
+    throw new TypeError("verifyWebhookSignature needs at least one non-empty signing secret");
   }
 
-  const tolerance =
-    options.toleranceSeconds ?? WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS;
+  const tolerance = options.toleranceSeconds ?? WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS;
   const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
 
   const { timestamp, candidates } = parseSignatureHeader(options.header);

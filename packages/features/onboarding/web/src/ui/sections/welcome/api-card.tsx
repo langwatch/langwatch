@@ -43,15 +43,7 @@ const APICard: React.FC = () => {
   }
 
   return (
-    <VStack
-      minH="80px"
-      boxShadow="sm"
-      borderRadius="xl"
-      bg="bg"
-      p={4}
-      gap={2}
-      align="stretch"
-    >
+    <VStack minH="80px" boxShadow="sm" borderRadius="xl" bg="bg" p={4} gap={2} align="stretch">
       <Box mb={1}>
         <Heading size="md" textAlign="left">
           Connect to LangWatch
@@ -84,8 +76,7 @@ const APICard: React.FC = () => {
               Endpoint
             </Text>
             <Text fontSize="xs" color="fg.muted" fontWeight="normal" mt={-1}>
-              This is the endpoint you should configure in your SDK to send data to
-              LangWatch.
+              This is the endpoint you should configure in your SDK to send data to LangWatch.
             </Text>
           </VStack>
           <CopyableInputWithPrefix

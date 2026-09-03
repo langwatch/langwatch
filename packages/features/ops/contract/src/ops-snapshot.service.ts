@@ -45,12 +45,6 @@ export abstract class OpsSnapshotService {
   }): AsyncIterable<DashboardData>;
   abstract acquireOrRenewLease(input: { writerId: string }): Promise<OpsSnapshotLease>;
   abstract releaseLease(): Promise<void>;
-  abstract writeLive(input: {
-    snapshot: LiveSnapshot;
-    leaseToken: string;
-  }): Promise<boolean>;
-  abstract writeDetail(input: {
-    snapshot: DetailSnapshot;
-    leaseToken: string;
-  }): Promise<boolean>;
+  abstract writeLive(input: { snapshot: LiveSnapshot; leaseToken: string }): Promise<boolean>;
+  abstract writeDetail(input: { snapshot: DetailSnapshot; leaseToken: string }): Promise<boolean>;
 }

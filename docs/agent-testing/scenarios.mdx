@@ -28,16 +28,20 @@ Write criteria about outcomes and actions, not wording. A criterion about an int
 **New scenario** on the Scenarios tab, or **Edit** on a row, opens the editor.
 
 <Frame>
-<img className="block" src="/images/agent-testing/scenario-editor.png" alt="The scenario editor with the title, the test suite, the situation, the criteria and the labels" />
+  <img
+    className="block"
+    src="/images/agent-testing/scenario-editor.png"
+    alt="The scenario editor with the title, the test suite, the situation, the criteria and the labels"
+  />
 </Frame>
 
-| Field | What it is |
-|---|---|
-| **Title** | The name of the scenario, shown in every table and result. |
-| **Test suite** | The test suite of the scenario. **No test suite** files it under **Default**. |
-| **Situation** | Who the user is and what they are trying to do. |
-| **Criteria** | One criterion per line. Blank lines are dropped. |
-| **Labels** | Free text tags, any number. A run plan can scope by labels across test suites. |
+| Field          | What it is                                                                     |
+| -------------- | ------------------------------------------------------------------------------ |
+| **Title**      | The name of the scenario, shown in every table and result.                     |
+| **Test suite** | The test suite of the scenario. **No test suite** files it under **Default**.  |
+| **Situation**  | Who the user is and what they are trying to do.                                |
+| **Criteria**   | One criterion per line. Blank lines are dropped.                               |
+| **Labels**     | Free text tags, any number. A run plan can scope by labels across test suites. |
 
 **Save** stores the scenario. **Save & Run** stores it and opens the [run dialog](/agent-testing/run-plans#the-run-dialog). **Open recent run** opens the latest run of this scenario.
 
@@ -46,7 +50,11 @@ Write criteria about outcomes and actions, not wording. A criterion about an int
 Three chips under the criteria open optional blocks:
 
 <Frame>
-<img className="block" src="/images/agent-testing/scenario-editor-customize.png" alt="The Customize scenario chips expanded: parameters, min and max turns, and the model overrides" />
+  <img
+    className="block"
+    src="/images/agent-testing/scenario-editor-customize.png"
+    alt="The Customize scenario chips expanded: parameters, min and max turns, and the model overrides"
+  />
 </Frame>
 
 - **Add parameters** declares run parameters as one line of `name=default` pairs, for example `plan=free, locale=de`. The situation, the criteria and the target read a value as `{{ params.NAME }}`. See [Run parameters](/agent-testing/run-parameters).
@@ -58,7 +66,11 @@ Three chips under the criteria open optional blocks:
 Every save is a new version. The editor shows the current one as `v3 · History`; open **History** to see every version with when it was saved and by whom. **Restore** on an older version writes its content forward as a new version, so every version stays in the history.
 
 <Frame>
-<img className="block" src="/images/agent-testing/scenario-version-history.png" alt="The version history of a scenario, with Restore on an older version" />
+  <img
+    className="block"
+    src="/images/agent-testing/scenario-version-history.png"
+    alt="The version history of a scenario, with Restore on an older version"
+  />
 </Frame>
 
 When someone else saves the scenario while you have it open, the editor tells you and offers to reload before you save over it.
@@ -68,7 +80,11 @@ When someone else saves the scenario while you have it open, the editor tells yo
 The row menu of a scenario offers **Edit**, **Duplicate**, **Open recent runs**, **Move to suite...** and **Archive**. Select several rows to move them together.
 
 <Frame>
-<img className="block" src="/images/agent-testing/scenario-row-menu.png" alt="The row menu of a scenario" />
+  <img
+    className="block"
+    src="/images/agent-testing/scenario-row-menu.png"
+    alt="The row menu of a scenario"
+  />
 </Frame>
 
 Archiving removes the scenario from the tables and from every future run. Its past runs stay on the Results tab.
@@ -83,10 +99,10 @@ Through the [LangWatch MCP integration](/integration/mcp), a coding assistant su
 
 ## Limits
 
-| Limit | Value |
-|---|---|
-| Parameters declared on one scenario | 20 |
-| Max turns without a value | 10 |
-| Versions kept | All |
+| Limit                               | Value |
+| ----------------------------------- | ----- |
+| Parameters declared on one scenario | 20    |
+| Max turns without a value           | 10    |
+| Versions kept                       | All   |
 
 Also check: [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Run parameters](/agent-testing/run-parameters).

@@ -225,9 +225,9 @@ describe("refresh", () => {
 
   it("throws DeviceFlowError(unauthorized) on 401 so the caller can wipe local state", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(401));
-    await expect(
-      refresh({ baseUrl: "http://x", fetchImpl }, "rt_x"),
-    ).rejects.toMatchObject({ kind: "unauthorized" });
+    await expect(refresh({ baseUrl: "http://x", fetchImpl }, "rt_x")).rejects.toMatchObject({
+      kind: "unauthorized",
+    });
   });
 });
 
@@ -235,9 +235,7 @@ describe("logout", () => {
   it("treats 200/401/404 as success (idempotent)", async () => {
     for (const status of [200, 401, 404]) {
       const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(status));
-      await expect(
-        logout({ baseUrl: "http://x", fetchImpl }, "rt"),
-      ).resolves.toBeUndefined();
+      await expect(logout({ baseUrl: "http://x", fetchImpl }, "rt")).resolves.toBeUndefined();
     }
   });
 

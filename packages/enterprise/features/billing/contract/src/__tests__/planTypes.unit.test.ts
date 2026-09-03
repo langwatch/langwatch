@@ -13,11 +13,6 @@ describe("SUBSCRIBABLE_PLANS", () => {
 
 describe("portable enum vocabulary", () => {
   it("keeps the subscription lifecycle values stable", () => {
-    expect(Object.values(SubscriptionStatus)).toEqual([
-      "PENDING",
-      "FAILED",
-      "ACTIVE",
-      "CANCELLED",
-    ]);
+    expect(Object.values(SubscriptionStatus)).toEqual(["PENDING", "FAILED", "ACTIVE", "CANCELLED"]);
   });
 });

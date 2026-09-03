@@ -21,10 +21,7 @@ export class PrismaOrganizationSessionPolicyRepository extends OrganizationSessi
     return { maxSessionDurationDays: organization?.maxSessionDurationDays ?? 0 };
   }
 
-  async setMaxDurationDays(
-    organizationId: string,
-    maxSessionDurationDays: number,
-  ): Promise<void> {
+  async setMaxDurationDays(organizationId: string, maxSessionDurationDays: number): Promise<void> {
     await this.prisma.organization.update({
       where: { id: organizationId },
       data: { maxSessionDurationDays },

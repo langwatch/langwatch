@@ -84,19 +84,13 @@ export class SubscriptionItemCalculatorService {
         this.prices[planConfig.userPriceKey],
         this.prices[planConfig.tracesPriceKey],
       ]);
-      const keepItems = input.currentItems.filter((item) =>
-        keepPriceIds.has(item.price.id),
-      );
+      const keepItems = input.currentItems.filter((item) => keepPriceIds.has(item.price.id));
       deleteItems = input.currentItems.filter((item) => !keepItems.includes(item));
       tracesItem = keepItems.find(
         (item) => item.price.id === this.prices[planConfig.tracesPriceKey],
       );
-      userItem = keepItems.find(
-        (item) => item.price.id === this.prices[planConfig.userPriceKey],
-      );
-      planItem = keepItems.find(
-        (item) => item.price.id === this.prices[planConfig.basePriceKey],
-      );
+      userItem = keepItems.find((item) => item.price.id === this.prices[planConfig.userPriceKey]);
+      planItem = keepItems.find((item) => item.price.id === this.prices[planConfig.basePriceKey]);
     }
 
     const limits = PLAN_LIMITS[input.plan];
@@ -111,8 +105,7 @@ export class SubscriptionItemCalculatorService {
       });
     } else if (totalTraces > 0 && planConfig) {
       const quantity = Math.floor(totalTraces / planConfig.tracesUnit);
-      if (quantity > 0)
-        updates.push({ price: this.prices[planConfig.tracesPriceKey], quantity });
+      if (quantity > 0) updates.push({ price: this.prices[planConfig.tracesPriceKey], quantity });
     }
     if (userItem) updates.push({ id: userItem.id, quantity: totalMembers });
     else if (totalMembers > 0 && planConfig)

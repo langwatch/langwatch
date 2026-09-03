@@ -26,9 +26,7 @@ export const PLATFORM_TOOL_POLICY_DEFAULTS: PlatformToolPolicyMap = {
   copilot: { allowVk: true, allowOtelDirect: true },
   code: { allowVk: false, allowOtelDirect: true },
 };
-export const PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE: Readonly<
-  Record<string, PlatformToolSlug>
-> = {
+export const PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE: Readonly<Record<string, PlatformToolSlug>> = {
   claude_code: "claude",
   codex: "codex",
   gemini: "gemini",

@@ -1,7 +1,4 @@
-import {
-  getEvaluator as apiGetEvaluator,
-  getEvaluatorType,
-} from "../langwatch-api-evaluators.js";
+import { getEvaluator as apiGetEvaluator, getEvaluatorType } from "../langwatch-api-evaluators.js";
 
 /**
  * Handles the platform_get_evaluator MCP tool invocation.

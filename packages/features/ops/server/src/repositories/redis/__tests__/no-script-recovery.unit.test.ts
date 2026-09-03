@@ -77,10 +77,7 @@ describe("execWithNoScriptRecovery", () => {
   describe("given a command failed for some other reason", () => {
     describe("when the batch is resolved", () => {
       it("passes the failure through untouched rather than retrying it", async () => {
-        const connectionLost: [Error | null, unknown] = [
-          new Error("Connection is closed."),
-          null,
-        ];
+        const connectionLost: [Error | null, unknown] = [new Error("Connection is closed."), null];
         let wasRerun = false;
 
         const results = await execWithNoScriptRecovery(

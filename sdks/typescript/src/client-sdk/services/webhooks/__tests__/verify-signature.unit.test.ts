@@ -87,9 +87,7 @@ const vector = (name: string): VerificationVector => {
 
 describe("Feature: verifying a LangWatch webhook delivery", () => {
   it("defaults to the tolerance the sender documents", () => {
-    expect(WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS).toBe(
-      vectors.default_tolerance_seconds,
-    );
+    expect(WEBHOOK_SIGNATURE_DEFAULT_TOLERANCE_SECONDS).toBe(vectors.default_tolerance_seconds);
   });
 
   it("names the headers the sender actually sets", () => {
@@ -139,9 +137,7 @@ describe("Feature: verifying a LangWatch webhook delivery", () => {
   describe("when the body was altered after signing", () => {
     /** @scenario A body changed in transit is refused as a bad signature */
     it("refuses it as a signature mismatch, not as a stale delivery", () => {
-      expect(outcomeOf(vector("invalid_signature_tampered_body"))).toBe(
-        "invalid_signature",
-      );
+      expect(outcomeOf(vector("invalid_signature_tampered_body"))).toBe("invalid_signature");
     });
   });
 

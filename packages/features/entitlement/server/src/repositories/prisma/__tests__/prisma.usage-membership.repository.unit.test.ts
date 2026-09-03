@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  OrganizationUserRole,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaUsageMembershipRepository } from "../prisma.usage-membership.repository";
 
 /**
@@ -63,9 +60,7 @@ describe("PrismaUsageMembershipRepository", () => {
 
   beforeEach(() => {
     mockPrisma = createMockPrisma();
-    repository = PrismaUsageMembershipRepository.create(
-      mockPrisma as unknown as PrismaClient,
-    );
+    repository = PrismaUsageMembershipRepository.create(mockPrisma as unknown as PrismaClient);
   });
 
   describe("getMemberCount", () => {
@@ -96,9 +91,7 @@ describe("PrismaUsageMembershipRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { userId: "u1", customRoleId: "role-1" },
-      ]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([{ userId: "u1", customRoleId: "role-1" }]);
       mockPrisma.customRole.findMany.mockResolvedValue([
         { id: "role-1", permissions: ["project:view", "project:manage"] },
       ]);
@@ -114,9 +107,7 @@ describe("PrismaUsageMembershipRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { userId: "u1", customRoleId: "role-1" },
-      ]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([{ userId: "u1", customRoleId: "role-1" }]);
       mockPrisma.customRole.findMany.mockResolvedValue([
         { id: "role-1", permissions: ["project:view", "analytics:view"] },
       ]);
@@ -273,9 +264,7 @@ describe("PrismaUsageMembershipRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { userId: "u1", customRoleId: null },
-      ]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([{ userId: "u1", customRoleId: null }]);
       mockPrisma.customRole.findMany.mockResolvedValue([]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
 
@@ -289,9 +278,7 @@ describe("PrismaUsageMembershipRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { userId: "u1", customRoleId: "role-1" },
-      ]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([{ userId: "u1", customRoleId: "role-1" }]);
       mockPrisma.customRole.findMany.mockResolvedValue([
         { id: "role-1", permissions: ["project:view", "analytics:view"] },
       ]);
@@ -307,9 +294,7 @@ describe("PrismaUsageMembershipRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { userId: "u1", customRoleId: "role-1" },
-      ]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([{ userId: "u1", customRoleId: "role-1" }]);
       mockPrisma.customRole.findMany.mockResolvedValue([
         { id: "role-1", permissions: ["project:view", "project:manage"] },
       ]);
@@ -438,9 +423,7 @@ describe("PrismaUsageMembershipRepository", () => {
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { userId: "u1", customRoleId: null },
-      ]);
+      mockPrisma.roleBinding.findMany.mockResolvedValue([{ userId: "u1", customRoleId: null }]);
       mockPrisma.customRole.findMany.mockResolvedValue([]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([
         {
@@ -459,10 +442,7 @@ describe("PrismaUsageMembershipRepository", () => {
   describe("getCurrentMonthCost", () => {
     /** @scenario "getCurrentMonthCost remains available in the repository" */
     it("fetches project IDs and aggregates cost for current month", async () => {
-      mockPrisma.project.findMany.mockResolvedValue([
-        { id: "proj-1" },
-        { id: "proj-2" },
-      ]);
+      mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }, { id: "proj-2" }]);
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 150.5 } });
 
       const result = await repository.getCurrentMonthCost(organizationId);
@@ -530,8 +510,7 @@ describe("PrismaUsageMembershipRepository", () => {
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 75.25 } });
       const projectIds = ["proj-a", "proj-b", "proj-c"];
 
-      const result =
-        await repository.getCurrentMonthCostForProjects(projectIds);
+      const result = await repository.getCurrentMonthCostForProjects(projectIds);
 
       expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
         where: {
@@ -546,9 +525,7 @@ describe("PrismaUsageMembershipRepository", () => {
     it("returns zero when amount is null", async () => {
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
 
-      const result = await repository.getCurrentMonthCostForProjects([
-        "proj-1",
-      ]);
+      const result = await repository.getCurrentMonthCostForProjects(["proj-1"]);
 
       expect(result).toBe(0);
     });

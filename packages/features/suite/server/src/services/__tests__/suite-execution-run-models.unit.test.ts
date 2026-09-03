@@ -17,11 +17,7 @@ import type { SuiteRunModelsResolver } from "../suite-run-models.service";
 const scenarioId = "scenario_refund";
 
 const noopScenarios = {
-  resolveRunParametersForScenarios: async ({
-    scenarios,
-  }: {
-    scenarios: { id: string }[];
-  }) =>
+  resolveRunParametersForScenarios: async ({ scenarios }: { scenarios: { id: string }[] }) =>
     scenarios.map((scenario) => ({
       scenarioId: scenario.id,
       parameters: {},

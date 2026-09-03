@@ -1,13 +1,4 @@
-import {
-  Box,
-  chakra,
-  Flex,
-  HStack,
-  Icon,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, chakra, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { memo, type RefObject, useCallback, useMemo } from "react";
 import {
@@ -20,14 +11,8 @@ import {
 import { RedactedInline } from "../../redacted-field";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants";
-import {
-  type ConversationTurn,
-  useConversationContext,
-} from "../hooks/use-conversation-context";
-import {
-  type UseTextTranslationResult,
-  useTextTranslation,
-} from "../hooks/use-text-translation";
+import { type ConversationTurn, useConversationContext } from "../hooks/use-conversation-context";
+import { type UseTextTranslationResult, useTextTranslation } from "../hooks/use-text-translation";
 import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation";
 import {
   formatPreview,
@@ -167,10 +152,7 @@ function buildRows({
   // Always returns exactly 3 rows so the section's height is stable. Missing
   // prev/next slots become "Start of conversation" / "End of conversation"
   // placeholders.
-  const placeholder = (
-    pos: "previous" | "next",
-    boundary: "start" | "end",
-  ): ConversationRow => ({
+  const placeholder = (pos: "previous" | "next", boundary: "start" | "end"): ConversationRow => ({
     key: `${pos}-placeholder`,
     traceId: "",
     userText: null,
@@ -251,10 +233,7 @@ export const ConversationContext = memo(function ConversationContext({
         out[`${row.key}:user`] = row.userText.slice(0, TRANSLATE_TEXT_MAX_CHARS);
       }
       if (row.assistantText) {
-        out[`${row.key}:assistant`] = row.assistantText.slice(
-          0,
-          TRANSLATE_TEXT_MAX_CHARS,
-        );
+        out[`${row.key}:assistant`] = row.assistantText.slice(0, TRANSLATE_TEXT_MAX_CHARS);
       }
     }
     return out;
@@ -354,12 +333,7 @@ export const ConversationContext = memo(function ConversationContext({
         // (visible as the slow-drag with infinite trailing whitespace).
         <Box flex={1} minHeight={0} overflow="auto" paddingX={4} paddingY={3}>
           <Box ref={contentRef}>
-            <ContextBody
-              ctx={ctx}
-              rows={displayRows}
-              traceId={traceId}
-              onSelect={navigate}
-            />
+            <ContextBody ctx={ctx} rows={displayRows} traceId={traceId} onSelect={navigate} />
           </Box>
         </Box>
       )}
@@ -470,11 +444,7 @@ function ContextHeader({
 }
 
 /** Translate-to-English toggle for the whole context strip. */
-function ContextTranslateButton({
-  translation,
-}: {
-  translation: UseTextTranslationResult;
-}) {
+function ContextTranslateButton({ translation }: { translation: UseTextTranslationResult }) {
   const label = translation.isLoading
     ? "Translating…"
     : translation.isActive
@@ -482,11 +452,7 @@ function ContextTranslateButton({
       : "Translate";
   return (
     <Tooltip
-      content={
-        translation.isActive
-          ? "Show the original text"
-          : "Translate these turns to English"
-      }
+      content={translation.isActive ? "Show the original text" : "Translate these turns to English"}
       positioning={{ placement: "top" }}
     >
       <chakra.button
@@ -563,12 +529,7 @@ function ContextBody({
             >
               <Skeleton height="14px" width="56px" borderRadius="sm" />
               <Skeleton height="14px" width="14px" borderRadius="full" />
-              <Skeleton
-                height="12px"
-                flex={1}
-                borderRadius="sm"
-                opacity={i === 1 ? 1 : 0.55}
-              />
+              <Skeleton height="12px" flex={1} borderRadius="sm" opacity={i === 1 ? 1 : 0.55} />
             </HStack>
           ))}
         </VStack>
@@ -692,14 +653,7 @@ const ConversationRow = memo(function ConversationRow({
       >
         <Flex align="center" gap={2.5} flex={1} minWidth={0} opacity={0.55}>
           <Icon as={PlaceholderIcon} boxSize={3.5} color="fg.subtle" flexShrink={0} />
-          <Text
-            textStyle="xs"
-            color="fg.subtle"
-            fontStyle="italic"
-            truncate
-            flex={1}
-            minWidth={0}
-          >
+          <Text textStyle="xs" color="fg.subtle" fontStyle="italic" truncate flex={1} minWidth={0}>
             {row.assistantText ?? row.userText ?? ""}
           </Text>
         </Flex>
@@ -883,15 +837,7 @@ const TurnLine: React.FC<{
       ) : (
         <Text
           textStyle="xs"
-          color={
-            text
-              ? isAssistant
-                ? "fg.muted"
-                : emphasised
-                  ? "fg"
-                  : "fg.muted"
-              : "fg.subtle"
-          }
+          color={text ? (isAssistant ? "fg.muted" : emphasised ? "fg" : "fg.muted") : "fg.subtle"}
           fontStyle={text ? "normal" : "italic"}
           fontWeight={emphasised && text && !isAssistant ? "medium" : "normal"}
           flex={1}

@@ -43,24 +43,17 @@ const manifests: { path: string; pkg: PackageJson }[] = manifestPaths.map((path)
 
 /** Every lifecycle script of `name` across the workspace, with the manifest that declared it. */
 function lifecycleScripts(name: string): { path: string; script: string }[] {
-  return manifests
-    .flatMap(({ path, pkg }) => {
-      const script = pkg.scripts?.[name];
-      return script === undefined ? [] : [{ path, script }];
-    });
+  return manifests.flatMap(({ path, pkg }) => {
+    const script = pkg.scripts?.[name];
+    return script === undefined ? [] : [{ path, script }];
+  });
 }
 
 /**
  * Patterns that indicate a script is downloading from the network.
  * Any match in a lifecycle script means the constraint is violated.
  */
-const FORBIDDEN_PATTERNS = [
-  /curl/i,
-  /wget/i,
-  /\bfetch\b/i,
-  /download/i,
-  /https?:\/\//i,
-] as const;
+const FORBIDDEN_PATTERNS = [/curl/i, /wget/i, /\bfetch\b/i, /download/i, /https?:\/\//i] as const;
 
 /**
  * Returns true when the given script string contains any forbidden pattern.

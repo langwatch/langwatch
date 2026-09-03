@@ -17,10 +17,7 @@ import {
   ORGANIZATION_SAFE_SELECT,
   PROJECT_SAFE_SELECT,
 } from "./prisma.admin.repository";
-import {
-  PrismaAdminUserMapper,
-  USER_BACKOFFICE_INCLUDE,
-} from "./prisma.admin-user.mapper";
+import { PrismaAdminUserMapper, USER_BACKOFFICE_INCLUDE } from "./prisma.admin-user.mapper";
 import { AdminBackofficeRepository } from "../admin-backoffice.repository";
 
 /**
@@ -83,8 +80,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
           {
             ...query.where,
             include: USER_BACKOFFICE_INCLUDE,
-            map: (users: UserWithBackofficeIncludes[]) =>
-              users.map(PrismaAdminUserMapper.map),
+            map: (users: UserWithBackofficeIncludes[]) => users.map(PrismaAdminUserMapper.map),
           },
         );
       case "organization":
@@ -153,10 +149,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
     );
   }
 
-  private defaultParams(
-    method: AdminOperationInput["method"],
-    params: AdminOperationParams,
-  ) {
+  private defaultParams(method: AdminOperationInput["method"], params: AdminOperationParams) {
     switch (method) {
       case "getMany":
         return { ids: this.stringArray(params.ids) };
@@ -271,11 +264,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
                 { stripeSubscriptionId: insensitive },
                 {
                   organization: {
-                    OR: [
-                      { id: insensitive },
-                      { name: insensitive },
-                      { slug: insensitive },
-                    ],
+                    OR: [{ id: insensitive }, { name: insensitive }, { slug: insensitive }],
                   },
                 },
                 ...(matchingPlan ? [{ plan: { equals: matchingPlan } }] : []),

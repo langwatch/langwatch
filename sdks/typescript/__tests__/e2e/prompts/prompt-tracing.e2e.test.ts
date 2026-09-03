@@ -50,9 +50,7 @@ describe("Prompt tracing", () => {
 
     it("sets prompt metadata attributes", () => {
       // New combined format: handle:version
-      expect(getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_ID]).toBe(
-        "test-prompt-1:1",
-      );
+      expect(getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_ID]).toBe("test-prompt-1:1");
     });
 
     it("sets output data", () => {
@@ -94,18 +92,14 @@ describe("Prompt tracing", () => {
 
     it("sets prompt metadata attributes", () => {
       // New combined format: handle:version
-      expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_ID]).toBe(
-        "test-prompt-1:1",
-      );
+      expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_ID]).toBe("test-prompt-1:1");
     });
 
     it("sets output data", () => {
       // Check that output was set (it should be JSON stringified)
       expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT]).toBeDefined();
 
-      const outputAttr = compileSpan?.attributes[
-        attributes.ATTR_LANGWATCH_OUTPUT
-      ] as string;
+      const outputAttr = compileSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT] as string;
       const output = JSON.parse(outputAttr);
 
       expect(output.value.prompt).toBe("Hello Alice, how is the weather today?");
@@ -114,9 +108,7 @@ describe("Prompt tracing", () => {
 
     it("sets input variables", () => {
       // Check that input variables were captured
-      expect(
-        compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VARIABLES],
-      ).toBeDefined();
+      expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VARIABLES]).toBeDefined();
 
       const variablesAttr = compileSpan?.attributes[
         attributes.ATTR_LANGWATCH_PROMPT_VARIABLES

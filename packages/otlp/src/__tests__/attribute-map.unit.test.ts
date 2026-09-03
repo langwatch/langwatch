@@ -170,9 +170,11 @@ describe("normalizeOtlpAttributeMap", () => {
     });
 
     it("hex-encodes bytes that arrived as base64, so both transports store alike", () => {
-      expect(normalizeOtlpAttributeMap([{ key: "id", value: { bytesValue: "3q2+7w==" } }])).toEqual({
-        id: "deadbeef",
-      });
+      expect(normalizeOtlpAttributeMap([{ key: "id", value: { bytesValue: "3q2+7w==" } }])).toEqual(
+        {
+          id: "deadbeef",
+        },
+      );
     });
   });
 
@@ -225,7 +227,10 @@ describe("normalizeOtlpAttributeMap", () => {
     it("keeps an all-scalar array as one JSON value rather than indexing it", () => {
       expect(
         normalizeOtlpAttributeMap([
-          { key: "tags", value: { arrayValue: { values: [{ stringValue: "a" }, { intValue: 2 }] } } },
+          {
+            key: "tags",
+            value: { arrayValue: { values: [{ stringValue: "a" }, { intValue: 2 }] } },
+          },
         ]),
       ).toEqual({ tags: '["a",2]' });
     });

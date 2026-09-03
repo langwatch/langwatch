@@ -61,9 +61,7 @@ export class NodeLicenseCryptographyAdapter extends LicenseCryptographyPort {
   static create(
     options: NodeLicenseCryptographyAdapterOptions = {},
   ): NodeLicenseCryptographyAdapter {
-    return new NodeLicenseCryptographyAdapter(
-      options.publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY,
-    );
+    return new NodeLicenseCryptographyAdapter(options.publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY);
   }
 
   /**
@@ -82,9 +80,7 @@ export class NodeLicenseCryptographyAdapter extends LicenseCryptographyPort {
 
     const base64 = body.replace(/\s+/g, "");
     const lines = base64.match(PEM_BODY_LINE) ?? [];
-    return [`-----BEGIN ${label!}-----`, ...lines, `-----END ${label!}-----`, ""].join(
-      "\n",
-    );
+    return [`-----BEGIN ${label!}-----`, ...lines, `-----END ${label!}-----`, ""].join("\n");
   }
 
   /** True when the key is passphrase-protected. */

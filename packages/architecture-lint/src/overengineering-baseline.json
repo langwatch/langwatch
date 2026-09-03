@@ -1,9 +1,9 @@
 {
- "version": 0,
- "sites": [
-  "conditional-type-depth|packages/config/src/index.ts",
-  "layer-class|apps/worker/src/app/worker-automation-graph.composition.ts",
-  "layer-class|packages/features/agent/server/src/transport/api-rest/agent-legacy-facade.api.ts",
-  "overload-by-literal|packages/config/src/index.ts"
- ]
+  "version": 0,
+  "sites": [
+    "conditional-type-depth|packages/config/src/index.ts",
+    "layer-class|apps/worker/src/app/worker-automation-graph.composition.ts",
+    "layer-class|packages/features/agent/server/src/transport/api-rest/agent-legacy-facade.api.ts",
+    "overload-by-literal|packages/config/src/index.ts"
+  ]
 }

@@ -95,9 +95,7 @@ export interface UsageStatsWorkerContributionOptions {
 export class UsageStatsWorkerContribution {
   private constructor(private readonly options: UsageStatsWorkerContributionOptions) {}
 
-  static create(
-    options: UsageStatsWorkerContributionOptions,
-  ): UsageStatsWorkerContribution {
+  static create(options: UsageStatsWorkerContributionOptions): UsageStatsWorkerContribution {
     return new UsageStatsWorkerContribution(options);
   }
 
@@ -118,10 +116,7 @@ export class UsageStatsWorkerContribution {
       try {
         await this.sendForAllOrganizations();
       } catch (error) {
-        usageStatsLogger.warn(
-          { error },
-          "usage stats tick failed (will retry on next interval)",
-        );
+        usageStatsLogger.warn({ error }, "usage stats tick failed (will retry on next interval)");
       }
       if (!stopped) {
         timer = setTimeout(() => void tick(), USAGE_STATS_INTERVAL_MS);

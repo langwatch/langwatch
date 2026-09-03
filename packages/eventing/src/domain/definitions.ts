@@ -13,9 +13,7 @@ export interface AggregateDefinition<
   readonly events: Events;
 }
 
-export function defineEvent<const Type extends EventType>(
-  type: Type,
-): EventDefinition<Type> {
+export function defineEvent<const Type extends EventType>(type: Type): EventDefinition<Type> {
   return Object.freeze({ type });
 }
 
@@ -54,10 +52,7 @@ export function defineAggregate<
   });
 }
 
-type AnyAggregateDefinition = AggregateDefinition<
-  AggregateType,
-  readonly EventDefinition[]
->;
+type AnyAggregateDefinition = AggregateDefinition<AggregateType, readonly EventDefinition[]>;
 
 export class EventCatalogue {
   private readonly aggregatesByType = new Map<AggregateType, AnyAggregateDefinition>();

@@ -1,8 +1,5 @@
 import { useCallback, useMemo } from "react";
-import {
-  selectSpanParamsBaseline,
-  useTraceEditStore,
-} from "../../../../../index";
+import { selectSpanParamsBaseline, useTraceEditStore } from "../../../../../index";
 import type { AttributeEditing } from "../attribute-table";
 
 /**
@@ -49,8 +46,7 @@ export function useSpanAttributeEditing({
   );
 
   const editing = useMemo(
-    () =>
-      enabled ? { edits: edits ?? {}, onEditAttribute, onResetAttribute } : undefined,
+    () => (enabled ? { edits: edits ?? {}, onEditAttribute, onResetAttribute } : undefined),
     [enabled, edits, onEditAttribute, onResetAttribute],
   );
 

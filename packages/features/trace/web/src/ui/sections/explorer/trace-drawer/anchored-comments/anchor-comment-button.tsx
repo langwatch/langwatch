@@ -88,11 +88,7 @@ export function AnchorCommentButton({
         positioning={{ placement: "bottom-end", flip: true, shift: 16 }}
       >
         <Popover.Trigger asChild>{trigger}</Popover.Trigger>
-        <Popover.Content
-          width="380px"
-          onClick={(e) => e.stopPropagation()}
-          bg="bg.panel/92"
-        >
+        <Popover.Content width="380px" onClick={(e) => e.stopPropagation()} bg="bg.panel/92">
           <Popover.Arrow />
           <Popover.Body padding={3}>
             <AnchorCommentThread comments={comments} />

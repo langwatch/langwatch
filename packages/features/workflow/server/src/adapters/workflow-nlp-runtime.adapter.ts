@@ -29,12 +29,7 @@ import {
  * by the call site so every span downstream (nlpgo + gateway) inherits a
  * consistent attribution. See specs/nlp-go/telemetry.feature.
  */
-export type NlpOrigin =
-  | "workflow"
-  | "playground"
-  | "evaluation"
-  | "scenario"
-  | "topic_clustering";
+export type NlpOrigin = "workflow" | "playground" | "evaluation" | "scenario" | "topic_clustering";
 
 const TRACE_ID_HEX_RE = /^[0-9a-fA-F]{32}$/;
 const SPAN_ID_HEX_RE = /^[0-9a-fA-F]{16}$/;
@@ -109,9 +104,7 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
     return new HttpWorkflowNlpRuntimeAdapter(options);
   }
 
-  private constructor(
-    private readonly options: { serviceUrl: string; fetch?: typeof fetch },
-  ) {
+  private constructor(private readonly options: { serviceUrl: string; fetch?: typeof fetch }) {
     super();
   }
 
@@ -164,10 +157,11 @@ export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
     }
 
     const call = this.options.fetch ?? fetch;
-    const response = await call(
-      `${this.options.serviceUrl.replace(/\/$/, "")}/go${request.path}`,
-      { method: "POST", headers, body: JSON.stringify(request.body) },
-    );
+    const response = await call(`${this.options.serviceUrl.replace(/\/$/, "")}/go${request.path}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(request.body),
+    });
 
     return {
       ok: response.ok,

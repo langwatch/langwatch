@@ -41,13 +41,8 @@ vi.mock("../../../behavior/organization-api", () => ({
 
 import { MemberSeatUsage } from "../member-seat-usage";
 
-const planWith = ({
-  maxMembers,
-  maxMembersLite,
-}: {
-  maxMembers: number;
-  maxMembersLite: number;
-}) => ({ maxMembers, maxMembersLite }) as any;
+const planWith = ({ maxMembers, maxMembersLite }: { maxMembers: number; maxMembersLite: number }) =>
+  ({ maxMembers, maxMembersLite }) as any;
 
 const renderSeatUsage = (plan: { maxMembers: number; maxMembersLite: number }) =>
   render(

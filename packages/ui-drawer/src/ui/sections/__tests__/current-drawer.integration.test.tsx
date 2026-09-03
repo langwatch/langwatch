@@ -77,17 +77,17 @@ function CurrentAddress() {
 function mount(at: string): void {
   render(
     <MemoryRouter initialEntries={[at]}>
-        <Routes>
-          <Route
-            path="/:project/traces"
-            element={
-              <>
-                <Opener />
-                <CurrentAddress />
-                <CurrentDrawer drawers={drawers} />
-              </>
-            }
-          />
+      <Routes>
+        <Route
+          path="/:project/traces"
+          element={
+            <>
+              <Opener />
+              <CurrentAddress />
+              <CurrentDrawer drawers={drawers} />
+            </>
+          }
+        />
       </Routes>
     </MemoryRouter>,
   );

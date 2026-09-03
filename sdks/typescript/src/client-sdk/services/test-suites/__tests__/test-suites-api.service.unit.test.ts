@@ -4,10 +4,7 @@
  * Spec: specs/typescript-sdk/run-plans-and-test-suites.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import {
-  TestSuitesApiError,
-  TestSuitesApiService,
-} from "../test-suites-api.service";
+import { TestSuitesApiError, TestSuitesApiService } from "../test-suites-api.service";
 import { isLangWatchHandledError } from "@/internal/api/errors";
 import type { LangwatchApiClient } from "@/internal/api/client";
 import { LangWatch } from "@/client-sdk/index";
@@ -23,11 +20,7 @@ const nestedUnauthorized = {
   },
 };
 
-const serviceWith = (result: {
-  data?: unknown;
-  error?: unknown;
-  response?: Response;
-}) => {
+const serviceWith = (result: { data?: unknown; error?: unknown; response?: Response }) => {
   const calls = {
     GET: vi.fn(async (_path: string, _init?: RequestInit) => result),
     POST: vi.fn(async (_path: string, init?: { body?: Record<string, unknown> }) => {
@@ -86,9 +79,7 @@ describe("TestSuitesApiService", () => {
       expect(calls.GET).toHaveBeenCalledWith("/api/v1/test-suites/{id}", {
         params: { path: { id: "suite_abc" } },
       });
-      expect(suite.scenarios).toEqual([
-        { id: "scenario_1", name: "Refund a paid order" },
-      ]);
+      expect(suite.scenarios).toEqual([{ id: "scenario_1", name: "Refund a paid order" }]);
     });
   });
 

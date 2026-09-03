@@ -76,9 +76,10 @@ export const unreachableCollector: typeof fetch = (async () => {
 
 export const attributesOf = (request: PostedRequest): Record<string, string> =>
   Object.fromEntries(
-    request.body.resourceLogs[0]!.scopeLogs[0]!.logRecords[0]!.attributes.map(
-      (attribute) => [attribute.key, attribute.value.stringValue],
-    ),
+    request.body.resourceLogs[0]!.scopeLogs[0]!.logRecords[0]!.attributes.map((attribute) => [
+      attribute.key,
+      attribute.value.stringValue,
+    ]),
   );
 
 export const recordOf = (request: PostedRequest) =>
@@ -193,13 +194,10 @@ export const installHookHarness = (): HookHarness => {
     }: RunHookOptions = {}) =>
       hookCommand({
         tool,
-        env: shouldOmitExporterEnv
-          ? env
-          : { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...env },
+        env: shouldOmitExporterEnv ? env : { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...env },
         readInput:
           readInput ??
-          (() =>
-            Promise.resolve(typeof input === "string" ? input : JSON.stringify(input))),
+          (() => Promise.resolve(typeof input === "string" ? input : JSON.stringify(input))),
         runGit: runGit ?? gitRunner(git),
         fetchImpl,
         now: () => now,

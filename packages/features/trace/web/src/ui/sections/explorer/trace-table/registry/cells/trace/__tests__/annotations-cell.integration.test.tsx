@@ -193,9 +193,7 @@ describe("AnnotationsCell", () => {
     describe("when the Annotations cell renders", () => {
       /** @scenario "The list still renders while annotations are in flight" */
       it("holds the space rather than claiming nobody reviewed the trace", () => {
-        const { container } = renderCell(
-          row({ annotations: [], annotationsLoading: true }),
-        );
+        const { container } = renderCell(row({ annotations: [], annotationsLoading: true }));
 
         expect(screen.queryByText("—")).not.toBeInTheDocument();
         expect(container.firstChild).toBeTruthy();

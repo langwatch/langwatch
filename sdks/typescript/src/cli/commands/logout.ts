@@ -3,10 +3,7 @@ import * as readline from "node:readline";
 import chalk from "chalk";
 
 import { clearConfig, isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
-import {
-  DeviceFlowError,
-  logout as serverRevokeLogout,
-} from "@/cli/utils/governance/device-flow";
+import { DeviceFlowError, logout as serverRevokeLogout } from "@/cli/utils/governance/device-flow";
 import { scanTelemetryTargets } from "@/cli/utils/governance/telemetry-targets";
 
 export interface LogoutOptions {
@@ -105,9 +102,7 @@ export const logoutCommand = async (options: LogoutOptions = {}): Promise<void> 
     try {
       if (t.remove()) removed.push(t.label);
     } catch (err) {
-      console.log(
-        chalk.yellow(`  ! Couldn't remove ${t.label}: ${(err as Error).message}`),
-      );
+      console.log(chalk.yellow(`  ! Couldn't remove ${t.label}: ${(err as Error).message}`));
     }
   }
 

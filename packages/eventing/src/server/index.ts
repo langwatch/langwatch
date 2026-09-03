@@ -83,18 +83,9 @@ export {
   PROCESS_RETENTION_FAILURES_METRIC_NAME,
   PROCESS_RETENTION_SWEPT_ROWS_METRIC_NAME,
 } from "./maintenance/otel.retention-metrics.adapter";
-export {
-  computeCatchUp,
-  computeNextRunAt,
-} from "./schedule/next-run-at";
-export {
-  SchedulerRegistry,
-  schedulerRegistry,
-} from "./schedule/scheduler.registry";
-export {
-  SchedulerService,
-  type SchedulerServiceDeps,
-} from "./schedule/scheduler.service";
+export { computeCatchUp, computeNextRunAt } from "./schedule/next-run-at";
+export { SchedulerRegistry, schedulerRegistry } from "./schedule/scheduler.registry";
+export { SchedulerService, type SchedulerServiceDeps } from "./schedule/scheduler.service";
 export type {
   ScheduledJobFire,
   ScheduledJobRecord,

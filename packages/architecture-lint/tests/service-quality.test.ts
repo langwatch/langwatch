@@ -58,10 +58,7 @@ describe("service quality baseline", () => {
     writeFileSync(current, JSON.stringify({ version: 0, services: [ceiling] }));
 
     expect(
-      lintServiceQualityBaseline(
-        fixtureRoot,
-        join(fixtureRoot, "merge-base-baseline.json"),
-      ),
+      lintServiceQualityBaseline(fixtureRoot, join(fixtureRoot, "merge-base-baseline.json")),
     ).toEqual({ violations: [], bootstrapped: true });
 
     const missingBaselineRoot = mkdtempSync(join(tmpdir(), "missing-baseline-"));

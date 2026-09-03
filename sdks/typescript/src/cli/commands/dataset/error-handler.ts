@@ -62,9 +62,7 @@ export function handleDatasetCommandError({
       action: context,
     });
     if (error.current !== undefined && error.max !== undefined) {
-      console.error(
-        chalk.gray(`  Current ${error.limitType}: ${error.current} / ${error.max}`),
-      );
+      console.error(chalk.gray(`  Current ${error.limitType}: ${error.current} / ${error.max}`));
     }
   } else if (error instanceof DatasetApiError) {
     // DatasetApiError.message is already built with formatApiErrorForOperation

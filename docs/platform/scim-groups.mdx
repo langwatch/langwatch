@@ -10,8 +10,8 @@ SCIM Groups allow your identity provider to push group memberships into LangWatc
 Whether the group is SCIM-synced or created manually in the UI, groups are an **Enterprise** feature in LangWatch.
 
 <Info>
-  SCIM Groups are an **Enterprise** feature. See [SCIM Provisioning](/platform/scim) for
-  setting up user provisioning first.
+  SCIM Groups are an **Enterprise** feature. See [SCIM Provisioning](/platform/scim) for setting up
+  user provisioning first.
 </Info>
 
 ---
@@ -51,8 +51,8 @@ Open a group and use the **Access granted** section to add role bindings:
 4. Click **Add**
 
 <Tip>
-  You can add multiple bindings to a single group, for example, _Member on the whole
-  organization_ plus _Admin on Team Platform_.
+  You can add multiple bindings to a single group, for example, _Member on the whole organization_
+  plus _Admin on Team Platform_.
 </Tip>
 
 ### Role Scopes
@@ -113,9 +113,9 @@ When your IdP suspends a user (sets `active: false`):
 - Re-activating (`active: true`) immediately restores access
 
 <Info>
-  Use `PATCH active=false` for temporary suspension (e.g. leave of absence). Use DELETE
-  for permanent offboarding. The distinction matters because DELETE removes all role
-  bindings and group memberships, re-provisioning the user starts from scratch.
+  Use `PATCH active=false` for temporary suspension (e.g. leave of absence). Use DELETE for
+  permanent offboarding. The distinction matters because DELETE removes all role bindings and group
+  memberships, re-provisioning the user starts from scratch.
 </Info>
 
 ---
@@ -132,8 +132,8 @@ You can also create groups manually without an identity provider:
 Manual groups behave identically to SCIM groups for role assignment. Members must already be in your organization to be added.
 
 <Note>
-  Manual groups are not synced with any identity provider. Membership must be managed from
-  within LangWatch.
+  Manual groups are not synced with any identity provider. Membership must be managed from within
+  LangWatch.
 </Note>
 
 ---
@@ -207,8 +207,8 @@ In addition to the UI and SCIM provisioning, groups can be managed programmatica
 See the [Groups API Reference](/api-reference/groups/overview) for full endpoint documentation.
 
 <Info>
-  SCIM-managed groups cannot have their members or names modified via the REST API. Those
-  operations are reserved for the identity provider.
+  SCIM-managed groups cannot have their members or names modified via the REST API. Those operations
+  are reserved for the identity provider.
 </Info>
 
 ---

@@ -343,8 +343,8 @@ Detect the user's transport from their codebase and pick the matching adapter. *
 | Pipecat / Twilio Media Streams WS bot deployed somewhere                                              | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)`                        | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely).                                                                                                                                                                                         |
 | ElevenLabs hosted ConvAI agent (created in the EL dashboard)                                          | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)`                             | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools.                                                                                                                                                                                                                        |
 | Twilio phone number (real PSTN, agent answers via Media Streams)                                      | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`)                    | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up.                                                                                                                                                                                                                                          |
-| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params, so there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                   |
-| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live. The **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
+| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params, so there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                 |
+| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live. The **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                    |
 | Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a _voice wrapper_ around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
 If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed, and they will (rightly) call it useless.
@@ -553,10 +553,7 @@ describe("Voice agent: angry billing", () => {
             "spoken sentences. You were double-charged and you are FURIOUS. " +
             "Use [shouting], [angry], [frustrated] markers every turn. " +
             "1-2 short heated sentences per turn.",
-          audioEffects: [
-            voice.effects.backgroundNoise("cafe", 0.4),
-            voice.effects.phoneQuality(),
-          ],
+          audioEffects: [voice.effects.backgroundNoise("cafe", 0.4), voice.effects.phoneQuality()],
         }),
         scenario.judgeAgent({
           criteria: [
@@ -566,12 +563,7 @@ describe("Voice agent: angry billing", () => {
           ],
         }),
       ],
-      script: [
-        scenario.agent(),
-        scenario.user(),
-        scenario.proceed(5),
-        scenario.judge(),
-      ],
+      script: [scenario.agent(), scenario.user(), scenario.proceed(5), scenario.judge()],
     });
     expect(result.success).toBe(true);
   }, 240_000); // Voice scenarios are slow because they include TTS, transport, and multiple turns.
@@ -612,10 +604,7 @@ describe("Voice agent: angry billing (Pipecat WS)", () => {
             "spoken sentences. You were double-charged and you are FURIOUS. " +
             "Use [shouting], [angry], [frustrated] markers every turn. " +
             "1-2 short heated sentences per turn.",
-          audioEffects: [
-            voice.effects.backgroundNoise("cafe", 0.4),
-            voice.effects.phoneQuality(),
-          ],
+          audioEffects: [voice.effects.backgroundNoise("cafe", 0.4), voice.effects.phoneQuality()],
         }),
         scenario.judgeAgent({
           criteria: [
@@ -714,12 +703,12 @@ Then drive everything via `langwatch scenario --help`, `langwatch test-suite --h
 
 ### Four nouns, and mixing them up is what makes this API feel confusing
 
-| Noun | What it is | Commands |
-| --- | --- | --- |
-| **scenario** | One test: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
-| **test suite** | A test suite groups scenarios: a name and the scenarios filed under it, and nothing else. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …` |
-| **run plan** | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan. | `langwatch run-plan …` |
-| **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`. | `langwatch simulation-run …` |
+| Noun               | What it is                                                                                                                                                                | Commands                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| **scenario**       | One test: a _situation_ plus natural-language _criteria_. It needs a target to run against.                                                                               | `langwatch scenario …`       |
+| **test suite**     | A test suite groups scenarios: a name and the scenarios filed under it, and nothing else. Every project has a `Default` test suite, so no scenario is loose.              | `langwatch test-suite …`     |
+| **run plan**       | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan. | `langwatch run-plan …`       |
+| **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`.                                                                                | `langwatch simulation-run …` |
 
 A run plan's configuration is the scope (all scenarios, the scenarios of one or more test suites, the scenarios carrying given labels, or a hand-picked list), the targets, the repeat count and the two models. Parameters, the note and the idempotency key belong to one run, not to the plan.
 
@@ -885,7 +874,7 @@ Review the results, sharpen the scenario with `langwatch scenario update <id> --
 
 One short question beats a confident wrong run.
 
-- Never choose *which* agent or prompt to test when the user has not said. That is their call, and the wrong one burns real LLM spend.
+- Never choose _which_ agent or prompt to test when the user has not said. That is their call, and the wrong one burns real LLM spend.
 - Never invent a target: `http:demo-agent-support` is not an agent id.
 - Never widen a vague request into a bigger investigation, or a bigger plan, than was asked for. If the instruction is two words and ambiguous, ask one question and stop.
 

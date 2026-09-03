@@ -77,10 +77,7 @@ async function seedSession(store: ReturnType<typeof createMemoryStateStore>) {
   );
 }
 
-async function parkCall(
-  store: ReturnType<typeof createMemoryStateStore>,
-  callId: string,
-) {
+async function parkCall(store: ReturnType<typeof createMemoryStateStore>, callId: string) {
   const deadlineAt = Date.now() + 60_000;
   const stored: StoredCall = {
     projectId,
@@ -123,12 +120,8 @@ describe("LongPollTransport with a memory store", () => {
     /** @scenario "A poll with nothing pending answers empty after the poll wait" */
     it("answers no frame once the poll wait passes", async () => {
       const { store, transport } = build({ pollWaitMs: 120 });
-      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(
-        resolved,
-      );
-      vi.spyOn(AgentSessionCore.prototype, "refreshPresence").mockResolvedValue(
-        undefined,
-      );
+      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
+      vi.spyOn(AgentSessionCore.prototype, "refreshPresence").mockResolvedValue(undefined);
       await seedSession(store);
 
       const started = Date.now();
@@ -148,12 +141,8 @@ describe("LongPollTransport with a memory store", () => {
     /** @scenario "A poll delivers a parked call once" */
     it("hands the call to the first poll and never again", async () => {
       const { store, transport } = build({ pollWaitMs: 50 });
-      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(
-        resolved,
-      );
-      vi.spyOn(AgentSessionCore.prototype, "refreshPresence").mockResolvedValue(
-        undefined,
-      );
+      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
+      vi.spyOn(AgentSessionCore.prototype, "refreshPresence").mockResolvedValue(undefined);
       await seedSession(store);
       await parkCall(store, "call_1");
 

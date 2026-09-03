@@ -41,11 +41,7 @@ export function LangyGitHubProgressCard({ events }: { events: GithubProgressEven
   const latest = events[events.length - 1]?.detail;
   const opened = reached.has("opened");
   // Single mono label line, e.g. "WORKING ON IT · PUSHING BRANCH…".
-  const label = opened
-    ? "Opened"
-    : latest
-      ? `Working on it · ${latest}`
-      : "Working on it";
+  const label = opened ? "Opened" : latest ? `Working on it · ${latest}` : "Working on it";
 
   return (
     <Box
@@ -91,10 +87,7 @@ export function LangyGitHubProgressCard({ events }: { events: GithubProgressEven
   );
 }
 
-function isDoneFor(
-  stage: GithubProgressStage,
-  reached: Set<GithubProgressStage>,
-): boolean {
+function isDoneFor(stage: GithubProgressStage, reached: Set<GithubProgressStage>): boolean {
   if (reached.has(stage)) return true;
   // 'cloning' arrives before 'cloned'; cap intermediate states so the cloned
   // pill lights up the moment a clone is in progress.

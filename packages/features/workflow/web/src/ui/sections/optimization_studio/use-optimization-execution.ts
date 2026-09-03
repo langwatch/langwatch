@@ -15,12 +15,13 @@ export const useOptimizationExecution = () => {
     timeout_on_status: "waiting" | "running";
   } | null>(null);
 
-  const { getWorkflow, setOptimizationState, setOpenResultsPanelRequest } =
-    useWorkflowStore((state) => ({
+  const { getWorkflow, setOptimizationState, setOpenResultsPanelRequest } = useWorkflowStore(
+    (state) => ({
       getWorkflow: state.getWorkflow,
       setOptimizationState: state.setOptimizationState,
       setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
-    }));
+    }),
+  );
 
   const socketAvailable = useCallback(() => {
     if (socketStatus !== "connected") {
@@ -99,13 +100,7 @@ export const useOptimizationExecution = () => {
         setTriggerTimeout({ run_id, timeout_on_status: "waiting" });
       }, 20_000);
     },
-    [
-      socketAvailable,
-      setOpenResultsPanelRequest,
-      setOptimizationState,
-      getWorkflow,
-      postEvent,
-    ],
+    [socketAvailable, setOpenResultsPanelRequest, setOptimizationState, getWorkflow, postEvent],
   );
 
   const stopOptimizationExecution = useCallback(

@@ -48,10 +48,7 @@ import { handlerManagedAuth } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import {
-  assertEnterprisePlan,
-  ENTERPRISE_FEATURE_ERRORS,
-} from "@langwatch/enterprise-plan-gate";
+import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
 import {
   NoEligibleProvidersError,
   PersonalVirtualKeyAlreadyExistsError,
@@ -98,10 +95,7 @@ export type GovernanceCliAccessTokenPort = Readonly<{
    * stops authenticating the moment it is refused rather than at its next
    * hourly expiry.
    */
-  revoke: (input: {
-    authHeader: string | null | undefined;
-    userId: string;
-  }) => Promise<void>;
+  revoke: (input: { authHeader: string | null | undefined; userId: string }) => Promise<void>;
 }>;
 
 /** The personal workspace the credential routes resolve a project through. */
@@ -759,83 +753,73 @@ export function createGovernanceCliRestApp(options: {
   });
 
   // ---------- GET /api/auth/cli/governance/ingest/sources/:id/events ----------
-  secured
-    .access(cliActivityMonitorAuth)
-    .get("/governance/ingest/sources/:id/events", async (c) => {
-      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-      if (!caller) return unauthorized(c);
-      const gate = await refuseWithoutEnterprise(
-        c,
-        caller.organization_id,
-        ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
-      );
-      if (gate) return gate;
-      const denied = await refuseWithoutPermission(c, caller, "activityMonitor:view");
-      if (denied) return denied;
+  secured.access(cliActivityMonitorAuth).get("/governance/ingest/sources/:id/events", async (c) => {
+    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+    if (!caller) return unauthorized(c);
+    const gate = await refuseWithoutEnterprise(
+      c,
+      caller.organization_id,
+      ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
+    );
+    if (gate) return gate;
+    const denied = await refuseWithoutPermission(c, caller, "activityMonitor:view");
+    if (denied) return denied;
 
-      const sourceId = c.req.param("id");
-      if (!sourceId) {
-        return c.json(
-          { error: "invalid_request", error_description: "source id is required" },
-          400,
-        );
-      }
-      const limitRaw = c.req.query("limit");
-      const beforeIso = c.req.query("before_iso") ?? undefined;
-      const limit = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200) : 50;
+    const sourceId = c.req.param("id");
+    if (!sourceId) {
+      return c.json({ error: "invalid_request", error_description: "source id is required" }, 400);
+    }
+    const limitRaw = c.req.query("limit");
+    const beforeIso = c.req.query("before_iso") ?? undefined;
+    const limit = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200) : 50;
 
-      // Ownership is proved before the analytics read, so a valid bearer
-      // cannot walk source ids belonging to another tenant even though the
-      // read below also filters by organization.
-      await ports.governance().ingestionSourceGetById({
-        id: sourceId,
-        organizationId: caller.organization_id,
-      });
-
-      const events = await ports.governance().activityEventsForSource({
-        organizationId: caller.organization_id,
-        sourceId,
-        limit,
-        beforeIso,
-      });
-      return c.json({ events });
+    // Ownership is proved before the analytics read, so a valid bearer
+    // cannot walk source ids belonging to another tenant even though the
+    // read below also filters by organization.
+    await ports.governance().ingestionSourceGetById({
+      id: sourceId,
+      organizationId: caller.organization_id,
     });
+
+    const events = await ports.governance().activityEventsForSource({
+      organizationId: caller.organization_id,
+      sourceId,
+      limit,
+      beforeIso,
+    });
+    return c.json({ events });
+  });
 
   // ---------- GET /api/auth/cli/governance/ingest/sources/:id/health ----------
-  secured
-    .access(cliActivityMonitorAuth)
-    .get("/governance/ingest/sources/:id/health", async (c) => {
-      const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
-      if (!caller) return unauthorized(c);
-      const gate = await refuseWithoutEnterprise(
-        c,
-        caller.organization_id,
-        ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
-      );
-      if (gate) return gate;
-      const denied = await refuseWithoutPermission(c, caller, "activityMonitor:view");
-      if (denied) return denied;
+  secured.access(cliActivityMonitorAuth).get("/governance/ingest/sources/:id/health", async (c) => {
+    const caller = await ports.accessTokens.resolve(c.req.header("Authorization"));
+    if (!caller) return unauthorized(c);
+    const gate = await refuseWithoutEnterprise(
+      c,
+      caller.organization_id,
+      ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
+    );
+    if (gate) return gate;
+    const denied = await refuseWithoutPermission(c, caller, "activityMonitor:view");
+    if (denied) return denied;
 
-      const sourceId = c.req.param("id");
-      if (!sourceId) {
-        return c.json(
-          { error: "invalid_request", error_description: "source id is required" },
-          400,
-        );
-      }
-      const source = await ports.governance().ingestionSourceGetById({
-        id: sourceId,
-        organizationId: caller.organization_id,
-      });
-      const health = await ports.governance().activitySourceHealthMetrics({
-        organizationId: caller.organization_id,
-        sourceId,
-      });
-      return c.json({
-        source: { id: source.id, name: source.name, status: source.status },
-        health,
-      });
+    const sourceId = c.req.param("id");
+    if (!sourceId) {
+      return c.json({ error: "invalid_request", error_description: "source id is required" }, 400);
+    }
+    const source = await ports.governance().ingestionSourceGetById({
+      id: sourceId,
+      organizationId: caller.organization_id,
     });
+    const health = await ports.governance().activitySourceHealthMetrics({
+      organizationId: caller.organization_id,
+      sourceId,
+    });
+    return c.json({
+      source: { id: source.id, name: source.name, status: source.status },
+      health,
+    });
+  });
 
   // ---------- GET /api/auth/cli/governance/status ----------
   secured.access(cliPolicy).get("/governance/status", async (c) => {
@@ -911,10 +895,7 @@ export function createGovernanceCliRestApp(options: {
     // `Object.hasOwn` rather than a plain lookup: the key is request-
     // controlled, so `"toString"` would otherwise resolve an inherited
     // function, pass a truthy check, and index the policy map with nothing.
-    const policedSlug = Object.hasOwn(
-      PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
-      parsed.data.source_type,
-    )
+    const policedSlug = Object.hasOwn(PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE, parsed.data.source_type)
       ? PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE[parsed.data.source_type]
       : undefined;
     if (policedSlug) {
@@ -1084,9 +1065,7 @@ export function createGovernanceCliRestApp(options: {
         // can attribute it. Falls back to the hostname when the CLI sent no
         // explicit label; null for CLIs that predate device metadata.
         createdByDeviceLabel:
-          input.caller.client_info?.device_label ??
-          input.caller.client_info?.hostname ??
-          null,
+          input.caller.client_info?.device_label ?? input.caller.client_info?.hostname ?? null,
       });
       return c.json(
         {
@@ -1105,8 +1084,7 @@ export function createGovernanceCliRestApp(options: {
         return c.json(
           {
             error: "precondition_failed",
-            error_description:
-              "Sign in to a personal workspace before issuing an ingestion key.",
+            error_description: "Sign in to a personal workspace before issuing an ingestion key.",
           },
           412,
         );

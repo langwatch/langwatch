@@ -138,10 +138,7 @@ export function createLangyWorkerPort(config: LangyWorkerAdapterConfig): LangyWo
             });
             void response.body?.cancel();
           } catch (error) {
-            logger.debug(
-              { error, conversationId },
-              "langy worker warm failed — cold-starting",
-            );
+            logger.debug({ error, conversationId }, "langy worker warm failed — cold-starting");
           }
         },
       );

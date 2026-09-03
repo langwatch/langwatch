@@ -111,8 +111,7 @@ export function EvaluatorEditorContent({
         {isWorkflowEvaluator && workflow && (
           <VStack gap={4} paddingTop={4} align="stretch">
             <Text fontSize="sm" color="fg.muted">
-              This evaluator is powered by a workflow. Click below to open the workflow
-              editor:
+              This evaluator is powered by a workflow. Click below to open the workflow editor:
             </Text>
             <Link
               href={`/${workflow.projectSlug}/studio/${workflow.id}`}

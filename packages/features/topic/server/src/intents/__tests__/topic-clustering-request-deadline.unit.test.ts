@@ -79,8 +79,7 @@ describe("topic clustering langevals requests", () => {
         await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
         await settled;
 
-        const signal = deps.langevals.postClustering.mock.calls[0]?.[0]
-          ?.signal as AbortSignal;
+        const signal = deps.langevals.postClustering.mock.calls[0]?.[0]?.signal as AbortSignal;
         expect(signal).toBeInstanceOf(AbortSignal);
         expect(signal.aborted).toBe(true);
       });
@@ -112,11 +111,9 @@ describe("topic clustering langevals requests", () => {
         const deps = fakeRunnerDeps();
         hangUntilAborted(deps);
 
-        const settled = fetchTopicsIncrementalClustering(
-          deps,
-          "proj-1",
-          incrementalParams,
-        ).catch((error) => error);
+        const settled = fetchTopicsIncrementalClustering(deps, "proj-1", incrementalParams).catch(
+          (error) => error,
+        );
 
         await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS);
         const error = await settled;
@@ -137,23 +134,22 @@ describe("topic clustering langevals requests", () => {
         // exact shape ran unbounded — past the lease, into the double-lease
         // batch-delete race the deadline exists to prevent.
         const deps = fakeRunnerDeps();
-        deps.langevals.postClustering.mockImplementation(
-          ({ signal }: { signal?: AbortSignal }) =>
-            Promise.resolve({
-              ok: true,
-              statusText: "OK",
-              text: () => Promise.resolve(""),
-              json: () =>
-                new Promise((_resolve, reject) => {
-                  signal?.addEventListener("abort", () => {
-                    reject(
-                      Object.assign(new Error("The operation was aborted"), {
-                        name: "AbortError",
-                      }),
-                    );
-                  });
-                }),
-            }),
+        deps.langevals.postClustering.mockImplementation(({ signal }: { signal?: AbortSignal }) =>
+          Promise.resolve({
+            ok: true,
+            statusText: "OK",
+            text: () => Promise.resolve(""),
+            json: () =>
+              new Promise((_resolve, reject) => {
+                signal?.addEventListener("abort", () => {
+                  reject(
+                    Object.assign(new Error("The operation was aborted"), {
+                      name: "AbortError",
+                    }),
+                  );
+                });
+              }),
+          }),
         );
 
         const settled = fetchTopicsBatchClustering(deps, "proj-1", batchParams).catch(
@@ -188,9 +184,9 @@ describe("topic clustering langevals requests", () => {
           json: () => Promise.resolve(body),
         });
 
-        await expect(
-          fetchTopicsBatchClustering(deps, "proj-1", batchParams),
-        ).resolves.toEqual(body);
+        await expect(fetchTopicsBatchClustering(deps, "proj-1", batchParams)).resolves.toEqual(
+          body,
+        );
       });
 
       it("does not leave the deadline abort pending against a finished call", async () => {
@@ -211,8 +207,7 @@ describe("topic clustering langevals requests", () => {
         await fetchTopicsBatchClustering(deps, "proj-1", batchParams);
         await vi.advanceTimersByTimeAsync(TOPIC_CLUSTERING_REQUEST_DEADLINE_MS * 2);
 
-        const signal = deps.langevals.postClustering.mock.calls[0]?.[0]
-          ?.signal as AbortSignal;
+        const signal = deps.langevals.postClustering.mock.calls[0]?.[0]?.signal as AbortSignal;
         expect(signal.aborted).toBe(false);
       });
     });

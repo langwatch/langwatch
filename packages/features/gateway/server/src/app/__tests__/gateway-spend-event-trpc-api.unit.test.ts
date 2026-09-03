@@ -23,9 +23,7 @@ function gatewayAppStub(dependencies: Partial<GatewayAppDependencies>): GatewayA
   return GatewayApp.create(dependencies as GatewayAppDependencies);
 }
 
-function spendEventsStub(
-  overrides: Partial<GatewaySpendEventsService>,
-): GatewaySpendEventsService {
+function spendEventsStub(overrides: Partial<GatewaySpendEventsService>): GatewaySpendEventsService {
   return overrides as GatewaySpendEventsService;
 }
 

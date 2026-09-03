@@ -124,8 +124,7 @@ beforeEach(() => {
   sendSettleSpend = vi.fn().mockResolvedValue(undefined);
   findOpenAdmissions = vi.fn().mockResolvedValue([]);
   const deps: SpendSettlementProcessDeps = {
-    sendSettleSpend:
-      sendSettleSpend as unknown as SpendSettlementProcessDeps["sendSettleSpend"],
+    sendSettleSpend: sendSettleSpend as unknown as SpendSettlementProcessDeps["sendSettleSpend"],
     findOpenAdmissions:
       findOpenAdmissions as unknown as SpendSettlementProcessDeps["findOpenAdmissions"],
     graceMs: GRACE_MS,
@@ -193,9 +192,7 @@ describe("spend settlement sweeper", () => {
     /** @scenario A settled request names the organization it belonged to */
     it("settles each one, carrying the attribution the fold recorded", async () => {
       await armSchedule();
-      findOpenAdmissions.mockResolvedValue([
-        openAdmission({ gatewayRequestId: `${ns}-silent` }),
-      ]);
+      findOpenAdmissions.mockResolvedValue([openAdmission({ gatewayRequestId: `${ns}-silent` })]);
 
       clock = T0 + SETTLEMENT_SWEEP_INTERVAL_MS + 1;
       expect(await fireWake()).toBe(true);
@@ -230,9 +227,7 @@ describe("spend settlement sweeper", () => {
     /** @scenario An unconfirmed admission settles when the grace expires */
     it("issues settleSpend for an admission the grace has passed", async () => {
       await armSchedule();
-      findOpenAdmissions.mockResolvedValue([
-        openAdmission({ gatewayRequestId: `${ns}-expired` }),
-      ]);
+      findOpenAdmissions.mockResolvedValue([openAdmission({ gatewayRequestId: `${ns}-expired` })]);
 
       clock = T0 + SETTLEMENT_SWEEP_INTERVAL_MS + 1;
       expect(await fireWake()).toBe(true);

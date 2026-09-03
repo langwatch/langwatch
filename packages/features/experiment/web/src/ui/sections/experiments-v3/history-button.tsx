@@ -24,12 +24,11 @@ export function HistoryButton({ disabled = false }: HistoryButtonProps) {
   const { project } = useOrganizationTeamProject();
 
   // Get experiment info and whether we've run this session
-  const { experimentId, experimentSlug, hasRunThisSession } =
-    useEvaluationsV3Store((state) => ({
-      experimentId: state.experimentId,
-      experimentSlug: state.experimentSlug,
-      hasRunThisSession: state.ui.hasRunThisSession,
-    }));
+  const { experimentId, experimentSlug, hasRunThisSession } = useEvaluationsV3Store((state) => ({
+    experimentId: state.experimentId,
+    experimentSlug: state.experimentSlug,
+    hasRunThisSession: state.ui.hasRunThisSession,
+  }));
 
   // Check if there are any runs from previous sessions (only on page load)
   const runsQuery = api.experiments.getExperimentBatchEvaluationRuns.useQuery(

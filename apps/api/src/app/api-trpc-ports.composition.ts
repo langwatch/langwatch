@@ -675,10 +675,7 @@ export function createApiTrpcPorts<
           });
         },
 
-        listPublishedComponents: async (
-          _ctx: unknown,
-          input: Readonly<{ projectId: string }>,
-        ) => {
+        listPublishedComponents: async (_ctx: unknown, input: Readonly<{ projectId: string }>) => {
           const workflows = await prisma.workflow.findMany({
             where: {
               projectId: input.projectId,

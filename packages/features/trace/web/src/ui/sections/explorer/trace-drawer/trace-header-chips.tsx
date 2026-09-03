@@ -165,11 +165,7 @@ function buildChipDef(
       return { ...buildSdkChipDef(data.sdk), priority };
     case "promptSelected":
       return {
-        ...buildSelectedPromptChipDef(
-          data.selectedId,
-          data.spanId,
-          callbacks.onSelectSpan,
-        ),
+        ...buildSelectedPromptChipDef(data.selectedId, data.spanId, callbacks.onSelectSpan),
         priority,
       };
     case "promptLastUsed":
@@ -197,9 +193,7 @@ function buildChipDef(
  * shows both with their own filter buttons so the trace table can be
  * scoped to either independently.
  */
-function buildServiceChipDef(
-  data: Extract<TraceHeaderChipData, { kind: "service" }>,
-): ChipDef {
+function buildServiceChipDef(data: Extract<TraceHeaderChipData, { kind: "service" }>): ChipDef {
   return {
     id: "service",
     label: "Service",
@@ -212,9 +206,7 @@ function buildServiceChipDef(
   };
 }
 
-function buildOriginChipDef(
-  data: Extract<TraceHeaderChipData, { kind: "origin" }>,
-): ChipDef {
+function buildOriginChipDef(data: Extract<TraceHeaderChipData, { kind: "origin" }>): ChipDef {
   return {
     id: "origin",
     label: "Origin",
@@ -277,8 +269,8 @@ function buildSelectedPromptChipDef(
           {selectedId}
         </Text>
         <Text textStyle="2xs" color="fg.muted">
-          Pin set on the span. Resolved to a different concrete prompt at runtime — see
-          the &ldquo;last used&rdquo; chip for what actually ran.
+          Pin set on the span. Resolved to a different concrete prompt at runtime — see the
+          &ldquo;last used&rdquo; chip for what actually ran.
         </Text>
       </VStack>
     ),
@@ -352,8 +344,7 @@ function buildLastUsedPromptChipDef({
         </HStack>
         {state.missing ? (
           <Text textStyle="2xs" color="fg.muted">
-            Prompt no longer exists in this project. The trace still shows what ran at the
-            time.
+            Prompt no longer exists in this project. The trace still shows what ran at the time.
           </Text>
         ) : (
           <HStack gap={1}>
@@ -364,12 +355,7 @@ function buildLastUsedPromptChipDef({
           </HStack>
         )}
         {outOfDate && state.latestVersion != null && (
-          <HStack
-            gap={1.5}
-            paddingTop={1.5}
-            borderTopWidth="1px"
-            borderColor="border.muted"
-          >
+          <HStack gap={1.5} paddingTop={1.5} borderTopWidth="1px" borderColor="border.muted">
             <Icon as={LuTriangleAlert} boxSize={3} color="yellow.fg" />
             <Text textStyle="2xs" color="yellow.fg">
               Out of date — current latest is v{state.latestVersion}.
@@ -377,12 +363,7 @@ function buildLastUsedPromptChipDef({
           </HStack>
         )}
         {driftFromSelection && (
-          <HStack
-            gap={1.5}
-            paddingTop={1.5}
-            borderTopWidth="1px"
-            borderColor="border.muted"
-          >
+          <HStack gap={1.5} paddingTop={1.5} borderTopWidth="1px" borderColor="border.muted">
             <Icon as={LuTriangleAlert} boxSize={3} color="yellow.fg" />
             <Text textStyle="2xs" color="yellow.fg">
               Pinned prompt resolved to a different concrete prompt at runtime.
@@ -416,8 +397,7 @@ function buildLastUsedPromptChipDef({
 function EvalChipVerdict({ display }: { display: EvalChipDisplay }) {
   if (display.status === "skipped")
     return <NoVerdictMicroBadge icon={LuCircleSlash} label="SKIPPED" />;
-  if (display.status === "error")
-    return <NoVerdictMicroBadge icon={LuCircleAlert} label="ERROR" />;
+  if (display.status === "error") return <NoVerdictMicroBadge icon={LuCircleAlert} label="ERROR" />;
   if (display.categoryLabel)
     return (
       <Text textStyle="2xs" fontWeight="semibold" color="blue.fg" truncate>
@@ -567,13 +547,7 @@ function buildEvalChipDef(ev: RichEval, onClick: () => void): ChipDef {
  * icon, uppercase letter-spaced label) so the same status reads the same
  * way at every scale: chip → list pill → card header.
  */
-function NoVerdictMicroBadge({
-  icon,
-  label,
-}: {
-  icon: typeof LuCircleSlash;
-  label: string;
-}) {
+function NoVerdictMicroBadge({ icon, label }: { icon: typeof LuCircleSlash; label: string }) {
   return (
     <HStack
       gap={0.5}

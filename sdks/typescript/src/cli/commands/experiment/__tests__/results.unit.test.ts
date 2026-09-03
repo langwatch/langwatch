@@ -6,16 +6,13 @@ const oraMocks = vi.hoisted(() => ({
   fail: vi.fn(),
 }));
 
-vi.mock(
-  "@/client-sdk/services/experiments/experiments-api.service",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof EvaluationsApiModule>();
-    return {
-      ...actual,
-      ExperimentsApiService: vi.fn(),
-    };
-  },
-);
+vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof EvaluationsApiModule>();
+  return {
+    ...actual,
+    ExperimentsApiService: vi.fn(),
+  };
+});
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -207,9 +204,9 @@ describe("experimentResultsCommand()", () => {
       /** @scenario "User requests an experiment with no runs" */
       it("exits with code 1", async () => {
         mockListRuns.mockResolvedValue({ runs: [] });
-        await expect(
-          experimentResultsCommand({ experimentSlug: "doc-qa" }),
-        ).rejects.toMatchObject({ code: 1 });
+        await expect(experimentResultsCommand({ experimentSlug: "doc-qa" })).rejects.toMatchObject({
+          code: 1,
+        });
         expect(mockGetRunResults).not.toHaveBeenCalled();
       });
     });
@@ -273,9 +270,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         result?.table();
-        const printed = logSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]))
-          .join("\n");
+        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("Showing 5 of 50");
       });
     });
@@ -422,9 +417,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         const evaluations = (result as any).data.evaluations;
-        const verdicts = evaluations.filter(
-          (e: any) => e.evaluator === "target_comparison",
-        );
+        const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
         expect(verdicts).toHaveLength(2);
         expect(verdicts.map((v: any) => v.label)).toEqual(["target_a", "target_b"]);
         // The judge's reasoning is the reason to reach for this at all.
@@ -471,9 +464,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         const evaluations = (result as any).data.evaluations;
-        const verdicts = evaluations.filter(
-          (e: any) => e.evaluator === "target_comparison",
-        );
+        const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
         expect(verdicts.map((v: any) => v.index)).toEqual([1]);
       });
     });
@@ -489,9 +480,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         const evaluations = (result as any).data.evaluations;
-        const verdicts = evaluations.filter(
-          (e: any) => e.evaluator === "target_comparison",
-        );
+        const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
         // Both judged rows are in the answer, not only the two rows the table
         // would have printed.
         expect(verdicts.map((v: any) => v.index).sort()).toEqual([0, 1]);
@@ -509,9 +498,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         const evaluations = (result as any).data.evaluations;
-        expect(evaluations.some((e: any) => e.evaluator === "target_comparison")).toBe(
-          false,
-        );
+        expect(evaluations.some((e: any) => e.evaluator === "target_comparison")).toBe(false);
       });
     });
   });
@@ -528,9 +515,7 @@ describe("experimentResultsCommand()", () => {
             options: { runId: "missing" },
           }),
         ).rejects.toMatchObject({ code: 1 });
-        expect(oraMocks.fail).toHaveBeenCalledWith(
-          expect.stringContaining("Run not found"),
-        );
+        expect(oraMocks.fail).toHaveBeenCalledWith(expect.stringContaining("Run not found"));
       });
     });
   });
@@ -612,9 +597,7 @@ describe("experimentResultsCommand() — failures the row join cannot see", () =
       })) as { data: { dataset: unknown[]; evaluations: { evaluator: string }[] } };
 
       expect(result.data.dataset.length).toBeGreaterThan(0);
-      expect(
-        result.data.evaluations.some((e) => e.evaluator === "target_comparison"),
-      ).toBe(true);
+      expect(result.data.evaluations.some((e) => e.evaluator === "target_comparison")).toBe(true);
     });
   });
 
@@ -623,9 +606,7 @@ describe("experimentResultsCommand() — failures the row join cannot see", () =
       mockGetRunResults2.mockResolvedValue({
         ...comparisonFailedResults,
         evaluations: comparisonFailedResults.evaluations.map((e) =>
-          e.status === "error"
-            ? { ...e, status: "processed", score: 1, label: "target_a" }
-            : e,
+          e.status === "error" ? { ...e, status: "processed", score: 1, label: "target_a" } : e,
         ),
       });
 

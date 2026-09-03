@@ -82,9 +82,7 @@ class TestPullRequestRepository extends NullGithubPullRequestsRepository {
   );
 
   constructor(
-    private readonly find: (input: {
-      prNumber: number;
-    }) => Promise<GithubPullRequestRow | null>,
+    private readonly find: (input: { prNumber: number }) => Promise<GithubPullRequestRow | null>,
   ) {
     super();
   }
@@ -140,9 +138,7 @@ class TestAppTokens extends GithubAppTokenPort {
     });
   }
 
-  mintInstallationToken(
-    _input: MintInstallationTokenInput,
-  ): Promise<GithubInstallationToken> {
+  mintInstallationToken(_input: MintInstallationTokenInput): Promise<GithubInstallationToken> {
     return Promise.resolve({ token: "token", expiresAt: "" });
   }
 
@@ -196,15 +192,10 @@ function serviceWith({
   redis?: GithubRedisPort | null;
   find?: (input: { prNumber: number }) => Promise<GithubPullRequestRow | null>;
 }) {
-  const repository = new TestPullRequestRepository(
-    find ?? (() => Promise.resolve(stored)),
-  );
+  const repository = new TestPullRequestRepository(find ?? (() => Promise.resolve(stored)));
   const appTokens = new TestAppTokens(getPullRequest);
   const installationRepository = new TestInstallationRepository();
-  const access = GithubInstallationAccessService.create(
-    installationRepository,
-    appTokens,
-  );
+  const access = GithubInstallationAccessService.create(installationRepository, appTokens);
   const installations = GithubInstallationsService.create(
     installationRepository,
     appTokens,
@@ -233,9 +224,7 @@ describe("deriveStatus", () => {
           draft: false,
         }),
       ).toBe("merged");
-      expect(deriveStatus({ mergedAt: null, state: "closed", draft: false })).toBe(
-        "closed",
-      );
+      expect(deriveStatus({ mergedAt: null, state: "closed", draft: false })).toBe("closed");
     });
 
     it("calls a merged pull request merged even while GitHub still calls it a draft", () => {
@@ -259,9 +248,7 @@ describe("GithubPullRequestStatusService", () => {
         stored: storedRow({ state: "closed", prMergedAt: MAPPED_AT }),
         getPullRequest: vi
           .fn()
-          .mockRejectedValue(
-            new GithubRateLimitedError({ retryAfterSec: 30, resetAt: null }),
-          ),
+          .mockRejectedValue(new GithubRateLimitedError({ retryAfterSec: 30, resetAt: null })),
       });
 
       const [status] = await service.getLiveStatuses({

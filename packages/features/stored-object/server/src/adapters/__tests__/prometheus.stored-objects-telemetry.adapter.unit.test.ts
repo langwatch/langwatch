@@ -27,17 +27,13 @@ describe("stored_object metrics are registered", () => {
   it("registers stored_object_extract_total counter", () => {
     const metric = register.getSingleMetric("stored_object_extract_total");
     expect(metric).toBeDefined();
-    expect((metric as { name: string } | undefined)?.name).toBe(
-      "stored_object_extract_total",
-    );
+    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_extract_total");
   });
 
   it("registers stored_object_dedup_hit_total counter", () => {
     const metric = register.getSingleMetric("stored_object_dedup_hit_total");
     expect(metric).toBeDefined();
-    expect((metric as { name: string } | undefined)?.name).toBe(
-      "stored_object_dedup_hit_total",
-    );
+    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_dedup_hit_total");
   });
 
   it("registers stored_object_write_failures_total counter", () => {
@@ -59,9 +55,7 @@ describe("stored_object metrics are registered", () => {
   it("registers stored_object_size_bytes histogram", () => {
     const metric = register.getSingleMetric("stored_object_size_bytes");
     expect(metric).toBeDefined();
-    expect((metric as { name: string } | undefined)?.name).toBe(
-      "stored_object_size_bytes",
-    );
+    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_size_bytes");
   });
 
   describe("when purpose-labelled metrics are recorded", () => {
@@ -73,25 +67,19 @@ describe("stored_object metrics are registered", () => {
 
     it("stored_object_dedup_hit_total carries purpose label", async () => {
       telemetry.recordDedupHit("scenario_event");
-      const lines = await register.getSingleMetricAsString(
-        "stored_object_dedup_hit_total",
-      );
+      const lines = await register.getSingleMetricAsString("stored_object_dedup_hit_total");
       expect(lines).toContain('purpose="scenario_event"');
     });
 
     it("stored_object_write_failures_total carries purpose label", async () => {
       telemetry.recordWriteFailure("scenario_event");
-      const lines = await register.getSingleMetricAsString(
-        "stored_object_write_failures_total",
-      );
+      const lines = await register.getSingleMetricAsString("stored_object_write_failures_total");
       expect(lines).toContain('purpose="scenario_event"');
     });
 
     it("stored_object_read_failures_total increments without label", async () => {
       telemetry.recordReadFailure();
-      const lines = await register.getSingleMetricAsString(
-        "stored_object_read_failures_total",
-      );
+      const lines = await register.getSingleMetricAsString("stored_object_read_failures_total");
       expect(lines).toContain("stored_object_read_failures_total");
     });
 

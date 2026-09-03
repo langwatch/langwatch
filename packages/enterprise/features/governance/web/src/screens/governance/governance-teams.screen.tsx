@@ -52,9 +52,7 @@ function SortChip({
           ? "var(--chakra-colors-orange-500)"
           : "var(--chakra-colors-border-muted)",
         backgroundColor: active ? "var(--chakra-colors-orange-50)" : "transparent",
-        color: active
-          ? "var(--chakra-colors-orange-700)"
-          : "var(--chakra-colors-fg-muted)",
+        color: active ? "var(--chakra-colors-orange-700)" : "var(--chakra-colors-fg-muted)",
         fontSize: 12,
         fontWeight: 500,
         cursor: "pointer",
@@ -122,8 +120,8 @@ function GovernanceTeamsListPage() {
             </Text>
             <Heading size="md">All teams by {SORT_LABEL[sortBy]}</Heading>
             <Text color="fg.muted" fontSize="sm">
-              Every team that reported activity in the last 30 days. Click a row to drill
-              into a single team.
+              Every team that reported activity in the last 30 days. Click a row to drill into a
+              single team.
             </Text>
           </VStack>
         </HStack>
@@ -173,17 +171,10 @@ function TeamSpendPanel({
         <Text fontSize="sm" color="fg.muted" id="sort-by-label">
           Sort by:
         </Text>
-        <SortChips
-          value={sortBy}
-          onChange={onSortChange}
-          ariaLabelledBy="sort-by-label"
-        />
+        <SortChips value={sortBy} onChange={onSortChange} ariaLabelledBy="sort-by-label" />
       </HStack>
 
-      <HandledErrorAlert
-        error={teamsQuery.error}
-        fallbackTitle="Couldn't load team activity"
-      />
+      <HandledErrorAlert error={teamsQuery.error} fallbackTitle="Couldn't load team activity" />
 
       <VStack
         align="stretch"
@@ -270,8 +261,7 @@ function Header() {
 function Row({ team }: { team: SpendByTeam }) {
   const isOrgWide = !team.teamId;
   const dotColor = isOrgWide ? "#94a3b8" : getHexColorForString(team.teamName);
-  const arrow =
-    team.deltaPctVsPriorWindow > 0 ? "↑" : team.deltaPctVsPriorWindow < 0 ? "↓" : "·";
+  const arrow = team.deltaPctVsPriorWindow > 0 ? "↑" : team.deltaPctVsPriorWindow < 0 ? "↓" : "·";
   const trendColor = !team.hasPriorBaseline
     ? "fg.muted"
     : team.deltaPctVsPriorWindow > 25
@@ -309,9 +299,7 @@ function Row({ team }: { team: SpendByTeam }) {
         {fmtRelative(team.lastActivityIso)}
       </Box>
       <Box flex={2} color={trendColor}>
-        {team.hasPriorBaseline
-          ? `${arrow} ${fmtTrendPct(team.deltaPctVsPriorWindow)}`
-          : "—"}
+        {team.hasPriorBaseline ? `${arrow} ${fmtTrendPct(team.deltaPctVsPriorWindow)}` : "—"}
       </Box>
       <Box flex={2} color="fg.muted">
         {team.sourceCount} {team.sourceCount === 1 ? "source" : "sources"}

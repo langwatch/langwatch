@@ -113,9 +113,10 @@ describe("Experiment.compare", () => {
           options: { targets: ["gpt-5-mini", "claude-sonnet-5"] },
         });
 
-        expect(
-          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id),
-        ).toEqual(["gpt-5-mini", "claude-sonnet-5"]);
+        expect(harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)).toEqual([
+          "gpt-5-mini",
+          "claude-sonnet-5",
+        ]);
         expect(verdict?.candidates).toEqual(["gpt-5-mini", "claude-sonnet-5"]);
       });
     });

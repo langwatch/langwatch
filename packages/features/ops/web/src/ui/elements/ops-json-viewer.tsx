@@ -12,12 +12,7 @@ function findChangedPaths(prev: unknown, curr: unknown, path = ""): Set<string> 
 
   if (prev === curr) return changed;
 
-  if (
-    prev === null ||
-    curr === null ||
-    typeof prev !== "object" ||
-    typeof curr !== "object"
-  ) {
+  if (prev === null || curr === null || typeof prev !== "object" || typeof curr !== "object") {
     if (prev !== curr && path) {
       changed.add(path);
     }
@@ -81,11 +76,7 @@ interface RenderContext {
   indent: number;
 }
 
-function renderValue(
-  value: unknown,
-  path: string,
-  ctx: RenderContext,
-): React.ReactNode[] {
+function renderValue(value: unknown, path: string, ctx: RenderContext): React.ReactNode[] {
   if (value === null) {
     return [
       <TokenSpan key={path} color="red.400" path={path} changedPaths={ctx.changedPaths}>
@@ -96,12 +87,7 @@ function renderValue(
 
   if (typeof value === "boolean") {
     return [
-      <TokenSpan
-        key={path}
-        color="purple.400"
-        path={path}
-        changedPaths={ctx.changedPaths}
-      >
+      <TokenSpan key={path} color="purple.400" path={path} changedPaths={ctx.changedPaths}>
         {String(value)}
       </TokenSpan>,
     ];
@@ -109,12 +95,7 @@ function renderValue(
 
   if (typeof value === "number") {
     return [
-      <TokenSpan
-        key={path}
-        color="orange.400"
-        path={path}
-        changedPaths={ctx.changedPaths}
-      >
+      <TokenSpan key={path} color="orange.400" path={path} changedPaths={ctx.changedPaths}>
         {String(value)}
       </TokenSpan>,
     ];
@@ -132,12 +113,7 @@ function renderValue(
   if (Array.isArray(value)) {
     if (value.length === 0) {
       return [
-        <TokenSpan
-          key={path}
-          color="fg.muted"
-          path={path}
-          changedPaths={ctx.changedPaths}
-        >
+        <TokenSpan key={path} color="fg.muted" path={path} changedPaths={ctx.changedPaths}>
           {"[]"}
         </TokenSpan>,
       ];
@@ -182,12 +158,7 @@ function renderValue(
     const entries = Object.entries(value as Record<string, unknown>);
     if (entries.length === 0) {
       return [
-        <TokenSpan
-          key={path}
-          color="fg.muted"
-          path={path}
-          changedPaths={ctx.changedPaths}
-        >
+        <TokenSpan key={path} color="fg.muted" path={path} changedPaths={ctx.changedPaths}>
           {"{}"}
         </TokenSpan>,
       ];
@@ -258,13 +229,7 @@ function TokenSpan({
   );
 }
 
-function DiffLine({
-  children,
-  highlight,
-}: {
-  children: React.ReactNode;
-  highlight: boolean;
-}) {
+function DiffLine({ children, highlight }: { children: React.ReactNode; highlight: boolean }) {
   return (
     <Box
       as="div"

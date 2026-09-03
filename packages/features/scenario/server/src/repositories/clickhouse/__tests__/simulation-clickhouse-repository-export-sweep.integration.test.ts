@@ -106,9 +106,7 @@ async function insertRows(rows: ReturnType<typeof makeInsertRow>[]) {
 }
 
 /** Sweeps to exhaustion the way the service does, so cursor handling is exercised too. */
-async function sweep(
-  params: Parameters<SimulationClickHouseRepository["findRunsForExport"]>[0],
-) {
+async function sweep(params: Parameters<SimulationClickHouseRepository["findRunsForExport"]>[0]) {
   const collected = [];
   let cursor: string | undefined;
   do {
@@ -266,14 +264,10 @@ integration("scenario run export sweep (integration)", () => {
     /** @scenario Export is scoped to my own project */
     it("never returns another project's runs", async () => {
       const runs = await sweep({ projectId: tenantId, limit: 100 });
-      expect(runs.map((run) => run.scenarioRunId)).not.toContain(
-        otherProjectRunId,
-      );
+      expect(runs.map((run) => run.scenarioRunId)).not.toContain(otherProjectRunId);
 
       const otherRuns = await sweep({ projectId: otherTenantId, limit: 100 });
-      expect(otherRuns.map((run) => run.scenarioRunId)).toEqual([
-        otherProjectRunId,
-      ]);
+      expect(otherRuns.map((run) => run.scenarioRunId)).toEqual([otherProjectRunId]);
     });
   });
 

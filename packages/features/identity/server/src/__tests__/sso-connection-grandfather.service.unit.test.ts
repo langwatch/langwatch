@@ -41,9 +41,7 @@ function routable(
 }
 
 class StubRouting implements SignInDomainRoutingPort {
-  constructor(
-    private readonly byDomain: Record<string, RoutableConnection | null>,
-  ) {}
+  constructor(private readonly byDomain: Record<string, RoutableConnection | null>) {}
 
   async tryFindConnectionForDomain({ domain }: { domain: string }) {
     return this.byDomain[domain] ?? null;
@@ -158,9 +156,7 @@ describe("the sso connection grandfather migration", () => {
       const report = outcome.report as {
         disagreements: { domain: string }[];
       };
-      expect(report.disagreements.map((entry) => entry.domain)).toEqual([
-        "acme.com",
-      ]);
+      expect(report.disagreements.map((entry) => entry.domain)).toEqual(["acme.com"]);
       // Both answers are on the report: a held organization is a thing an
       // operator has to be able to diagnose without re-running anything.
       expect(report.disagreements[0]).toMatchObject({
@@ -188,9 +184,7 @@ describe("the sso connection grandfather migration", () => {
 
       const first = await agreeing();
       expect(first.report).toMatchObject({ kind: "grandfathered" });
-      expect(
-        (first.report as { eventsAppended: number }).eventsAppended,
-      ).toBeGreaterThan(0);
+      expect((first.report as { eventsAppended: number }).eventsAppended).toBeGreaterThan(0);
 
       const second = await agreeing();
       expect(second.status).toBe("finalized");

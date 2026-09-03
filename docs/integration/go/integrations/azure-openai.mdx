@@ -17,8 +17,8 @@ go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ## Usage
 
 <Info>
-  Set `LANGWATCH_API_KEY`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_ENDPOINT` environment
-  variables before running.
+  Set `LANGWATCH_API_KEY`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_ENDPOINT` environment variables
+  before running.
 </Info>
 
 ```go
@@ -78,8 +78,8 @@ func main() {
 Set `AZURE_OPENAI_ENDPOINT` to your Azure OpenAI resource endpoint URL (e.g., `https://your-resource.openai.azure.com/openai/deployments/your-deployment`).
 
 <Warning>
-  The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory
-  will be lost when your application exits.
+  The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost
+  when your application exits.
 </Warning>
 
 ## Related

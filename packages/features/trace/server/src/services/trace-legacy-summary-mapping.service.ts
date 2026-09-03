@@ -184,11 +184,10 @@ const RESERVED_TOKEN_METRIC_ATTRIBUTES = {
 function tokenMetricsFromAttributes(
   attributes: Record<string, string>,
 ): Partial<Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>> {
-  const metrics: Partial<Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>> =
-    {};
-  for (const [metricKey, attrKey] of Object.entries(
-    RESERVED_TOKEN_METRIC_ATTRIBUTES,
-  ) as Array<[keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, string]>) {
+  const metrics: Partial<Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>> = {};
+  for (const [metricKey, attrKey] of Object.entries(RESERVED_TOKEN_METRIC_ATTRIBUTES) as Array<
+    [keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, string]
+  >) {
     const raw = attributes[attrKey];
     if (raw == null || raw === "") continue;
     const value = Number(raw);
@@ -262,11 +261,7 @@ function extractTextFromStateObject(
   if (entries.length === 1) {
     const [, only] = entries[0]!;
     if (only && typeof only === "object" && !Array.isArray(only)) {
-      return extractTextFromStateObject(
-        only as Record<string, unknown>,
-        fieldNames,
-        depth + 1,
-      );
+      return extractTextFromStateObject(only as Record<string, unknown>, fieldNames, depth + 1);
     }
   }
 
@@ -535,11 +530,7 @@ export function mapTraceSummaryToTrace(
   projectId: string,
   traceCanonicalisation: TraceCanonicalisationService,
 ): Trace {
-  const metadata = mapAttributesToMetadata(
-    summary.attributes,
-    summary.topicId,
-    summary.subTopicId,
-  );
+  const metadata = mapAttributesToMetadata(summary.attributes, summary.topicId, summary.subTopicId);
 
   const events = extractEventsFromSpans({
     spans,
@@ -557,21 +548,12 @@ export function mapTraceSummaryToTrace(
       // start to report; before the anchor existed it reported the epoch, which
       // rendered as 1970 in the drawer and the list. The anchor is the time that
       // trace's first signal was accepted, which is the honest answer.
-      started_at:
-        summary.occurredAt > 0 ? summary.occurredAt : (summary.storageAnchorMs ?? 0),
+      started_at: summary.occurredAt > 0 ? summary.occurredAt : (summary.storageAnchorMs ?? 0),
       inserted_at: summary.createdAt,
       updated_at: summary.updatedAt,
     },
-    input: parseComputedInput(
-      summary.computedInput,
-      summary.attributes,
-      traceCanonicalisation,
-    ),
-    output: parseComputedOutput(
-      summary.computedOutput,
-      summary.attributes,
-      traceCanonicalisation,
-    ),
+    input: parseComputedInput(summary.computedInput, summary.attributes, traceCanonicalisation),
+    output: parseComputedOutput(summary.computedOutput, summary.attributes, traceCanonicalisation),
     metrics: {
       first_token_ms: summary.timeToFirstTokenMs,
       total_time_ms: summary.totalDurationMs,

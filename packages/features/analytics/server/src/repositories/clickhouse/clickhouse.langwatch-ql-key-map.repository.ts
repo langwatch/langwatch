@@ -59,9 +59,7 @@ export class LwqlKeyMapClickHouseRepository implements LwqlKeyMapRepository {
 export class NullLwqlKeyMapRepository implements LwqlKeyMapRepository {
   insertRow(): Promise<void> {
     return Promise.reject(
-      new Error(
-        "No ClickHouse in this preset — the LangWatchQL key-map row was not written",
-      ),
+      new Error("No ClickHouse in this preset — the LangWatchQL key-map row was not written"),
     );
   }
 }

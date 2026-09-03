@@ -57,11 +57,7 @@ export function parseLLMSpanMessages(attrs: Record<string, unknown>): ChatMessag
   return messages;
 }
 
-function pushDecoded(
-  out: ChatMessage[],
-  raw: string,
-  defaultRole: "user" | "assistant",
-): void {
+function pushDecoded(out: ChatMessage[], raw: string, defaultRole: "user" | "assistant"): void {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -130,9 +126,7 @@ function pushDecoded(
     });
   } else {
     const wrapped =
-      parsed && typeof parsed === "object"
-        ? (parsed as { value?: unknown }).value
-        : undefined;
+      parsed && typeof parsed === "object" ? (parsed as { value?: unknown }).value : undefined;
     if (typeof wrapped === "string") {
       out.push({ role: defaultRole, content: wrapped });
     } else if (typeof parsed === "string") {

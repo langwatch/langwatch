@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { parsePrismaDatamodel } from "./datamodel";
 import type { GuardParams } from "./guard-middleware";
-import {
-  guardProjectId,
-  PROJECT_TENANCY_REGIMES,
-  SCOPED_MODEL_NAMES,
-} from "./multi-tenancy-guard";
+import { guardProjectId, PROJECT_TENANCY_REGIMES, SCOPED_MODEL_NAMES } from "./multi-tenancy-guard";
 import { ORG_BEARING_MODEL_NAMES } from "./organization-guard";
 
 /**
@@ -63,10 +59,7 @@ describe("guardProjectId — FeatureFlagExperimentSetting", () => {
         args: {
           where: {
             flagKey: "release_ui_ai_gateway_menu_enabled",
-            OR: [
-              { subjectType: "USER", subjectId: "user_01" },
-              { subjectType: "ORGANIZATION" },
-            ],
+            OR: [{ subjectType: "USER", subjectId: "user_01" }, { subjectType: "ORGANIZATION" }],
           },
         },
       }),
@@ -1010,9 +1003,7 @@ describe("project-tenancy regime partition", () => {
   const allModelNames = datamodel.map((m) => m.name);
   const modelHasField = (model: string, field: string) =>
     datamodel.find((m) => m.name === model)?.fields.includes(field) ?? false;
-  const noProjectIdModels = allModelNames.filter(
-    (name) => !modelHasField(name, "projectId"),
-  );
+  const noProjectIdModels = allModelNames.filter((name) => !modelHasField(name, "projectId"));
   const orgBearing = new Set(ORG_BEARING_MODEL_NAMES);
 
   it("classifies every projectId-less model into exactly one regime", () => {

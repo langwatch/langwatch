@@ -9,11 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { FEATURE_MAP } from "../../../../internal/generated/cli/feature-map.generated";
 import { buildProgram } from "../../../program";
-import {
-  buildCatalog,
-  flattenCatalog,
-  type CatalogEntry,
-} from "../../../utils/commandCatalog";
+import { buildCatalog, flattenCatalog, type CatalogEntry } from "../../../utils/commandCatalog";
 
 // program.ts reads the tsup-injected __CLI_VERSION__ build constant; under
 // vitest there is no bundler define, so stub it before buildProgram() runs.
@@ -45,9 +41,7 @@ const verbsOf = (group: string): string[] => {
 /** The leaf verbs registered under a nested group, e.g. `teams members`. */
 const nestedVerbsOf = (group: string, nested: string): string[] => {
   const entry = catalog().find((candidate) => candidate.path === group);
-  const child = entry?.children.find(
-    (candidate) => candidate.path === `${group} ${nested}`,
-  );
+  const child = entry?.children.find((candidate) => candidate.path === `${group} ${nested}`);
   return (child?.children ?? []).map((leaf) => leaf.path.split(" ").pop()!);
 };
 
@@ -84,14 +78,7 @@ describe("the management command tree", () => {
 
     /** @scenario Team commands cover the team lifecycle and membership */
     it("gives the teams family its lifecycle plus nested member commands, and add accepts the role", () => {
-      expect(verbsOf("teams")).toEqual([
-        "list",
-        "get",
-        "create",
-        "update",
-        "archive",
-        "members",
-      ]);
+      expect(verbsOf("teams")).toEqual(["list", "get", "create", "update", "archive", "members"]);
       expect(nestedVerbsOf("teams", "members")).toEqual(["list", "add", "remove"]);
       expect(carriesFlag("teams members add", "--role <role>")).toBe(true);
     });

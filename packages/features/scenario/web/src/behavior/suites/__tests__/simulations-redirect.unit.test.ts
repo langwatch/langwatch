@@ -52,9 +52,7 @@ describe("resolveSimulationsRedirect", () => {
     });
 
     it("sends a named external set to that set", () => {
-      expect(redirect(["suites"], { externalSet: "my-set" })).toBe(
-        "/acme/simulations/my-set",
-      );
+      expect(redirect(["suites"], { externalSet: "my-set" })).toBe("/acme/simulations/my-set");
     });
 
     it("sends an unnamed one to the run history", () => {

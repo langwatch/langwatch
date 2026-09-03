@@ -49,9 +49,7 @@ type FormData = {
  * - Creates an evaluator linked to the new workflow
  * - Navigates to the workflow studio for editing
  */
-export function WorkflowSelectorForEvaluatorDrawer(
-  props: WorkflowSelectorForEvaluatorDrawerProps,
-) {
+export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEvaluatorDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
@@ -153,15 +151,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
         });
       }
     },
-    [
-      project,
-      defaultIcon,
-      createWorkflowMutation,
-      createEvaluatorMutation,
-      onClose,
-      router,
-      form,
-    ],
+    [project, defaultIcon, createWorkflowMutation, createEvaluatorMutation, onClose, router, form],
   );
 
   const isValid = name?.trim().length > 0;
@@ -193,16 +183,11 @@ export function WorkflowSelectorForEvaluatorDrawer(
               <Heading>Create Workflow Evaluator</Heading>
             </HStack>
           </Drawer.Header>
-          <Drawer.Body
-            display="flex"
-            flexDirection="column"
-            overflow="hidden"
-            padding={0}
-          >
+          <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
             <VStack gap={4} align="stretch" flex={1} overflow="hidden">
               <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-                Create a new workflow to use as a custom evaluator. You&apos;ll be taken
-                to the workflow editor to configure the evaluation logic.
+                Create a new workflow to use as a custom evaluator. You&apos;ll be taken to the
+                workflow editor to configure the evaluation logic.
               </Text>
 
               <Box paddingX={6}>
@@ -220,11 +205,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
                     />
                     <Field.Label>Name and Icon</Field.Label>
                     <HStack>
-                      <Button
-                        variant="outline"
-                        onClick={emojiPicker.onOpen}
-                        fontSize="18px"
-                      >
+                      <Button variant="outline" onClick={emojiPicker.onOpen} fontSize="18px">
                         {icon}
                       </Button>
                       <Input

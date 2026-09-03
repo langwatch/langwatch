@@ -107,9 +107,7 @@ describe("given a login that minted a user-scoped CLI key", () => {
       const result = await run({ args: ["whoami"] });
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain(
-        "Permissions:  prompts:view, scenarios:manage",
-      );
+      expect(result.stdout).toContain("Permissions:  prompts:view, scenarios:manage");
     });
 
     /** @scenario "whoami stays silent about permissions the login never recorded" */

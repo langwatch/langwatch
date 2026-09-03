@@ -79,9 +79,7 @@ describe("Origin validation", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("access-control-allow-origin")).toBe(
-      "http://localhost:5173",
-    );
+    expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
   });
 
   it("accepts a configured origin", async () => {
@@ -90,17 +88,11 @@ describe("Origin validation", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("access-control-allow-origin")).toBe(
-      "https://console.example.com",
-    );
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://console.example.com");
   });
 
   it("never answers with a wildcard origin", async () => {
-    for (const origin of [
-      undefined,
-      "http://localhost:5173",
-      "https://console.example.com",
-    ]) {
+    for (const origin of [undefined, "http://localhost:5173", "https://console.example.com"]) {
       const response = await fetch(`${harness.baseUrl}/health`, {
         headers: origin ? { Origin: origin } : {},
       });
@@ -113,9 +105,9 @@ describe("Origin validation", () => {
       headers: { Origin: "https://console.example.com" },
     });
 
-    expect(
-      response.headers.get("access-control-expose-headers")?.toLowerCase(),
-    ).toContain("mcp-session-id");
+    expect(response.headers.get("access-control-expose-headers")?.toLowerCase()).toContain(
+      "mcp-session-id",
+    );
   });
 
   it("sets the sniffing and framing headers a browser-reachable server needs", async () => {

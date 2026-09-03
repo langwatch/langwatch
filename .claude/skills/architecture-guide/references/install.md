@@ -10,10 +10,15 @@ a user.
 
 2. **Declare the use in the catalogue.**
    `apps/ui/src/features/catalogue.json` → `features[]`:
+
    ```json
-   { "id": "secret", "root": "secret",
-     "uses": { "screens": ["@langwatch/secret-web/screens/secret"], "surfaces": [] } }
+   {
+     "id": "secret",
+     "root": "secret",
+     "uses": { "screens": ["@langwatch/secret-web/screens/secret"], "surfaces": [] }
+   }
    ```
+
    `ui-web-capability-declaration` checks each entry names an exact exported
    `screens/*` or `surfaces/*`. `governedWebPackages` lists every `*-web` package under
    the frontend rules; a new web package is added there.
@@ -22,6 +27,7 @@ a user.
    `apps/ui/src/features/<f>/{index.ts, model/, behavior/, ui/sections/<f>-routes.tsx}`.
    Only `index.ts` may sit at the feature root (`ui-feature-layout`). The routes file
    builds page loaders:
+
    ```ts
    const secretsPage: UiPageLoader = async () => {
      const module = await secretScreens.secrets();
@@ -30,6 +36,7 @@ a user.
    };
    export const secretPageLoaders: UiPageLoaderRegistry = { "pages/settings/secrets": secretsPage };
    ```
+
    Host provider outermost, chrome next, permission guard innermost. The host
    implementation of `<F>HostPort` lives here too (session, project, navigation).
 
@@ -54,11 +61,11 @@ a user.
 
 ```ts
 export type UiFeatureInstall = {
-  loaders?: UiPageLoaderRegistry;        // pages this package serves; replaces the host's
+  loaders?: UiPageLoaderRegistry; // pages this package serves; replaces the host's
   apis?: readonly UiFeatureApiBinding[]; // one per feature package with mounted hooks
-  capabilities?: UiCapabilityInstall;    // ports the composing app answers itself
-  transport?: UiFeatureApiTransport;     // same-origin when absent
-  session?: UiSessionSource;             // absent: the session port refuses by name
+  capabilities?: UiCapabilityInstall; // ports the composing app answers itself
+  transport?: UiFeatureApiTransport; // same-origin when absent
+  session?: UiSessionSource; // absent: the session port refuses by name
 };
 ```
 

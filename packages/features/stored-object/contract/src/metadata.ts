@@ -88,9 +88,7 @@ export const storedObjectLifecycleStatusSchema = z.enum([
   "deleted",
   "failed",
 ]);
-export type StoredObjectLifecycleStatus = z.infer<
-  typeof storedObjectLifecycleStatusSchema
->;
+export type StoredObjectLifecycleStatus = z.infer<typeof storedObjectLifecycleStatusSchema>;
 
 export const storedObjectWriteOperationStatusSchema = z.enum([
   "pending",

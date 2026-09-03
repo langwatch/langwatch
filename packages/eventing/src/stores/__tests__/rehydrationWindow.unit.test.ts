@@ -10,16 +10,12 @@ describe("rehydrationLowerBoundMs", () => {
 
   describe("when the aggregate type is time-local", () => {
     it("returns the anchor minus the window for a trace", () => {
-      expect(rehydrationLowerBoundMs("trace", anchor)).toBe(
-        anchor - REHYDRATION_WINDOW_MS,
-      );
+      expect(rehydrationLowerBoundMs("trace", anchor)).toBe(anchor - REHYDRATION_WINDOW_MS);
     });
 
     it("returns a bound for every time-local type", () => {
       for (const type of TIME_LOCAL_AGGREGATE_TYPES) {
-        expect(rehydrationLowerBoundMs(type, anchor)).toBe(
-          anchor - REHYDRATION_WINDOW_MS,
-        );
+        expect(rehydrationLowerBoundMs(type, anchor)).toBe(anchor - REHYDRATION_WINDOW_MS);
       }
     });
 

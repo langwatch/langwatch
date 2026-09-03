@@ -1,10 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2023",
-    "lib": [
-      "es2023",
-      "dom"
-    ],
+    "lib": ["es2023", "dom"],
     "noEmit": true,
     "module": "preserve",
     "moduleResolution": "bundler",
@@ -15,16 +12,8 @@
     "jsx": "react-jsx",
     "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/langy-web.tsbuildinfo",
-    "types": [
-      "vitest/globals",
-      "@testing-library/jest-dom"
-    ],
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
     "resolveJsonModule": true
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.d.ts",
-    "scripts/**/*.ts"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "scripts/**/*.ts"]
 }

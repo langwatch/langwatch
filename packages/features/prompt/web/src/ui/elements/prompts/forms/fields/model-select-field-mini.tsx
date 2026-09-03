@@ -8,7 +8,10 @@ import {
   type OutputType,
 } from "../../../llmPromptConfigs/llm-config-popover";
 import { LLMModelDisplay } from "../../../llmPromptConfigs/llm-model-display";
-import { allModelOptions, useModelSelectionOptions } from "@langwatch/model-provider-web/components/ModelSelector";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "@langwatch/model-provider-web/components/ModelSelector";
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/components/NoModelsConfiguredCallout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";

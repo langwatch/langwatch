@@ -9,8 +9,8 @@ import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
 
 <Tip>
   **Quick setup?** Instead of following these steps manually, [copy a
-  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set
-  this up for you automatically.
+  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up
+  for you automatically.
 </Tip>
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
@@ -50,8 +50,8 @@ npm install @ai-sdk/openai ai
 ```
 
 <Note>
-  The `@ai-sdk/openai` and `ai` packages are only required for the example in this guide.
-  You can skip this step if you're only looking to install the LangWatch SDK.
+  The `@ai-sdk/openai` and `ai` packages are only required for the example in this guide. You can
+  skip this step if you're only looking to install the LangWatch SDK.
 </Note>
 
 ### Step 2: Set Up API Keys
@@ -74,8 +74,8 @@ export OPENAI_API_KEY=your_openai_api_key_here
 
 <Note>
   `LANGWATCH_PROJECT_ID` is required when using a **service API key** (e.g. for CI/CD or
-  multi-project setups). Project API keys obtained via `npx langwatch login` or from the
-  project settings page already have the project context built in.
+  multi-project setups). Project API keys obtained via `npx langwatch login` or from the project
+  settings page already have the project context built in.
 </Note>
 
 ### Step 3: Your First LLM Trace
@@ -150,14 +150,12 @@ Think of LangWatch like a **debugger for your LLM applications**:
 - **Threads** = Conversations (group related traces together)
 - **Users** = Individual users (for analytics)
 
-<Note>
-  For detailed explanations of all concepts, see our [Concepts Guide](/concepts).
-</Note>
+<Note>For detailed explanations of all concepts, see our [Concepts Guide](/concepts).</Note>
 
 <Tip>
   For consistent observability across your application, learn about [Semantic
-  Conventions](/integration/typescript/tutorials/semantic-conventions) - standardized
-  naming guidelines for attributes and metadata.
+  Conventions](/integration/typescript/tutorials/semantic-conventions) - standardized naming
+  guidelines for attributes and metadata.
 </Tip>
 
 ## Integrations
@@ -174,8 +172,8 @@ Below is a list of currently supported integrations. Click on each to learn more
 
 <Note>
   For detailed integration guides, see our [integration
-  documentation](/integration/typescript/integrations). Each integration includes
-  framework-specific examples and best practices.
+  documentation](/integration/typescript/integrations). Each integration includes framework-specific
+  examples and best practices.
 </Note>
 
 ## Common Development Scenarios
@@ -234,8 +232,8 @@ async function answerWithRAG(question: string) {
 
 <Note>
   For consistent attribute naming and TypeScript autocomplete support, see our [Semantic
-  Conventions](/integration/typescript/tutorials/semantic-conventions) guide. For advanced
-  span management techniques, check out [Manual
+  Conventions](/integration/typescript/tutorials/semantic-conventions) guide. For advanced span
+  management techniques, check out [Manual
   Instrumentation](/integration/typescript/tutorials/manual-instrumentation).
 </Note>
 
@@ -346,12 +344,12 @@ signal. The process then ends on the signal exactly as it would have if LangWatc
 not installed.
 
 <Warning>
-  Earlier SDK versions called `process.exit(0)` as soon as LangWatch's own flush finished,
-  which ended the process out from under any other `SIGINT` / `SIGTERM` listener. If your
-  application relied on that to terminate (because it registers a signal handler that
-  never exits the process itself), either exit at the end of your own handler
-  (recommended) or set `advanced.UNSAFE_exitProcessAfterAutoShutdown: true` to restore the
-  old behaviour while you migrate.
+  Earlier SDK versions called `process.exit(0)` as soon as LangWatch's own flush finished, which
+  ended the process out from under any other `SIGINT` / `SIGTERM` listener. If your application
+  relied on that to terminate (because it registers a signal handler that never exits the process
+  itself), either exit at the end of your own handler (recommended) or set
+  `advanced.UNSAFE_exitProcessAfterAutoShutdown: true` to restore the old behaviour while you
+  migrate.
 </Warning>
 
 #### Manual Shutdown
@@ -380,10 +378,7 @@ process.on("SIGTERM", async () => {
 // Force shutdown with timeout
 process.on("SIGINT", async () => {
   console.log("Force shutdown...");
-  await Promise.race([
-    handle.shutdown(),
-    new Promise((resolve) => setTimeout(resolve, 5000)),
-  ]);
+  await Promise.race([handle.shutdown(), new Promise((resolve) => setTimeout(resolve, 5000))]);
   process.exit(1);
 });
 ```
@@ -398,13 +393,12 @@ The shutdown process ensures data integrity:
 4. **Cleans up registered instrumentations**
 
 <Tip>
-  Always call `shutdown()` before your application exits to prevent data loss. The method
-  is safe to call multiple times.
+  Always call `shutdown()` before your application exits to prevent data loss. The method is safe to
+  call multiple times.
 </Tip>
 
 <Warning>
-  If you don't call `shutdown()`, some traces may be lost when your application terminates
-  abruptly.
+  If you don't call `shutdown()`, some traces may be lost when your application terminates abruptly.
 </Warning>
 
 ## Development Workflow
@@ -459,8 +453,8 @@ const handle = setupObservability({
 </Accordion>
 
 <Accordion title="High memory usage">
-  - Use batch processing: `processorType: 'batch'` - Implement graceful shutdown -
-  Consider reducing data capture in production
+  - Use batch processing: `processorType: 'batch'` - Implement graceful shutdown - Consider reducing
+  data capture in production
 </Accordion>
 
 <Accordion title="Performance impact">
@@ -488,6 +482,6 @@ Now that you have basic tracing working, explore:
 - **[Framework Integrations](/integration/typescript/integrations)** - Specific guides for OpenAI, LangChain, Azure, and more
 
 <Tip>
-  Start simple and add complexity gradually. You can always add more detailed tracing
-  later as your application grows!
+  Start simple and add complexity gradually. You can always add more detailed tracing later as your
+  application grows!
 </Tip>

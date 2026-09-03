@@ -58,9 +58,7 @@ export class ApiKeyVisibilityService {
     ];
     const candidates = await this.options.projects.listActiveByScopes({
       organizationId: parsed.organizationId,
-      organizationWide: key.roleBindings.some(
-        (binding) => binding.scopeType === "ORGANIZATION",
-      ),
+      organizationWide: key.roleBindings.some((binding) => binding.scopeType === "ORGANIZATION"),
       teamIds,
       projectIds,
       limit: MAX_VISIBLE_PROJECT_CANDIDATES,

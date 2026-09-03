@@ -20,9 +20,7 @@ export function SharedTraceProvider({
   value: SharedTraceData;
   children: ReactNode;
 }) {
-  return (
-    <SharedTraceContext.Provider value={value}>{children}</SharedTraceContext.Provider>
-  );
+  return <SharedTraceContext.Provider value={value}>{children}</SharedTraceContext.Provider>;
 }
 
 /** The shared payload when rendering inside the share page, else null. */

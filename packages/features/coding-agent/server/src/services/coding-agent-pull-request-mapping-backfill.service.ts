@@ -89,8 +89,7 @@ export class CodingAgentPullRequestMappingBackfillService {
   }): void {
     for (const session of input.sessions) {
       if (input.targets.size >= PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP) break;
-      if (!session.repositoryOwner || !session.repositoryName || !session.gitBranch)
-        continue;
+      if (!session.repositoryOwner || !session.repositoryName || !session.gitBranch) continue;
       const repositoryHost = this.dependencies.github.normalizeRepositoryHost(
         session.repositoryHost,
       );
@@ -116,21 +115,13 @@ export class CodingAgentPullRequestMappingBackfillService {
     targets: ReadonlyMap<string, PullRequestMappingTarget>,
   ): Promise<void> {
     const values = [...targets.values()];
-    for (
-      let index = 0;
-      index < values.length;
-      index += PULL_REQUEST_MAPPING_BACKFILL_CONCURRENCY
-    ) {
+    for (let index = 0; index < values.length; index += PULL_REQUEST_MAPPING_BACKFILL_CONCURRENCY) {
       await Promise.all(
-        values
-          .slice(index, index + PULL_REQUEST_MAPPING_BACKFILL_CONCURRENCY)
-          .map((target) =>
-            this.dependencies.github
-              .requestBranchMapping(target)
-              .catch((error: unknown) => {
-                logger.warn({ error, ...target }, "backfill could not map a branch");
-              }),
-          ),
+        values.slice(index, index + PULL_REQUEST_MAPPING_BACKFILL_CONCURRENCY).map((target) =>
+          this.dependencies.github.requestBranchMapping(target).catch((error: unknown) => {
+            logger.warn({ error, ...target }, "backfill could not map a branch");
+          }),
+        ),
       );
     }
   }

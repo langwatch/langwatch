@@ -9,9 +9,7 @@ import type { FieldMapping as StoreFieldMapping } from "./types";
  * Convert store FieldMapping to UI FieldMapping format.
  * Used when displaying mappings in the UI.
  */
-export const convertToUIMapping = (
-  mapping: StoreFieldMapping,
-): UIFieldMapping => {
+export const convertToUIMapping = (mapping: StoreFieldMapping): UIFieldMapping => {
   if (mapping.type === "value") {
     return { type: "value", value: mapping.value };
   }

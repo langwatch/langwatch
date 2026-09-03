@@ -102,20 +102,12 @@ export function SelectionToolbar({
         >
           <Trash2 size={16} /> Delete
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onClear}
-          data-testid="selection-clear-btn"
-        >
+        <Button size="sm" variant="ghost" onClick={onClear} data-testid="selection-clear-btn">
           <X size={16} />
         </Button>
       </HStack>
 
-      <DialogRoot
-        open={showDeleteConfirm}
-        onOpenChange={({ open }) => setShowDeleteConfirm(open)}
-      >
+      <DialogRoot open={showDeleteConfirm} onOpenChange={({ open }) => setShowDeleteConfirm(open)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>

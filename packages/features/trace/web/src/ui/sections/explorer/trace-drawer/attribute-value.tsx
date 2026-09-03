@@ -45,10 +45,7 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
   const active = override ?? detected;
 
   const raw = useMemo(() => stringifyForCopy(value), [value]);
-  const inline = useMemo(
-    () => buildInlineDescriptor(value, detected, raw),
-    [value, detected, raw],
-  );
+  const inline = useMemo(() => buildInlineDescriptor(value, detected, raw), [value, detected, raw]);
 
   if (detected === "leaf") {
     return (
@@ -125,13 +122,7 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
             >
               <HStack gap={2} minWidth={0} flex={1}>
                 <FormatGlyph format={detected} />
-                <Text
-                  textStyle="2xs"
-                  color="fg.muted"
-                  fontFamily="mono"
-                  truncate
-                  minWidth={0}
-                >
+                <Text textStyle="2xs" color="fg.muted" fontFamily="mono" truncate minWidth={0}>
                   {attrKey}
                 </Text>
               </HStack>
@@ -224,8 +215,7 @@ function FormatToggle({
   // Chat and text map to themselves; `json`, `json-string` and `leaf` all
   // render through the JSON option. Without this, a detected `json-string`
   // would match no option and the selector would read as the first one.
-  const value: OverridableFormat =
-    active === "chat" || active === "text" ? active : "json";
+  const value: OverridableFormat = active === "chat" || active === "text" ? active : "json";
   return (
     <HStack gap={1} flexShrink={0}>
       <Text
@@ -270,13 +260,7 @@ function FormatBody({
 
   const text = typeof value === "string" ? value : raw;
   return (
-    <Text
-      textStyle="xs"
-      fontFamily="mono"
-      color="fg"
-      whiteSpace="pre-wrap"
-      wordBreak="break-word"
-    >
+    <Text textStyle="xs" fontFamily="mono" color="fg" whiteSpace="pre-wrap" wordBreak="break-word">
       {text}
     </Text>
   );
@@ -320,11 +304,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
   const role = message.role.toLowerCase();
   const known = KNOWN_CHAT_ROLES.has(role);
   const RoleIcon =
-    role === "assistant"
-      ? LuBot
-      : role === "tool" || role === "function"
-        ? LuWrench
-        : LuUser;
+    role === "assistant" ? LuBot : role === "tool" || role === "function" ? LuWrench : LuUser;
   return (
     <Box>
       <HStack gap={1.5} marginBottom={1}>
@@ -339,13 +319,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
           {message.role}
         </Text>
       </HStack>
-      <Text
-        textStyle="xs"
-        color="fg"
-        whiteSpace="pre-wrap"
-        wordBreak="break-word"
-        paddingLeft={4}
-      >
+      <Text textStyle="xs" color="fg" whiteSpace="pre-wrap" wordBreak="break-word" paddingLeft={4}>
         {contentToString(message.content) || EM_DASH}
       </Text>
     </Box>
@@ -357,11 +331,7 @@ function CopyButton({ payload }: { payload: string }) {
   const handleClick = useCallback(() => copy(payload), [copy, payload]);
   return (
     <IconButton aria-label="Copy value" size="2xs" variant="ghost" onClick={handleClick}>
-      <Icon
-        as={copied ? LuCheck : LuCopy}
-        boxSize={3}
-        color={copied ? "green.fg" : "fg.subtle"}
-      />
+      <Icon as={copied ? LuCheck : LuCopy} boxSize={3} color={copied ? "green.fg" : "fg.subtle"} />
     </IconButton>
   );
 }

@@ -153,12 +153,8 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     const cursors: Record<string, string> = cursor
       ? (JSON.parse(cursor) as Record<string, string>)
       : {};
-    const nodes: Array<{ id: string; client: { scan: IORedis["scan"] } }> = isCluster(
-      this.redis,
-    )
-      ? this.redis
-          .nodes("master")
-          .map((node, index) => ({ id: String(index), client: node }))
+    const nodes: Array<{ id: string; client: { scan: IORedis["scan"] } }> = isCluster(this.redis)
+      ? this.redis.nodes("master").map((node, index) => ({ id: String(index), client: node }))
       : [{ id: "0", client: this.redis }];
 
     const keys: string[] = [];
@@ -180,18 +176,13 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
         nodeCursor = next;
         keys.push(...batch);
         calls += 1;
-      } while (
-        nodeCursor !== "0" &&
-        keys.length < pageSize &&
-        calls < MAX_SCAN_CALLS_PER_PAGE
-      );
+      } while (nodeCursor !== "0" && keys.length < pageSize && calls < MAX_SCAN_CALLS_PER_PAGE);
       if (nodeCursor !== "0") nextCursors[node.id] = nodeCursor;
     }
 
     return {
       facts: await this.describe(queueName, keys.slice(0, pageSize)),
-      nextCursor:
-        Object.keys(nextCursors).length > 0 ? JSON.stringify(nextCursors) : null,
+      nextCursor: Object.keys(nextCursors).length > 0 ? JSON.stringify(nextCursors) : null,
     };
   }
 
@@ -256,8 +247,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
         // A null TTL means no expiry at all, which outlives every finite one.
         ranked.sort(
           (a, b) =>
-            (a.ttlSeconds ?? Number.POSITIVE_INFINITY) -
-            (b.ttlSeconds ?? Number.POSITIVE_INFINITY),
+            (a.ttlSeconds ?? Number.POSITIVE_INFINITY) - (b.ttlSeconds ?? Number.POSITIVE_INFINITY),
         );
         break;
       case "unreferenced":
@@ -374,10 +364,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
    * through the script's own EVAL fallback, which warms the cache for later
    * calls.
    */
-  private async withOutcomes(
-    queueName: string,
-    facts: BlobFacts[],
-  ): Promise<OpsBlobSummary[]> {
+  private async withOutcomes(queueName: string, facts: BlobFacts[]): Promise<OpsBlobSummary[]> {
     if (facts.length === 0) return [];
 
     const keysFor = (fact: BlobFacts) => {
@@ -386,11 +373,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
         projectId: createTenantId(fact.projectId),
         hash: fact.hash,
       };
-      return [
-        blobLeaseSetKey(keyArgs),
-        blobHolderSetKey(keyArgs),
-        redisBlobKey(keyArgs),
-      ] as const;
+      return [blobLeaseSetKey(keyArgs), blobHolderSetKey(keyArgs), redisBlobKey(keyArgs)] as const;
     };
 
     const pipeline = this.redis.pipeline();

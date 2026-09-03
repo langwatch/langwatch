@@ -29,10 +29,7 @@ import {
 } from "@langwatch/langy-contract";
 import { Fragment, useMemo, useRef, type ReactNode } from "react";
 import { StreamingText } from "../streaming-text";
-import {
-  LangyDerivedCardView,
-  type LangyDerivedCardViewProps,
-} from "./langy-derived-card-view";
+import { LangyDerivedCardView, type LangyDerivedCardViewProps } from "./langy-derived-card-view";
 
 type StreamSegment =
   | { type: "text"; text: string }

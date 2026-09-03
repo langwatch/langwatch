@@ -13,8 +13,7 @@ import TypeScriptIntro from "/snippets/typescript-intro.mdx";
 ## Integration
 
 <Info>
-  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment
-  variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
 Start by setting up observability and initializing the LangWatch tracer:
@@ -127,14 +126,14 @@ const completion = await openai.chat.completions.create({
 </Steps>
 
 <Info>
-  The OpenInference instrumentation automatically captures: - Input messages and model
-  configuration - Output responses and token usage - Error handling and status codes -
-  Request/response timing - Azure-specific configuration (endpoint, API version)
+  The OpenInference instrumentation automatically captures: - Input messages and model configuration
+  - Output responses and token usage - Error handling and status codes - Request/response timing -
+  Azure-specific configuration (endpoint, API version)
 </Info>
 
 <Warning>
-  When using auto-instrumentation, you may need to configure data capture settings to
-  control what information is sent to LangWatch.
+  When using auto-instrumentation, you may need to configure data capture settings to control what
+  information is sent to LangWatch.
 </Warning>
 
 import TypeScriptSharedSpanExcepEval from "/snippets/typescript-shared-span-excep-eval.mdx";
@@ -153,6 +152,6 @@ For more advanced Azure AI integration patterns and best practices:
 
 <Tip>
   For production Azure AI applications, combine manual instrumentation with [Semantic
-  Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent
-  observability and better analytics.
+  Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent observability
+  and better analytics.
 </Tip>

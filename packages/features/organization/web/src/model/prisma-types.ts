@@ -19,8 +19,7 @@ export const OrganizationUserRole = {
   MEMBER: "MEMBER",
   EXTERNAL: "EXTERNAL",
 } as const;
-export type OrganizationUserRole =
-  (typeof OrganizationUserRole)[keyof typeof OrganizationUserRole];
+export type OrganizationUserRole = (typeof OrganizationUserRole)[keyof typeof OrganizationUserRole];
 
 export const TeamUserRole = {
   ADMIN: "ADMIN",
@@ -44,5 +43,4 @@ export const RoleBindingScopeType = {
   PROJECT: "PROJECT",
   PLATFORM: "PLATFORM",
 } as const;
-export type RoleBindingScopeType =
-  (typeof RoleBindingScopeType)[keyof typeof RoleBindingScopeType];
+export type RoleBindingScopeType = (typeof RoleBindingScopeType)[keyof typeof RoleBindingScopeType];

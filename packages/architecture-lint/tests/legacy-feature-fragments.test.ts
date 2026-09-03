@@ -143,10 +143,7 @@ describe("shrinking legacy feature fragment inventory", () => {
       "export class LegacyDatasetService {}",
     );
     baseline();
-    write(
-      "platform/app/src/hooks/datasets/useDataset.ts",
-      "export const useDataset = () => null;",
-    );
+    write("platform/app/src/hooks/datasets/useDataset.ts", "export const useDataset = () => null;");
 
     expect(fragmentViolations()).toEqual([
       expect.objectContaining({ policy: "legacy-feature-fragment" }),

@@ -136,13 +136,7 @@ export function ViaPlatformScreen(): React.ReactElement {
             <GridItem key={cap.title} display="flex">
               <CapabilityCard
                 {...cap}
-                href={
-                  cap.absolute
-                    ? cap.path
-                    : project?.slug
-                      ? `/${project.slug}${cap.path}`
-                      : "#"
-                }
+                href={cap.absolute ? cap.path : project?.slug ? `/${project.slug}${cap.path}` : "#"}
               />
             </GridItem>
           ))}

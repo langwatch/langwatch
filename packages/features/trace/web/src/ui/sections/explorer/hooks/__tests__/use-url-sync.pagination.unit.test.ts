@@ -54,9 +54,7 @@ function selectSevenDayRange(): void {
   const preset = getPresetById("7d");
   if (!preset) throw new Error("the 7d preset went missing");
   const { from, to } = preset.compute();
-  useFilterStore
-    .getState()
-    .setTimeRange({ from, to, label: preset.label, presetId: preset.id });
+  useFilterStore.getState().setTimeRange({ from, to, label: preset.label, presetId: preset.id });
 }
 
 beforeEach(() => {

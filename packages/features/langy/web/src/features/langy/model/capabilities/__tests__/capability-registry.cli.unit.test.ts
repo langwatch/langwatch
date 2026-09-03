@@ -223,9 +223,7 @@ describe("buildResourceHref, given a row-level deep link", () => {
           projectSlug: "acme",
           resourceId: "monitor_1",
         }),
-      ).toBe(
-        "/acme/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=monitor_1",
-      );
+      ).toBe("/acme/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=monitor_1");
     });
 
     it("opens a reusable evaluator from the Evaluators library", () => {
@@ -235,9 +233,7 @@ describe("buildResourceHref, given a row-level deep link", () => {
           projectSlug: "acme",
           resourceId: "evaluator_1",
         }),
-      ).toBe(
-        "/acme/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=evaluator_1",
-      );
+      ).toBe("/acme/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=evaluator_1");
     });
   });
 
@@ -257,9 +253,7 @@ describe("buildResourceHref, given a row-level deep link", () => {
           projectSlug: "acme",
           resourceId: "scenario_1",
         }),
-      ).toBe(
-        "/acme/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=scenario_1",
-      );
+      ).toBe("/acme/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=scenario_1");
     });
   });
 
@@ -282,8 +276,7 @@ describe("extractPlatformUrl, given a settled tool call's result payload", () =>
       expect(
         extractPlatformUrl({
           scenarioRunId: "run_1",
-          platformUrl:
-            "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
+          platformUrl: "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
         }),
       ).toBe("https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1");
     });
@@ -377,17 +370,17 @@ describe("withDecidedCard, given a result whose card was decided by its shape", 
 
   describe("when the decided card is richer than the name's", () => {
     it("draws the decided card", () => {
-      expect(
-        withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" }).render,
-      ).toBe("timeseries");
+      expect(withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" }).render).toBe(
+        "timeseries",
+      );
     });
 
     it("re-derives the body widget for the card being drawn", () => {
       // A trend's body is its plot. Carrying the metrics card's figures over
       // would draw the promoted card with the widget of the card it replaced.
-      expect(
-        withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" }).body,
-      ).toBe("chart");
+      expect(withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" }).body).toBe(
+        "chart",
+      );
     });
 
     it("keeps the wording and surface the command earned", () => {

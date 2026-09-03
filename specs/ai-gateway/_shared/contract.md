@@ -286,9 +286,7 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
     "request_fail_open": false,
     "response_fail_open": false,
     "pre": [{ "id": "guard_01HZ...", "evaluator": "evaluators/pii-check-abc12" }],
-    "post": [
-      { "id": "guard_01HZ...", "evaluator": "evaluators/hallucination-check-def34" }
-    ],
+    "post": [{ "id": "guard_01HZ...", "evaluator": "evaluators/hallucination-check-def34" }],
     "stream_chunk": []
   },
   "policy_rules": {

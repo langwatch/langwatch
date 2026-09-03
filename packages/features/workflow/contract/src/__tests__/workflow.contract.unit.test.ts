@@ -16,8 +16,6 @@ describe("Workflow contract", () => {
   });
 
   it("rejects a graph without a version", () => {
-    expect(() =>
-      workflowDslSchema.parse({ name: "Incomplete", nodes: [], edges: [] }),
-    ).toThrow();
+    expect(() => workflowDslSchema.parse({ name: "Incomplete", nodes: [], edges: [] })).toThrow();
   });
 });

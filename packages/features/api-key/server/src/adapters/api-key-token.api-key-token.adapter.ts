@@ -39,10 +39,7 @@ export class ApiKeyTokenAdapter extends ApiKeyTokenPort {
   }
 
   static randomText(length: number): string {
-    return Array.from(
-      randomBytes(length),
-      (byte) => ALPHABET[byte % ALPHABET.length],
-    ).join("");
+    return Array.from(randomBytes(length), (byte) => ALPHABET[byte % ALPHABET.length]).join("");
   }
 
   static hashApiKeySecret(secret: string, pepper: string): string {
@@ -56,8 +53,7 @@ export class ApiKeyTokenAdapter extends ApiKeyTokenPort {
   ): "match" | "match_legacy" | "no_match" {
     const stored = Buffer.from(hashedSecret, "hex");
     const current = Buffer.from(this.hashApiKeySecret(secret, pepper), "hex");
-    if (stored.length === current.length && timingSafeEqual(stored, current))
-      return "match";
+    if (stored.length === current.length && timingSafeEqual(stored, current)) return "match";
     const legacy = Buffer.from(createHash("sha256").update(secret).digest("hex"), "hex");
     return stored.length === legacy.length && timingSafeEqual(stored, legacy)
       ? "match_legacy"

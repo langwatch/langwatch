@@ -24,7 +24,10 @@ describe("given an address inside the reader's project", () => {
   describe("when a page under the project is on screen", () => {
     it("keeps everything after the project segment", () => {
       expect(
-        toProjectRoutePattern({ pathname: "/acme-app/simulations/scenarios", projectSlug: "acme-app" }),
+        toProjectRoutePattern({
+          pathname: "/acme-app/simulations/scenarios",
+          projectSlug: "acme-app",
+        }),
       ).toBe("/[project]/simulations/scenarios");
     });
   });

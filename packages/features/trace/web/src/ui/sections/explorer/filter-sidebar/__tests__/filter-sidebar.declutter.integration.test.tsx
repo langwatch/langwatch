@@ -152,9 +152,7 @@ describe("<FilterSidebar /> declutter", () => {
   describe("given the sidebar is open", () => {
     it("no longer renders the Find a facet button", () => {
       renderSidebar();
-      expect(
-        screen.queryByRole("button", { name: /find a facet/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /find a facet/i })).not.toBeInTheDocument();
     });
 
     it("renders a More… button below the facet list", () => {

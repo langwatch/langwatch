@@ -20,14 +20,10 @@ export function LangyObserverGlyph() {
         background="orange.solid"
         filter="blur(3px)"
         animate={
-          reduce
-            ? { opacity: 0.35 }
-            : { opacity: [0.2, 0.65, 0.2], scale: [0.8, 1.35, 0.8] }
+          reduce ? { opacity: 0.35 } : { opacity: [0.2, 0.65, 0.2], scale: [0.8, 1.35, 0.8] }
         }
         transition={
-          reduce
-            ? { duration: 0 }
-            : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
+          reduce ? { duration: 0 } : { duration: 2.4, repeat: Infinity, ease: "easeInOut" }
         }
       />
       <Box

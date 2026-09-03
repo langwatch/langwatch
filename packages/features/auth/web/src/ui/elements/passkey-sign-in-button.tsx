@@ -34,9 +34,7 @@ function passkeyFailure(status: number | undefined): { error: string } {
   // belongs to somebody else or to nobody — the endpoint does not say which.
   const refused = status === 400 || status === 401 || status === 403;
   return {
-    error: refused
-      ? "identity_passkey_not_recognized"
-      : "identity_passkey_ceremony_failed",
+    error: refused ? "identity_passkey_not_recognized" : "identity_passkey_ceremony_failed",
   };
 }
 

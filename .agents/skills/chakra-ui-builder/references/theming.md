@@ -28,38 +28,30 @@ customizations, then merge with `defaultConfig`:
 
 ```ts
 // theme.ts
-import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react"
+import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
 
 const config = defineConfig({
   theme: {
-    tokens: {
-      /* ... */
-    },
-    semanticTokens: {
-      /* ... */
-    },
-    recipes: {
-      /* ... */
-    },
-    slotRecipes: {
-      /* ... */
-    },
+    tokens: {/* ... */},
+    semanticTokens: {/* ... */},
+    recipes: {/* ... */},
+    slotRecipes: {/* ... */},
   },
-})
+});
 
-export const system = createSystem(defaultConfig, config)
+export const system = createSystem(defaultConfig, config);
 ```
 
 Pass `system` to `ChakraProvider`:
 
 ```tsx
 // components/ui/provider.tsx
-"use client"
-import { system } from "@/theme"
-import { ChakraProvider } from "@chakra-ui/react"
+"use client";
+import { system } from "@/theme";
+import { ChakraProvider } from "@chakra-ui/react";
 
 export function Provider({ children }) {
-  return <ChakraProvider value={system}>{children}</ChakraProvider>
+  return <ChakraProvider value={system}>{children}</ChakraProvider>;
 }
 ```
 
@@ -107,7 +99,7 @@ const config = defineConfig({
       },
     },
   },
-})
+});
 ```
 
 Use scale-based keys for palettes (`50`, `100`, …, `900`) and semantic keys for
@@ -160,7 +152,7 @@ const config = defineConfig({
       },
     },
   },
-})
+});
 ```
 
 Components that use `bg="bg.subtle"` instead of `bg="gray.50"` automatically get
@@ -175,7 +167,7 @@ Recipes replace `styleConfig` from v2. Use them when a single component has
 meaningful style variants that developers will reuse across the project.
 
 ```ts
-import { defineRecipe } from "@chakra-ui/react"
+import { defineRecipe } from "@chakra-ui/react";
 
 export const badgeRecipe = defineRecipe({
   base: {
@@ -204,13 +196,13 @@ export const badgeRecipe = defineRecipe({
     },
   },
   defaultVariants: { variant: "subtle", size: "md" },
-})
+});
 ```
 
 Register in the theme config:
 
 ```ts
-const config = defineConfig({ theme: { recipes: { badge: badgeRecipe } } })
+const config = defineConfig({ theme: { recipes: { badge: badgeRecipe } } });
 ```
 
 `colorPalette` inside a recipe is a placeholder — it resolves to whatever
@@ -224,7 +216,7 @@ Slot recipes replace `multiStyleConfig` from v2. Use them when a component has
 multiple coordinated parts that all respond to the same variants.
 
 ```ts
-import { defineSlotRecipe } from "@chakra-ui/react"
+import { defineSlotRecipe } from "@chakra-ui/react";
 
 export const cardSlotRecipe = defineSlotRecipe({
   slots: ["root", "header", "body", "footer", "title"],
@@ -254,7 +246,7 @@ export const cardSlotRecipe = defineSlotRecipe({
     },
   },
   defaultVariants: { variant: "elevated", size: "md" },
-})
+});
 ```
 
 Register:
@@ -263,12 +255,12 @@ Register:
 Consume with `useSlotRecipe`:
 
 ```tsx
-import { useSlotRecipe } from "@chakra-ui/react"
+import { useSlotRecipe } from "@chakra-ui/react";
 
 function Card({ variant = "elevated", size = "md", children }) {
-  const recipe = useSlotRecipe({ key: "card" })
-  const styles = recipe({ variant, size })
-  return <Box css={styles.root}>{children}</Box>
+  const recipe = useSlotRecipe({ key: "card" });
+  const styles = recipe({ variant, size });
+  return <Box css={styles.root}>{children}</Box>;
 }
 ```
 

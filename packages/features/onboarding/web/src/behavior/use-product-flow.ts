@@ -22,27 +22,23 @@ const VALID_PRODUCTS: ProductSelection[] = [
  * assistant and AI assists have a model to run on; the step is skippable,
  * and the coding-agent flavours go straight to their setup screen.
  */
-const PRODUCT_TO_SCREENS: Record<
-  ProductSelection,
-  [ProductScreenIndex, ...ProductScreenIndex[]]
-> = {
-  "via-claude-code": [ProductScreenIndex.VIA_CLAUDE_CODE],
-  // MODEL_PROVIDER is not served in this package — see
-  // `create-product-screens`. It was a skippable pre-step in front of this
-  // flavour and nothing else reached it.
-  "via-platform": [ProductScreenIndex.VIA_PLATFORM],
-  "via-claude-desktop": [ProductScreenIndex.VIA_CLAUDE_DESKTOP],
-  manually: [ProductScreenIndex.MANUALLY],
-};
+const PRODUCT_TO_SCREENS: Record<ProductSelection, [ProductScreenIndex, ...ProductScreenIndex[]]> =
+  {
+    "via-claude-code": [ProductScreenIndex.VIA_CLAUDE_CODE],
+    // MODEL_PROVIDER is not served in this package — see
+    // `create-product-screens`. It was a skippable pre-step in front of this
+    // flavour and nothing else reached it.
+    "via-platform": [ProductScreenIndex.VIA_PLATFORM],
+    "via-claude-desktop": [ProductScreenIndex.VIA_CLAUDE_DESKTOP],
+    manually: [ProductScreenIndex.MANUALLY],
+  };
 
 const firstScreenFor = (product: ProductSelection): ProductScreenIndex =>
   PRODUCT_TO_SCREENS[product][0];
 
 export function useProductFlow() {
   const router = useRouter();
-  const [selectedProduct, setSelectedProduct] = useState<ProductSelection | undefined>(
-    undefined,
-  );
+  const [selectedProduct, setSelectedProduct] = useState<ProductSelection | undefined>(undefined);
   const [flowConfig, setFlowConfig] = useState<ProductFlowConfig>(PRODUCT_FLOW_CONFIG);
 
   // Initialize selected product from URL: prefer product, then step, then slug

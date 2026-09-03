@@ -7,19 +7,11 @@ const mockRedis = {
   setex: vi.fn(async (key: string, ttl: number, value: string) => {
     mockRedisStore.set(key, { value, ttl });
   }),
-  set: vi.fn(
-    async (
-      key: string,
-      value: string,
-      ex: string,
-      ttl: number,
-      nx: string,
-    ) => {
-      if (nx === "NX" && mockRedisStore.has(key)) return null;
-      mockRedisStore.set(key, { value, ttl });
-      return "OK";
-    },
-  ),
+  set: vi.fn(async (key: string, value: string, ex: string, ttl: number, nx: string) => {
+    if (nx === "NX" && mockRedisStore.has(key)) return null;
+    mockRedisStore.set(key, { value, ttl });
+    return "OK";
+  }),
   del: vi.fn(async (key: string) => {
     mockRedisStore.delete(key);
   }),
@@ -68,11 +60,7 @@ describe("TtlCache", () => {
 
       await cache.set("key1", 1);
 
-      expect(mockRedis.setex).toHaveBeenCalledWith(
-        expect.any(String),
-        45,
-        expect.any(String),
-      );
+      expect(mockRedis.setex).toHaveBeenCalledWith(expect.any(String), 45, expect.any(String));
     });
 
     it("uses custom prefix for Redis keys", async () => {
@@ -88,10 +76,7 @@ describe("TtlCache", () => {
     });
 
     it("serializes complex objects to JSON", async () => {
-      const cache = new TtlCache<{ name: string; count: number }>(
-        30_000,
-        "test:",
-      );
+      const cache = new TtlCache<{ name: string; count: number }>(30_000, "test:");
       const obj = { name: "test", count: 42 };
 
       await cache.set("obj1", obj);
@@ -159,9 +144,7 @@ describe("TtlCache", () => {
       // costs is a stale answer. A claim that fell back the same way would
       // name one winner per process, which is the one outcome it exists to
       // prevent, so it refuses instead and the caller decides.
-      await expect(cache.claim("lock1", true)).rejects.toThrow(
-        "connection reset",
-      );
+      await expect(cache.claim("lock1", true)).rejects.toThrow("connection reset");
 
       // Nothing was recorded, so no later read finds a key this process
       // alone believes it holds.

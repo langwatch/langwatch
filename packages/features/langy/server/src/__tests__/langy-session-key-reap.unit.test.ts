@@ -34,10 +34,7 @@ describe("langySessionKeyReap process", () => {
       });
 
       it("keys the intent by the tick so a redelivered wake collapses", () => {
-        const first = langySessionKeyReapWake(
-          { lastReapAt: null },
-          wakeContext(2_000) as never,
-        );
+        const first = langySessionKeyReapWake({ lastReapAt: null }, wakeContext(2_000) as never);
         const redelivered = langySessionKeyReapWake(
           { lastReapAt: 2_000 },
           wakeContext(2_000) as never,

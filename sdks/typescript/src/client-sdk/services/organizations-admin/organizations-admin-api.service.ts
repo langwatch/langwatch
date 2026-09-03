@@ -13,10 +13,7 @@
  * CLI-only, and deliberately not exported from the client SDK's public index.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
-import {
-  createManagementRequest,
-  type ManagementRequest,
-} from "../_shared/management-request";
+import { createManagementRequest, type ManagementRequest } from "../_shared/management-request";
 
 export interface ProvisionedOrganizationSummary {
   id: string;
@@ -62,11 +59,7 @@ export const INSTANCE_ADMIN_KEY_ENV = "LANGWATCH_INSTANCE_ADMIN_API_KEY";
  * string, which ships `Authorization: Bearer ` and lets the family's 404 tell
  * an operator who forgot the variable that the surface does not exist.
  */
-export const resolveInstanceAdminToken = ({
-  instanceKey,
-}: {
-  instanceKey?: string;
-}): string => {
+export const resolveInstanceAdminToken = ({ instanceKey }: { instanceKey?: string }): string => {
   const token = instanceKey ?? process.env[INSTANCE_ADMIN_KEY_ENV];
   if (!token) {
     throw new Error(

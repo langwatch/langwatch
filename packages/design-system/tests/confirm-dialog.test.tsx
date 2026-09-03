@@ -75,11 +75,7 @@ describe("ConfirmDialog", () => {
       const onOpenChange = vi.fn<(open: boolean) => void>();
       const onConfirm = vi.fn<() => void>();
       renderWithDesignSystem(
-        <ConfirmDialog
-          {...defaultProps}
-          onOpenChange={onOpenChange}
-          onConfirm={onConfirm}
-        />,
+        <ConfirmDialog {...defaultProps} onOpenChange={onOpenChange} onConfirm={onConfirm} />,
       );
 
       fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));

@@ -15,13 +15,9 @@ describe("product registry", () => {
 
       it("advertises function in every pitch", () => {
         expect(productById("me").pitch).toBe("Track your coding assistants");
-        expect(productById("llm-ops").pitch).toBe(
-          "Observe, evaluate and test your agents",
-        );
+        expect(productById("llm-ops").pitch).toBe("Observe, evaluate and test your agents");
         expect(productById("gateway").pitch).toBe("Route, meter and bill LLM usage");
-        expect(productById("governance").pitch).toBe(
-          "Every AI tool, license, agent and dollar",
-        );
+        expect(productById("governance").pitch).toBe("Every AI tool, license, agent and dollar");
       });
     });
   });

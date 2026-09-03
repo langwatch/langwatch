@@ -88,8 +88,6 @@ describe("buildPairwiseComparisons", () => {
       0: { rowIndex: 0, winnerId: "variant-a" },
     });
 
-    expect(buildPairwiseComparisons(column)).toEqual([
-      { candidates: [], winner: "variant-a" },
-    ]);
+    expect(buildPairwiseComparisons(column)).toEqual([{ candidates: [], winner: "variant-a" }]);
   });
 });

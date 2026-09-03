@@ -9,10 +9,7 @@ import {
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-import {
-  PULL_REQUEST_STATUS_LABELS,
-  type PullRequestStatus,
-} from "./pull-request-status";
+import { PULL_REQUEST_STATUS_LABELS, type PullRequestStatus } from "./pull-request-status";
 
 /**
  * A pull request's state, drawn the way GitHub draws it: a solid badge in the

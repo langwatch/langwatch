@@ -42,9 +42,7 @@ describe("feature tRPC bindings", () => {
     });
 
     it("derives identical procedure-wide keys", () => {
-      expect(getQueryKey(probeApi.tracesV2.list)).toEqual(
-        getQueryKey(otherInstance.tracesV2.list),
-      );
+      expect(getQueryKey(probeApi.tracesV2.list)).toEqual(getQueryKey(otherInstance.tracesV2.list));
     });
   });
 

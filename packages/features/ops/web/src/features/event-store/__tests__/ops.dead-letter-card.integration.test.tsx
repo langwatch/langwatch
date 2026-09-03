@@ -100,9 +100,7 @@ describe("DeadLettersCard", () => {
       expect(screen.getByTestId("dead-total").textContent).toContain(
         "104 dead messages across 2 processes",
       );
-      expect(screen.getByTestId("dead-filter-triggerSettlement").textContent).toContain(
-        "92",
-      );
+      expect(screen.getByTestId("dead-filter-triggerSettlement").textContent).toContain("92");
     });
 
     it("narrows to one process when its chip is pressed", () => {
@@ -167,9 +165,7 @@ describe("DeadLettersCard", () => {
         />,
       );
 
-      fireEvent.click(
-        screen.getByTestId("dead-redrive-process:req_01:deliver:confirmed"),
-      );
+      fireEvent.click(screen.getByTestId("dead-redrive-process:req_01:deliver:confirmed"));
       // Carries the full ref, which is what makes acting from the fleet-wide
       // list possible at all.
       expect(onRedrive).toHaveBeenCalledWith(
@@ -196,9 +192,7 @@ describe("DeadLettersCard", () => {
         />,
       );
 
-      expect(
-        screen.queryByTestId("dead-redrive-process:req_01:deliver:confirmed"),
-      ).toBeNull();
+      expect(screen.queryByTestId("dead-redrive-process:req_01:deliver:confirmed")).toBeNull();
     });
 
     it("reveals the trace and payload when expanded", () => {
@@ -249,9 +243,7 @@ describe("DeadLettersCard", () => {
       expect(first.textContent).toContain("receiver returned 503");
       expect(second.textContent).toContain("receiver returned 410");
       // Oldest first: the story reads top to bottom.
-      expect(
-        first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+      expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     // Deliberately unbound. What this asserts is that the row offers both
@@ -279,9 +271,7 @@ describe("DeadLettersCard", () => {
         />,
       );
 
-      fireEvent.click(
-        screen.getByTestId("dead-discard-process:req_01:deliver:confirmed"),
-      );
+      fireEvent.click(screen.getByTestId("dead-discard-process:req_01:deliver:confirmed"));
       expect(onDiscard).toHaveBeenCalledWith(
         expect.objectContaining({
           processName: "webhookDelivery",

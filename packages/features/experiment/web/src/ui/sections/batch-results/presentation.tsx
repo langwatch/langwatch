@@ -8,10 +8,7 @@ import type {
   Payload,
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
-import type {
-  BatchEvaluatorResult,
-  BatchTargetOutput,
-} from "../batch-evaluation-results.types";
+import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluation-results.types";
 
 export type BatchCellFailure = {
   title: string;
@@ -24,9 +21,7 @@ export type DescribeBatchCellFailure = (input: {
   domainError: BatchTargetOutput["domainError"];
 }) => BatchCellFailure | null;
 
-export type RenderBatchEvaluatorResult = (input: {
-  result: BatchEvaluatorResult;
-}) => ReactNode;
+export type RenderBatchEvaluatorResult = (input: { result: BatchEvaluatorResult }) => ReactNode;
 
 export type RenderTracePeek = (input: { traceId: string }) => ReactNode;
 
@@ -90,9 +85,7 @@ export const formatTargetOutput = (output: unknown): string => {
   if (isSingleOutputKey(output)) {
     const content = output.output;
     if (content === null || content === undefined) return "";
-    return typeof content === "object"
-      ? JSON.stringify(content, null, 2)
-      : String(content);
+    return typeof content === "object" ? JSON.stringify(content, null, 2) : String(content);
   }
 
   return JSON.stringify(output, null, 2);
@@ -128,9 +121,7 @@ export const getImageUrl = (value: unknown): string | null => {
     }
 
     const segment = url.pathname.split("/").at(-1);
-    return segment && segment.length > 50 && /^[A-Za-z0-9+/=]+$/.test(segment)
-      ? source
-      : null;
+    return segment && segment.length > 50 && /^[A-Za-z0-9+/=]+$/.test(segment) ? source : null;
   } catch {
     return null;
   }
@@ -234,12 +225,7 @@ export const PassRateCircle = ({
   passRate: number | null;
   size?: string;
 }) => (
-  <Box
-    borderRadius="full"
-    width={size}
-    height={size}
-    bg={getPassRateGradientColor(passRate)}
-  />
+  <Box borderRadius="full" width={size} height={size} bg={getPassRateGradientColor(passRate)} />
 );
 
 export const MetricStatsTooltip = ({

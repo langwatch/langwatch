@@ -1,18 +1,9 @@
-import {
-  LANGY_SESSION_API_KEY_NAME,
-  type ApiKeyService,
-} from "@langwatch/api-key-contract";
+import { LANGY_SESSION_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
-import {
-  langyCandidatePermissions,
-  type LangyCredentialSession,
-} from "@langwatch/langy-contract";
+import { langyCandidatePermissions, type LangyCredentialSession } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { LangySessionKeyMetricsPort } from "../ports/langy-session-key-metrics.port";
-import {
-  LangySessionKeyPort,
-  LangySessionKeyScopeError,
-} from "../ports/langy-turn-runtime.port";
+import { LangySessionKeyPort, LangySessionKeyScopeError } from "../ports/langy-turn-runtime.port";
 import type { LangySessionKeyRepository } from "../repositories/langy-session-key.repository";
 import { LangySessionKeyReapService } from "./langy-session-key-reap.service";
 
@@ -32,15 +23,9 @@ const sessionKeyLifetimeMs = 6 * 60 * 60 * 1000;
  * the requesting human actually holds, so widening it can never give anyone
  * access they did not already have by hand.
  */
-export const LANGY_CANDIDATE_PERMISSIONS = Object.freeze(
-  langyCandidatePermissions(),
-);
+export const LANGY_CANDIDATE_PERMISSIONS = Object.freeze(langyCandidatePermissions());
 
-export type LangySessionKeyRevocation =
-  | "revoked"
-  | "already_revoked"
-  | "not_found"
-  | "refused";
+export type LangySessionKeyRevocation = "revoked" | "already_revoked" | "not_found" | "refused";
 
 export class LangySessionKeyService extends LangySessionKeyPort {
   private constructor(
@@ -58,12 +43,7 @@ export class LangySessionKeyService extends LangySessionKeyPort {
     authz: AuthzService;
     metrics: LangySessionKeyMetricsPort;
   }): LangySessionKeyService {
-    return new LangySessionKeyService(
-      input.repository,
-      input.apiKeys,
-      input.authz,
-      input.metrics,
-    );
+    return new LangySessionKeyService(input.repository, input.apiKeys, input.authz, input.metrics);
   }
 
   async mint(input: {
@@ -139,10 +119,7 @@ export class LangySessionKeyService extends LangySessionKeyPort {
       return "not_found";
     }
     if (key.name !== LANGY_SESSION_API_KEY_NAME) {
-      logger.warn(
-        { apiKeyId: key.id, name: key.name },
-        "refusing to revoke a non-Langy key",
-      );
+      logger.warn({ apiKeyId: key.id, name: key.name }, "refusing to revoke a non-Langy key");
       return "refused";
     }
     if (!key.isScopedToProject) {

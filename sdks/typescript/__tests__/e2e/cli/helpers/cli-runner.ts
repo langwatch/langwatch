@@ -162,8 +162,7 @@ export class CliRunner {
         if (CLOSED_PIPE_CODES.has(error.code ?? "")) return;
         errorOutput += `stdin error: ${error.message}\n`;
       });
-      const canWriteStdin = () =>
-        !child.killed && child.stdin.writable && !child.stdin.destroyed;
+      const canWriteStdin = () => !child.killed && child.stdin.writable && !child.stdin.destroyed;
 
       // Send inputs to stdin with timing
       if (inputs.length > 0) {

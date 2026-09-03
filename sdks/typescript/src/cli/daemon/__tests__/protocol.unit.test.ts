@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  type ClientFrame,
-  encodeFrame,
-  FrameDecoder,
-  type ServerFrame,
-} from "../protocol";
+import { type ClientFrame, encodeFrame, FrameDecoder, type ServerFrame } from "../protocol";
 
 describe("FrameDecoder", () => {
   describe("given a frame split across several socket reads", () => {
@@ -56,9 +51,7 @@ describe("FrameDecoder", () => {
       const payload = Buffer.from("line one\nline two\n");
       const decoder = new FrameDecoder<ServerFrame>();
 
-      const frames = decoder.push(
-        encodeFrame({ t: "out", d: payload.toString("base64") }),
-      );
+      const frames = decoder.push(encodeFrame({ t: "out", d: payload.toString("base64") }));
 
       expect(frames).toHaveLength(1);
       expect(Buffer.from((frames[0] as { d: string }).d, "base64").toString()).toBe(

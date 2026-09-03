@@ -11,9 +11,7 @@ import type { PromptConfigFormValues } from "./prompt-form.schemas";
  * carries the rule the user is most likely to see. Anything else falls
  * back to a generic copy.
  */
-export const getSaveBlockerMessage = (
-  methods: UseFormReturn<PromptConfigFormValues>,
-): string => {
+export const getSaveBlockerMessage = (methods: UseFormReturn<PromptConfigFormValues>): string => {
   const messagesError = methods.formState.errors.version?.configData?.messages as
     | { message?: string }
     | undefined;

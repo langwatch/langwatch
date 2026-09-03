@@ -17,9 +17,7 @@ export const updateCommand = async (
   await resolveCredentials();
 
   if (!options.name && !options.columns) {
-    console.error(
-      chalk.red("Error: At least one of --name or --columns must be provided."),
-    );
+    console.error(chalk.red("Error: At least one of --name or --columns must be provided."));
     process.exit(1);
   }
 
@@ -28,9 +26,7 @@ export const updateCommand = async (
     try {
       columnTypes = parseColumns(options.columns);
     } catch (error) {
-      console.error(
-        chalk.red(error instanceof Error ? error.message : "Invalid columns format"),
-      );
+      console.error(chalk.red(error instanceof Error ? error.message : "Invalid columns format"));
       process.exit(1);
     }
   }
@@ -57,9 +53,7 @@ export const updateCommand = async (
           console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
         }
         if (dataset.platformUrl) {
-          console.log(
-            `  ${chalk.bold("View:")}  ${chalk.underline(dataset.platformUrl)}`,
-          );
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(dataset.platformUrl)}`);
         }
       },
     };

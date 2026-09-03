@@ -1,8 +1,5 @@
 import { type AttributeValue, type Span, type SpanOptions } from "@opentelemetry/api";
-import {
-  type SpanInputOutput,
-  type ChatMessage,
-} from "../../internal/generated/types/tracer";
+import { type SpanInputOutput, type ChatMessage } from "../../internal/generated/types/tracer";
 import { type Prompt } from "@/client-sdk/services/prompts";
 import { type AddEvaluationParams } from "../evaluation";
 

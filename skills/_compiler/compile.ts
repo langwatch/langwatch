@@ -46,13 +46,7 @@ Once they provide it, use it wherever you see a placeholder below.`;
     .replace(/your-key-here/g, "ASK_USER_FOR_LANGWATCH_API_KEY");
 }
 
-const LEVEL_UP_SKILLS = [
-  "tracing",
-  "prompts",
-  "experiments",
-  "online-evaluations",
-  "scenarios",
-];
+const LEVEL_UP_SKILLS = ["tracing", "prompts", "experiments", "online-evaluations", "scenarios"];
 
 function expandSkill(name: string): string[] {
   return name === "level-up" ? LEVEL_UP_SKILLS : [name];

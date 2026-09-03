@@ -43,15 +43,11 @@ describe("toRelativeSameOriginHref", () => {
 
 describe("isPreciseResourceHref", () => {
   it("distinguishes a surface index from a concrete resource address", () => {
-    expect(isPreciseResourceHref("https://app.langwatch.ai/demo/simulations")).toBe(
-      false,
-    );
+    expect(isPreciseResourceHref("https://app.langwatch.ai/demo/simulations")).toBe(false);
     expect(isPreciseResourceHref("/demo/simulations")).toBe(false);
     expect(isPreciseResourceHref("/demo/datasets/ds_123")).toBe(true);
     expect(
-      isPreciseResourceHref(
-        "/demo/agents?drawer.open=agentCodeEditor&drawer.agentId=ag_1",
-      ),
+      isPreciseResourceHref("/demo/agents?drawer.open=agentCodeEditor&drawer.agentId=ag_1"),
     ).toBe(true);
   });
 });

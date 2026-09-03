@@ -13,11 +13,9 @@ export class ScenarioRunExportUnauthenticatedError extends HandledError {
   declare readonly code: "scenario_run_export_unauthenticated";
 
   constructor() {
-    super(
-      "scenario_run_export_unauthenticated",
-      "You must be logged in to export scenario runs.",
-      { httpStatus: 401 },
-    );
+    super("scenario_run_export_unauthenticated", "You must be logged in to export scenario runs.", {
+      httpStatus: 401,
+    });
   }
 }
 

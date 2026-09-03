@@ -72,10 +72,7 @@ export function detectCompression(buf: Buffer): CompressionCodec {
   return "none";
 }
 
-export async function compress(
-  data: Buffer | string,
-  codec: CompressionCodec,
-): Promise<Buffer> {
+export async function compress(data: Buffer | string, codec: CompressionCodec): Promise<Buffer> {
   switch (codec) {
     case "gzip":
       return await gzipAsync(data);
@@ -129,8 +126,7 @@ export function encodePayload(
 export function decodePayload(buf: Buffer): Record<string, unknown> {
   const first = buf[0];
   const isMsgpack =
-    first !== undefined &&
-    ((first >= 0x80 && first <= 0x8f) || first === 0xde || first === 0xdf);
+    first !== undefined && ((first >= 0x80 && first <= 0x8f) || first === 0xde || first === 0xdf);
 
   return isMsgpack
     ? (packr.unpack(buf) as Record<string, unknown>)

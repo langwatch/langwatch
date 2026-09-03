@@ -26,11 +26,7 @@ export interface ExpectedIdentifier {
 }
 
 export type BackfillDiff = {
-  kind:
-    | "identifier_missing"
-    | "state_mismatch"
-    | "value_mismatch"
-    | "surplus_row";
+  kind: "identifier_missing" | "state_mismatch" | "value_mismatch" | "surplus_row";
   identifierId: string;
   provider: string;
   expectedState?: string;
@@ -94,9 +90,7 @@ export function backfillParityDiffs({
       });
     }
   }
-  const expectedIds = new Set(
-    expected.map((expectation) => expectation.identifierId),
-  );
+  const expectedIds = new Set(expected.map((expectation) => expectation.identifierId));
   for (const row of rows) {
     if (expectedIds.has(row.id) || !isLiveIdentifierState(row.state)) continue;
     diffs.push({

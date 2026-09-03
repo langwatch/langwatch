@@ -32,9 +32,7 @@ export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({ compact = fal
 
   const activePreset = useMemo(
     () =>
-      timeRange.presetId
-        ? (getPresetById(timeRange.presetId) ?? null)
-        : matchPreset(timeRange),
+      timeRange.presetId ? (getPresetById(timeRange.presetId) ?? null) : matchPreset(timeRange),
     [timeRange],
   );
 
@@ -62,10 +60,7 @@ export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({ compact = fal
           is squeezed, when it collapses to the clock icon (the full range
           stays one hover away in the tooltip). Size + padding match the rest
           of the toolbar's `xs` buttons. */}
-      <Tooltip
-        content={`Time range: ${triggerLabel}`}
-        positioning={{ placement: "bottom" }}
-      >
+      <Tooltip content={`Time range: ${triggerLabel}`} positioning={{ placement: "bottom" }}>
         <TriggerAnchor>
           <Popover.Trigger asChild>
             <Button
@@ -84,10 +79,7 @@ export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({ compact = fal
       <Popover.Content width="auto" minWidth="420px">
         <Popover.Body padding={0}>
           <Flex>
-            <PresetColumn
-              activePresetId={activePreset?.id ?? null}
-              onSelect={applyPreset}
-            />
+            <PresetColumn activePresetId={activePreset?.id ?? null} onSelect={applyPreset} />
             <AbsoluteRangeColumn range={timeRange} onApply={applyAbsolute} />
           </Flex>
           <Separator />
@@ -234,12 +226,7 @@ const Footer: React.FC<{ range: TimeRange }> = ({ range }) => {
         {timezone}
       </Text>
       <Tooltip content={copied ? "Copied!" : "Copy time range"}>
-        <IconButton
-          aria-label="Copy time range"
-          variant="ghost"
-          size="xs"
-          onClick={handleCopy}
-        >
+        <IconButton aria-label="Copy time range" variant="ghost" size="xs" onClick={handleCopy}>
           {copied ? <Check size={12} /> : <Copy size={12} />}
         </IconButton>
       </Tooltip>

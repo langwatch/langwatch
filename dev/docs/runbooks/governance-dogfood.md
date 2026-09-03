@@ -187,7 +187,7 @@ they're docs assets under `docs/images/ai-governance/`.
 | Symptom                                | Cause                                      | Fix                                                                                     |
 | -------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------- |
 | Walker times out on "By tool" selector | Dev stack 502 or auth expired              | Restart `wise-mixing-zebra-app-1`, re-seed auth.json                                    |
-| `Cannot find module '.prisma/client'`  | Generated types missing in worktree        | `pnpm start:prepare:files` from the repository root                                           |
+| `Cannot find module '.prisma/client'`  | Generated types missing in worktree        | `pnpm start:prepare:files` from the repository root                                     |
 | Install drawer returns 409 CONFLICT    | Tile already has binding                   | Drawer should auto-route to Rotate path; if not, check `hasExistingBinding` prop wiring |
 | TotalCost = NULL on trace              | Legacy model alias not in llmModels.json   | Bump payload to current-gen alias                                                       |
 | `pnpm tsx scripts/...` silently no-ops | Host `.env` DATABASE_URL points at AWS RDS | Run inside `docker exec wise-mixing-zebra-app-1`                                        |

@@ -36,9 +36,7 @@ describe("customEvaluatorTemplate", () => {
           parameters: Array<{ identifier: string; value: unknown }>;
         }
       ).parameters;
-      const messages = JSON.stringify(
-        params.find((p) => p.identifier === "messages")?.value,
-      );
+      const messages = JSON.stringify(params.find((p) => p.identifier === "messages")?.value);
       expect(messages).toContain("{{input}}");
       expect(messages).not.toContain("llm_output");
     });

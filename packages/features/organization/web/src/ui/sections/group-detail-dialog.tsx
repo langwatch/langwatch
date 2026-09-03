@@ -53,12 +53,8 @@ export function GroupDetailDialog({
   const [pendingName, setPendingName] = useState(group.name);
   const [committedName, setCommittedName] = useState(group.name);
 
-  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(
-    new Set(),
-  );
-  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<
-    PendingBinding[]
-  >([]);
+  const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(new Set());
+  const [pendingBindingAdditions, setPendingBindingAdditions] = useState<PendingBinding[]>([]);
 
   const [pendingRemovals, setPendingRemovals] = useState<Set<string>>(new Set());
   const [pendingAdditions, setPendingAdditions] = useState<PendingAddition[]>([]);
@@ -211,10 +207,7 @@ export function GroupDetailDialog({
               <HStack>
                 <SourceBadge scimSource={d.scimSource} />
                 <Text fontSize="sm" color="fg.muted">
-                  {Math.max(
-                    0,
-                    d.members.length - pendingRemovals.size + pendingAdditions.length,
-                  )}{" "}
+                  {Math.max(0, d.members.length - pendingRemovals.size + pendingAdditions.length)}{" "}
                   members
                 </Text>
               </HStack>
@@ -265,9 +258,7 @@ export function GroupDetailDialog({
                               size="xs"
                               variant="ghost"
                               color={markedForRemoval ? "blue.500" : "fg.muted"}
-                              aria-label={
-                                markedForRemoval ? "Undo removal" : `Remove binding`
-                              }
+                              aria-label={markedForRemoval ? "Undo removal" : `Remove binding`}
                               onClick={() => toggleBindingRemoval(b.id)}
                             >
                               <X size={14} />
@@ -301,9 +292,7 @@ export function GroupDetailDialog({
                           color="fg.muted"
                           aria-label="Undo add"
                           onClick={() =>
-                            setPendingBindingAdditions((prev) =>
-                              prev.filter((_, j) => j !== i),
-                            )
+                            setPendingBindingAdditions((prev) => prev.filter((_, j) => j !== i))
                           }
                         >
                           <X size={14} />
@@ -398,9 +387,7 @@ export function GroupDetailDialog({
                           color="fg.muted"
                           aria-label={`Undo adding ${a.label}`}
                           onClick={() =>
-                            setPendingAdditions((prev) =>
-                              prev.filter((x) => x.userId !== a.userId),
-                            )
+                            setPendingAdditions((prev) => prev.filter((x) => x.userId !== a.userId))
                           }
                         >
                           <X size={14} />
@@ -470,9 +457,7 @@ export function GroupDetailDialog({
                           colorPalette={addMemberId ? "blue" : undefined}
                           disabled={!addMemberId}
                           onClick={() => {
-                            const item = allAvailable.find(
-                              (a) => a.value === addMemberId,
-                            );
+                            const item = allAvailable.find((a) => a.value === addMemberId);
                             if (item)
                               stageMemberAdd({
                                 userId: item.value,

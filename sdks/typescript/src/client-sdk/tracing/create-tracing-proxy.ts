@@ -10,9 +10,7 @@ type DecoratorMethodWithSpan<T extends (...args: any[]) => any> = (
 // Type for decorator class that maps original methods to span-aware versions
 // Only requires methods that are actually implemented in the decorator
 type DecoratorClass<T> = new (target: T) => Partial<{
-  [K in keyof T]: T[K] extends (...args: any[]) => any
-    ? DecoratorMethodWithSpan<T[K]>
-    : T[K];
+  [K in keyof T]: T[K] extends (...args: any[]) => any ? DecoratorMethodWithSpan<T[K]> : T[K];
 }>;
 
 /**

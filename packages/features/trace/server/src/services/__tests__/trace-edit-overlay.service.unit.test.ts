@@ -28,9 +28,7 @@ const row = (patch: unknown): TraceEditOverlayRow =>
   }) as TraceEditOverlayRow;
 
 const buildService = (stored: unknown | null) => {
-  const upsert = vi.fn(async ({ patch }: { patch: TraceEditOverlayPatch }) =>
-    row(patch),
-  );
+  const upsert = vi.fn(async ({ patch }: { patch: TraceEditOverlayPatch }) => row(patch));
   const deleteRow = vi.fn(async () => undefined);
   const repository = {
     tryFindByProjectAndTrace: vi.fn(async () => (stored ? row(stored) : null)),
@@ -85,9 +83,7 @@ describe("TraceEditOverlayService", () => {
         value: "the right answer",
       });
       expect(merged.patch.deletedSpanIds).toEqual(["span-noise"]);
-      expect(merged.patch.spans).toEqual([
-        { spanId: "span-1", name: "cleaned up" },
-      ]);
+      expect(merged.patch.spans).toEqual([{ spanId: "span-1", name: "cleaned up" }]);
       expect(upsert).toHaveBeenCalledTimes(1);
     });
   });
@@ -351,9 +347,7 @@ describe("TraceEditOverlayService", () => {
         const remaining = await removeOutput(service);
 
         expect(remaining?.patch.trace).toBeUndefined();
-        expect(remaining?.patch.spans).toEqual([
-          { spanId: "span-1", name: "cleaned up" },
-        ]);
+        expect(remaining?.patch.spans).toEqual([{ spanId: "span-1", name: "cleaned up" }]);
         expect(remaining?.patch.deletedSpanIds).toEqual(["span-noise"]);
         expect(deleteRow).not.toHaveBeenCalled();
         expect(upsert).toHaveBeenCalledWith({
@@ -519,9 +513,7 @@ describe("TraceEditOverlayService", () => {
           userId: "user-2",
         });
 
-        expect(remaining?.patch.spans).toEqual([
-          { spanId: "span-1", name: "cleaned up" },
-        ]);
+        expect(remaining?.patch.spans).toEqual([{ spanId: "span-1", name: "cleaned up" }]);
         expect(deleteRow).not.toHaveBeenCalled();
       });
 
@@ -546,9 +538,7 @@ describe("TraceEditOverlayService", () => {
           userId: "user-2",
         });
 
-        expect(remaining?.patch.spans).toEqual([
-          { spanId: "span-2", name: "cleaned up" },
-        ]);
+        expect(remaining?.patch.spans).toEqual([{ spanId: "span-2", name: "cleaned up" }]);
       });
 
       it("returns the trace to uncorrected when the field was the whole correction", async () => {

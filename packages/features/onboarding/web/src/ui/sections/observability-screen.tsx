@@ -3,10 +3,7 @@ import type React from "react";
 import { useMemo, useState } from "react";
 import { getRegistryEntry } from "./observability/codegen/registry";
 import type { FrameworkKey, PlatformKey } from "../../model/observability/types";
-import {
-  FRAMEWORKS_BY_PLATFORM,
-  PLATFORM_OPTIONS,
-} from "./observability/ui-options";
+import { FRAMEWORKS_BY_PLATFORM, PLATFORM_OPTIONS } from "./observability/ui-options";
 import { ApiIntegrationInfoCard } from "./observability/api-integration-info-card";
 import { DocsLinks } from "../blocks/observability/docs-links";
 import { FrameworkGrid } from "./observability/framework-grid";
@@ -34,10 +31,7 @@ export function ObservabilityScreen(): React.ReactElement {
   }, [selectedPlatform]);
 
   const selectedEntry = useMemo(() => {
-    return getRegistryEntry(
-      selectedPlatform,
-      hasFrameworks ? selectedFramework : undefined,
-    );
+    return getRegistryEntry(selectedPlatform, hasFrameworks ? selectedFramework : undefined);
   }, [selectedPlatform, selectedFramework, hasFrameworks]);
 
   return (

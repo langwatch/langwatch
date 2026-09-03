@@ -13,10 +13,7 @@
  * deleted / skip reason reported), not the shape of any message.
  */
 import { describe, expect, it, vi } from "vitest";
-import {
-  clusterTopicsForProject,
-  storeResults,
-} from "../topic-clustering-runner.intent";
+import { clusterTopicsForProject, storeResults } from "../topic-clustering-runner.intent";
 import { fakeRunnerDeps } from "./topic-clustering-runner.fixture";
 
 /** A full page of clusterable traces, well over the batch minimum of 10. */
@@ -44,9 +41,7 @@ describe("clusterTopicsForProject", () => {
         });
         // The deployment shape that triggers the bug: no clustering endpoint.
         return fakeRunnerDeps({
-          resolveClickHouseClient: vi
-            .fn()
-            .mockResolvedValue({ query: mockClickHouseQuery }),
+          resolveClickHouseClient: vi.fn().mockResolvedValue({ query: mockClickHouseQuery }),
           langevalsEndpoint: null,
         });
       };
@@ -92,9 +87,7 @@ describe("storeResults", () => {
 
       it("returns null so the caller can report a skip", async () => {
         const deps = fakeRunnerDeps();
-        await expect(
-          storeResults(deps, "proj-1", undefined, false),
-        ).resolves.toBeNull();
+        await expect(storeResults(deps, "proj-1", undefined, false)).resolves.toBeNull();
       });
     });
   });

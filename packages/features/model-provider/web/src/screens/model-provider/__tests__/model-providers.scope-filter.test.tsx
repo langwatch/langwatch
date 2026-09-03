@@ -114,7 +114,12 @@ const OTHER_TEAM_ROW = {
 
 function hostAt(query: Record<string, string | undefined>) {
   return new FakeModelProviderHost({
-    scope: { organizationId: "org-1", teamId: "team-1", projectId: "proj-1", projectSlug: "web-app" },
+    scope: {
+      organizationId: "org-1",
+      teamId: "team-1",
+      projectId: "proj-1",
+      projectSlug: "web-app",
+    },
     availableScopes: AVAILABLE,
     query,
   });

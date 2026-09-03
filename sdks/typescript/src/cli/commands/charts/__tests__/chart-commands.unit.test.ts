@@ -158,9 +158,7 @@ describe("createChartCommand()", () => {
 
   describe("when no statement is supplied", () => {
     it("refuses locally without calling the API", async () => {
-      await expect(
-        createChartCommand({ name: "No SQL" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createChartCommand({ name: "No SQL" })).rejects.toThrow(ProcessExitError);
       expect(mocks.create).not.toHaveBeenCalled();
     });
   });
@@ -169,9 +167,7 @@ describe("createChartCommand()", () => {
 describe("updateChartCommand()", () => {
   describe("when nothing is supplied to change", () => {
     it("refuses locally, matching the API's own refusal of an empty update", async () => {
-      await expect(updateChartCommand("chart-1", {})).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(updateChartCommand("chart-1", {})).rejects.toThrow(ProcessExitError);
       expect(mocks.update).not.toHaveBeenCalled();
     });
   });
@@ -223,9 +219,9 @@ describe("runChartCommand()", () => {
 
   describe("when only one of --start/--end is given", () => {
     it("refuses locally without calling the API", async () => {
-      await expect(
-        runChartCommand("chart-1", { start: "2026-08-01T00:00:00Z" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runChartCommand("chart-1", { start: "2026-08-01T00:00:00Z" })).rejects.toThrow(
+        ProcessExitError,
+      );
       expect(mocks.get).not.toHaveBeenCalled();
       expect(mocks.runQuery).not.toHaveBeenCalled();
     });
@@ -235,9 +231,9 @@ describe("runChartCommand()", () => {
     it("refuses locally, naming the offered steps, without calling the API", async () => {
       const errorSpy = vi.mocked(console.error);
 
-      await expect(
-        runChartCommand("chart-1", { granularity: "86400" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runChartCommand("chart-1", { granularity: "86400" })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(mocks.get).not.toHaveBeenCalled();
       expect(mocks.runQuery).not.toHaveBeenCalled();
@@ -305,9 +301,7 @@ describe("placeChartCommand()", () => {
 
   describe("when no dashboard id is given", () => {
     it("refuses locally without calling the API", async () => {
-      await expect(placeChartCommand("chart-1", {})).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(placeChartCommand("chart-1", {})).rejects.toThrow(ProcessExitError);
       expect(mocks.place).not.toHaveBeenCalled();
     });
   });
@@ -364,10 +358,7 @@ describe("the chart family while the workbench switch is off", () => {
   describe("when the platform answers every verb with lwql_not_enabled", () => {
     /** @scenario "Every CLI verb this slice adds refuses while the workbench switch is off, and writes nothing" */
     it("every verb exits non-zero, surfacing the refusal instead of swallowing it", async () => {
-      const flagOff = new ChartsApiError(
-        "Failed: lwql_not_enabled",
-        "workbench switch off",
-      );
+      const flagOff = new ChartsApiError("Failed: lwql_not_enabled", "workbench switch off");
       mocks.list.mockRejectedValue(flagOff);
       mocks.get.mockRejectedValue(flagOff);
       mocks.create.mockRejectedValue(flagOff);
@@ -384,10 +375,7 @@ describe("the chart family while the workbench switch is off", () => {
         ["update", () => updateChartCommand("chart-1", { name: "y" })],
         ["delete", () => deleteChartCommand("chart-1")],
         ["run", () => runChartCommand("chart-1", {})],
-        [
-          "place",
-          () => placeChartCommand("chart-1", { dashboardId: "dashboard-1" }),
-        ],
+        ["place", () => placeChartCommand("chart-1", { dashboardId: "dashboard-1" })],
         ["unplace", () => unplaceChartCommand("chart-1")],
       ];
 

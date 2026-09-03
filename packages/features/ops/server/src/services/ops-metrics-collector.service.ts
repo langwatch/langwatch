@@ -198,8 +198,7 @@ export function buildPipelineTree({
       if (!typeMap.has(normalized)) typeMap.set(normalized, new Map());
       if (jName) {
         const nameMap = typeMap.get(normalized)!;
-        if (!nameMap.has(jName))
-          nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
+        if (!nameMap.has(jName)) nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
       }
     }
   };
@@ -412,10 +411,7 @@ export class OpsMetricsCollector {
     // will keep collecting on schedule. Errors are caught inside collect().
     void this.collect();
     this.collectInterval = setInterval(() => this.collect(), METRICS_COLLECT_INTERVAL_MS);
-    this.discoveryInterval = setInterval(
-      () => this.discoverQueues(),
-      QUEUE_DISCOVERY_INTERVAL_MS,
-    );
+    this.discoveryInterval = setInterval(() => this.discoverQueues(), QUEUE_DISCOVERY_INTERVAL_MS);
     this.reconcileInterval = setInterval(
       () => this.reconcilePending(),
       PENDING_RECONCILE_INTERVAL_MS,
@@ -518,9 +514,7 @@ export class OpsMetricsCollector {
       totalPendingJobs += q.totalPendingJobs;
     }
 
-    const treeSeedKeys = [
-      ...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths]),
-    ];
+    const treeSeedKeys = [...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths])];
     const pipelineTree = buildPipelineTree({
       queues: fullQueues,
       seedKeys: treeSeedKeys,
@@ -564,9 +558,7 @@ export class OpsMetricsCollector {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    const queues: QueueSummaryInfo[] = fullQueues.map(
-      ({ groups: _groups, ...summary }) => summary,
-    );
+    const queues: QueueSummaryInfo[] = fullQueues.map(({ groups: _groups, ...summary }) => summary);
 
     const mem = process.memoryUsage();
 
@@ -705,9 +697,7 @@ export class OpsMetricsCollector {
           this.computeLatencyWindows(),
         ]);
 
-        const treeSeedKeys = [
-          ...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths]),
-        ];
+        const treeSeedKeys = [...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths])];
 
         const detail: DetailSnapshot = {
           version: SNAPSHOT_VERSION,
@@ -786,15 +776,11 @@ export class OpsMetricsCollector {
     const plan: Array<"minute" | "hour" | "all"> = [];
     for (const queueName of this.groupQueueNames) {
       for (let i = 0; i < 60; i++) {
-        pipeline.hgetall(
-          latencyMinuteBucketKey(queueName, nowMs - i * LATENCY_MINUTE_BUCKET_MS),
-        );
+        pipeline.hgetall(latencyMinuteBucketKey(queueName, nowMs - i * LATENCY_MINUTE_BUCKET_MS));
         plan.push("minute");
       }
       for (let i = 0; i < 168; i++) {
-        pipeline.hgetall(
-          latencyHourBucketKey(queueName, nowMs - i * LATENCY_HOUR_BUCKET_MS),
-        );
+        pipeline.hgetall(latencyHourBucketKey(queueName, nowMs - i * LATENCY_HOUR_BUCKET_MS));
         plan.push("hour");
       }
       pipeline.hgetall(latencyAllTimeKey(queueName));
@@ -1079,15 +1065,9 @@ export class OpsMetricsCollector {
       const state: PersistedMetricsState = JSON.parse(raw);
       if (state.version !== 3) return;
 
-      this.peakCompletedPerSec = Math.max(
-        this.peakCompletedPerSec,
-        state.peakCompletedPerSec,
-      );
+      this.peakCompletedPerSec = Math.max(this.peakCompletedPerSec, state.peakCompletedPerSec);
       this.peakFailedPerSec = Math.max(this.peakFailedPerSec, state.peakFailedPerSec);
-      this.peakIngestedPerSec = Math.max(
-        this.peakIngestedPerSec,
-        state.peakIngestedPerSec,
-      );
+      this.peakIngestedPerSec = Math.max(this.peakIngestedPerSec, state.peakIngestedPerSec);
       this.peakLatencyP50Ms = Math.max(this.peakLatencyP50Ms, state.peakLatencyP50Ms);
       this.peakLatencyP99Ms = Math.max(this.peakLatencyP99Ms, state.peakLatencyP99Ms);
 
@@ -1113,16 +1093,10 @@ export class OpsMetricsCollector {
       });
 
       // Monotonic lifetime totals: the larger is the later reading.
-      this.latestTotalCompleted = Math.max(
-        this.latestTotalCompleted,
-        state.latestTotalCompleted,
-      );
+      this.latestTotalCompleted = Math.max(this.latestTotalCompleted, state.latestTotalCompleted);
       this.latestTotalFailed = Math.max(this.latestTotalFailed, state.latestTotalFailed);
     } catch (err) {
-      logger.warn(
-        { error: err },
-        "Failed to restore persisted metrics state, starting fresh",
-      );
+      logger.warn({ error: err }, "Failed to restore persisted metrics state, starting fresh");
     }
   }
 
@@ -1141,12 +1115,7 @@ export class OpsMetricsCollector {
       latestTotalCompleted: this.latestTotalCompleted,
       latestTotalFailed: this.latestTotalFailed,
     };
-    await this.redis.set(
-      REDIS_STATE_KEY,
-      JSON.stringify(state),
-      "EX",
-      REDIS_STATE_TTL_SECONDS,
-    );
+    await this.redis.set(REDIS_STATE_KEY, JSON.stringify(state), "EX", REDIS_STATE_TTL_SECONDS);
   }
 
   private async getRedisInfo(): Promise<RedisInfo> {
@@ -1289,20 +1258,12 @@ export class OpsMetricsCollector {
         this.currentCompletedPerSec = Math.round((newCompleted / elapsed) * 100) / 100;
         this.currentFailedPerSec = Math.round((newFailed / elapsed) * 100) / 100;
 
-        const ingestedDelta =
-          totalInFlight - this.lastTotalInFlight + newCompleted + newFailed;
-        this.currentIngestedPerSec =
-          Math.round((Math.max(0, ingestedDelta) / elapsed) * 100) / 100;
+        const ingestedDelta = totalInFlight - this.lastTotalInFlight + newCompleted + newFailed;
+        this.currentIngestedPerSec = Math.round((Math.max(0, ingestedDelta) / elapsed) * 100) / 100;
 
-        this.peakCompletedPerSec = Math.max(
-          this.peakCompletedPerSec,
-          this.currentCompletedPerSec,
-        );
+        this.peakCompletedPerSec = Math.max(this.peakCompletedPerSec, this.currentCompletedPerSec);
         this.peakFailedPerSec = Math.max(this.peakFailedPerSec, this.currentFailedPerSec);
-        this.peakIngestedPerSec = Math.max(
-          this.peakIngestedPerSec,
-          this.currentIngestedPerSec,
-        );
+        this.peakIngestedPerSec = Math.max(this.peakIngestedPerSec, this.currentIngestedPerSec);
       }
 
       this.lastTotalInFlight = totalInFlight;

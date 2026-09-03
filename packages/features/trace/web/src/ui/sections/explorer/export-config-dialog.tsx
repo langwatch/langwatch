@@ -67,10 +67,7 @@ export function ExportConfigDialog({
               <Text fontWeight="medium" fontSize="sm">
                 Mode
               </Text>
-              <RadioGroup
-                value={mode}
-                onValueChange={({ value }) => setMode(value as ExportMode)}
-              >
+              <RadioGroup value={mode} onValueChange={({ value }) => setMode(value as ExportMode)}>
                 <VStack align="stretch" gap={2}>
                   <HStack gap={2}>
                     <Radio value="summary">Summary</Radio>

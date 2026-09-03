@@ -8,12 +8,7 @@ import {
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import {
-  buildBudgetFlags,
-  formatScope,
-  parseRoutingModeArg,
-  parseScopeArg,
-} from "./_shared";
+import { buildBudgetFlags, formatScope, parseRoutingModeArg, parseScopeArg } from "./_shared";
 import type { CommandResult } from "../../utils/output";
 
 export interface UpdateVirtualKeyOptions {
@@ -34,9 +29,7 @@ export interface UpdateVirtualKeyOptions {
   configFile?: string;
 }
 
-function parseConfig(
-  options: UpdateVirtualKeyOptions,
-): Record<string, unknown> | undefined {
+function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> | undefined {
   if (options.configJson) {
     try {
       return JSON.parse(options.configJson) as Record<string, unknown>;
@@ -84,9 +77,7 @@ export const updateVirtualKeyCommand = async (
       routingMode = parseRoutingModeArg(options.routingMode);
     }
   } catch (err) {
-    console.error(
-      chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`),
-    );
+    console.error(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`));
     process.exit(1);
   }
 

@@ -5,11 +5,11 @@ worked example is [`dataset.md`](./dataset.md).
 
 ## 1. What is there now
 
-| Package | Non-test files | Lines |
-| --- | --- | --- |
-| `server/src` | 40 | 7,106 |
-| `contract/src` | 14 | 2,402 |
-| `web/src` | 45 (+44 test files) | 13,906 |
+| Package        | Non-test files      | Lines  |
+| -------------- | ------------------- | ------ |
+| `server/src`   | 40                  | 7,106  |
+| `contract/src` | 14                  | 2,402  |
+| `web/src`      | 45 (+44 test files) | 13,906 |
 
 **33 operations**, declared at least four times each; the execution four are
 declared eight times.
@@ -104,14 +104,14 @@ Ten of the contract's 33 operations — `findOrCreateForWorkflow`,
 `listDspySteps`, `recordWorkbenchRunResults` — are not on `ExperimentApp` at
 all. They are reached through this getter from **eleven non-test call sites**:
 
-| Site | What it takes |
-| --- | --- |
-| `platform/app/src/server/routes/evaluations-legacy.ts:1534,1617` | `startExperimentRun`, `completeExperimentRun` |
-| `platform/app/src/server/routes/evaluations-legacy.ts:1493,1552,1581` | the service whole |
-| `platform/app/src/server/routes/experiments-v3.ts:652,773` | the service whole |
-| `platform/app/src/server/routes/misc.ts:481,662` | the service whole |
-| `platform/app/src/server/routes/langy-ui-actions.ts:136` | the service whole |
-| `platform/app/src/server/api-router.ts:335` | the service whole |
+| Site                                                                  | What it takes                                 |
+| --------------------------------------------------------------------- | --------------------------------------------- |
+| `platform/app/src/server/routes/evaluations-legacy.ts:1534,1617`      | `startExperimentRun`, `completeExperimentRun` |
+| `platform/app/src/server/routes/evaluations-legacy.ts:1493,1552,1581` | the service whole                             |
+| `platform/app/src/server/routes/experiments-v3.ts:652,773`            | the service whole                             |
+| `platform/app/src/server/routes/misc.ts:481,662`                      | the service whole                             |
+| `platform/app/src/server/routes/langy-ui-actions.ts:136`              | the service whole                             |
+| `platform/app/src/server/api-router.ts:335`                           | the service whole                             |
 
 So the facade's own docblock claim — "the one typed thing a transport is given"
 — is untrue for the run-execution half of the feature. The getter's comment
@@ -124,12 +124,12 @@ eleven.
 have to know, and did". Four tRPC procedures say otherwise — **342 of the
 transport's 1,046 lines (33%)** are orchestration the REST door cannot reach:
 
-| Procedure | Lines | What it orchestrates |
-| --- | --- | --- |
-| `copy` | `transport/api-trpc/experiment.api.ts:841-951` (111) | source-project permission probe, V2/V3 branch, workflow copy, version save, experiment save |
-| `saveExperiment` | `:258-355` (98) | draft naming, workflow lookup/creation, **dataset renaming to follow the experiment name** (293-315), version save, experiment save |
-| `getAllForEvaluationsList` | `:631-709` (79) | list + aggregate + workflow join |
-| `saveAsMonitor` | `:519-572` (54) | DSL parse, evaluator extraction, monitor upsert |
+| Procedure                  | Lines                                                | What it orchestrates                                                                                                                |
+| -------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `copy`                     | `transport/api-trpc/experiment.api.ts:841-951` (111) | source-project permission probe, V2/V3 branch, workflow copy, version save, experiment save                                         |
+| `saveExperiment`           | `:258-355` (98)                                      | draft naming, workflow lookup/creation, **dataset renaming to follow the experiment name** (293-315), version save, experiment save |
+| `getAllForEvaluationsList` | `:631-709` (79)                                      | list + aggregate + workflow join                                                                                                    |
+| `saveAsMonitor`            | `:519-572` (54)                                      | DSL parse, evaluator extraction, monitor upsert                                                                                     |
 
 `saveExperiment:293-315` walks `input.dsl.nodes`, filters dataset nodes, reads
 them through the app and renames each one whose name starts with the old
@@ -201,12 +201,12 @@ abstract class buys nothing at that seam either.
 
 ### P5 — `ExperimentClickHousePort` has one implementation, in the same package (R4)
 
-| Port | Implementations | Verdict |
-| --- | --- | --- |
-| `ExperimentDspyRetentionPort` (`ports/experiment-dspy-retention.port.ts:1`) | 1, in `platform/app` (`runtime/app/features/experiment.ts:11`) | **Keep** — cross-package inversion |
-| `ExperimentWorkbenchUpdatesPort` (`ports/experiment-workbench-updates.port.ts:3`) | 2 — noop in-package, `AppExperimentWorkbenchUpdatesAdapter` in `platform/app` | **Keep** |
-| `ExperimentExecutionPort` (`ports/experiment-execution.port.ts:13`) | 1 in-package (refuses), 1 structural in `platform/app` | **Keep the port, drop the optionality** — see P3 |
-| `ExperimentClickHousePort` (`ports/experiment-clickhouse.port.ts:28`) | 1 — `ExperimentClickHouseAdapter`, same package | **Delete** |
+| Port                                                                              | Implementations                                                               | Verdict                                          |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------ |
+| `ExperimentDspyRetentionPort` (`ports/experiment-dspy-retention.port.ts:1`)       | 1, in `platform/app` (`runtime/app/features/experiment.ts:11`)                | **Keep** — cross-package inversion               |
+| `ExperimentWorkbenchUpdatesPort` (`ports/experiment-workbench-updates.port.ts:3`) | 2 — noop in-package, `AppExperimentWorkbenchUpdatesAdapter` in `platform/app` | **Keep**                                         |
+| `ExperimentExecutionPort` (`ports/experiment-execution.port.ts:13`)               | 1 in-package (refuses), 1 structural in `platform/app`                        | **Keep the port, drop the optionality** — see P3 |
+| `ExperimentClickHousePort` (`ports/experiment-clickhouse.port.ts:28`)             | 1 — `ExperimentClickHouseAdapter`, same package                               | **Delete**                                       |
 
 `ExperimentClickHouseAdapter` (`adapters/experiment-clickhouse.adapter.ts:12-27`)
 is 27 lines whose whole job is to turn `(tenantId) => Promise<Client>` into an
@@ -227,12 +227,19 @@ declared the port, and "the first read would have thrown".
 
 ```ts
 // adapters/eventing.experiment-run-processing.adapter.ts:46-84  — used by pipelineRegistry.ts:1511
-ExperimentEventingAdapter.createStateRepository({ resolveClient, clickhouseEnabled, defaultRetentionDays })
-ExperimentEventingAdapter.createStateFoldStore(repository)     // :80-84, pure delegation
+ExperimentEventingAdapter.createStateRepository({
+  resolveClient,
+  clickhouseEnabled,
+  defaultRetentionDays,
+});
+ExperimentEventingAdapter.createStateFoldStore(repository); // :80-84, pure delegation
 
 // adapters/experiment-run-state-store.adapter.ts:20-44  — used by replay-runtime.adapter.ts:104
-ExperimentRunStateStoreAdapter.create({ type: "clickhouse", resolveClient, defaultRetentionDays })
-  .createFoldStore()                                            // :41-43, pure delegation
+ExperimentRunStateStoreAdapter.create({
+  type: "clickhouse",
+  resolveClient,
+  defaultRetentionDays,
+}).createFoldStore(); // :41-43, pure delegation
 ```
 
 Both end at `createExperimentRunStateFoldStore(new ExperimentRunStateRepositoryClickHouse(...))`.
@@ -304,14 +311,14 @@ Four files, 122 lines, none of which is a process:
 R1: repositories are `findAll` / `findById`; services are `getAll` / `getById`.
 Eleven repository methods break it:
 
-| File:line | Method |
-| --- | --- |
-| `repositories/experiment.repository.ts:55` | `getBySlugOrId` |
-| `repositories/experiment.repository.ts:56` | `tryGetRowState` |
-| `repositories/experiment.repository.ts:83` | `getWorkbenchState` |
-| `repositories/experiment.repository.ts:119` | `getWorkbenchVersion` |
+| File:line                                                  | Method                                                              |
+| ---------------------------------------------------------- | ------------------------------------------------------------------- |
+| `repositories/experiment.repository.ts:55`                 | `getBySlugOrId`                                                     |
+| `repositories/experiment.repository.ts:56`                 | `tryGetRowState`                                                    |
+| `repositories/experiment.repository.ts:83`                 | `getWorkbenchState`                                                 |
+| `repositories/experiment.repository.ts:119`                | `getWorkbenchVersion`                                               |
 | `repositories/experiment-run.repository.ts:13,14,17,21,22` | `list`, `getAggregates`, `getPage`, `tryGet`, `getWorkflowVersions` |
-| `repositories/experiment-dspy.repository.ts:10,11` | `list`, `tryGet` |
+| `repositories/experiment-dspy.repository.ts:10,11`         | `list`, `tryGet`                                                    |
 
 `getBySlugOrId` is the one detector hit in the feature, and the name is the
 symptom of something worse. Every other lookup on the service parses first:
@@ -353,14 +360,14 @@ naming and cohesion problem, not a correctness one.)
 
 The contract's own errors are exemplary; the transport does not use them:
 
-| `transport/api-trpc/experiment.api.ts` | Message |
-| --- | --- |
-| `:287` | `"Workflow not found"` |
-| `:551` | `"Experiment is not ready to be saved as a monitor"` |
-| `:594` | `"Either experimentId or experimentSlug must be provided"` |
-| `:862` | `"You do not have permission to manage evaluations in the source project"` |
-| `:884`, `:892` | `"Experiment workflow not found"` |
-| `:926` | `"Failed to create workflow"` |
+| `transport/api-trpc/experiment.api.ts` | Message                                                                    |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| `:287`                                 | `"Workflow not found"`                                                     |
+| `:551`                                 | `"Experiment is not ready to be saved as a monitor"`                       |
+| `:594`                                 | `"Either experimentId or experimentSlug must be provided"`                 |
+| `:862`                                 | `"You do not have permission to manage evaluations in the source project"` |
+| `:884`, `:892`                         | `"Experiment workflow not found"`                                          |
+| `:926`                                 | `"Failed to create workflow"`                                              |
 
 Each is a named cause the caller can act on, so each should be a `HandledError`
 with a `code`, a `codes.ts` entry and a `presentation.ts` entry. As written the
@@ -462,17 +469,17 @@ DELETED: ports/experiment-clickhouse.port.ts · adapters/experiment-clickhouse.a
 export class ExperimentService extends ExperimentServiceContract {
   static create(options: {
     database: ExperimentDatabase & Pick<PrismaClient, "workflowVersion">;
-    resolveClickHouseClient: ExperimentClickHouseResolver;   // the function, no port
+    resolveClickHouseClient: ExperimentClickHouseResolver; // the function, no port
     dspyRetention: ExperimentDspyRetentionPort;
-    execution: ExperimentExecutionPort;                       // required (P3)
-    updates: ExperimentWorkbenchUpdatesPort;                  // required (P3)
+    execution: ExperimentExecutionPort; // required (P3)
+    updates: ExperimentWorkbenchUpdatesPort; // required (P3)
     tupleParam: (values: string[]) => unknown;
     runHistoryTelemetry: ExperimentRunHistoryTelemetry;
     slugify: (value: string) => string;
     newId: () => string;
     now?: () => Date;
     references: ExperimentReferences;
-  }): ExperimentService
+  }): ExperimentService;
 }
 ```
 
@@ -494,13 +501,16 @@ production `never` throws and two silent no-ops that ship.
 export class ExperimentApp {
   /** The wizard save: names the draft, finds or creates its workflow, keeps its
    *  datasets named after it, writes the version, then saves the experiment. */
-  async saveFromWizard(input: {
-    projectId: string;
-    experimentId?: string;
-    workbenchState: unknown;
-    dsl: StudioWorkflow;
-    commitMessage?: string;
-  }, by: ExperimentCaller): Promise<Experiment>
+  async saveFromWizard(
+    input: {
+      projectId: string;
+      experimentId?: string;
+      workbenchState: unknown;
+      dsl: StudioWorkflow;
+      commitMessage?: string;
+    },
+    by: ExperimentCaller,
+  ): Promise<Experiment>;
 
   /** Copies an experiment into another project, with its workflow and,
    *  optionally, its datasets. The caller has already been authorised for BOTH
@@ -510,15 +520,15 @@ export class ExperimentApp {
     sourceProjectId: string;
     targetProjectId: string;
     copyDatasets?: boolean;
-  }): Promise<{ experiment: Experiment; workflow: { id: string } }>
+  }): Promise<{ experiment: Experiment; workflow: { id: string } }>;
 
   /** Publishes an experiment's real-time configuration as a monitor. */
-  async publishAsMonitor(input: { projectId: string; experimentId: string }): Promise<void>
+  async publishAsMonitor(input: { projectId: string; experimentId: string }): Promise<void>;
 }
 ```
 
 `transport/api-trpc/experiment.api.ts` drops from 1,046 to roughly 700 lines and
-holds parsing, the permission probe on the *second* project (which is genuinely
+holds parsing, the permission probe on the _second_ project (which is genuinely
 transport-shaped, `:852-865`), and the call. The dataset-renaming rule stops
 being reachable from one door only.
 
@@ -555,7 +565,7 @@ collision with `trace/server`.
 - **Every ClickHouse query.** Checked against
   `dev/docs/best_practices/clickhouse-queries.md`: `TenantId` is the first
   predicate in all nine (`clickhouse.experiment-run.repository.ts:213, 266, 279,
-  284, 338, 344, 366, 382, 433, 438, 586, 593`), dedup uses the IN-tuple form
+284, 338, 344, 366, 382, 433, 438, 586, 593`), dedup uses the IN-tuple form
   (`:281-287, 371-388, 435-441, 590-596`) not `LIMIT 1 BY`, the item and trace
   reads carry `OccurredAt` partition bounds on **both** the outer and inner
   scopes (`:369-370, 385-386, 588-589, 593-595`), and sort keys use
@@ -620,18 +630,18 @@ Six commits, each leaving the suite green.
 
 Symbols taken from `experiment-server`:
 
-| Symbol | External files |
-| --- | --- |
-| `handledErrorEnvelopeSchema` and 19 sibling REST schemas | 13 (re-exported wholesale by `apps/api/src/index.ts:102-125`) |
-| `createExperimentsRestApp` | 11 |
-| `ExperimentEventingAdapter` | 6 |
-| `ExperimentApp` | 5 |
-| `EXPERIMENT_RUN_EVENT_TYPES` | 4 |
-| `ExperimentTrpcApi`, `ExperimentTrpcContext`, `ExperimentTrpcPorts` | 3 |
-| `createExperimentRunProcessingPipeline`, `workbenchActorFrom` | 3 |
-| `PostgresExperimentAdapter` + `…Options`, `ExperimentDspyRetentionPort`, `ExperimentWorkbenchUpdatesPort`, `ExperimentRunStateStoreAdapter` | 2 each |
-| The four `ExperimentRunEventing*` aliases | 2 each |
-| `createBlankWorkbenchState` | 1 |
+| Symbol                                                                                                                                      | External files                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `handledErrorEnvelopeSchema` and 19 sibling REST schemas                                                                                    | 13 (re-exported wholesale by `apps/api/src/index.ts:102-125`) |
+| `createExperimentsRestApp`                                                                                                                  | 11                                                            |
+| `ExperimentEventingAdapter`                                                                                                                 | 6                                                             |
+| `ExperimentApp`                                                                                                                             | 5                                                             |
+| `EXPERIMENT_RUN_EVENT_TYPES`                                                                                                                | 4                                                             |
+| `ExperimentTrpcApi`, `ExperimentTrpcContext`, `ExperimentTrpcPorts`                                                                         | 3                                                             |
+| `createExperimentRunProcessingPipeline`, `workbenchActorFrom`                                                                               | 3                                                             |
+| `PostgresExperimentAdapter` + `…Options`, `ExperimentDspyRetentionPort`, `ExperimentWorkbenchUpdatesPort`, `ExperimentRunStateStoreAdapter` | 2 each                                                        |
+| The four `ExperimentRunEventing*` aliases                                                                                                   | 2 each                                                        |
+| `createBlankWorkbenchState`                                                                                                                 | 1                                                             |
 
 Zero external users: `ExperimentAppDependencies`, `ExperimentBroadcast`,
 `ExperimentCaller`, `ExperimentMonitorCascade`, `ExperimentWithRuns`,

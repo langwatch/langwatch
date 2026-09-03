@@ -68,11 +68,7 @@ export const renderTargetOutput = (result: unknown): string => {
   if (typeof result === "string") {
     return result;
   }
-  if (
-    typeof result === "number" ||
-    typeof result === "boolean" ||
-    typeof result === "bigint"
-  ) {
+  if (typeof result === "number" || typeof result === "boolean" || typeof result === "bigint") {
     return String(result);
   }
   if (typeof result === "object" && !Array.isArray(result)) {

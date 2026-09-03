@@ -21,11 +21,7 @@ export {
   redisBlobKey,
   redisBlobKeyPrefix,
 } from "./blobKeys";
-export {
-  BLOB_SWEEP_LUA,
-  BLOB_SWEEP_OUTCOMES,
-  type BlobSweepOutcome,
-} from "./blobSweepLua";
+export { BLOB_SWEEP_LUA, BLOB_SWEEP_OUTCOMES, type BlobSweepOutcome } from "./blobSweepLua";
 export type { BlobSweepReport, BlobSweepTally } from "./blobSweeper";
 export { BlobSweeper, BlobSweeper as GroupQueueBlobSweeper } from "./blobSweeper";
 export { CachedLuaScript, isNoScriptResult } from "./cachedLuaScript";

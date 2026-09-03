@@ -67,9 +67,7 @@ export class SsoConnectionService {
     private readonly ledger: SsoConnectionLedger,
   ) {}
 
-  async registerConnection(
-    input: RegisterConnectionCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async registerConnection(input: RegisterConnectionCommandData): Promise<SsoConnectionFact[]> {
     const data = registerConnectionCommandDataSchema.parse(input);
     return this.commit(
       { type: REGISTER_CONNECTION_COMMAND_TYPE, data },
@@ -77,9 +75,7 @@ export class SsoConnectionService {
     );
   }
 
-  async claimDomain(
-    input: ClaimDomainCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async claimDomain(input: ClaimDomainCommandData): Promise<SsoConnectionFact[]> {
     const data = claimDomainCommandDataSchema.parse(input);
     return this.commit(
       { type: CLAIM_DOMAIN_COMMAND_TYPE, data },
@@ -87,9 +83,7 @@ export class SsoConnectionService {
     );
   }
 
-  async approveDomainClaim(
-    input: ApproveDomainClaimCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async approveDomainClaim(input: ApproveDomainClaimCommandData): Promise<SsoConnectionFact[]> {
     const data = approveDomainClaimCommandDataSchema.parse(input);
     return this.commit(
       { type: APPROVE_DOMAIN_CLAIM_COMMAND_TYPE, data },
@@ -97,9 +91,7 @@ export class SsoConnectionService {
     );
   }
 
-  async rejectDomainClaim(
-    input: RejectDomainClaimCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async rejectDomainClaim(input: RejectDomainClaimCommandData): Promise<SsoConnectionFact[]> {
     const data = rejectDomainClaimCommandDataSchema.parse(input);
     return this.commit(
       { type: REJECT_DOMAIN_CLAIM_COMMAND_TYPE, data },
@@ -107,9 +99,7 @@ export class SsoConnectionService {
     );
   }
 
-  async discardConnection(
-    input: DiscardConnectionCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async discardConnection(input: DiscardConnectionCommandData): Promise<SsoConnectionFact[]> {
     const data = discardConnectionCommandDataSchema.parse(input);
     return this.commit(
       { type: DISCARD_CONNECTION_COMMAND_TYPE, data },
@@ -117,9 +107,7 @@ export class SsoConnectionService {
     );
   }
 
-  async requestVerification(
-    input: RequestVerificationCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async requestVerification(input: RequestVerificationCommandData): Promise<SsoConnectionFact[]> {
     const data = requestVerificationCommandDataSchema.parse(input);
     return this.commit(
       { type: REQUEST_VERIFICATION_COMMAND_TYPE, data },
@@ -130,9 +118,7 @@ export class SsoConnectionService {
   /** Tier 1's ceremony, in one verb: a platform operator states the domain is
    *  the organization's, and the connection is VERIFIED with nothing
    *  published anywhere. */
-  async attestDomain(
-    input: AttestDomainCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async attestDomain(input: AttestDomainCommandData): Promise<SsoConnectionFact[]> {
     const data = attestDomainCommandDataSchema.parse(input);
     return this.commit(
       { type: ATTEST_DOMAIN_COMMAND_TYPE, data },
@@ -140,9 +126,7 @@ export class SsoConnectionService {
     );
   }
 
-  async verifyDomain(
-    input: VerifyDomainCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async verifyDomain(input: VerifyDomainCommandData): Promise<SsoConnectionFact[]> {
     const data = verifyDomainCommandDataSchema.parse(input);
     return this.commit(
       { type: VERIFY_DOMAIN_COMMAND_TYPE, data },
@@ -150,9 +134,7 @@ export class SsoConnectionService {
     );
   }
 
-  async activateConnection(
-    input: ActivateConnectionCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async activateConnection(input: ActivateConnectionCommandData): Promise<SsoConnectionFact[]> {
     const data = activateConnectionCommandDataSchema.parse(input);
     return this.commit(
       { type: ACTIVATE_CONNECTION_COMMAND_TYPE, data },
@@ -160,9 +142,7 @@ export class SsoConnectionService {
     );
   }
 
-  async suspendConnection(
-    input: SuspendConnectionCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async suspendConnection(input: SuspendConnectionCommandData): Promise<SsoConnectionFact[]> {
     const data = suspendConnectionCommandDataSchema.parse(input);
     return this.commit(
       { type: SUSPEND_CONNECTION_COMMAND_TYPE, data },
@@ -170,9 +150,7 @@ export class SsoConnectionService {
     );
   }
 
-  async resumeConnection(
-    input: ResumeConnectionCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async resumeConnection(input: ResumeConnectionCommandData): Promise<SsoConnectionFact[]> {
     const data = resumeConnectionCommandDataSchema.parse(input);
     return this.commit(
       { type: RESUME_CONNECTION_COMMAND_TYPE, data },
@@ -180,9 +158,7 @@ export class SsoConnectionService {
     );
   }
 
-  async requestTeardown(
-    input: RequestTeardownCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async requestTeardown(input: RequestTeardownCommandData): Promise<SsoConnectionFact[]> {
     const data = requestTeardownCommandDataSchema.parse(input);
     return this.commit(
       { type: REQUEST_TEARDOWN_COMMAND_TYPE, data },
@@ -190,9 +166,7 @@ export class SsoConnectionService {
     );
   }
 
-  async completeTeardown(
-    input: CompleteTeardownCommandData,
-  ): Promise<SsoConnectionFact[]> {
+  async completeTeardown(input: CompleteTeardownCommandData): Promise<SsoConnectionFact[]> {
     const data = completeTeardownCommandDataSchema.parse(input);
     return this.commit(
       { type: COMPLETE_TEARDOWN_COMMAND_TYPE, data },

@@ -1,5 +1,8 @@
 import { PostgresIdentityGuardsAdapter } from "./postgres.identity-guards.adapter";
-import { createIdentityPipeline, type IdentityPipeline } from "./identity-pipeline-definition.adapter";
+import {
+  createIdentityPipeline,
+  type IdentityPipeline,
+} from "./identity-pipeline-definition.adapter";
 import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository";
 import { PrismaMfaEnrollmentProjectionRepository } from "../repositories/prisma/prisma.mfa-enrollment-projection.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

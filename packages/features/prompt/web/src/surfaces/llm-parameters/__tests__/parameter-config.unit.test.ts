@@ -119,12 +119,7 @@ describe("Parameter Config", () => {
     });
 
     it("handles reasoning model style parameters", () => {
-      const params = getDisplayParameters([
-        "reasoning",
-        "max_tokens",
-        "seed",
-        "tool_choice",
-      ]);
+      const params = getDisplayParameters(["reasoning", "max_tokens", "seed", "tool_choice"]);
       expect(params).toContain("reasoning");
       expect(params).toContain("max_tokens");
       expect(params).toContain("seed");

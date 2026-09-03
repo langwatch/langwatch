@@ -39,9 +39,7 @@ export const createCommand = async (
     try {
       columnTypes = parseColumns(options.columns);
     } catch (error) {
-      console.error(
-        chalk.red(error instanceof Error ? error.message : "Invalid columns format"),
-      );
+      console.error(chalk.red(error instanceof Error ? error.message : "Invalid columns format"));
       process.exit(1);
     }
   }

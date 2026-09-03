@@ -92,9 +92,7 @@ describe("resolving a retention floor for a read", () => {
      */
     /** @scenario "A retention lookup that fails falls back to the platform default" */
     it("uses the default when the provider returns a non-finite number", async () => {
-      const floor = await serviceWith(
-        providerReturning(Number.POSITIVE_INFINITY),
-      ).getFloorMs({
+      const floor = await serviceWith(providerReturning(Number.POSITIVE_INFINITY)).getFloorMs({
         table: "trace_summaries",
         tenantId: "project_infinite",
         nowMs: NOW,
@@ -223,9 +221,7 @@ describe("resolving a retention floor for a read", () => {
     /** @scenario "The retention lookup is not repeated for every read" */
     it("keeps one tenant's answer from being served to another", async () => {
       const provider: RetentionDaysProvider = {
-        getRetentionDays: vi.fn(async ({ tenantId }) =>
-          tenantId === "project_long" ? 400 : 10,
-        ),
+        getRetentionDays: vi.fn(async ({ tenantId }) => (tenantId === "project_long" ? 400 : 10)),
       };
       const service = serviceWith(provider);
 

@@ -45,9 +45,7 @@ function extractFrontmatter(filePath) {
 
     return {
       title: titleMatch ? titleMatch[1].replace(/^["']|["']$/g, "") : null,
-      description: descriptionMatch
-        ? descriptionMatch[1].replace(/^["']|["']$/g, "")
-        : null,
+      description: descriptionMatch ? descriptionMatch[1].replace(/^["']|["']$/g, "") : null,
     };
   } catch (err) {
     console.error(`Error reading frontmatter from ${filePath}: ${err.message}`);
@@ -204,9 +202,7 @@ function processImports(content, filePath) {
   // code and must survive inside ```code``` fences.
   modifiedContent = modifiedContent
     .split(/(```[\s\S]*?```)/g)
-    .map((segment) =>
-      segment.startsWith("```") ? segment : segment.replace(importRegex, ""),
-    )
+    .map((segment) => (segment.startsWith("```") ? segment : segment.replace(importRegex, "")))
     .join("");
 
   // Replace <Tab title="X"> with ### X

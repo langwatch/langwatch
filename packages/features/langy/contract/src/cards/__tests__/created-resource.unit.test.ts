@@ -114,9 +114,7 @@ describe("reading a create result as a created-resource card", () => {
     });
 
     it("records the outcome as unconfirmed rather than dropping the card", () => {
-      expect(
-        toCliToolResult({ resource: "scenario", verb: "create", payload: [] }),
-      ).toEqual({
+      expect(toCliToolResult({ resource: "scenario", verb: "create", payload: [] })).toEqual({
         kind: "card",
         card: "resourceCreated",
         payload: [],
@@ -170,9 +168,7 @@ describe("reading a create result as a created-resource card", () => {
     });
 
     it("records the outcome as unconfirmed", () => {
-      expect(
-        toCliToolResult({ resource: "prompt", verb: "create", payload: scaffold }),
-      ).toEqual({
+      expect(toCliToolResult({ resource: "prompt", verb: "create", payload: scaffold })).toEqual({
         kind: "card",
         card: "resourceCreated",
         payload: scaffold,
@@ -182,23 +178,29 @@ describe("reading a create result as a created-resource card", () => {
 
     it("confirms the create once a server id arrives beside the file path", () => {
       const pushed = { ...scaffold, id: "prompt_1" };
-      expect(
-        toCliToolResult({ resource: "prompt", verb: "create", payload: pushed }),
-      ).toEqual({ kind: "card", card: "resourceCreated", payload: pushed });
+      expect(toCliToolResult({ resource: "prompt", verb: "create", payload: pushed })).toEqual({
+        kind: "card",
+        card: "resourceCreated",
+        payload: pushed,
+      });
     });
   });
 
   describe("when the verb is not a create", () => {
     it("leaves an empty update result alone", () => {
-      expect(
-        toCliToolResult({ resource: "scenario", verb: "update", payload: {} }),
-      ).toEqual({ kind: "card", card: "resourceUpdated", payload: {} });
+      expect(toCliToolResult({ resource: "scenario", verb: "update", payload: {} })).toEqual({
+        kind: "card",
+        card: "resourceUpdated",
+        payload: {},
+      });
     });
 
     it("leaves an empty delete result alone", () => {
-      expect(
-        toCliToolResult({ resource: "scenario", verb: "delete", payload: {} }),
-      ).toEqual({ kind: "card", card: "resourceRemoved", payload: {} });
+      expect(toCliToolResult({ resource: "scenario", verb: "delete", payload: {} })).toEqual({
+        kind: "card",
+        card: "resourceRemoved",
+        payload: {},
+      });
     });
   });
 });

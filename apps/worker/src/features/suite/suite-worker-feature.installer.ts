@@ -1,9 +1,6 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { SuiteRunProcessingPipeline } from "@langwatch/suite-server";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**

@@ -42,9 +42,7 @@ export const listGatewayBudgetsCommand = async (
     const requested = options.scopeType
       .split(",")
       .map((s) => s.trim().toLowerCase().replace(/-/g, "_"));
-    const invalid = requested.filter(
-      (s) => !(SCOPE_KINDS as readonly string[]).includes(s),
-    );
+    const invalid = requested.filter((s) => !(SCOPE_KINDS as readonly string[]).includes(s));
     if (invalid.length > 0) {
       console.error(
         chalk.red(
@@ -89,8 +87,7 @@ export const listGatewayBudgetsCommand = async (
           const limit = Number.parseFloat(b.limit_usd);
           // Null spend means it could not be totalled. Parsing null as 0
           // would render an unknown as a confident "$0.00 spent".
-          const spent =
-            b.spent_usd === null ? Number.NaN : Number.parseFloat(b.spent_usd);
+          const spent = b.spent_usd === null ? Number.NaN : Number.parseFloat(b.spent_usd);
           // `group` rows: limit is the PER-MEMBER allowance while spent sums
           // the whole group, so utilization compares against limit x members.
           const isGroup = b.scope_type === "group";

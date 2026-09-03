@@ -23,10 +23,7 @@ interface CursorInfo {
 /**
  * Safely parses a URL query parameter to a number with fallback
  */
-const parseQueryNumber = (
-  value: string | string[] | undefined,
-  fallback: number,
-): number => {
+const parseQueryNumber = (value: string | string[] | undefined, fallback: number): number => {
   if (typeof value === "string") {
     const parsed = parseInt(value, 10);
     return isNaN(parsed) ? fallback : parsed;

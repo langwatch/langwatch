@@ -152,9 +152,9 @@ describe("GatewayBudgetTrpcApi.list for a per-person template", () => {
   describe("given a template nobody has used yet", () => {
     /** @scenario "A per-person template nobody has used yet says so instead of showing a dash" */
     it("reports zero seen and zero over", async () => {
-      const { budgets } = await callerFor([
-        template({ endUsersSeen: 0, endUsersOver: 0 }),
-      ]).list({ organizationId: ORG_ID });
+      const { budgets } = await callerFor([template({ endUsersSeen: 0, endUsersOver: 0 })]).list({
+        organizationId: ORG_ID,
+      });
 
       expect(budgets[0]?.endUsersSeen).toBe(0);
       expect(budgets[0]?.endUsersOver).toBe(0);

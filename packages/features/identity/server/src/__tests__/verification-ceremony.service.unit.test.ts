@@ -57,8 +57,7 @@ function harness(options?: {
 }) {
   const store = new InMemoryVerificationStore();
   const verifyIdentifier = vi.fn(
-    async (_data: VerifyIdentifierCommandData): Promise<unknown[]> =>
-      options?.emits?.() ?? [],
+    async (_data: VerifyIdentifierCommandData): Promise<unknown[]> => options?.emits?.() ?? [],
   );
   const service = new VerificationCeremonyService(
     store,
@@ -173,9 +172,7 @@ describe("the email verification ceremony", () => {
       await expect(complete()).rejects.toMatchObject({
         code: "identity_email_in_use",
       });
-      expect(store.records.get(WORK)?.verificationId).toBe(
-        minted.verificationId,
-      );
+      expect(store.records.get(WORK)?.verificationId).toBe(minted.verificationId);
 
       // The proof outlived the refusal, so the very same link completes once
       // the collision is gone.

@@ -71,8 +71,7 @@ describe("poison-guard timing invariants", () => {
       it("refreshes the beacon often enough to survive a lost write or two", () => {
         // A single failed refresh must not expire a live worker's beacon, or
         // ordinary Redis noise starts booking deaths against healthy workers.
-        const refreshesPerTtl =
-          (WORKER_LIVENESS_TTL_SECONDS * 1000) / WORKER_LIVENESS_REFRESH_MS;
+        const refreshesPerTtl = (WORKER_LIVENESS_TTL_SECONDS * 1000) / WORKER_LIVENESS_REFRESH_MS;
 
         expect(refreshesPerTtl).toBeGreaterThanOrEqual(3);
       });
@@ -169,9 +168,7 @@ describe("GroupQueueProcessor worker liveness beacon", () => {
             await publishGate;
           },
         );
-        vi.spyOn(GroupStagingScripts.prototype, "retireWorker").mockResolvedValue(
-          undefined,
-        );
+        vi.spyOn(GroupStagingScripts.prototype, "retireWorker").mockResolvedValue(undefined);
 
         const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
           consumerEnabled: true,

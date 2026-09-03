@@ -35,9 +35,7 @@ export const createTriggerCommand = async (
   ];
   if (!validActions.includes(options.action)) {
     reportCommandError({
-      error: commandValidationError(
-        `--action must be one of: ${validActions.join(", ")}`,
-      ),
+      error: commandValidationError(`--action must be one of: ${validActions.join(", ")}`),
     });
     process.exit(1);
   }
@@ -93,9 +91,7 @@ export const createTriggerCommand = async (
         console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
         console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
         if (trigger.platformUrl) {
-          console.log(
-            `  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`,
-          );
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`);
         }
         console.log();
       },

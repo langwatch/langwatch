@@ -96,9 +96,7 @@ describe("ES pipeline metrics", () => {
     });
 
     it("registers es_fold_cache_store_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "es_fold_cache_store_duration_milliseconds",
-      );
+      const metric = register.getSingleMetric("es_fold_cache_store_duration_milliseconds");
       expect(metric).toBeDefined();
     });
 
@@ -150,9 +148,7 @@ describe("ES pipeline metrics", () => {
     it("records command duration with correct labels", async () => {
       observeEsCommandDuration("test-pipeline", "StartRun", 42.5);
 
-      const lines = await register.getSingleMetricAsString(
-        "es_command_duration_milliseconds",
-      );
+      const lines = await register.getSingleMetricAsString("es_command_duration_milliseconds");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('command_type="StartRun"');
     });
@@ -313,9 +309,7 @@ describe("ES pipeline metrics", () => {
         durationMs: 12,
       });
 
-      const processTotals = await register.getSingleMetricAsString(
-        "es_process_manager_total",
-      );
+      const processTotals = await register.getSingleMetricAsString("es_process_manager_total");
       expect(processTotals).toContain('input_kind="event"');
       for (const outcome of outcomes) {
         expect(processTotals).toContain(`outcome="${outcome}"`);
@@ -327,9 +321,7 @@ describe("ES pipeline metrics", () => {
       expect(processDurations).toContain('process_name="langy-conversation"');
       expect(processDurations).toContain('input_kind="wake"');
 
-      const outboxTotals = await register.getSingleMetricAsString(
-        "es_process_outbox_total",
-      );
+      const outboxTotals = await register.getSingleMetricAsString("es_process_outbox_total");
       expect(outboxTotals).toContain('intent_type="worker-dispatch"');
       for (const status of outboxStatuses) {
         expect(outboxTotals).toContain(`status="${status}"`);
@@ -356,9 +348,7 @@ describe("ES pipeline metrics", () => {
     it("records subscriber duration with correct labels", async () => {
       observeEsReactorDuration("test-pipeline", "evaluationTrigger", 150.0);
 
-      const lines = await register.getSingleMetricAsString(
-        "es_reactor_duration_milliseconds",
-      );
+      const lines = await register.getSingleMetricAsString("es_reactor_duration_milliseconds");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('reactor_name="evaluationTrigger"');
     });
@@ -402,9 +392,7 @@ describe("ES pipeline metrics", () => {
       incrementEsFoldCacheRedisError("traceSummary", "get");
       incrementEsFoldCacheRedisError("traceSummary", "set");
 
-      const lines = await register.getSingleMetricAsString(
-        "es_fold_cache_redis_error_total",
-      );
+      const lines = await register.getSingleMetricAsString("es_fold_cache_redis_error_total");
       expect(lines).toContain('projection_name="traceSummary"');
       expect(lines).toContain('operation="get"');
       expect(lines).toContain('operation="set"');

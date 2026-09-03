@@ -105,9 +105,7 @@ describe("EventingAuthzAuditAdapter", () => {
    * @scenario "A grant an automated surface made still reaches the audit trail"
    */
   it.each(
-    GRANT_EVENT_SOURCES.filter(
-      (source) => !["migration", "read-through-mint"].includes(source),
-    ),
+    GRANT_EVENT_SOURCES.filter((source) => !["migration", "read-through-mint"].includes(source)),
   )("still writes a row for %s", async (source) => {
     const store = new RecordingAuditTrailStore();
     const adapter = EventingAuthzAuditAdapter.create({ store });

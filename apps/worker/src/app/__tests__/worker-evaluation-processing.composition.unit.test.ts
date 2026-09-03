@@ -179,7 +179,9 @@ function processingOptions(
   return {
     resolveClickHouseClient: (async () => {
       throw new Error("no ClickHouse in this test");
-    }) as unknown as Parameters<typeof createWorkerEvaluationProcessing>[0]["resolveClickHouseClient"],
+    }) as unknown as Parameters<
+      typeof createWorkerEvaluationProcessing
+    >[0]["resolveClickHouseClient"],
     defaultRetentionDays: 49,
     analytics,
     traces: {} as unknown as Parameters<typeof createWorkerEvaluationProcessing>[0]["traces"],
@@ -200,7 +202,9 @@ function executeHandler(definition: {
     throw new Error("executeEvaluation is not registered with an instance");
   }
 
-  return registered.handlerInstance as { handle(command: unknown): Promise<Array<{ type: string }>> };
+  return registered.handlerInstance as {
+    handle(command: unknown): Promise<Array<{ type: string }>>;
+  };
 }
 
 function command(): ExecuteEvaluationCommandData {
@@ -235,9 +239,9 @@ describe("given the worker composes evaluation processing", () => {
       const definition = capability.buildProcessing();
 
       expect(reported).toEqual(["execution"]);
-      await expect(
-        executeHandler(definition as never).handle({ data: command() }),
-      ).rejects.toThrow(/cannot run evaluator langevals\/basic/);
+      await expect(executeHandler(definition as never).handle({ data: command() })).rejects.toThrow(
+        /cannot run evaluator langevals\/basic/,
+      );
     });
   });
 

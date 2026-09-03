@@ -17,11 +17,7 @@ import type {
   SpanStorageRepository,
   TraceEventRollupParams,
 } from "../repositories/span-storage.repository";
-import type {
-  SpanResourceInfo,
-  SpanSummaryRow,
-  TraceEventRollup,
-} from "@langwatch/trace-contract";
+import type { SpanResourceInfo, SpanSummaryRow, TraceEventRollup } from "@langwatch/trace-contract";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { redactSpanContent } from "./trace-visibility-window.service";

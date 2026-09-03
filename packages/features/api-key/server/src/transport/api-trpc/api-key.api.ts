@@ -228,10 +228,7 @@ export class ApiKeyTrpcApi {
         allow: { organizationId: "creating API key for user's own org" },
       })(procedure.input(createInputSchema)).mutation(async ({ ctx, input }) => {
         const actor = ctx.actor();
-        const { token, apiKey, assignedToUserId } = await ctx.app.apiKeys.createKey(
-          input,
-          actor,
-        );
+        const { token, apiKey, assignedToUserId } = await ctx.app.apiKeys.createKey(input, actor);
 
         // The token is deliberately absent from the audit arguments: only the
         // key's identity and shape are recorded, never its secret.

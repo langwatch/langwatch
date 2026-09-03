@@ -54,13 +54,7 @@ export class ClickHouseQueryClient {
   private readonly limiter: ConcurrencyLimiter | undefined;
   private readonly retries: RetryPolicy | undefined;
 
-  constructor({
-    driver,
-    tenantGuard,
-    tracer,
-    limiter,
-    retries,
-  }: ClickHouseQueryClientOptions) {
+  constructor({ driver, tenantGuard, tracer, limiter, retries }: ClickHouseQueryClientOptions) {
     this.driver = driver;
     this.tenantGuard = tenantGuard;
     this.tracer = tracer;
@@ -90,8 +84,6 @@ export class ClickHouseQueryClient {
         ? withRetries()
         : this.limiter.run({ task: withRetries, signal: request.signal });
 
-    return this.tracer === undefined
-      ? withSlot()
-      : this.tracer.trace({ request, task: withSlot });
+    return this.tracer === undefined ? withSlot() : this.tracer.trace({ request, task: withSlot });
   }
 }

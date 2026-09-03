@@ -21,11 +21,7 @@ type DeltaQueryCall = {
   };
 };
 
-const node = (
-  spanId: string,
-  startTimeMs: number,
-  updatedAtMs = startTimeMs,
-): SpanTreeNode => ({
+const node = (spanId: string, startTimeMs: number, updatedAtMs = startTimeMs): SpanTreeNode => ({
   spanId,
   parentSpanId: null,
   name: spanId,
@@ -76,10 +72,7 @@ vi.mock("../../../trace-api", () => ({
     }),
     tracesV2: {
       spanTreeDelta: {
-        useQuery: (
-          input: DeltaQueryCall["input"],
-          options: DeltaQueryCall["options"],
-        ) => {
+        useQuery: (input: DeltaQueryCall["input"], options: DeltaQueryCall["options"]) => {
           capturedDeltaCalls.push({ input, options });
           // The merge effect keys on `dataUpdatedAt` (the RQ5 replacement for
           // onSuccess), so a delivered delta must carry a non-zero timestamp.
@@ -157,10 +150,7 @@ describe("useSpanTree", () => {
     it("keys and fetches the shared paged span-tree entry without its own poll interval", () => {
       renderHook(() => useSpanTree());
 
-      expect(lastTreeOptions().queryKey).toEqual([
-        "spanTree",
-        { projectId: "p1", traceId: "t1" },
-      ]);
+      expect(lastTreeOptions().queryKey).toEqual(["spanTree", { projectId: "p1", traceId: "t1" }]);
       expect(lastTreeOptions().queryFn).toBe(QUERY_FN_MARKER);
       expect(lastTreeOptions().enabled).toBe(true);
       expect(lastTreeOptions().refetchInterval).toBeUndefined();

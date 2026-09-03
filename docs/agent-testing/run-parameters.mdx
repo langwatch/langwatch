@@ -43,7 +43,11 @@ Each run records the values it used, so every result shows which plan it tested.
 
 Open the scenario and click **Parameters**, next to **Labels** at the bottom of the editor. Add one row per parameter: a name, an optional description, and an optional default value.
 
-<img src="/images/agent-testing/scenario-parameters-form.png" alt="The scenario editor with the parameters dialog open over it, declaring a fixture parameter with a description and a default value, referenced as params.fixture in the situation and criteria" width="100%" />
+<img
+  src="/images/agent-testing/scenario-parameters-form.png"
+  alt="The scenario editor with the parameters dialog open over it, declaring a fixture parameter with a description and a default value, referenced as params.fixture in the situation and criteria"
+  width="100%"
+/>
 
 - **Name** is what `{{ params.NAME }}` reads. Letters, digits and underscores, and the first character is a letter or an underscore.
 - **Description** appears beside the field when someone starts a run.
@@ -74,6 +78,7 @@ A [connected agent](/agent-testing/connect-your-agent) declares its parameters i
     ) -> str:
         ...
     ```
+
   </Tab>
   <Tab title="TypeScript">
     ```typescript
@@ -98,6 +103,7 @@ A [connected agent](/agent-testing/connect-your-agent) declares its parameters i
     `z.enum` becomes a closed option list, `.default()` the default, `.describe()` the description, and `z.number()` or `z.boolean()` the type. Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
 
     valibot and arktype work the same way, and so does any other Standard Schema object that carries a JSON Schema converter. For a project with no schema library, `parameters` also takes a definition map (`{ model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } }`) or a plain JSON Schema object.
+
   </Tab>
 </Tabs>
 
@@ -137,13 +143,13 @@ A scenario with no declared parameters is not a template. Its text does not rend
 
 ## Use the values in the target
 
-| Target | Reads a value as |
-|---|---|
+| Target              | Reads a value as                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------ |
 | **Connected agent** | A keyword argument of the decorated function (Python), or a field of `params` (TypeScript) |
-| **HTTP agent** | `{{ params.NAME }}` in the URL, the header values and the body template |
-| **Prompt** | `{{ params.NAME }}` in the prompt template |
-| **Code agent** | `params.NAME` in the Python code |
-| **Workflow** | One entry input per parameter |
+| **HTTP agent**      | `{{ params.NAME }}` in the URL, the header values and the body template                    |
+| **Prompt**          | `{{ params.NAME }}` in the prompt template                                                 |
+| **Code agent**      | `params.NAME` in the Python code                                                           |
+| **Workflow**        | One entry input per parameter                                                              |
 
 ### Connected agents
 
@@ -171,7 +177,11 @@ https://api.your-company.internal/{{ params.region }}/chat
 }
 ```
 
-<img src="/images/agent-testing/scenario-parameters-body-template.png" alt="The HTTP agent body template editor referencing params.fixture, with the available variables hint listing params.NAME" width="100%" />
+<img
+  src="/images/agent-testing/scenario-parameters-body-template.png"
+  alt="The HTTP agent body template editor referencing params.fixture, with the available variables hint listing params.NAME"
+  width="100%"
+/>
 
 Auth fields read project secrets, not parameters. See [Testing agents behind authentication](/agent-testing/authenticated-agents#referencing-project-secrets-from-an-http-target).
 
@@ -211,7 +221,9 @@ The sandbox injects `params` into the module globals. Do not import a module nam
 A workflow target receives the values as entry inputs, one entry input per parameter name.
 
 <Note>
-  A parameter reaches a downstream node only if the entry node has an edge carrying it. Adding a parameter to the run does not add the edge. Open the workflow and connect the new entry field to the node that reads it.
+  A parameter reaches a downstream node only if the entry node has an edge carrying it. Adding a
+  parameter to the run does not add the edge. Open the workflow and connect the new entry field to
+  the node that reads it.
 </Note>
 
 Entry inputs arrive as strings. A code node inside the workflow reads `params.NAME` with the original type.
@@ -224,7 +236,11 @@ A value set at run time overrides the scenario's default. A parameter with no ru
 
 Running a test suite opens a confirmation dialog with one field per parameter, prefilled with the defaults. Edit a field to change the value for that run; the scenario keeps its defaults.
 
-<img src="/images/agent-testing/scenario-parameters-run-dialog.png" alt="The test suite run confirmation dialog with a Parameters block, the fixture field prefilled from the scenario's default value" width="100%" />
+<img
+  src="/images/agent-testing/scenario-parameters-run-dialog.png"
+  alt="The test suite run confirmation dialog with a Parameters block, the fixture field prefilled from the scenario's default value"
+  width="100%"
+/>
 
 The **Save and Run** button in the scenario editor skips the dialog and runs with the defaults. To change a value, start the run from the test suite in **Agent Testing > Scenarios**.
 
@@ -288,12 +304,13 @@ import langwatch
 langwatch.setup()
 
 result = langwatch.test_suites.run(
-    "suite_abc123",
-    targets=[{"type": "http", "referenceId": "agent_abc123"}],
-    parameters={"plan": "enterprise", "region": "eu-central"},
+"suite_abc123",
+targets=[{"type": "http", "referenceId": "agent_abc123"}],
+parameters={"plan": "enterprise", "region": "eu-central"},
 )
 print(result["batchRunId"])
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -306,7 +323,8 @@ const result = await langwatch.testSuites.run("suite_abc123", {
   parameters: { plan: "enterprise", region: "eu-central" },
 });
 console.log(result.batchRunId);
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -337,35 +355,36 @@ The run records the name `api_token`. The value stays encrypted until the platfo
 A run value takes the place of a project secret of the same name, for that run only. The project secret keeps its value for every other run.
 
 <Warning>
-  A secret is hidden in the record of the run, not in the conversation. When the agent under test repeats the value in its own answer, that answer is conversation content and the run stores it.
+  A secret is hidden in the record of the run, not in the conversation. When the agent under test
+  repeats the value in its own answer, that answer is conversation content and the run stores it.
 </Warning>
 
 Also check: [Testing agents behind authentication](/agent-testing/authenticated-agents), for a credential that stays the same across runs.
 
 ## Limits
 
-| Limit | Value |
-|---|---|
-| Parameters declared on one scenario | 20 |
-| Parameters declared by one agent | 20 |
-| Options in one closed list | 50 |
-| Names one run supplies values for | 50 |
-| All of a run's values together | 16 kilobytes |
-| One string value | 4096 characters |
-| Parameter name | 64 characters |
-| Parameter description | 500 characters |
+| Limit                               | Value           |
+| ----------------------------------- | --------------- |
+| Parameters declared on one scenario | 20              |
+| Parameters declared by one agent    | 20              |
+| Options in one closed list          | 50              |
+| Names one run supplies values for   | 50              |
+| All of a run's values together      | 16 kilobytes    |
+| One string value                    | 4096 characters |
+| Parameter name                      | 64 characters   |
+| Parameter description               | 500 characters  |
 
 ## When a run is rejected
 
-| Error | What happened | What to do |
-|---|---|---|
-| `scenario_parameter_unknown` | The run set a name that neither a scenario in the run nor the target's agent declares, usually a spelling error. The message lists the rejected key, the target it was rejected for, and the accepted names. | Correct the spelling, or declare the parameter on the scenario or on the agent that reads it. |
-| `scenario_parameter_option_invalid` | A value is outside the closed option list its declaration carries. The message names the parameter and lists the accepted values. | Use one of the listed values, or widen the option list where it is declared. |
-| `scenario_parameter_missing` | The situation or a criterion reads a name with no value: the run set none and the scenario has no default. The message names the parameter and the field. | Set a value for the run, or give the parameter a default. |
-| `scenario_parameter_template_invalid` | A field references a parameter in a form that cannot be rendered. | Write the reference as `{{ params.name }}`. |
-| `scenario_secret_parameter_missing` | A scenario declares a secret parameter and the run set no value for it. A secret has no default, so the run cannot fall back. | Set the value when you start the run. |
-| `scenario_secret_parameter_in_text` | The situation or a criterion reads a secret parameter. Scenario text is recorded with the run, so it cannot carry a secret. | Read the value from the target instead, as `{{ secrets.NAME }}`. |
-| `scenario_secret_parameter_conflict` | One scenario in the run declares the name as secret and another declares it as plain. | Give the two parameters different names, or make both declarations agree. |
+| Error                                 | What happened                                                                                                                                                                                                | What to do                                                                                    |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `scenario_parameter_unknown`          | The run set a name that neither a scenario in the run nor the target's agent declares, usually a spelling error. The message lists the rejected key, the target it was rejected for, and the accepted names. | Correct the spelling, or declare the parameter on the scenario or on the agent that reads it. |
+| `scenario_parameter_option_invalid`   | A value is outside the closed option list its declaration carries. The message names the parameter and lists the accepted values.                                                                            | Use one of the listed values, or widen the option list where it is declared.                  |
+| `scenario_parameter_missing`          | The situation or a criterion reads a name with no value: the run set none and the scenario has no default. The message names the parameter and the field.                                                    | Set a value for the run, or give the parameter a default.                                     |
+| `scenario_parameter_template_invalid` | A field references a parameter in a form that cannot be rendered.                                                                                                                                            | Write the reference as `{{ params.name }}`.                                                   |
+| `scenario_secret_parameter_missing`   | A scenario declares a secret parameter and the run set no value for it. A secret has no default, so the run cannot fall back.                                                                                | Set the value when you start the run.                                                         |
+| `scenario_secret_parameter_in_text`   | The situation or a criterion reads a secret parameter. Scenario text is recorded with the run, so it cannot carry a secret.                                                                                  | Read the value from the target instead, as `{{ secrets.NAME }}`.                              |
+| `scenario_secret_parameter_conflict`  | One scenario in the run declares the name as secret and another declares it as plain.                                                                                                                        | Give the two parameters different names, or make both declarations agree.                     |
 
 The platform runs these checks before it schedules any jobs. A rejected run schedules no job at all.
 
@@ -374,7 +393,11 @@ The platform runs these checks before it schedules any jobs. A rejected run sche
 - The run detail drawer shows the values under **Parameters**, one row per name. A secret parameter appears as its name with a masked value.
 - The CSV export writes them as one JSON object per run: the `parameters` column in a criteria export, the `run_parameters` column in a full export. Secret parameters are left out.
 
-<img src="/images/agent-testing/scenario-parameters-run-drawer.png" alt="The simulation run detail drawer with the Parameters section showing the resolved value the run used, next to the rendered criteria and the judge's verdict" width="100%" />
+<img
+  src="/images/agent-testing/scenario-parameters-run-drawer.png"
+  alt="The simulation run detail drawer with the Parameters section showing the resolved value the run used, next to the rendered criteria and the judge's verdict"
+  width="100%"
+/>
 
 ## Next steps
 

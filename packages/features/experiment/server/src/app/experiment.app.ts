@@ -194,9 +194,7 @@ export class ExperimentApp {
   }
 
   /** One experiment's id and slug, for a caller that holds only the slug. */
-  tryGetIdBySlug(
-    input: ExperimentSlugLookup,
-  ): Promise<{ id: string; slug: string } | null> {
+  tryGetIdBySlug(input: ExperimentSlugLookup): Promise<{ id: string; slug: string } | null> {
     return this.dependencies.experiments.tryGetIdBySlug(input);
   }
 
@@ -443,9 +441,7 @@ export class ExperimentApp {
   // ── Datasets ───────────────────────────────────────────────────
 
   /** The named datasets of one project. */
-  getDatasets(
-    input: Readonly<{ projectId: string; datasetIds: string[] }>,
-  ): Promise<Dataset[]> {
+  getDatasets(input: Readonly<{ projectId: string; datasetIds: string[] }>): Promise<Dataset[]> {
     return this.dependencies.dataset.getByIds(input);
   }
 

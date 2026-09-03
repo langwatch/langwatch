@@ -34,11 +34,7 @@ const DEFAULT_MAX_VISIBLE = 6;
  * switch — service, origin, scenario link, prompts, sdk, etc. all flow
  * through here.
  */
-export function ChipBar({
-  chips,
-  maxVisible = DEFAULT_MAX_VISIBLE,
-  endSlot,
-}: ChipBarProps) {
+export function ChipBar({ chips, maxVisible = DEFAULT_MAX_VISIBLE, endSlot }: ChipBarProps) {
   const { primary, overflowChip } = splitChipsForOverflow(chips, maxVisible);
 
   return (

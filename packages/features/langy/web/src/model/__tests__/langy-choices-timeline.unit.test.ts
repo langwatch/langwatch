@@ -37,10 +37,7 @@ describe("langyChoicesTimeline", () => {
           parts: [{ type: "text", text: "Which one?" }, questionPart("q1")],
         },
       ]);
-      expect(timeline).toEqual([
-        { kind: "message" },
-        { kind: "question", blockId: "q1" },
-      ]);
+      expect(timeline).toEqual([{ kind: "message" }, { kind: "question", blockId: "q1" }]);
       // Its own prose never supersedes its own question.
       expect(deriveLangyChoicesLockState({ blockId: "q1", timeline })).toEqual({
         status: "open",

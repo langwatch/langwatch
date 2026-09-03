@@ -186,8 +186,7 @@ export function TargetPicker({
         borderColor="border"
       >
         <Text fontSize="xs" color="fg.muted">
-          {selectedTargets.length - (archivedTargets?.length ?? 0)} of {totalCount}{" "}
-          selected
+          {selectedTargets.length - (archivedTargets?.length ?? 0)} of {totalCount} selected
         </Text>
         <HStack gap={2}>
           <Button size="xs" variant="ghost" onClick={onSelectAll}>

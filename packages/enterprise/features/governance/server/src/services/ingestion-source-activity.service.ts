@@ -15,8 +15,7 @@ import type {
 import type { ActivityMonitorRepository } from "../ports/ingestion-source-activity.port";
 
 export class ActivityMonitorService {
-  private constructor(private readonly repository: ActivityMonitorRepository) {
-  }
+  private constructor(private readonly repository: ActivityMonitorRepository) {}
 
   static create(repository: ActivityMonitorRepository): ActivityMonitorService {
     return new ActivityMonitorService(repository);
@@ -46,16 +45,11 @@ export class ActivityMonitorService {
     return this.repository.spendOverTime(input);
   }
 
-  recentAnomalies(input: {
-    organizationId: string;
-    limit?: number;
-  }): Promise<RecentAnomalyRow[]> {
+  recentAnomalies(input: { organizationId: string; limit?: number }): Promise<RecentAnomalyRow[]> {
     return this.repository.recentAnomalies(input);
   }
 
-  ingestionSourcesHealth(input: {
-    organizationId: string;
-  }): Promise<IngestionSourceHealthRow[]> {
+  ingestionSourcesHealth(input: { organizationId: string }): Promise<IngestionSourceHealthRow[]> {
     return this.repository.ingestionSourcesHealth(input);
   }
 

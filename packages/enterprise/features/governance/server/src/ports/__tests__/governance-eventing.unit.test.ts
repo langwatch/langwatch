@@ -31,20 +31,14 @@ import {
   type GatewayResolvedBudget,
   type GatewaySpendProcessingEvent,
 } from "../gateway-debit.port";
-import {
-  GovernanceWebhookPort,
-  type GovernanceWebhookSendBatch,
-} from "../governance-webhook.port";
+import { GovernanceWebhookPort, type GovernanceWebhookSendBatch } from "../governance-webhook.port";
 import {
   IngestionPullMetricsPort,
   IngestionPullOutcomePort,
   IngestionPullRunPort,
   IngestionPullSchedulePort,
 } from "../ingestion-pull.port";
-import {
-  PulledUsageLedgerPort,
-  type PulledUsageLedgerRow,
-} from "../pulled-usage-ledger.port";
+import { PulledUsageLedgerPort, type PulledUsageLedgerRow } from "../pulled-usage-ledger.port";
 import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusEventingProjection,
@@ -514,9 +508,9 @@ describe("ingestion pull retry outcomes", () => {
       cursor: "held",
     };
 
-    await expect(
-      service.execute({ tenantId: "project-1", attempt: 1, pull }),
-    ).rejects.toThrow("provider unavailable");
+    await expect(service.execute({ tenantId: "project-1", attempt: 1, pull })).rejects.toThrow(
+      "provider unavailable",
+    );
     expect(outcome.failedCalls).not.toHaveBeenCalled();
     expect(metrics.counts).toEqual(["failed_retryable"]);
 

@@ -101,10 +101,7 @@ export function LicenseStatusPanel({
   return (
     <VStack align="start" gap={0} width="full">
       {licenseMetersSeats(status) && (
-        <OverSeatsCallout
-          currentMembers={status.currentMembers}
-          maxMembers={status.maxMembers}
-        />
+        <OverSeatsCallout currentMembers={status.currentMembers} maxMembers={status.maxMembers} />
       )}
       <LicenseDetailsCard status={status} onRemove={remove} isRemoving={isRemoving} />
       <LicenseGeneratorDrawer

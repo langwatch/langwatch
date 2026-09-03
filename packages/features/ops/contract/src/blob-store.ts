@@ -65,12 +65,7 @@ export const opsBlobStoreStatsSchema = z.object({
 });
 export type OpsBlobStoreStats = z.infer<typeof opsBlobStoreStatsSchema>;
 
-export type BlobSweepOutcome =
-  | "leased"
-  | "repaired"
-  | "reclaimed"
-  | "bookkeeping"
-  | "pending";
+export type BlobSweepOutcome = "leased" | "repaired" | "reclaimed" | "bookkeeping" | "pending";
 
 const blobSweepTallySchema = z.object({
   scanned: z.number(),

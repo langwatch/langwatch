@@ -37,11 +37,7 @@ describe("nlpgo test binary stamp", () => {
       path.join(root, "pkg"),
       path.join(root, "sdks", "go"),
     ];
-    watchFiles = [
-      path.join(root, "go.mod"),
-      path.join(root, "go.sum"),
-      path.join(root, "go.work"),
-    ];
+    watchFiles = [path.join(root, "go.mod"), path.join(root, "go.sum"), path.join(root, "go.work")];
     write("services/nlpgo/main.go", "package main\n");
     write("services/nlpgo/inner/util.go", "package inner\n");
     write("cmd/service/main.go", "package main\n");
@@ -106,9 +102,7 @@ describe("nlpgo test binary stamp", () => {
       writeStamp(stampPath, rebuilt);
 
       expect(readStamp(stampPath)).toBe(rebuilt);
-      expect(
-        cachedBinaryIsUsable({ binaryPath, stampPath, currentDigest: rebuilt }),
-      ).toBe(true);
+      expect(cachedBinaryIsUsable({ binaryPath, stampPath, currentDigest: rebuilt })).toBe(true);
     });
 
     // The stamp is written only AFTER a build succeeds, so a failed compile
@@ -128,9 +122,7 @@ describe("nlpgo test binary stamp", () => {
       ).toBe(false);
       // And the stale stamp is still exactly what it was — nothing recorded a
       // success that did not happen.
-      expect(readStamp(stampPath)).not.toBe(
-        digestGoSources({ watchDirs, watchFiles, root }),
-      );
+      expect(readStamp(stampPath)).not.toBe(digestGoSources({ watchDirs, watchFiles, root }));
     });
 
     /** @scenario "A record restored without its binary rebuilds" */

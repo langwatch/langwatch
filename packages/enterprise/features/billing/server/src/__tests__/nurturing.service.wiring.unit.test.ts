@@ -35,9 +35,7 @@ describe("NurturingService app wiring", () => {
     });
 
     it("makes HTTP requests when methods are called", async () => {
-      const fetchFn = vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(new Response(null, { status: 200 }));
+      const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 200 }));
       const service = NurturingService.create({
         config: { customerIoApiKey: "test-key", customerIoRegion: "us" },
         fetchFn,
@@ -70,9 +68,7 @@ describe("NurturingService app wiring", () => {
   describe("when the app config has no customerIoRegion", () => {
     /** @scenario 'Region defaults to EU when CUSTOMER_IO_REGION is not set' */
     it("defaults to the EU regional endpoint", async () => {
-      const fetchFn = vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(new Response(null, { status: 200 }));
+      const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 200 }));
       const service = NurturingService.create({
         config: { customerIoApiKey: "key", customerIoRegion: undefined },
         fetchFn,
@@ -99,9 +95,7 @@ describe("NurturingService app wiring", () => {
 
   describe("when region is set to 'eu'", () => {
     it("routes requests to the EU endpoint", async () => {
-      const fetchFn = vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(new Response(null, { status: 200 }));
+      const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 200 }));
       const service = NurturingService.create({
         config: { customerIoApiKey: "key", customerIoRegion: "eu" },
         fetchFn,

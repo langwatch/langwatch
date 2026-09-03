@@ -14,9 +14,7 @@ export const parseStripePricesFile = (value: unknown): StripePricesFile => {
   return stripePricesFileSchema.parse(value);
 };
 
-export const getStripeEnvironmentFromNodeEnv = (
-  nodeEnv: string | undefined,
-): StripeEnvironment => {
+export const getStripeEnvironmentFromNodeEnv = (nodeEnv: string | undefined): StripeEnvironment => {
   return nodeEnv === "production" ? "live" : "test";
 };
 

@@ -17,10 +17,7 @@ export const USER = "user_sam";
 export const ACTOR = { type: "user" as const, id: USER };
 export const T0 = 1_690_000_000_000;
 
-type AttachedData = Extract<
-  IdentityFact,
-  { type: "lw.identity.identifier_attached" }
->["data"];
+type AttachedData = Extract<IdentityFact, { type: "lw.identity.identifier_attached" }>["data"];
 
 export function attached({
   identifierId,
@@ -161,16 +158,12 @@ export function foldStream({
 }): IdentifierHead {
   return facts
     .filter((fact) => identifierStreamIds(fact).includes(identifierId))
-    .reduce<IdentifierHead>(
-      (head, fact) => reduceIdentifier({ identifierId, head, fact }),
-      null,
-    );
+    .reduce<IdentifierHead>((head, fact) => reduceIdentifier({ identifierId, head, fact }), null);
 }
 
 /** One head, in whatever state a case needs it. */
 export function headIn(state: IdentifierFact["state"]): IdentifierFact {
-  const head = foldUser([attached({ identifierId: "idf_work" })]).identifiers
-    .idf_work;
+  const head = foldUser([attached({ identifierId: "idf_work" })]).identifiers.idf_work;
   if (!head) throw new Error("the fixture attach produced no head");
   return { ...head, state };
 }

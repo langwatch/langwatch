@@ -1,7 +1,4 @@
-import type {
-  IdentifierFact,
-  IdentityHeads,
-} from "@langwatch/identity-contract";
+import type { IdentifierFact, IdentityHeads } from "@langwatch/identity-contract";
 
 /**
  * How the guards and the ceremonies see current state: reads over the
@@ -26,10 +23,7 @@ export interface IdentityHeadsRepository {
     normalizedValue: string;
   }): Promise<{ userId: string; identifierId: string } | null>;
   /** One head of this user's, or null — the verification mint's guard. */
-  findIdentifier(args: {
-    userId: string;
-    identifierId: string;
-  }): Promise<IdentifierFact | null>;
+  findIdentifier(args: { userId: string; identifierId: string }): Promise<IdentifierFact | null>;
   /**
    * The identifier a protocol `Account` row mirrors: by accountId first. A
    * row adopted before the projection carried accountIds falls back to the

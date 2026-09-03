@@ -29,10 +29,7 @@ export class GovernanceKpisSubscriber {
     return isGovernanceOriginTrace(context.state.attributes);
   }
 
-  async handle(
-    _event: GovernanceTraceEvent,
-    context: GovernanceTraceContext,
-  ): Promise<void> {
+  async handle(_event: GovernanceTraceEvent, context: GovernanceTraceContext): Promise<void> {
     const contribution = this.contribution(context);
     if (!contribution) return;
     try {
@@ -42,9 +39,7 @@ export class GovernanceKpisSubscriber {
     }
   }
 
-  private contribution(
-    context: GovernanceTraceContext,
-  ): GovernanceKpiContribution | undefined {
+  private contribution(context: GovernanceTraceContext): GovernanceKpiContribution | undefined {
     const { tenantId, state } = context;
     if (!isGovernanceOriginTrace(state.attributes)) return undefined;
     const sourceId = state.attributes[GOVERNANCE_ATTR.INGESTION_SOURCE_ID];

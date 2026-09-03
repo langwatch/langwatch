@@ -36,9 +36,7 @@ vi.mock("../../../ui/elements/router-link", () => ({
 import ResetPassword from "../reset-password.screen";
 
 const setToken = (token: string | null) => {
-  searchParamsRef.current = token
-    ? new URLSearchParams(`token=${token}`)
-    : new URLSearchParams("");
+  searchParamsRef.current = token ? new URLSearchParams(`token=${token}`) : new URLSearchParams("");
 };
 
 const renderPage = () => {
@@ -112,9 +110,7 @@ describe("ResetPassword page", () => {
       fillAndSubmit({ container, password: "short", confirm: "short" });
 
       // Length is enforced on the password field, so the message renders.
-      expect(
-        (await screen.findAllByText(/at least 8 characters/i)).length,
-      ).toBeGreaterThan(0);
+      expect((await screen.findAllByText(/at least 8 characters/i)).length).toBeGreaterThan(0);
       expect(mockResetPassword).not.toHaveBeenCalled();
     });
   });
@@ -164,9 +160,7 @@ describe("ResetPassword page", () => {
       const { container } = renderPage();
 
       expect(screen.getByRole("heading", { name: /invalid reset link/i })).toBeTruthy();
-      expect(
-        screen.getByRole("link", { name: /request a new reset link/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("link", { name: /request a new reset link/i })).toBeTruthy();
       // No password form is rendered without a token.
       expect(passwordInputs(container)).toHaveLength(0);
     });

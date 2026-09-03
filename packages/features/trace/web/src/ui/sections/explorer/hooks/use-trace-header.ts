@@ -108,8 +108,5 @@ export function useTraceHeader({
     [header, patch, spans],
   );
 
-  return useMemo(
-    () => (data === header ? query : { ...query, data }),
-    [query, data, header],
-  );
+  return useMemo(() => (data === header ? query : { ...query, data }), [query, data, header]);
 }

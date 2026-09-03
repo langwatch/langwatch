@@ -31,10 +31,9 @@ gemini "your task here"
 `GOOGLE_GEMINI_BASE_URL` is the documented endpoint override for Gemini CLI's `gemini-api-key` auth mode. The gateway accepts the request at `POST /v1beta/models/{model}:generateContent`, resolves the VK, dispatches through Bifrost's Gemini adapter (which injects the real `x-goog-api-key` from the bound credential), and streams the native Gemini response shape back unchanged.
 
 <Note>
-  Gemini CLI sends the VK secret as `x-goog-api-key` (its native auth header). The
-  gateway's auth middleware accepts that header, an `Authorization: Bearer …` header, OR
-  an `x-api-key` header, whichever your client sends. All three paths resolve to the same
-  VK.
+  Gemini CLI sends the VK secret as `x-goog-api-key` (its native auth header). The gateway's auth
+  middleware accepts that header, an `Authorization: Bearer …` header, OR an `x-api-key` header,
+  whichever your client sends. All three paths resolve to the same VK.
 </Note>
 
 For Vertex AI rather than the public Gemini API:

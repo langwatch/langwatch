@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  filterEmptyRows,
-  getNonEmptyRowIndices,
-  isRowEmpty,
-} from "../empty-row-detection";
+import { filterEmptyRows, getNonEmptyRowIndices, isRowEmpty } from "../empty-row-detection";
 
 describe("isRowEmpty", () => {
   it("returns true for completely empty object", () => {
@@ -67,9 +63,7 @@ describe("isRowEmpty", () => {
     // Row with id and non-empty content is not empty
     expect(isRowEmpty({ id: "abc123", input: "hello" })).toBe(false);
     // Mixed internal fields
-    expect(
-      isRowEmpty({ id: "abc123", _datasetId: "ds1", input: "", expected: "" }),
-    ).toBe(true);
+    expect(isRowEmpty({ id: "abc123", _datasetId: "ds1", input: "", expected: "" })).toBe(true);
     expect(
       isRowEmpty({
         id: "abc123",

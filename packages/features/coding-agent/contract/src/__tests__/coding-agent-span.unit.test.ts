@@ -10,11 +10,9 @@ describe("coding-agent span vocabulary", () => {
   });
 
   it("reads dotted attributes from flat and unflattened span shapes", () => {
-    expect(readString({ "gen_ai.request.model": "flat" }, "gen_ai.request.model")).toBe(
-      "flat",
+    expect(readString({ "gen_ai.request.model": "flat" }, "gen_ai.request.model")).toBe("flat");
+    expect(readString({ gen_ai: { request: { model: "nested" } } }, "gen_ai.request.model")).toBe(
+      "nested",
     );
-    expect(
-      readString({ gen_ai: { request: { model: "nested" } } }, "gen_ai.request.model"),
-    ).toBe("nested");
   });
 });

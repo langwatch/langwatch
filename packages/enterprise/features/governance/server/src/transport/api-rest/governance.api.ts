@@ -99,10 +99,7 @@ const createTemplateSchema = z.object({
   display_name: z.string().min(1).max(80),
   description: z.string().max(2000).optional(),
   icon_asset: z.string().max(20_000).optional(),
-  credential_schema: z
-    .enum(["otlp_token", "static_api_key", "agent_id"])
-    .nullable()
-    .optional(),
+  credential_schema: z.enum(["otlp_token", "static_api_key", "agent_id"]).nullable().optional(),
   ottl_rules: z.string().max(50_000).optional(),
 });
 
@@ -313,9 +310,7 @@ export function createGovernanceRestApp(options: {
           description: "Template detail",
           content: {
             "application/json": {
-              schema: resolver(
-                z.object({ ingestion_template: ingestionTemplateDtoSchema }),
-              ),
+              schema: resolver(z.object({ ingestion_template: ingestionTemplateDtoSchema })),
             },
           },
         },
@@ -349,9 +344,7 @@ export function createGovernanceRestApp(options: {
           description: "Template created",
           content: {
             "application/json": {
-              schema: resolver(
-                z.object({ ingestion_template: ingestionTemplateDtoSchema }),
-              ),
+              schema: resolver(z.object({ ingestion_template: ingestionTemplateDtoSchema })),
             },
           },
         },
@@ -420,9 +413,7 @@ export function createGovernanceRestApp(options: {
           description: "Updated",
           content: {
             "application/json": {
-              schema: resolver(
-                z.object({ ingestion_template: ingestionTemplateDtoSchema }),
-              ),
+              schema: resolver(z.object({ ingestion_template: ingestionTemplateDtoSchema })),
             },
           },
         },
@@ -518,9 +509,7 @@ export function createGovernanceRestApp(options: {
           description: "Cloned",
           content: {
             "application/json": {
-              schema: resolver(
-                z.object({ ingestion_template: ingestionTemplateDtoSchema }),
-              ),
+              schema: resolver(z.object({ ingestion_template: ingestionTemplateDtoSchema })),
             },
           },
         },

@@ -231,8 +231,7 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
     // still better than silence, even though it cannot name its scope.
     lines.push("");
     const period =
-      input.budget.period.charAt(0).toUpperCase() +
-      input.budget.period.slice(1).toLowerCase();
+      input.budget.period.charAt(0).toUpperCase() + input.budget.period.slice(1).toLowerCase();
     lines.push(
       `${period} budget: ${formatUsd(input.budget.limitUsd)}   |   Used: ${formatUsedUsd(input.budget.usedUsd)}`,
     );

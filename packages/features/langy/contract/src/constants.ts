@@ -164,8 +164,7 @@ export const LANGY_TITLE_SOURCE = {
   USER: "user",
 } as const;
 
-export type LangyTitleSource =
-  (typeof LANGY_TITLE_SOURCE)[keyof typeof LANGY_TITLE_SOURCE];
+export type LangyTitleSource = (typeof LANGY_TITLE_SOURCE)[keyof typeof LANGY_TITLE_SOURCE];
 
 /**
  * Lifecycle status of a single turn, held on the langyConversationTurn fold —

@@ -18,11 +18,11 @@ D06 gives an organization `mfaRequired`: a membership condition meaning "every
 member of this organization can prove a second factor", satisfied three ways —
 an enrollment on the account, a passkey, or a provider that asserted a factor.
 D07 settled that a passkey satisfies it, because a passkey is possession-based
-*and* phishing-resistant, which is strictly stronger than a typed code against
+_and_ phishing-resistant, which is strictly stronger than a typed code against
 the attack the requirement exists to stop.
 
-D07 then deferred the refinement, in as many words: *"an org-level
-'hardware-bound keys only' refinement… Build it when somebody asks."*
+D07 then deferred the refinement, in as many words: _"an org-level
+'hardware-bound keys only' refinement… Build it when somebody asks."_
 
 Somebody has asked. This ADR records the shape so it is not re-derived, and
 states plainly that it is **not built in the front-door work** — it needs the
@@ -104,7 +104,7 @@ through, not the password.
 
 - **Whether the impersonation rule follows.** D06 requires an operator's own
   account to have MFA when the subject's org requires it; the analogous rule
-  here would require the operator's *session* to be phishing-resistant. Likely
+  here would require the operator's _session_ to be phishing-resistant. Likely
   yes, and it belongs with D06's impersonation rewrite rather than here.
 - **Whether the gate is per-organization or per-resource.** D06's is a
   membership condition evaluated on the way into an organization's data. This

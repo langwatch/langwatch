@@ -22,11 +22,7 @@ process.stdout.write = ((
   encodingOrCb?: unknown,
   cb?: unknown,
 ) => {
-  return (process.stderr.write as (...args: unknown[]) => boolean)(
-    chunk,
-    encodingOrCb,
-    cb,
-  );
+  return (process.stderr.write as (...args: unknown[]) => boolean)(chunk, encodingOrCb, cb);
 }) as StdoutWrite;
 
 console.log = console.error.bind(console);

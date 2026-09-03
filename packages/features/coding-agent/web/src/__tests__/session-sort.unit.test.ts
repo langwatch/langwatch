@@ -26,9 +26,7 @@ import {
  * itself by its branch, which is the one field every row carries, so the order
  * a case asserts reads as a list of names.
  */
-function row(
-  over: Partial<SortableSessionRow> & { gitBranch: string },
-): SortableSessionRow {
+function row(over: Partial<SortableSessionRow> & { gitBranch: string }): SortableSessionRow {
   return {
     title: "A generated title",
     agent: "claude_code",
@@ -42,8 +40,7 @@ function row(
   };
 }
 
-const orderOf = (rows: readonly SortableSessionRow[]) =>
-  rows.map((each) => each.gitBranch);
+const orderOf = (rows: readonly SortableSessionRow[]) => rows.map((each) => each.gitBranch);
 
 /** The state a column lands in after `clicks` clicks, starting from default. */
 function afterClicks({
@@ -94,11 +91,7 @@ describe("the Sessions table order", () => {
       const sort = afterClicks({ column: "context", clicks: 1 });
 
       expect(sort).toEqual({ column: "context", direction: "desc" });
-      expect(orderOf(sortSessionRows({ rows, sort }))).toEqual([
-        "large",
-        "medium",
-        "small",
-      ]);
+      expect(orderOf(sortSessionRows({ rows, sort }))).toEqual(["large", "medium", "small"]);
     });
 
     it("leads with the most compactions", () => {
@@ -132,11 +125,7 @@ describe("the Sessions table order", () => {
       const sort = afterClicks({ column: "session", clicks: 1 });
 
       expect(sort).toEqual({ column: "session", direction: "asc" });
-      expect(orderOf(sortSessionRows({ rows, sort }))).toEqual([
-        "apple",
-        "middle",
-        "zebra",
-      ]);
+      expect(orderOf(sortSessionRows({ rows, sort }))).toEqual(["apple", "middle", "zebra"]);
     });
 
     it("falls back to the branch name for a session with no title", () => {
@@ -189,9 +178,7 @@ describe("the Sessions table order", () => {
         column: "lastUpdate",
         direction: "asc",
       });
-      expect(afterClicks({ column: "lastUpdate", clicks: 2 })).toEqual(
-        DEFAULT_SESSIONS_SORT,
-      );
+      expect(afterClicks({ column: "lastUpdate", clicks: 2 })).toEqual(DEFAULT_SESSIONS_SORT);
     });
 
     it("starts a different column from its own reading direction", () => {

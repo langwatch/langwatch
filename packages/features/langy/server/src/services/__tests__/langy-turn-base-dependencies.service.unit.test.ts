@@ -94,9 +94,7 @@ describe("LangyTurnBaseDependenciesService harness resolution", () => {
 
       await LangyTurnService.create(fixture.deps).startConversationTurn(input);
 
-      expect(fixture.probe).toHaveBeenCalledWith(
-        expect.objectContaining({ harness: "pi" }),
-      );
+      expect(fixture.probe).toHaveBeenCalledWith(expect.objectContaining({ harness: "pi" }));
       expect(fixture.stash).toHaveBeenCalledWith(
         expect.objectContaining({
           credentials: expect.objectContaining({ harness: "pi" }),

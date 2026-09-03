@@ -32,9 +32,7 @@ const MAX_REGISTRY_FILE_BYTES = 16 * 1024;
  * Where claude keeps the registry. Honours `CLAUDE_CONFIG_DIR` the same way
  * claude itself does, so a relocated config home is still found.
  */
-export function defaultClaudeSessionRegistryDir(
-  env: NodeJS.ProcessEnv = process.env,
-): string {
+export function defaultClaudeSessionRegistryDir(env: NodeJS.ProcessEnv = process.env): string {
   const configDir = env.CLAUDE_CONFIG_DIR?.trim();
   if (configDir) return join(configDir, "sessions");
   return join(homedir(), ".claude", "sessions");

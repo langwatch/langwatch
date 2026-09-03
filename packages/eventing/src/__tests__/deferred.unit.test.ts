@@ -37,9 +37,7 @@ describe("Deferred", () => {
       const deferred = new Deferred<() => void>("test");
       deferred.resolve(() => {});
 
-      expect(() => deferred.resolve(() => {})).toThrow(
-        'Deferred "test" already resolved',
-      );
+      expect(() => deferred.resolve(() => {})).toThrow('Deferred "test" already resolved');
     });
   });
 

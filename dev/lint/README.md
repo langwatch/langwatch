@@ -35,12 +35,12 @@ owner. See `dev/lint/ast-grep/README.md`.
 
 The division that keeps review comments worth reading:
 
-| Kind of rule                             | Home                                       |
-| ---------------------------------------- | ------------------------------------------ |
-| Expressible as oxlint config             | `/.oxlintrc.architecture.json`             |
-| Expressible as a syntactic pattern       | `/dev/lint/ast-grep/rules/`                |
-| Expressible as a semantic pattern        | `/dev/lint/semgrep/langwatch.yml`          |
-| Genuinely needs judgement                | `path_instructions` in `/.coderabbit.yaml` |
+| Kind of rule                       | Home                                       |
+| ---------------------------------- | ------------------------------------------ |
+| Expressible as oxlint config       | `/.oxlintrc.architecture.json`             |
+| Expressible as a syntactic pattern | `/dev/lint/ast-grep/rules/`                |
+| Expressible as a semantic pattern  | `/dev/lint/semgrep/langwatch.yml`          |
+| Genuinely needs judgement          | `path_instructions` in `/.coderabbit.yaml` |
 
 **There is one general-purpose JavaScript and TypeScript linter, and it is
 oxlint.** `/.oxlintrc.architecture.json` covers `packages/**` and `apps/**` in

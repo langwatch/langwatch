@@ -419,7 +419,9 @@ class UncachedFeatureFlags extends FeatureFlagCachePort {
 class ApiAnalyticsProtections {
   static create(dependencies: {
     authz: AuthzService;
-    dataPrivacy: { getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> };
+    dataPrivacy: {
+      getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy>;
+    };
   }): ApiAnalyticsProtections {
     return new ApiAnalyticsProtections(dependencies);
   }
@@ -435,10 +437,7 @@ class ApiAnalyticsProtections {
     },
   ) {}
 
-  async resolve(input: {
-    userId: string;
-    projectId: string;
-  }): Promise<LangWatchQLProtections> {
+  async resolve(input: { userId: string; projectId: string }): Promise<LangWatchQLProtections> {
     const [canSeeCosts, isMember, isAdmin] = await Promise.all([
       this.permitted(input, "cost:view"),
       this.permitted(input, "traces:view"),
@@ -521,5 +520,3 @@ class ApiAnalyticsProtections {
     });
   }
 }
-
-

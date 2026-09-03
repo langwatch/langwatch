@@ -1,10 +1,6 @@
 import { z } from "zod";
 
-import {
-  isValidHandle,
-  type PromptScope,
-  scopeSchema,
-} from "@langwatch/prompt-contract";
+import { isValidHandle, type PromptScope, scopeSchema } from "@langwatch/prompt-contract";
 
 export const changeHandleFormSchema = z.object({
   handle: z
@@ -29,10 +25,7 @@ export type ChangeHandleFormValues = z.infer<typeof changeHandleFormSchema>;
  * @returns The change handle form schema.
  */
 export const createChangeHandleFormSchema = (params: {
-  checkHandleUniqueness: (params: {
-    handle: string;
-    scope: PromptScope;
-  }) => Promise<boolean>;
+  checkHandleUniqueness: (params: { handle: string; scope: PromptScope }) => Promise<boolean>;
 }) => {
   const { checkHandleUniqueness } = params;
 

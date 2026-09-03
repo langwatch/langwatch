@@ -23,10 +23,7 @@ export async function listMonitors(): Promise<MonitorSummary[]> {
 }
 
 export async function getMonitor(id: string): Promise<MonitorSummary> {
-  return makeRequest(
-    "GET",
-    `/api/monitors/${encodeURIComponent(id)}`,
-  ) as Promise<MonitorSummary>;
+  return makeRequest("GET", `/api/monitors/${encodeURIComponent(id)}`) as Promise<MonitorSummary>;
 }
 
 export async function createMonitor(data: {
@@ -70,9 +67,7 @@ export async function toggleMonitor(params: {
   }) as Promise<{ id: string; enabled: boolean }>;
 }
 
-export async function deleteMonitor(
-  id: string,
-): Promise<{ id: string; deleted: boolean }> {
+export async function deleteMonitor(id: string): Promise<{ id: string; deleted: boolean }> {
   return makeRequest("DELETE", `/api/monitors/${encodeURIComponent(id)}`) as Promise<{
     id: string;
     deleted: boolean;

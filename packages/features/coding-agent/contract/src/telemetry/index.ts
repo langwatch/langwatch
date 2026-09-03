@@ -69,9 +69,7 @@ if (duplicateAgentId !== undefined) {
  * union, and the duplicate guard above closes the gap `satisfies` leaves.
  */
 export const LOGS_ONLY_AGENT_IDS: ReadonlySet<string> = new Set(
-  CODING_AGENT_REGISTRY.filter((agent) => agent.logsOnly === true).map(
-    (agent) => agent.id,
-  ),
+  CODING_AGENT_REGISTRY.filter((agent) => agent.logsOnly === true).map((agent) => agent.id),
 );
 
 /**
@@ -93,10 +91,7 @@ export const EVENTS_FOLD_TOOL_RUNS_AGENT_IDS: ReadonlySet<string> = new Set(
  * reports its own `tool_result`. Keyed by the same string-typed contribution
  * agent as the sets above.
  */
-export const WRAPPER_TOOL_NAMES_BY_AGENT_ID: ReadonlyMap<
-  string,
-  ReadonlySet<string>
-> = new Map(
+export const WRAPPER_TOOL_NAMES_BY_AGENT_ID: ReadonlyMap<string, ReadonlySet<string>> = new Map(
   CODING_AGENT_REGISTRY.filter(
     (agent) => agent.wrapperToolNames !== undefined && agent.wrapperToolNames.length > 0,
   ).map((agent) => [agent.id, new Set(agent.wrapperToolNames)]),

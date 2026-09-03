@@ -183,10 +183,7 @@ export function renderLaunchAgent(spec: LaunchAgentSpec): LaunchAgentDescriptor 
   switch (spec.platform) {
     case "darwin": {
       const envXml = entries
-        .map(
-          ([k, v]) =>
-            `    <key>${xmlEscape(k)}</key>\n    <string>${xmlEscape(v)}</string>`,
-        )
+        .map(([k, v]) => `    <key>${xmlEscape(k)}</key>\n    <string>${xmlEscape(v)}</string>`)
         .join("\n");
       const content = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

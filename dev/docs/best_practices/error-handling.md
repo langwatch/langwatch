@@ -112,7 +112,7 @@ This is the part that trips people up, so be precise about it:
 
 |                                        | source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| What a customer reads **in the app**   | The **client presentation registry**, keyed by `code` — `packages/handled-error/src/presentation.ts`                                                                                                                                                                                                                                                                                                                                                                                                   |
+| What a customer reads **in the app**   | The **client presentation registry**, keyed by `code` — `packages/handled-error/src/presentation.ts`                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `HandledError.message`                 | Logs, OTel, exception capture — **and the REST response body**. Customer-safe by rule, never the app's UI copy                                                                                                                                                                                                                                                                                                                                                                                                     |
 | The wire `message` field               | **Per transport.** tRPC collapses it to the `code` ([#5984](https://github.com/langwatch/langwatch/pull/5984)). REST sends `{ error: code, message }`, so the sentence rides _alongside_ the code. SSE sends the code with the serialised payload beside it                                                                                                                                                                                                                                                        |
 | Server-authored dynamic prose          | `meta.message`, an explicit opt-in — mirrors Go, where free text appears only when a caller sets `Meta["message"]`. Almost always prose _we_ wrote; the exception is a third party's own sentence deliberately relayed because it is the whole answer (a model provider's "your credit balance is too low" — `llm_upstream_error`). Either way a registry entry that renders it passes it through `safeProse` first, and the codes allowed to render it at all are named one by one in `presentation.unit.test.ts` |
@@ -152,7 +152,7 @@ in order of how often they are violated:
    was always the authority on what may ship, and it catches everything the
    plugin did except one shape — a copy object built outside the toast call's
    own argument list, `toaster.create(buildToast({ description: error.message
-   }))`, which the scanner attributes to `buildToast`. Rewriting the plugin as
+}))`, which the scanner attributes to `buildToast`. Rewriting the plugin as
    an oxlint JavaScript plugin is open follow-up work.
 
    The scanner works by derivation, so it will occasionally flag a value that
@@ -362,7 +362,7 @@ zod 4 a key schema's refusal is reported as an `invalid_key` issue with the
 real one nested inside it, and `flatten()` only reads the outer message. So
 
 ```ts
-z.record(z.string().max(256), valueSchema)   // ✗
+z.record(z.string().max(256), valueSchema); // ✗
 ```
 
 reaches the customer as `fieldErrors: { parameters: ["Invalid key in record"] }`
@@ -374,7 +374,8 @@ level down.
 Put the constraint in a refinement, where the issue is yours to shape:
 
 ```ts
-z.record(z.string(), valueSchema).superRefine((values, ctx) => {   // ✓
+z.record(z.string(), valueSchema).superRefine((values, ctx) => {
+  // ✓
   for (const name of Object.keys(values)) {
     if (name.length > MAX) {
       ctx.addIssue({

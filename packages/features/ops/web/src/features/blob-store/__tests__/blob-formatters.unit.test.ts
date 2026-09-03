@@ -76,9 +76,7 @@ describe("sweepOutcomeLabel", () => {
     });
 
     it("does not reuse a live-lease colour for the unknown case", () => {
-      expect(sweepOutcomeLabel("brand_new_verdict")).not.toEqual(
-        sweepOutcomeLabel("leased"),
-      );
+      expect(sweepOutcomeLabel("brand_new_verdict")).not.toEqual(sweepOutcomeLabel("leased"));
     });
   });
 });

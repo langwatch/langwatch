@@ -1,16 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { computeBTLeaderboard } from "@langwatch/experiment-web";
-import {
-  computeLeaderboardVerdict,
-  findCheaperTiedAlternative,
-} from "@langwatch/experiment-web";
+import { computeLeaderboardVerdict, findCheaperTiedAlternative } from "@langwatch/experiment-web";
 import { computeSampleAdequacy } from "@langwatch/experiment-web";
-import type {
-  BTLeaderboard,
-  BTLeaderboardEntry,
-  VariantMetrics,
-} from "@langwatch/experiment-web";
+import type { BTLeaderboard, BTLeaderboardEntry, VariantMetrics } from "@langwatch/experiment-web";
 
 const metricStats = (avg: number, count: number) => ({
   min: avg,
@@ -138,10 +131,7 @@ describe("computeLeaderboardVerdict — claims it must not make", () => {
     });
 
     it("does not read an infinite bound as a separation", () => {
-      const leaderboard = board([
-        entry("a", 100, [50, Infinity]),
-        entry("b", 10, [-40, 40]),
-      ]);
+      const leaderboard = board([entry("a", 100, [50, Infinity]), entry("b", 10, [-40, 40])]);
 
       expect(computeLeaderboardVerdict(leaderboard).kind).toBe("tie-at-top");
     });

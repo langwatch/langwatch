@@ -239,8 +239,7 @@ export function ComparisonWinnerCell({
             className="cell-fade-overlay"
             data-testid="comparison-winner-expand"
             css={{
-              background:
-                "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
+              background: "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
               "tr:hover &": {
                 background:
                   "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-muted))",

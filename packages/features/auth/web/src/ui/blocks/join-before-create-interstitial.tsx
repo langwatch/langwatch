@@ -1,10 +1,7 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import { useEffect } from "react";
-import {
-  type JoinableOrganization,
-  resolveJoinBeforeCreate,
-} from "../../model/join-before-create";
+import { type JoinableOrganization, resolveJoinBeforeCreate } from "../../model/join-before-create";
 
 /**
  * Join before create (ADR-117 §6): the step between confirming an address and
@@ -54,8 +51,7 @@ export function JoinBeforeCreateInterstitial({
     pendingOrganizationId,
   });
   const nothingToOffer = decision.outcome === "create_workspace";
-  const joinedAutomatically =
-    decision.outcome === "already_joined" ? decision.organization : null;
+  const joinedAutomatically = decision.outcome === "already_joined" ? decision.organization : null;
 
   useEffect(() => {
     if (nothingToOffer) onCreateWorkspace();
@@ -74,15 +70,10 @@ export function JoinBeforeCreateInterstitial({
 
   if (decision.outcome === "awaiting_approval") {
     return (
-      <VStack
-        width="full"
-        align="stretch"
-        gap={4}
-        data-testid="join-before-create"
-      >
+      <VStack width="full" align="stretch" gap={4} data-testid="join-before-create">
         <Text>
-          Your request to join {decision.organization.name} is waiting for one
-          of their administrators. We will email you either way.
+          Your request to join {decision.organization.name} is waiting for one of their
+          administrators. We will email you either way.
         </Text>
         <Button variant="outline" width="full" onClick={onCreateWorkspace}>
           Create a new organization anyway
@@ -92,15 +83,10 @@ export function JoinBeforeCreateInterstitial({
   }
 
   return (
-    <VStack
-      width="full"
-      align="stretch"
-      gap={4}
-      data-testid="join-before-create"
-    >
+    <VStack width="full" align="stretch" gap={4} data-testid="join-before-create">
       <Text>
-        Your colleagues are already on LangWatch. Join them instead of starting
-        a separate workspace.
+        Your colleagues are already on LangWatch. Join them instead of starting a separate
+        workspace.
       </Text>
       {decision.organizations.map((organization) => (
         <Button

@@ -133,12 +133,7 @@ export function getLangWatchTracerFromProvider(
               spanArgs.fn(createLangWatchSpan(span), ...cbArgs);
 
             if (spanArgs.context !== void 0)
-              return target.startActiveSpan(
-                spanArgs.name,
-                options,
-                spanArgs.context,
-                wrappedFn,
-              );
+              return target.startActiveSpan(spanArgs.name, options, spanArgs.context, wrappedFn);
 
             return target.startActiveSpan(spanArgs.name, options, wrappedFn);
           };
@@ -195,21 +190,14 @@ export function getLangWatchTracerFromProvider(
 
             // Call target.startActiveSpan to avoid double-wrapping
             if (spanArgs.context !== void 0)
-              return target.startActiveSpan(
-                spanArgs.name,
-                optionsWithOrigin,
-                spanArgs.context,
-                cb,
-              );
+              return target.startActiveSpan(spanArgs.name, optionsWithOrigin, spanArgs.context, cb);
 
             return target.startActiveSpan(spanArgs.name, optionsWithOrigin, cb);
           };
 
         case "startSpan":
           return (name: string, options?: SpanOptions, context?: Context) =>
-            createLangWatchSpan(
-              target.startSpan(name, withDefaultOrigin(options), context),
-            );
+            createLangWatchSpan(target.startSpan(name, withDefaultOrigin(options), context));
 
         case "addEvaluation":
           return (params: AddEvaluationParams) => {

@@ -32,10 +32,7 @@ export class GovernanceOcsfSubscriber {
     return isGovernanceOriginTrace(context.state.attributes);
   }
 
-  async handle(
-    _event: GovernanceTraceEvent,
-    context: GovernanceTraceContext,
-  ): Promise<void> {
+  async handle(_event: GovernanceTraceEvent, context: GovernanceTraceContext): Promise<void> {
     const row = this.row(context);
     if (!row) return;
     try {
@@ -59,8 +56,7 @@ export class GovernanceOcsfSubscriber {
     }
     if (state.occurredAt <= 0) return undefined;
 
-    const sourceType =
-      state.attributes[GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE] ?? "unknown";
+    const sourceType = state.attributes[GOVERNANCE_ATTR.INGESTION_SOURCE_TYPE] ?? "unknown";
     const actorUserId = state.attributes[GOVERNANCE_ATTR.USER_ID] ?? "";
     const actorEmail = state.attributes["user.email"] ?? "";
     const actorEnduserId = state.attributes["enduser.id"] ?? "";

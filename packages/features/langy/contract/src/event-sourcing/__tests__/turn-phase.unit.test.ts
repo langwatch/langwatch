@@ -9,8 +9,7 @@ import {
   type TurnPhaseState,
 } from "../turn-phase";
 
-const active = (turnId = "t1"): TurnPhaseState =>
-  beginTurn(initialTurnPhaseState, turnId);
+const active = (turnId = "t1"): TurnPhaseState => beginTurn(initialTurnPhaseState, turnId);
 
 describe("langyTurnPhase machine", () => {
   describe("given the idle initial state", () => {

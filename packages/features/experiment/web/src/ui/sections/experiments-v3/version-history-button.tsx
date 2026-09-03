@@ -22,9 +22,7 @@ type VersionHistoryButtonProps = {
   disabled?: boolean;
 };
 
-export function VersionHistoryButton({
-  disabled = false,
-}: VersionHistoryButtonProps) {
+export function VersionHistoryButton({ disabled = false }: VersionHistoryButtonProps) {
   const { project } = useOrganizationTeamProject();
   const [isOpen, setIsOpen] = useState(false);
 

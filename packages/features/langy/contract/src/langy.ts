@@ -16,20 +16,13 @@ export const langyEgressHostSchema = z
 
 export const langyEgressAllowlistSchema = z.array(langyEgressHostSchema);
 export type LangyEgressAllowlist = z.infer<typeof langyEgressAllowlistSchema>;
-export const langyEgressProjectInputSchema = z
-  .object({ projectId: z.string().min(1) })
-  .strict();
+export const langyEgressProjectInputSchema = z.object({ projectId: z.string().min(1) }).strict();
 export type LangyEgressProjectInput = z.infer<typeof langyEgressProjectInputSchema>;
 export const langySetEgressInputSchema = langyEgressProjectInputSchema
   .extend({ allowlist: langyEgressAllowlistSchema })
   .strict();
 export type LangySetEgressInput = z.infer<typeof langySetEgressInputSchema>;
-export const langyConversationMessageRoleSchema = z.enum([
-  "user",
-  "assistant",
-  "system",
-  "tool",
-]);
+export const langyConversationMessageRoleSchema = z.enum(["user", "assistant", "system", "tool"]);
 
 export const langyMessageSchema = z
   .object({
@@ -66,9 +59,7 @@ export const langyCreateConversationInputSchema = z
     conversationId: langyConversationIdSchema.optional(),
   })
   .strict();
-export type LangyCreateConversationInput = z.infer<
-  typeof langyCreateConversationInputSchema
->;
+export type LangyCreateConversationInput = z.infer<typeof langyCreateConversationInputSchema>;
 
 export const langyConversationListInputSchema = z
   .object({

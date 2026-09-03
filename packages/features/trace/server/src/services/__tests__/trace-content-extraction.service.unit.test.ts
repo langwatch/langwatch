@@ -105,9 +105,7 @@ describe("extractInlineMediaFromEvent", () => {
   describe("when an event has a text part", () => {
     it("returns the event unchanged and no refs", async () => {
       const service = makeService();
-      const event = makeEventWithContent([
-        { type: "text", text: "Hello, world!" },
-      ]);
+      const event = makeEventWithContent([{ type: "text", text: "Hello, world!" }]);
 
       const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
         ...BASE_PARAMS,
@@ -118,12 +116,8 @@ describe("extractInlineMediaFromEvent", () => {
       expect(refs).toHaveLength(0);
       expect(service.storeFromBytes).not.toHaveBeenCalled();
       // Content array must be identical
-      const rewrittenMessage = (
-        rewrittenEvent as { message: { content: unknown[] } }
-      ).message;
-      expect(rewrittenMessage.content).toEqual([
-        { type: "text", text: "Hello, world!" },
-      ]);
+      const rewrittenMessage = (rewrittenEvent as { message: { content: unknown[] } }).message;
+      expect(rewrittenMessage.content).toEqual([{ type: "text", text: "Hello, world!" }]);
     });
   });
 
@@ -169,8 +163,7 @@ describe("extractInlineMediaFromEvent", () => {
       );
 
       // The part must be rewritten to source.type="url"
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content).toHaveLength(1);
       expect(content[0]).toMatchObject({
         type: "audio",
@@ -229,8 +222,7 @@ describe("extractInlineMediaFromEvent", () => {
       expect(service.storeFromBytes).toHaveBeenCalledTimes(2);
       expect(refs).toHaveLength(2);
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content).toHaveLength(2);
       expect((content[0] as { source: { value: string } }).source.value).toBe(
         "/api/files/proj-1/stored-id-1",
@@ -279,8 +271,7 @@ describe("extractInlineMediaFromEvent", () => {
         }),
       );
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content).toHaveLength(1);
       const part = content[0] as {
         type: string;
@@ -347,9 +338,9 @@ describe("extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      await expect(
-        extractInlineMediaFromEvent({ ...BASE_PARAMS, event, service }),
-      ).rejects.toThrow("Storage failure");
+      await expect(extractInlineMediaFromEvent({ ...BASE_PARAMS, event, service })).rejects.toThrow(
+        "Storage failure",
+      );
 
       // Only the first part was attempted before the throw
       expect(service.storeFromBytes).toHaveBeenCalledOnce();
@@ -364,9 +355,7 @@ describe("extractInlineMediaFromEvent", () => {
       // Put an unrecognised part (unknown type) in the content array. The
       // walker falls through to its `unknown` handler (no-op) and leaves
       // the part untouched — "degraded, not broken".
-      const event = makeEventWithContent([
-        { type: "not-a-known-shape", someField: "value" },
-      ]);
+      const event = makeEventWithContent([{ type: "not-a-known-shape", someField: "value" }]);
 
       const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
         ...BASE_PARAMS,
@@ -503,12 +492,9 @@ describe("extractInlineMediaFromEvent", () => {
       const storedArgs = vi.mocked(service.storeFromBytes).mock.calls[0]![0];
       expect(storedArgs.mediaType).toBe("audio/wav");
       expect(storedArgs.bytes.subarray(0, 4).toString("ascii")).toBe("RIFF");
-      expect(
-        storedArgs.bytes.subarray(44).equals(Buffer.from("PCM16_AUDIO_BYTES")),
-      ).toBe(true);
+      expect(storedArgs.bytes.subarray(44).equals(Buffer.from("PCM16_AUDIO_BYTES"))).toBe(true);
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content).toHaveLength(2);
       expect(content[0]).toEqual({ type: "text", text: "Hi" });
       // File-shape inputs rewrite to a clean input_audio reference — NOT a
@@ -559,8 +545,7 @@ describe("extractInlineMediaFromEvent", () => {
         service,
       });
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content[0]).toEqual({
         type: "input_audio",
         input_audio: {
@@ -609,8 +594,7 @@ describe("extractInlineMediaFromEvent", () => {
         }),
       );
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       const part = content[0] as {
         type: string;
         id: string;
@@ -732,9 +716,7 @@ describe("extractInlineMediaFromEvent", () => {
       expect(secondMsg.content).toHaveLength(1);
       expect(secondMsg.content[0]!.type).toBe("audio");
       expect(secondMsg.content[0]!.source.type).toBe("url");
-      expect(secondMsg.content[0]!.source.value).toBe(
-        "/api/files/proj-1/stored-id-1",
-      );
+      expect(secondMsg.content[0]!.source.value).toBe("/api/files/proj-1/stored-id-1");
     });
   });
 
@@ -844,8 +826,7 @@ describe("extractInlineMediaFromEvent", () => {
       expect(refs).toHaveLength(1);
       expect(refs[0]!.id).toBe(storedId);
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content).toHaveLength(1);
       expect(content[0]).toMatchObject({
         type: "document",
@@ -890,8 +871,7 @@ describe("extractInlineMediaFromEvent", () => {
         }),
       );
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content[0]).toEqual({
         type: "text",
         text: "What do you see in this image?",
@@ -910,9 +890,7 @@ describe("extractInlineMediaFromEvent", () => {
     /** @scenario "AI-SDK image parts with http(s) URLs validate and pass through unchanged" */
     it("returns the event unchanged and does not call the storage service", async () => {
       const service = makeService();
-      const event = makeEventWithContent([
-        { type: "image", image: "https://example.com/cat.png" },
-      ]);
+      const event = makeEventWithContent([{ type: "image", image: "https://example.com/cat.png" }]);
 
       const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
         ...BASE_PARAMS,
@@ -964,8 +942,7 @@ describe("extractInlineMediaFromEvent", () => {
         }),
       );
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       const part = content[1] as {
         type: string;
         id: string;
@@ -1017,8 +994,7 @@ describe("extractInlineMediaFromEvent", () => {
         }),
       );
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content[0]).toMatchObject({
         type: "binary",
         url: `/api/files/proj-1/${storedId}`,
@@ -1032,9 +1008,7 @@ describe("extractInlineMediaFromEvent", () => {
     /** @scenario "OpenAI file parts carrying only a provider file_id pass through unchanged" */
     it("returns the event unchanged and does not call the storage service", async () => {
       const service = makeService();
-      const event = makeEventWithContent([
-        { type: "file", file: { file_id: "file-abc123" } },
-      ]);
+      const event = makeEventWithContent([{ type: "file", file: { file_id: "file-abc123" } }]);
 
       const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
         ...BASE_PARAMS,
@@ -1082,8 +1056,7 @@ describe("extractInlineMediaFromEvent", () => {
         }),
       );
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content[0]).toEqual({
         type: "input_audio",
         input_audio: {
@@ -1184,8 +1157,7 @@ describe("extractInlineMediaFromEvent", () => {
       expect(service.storeFromBytes).toHaveBeenCalledWith(
         expect.objectContaining({ mediaType: "text/csv" }),
       );
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content[0]).toMatchObject({
         type: "binary",
         filename: "report.csv",
@@ -1301,8 +1273,7 @@ describe("extractInlineMediaFromEvent", () => {
         }),
       );
 
-      const content = (rewrittenEvent as { message: { content: unknown[] } })
-        .message.content;
+      const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content[0]).toEqual({
         type: "input_audio",
         input_audio: {

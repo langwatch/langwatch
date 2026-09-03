@@ -21,9 +21,7 @@ export const SessionNameCell: React.FC<{
   isOpening: boolean;
   onOpenReplay?: (() => void) | undefined;
 }> = ({ row, isOpening, onOpenReplay }) => {
-  const where = [row.repositoryFullName, row.gitBranch]
-    .filter((part) => part !== "")
-    .join(" · ");
+  const where = [row.repositoryFullName, row.gitBranch].filter((part) => part !== "").join(" · ");
 
   return (
     // The column is capped, so both lines have to be told they may not grow
@@ -31,10 +29,7 @@ export const SessionNameCell: React.FC<{
     // lets a long branch name run under the next column instead of ellipsing.
     <VStack align="start" gap={0} minWidth={0} width="full">
       <HStack gap={2} minWidth={0} width="full">
-        <SessionNameButton
-          onOpenReplay={onOpenReplay}
-          label={row.title ?? "untitled session"}
-        >
+        <SessionNameButton onOpenReplay={onOpenReplay} label={row.title ?? "untitled session"}>
           {row.title ? (
             <Text fontSize="sm" fontWeight="medium" truncate>
               {row.title}
@@ -49,13 +44,7 @@ export const SessionNameCell: React.FC<{
       </HStack>
       {where === "" ? null : (
         <Tooltip content={where} positioning={{ placement: "bottom-start" }}>
-          <Text
-            fontSize="xs"
-            color="fg.subtle"
-            fontFamily="mono"
-            truncate
-            maxWidth="full"
-          >
+          <Text fontSize="xs" color="fg.subtle" fontFamily="mono" truncate maxWidth="full">
             {where}
           </Text>
         </Tooltip>

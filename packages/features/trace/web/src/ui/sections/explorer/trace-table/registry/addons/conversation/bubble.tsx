@@ -97,13 +97,7 @@ const TRUNCATE_BREAK_PREFER_RATIO = 0.5;
 
 // Cuts on a paragraph/sentence boundary above maxChars*ratio so we don't slice
 // mid-token and produce broken markdown (unclosed code fences, dangling lists).
-export function truncateMarkdown({
-  text,
-  maxChars,
-}: {
-  text: string;
-  maxChars: number;
-}): string {
+export function truncateMarkdown({ text, maxChars }: { text: string; maxChars: number }): string {
   if (maxChars <= 0 || text.length <= maxChars) return text;
   const truncated = text.slice(0, maxChars);
   const lastBreak = Math.max(
@@ -146,11 +140,7 @@ export const Bubble: React.FC<BubbleProps> = ({
   const canExpand = isExpandable && isTruncated;
   const truncated = truncateMarkdown({ text, maxChars });
   const display =
-    !isExpandable || !isTruncated
-      ? truncated
-      : expanded
-        ? text
-        : truncated.replace(/\n+…\s*$/, "");
+    !isExpandable || !isTruncated ? truncated : expanded ? text : truncated.replace(/\n+…\s*$/, "");
 
   return (
     <Flex
@@ -191,9 +181,7 @@ export const Bubble: React.FC<BubbleProps> = ({
             ? `inset ${side === "right" ? "-3px" : "3px"} 0 0 var(--chakra-colors-amber-solid)`
             : undefined
         }
-        _hover={
-          onClick ? { bg: palette.selectedBg, transform: "translateY(-1px)" } : undefined
-        }
+        _hover={onClick ? { bg: palette.selectedBg, transform: "translateY(-1px)" } : undefined}
         onClick={(e: React.MouseEvent) => {
           if (!onClick) return;
           e.stopPropagation();
@@ -201,12 +189,7 @@ export const Bubble: React.FC<BubbleProps> = ({
         }}
       >
         <HStack gap={1.5} marginBottom={1} align="center">
-          <Text
-            textStyle="2xs"
-            fontWeight="600"
-            color={palette.accent}
-            letterSpacing="0.02em"
-          >
+          <Text textStyle="2xs" fontWeight="600" color={palette.accent} letterSpacing="0.02em">
             {label}
           </Text>
           {hasAnnotation && (
@@ -269,10 +252,7 @@ export const Bubble: React.FC<BubbleProps> = ({
           <Markdown>{display}</Markdown>
         </Box>
         {canExpand && (
-          <MessageExpandToggle
-            expanded={expanded}
-            onToggle={() => setExpanded((v) => !v)}
-          />
+          <MessageExpandToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
         )}
       </Box>
     </Flex>

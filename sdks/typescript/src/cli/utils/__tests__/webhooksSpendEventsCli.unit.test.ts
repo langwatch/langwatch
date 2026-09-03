@@ -72,9 +72,7 @@ describe("Feature: CLI families for webhooks and spend events", () => {
 
   /** @scenario From and to flags parse ISO-8601 and epoch milliseconds */
   it("parses ISO instants and epoch ms, refusing garbage", () => {
-    expect(parseInstantOrNull("2026-07-01T00:00:00Z")).toBe(
-      Date.parse("2026-07-01T00:00:00Z"),
-    );
+    expect(parseInstantOrNull("2026-07-01T00:00:00Z")).toBe(Date.parse("2026-07-01T00:00:00Z"));
     expect(parseInstantOrNull("1753791000000")).toBe(1753791000000);
     expect(parseInstantOrNull("not-a-date")).toBeNull();
     expect(parseInstantOrNull("-5")).toBeNull();

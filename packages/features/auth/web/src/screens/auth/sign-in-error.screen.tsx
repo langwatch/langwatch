@@ -30,10 +30,7 @@ import { usePublicEnv } from "../../behavior/use-public-env";
  */
 export const normalizeErrorCode = (error: string | null | undefined): string | null => {
   if (!error) return null;
-  if (
-    error === "email_doesn't_match" ||
-    error === "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"
-  ) {
+  if (error === "email_doesn't_match" || error === "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED") {
     return "DIFFERENT_EMAIL_NOT_ALLOWED";
   }
   if (
@@ -172,13 +169,13 @@ export function SignInError({ error: rawError }: { error: string }) {
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      This email is already registered with a different sign-in method. To
-                      get back in, sign out completely and sign in again using the method
-                      you used originally.
+                      This email is already registered with a different sign-in method. To get back
+                      in, sign out completely and sign in again using the method you used
+                      originally.
                       <br />
                       <br />
-                      If your organization uses single sign-on, enter your work email and
-                      choose your company login.
+                      If your organization uses single sign-on, enter your work email and choose
+                      your company login.
                     </Text>
                     <Button asChild marginTop={4} color="white">
                       <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
@@ -189,8 +186,8 @@ export function SignInError({ error: rawError }: { error: string }) {
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      You cannot link an account with a different email address. Please
-                      use the same email address as your current account.
+                      You cannot link an account with a different email address. Please use the same
+                      email address as your current account.
                     </Text>
                     <Button asChild marginTop={4} color="white">
                       <Link href="/settings/authentication">Back to Settings</Link>
@@ -201,9 +198,8 @@ export function SignInError({ error: rawError }: { error: string }) {
                 <Alert.Description>
                   <VStack gap={1} align="start">
                     <Text>
-                      Your organization requires single sign-on. Sign out and sign in
-                      again by entering your company email address, then choose your
-                      organization's login.
+                      Your organization requires single sign-on. Sign out and sign in again by
+                      entering your company email address, then choose your organization's login.
                     </Text>
                     <Button asChild marginTop={4} color="white">
                       <a href={FEDERATED_LOGOUT_PATH}>Sign out &amp; try again</a>
@@ -217,9 +213,7 @@ export function SignInError({ error: rawError }: { error: string }) {
                   <Button asChild marginTop={4} color="white">
                     <Link
                       href={`/auth/signin${
-                        callbackUrl
-                          ? `?callbackUrl=${encodeURIComponent(callbackUrl)}`
-                          : ""
+                        callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""
                       }`}
                     >
                       Try Sign In Again

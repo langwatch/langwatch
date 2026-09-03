@@ -41,10 +41,7 @@ export function CostBreakdownTooltipContent({
           <TooltipRow label="Billed" value={formatCost(billedCost)} />
           <TooltipRow label="Non-billed" value={formatCost(nonBilledCost)} />
           <Box height="1px" bg="border" marginY={1} />
-          <TooltipRow
-            label="Theoretical total"
-            value={formatCost(grandCost, tokensEstimated)}
-          />
+          <TooltipRow label="Theoretical total" value={formatCost(grandCost, tokensEstimated)} />
           <Text textStyle="2xs" color="fg.muted" paddingTop={1}>
             Bundled plan, not billed per token
           </Text>

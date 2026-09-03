@@ -60,9 +60,7 @@ export class LangyTurnAttemptService {
     if (this.turnCommitted) {
       return;
     }
-    const cleanups: Promise<unknown>[] = [
-      this.deps.admission.abort({ ...this.identity }),
-    ];
+    const cleanups: Promise<unknown>[] = [this.deps.admission.abort({ ...this.identity })];
     if (this.permitReserved) {
       cleanups.push(this.deps.permits.release({ userId: this.identity.userId }));
     }

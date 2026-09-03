@@ -57,6 +57,8 @@ export class WorkflowCodeCompletionAdapter {
       },
     });
 
-    return copilot.complete({ body: input.body as Parameters<CompletionCopilot["complete"]>[0]["body"] });
+    return copilot.complete({
+      body: input.body as Parameters<CompletionCopilot["complete"]>[0]["body"],
+    });
   }
 }

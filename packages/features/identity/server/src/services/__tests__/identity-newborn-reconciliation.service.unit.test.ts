@@ -34,8 +34,7 @@ function harness(options?: {
   const findAbandoned = vi.fn(async () => options?.abandoned ?? []);
   const releaseClaim = vi.fn(async () => undefined);
   const eraseUser = vi.fn(async ({ userId }: { userId: string }) => {
-    if (options?.eraseFails?.(userId))
-      throw new Error("clickhouse unavailable");
+    if (options?.eraseFails?.(userId)) throw new Error("clickhouse unavailable");
     return [];
   });
 

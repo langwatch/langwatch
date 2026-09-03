@@ -127,17 +127,15 @@ beforeEach(() => {
   // Reset with `itemRights`, or a suite that sets item rects without setting
   // a container edge would inherit whichever one ran before it.
   containerRight = 0;
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
-    function (this: Element) {
-      if (!itemRights) return originalGetRect.call(this);
-      const id = this.getAttribute("data-overflow-id");
-      if (id && id in itemRights) return fakeRect(itemRights[id]!);
-      if (this.querySelector?.("[data-overflow-id]")) {
-        return fakeRect(containerRight);
-      }
-      return originalGetRect.call(this);
-    },
-  );
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+    if (!itemRights) return originalGetRect.call(this);
+    const id = this.getAttribute("data-overflow-id");
+    if (id && id in itemRights) return fakeRect(itemRights[id]!);
+    if (this.querySelector?.("[data-overflow-id]")) {
+      return fakeRect(containerRight);
+    }
+    return originalGetRect.call(this);
+  });
 });
 
 afterEach(() => {
@@ -221,9 +219,8 @@ describe("given an input panel in the drawer", () => {
     // First of the group: a longer format name then grows leftwards instead of
     // pushing the actions around.
     expect(
-      selector.compareDocumentPosition(
-        screen.getByRole("button", { name: "Translate" }),
-      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+      selector.compareDocumentPosition(screen.getByRole("button", { name: "Translate" })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 });
@@ -245,9 +242,7 @@ describe("given a chat-shaped input rendered in the Pretty format", () => {
     await user.click(formatTrigger());
     await user.click(await screen.findByRole("menuitem", { name: "Markdown" }));
 
-    expect(
-      await screen.findByRole("button", { name: "Rendered view" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Rendered view" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Source view" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Thread view" })).not.toBeInTheDocument();
   });
@@ -276,12 +271,8 @@ describe("given a toolbar too narrow for all action buttons", () => {
     });
     await user.click(menuTrigger);
 
-    expect(
-      await screen.findByRole("menuitem", { name: "Suggest edit" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: "Open in Playground" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Suggest edit" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Open in Playground" })).toBeInTheDocument();
     // The ones that still fit stay inline, not in the menu.
     expect(screen.queryByRole("menuitem", { name: "Translate" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Comment" })).not.toBeInTheDocument();
@@ -312,9 +303,10 @@ describe("given a toolbar too narrow for all action buttons", () => {
 
     // The menu holds the two actions that overflowed and nothing else — Copy
     // is not one of the measured items, so it can never be folded in.
-    expect(
-      (await screen.findAllByRole("menuitem")).map((item) => item.textContent),
-    ).toEqual(["Suggest edit", "Open in Playground"]);
+    expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual([
+      "Suggest edit",
+      "Open in Playground",
+    ]);
     expect(screen.getByRole("button", { name: "Copy to clipboard" })).toBeVisible();
   });
 
@@ -373,9 +365,7 @@ describe("given a reader who cannot manage annotations", () => {
 
       // Translate is unconditional, so waiting on it proves the toolbar
       // rendered before asserting the other two are absent.
-      expect(
-        await screen.findByRole("button", { name: /Translate/ }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: /Translate/ })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Comment" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Suggest edit" })).toBeNull();
     });
@@ -391,9 +381,9 @@ describe("given a reader who cannot manage annotations", () => {
 
       await user.click(await screen.findByRole("button", { name: "More actions" }));
 
-      expect(
-        (await screen.findAllByRole("menuitem")).map((item) => item.textContent),
-      ).toEqual(["Open in Playground"]);
+      expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual([
+        "Open in Playground",
+      ]);
     });
   });
 
@@ -417,9 +407,7 @@ describe("given a reader who cannot manage annotations", () => {
 
       // The control names the count, so this also proves the stored comment
       // reached it rather than the action merely being present.
-      expect(
-        await screen.findByRole("button", { name: "1 comment" }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "1 comment" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Suggest edit" })).toBeNull();
     });
   });

@@ -99,9 +99,7 @@ export class SsoConnectionLedgerWriter implements SsoConnectionLedger {
 
   private readonly projectionStore: StateProjectionStore<SsoConnectionFoldState>;
   private readonly eventStore: () => Promise<EventStore<SsoConnectionEvent>>;
-  private readonly stagedSender: (
-    name: string,
-  ) => SsoConnectionStagedSender | null;
+  private readonly stagedSender: (name: string) => SsoConnectionStagedSender | null;
   private readonly convergence: { timeoutMs: number; pollMs: number };
 
   constructor(deps: SsoConnectionLedgerWriterDeps) {
@@ -137,11 +135,7 @@ export class SsoConnectionLedgerWriter implements SsoConnectionLedger {
     return events as unknown as SsoConnectionFact[];
   }
 
-  private async stage({
-    command,
-  }: {
-    command: SsoConnectionCommand;
-  }): Promise<void> {
+  private async stage({ command }: { command: SsoConnectionCommand }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
     const sender = this.stagedSender(senderName);
     if (!sender) {
@@ -181,9 +175,7 @@ export class SsoConnectionLedgerWriter implements SsoConnectionLedger {
         );
         return;
       }
-      await new Promise((resolve) =>
-        setTimeout(resolve, this.convergence.pollMs),
-      );
+      await new Promise((resolve) => setTimeout(resolve, this.convergence.pollMs));
     }
   }
 

@@ -74,9 +74,7 @@ describe("Experiment.compare", () => {
 
         expect(error).toBeUndefined();
         expect(verdict?.status).toBe("error");
-        expect(verdict?.reasoning).toBe(
-          "The judge model is not configured for this project.",
-        );
+        expect(verdict?.reasoning).toBe("The judge model is not configured for this project.");
         expect(comparisonEvaluations(harness)[0]!.status).toBe("error");
       });
     });

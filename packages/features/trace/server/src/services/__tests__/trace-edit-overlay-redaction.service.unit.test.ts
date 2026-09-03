@@ -41,9 +41,7 @@ const trace = (spans: Span[]): Trace =>
     spans,
   }) as Trace;
 
-const patchOf = (
-  overrides: Partial<TraceEditOverlayPatch>,
-): TraceEditOverlayPatch => ({
+const patchOf = (overrides: Partial<TraceEditOverlayPatch>): TraceEditOverlayPatch => ({
   version: 1,
   spans: [],
   deletedSpanIds: [],
@@ -190,9 +188,7 @@ describe("redacting a correction for its reader", () => {
           }),
           protections: {
             ...openProtections,
-            hiddenAttributes: [
-              { pattern: "gen_ai.prompt.id", visibleTo: "Admins" },
-            ],
+            hiddenAttributes: [{ pattern: "gen_ai.prompt.id", visibleTo: "Admins" }],
           },
         }),
       });
@@ -217,9 +213,7 @@ describe("redacting a correction for its reader", () => {
         protections: {
           ...openProtections,
           canSeeCapturedInput: false,
-          hiddenAttributes: [
-            { pattern: "gen_ai.prompt.id", visibleTo: "Admins" },
-          ],
+          hiddenAttributes: [{ pattern: "gen_ai.prompt.id", visibleTo: "Admins" }],
         },
       });
 
@@ -273,9 +267,7 @@ describe("redacting corrected trace metadata", () => {
         patch: metadataPatch,
         protections: {
           ...openProtections,
-          hiddenAttributes: [
-            { pattern: "metadata.ticket", visibleTo: "Admins" },
-          ],
+          hiddenAttributes: [{ pattern: "metadata.ticket", visibleTo: "Admins" }],
         },
       });
 
@@ -292,9 +284,7 @@ describe("redacting corrected trace metadata", () => {
           patch: metadataPatch,
           protections: {
             ...openProtections,
-            hiddenAttributes: [
-              { pattern: "gen_ai.prompt.id", visibleTo: "Admins" },
-            ],
+            hiddenAttributes: [{ pattern: "gen_ai.prompt.id", visibleTo: "Admins" }],
           },
         }),
       ).toBe(metadataPatch);

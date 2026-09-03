@@ -73,9 +73,7 @@ export function useProjectPickItems({
   const filteredItems = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return allItems;
-    return allItems.filter(
-      (item) => item.kind === "project" && item.searchText.includes(needle),
-    );
+    return allItems.filter((item) => item.kind === "project" && item.searchText.includes(needle));
   }, [allItems, query]);
 
   const collection = useMemo(
@@ -125,9 +123,7 @@ export function resolvePickOutcome({
   if (!item) return null;
   if (item.kind === "new-project") {
     const team = groups.find((g) => g.team.teamId === item.teamId)?.team;
-    return team
-      ? { kind: "create", team: { teamId: team.teamId, orgId: team.orgId } }
-      : null;
+    return team ? { kind: "create", team: { teamId: team.teamId, orgId: team.orgId } } : null;
   }
   if (item.value === currentProjectId || !item.href) return null;
   return { kind: "open", href: item.href };

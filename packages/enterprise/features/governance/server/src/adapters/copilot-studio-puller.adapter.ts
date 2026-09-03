@@ -15,16 +15,10 @@
  *
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  */
-import {
-  type HttpPollingConfig,
-  HttpPollingPullerAdapter,
-} from "./http-poller.adapter";
+import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http-poller.adapter";
 import type { GovernanceHttpPort } from "../ports/governance-http.port";
 import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port";
-import type {
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
+import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
 /**
  * Locked reference config for Microsoft Copilot Studio. The URL +
@@ -109,10 +103,7 @@ export class CopilotStudioReferencePuller extends HttpPollingPullerAdapter {
     return COPILOT_STUDIO_PULL_CONFIG;
   }
 
-  override async runOnce(
-    options: PullRunOptions,
-    _config: HttpPollingConfig,
-  ): Promise<PullResult> {
+  override async runOnce(options: PullRunOptions, _config: HttpPollingConfig): Promise<PullResult> {
     return super.runOnce(options, COPILOT_STUDIO_PULL_CONFIG);
   }
 }

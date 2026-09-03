@@ -9,7 +9,10 @@ import type {
   BatchResultRow,
   BatchTargetColumn,
 } from "./batch-evaluation-results.types";
-import { computeMetricStats, type MetricStats } from "../../model/batch-evaluation-results.metric-stats";
+import {
+  computeMetricStats,
+  type MetricStats,
+} from "../../model/batch-evaluation-results.metric-stats";
 
 /**
  * Aggregate statistics for a target's evaluator results.

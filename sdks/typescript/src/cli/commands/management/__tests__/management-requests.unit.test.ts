@@ -126,9 +126,7 @@ describe("role-bindings list", () => {
       mockFetch.mockClear();
       respondWith({ bindings: [], totalCount: 0 });
       await listRoleBindingsCommand({});
-      expect(lastRequest().url).toBe(
-        "https://app.langwatch.ai/api/role-bindings/latest/",
-      );
+      expect(lastRequest().url).toBe("https://app.langwatch.ai/api/role-bindings/latest/");
     });
   });
 });
@@ -261,14 +259,10 @@ describe("the API key readings", () => {
           expect(output, `${name} in ${permissionMode} mode`).toContain(
             "No bindings: this key grants no access anywhere.",
           );
-          expect(output, `${name} in ${permissionMode} mode`).not.toContain(
-            "organization-wide",
-          );
+          expect(output, `${name} in ${permissionMode} mode`).not.toContain("organization-wide");
           // And the permissions line agrees: there are no bindings for them to
           // come from either.
-          expect(output, `${name} in ${permissionMode} mode`).not.toContain(
-            "from the bindings",
-          );
+          expect(output, `${name} in ${permissionMode} mode`).not.toContain("from the bindings");
         }
       }
     });
@@ -317,9 +311,7 @@ describe("invites create", () => {
       });
       const fromFlags = lastRequest();
 
-      expect(fromFlags.url).toBe(
-        "https://app.langwatch.ai/api/organization/latest/invites",
-      );
+      expect(fromFlags.url).toBe("https://app.langwatch.ai/api/organization/latest/invites");
       expect(fromFlags.init.method).toBe("POST");
       expect(fromFlags.body).toEqual({
         invites: [
@@ -336,10 +328,7 @@ describe("invites create", () => {
 
       // The same batch as JSON on a file.
       const file = join(mkdtempSync(join(tmpdir(), "lw-invites-")), "invites.json");
-      writeFileSync(
-        file,
-        JSON.stringify((fromFlags.body as { invites: unknown[] }).invites),
-      );
+      writeFileSync(file, JSON.stringify((fromFlags.body as { invites: unknown[] }).invites));
 
       mockFetch.mockClear();
       respondWith(created);
@@ -347,9 +336,7 @@ describe("invites create", () => {
       const fromFile = lastRequest();
 
       // And on standard input.
-      const stdinChunks = JSON.stringify(
-        (fromFlags.body as { invites: unknown[] }).invites,
-      );
+      const stdinChunks = JSON.stringify((fromFlags.body as { invites: unknown[] }).invites);
       const listeners = new Map<string, (chunk?: Buffer) => void>();
       const stdinOn = vi.spyOn(process.stdin, "on").mockImplementation(((
         event: string,
@@ -506,9 +493,7 @@ describe("every management family", () => {
 
         const result = await testCase.run();
 
-        expect(result?.data, `${testCase.name} machine payload`).toEqual(
-          testCase.response,
-        );
+        expect(result?.data, `${testCase.name} machine payload`).toEqual(testCase.response);
         // Nothing is printed until the human rendering is asked for, so a
         // machine format sees only the document the output port writes.
         expect(logged, `${testCase.name} printed before rendering`).toEqual([]);

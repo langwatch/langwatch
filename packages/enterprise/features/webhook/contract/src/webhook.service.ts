@@ -31,9 +31,7 @@ export abstract class WebhookEventsService {
     organizationId: string;
     id: string;
   }): Promise<import("./webhook").WebhookEnvelope | null>;
-  abstract getEmittedEvents(
-    query: ListWebhookEventsQuery,
-  ): Promise<ListWebhookEventsResult>;
+  abstract getEmittedEvents(query: ListWebhookEventsQuery): Promise<ListWebhookEventsResult>;
 }
 
 export abstract class WebhookHealthService {

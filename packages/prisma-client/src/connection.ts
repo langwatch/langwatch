@@ -1,8 +1,5 @@
 import { type Prisma, PrismaClient } from "./generated/client";
-import {
-  PrismaDriverAdapterService,
-  type PrismaDriverAdapterFactory,
-} from "./driver-adapter";
+import { PrismaDriverAdapterService, type PrismaDriverAdapterFactory } from "./driver-adapter";
 import type { PrismaConfiguration } from "./config";
 import type { Pool } from "pg";
 import type { PrismaPg } from "@prisma/adapter-pg";
@@ -29,10 +26,7 @@ export type PrismaQueryExecutor = (args: unknown) => Promise<unknown>;
  * its own copy of the rules, which is how a guard stops being a guard.
  */
 export abstract class PrismaQueryGuard {
-  abstract execute(
-    context: PrismaQueryContext,
-    next: PrismaQueryExecutor,
-  ): Promise<unknown>;
+  abstract execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown>;
 }
 
 export interface PrismaClientFactoryInput {

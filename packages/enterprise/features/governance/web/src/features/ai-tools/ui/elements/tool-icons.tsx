@@ -18,14 +18,7 @@ import {
  * Stored as `preset:tool:<key>` on AiToolEntry.iconAsset and resolved
  * back to the lucide ReactNode in TileIcon.
  */
-export const TOOL_KINDS = [
-  "wrench",
-  "globe",
-  "book",
-  "message",
-  "box",
-  "sparkles",
-] as const;
+export const TOOL_KINDS = ["wrench", "globe", "book", "message", "box", "sparkles"] as const;
 
 export type ToolKind = (typeof TOOL_KINDS)[number];
 

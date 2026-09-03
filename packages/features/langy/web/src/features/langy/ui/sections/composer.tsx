@@ -95,8 +95,7 @@ const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
 // Shown under every composer, in every variant and at every viewport height. A
 // notice about what happens to what you type only does its job where you type,
 // so it is not gated on the layout the way the tagline below it is.
-const COMPOSER_DATA_USE_NOTICE =
-  "Note: these chats are used by LangWatch to improve Langy.";
+const COMPOSER_DATA_USE_NOTICE = "Note: these chats are used by LangWatch to improve Langy.";
 
 /**
  * The composer rail — affordances that sit beside the model picker.
@@ -613,11 +612,7 @@ const ComposerInputRow = memo(function ComposerInputRow({
         // next message…", the user wrote one, pressed Enter, and nothing
         // happened: the text sat in the field with no sign it had been
         // refused.
-        placeholder={
-          turnActive
-            ? "Langy is working. You can send when it stops."
-            : placeholder
-        }
+        placeholder={turnActive ? "Langy is working. You can send when it stops." : placeholder}
         disabled={disabled}
         rows={1}
         autoresize
@@ -694,13 +689,7 @@ function ComposerSendControl({
   );
 }
 
-function StopTurnButton({
-  isStopping,
-  onStop,
-}: {
-  isStopping: boolean;
-  onStop: () => void;
-}) {
+function StopTurnButton({ isStopping, onStop }: { isStopping: boolean; onStop: () => void }) {
   return (
     <SendButton
       aria-label={isStopping ? "Stopping" : "Stop"}
@@ -896,8 +885,8 @@ function ContextSummaryMenu({
       <Menu.Content minWidth="300px" maxWidth="360px" padding={1}>
         {contextChips.length === 0 && addableChips.length === 0 ? (
           <Text padding={3} textStyle="xs" color="fg.muted">
-            Langy can use the trace, evaluation, dataset, or feature you&apos;re looking
-            at. Open one to make it available here.
+            Langy can use the trace, evaluation, dataset, or feature you&apos;re looking at. Open
+            one to make it available here.
           </Text>
         ) : null}
         {contextChips.length > 0 ? (

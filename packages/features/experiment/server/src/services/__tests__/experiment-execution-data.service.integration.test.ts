@@ -33,7 +33,11 @@ import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract"
 import type { PromptService } from "@langwatch/prompt-contract";
 import { PostgresPromptAdapter } from "@langwatch/prompt-server";
 import type { ExperimentWorkflowDslPort } from "../../ports/experiment-workflow-dsl.port";
-import { loadExecutionData, promptLoadKey, workflowLoadKey } from "../experiment-execution-data.service";
+import {
+  loadExecutionData,
+  promptLoadKey,
+  workflowLoadKey,
+} from "../experiment-execution-data.service";
 
 /**
  * This suite writes and reads the rows itself and does not exercise
@@ -167,10 +171,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       ["agent", { id: { in: cleanupAgentIds }, projectId: PROJECT_ID }],
       ["workflowVersion", { workflowId: { in: cleanupWorkflowIds }, projectId: PROJECT_ID }],
       ["workflow", { id: { in: cleanupWorkflowIds }, projectId: PROJECT_ID }],
-      [
-        "llmPromptConfigVersion",
-        { configId: { in: cleanupPromptIds }, projectId: PROJECT_ID },
-      ],
+      ["llmPromptConfigVersion", { configId: { in: cleanupPromptIds }, projectId: PROJECT_ID }],
       ["llmPromptConfig", { id: { in: cleanupPromptIds }, projectId: PROJECT_ID }],
       ["user", { id: authorId }],
       ["project", { id: PROJECT_ID }],
@@ -264,9 +265,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         throw new Error(`loadExecutionData failed: ${result.error}`);
       }
 
-      const loadedWorkflow = result.loadedWorkflows.get(
-        workflowLoadKey({ workflowId }),
-      );
+      const loadedWorkflow = result.loadedWorkflows.get(workflowLoadKey({ workflowId }));
       expect(loadedWorkflow).toBeDefined();
       expect(loadedWorkflow?.id).toBe(workflowId);
       expect(loadedWorkflow?.versionId).toBe(versionId);
@@ -423,9 +422,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
 
         expect("error" in result).toBe(true);
         if ("error" in result) {
-          expect(result.error).toBe(
-            `Evaluator "${missingEvaluatorId}" not found`,
-          );
+          expect(result.error).toBe(`Evaluator "${missingEvaluatorId}" not found`);
           expect(result.status).toBe(404);
         }
       });

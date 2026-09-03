@@ -1,10 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { Terminal } from "react-feather";
 
-import {
-  type ApiSnippetTab,
-  GenerateApiSnippetDialog,
-} from "../generate-api-snippet-dialog";
+import { type ApiSnippetTab, GenerateApiSnippetDialog } from "../generate-api-snippet-dialog";
 import { DataSourcePicker } from "../../elements/run-via-api/data-source-picker";
 import {
   buildRunSnippet,
@@ -37,19 +34,18 @@ export function RunViaApiButton({
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://app.langwatch.ai";
 
-  const { dataSource, setDataSource, tabs } = useRunViaApiTabs(
-    ({ lang, dataSource: source }) =>
-      buildRunSnippet({
-        kind: "workflow",
-        identifier: workflowId,
-        baseUrl,
-        entryFields,
-        datasetColumns,
-        datasetName,
-        dataSource: source,
-        projectSlug,
-        lang,
-      }),
+  const { dataSource, setDataSource, tabs } = useRunViaApiTabs(({ lang, dataSource: source }) =>
+    buildRunSnippet({
+      kind: "workflow",
+      identifier: workflowId,
+      baseUrl,
+      entryFields,
+      datasetColumns,
+      datasetName,
+      dataSource: source,
+      projectSlug,
+      lang,
+    }),
   );
 
   return (

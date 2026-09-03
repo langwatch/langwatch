@@ -57,22 +57,22 @@ In **Settings → SSO**, click **Connect identity provider**.
 <Tabs>
   <Tab title="Okta (SAML)">
     1. In Okta admin, create a new SAML 2.0 application. 2. **Single sign-on URL**:
-    `https://app.langwatch.ai/api/auth/sso/{your - org - slug}/callback` 3. **Audience
-    URI**: `https://app.langwatch.ai` 4. Map the **NameID** to email and add the standard
-    claims (`email`, `firstName`, `lastName`). 5. Download the IdP metadata XML. 6. Paste
-    it into LangWatch's **Connect identity provider** form. 7. (Optional) Enable **SCIM
-    provisioning** so users are auto-created the first time they sign in.
+    `https://app.langwatch.ai/api/auth/sso/{your - org - slug}/callback` 3. **Audience URI**:
+    `https://app.langwatch.ai` 4. Map the **NameID** to email and add the standard claims (`email`,
+    `firstName`, `lastName`). 5. Download the IdP metadata XML. 6. Paste it into LangWatch's
+    **Connect identity provider** form. 7. (Optional) Enable **SCIM provisioning** so users are
+    auto-created the first time they sign in.
   </Tab>
   <Tab title="Azure AD (OIDC)">
     1. In Azure portal, register a new application. 2. Set redirect URI to
-    `https://app.langwatch.ai/api/auth/sso/{your - org - slug}/callback` 3. Generate a
-    client secret. 4. Note the tenant ID, client ID, client secret. 5. Paste into
-    LangWatch's **Connect identity provider** form.
+    `https://app.langwatch.ai/api/auth/sso/{your - org - slug}/callback` 3. Generate a client
+    secret. 4. Note the tenant ID, client ID, client secret. 5. Paste into LangWatch's **Connect
+    identity provider** form.
   </Tab>
   <Tab title="Google Workspace (OIDC)">
-    1. In Google Cloud Console, create OAuth 2.0 credentials. 2. Set authorized redirect
-    URI to `https://app.langwatch.ai/api/auth/sso/{your - org - slug}/callback` 3.
-    Restrict to your Workspace domain. 4. Paste client ID + secret into LangWatch.
+    1. In Google Cloud Console, create OAuth 2.0 credentials. 2. Set authorized redirect URI to
+    `https://app.langwatch.ai/api/auth/sso/{your - org - slug}/callback` 3. Restrict to your
+    Workspace domain. 4. Paste client ID + secret into LangWatch.
   </Tab>
 </Tabs>
 
@@ -95,8 +95,8 @@ is available everywhere. You can tighten later by creating
 team-scoped overrides.
 
 <Note>
-  The provider entries here are the same ones the AI Gateway already uses for service
-  virtual keys. Personal keys reuse them. There is no parallel pool.
+  The provider entries here are the same ones the AI Gateway already uses for service virtual keys.
+  Personal keys reuse them. There is no parallel pool.
 </Note>
 
 ## 3. Define routing policies
@@ -138,13 +138,12 @@ Policies cascade: a `TEAM`-scoped policy with `isDefault=true`
 overrides the `ORG`-scoped default for members of that team.
 
 <Note>
-  **Smoke-test before you publish the portal**: the org-default routing policy MUST have
-  at least one provider in its chain before personal keys can serve traffic. If you
-  publish `/me` to teammates with an empty `developer-default` policy, every issued VK
-  provisions successfully but the first call returns `504 provider_timeout` (the gateway
-  has nothing to forward to). After §2 (Connect providers) + this section, mint a test key
-  against your own user, fire one completion, and confirm a 200 before announcing the
-  portal.
+  **Smoke-test before you publish the portal**: the org-default routing policy MUST have at least
+  one provider in its chain before personal keys can serve traffic. If you publish `/me` to
+  teammates with an empty `developer-default` policy, every issued VK provisions successfully but
+  the first call returns `504 provider_timeout` (the gateway has nothing to forward to). After §2
+  (Connect providers) + this section, mint a test key against your own user, fire one completion,
+  and confirm a 200 before announcing the portal.
 </Note>
 
 ## 4. Set per-user budgets

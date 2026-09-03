@@ -56,28 +56,31 @@ vi.mock("../../../../../../index", async (importOriginal) => ({
  * where that layout lives; here it reports what the conversation told it about
  * the turn under review.
  */
-vi.mock("../../../../../sections/explorer/trace-drawer/conversation-view/annotated-turn-row", () => ({
-  AnnotatedTurnRow: ({
-    parsed,
-    showSessionCheckbox,
-    isFocused,
-    isBlinking,
-  }: {
-    parsed: { turn: { traceId: string } };
-    showSessionCheckbox?: boolean;
-    isFocused?: boolean;
-    isBlinking?: boolean;
-  }) => (
-    <div
-      data-testid="annotated-turn-row"
-      data-session-checkbox={String(!!showSessionCheckbox)}
-      data-focused-turn={String(!!isFocused)}
-      data-blinking={String(!!isBlinking)}
-    >
-      {parsed.turn.traceId}
-    </div>
-  ),
-}));
+vi.mock(
+  "../../../../../sections/explorer/trace-drawer/conversation-view/annotated-turn-row",
+  () => ({
+    AnnotatedTurnRow: ({
+      parsed,
+      showSessionCheckbox,
+      isFocused,
+      isBlinking,
+    }: {
+      parsed: { turn: { traceId: string } };
+      showSessionCheckbox?: boolean;
+      isFocused?: boolean;
+      isBlinking?: boolean;
+    }) => (
+      <div
+        data-testid="annotated-turn-row"
+        data-session-checkbox={String(!!showSessionCheckbox)}
+        data-focused-turn={String(!!isFocused)}
+        data-blinking={String(!!isBlinking)}
+      >
+        {parsed.turn.traceId}
+      </div>
+    ),
+  }),
+);
 
 import type { TraceListItem } from "../../../../../sections/explorer/types/trace";
 import { ConversationView } from "../../../../../sections/explorer/trace-drawer/conversation-view/conversation-view";
@@ -149,9 +152,7 @@ describe("given a queue item opened on a thread of several turns", () => {
 
     restIsOver();
 
-    expect(scrollTo).toHaveBeenCalledWith(
-      expect.objectContaining({ behavior: "smooth" }),
-    );
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
     expect(blinkingTurns()).toHaveLength(1);
     expect(blinkingTurns()[0]).toHaveTextContent("trace-2");
   });
@@ -201,10 +202,7 @@ describe("given a queue item opened on a thread of several turns", () => {
 });
 
 describe("given the thread is still laying out when the reader arrives", () => {
-  const originalOffsetTop = Object.getOwnPropertyDescriptor(
-    HTMLElement.prototype,
-    "offsetTop",
-  );
+  const originalOffsetTop = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetTop");
   let mockOffsetTop = 0;
 
   beforeEach(() => {

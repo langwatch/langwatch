@@ -37,10 +37,7 @@ export const CLI_CARD_OUTCOMES = ["unconfirmed"] as const;
 
 export type CliCardOutcome = (typeof CLI_CARD_OUTCOMES)[number];
 
-const cardResult = <Kind extends string, Schema extends z.ZodType>(
-  card: Kind,
-  payload: Schema,
-) =>
+const cardResult = <Kind extends string, Schema extends z.ZodType>(card: Kind, payload: Schema) =>
   z.object({
     kind: z.literal("card"),
     card: z.literal(card),

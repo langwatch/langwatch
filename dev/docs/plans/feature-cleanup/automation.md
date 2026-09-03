@@ -12,20 +12,20 @@ comment lines (9.7%), 504 of which sit in two of the 78 files**.
 
 Server, by directory:
 
-| Directory | Files | Lines |
-| --- | ---: | ---: |
-| `services/` | 24 | 4,812 |
-| `transport/api-trpc/` | 3 | 1,461 |
-| `adapters/` | 8 | 1,477 |
-| `repositories/prisma/` | 8 | 791 |
-| `app/` | 1 | 572 |
-| `ports/` | 16 (30 classes) | 436 |
-| `transport/api-rest/` | 1 | 362 |
-| `processes/` | 3 | 268 |
-| `subscribers/` | 2 | 177 |
-| `repositories/` | 7 | 175 |
-| `index.ts` / `testing.ts` | 2 | 278 |
-| `intents/` | 3 | 116 |
+| Directory                 |           Files | Lines |
+| ------------------------- | --------------: | ----: |
+| `services/`               |              24 | 4,812 |
+| `transport/api-trpc/`     |               3 | 1,461 |
+| `adapters/`               |               8 | 1,477 |
+| `repositories/prisma/`    |               8 |   791 |
+| `app/`                    |               1 |   572 |
+| `ports/`                  | 16 (30 classes) |   436 |
+| `transport/api-rest/`     |               1 |   362 |
+| `processes/`              |               3 |   268 |
+| `subscribers/`            |               2 |   177 |
+| `repositories/`           |               7 |   175 |
+| `index.ts` / `testing.ts` |               2 |   278 |
+| `intents/`                |               3 |   116 |
 
 ### The write path (tRPC `upsert`)
 
@@ -156,12 +156,12 @@ functions in `subscribers/`, re-passing the same four dependencies each time.
 `ports/*.port.ts` to export an abstract class **whose name ends in `Port`**. Four
 files satisfy it with an empty subclass and keep the real name for every consumer:
 
-| File | Real class | Lint-satisfying alias | References to the alias |
-| --- | --- | --- | ---: |
-| `ports/automation-clock.port.ts:5` | `AutomationClock` (47 refs) | `AutomationClockPort` | **1** — its own declaration |
-| `ports/scheduled-jobs.port.ts:28` | `ScheduledJobStore` (28 refs) | `ScheduledJobStorePort` | **1** |
-| `ports/scheduler-wake.port.ts:5` | `SchedulerWake` (15 refs) | `SchedulerWakePort` | **1** |
-| `ports/unsubscribe-token.port.ts:10` | `UnsubscribeTokenVerifier` (13 refs) | `UnsubscribeTokenVerifierPort` | **1** |
+| File                                 | Real class                           | Lint-satisfying alias          |     References to the alias |
+| ------------------------------------ | ------------------------------------ | ------------------------------ | --------------------------: |
+| `ports/automation-clock.port.ts:5`   | `AutomationClock` (47 refs)          | `AutomationClockPort`          | **1** — its own declaration |
+| `ports/scheduled-jobs.port.ts:28`    | `ScheduledJobStore` (28 refs)        | `ScheduledJobStorePort`        |                       **1** |
+| `ports/scheduler-wake.port.ts:5`     | `SchedulerWake` (15 refs)            | `SchedulerWakePort`            |                       **1** |
+| `ports/unsubscribe-token.port.ts:10` | `UnsubscribeTokenVerifier` (13 refs) | `UnsubscribeTokenVerifierPort` |                       **1** |
 
 Nothing imports any of the four aliases. R4's own wording covers this: "renaming
 the file and the class is one change or neither." Rename the base classes and
@@ -172,21 +172,21 @@ delete the aliases.
 Full ledger of the 26 distinct ports (`grep -rn "extends <Port>"`, production
 implementations only):
 
-| Port | Production impls | Where | Verdict |
-| --- | ---: | --- | --- |
-| `AutomationTriggerMatchRecorderPort` | 3 | `platform/app`, `apps/worker` ×2 | **Keep** — real polymorphism |
-| `ScheduledJobStore` | 2 | `platform/app` (Prisma, Null) | **Keep** |
-| `AutomationLoggerPort` · `AutomationHeartbeatPort` · `AutomationDispatchErrorPort` · `AutomationRunawayPort` · `AutomationNotificationDeliveryPort` · `AutomationEmailCapStorePort` · `AutomationDatasetMapperPort` · `AutomationPersistActionWriterPort` · `AutomationSettlementFilterEvaluatorPort` · `AutomationSettlementObservabilityPort` · `AutomationTestFirePort` · `AutomationClock` · `SchedulerWake` · `UnsubscribeTokenVerifier` | 1 each | `platform/app` | **Keep** — genuine inversion |
-| `AutomationIntentRetentionPort` | structural | `apps/worker` process store | **Keep** — cross-package |
-| `AutomationScheduledIntentPort` | structural | narrows 44 contract signatures to 3 | **Keep** — the narrowing earns it |
-| `AutomationGraphNotifierPort` | 1 | `platform/app:291` wrapping the feature's own `GraphAlertDispatchService` | **Delete** |
-| `AutomationSlackBotTokenDecryptorPort` | 1 | `platform/app:93` wrapping the feature's own `SlackProviderAdapter` | **Delete** — see P6 |
-| `AutomationGraphDeliveryPort` | 1 | `adapters/postgres.automation-graph-delivery.adapter.ts:14`, same package | **Delete** |
-| `AutomationEvaluationTriggerFilterPort` | 1 | `services/automation-evaluation-trigger-filter.service.ts:9`, same package | **Delete** |
-| `AutomationSlackProviderPort` | 1 | `adapters/slack-provider.adapter.ts:79`, same package | **Delete** |
-| `AutomationWebhookProviderPort` | 1 | `adapters/webhook-provider.adapter.ts:170`, same package | **Delete** |
-| `AutomationSettlementExecutorPort` | 1 | `services/trigger-settlement-dispatch.service.ts:48`, same package | **Delete** |
-| `AutomationSettlementMatchConfirmationPort` | 1 | `services/automation-settlement-match-confirmation.service.ts:41`, same package | **Delete** |
+| Port                                                                                                                                                                                                                                                                                                                                                                                                                                          | Production impls | Where                                                                           | Verdict                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------: | ------------------------------------------------------------------------------- | --------------------------------- |
+| `AutomationTriggerMatchRecorderPort`                                                                                                                                                                                                                                                                                                                                                                                                          |                3 | `platform/app`, `apps/worker` ×2                                                | **Keep** — real polymorphism      |
+| `ScheduledJobStore`                                                                                                                                                                                                                                                                                                                                                                                                                           |                2 | `platform/app` (Prisma, Null)                                                   | **Keep**                          |
+| `AutomationLoggerPort` · `AutomationHeartbeatPort` · `AutomationDispatchErrorPort` · `AutomationRunawayPort` · `AutomationNotificationDeliveryPort` · `AutomationEmailCapStorePort` · `AutomationDatasetMapperPort` · `AutomationPersistActionWriterPort` · `AutomationSettlementFilterEvaluatorPort` · `AutomationSettlementObservabilityPort` · `AutomationTestFirePort` · `AutomationClock` · `SchedulerWake` · `UnsubscribeTokenVerifier` |           1 each | `platform/app`                                                                  | **Keep** — genuine inversion      |
+| `AutomationIntentRetentionPort`                                                                                                                                                                                                                                                                                                                                                                                                               |       structural | `apps/worker` process store                                                     | **Keep** — cross-package          |
+| `AutomationScheduledIntentPort`                                                                                                                                                                                                                                                                                                                                                                                                               |       structural | narrows 44 contract signatures to 3                                             | **Keep** — the narrowing earns it |
+| `AutomationGraphNotifierPort`                                                                                                                                                                                                                                                                                                                                                                                                                 |                1 | `platform/app:291` wrapping the feature's own `GraphAlertDispatchService`       | **Delete**                        |
+| `AutomationSlackBotTokenDecryptorPort`                                                                                                                                                                                                                                                                                                                                                                                                        |                1 | `platform/app:93` wrapping the feature's own `SlackProviderAdapter`             | **Delete** — see P6               |
+| `AutomationGraphDeliveryPort`                                                                                                                                                                                                                                                                                                                                                                                                                 |                1 | `adapters/postgres.automation-graph-delivery.adapter.ts:14`, same package       | **Delete**                        |
+| `AutomationEvaluationTriggerFilterPort`                                                                                                                                                                                                                                                                                                                                                                                                       |                1 | `services/automation-evaluation-trigger-filter.service.ts:9`, same package      | **Delete**                        |
+| `AutomationSlackProviderPort`                                                                                                                                                                                                                                                                                                                                                                                                                 |                1 | `adapters/slack-provider.adapter.ts:79`, same package                           | **Delete**                        |
+| `AutomationWebhookProviderPort`                                                                                                                                                                                                                                                                                                                                                                                                               |                1 | `adapters/webhook-provider.adapter.ts:170`, same package                        | **Delete**                        |
+| `AutomationSettlementExecutorPort`                                                                                                                                                                                                                                                                                                                                                                                                            |                1 | `services/trigger-settlement-dispatch.service.ts:48`, same package              | **Delete**                        |
+| `AutomationSettlementMatchConfirmationPort`                                                                                                                                                                                                                                                                                                                                                                                                   |                1 | `services/automation-settlement-match-confirmation.service.ts:41`, same package | **Delete**                        |
 
 `automation-settlement.port.ts:17-19` documents its own expiry: "The port has one
 compatibility implementation while the trace filter evaluator finishes its own
@@ -351,21 +351,21 @@ of 78 files**: `transport/api-trpc/automation.api.ts` (336) and
 in. Nineteen non-test files over ~90 code lines carry two comment lines or fewer,
 ten of them **zero**:
 
-| File | Code lines | Comment lines |
-| --- | ---: | ---: |
-| `services/trigger-settlement-notification.service.ts` | 423 | **0** |
-| `services/automation.service.ts` | 414 | **0** |
-| `services/trigger-settlement-persistence.service.ts` | 261 | **0** |
-| `services/automation-template.service.ts` | 239 | **0** |
-| `services/graph-alert-dispatch.service.ts` | 231 | 1 |
-| `repositories/prisma/prisma.graph-trigger-sent.repository.ts` | 199 | 1 |
-| `services/graph-trigger-alert-delivery.service.ts` | 193 | **0** |
-| `services/trigger-evaluator.service.ts` | 193 | 1 |
-| `repositories/prisma/prisma.trigger.repository.ts` | 185 | **0** |
-| `services/runaway-containment.service.ts` | 156 | 1 |
-| `services/trigger-settlement-email.service.ts` | 149 | **0** |
-| `repositories/prisma/prisma.trigger-fire-history.repository.ts` | 129 | **0** |
-| `services/graph-trigger-evaluation-plan.service.ts` | 127 | **0** |
+| File                                                            | Code lines | Comment lines |
+| --------------------------------------------------------------- | ---------: | ------------: |
+| `services/trigger-settlement-notification.service.ts`           |        423 |         **0** |
+| `services/automation.service.ts`                                |        414 |         **0** |
+| `services/trigger-settlement-persistence.service.ts`            |        261 |         **0** |
+| `services/automation-template.service.ts`                       |        239 |         **0** |
+| `services/graph-alert-dispatch.service.ts`                      |        231 |             1 |
+| `repositories/prisma/prisma.graph-trigger-sent.repository.ts`   |        199 |             1 |
+| `services/graph-trigger-alert-delivery.service.ts`              |        193 |         **0** |
+| `services/trigger-evaluator.service.ts`                         |        193 |             1 |
+| `repositories/prisma/prisma.trigger.repository.ts`              |        185 |         **0** |
+| `services/runaway-containment.service.ts`                       |        156 |             1 |
+| `services/trigger-settlement-email.service.ts`                  |        149 |         **0** |
+| `repositories/prisma/prisma.trigger-fire-history.repository.ts` |        129 |         **0** |
+| `services/graph-trigger-evaluation-plan.service.ts`             |        127 |         **0** |
 
 The sharpest case is the whole once-per-trace notification guarantee:
 
@@ -476,9 +476,15 @@ export class AutomationService extends AutomationCapability {
     private readonly graphEvaluator: GraphTriggerEvaluatorService,
     private readonly graphHeartbeat: GraphTriggerHeartbeatService,
     private readonly containment: RunawayContainmentService,
-  ) { super(); }
+  ) {
+    super();
+  }
 
-  evaluateGraphTrigger(input: { triggerId: string; projectId: string; reason: GraphTriggerEvaluationReason }) {
+  evaluateGraphTrigger(input: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }) {
     return this.graphEvaluator.evaluate(input);
   }
 }
@@ -493,7 +499,7 @@ export class GraphTriggerEvaluatorService {
     private readonly plans: GraphTriggerEvaluationPlanService,
     private readonly series: GraphTriggerSeriesEvaluationService,
     private readonly incidents: GraphTriggerIncidentService,
-    private readonly dispatch: GraphAlertDispatchService,   // ← was AutomationGraphNotifierPort
+    private readonly dispatch: GraphAlertDispatchService, // ← was AutomationGraphNotifierPort
   ) {}
 }
 ```
@@ -519,22 +525,31 @@ export class AutomationPersistCapService {
     private readonly projects: ProjectService,
     private readonly plans: AutomationPlanProvider,
     private readonly config: PersistCapConfig,
-    private readonly redis: AutomationEmailCapStorePort | null,   // ← the existing port,
-  ) {}                                                            //   not a second Redis interface
+    private readonly redis: AutomationEmailCapStorePort | null, // ← the existing port,
+  ) {} //   not a second Redis interface
 
-  static create(options: { projects; planProvider; config; redis?: AutomationEmailCapStorePort | null }): AutomationPersistCapService
+  static create(options: {
+    projects;
+    planProvider;
+    config;
+    redis?: AutomationEmailCapStorePort | null;
+  }): AutomationPersistCapService;
 
-  async resolvePersistDailyCap(projectId: string): Promise<number>
-  async consumePersistCapSlot(input: ConsumePersistCapSlotInput): Promise<AutomationPersistCapDecision>
-  async readPersistCapCounts(input: ReadPersistCapCountsInput): Promise<Record<string, AutomationPersistCapCount>>
+  async resolvePersistDailyCap(projectId: string): Promise<number>;
+  async consumePersistCapSlot(
+    input: ConsumePersistCapSlotInput,
+  ): Promise<AutomationPersistCapDecision>;
+  async readPersistCapCounts(
+    input: ReadPersistCapCountsInput,
+  ): Promise<Record<string, AutomationPersistCapCount>>;
 
-  private capForPlan(plan: AutomationPlan): number
-  private persistCapKey(input: PersistCapKeyInput): string
-  private persistCapClaimKey(input: PersistCapClaimKeyInput): string
-  private rememberClaim(claimKey: string, expiresAt: number): void
-  private sweepExpiredMemoryEntries(now: number): void
-  private async tryCountViaRedis(input): Promise<Record<string, AutomationPersistCapCount> | null>
-  private countInMemory(input): Record<string, AutomationPersistCapCount>
+  private capForPlan(plan: AutomationPlan): number;
+  private persistCapKey(input: PersistCapKeyInput): string;
+  private persistCapClaimKey(input: PersistCapClaimKeyInput): string;
+  private rememberClaim(claimKey: string, expiresAt: number): void;
+  private sweepExpiredMemoryEntries(now: number): void;
+  private async tryCountViaRedis(input): Promise<Record<string, AutomationPersistCapCount> | null>;
+  private countInMemory(input): Record<string, AutomationPersistCapCount>;
 }
 ```
 
@@ -555,8 +570,14 @@ it:
 ```ts
 export abstract class AutomationSlackProviderPort {
   abstract tryDecrypt(params: SlackActionParams): string | null;
-  abstract tokenMissing(input: { incoming: SlackActionParams; existing?: SlackActionParams | null }): boolean;
-  abstract persist(input: { incoming: SlackActionParams; existing?: SlackActionParams | null }): SlackActionParams;
+  abstract tokenMissing(input: {
+    incoming: SlackActionParams;
+    existing?: SlackActionParams | null;
+  }): boolean;
+  abstract persist(input: {
+    incoming: SlackActionParams;
+    existing?: SlackActionParams | null;
+  }): SlackActionParams;
   abstract redact(params: SlackActionParams): SlackActionParams;
 }
 ```
@@ -664,14 +685,14 @@ feature** (P3 of the cleanup list, commit 3).
 
 The heaviest external consumers, by what they name:
 
-| File | Symbols |
-| --- | --- |
-| `platform/app/src/server/app-layer/presets.ts` | `AppAutomationRuntime`, `AppAutomationClock`, `AutomationPersistCapService`, `PostgresAutomationGraphDeliveryAdapter`, `createAutomationTestFirePort`, `createAutomationTestRuntime` |
-| `platform/app/src/runtime/app/features/automation-graph-ports.ts` | `GraphAlertDispatchService`, `WebhookProviderAdapter`, and 6 port classes |
-| `platform/app/src/runtime/app/features/automation-dispatch.wiring.ts` | `AutomationSettlementDispatchService`, `SlackProviderAdapter`, `AutomationSettlement*Port` ×3 |
-| `platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts` | `createAutomationsPipeline` |
-| `apps/api/src/features/automation/automation-trpc.mount.ts`, `app-rest.features.ts` | `AutomationTrpcApi`, `EmailSuppressionTrpcApi`, `createTriggerRestApp` |
-| `apps/worker/src/features/automation/automation-worker-feature.installer.ts` | `AutomationTriggerMatchRecorderPort`, `AutomationIntentRetentionPort` |
+| File                                                                                | Symbols                                                                                                                                                                              |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `platform/app/src/server/app-layer/presets.ts`                                      | `AppAutomationRuntime`, `AppAutomationClock`, `AutomationPersistCapService`, `PostgresAutomationGraphDeliveryAdapter`, `createAutomationTestFirePort`, `createAutomationTestRuntime` |
+| `platform/app/src/runtime/app/features/automation-graph-ports.ts`                   | `GraphAlertDispatchService`, `WebhookProviderAdapter`, and 6 port classes                                                                                                            |
+| `platform/app/src/runtime/app/features/automation-dispatch.wiring.ts`               | `AutomationSettlementDispatchService`, `SlackProviderAdapter`, `AutomationSettlement*Port` ×3                                                                                        |
+| `platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts`           | `createAutomationsPipeline`                                                                                                                                                          |
+| `apps/api/src/features/automation/automation-trpc.mount.ts`, `app-rest.features.ts` | `AutomationTrpcApi`, `EmailSuppressionTrpcApi`, `createTriggerRestApp`                                                                                                               |
+| `apps/worker/src/features/automation/automation-worker-feature.installer.ts`        | `AutomationTriggerMatchRecorderPort`, `AutomationIntentRetentionPort`                                                                                                                |
 
 **71 files import `@langwatch/automation-contract`** and **28 import
 `@langwatch/automation-web`** — neither is touched by commits 1–8. Commit 5 is

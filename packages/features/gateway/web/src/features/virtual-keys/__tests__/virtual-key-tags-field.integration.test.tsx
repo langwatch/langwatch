@@ -62,7 +62,6 @@ const host = fakeGatewayHost({
   currentUser: { id: "user-1", name: "Ada", email: "ada@acme.test" },
 });
 
-
 const renderDrawer = () =>
   renderWithGatewayHost(
     <VirtualKeyCreateDrawer
@@ -164,7 +163,9 @@ describe("given the New virtual key drawer is open", () => {
       // what keeps the assertion off the links in the closed ones.
       const explanation = screen.getByText(/Group this key's traffic/);
       const popover = explanation.closest('[data-scope="popover"][data-part="content"]');
-      const link = within(popover as HTMLElement).getByText("Read more").closest("a");
+      const link = within(popover as HTMLElement)
+        .getByText("Read more")
+        .closest("a");
       await waitFor(() => expect(link).toBeVisible());
       expect(link).toHaveAttribute(
         "href",

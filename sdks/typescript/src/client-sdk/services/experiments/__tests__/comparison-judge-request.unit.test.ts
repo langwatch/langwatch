@@ -38,11 +38,7 @@ describe("Experiment.compare", () => {
           "gemini-flash",
         ]);
         expect(request.settings).toEqual({});
-        expect(verdict?.candidates).toEqual([
-          "gpt-5-mini",
-          "claude-sonnet-5",
-          "gemini-flash",
-        ]);
+        expect(verdict?.candidates).toEqual(["gpt-5-mini", "claude-sonnet-5", "gemini-flash"]);
       });
 
       it("judges outputs the batch already sent and cleared", async () => {
@@ -59,9 +55,9 @@ describe("Experiment.compare", () => {
         expect(harness.loggedDatasetTargets.flat()).toEqual(
           expect.arrayContaining(Object.keys(THREE_OUTPUTS)),
         );
-        expect(
-          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id),
-        ).toEqual(Object.keys(THREE_OUTPUTS));
+        expect(harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)).toEqual(
+          Object.keys(THREE_OUTPUTS),
+        );
       });
 
       /** @scenario "Judging on merits is the default" */

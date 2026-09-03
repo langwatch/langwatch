@@ -21,8 +21,8 @@ declares the field at all.
 `runtime-enrollment.unit.test.ts` has two scenarios under "when the migration
 declares itself enrolled automatically". Both name `AUTHZ_ENGINE_MIGRATION_NAME`
 (`"authz-engine"`) as the migration that declares it, and one says so in a
-comment: *"The registered authorization-engine migration is the one that
-declares it."*
+comment: _"The registered authorization-engine migration is the one that
+declares it."_
 
 It is not registered among those migration classes, and it does not declare it.
 So both fail, asserting `true` and getting `false`.

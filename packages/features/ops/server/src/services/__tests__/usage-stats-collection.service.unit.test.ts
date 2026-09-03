@@ -44,8 +44,7 @@ class CountsFake extends UsageStatsClickHouseRepository {
 }
 
 class ClickHouseClientFake extends UsageStatsClickHouseClient {
-  readonly query =
-    vi.fn<(input: UsageStatsClickHouseQuery) => ReturnType<typeof queryResult>>();
+  readonly query = vi.fn<(input: UsageStatsClickHouseQuery) => ReturnType<typeof queryResult>>();
 }
 
 class ClickHouseClientsFake extends UsageStatsClickHouseClientResolver {
@@ -214,8 +213,6 @@ describe("ClickHouseUsageStatsRepository", () => {
     expect(scenarioQuery).not.toMatch(/SELECT\s+\*\s+FROM\s+simulation_runs/i);
     expect(scenarioQuery).toContain("AND t.ArchivedAt IS NULL");
     expect(scenarioQuery).toContain("max(UpdatedAt)");
-    expect(scenarioQuery).toContain(
-      "GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId",
-    );
+    expect(scenarioQuery).toContain("GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId");
   });
 });

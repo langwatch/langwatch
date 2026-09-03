@@ -51,9 +51,7 @@ function createTestSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan
   };
 }
 
-function billedLlmSpan(
-  overrides: Partial<NormalizedSpan["spanAttributes"]> = {},
-): NormalizedSpan {
+function billedLlmSpan(overrides: Partial<NormalizedSpan["spanAttributes"]> = {}): NormalizedSpan {
   return createTestSpan({
     spanAttributes: {
       "langwatch.span.type": "llm",
@@ -131,9 +129,7 @@ describe("SpanCostService.deriveStorageCost", () => {
     // Builds the span through the real canonicalisation chain, so the test
     // exercises the CodexExtractor's non-billable stamp and the registry
     // lookup exactly as ingestion does.
-    const canonicalizedCodexSpan = (
-      wireAttributes: Record<string, unknown>,
-    ): NormalizedSpan => {
+    const canonicalizedCodexSpan = (wireAttributes: Record<string, unknown>): NormalizedSpan => {
       const base = createTestSpan({ name: "gen_ai.responses" });
       const { attributes } = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: wireAttributes as NormalizedSpan["spanAttributes"],

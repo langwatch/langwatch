@@ -161,12 +161,7 @@ export const FieldsButton = ({ fields, onToggle }: FieldsButtonProps) => (
       <PopoverArrow />
       <PopoverBody>
         {(Object.keys(FIELD_LABELS) as ResultField[]).map((field) => (
-          <FieldToggle
-            key={field}
-            field={field}
-            checked={fields[field]}
-            onToggle={onToggle}
-          />
+          <FieldToggle key={field} field={field} checked={fields[field]} onToggle={onToggle} />
         ))}
       </PopoverBody>
     </PopoverContent>
@@ -199,11 +194,7 @@ const GROUPABLE_FIELD_HELP =
  * version had to hand-roll a Portal to escape an `overflow: hidden` ancestor;
  * from the toolbar there is nothing to escape.
  */
-export const GroupRowsButton = ({
-  availableKeys,
-  value,
-  onChange,
-}: GroupRowsButtonProps) => {
+export const GroupRowsButton = ({ availableKeys, value, onChange }: GroupRowsButtonProps) => {
   if (availableKeys.length === 0) return null;
   return (
     <PopoverRoot>

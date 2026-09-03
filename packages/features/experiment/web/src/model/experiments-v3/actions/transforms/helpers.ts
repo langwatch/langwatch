@@ -1,9 +1,4 @@
-import type {
-  DatasetReference,
-  EvaluatorConfig,
-  InlineDataset,
-  TargetConfig,
-} from "../../types";
+import type { DatasetReference, EvaluatorConfig, InlineDataset, TargetConfig } from "../../types";
 import { TransformError, type WorkbenchState } from "./types";
 
 export const requireTarget = ({

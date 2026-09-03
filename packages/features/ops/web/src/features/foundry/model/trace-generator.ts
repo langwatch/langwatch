@@ -23,14 +23,7 @@ export interface GeneratorOptions {
   includeEvents?: boolean;
 }
 
-const INFRA_TYPES: SpanType[] = [
-  "server",
-  "client",
-  "span",
-  "task",
-  "component",
-  "module",
-];
+const INFRA_TYPES: SpanType[] = ["server", "client", "span", "task", "component", "module"];
 
 const MODEL_NAMES = [
   "gpt-4o",
@@ -150,12 +143,7 @@ function makeExceptionEvent(
     name: "exception",
     offsetMs: Math.max(1, durationMs - randInt(1, 5)),
     attributes: {
-      "exception.type": pick([
-        "TimeoutError",
-        "RateLimitError",
-        "ValidationError",
-        "TypeError",
-      ]),
+      "exception.type": pick(["TimeoutError", "RateLimitError", "ValidationError", "TypeError"]),
       "exception.message": message,
       "exception.stacktrace": `Error: ${message}\n    at handleRequest (server.ts:${randInt(10, 500)})\n    at process (worker.ts:${randInt(10, 200)})`,
     },
@@ -209,8 +197,7 @@ function synthesizePromptVariables(inputs: PromptRef["inputs"]): Record<string, 
 }
 
 function makeLlmSpan(prompts?: PromptRef[], includeEvents?: boolean): SpanConfig {
-  const promptRef =
-    prompts && prompts.length > 0 && Math.random() < 0.7 ? pick(prompts) : null;
+  const promptRef = prompts && prompts.length > 0 && Math.random() < 0.7 ? pick(prompts) : null;
   const model = promptRef?.model ?? pick(MODEL_NAMES);
   const userMsg = pick(USER_MESSAGES);
   const assistantMsg = pick(ASSISTANT_RESPONSES);
@@ -401,10 +388,7 @@ function appendAgentLoopStep(remaining: number, args: SubtreeArgs): StepResult {
   };
   let used = 1;
 
-  let childBudget = Math.min(
-    remaining - 1,
-    randInt(3, Math.max(3, Math.floor(remaining * 0.4))),
-  );
+  let childBudget = Math.min(remaining - 1, randInt(3, Math.max(3, Math.floor(remaining * 0.4))));
 
   for (let i = 0; i < loopIterations && childBudget > 0; i++) {
     // LLM call
@@ -436,8 +420,7 @@ function appendAgentLoopStep(remaining: number, args: SubtreeArgs): StepResult {
   }
 
   // Compute agent duration from children
-  agent.durationMs =
-    agent.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(10, 50);
+  agent.durationMs = agent.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(10, 50);
   return { span: agent, used };
 }
 
@@ -483,8 +466,7 @@ function appendRagPipelineStep(remaining: number, args: SubtreeArgs): StepResult
     used += sub.used;
   }
 
-  chain.durationMs =
-    chain.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(5, 20);
+  chain.durationMs = chain.children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(5, 20);
   return { span: chain, used };
 }
 
@@ -502,10 +484,7 @@ function appendWorkflowStep(remaining: number, args: SubtreeArgs): StepResult {
   };
   let used = 1;
 
-  const childBudget = Math.min(
-    remaining - 1,
-    randInt(2, Math.max(2, Math.floor(remaining * 0.3))),
-  );
+  const childBudget = Math.min(remaining - 1, randInt(2, Math.max(2, Math.floor(remaining * 0.3))));
   const sub = buildSubtree({
     budget: childBudget,
     depth: depth + 1,
@@ -623,8 +602,7 @@ export function generateTrace(options: GeneratorOptions): TraceConfig {
   });
 
   rootAgent.children = children;
-  rootAgent.durationMs =
-    children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(20, 100);
+  rootAgent.durationMs = children.reduce((sum, c) => sum + c.durationMs, 0) + randInt(20, 100);
 
   assignOffsets([rootAgent]);
 
@@ -639,10 +617,7 @@ export function generateTrace(options: GeneratorOptions): TraceConfig {
       userId: `user-${randInt(1000, 9999)}`,
       threadId: `thread-${shortId()}`,
       customerId: `customer-${randInt(100, 999)}`,
-      labels: [
-        pick(["production", "staging", "development"]),
-        pick(["v2", "beta", "canary"]),
-      ],
+      labels: [pick(["production", "staging", "development"]), pick(["v2", "beta", "canary"])],
     },
     spans: [rootAgent],
   };

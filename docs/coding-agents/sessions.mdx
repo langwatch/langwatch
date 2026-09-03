@@ -21,16 +21,16 @@ A session is one run of a coding agent: everything between starting Claude Code,
 
 One row per session, over the last 90 days. Every column sorts; a third click on the same column resets the sort.
 
-| Column | What it shows |
-| --- | --- |
-| **Session** | The session's title, lifted from the agent's own generated conversation title. |
-| **Agent** | Which assistant ran it: Claude Code, Codex, Copilot, Gemini CLI, OpenCode. |
-| **Last update** | When the session last did anything. |
-| **Context** | Peak context: the most tokens the session carried into a single model call. |
-| **Compactions** | How many times the agent compacted its conversation to fit the context window, and under it, how many times it rebuilt the prompt cache. |
-| **Active and waiting** | How long the agent worked, next to how long it sat waiting for you. |
-| **Token cost** | What the session cost, cache-aware: tokens read from cache are priced as cache reads, not as fresh input. |
-| **Pull requests** | The pull requests the session's branches map to. |
+| Column                 | What it shows                                                                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Session**            | The session's title, lifted from the agent's own generated conversation title.                                                           |
+| **Agent**              | Which assistant ran it: Claude Code, Codex, Copilot, Gemini CLI, OpenCode.                                                               |
+| **Last update**        | When the session last did anything.                                                                                                      |
+| **Context**            | Peak context: the most tokens the session carried into a single model call.                                                              |
+| **Compactions**        | How many times the agent compacted its conversation to fit the context window, and under it, how many times it rebuilt the prompt cache. |
+| **Active and waiting** | How long the agent worked, next to how long it sat waiting for you.                                                                      |
+| **Token cost**         | What the session cost, cache-aware: tokens read from cache are priced as cache reads, not as fresh input.                                |
+| **Pull requests**      | The pull requests the session's branches map to.                                                                                         |
 
 Search matches session titles. The period selector starts unset and reads **All time**, which means the whole 90-day window above rather than every session you ever ran. Pick a range when you look for a specific day.
 
@@ -40,12 +40,12 @@ Click a row to open the session. The **Usage** tab opens on the totals: cost, mo
 
 The **Cache health** section is where the money goes:
 
-| Stat | What it tells you |
-| --- | --- |
-| **Peak context** | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions. |
-| **Cache misses** | Model calls that re-created most of the context instead of reading it from cache. A cache write costs more per token than a read, so each miss pays twice for the same tokens. |
-| **Context reused** | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input. |
-| **Context rebuilt** | Tokens spent writing the cache again, summed across the session. |
+| Stat                | What it tells you                                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Peak context**    | The largest context the session carried, as a share of the model's window, banded against the current reliability guidance for long-context sessions.                          |
+| **Cache misses**    | Model calls that re-created most of the context instead of reading it from cache. A cache write costs more per token than a read, so each miss pays twice for the same tokens. |
+| **Context reused**  | Tokens served from the prompt cache across the session. These bill at a fraction of fresh input.                                                                               |
+| **Context rebuilt** | Tokens spent writing the cache again, summed across the session.                                                                                                               |
 
 The detail also shows the biggest single rebuild: how many tokens one model call re-sent instead of reusing from cache.
 

@@ -50,9 +50,7 @@ describe("renderMessageLine", () => {
     expect(line).toBeDefined();
     // The marker rides INSIDE the budget: a line that overshot it by the
     // marker's own length would break the cap buildHandoffDigest counts on.
-    expect(Buffer.byteLength(line as string, "utf8")).toBeLessThanOrEqual(
-      DIGEST_MESSAGE_MAX_BYTES,
-    );
+    expect(Buffer.byteLength(line as string, "utf8")).toBeLessThanOrEqual(DIGEST_MESSAGE_MAX_BYTES);
     expect(line).toContain("[message truncated]");
   });
 });

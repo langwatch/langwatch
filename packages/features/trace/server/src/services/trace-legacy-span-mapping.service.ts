@@ -15,13 +15,7 @@ import type {
 import { coerceToNumber } from "./trace-number-coercion.service";
 import { safeUnflatten } from "@langwatch/trace-contract";
 
-type JsonSerializable =
-  | string
-  | number
-  | boolean
-  | null
-  | Record<string, unknown>
-  | unknown[];
+type JsonSerializable = string | number | boolean | null | Record<string, unknown> | unknown[];
 
 /**
  * Converts attribute values to JSON-serializable format.
@@ -106,10 +100,7 @@ function unwrapLegacyWrapper(
  * Reads the annotated value type for a canonical key from
  * langwatch.reserved.value_types (e.g. ["langwatch.input=chat_messages"]).
  */
-function getAnnotatedType(
-  spanAttributes: NormalizedAttributes,
-  attrKey: string,
-): string | null {
+function getAnnotatedType(spanAttributes: NormalizedAttributes, attrKey: string): string | null {
   let raw = spanAttributes["langwatch.reserved.value_types"];
 
   // ClickHouse Map(String, String) stores arrays as JSON strings
@@ -267,8 +258,7 @@ function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOutput | 
       } as unknown as SpanInputOutput;
     }
     if (annotatedType === "text" || typeof lwOutput === "string") {
-      const textValue =
-        typeof lwOutput === "string" ? lwOutput : JSON.stringify(lwOutput);
+      const textValue = typeof lwOutput === "string" ? lwOutput : JSON.stringify(lwOutput);
       return { type: "text", value: textValue };
     }
     return {
@@ -293,8 +283,7 @@ function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOutput | 
  */
 function extractMetrics(spanAttributes: NormalizedAttributes): SpanMetrics | null {
   const promptTokens = coerceToNumber(
-    spanAttributes["gen_ai.usage.input_tokens"] ??
-      spanAttributes["gen_ai.usage.prompt_tokens"],
+    spanAttributes["gen_ai.usage.input_tokens"] ?? spanAttributes["gen_ai.usage.prompt_tokens"],
   );
 
   const completionTokens = coerceToNumber(
@@ -349,8 +338,7 @@ function extractMetrics(spanAttributes: NormalizedAttributes): SpanMetrics | nul
  * After canonicalization, model is at gen_ai.response.model / gen_ai.request.model.
  */
 function extractModel(spanAttributes: NormalizedAttributes): string | null {
-  const model =
-    spanAttributes["gen_ai.response.model"] ?? spanAttributes["gen_ai.request.model"];
+  const model = spanAttributes["gen_ai.response.model"] ?? spanAttributes["gen_ai.request.model"];
 
   return typeof model === "string" ? model : null;
 }
@@ -360,8 +348,7 @@ function extractModel(spanAttributes: NormalizedAttributes): string | null {
  * After canonicalization, vendor is at gen_ai.system / gen_ai.provider.name.
  */
 function extractVendor(spanAttributes: NormalizedAttributes): string | null {
-  const vendor =
-    spanAttributes["gen_ai.provider.name"] ?? spanAttributes["gen_ai.system"];
+  const vendor = spanAttributes["gen_ai.provider.name"] ?? spanAttributes["gen_ai.system"];
 
   return typeof vendor === "string" ? vendor : null;
 }
@@ -435,12 +422,8 @@ function extractError(
   const attrMessage = spanAttributes["exception.message"];
 
   const errorMessage =
-    (typeof eventMessage === "string" && eventMessage.length > 0
-      ? eventMessage
-      : undefined) ??
-    (typeof attrMessage === "string" && attrMessage.length > 0
-      ? attrMessage
-      : undefined) ??
+    (typeof eventMessage === "string" && eventMessage.length > 0 ? eventMessage : undefined) ??
+    (typeof attrMessage === "string" && attrMessage.length > 0 ? attrMessage : undefined) ??
     statusMessage ??
     "Unknown error";
 
@@ -468,9 +451,7 @@ function extractError(
  *
  * @internal Exported for unit testing
  */
-export function unflattenDotNotation(
-  flat: NormalizedAttributes,
-): Record<string, unknown> {
+export function unflattenDotNotation(flat: NormalizedAttributes): Record<string, unknown> {
   return safeUnflatten(flat as Record<string, unknown>);
 }
 

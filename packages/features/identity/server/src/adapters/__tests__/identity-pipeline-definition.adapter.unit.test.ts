@@ -6,15 +6,8 @@ import {
 import { IdentityGuards } from "../../guards";
 import type { IdentityHeadsRepository } from "../../identity-heads.repository";
 import { describe, expect, it } from "vitest";
-import {
-  inMemoryIdentityReservations,
-  inMemoryIdentityUsers,
-} from "../../testing";
-import {
-  type Command,
-  createTenantId,
-  validateEventAggregateType,
-} from "@langwatch/eventing";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
+import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
 import { AttachIdentifierCommand } from "../../intents/attach-identifier.intent";
 import { DetachIdentifierCommand } from "../../intents/detach-identifier.intent";
 import { EraseUserCommand } from "../../intents/erase-user.intent";
@@ -177,10 +170,7 @@ describe("identity event aggregate type", () => {
         ),
         data: { ...base, commandId: "idcmd_5" },
       },
-    ])("the store accepts every event $label emits", async ({
-      handler,
-      data,
-    }) => {
+    ])("the store accepts every event $label emits", async ({ handler, data }) => {
       const declared = createIdentityPipeline({
         identityProjectionStore: {} as never,
         identityGuards: {} as never,
@@ -191,9 +181,7 @@ describe("identity event aggregate type", () => {
 
       expect(events.length).toBeGreaterThan(0);
       for (const [index, event] of events.entries()) {
-        expect(() =>
-          validateEventAggregateType(event as never, declared, index),
-        ).not.toThrow();
+        expect(() => validateEventAggregateType(event as never, declared, index)).not.toThrow();
       }
     });
   });

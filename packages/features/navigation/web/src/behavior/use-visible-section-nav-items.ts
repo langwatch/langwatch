@@ -37,9 +37,7 @@ export function useVisibleSectionNavItems(
     ? host.featureFlag("release_ui_governance_billed_cost_enabled")
     : { enabled: false, isLoading: false };
 
-  const flagEnabled = (
-    flag: NonNullable<SectionNavItemData["featureFlag"]>,
-  ) => {
+  const flagEnabled = (flag: NonNullable<SectionNavItemData["featureFlag"]>) => {
     switch (flag) {
       case "release_ui_governance_billed_cost_enabled":
         return billedCost.enabled;
@@ -48,7 +46,5 @@ export function useVisibleSectionNavItems(
     }
   };
 
-  return items.filter(
-    (item) => item.featureFlag === undefined || flagEnabled(item.featureFlag),
-  );
+  return items.filter((item) => item.featureFlag === undefined || flagEnabled(item.featureFlag));
 }

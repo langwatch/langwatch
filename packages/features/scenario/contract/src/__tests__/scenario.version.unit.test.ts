@@ -19,9 +19,7 @@ import {
   touchesVersionedFields,
 } from "../scenario.version";
 
-function fields(
-  overrides: Partial<ScenarioSnapshotFields> = {},
-): ScenarioSnapshotFields {
+function fields(overrides: Partial<ScenarioSnapshotFields> = {}): ScenarioSnapshotFields {
   return {
     name: "Refund flow",
     situation: "A customer asks for a refund",
@@ -70,11 +68,7 @@ describe("changedSnapshotFields", () => {
       maxTurns: 12,
     });
 
-    expect(changedSnapshotFields(previous, next)).toEqual([
-      "name",
-      "criteria",
-      "maxTurns",
-    ]);
+    expect(changedSnapshotFields(previous, next)).toEqual(["name", "criteria", "maxTurns"]);
   });
 });
 
@@ -126,10 +120,9 @@ describe("the snapshot envelope", () => {
   });
 
   it("round-trips through build and parse", () => {
-    const envelope = buildSnapshotEnvelope(
-      fields({ parameters: [{ name: "tier" }] }),
-      ["parameters"],
-    );
+    const envelope = buildSnapshotEnvelope(fields({ parameters: [{ name: "tier" }] }), [
+      "parameters",
+    ]);
 
     const parsed = parseSnapshotEnvelope(envelope as never);
     expect(parsed.schemaVersion).toBe(scenarioSnapshotSchemaVersion);

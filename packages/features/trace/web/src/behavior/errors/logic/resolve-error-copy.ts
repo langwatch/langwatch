@@ -72,9 +72,7 @@ export function resolveErrorCopy({
   return {
     title:
       title ??
-      (explanation.isRegistered
-        ? explanation.title
-        : (fallbackTitle ?? explanation.title)),
+      (explanation.isRegistered ? explanation.title : (fallbackTitle ?? explanation.title)),
     description: explanation.description,
     tips: supplementalTips({
       tips: handled?.tips ?? [],

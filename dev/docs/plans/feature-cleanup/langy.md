@@ -19,30 +19,30 @@ to different definitions of which CLI verbs return a collection (P15).
 
 **35,515 lines, 204 non-test files** across three packages:
 
-| package | non-test files | lines |
-|---|---|---|
-| `server/src` | 85 | 15,111 |
-| `contract/src` | 39 | 7,603 |
-| `web/src` | 80 | 12,801 |
+| package        | non-test files | lines  |
+| -------------- | -------------- | ------ |
+| `server/src`   | 85             | 15,111 |
+| `contract/src` | 39             | 7,603  |
+| `web/src`      | 80             | 12,801 |
 
 Server layer inventory (`server/src`, non-test):
 
-| dir | files | lines |
-|---|---|---|
-| `services/` | 19 | 4,546 |
-| `streaming/` | 13 | 2,956 |
-| `adapters/` | 15 | 2,046 |
-| `transport/api-trpc/` | 2 | 1,179 |
-| `repositories/prisma/` | 9 | 1,063 |
-| `projections/` | 4 | 604 |
-| `intents/` | 2 | 508 |
-| `ports/` | 7 | 489 |
-| `app/` | 1 | 474 |
-| `subscribers/` | 1 | 335 |
-| `repositories/` (abstract) | 6 | 310 |
-| `processes/` | 3 | 309 |
-| `api/public/` | 1 | 56 |
-| root (`index.ts`, `testing.ts`) | 2 | 236 |
+| dir                             | files | lines |
+| ------------------------------- | ----- | ----- |
+| `services/`                     | 19    | 4,546 |
+| `streaming/`                    | 13    | 2,956 |
+| `adapters/`                     | 15    | 2,046 |
+| `transport/api-trpc/`           | 2     | 1,179 |
+| `repositories/prisma/`          | 9     | 1,063 |
+| `projections/`                  | 4     | 604   |
+| `intents/`                      | 2     | 508   |
+| `ports/`                        | 7     | 489   |
+| `app/`                          | 1     | 474   |
+| `subscribers/`                  | 1     | 335   |
+| `repositories/` (abstract)      | 6     | 310   |
+| `processes/`                    | 3     | 309   |
+| `api/public/`                   | 1     | 56    |
+| root (`index.ts`, `testing.ts`) | 2     | 236   |
 
 The stack a customer request travels, transport to datastore:
 
@@ -108,19 +108,19 @@ So `private get persistence()` (`services/langy.service.ts:151-156`) throws
 `Error("Langy persistence is not configured")` in every production process, and
 **eleven of the contract's thirty-three operations are unreachable or broken**:
 
-| method | line | reached by |
-|---|---|---|
-| `listConversations` | `:158` | nothing |
-| `getConversation` | `:164` | nothing |
-| `createConversation` | `:173` | nothing |
-| `archiveConversation` | `:179` | nothing |
-| `startTurn` → `startTurnForConversation` | `:185`, `:436` | nothing |
-| `listMessages` | `:208` | nothing |
-| `resolveCredential` | `:214` | nothing |
-| `relay` | `:237` | nothing |
-| `stopTurn` (the `userId === undefined` branch) | `:203-205` | nothing |
-| **`tryGetEgressAllowlist`** | `:218` | **`LangyApp.egressAllowlist`, `app/langy.app.ts:352`** |
-| **`trySetEgressAllowlist`** | `:225` | **`LangyApp.setEgressAllowlist`, `app/langy.app.ts:360`** |
+| method                                         | line           | reached by                                                |
+| ---------------------------------------------- | -------------- | --------------------------------------------------------- |
+| `listConversations`                            | `:158`         | nothing                                                   |
+| `getConversation`                              | `:164`         | nothing                                                   |
+| `createConversation`                           | `:173`         | nothing                                                   |
+| `archiveConversation`                          | `:179`         | nothing                                                   |
+| `startTurn` → `startTurnForConversation`       | `:185`, `:436` | nothing                                                   |
+| `listMessages`                                 | `:208`         | nothing                                                   |
+| `resolveCredential`                            | `:214`         | nothing                                                   |
+| `relay`                                        | `:237`         | nothing                                                   |
+| `stopTurn` (the `userId === undefined` branch) | `:203-205`     | nothing                                                   |
+| **`tryGetEgressAllowlist`**                    | `:218`         | **`LangyApp.egressAllowlist`, `app/langy.app.ts:352`**    |
+| **`trySetEgressAllowlist`**                    | `:225`         | **`LangyApp.setEgressAllowlist`, `app/langy.app.ts:360`** |
 
 The last two are a **latent production fault, not merely dead code**. The
 `langyEgress` router is mounted at `platform/app/src/server/api/root.ts:887`,
@@ -227,16 +227,16 @@ optional or nullable dependencies. Checked against both composition roots
 (`platform/app/src/server/app-layer/presets.ts:2528-2563` for production,
 `:3695-3723` for the test app):
 
-| dep | declared | production | test app | verdict |
-|---|---|---|---|---|
-| `worker \| null` | `:54` | conditional (`presets.ts:2542`) | `null` | **genuinely optional** |
-| `tokenBuffer \| null` | `:55` | redis-gated (`:2543`) | `null` | **genuinely optional** |
-| `accessStore \| null` | `:63` | redis-gated (`:2561`) | `null` | **genuinely optional** |
-| `handoffStore \| null` | `:64` | redis-gated (`:2562`) | `null` | **genuinely optional** |
-| `promptProjectId?` | `:52` | env (`:2532`) | env | **genuinely optional** |
-| `harness?` | `:57` | **always** (`:2550`) | omitted | test-only optionality |
-| `finalParts?` | `:48` | never passed | never passed | **fake** — defaulted at `langy-turn.service.ts:28`, then used unguarded at `langy-turn-stop.service.ts:59` |
-| `messages \| null` | `:65` | **always** (`langy.langy.adapter.ts:198`) | always | **fake** — nothing can pass null; guard at `langy-turn-preparation.service.ts:119` is dead |
+| dep                    | declared | production                                | test app     | verdict                                                                                                    |
+| ---------------------- | -------- | ----------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------- |
+| `worker \| null`       | `:54`    | conditional (`presets.ts:2542`)           | `null`       | **genuinely optional**                                                                                     |
+| `tokenBuffer \| null`  | `:55`    | redis-gated (`:2543`)                     | `null`       | **genuinely optional**                                                                                     |
+| `accessStore \| null`  | `:63`    | redis-gated (`:2561`)                     | `null`       | **genuinely optional**                                                                                     |
+| `handoffStore \| null` | `:64`    | redis-gated (`:2562`)                     | `null`       | **genuinely optional**                                                                                     |
+| `promptProjectId?`     | `:52`    | env (`:2532`)                             | env          | **genuinely optional**                                                                                     |
+| `harness?`             | `:57`    | **always** (`:2550`)                      | omitted      | test-only optionality                                                                                      |
+| `finalParts?`          | `:48`    | never passed                              | never passed | **fake** — defaulted at `langy-turn.service.ts:28`, then used unguarded at `langy-turn-stop.service.ts:59` |
+| `messages \| null`     | `:65`    | **always** (`langy.langy.adapter.ts:198`) | always       | **fake** — nothing can pass null; guard at `langy-turn-preparation.service.ts:119` is dead                 |
 
 `worker` is the worst of the genuine ones: three absence policies that disagree.
 `services/langy-turn-start.service.ts:86-88` throws
@@ -266,8 +266,8 @@ reachable from warm. When `worker.warm` rejects at
 **Honest bound:** the key is not leaked forever. The hourly reap
 (`intents/langy-session-key-reap.intent.ts:14-15`, "revokes every elapsed,
 unrevoked Langy session key") collects it once its own TTL elapses. So the
-defect is *a live worker credential that outlives its failed warm by up to its
-full expiry*, where the start path revokes immediately. It is the divergence
+defect is _a live worker credential that outlives its failed warm by up to its
+full expiry_, where the start path revokes immediately. It is the divergence
 between two copies of the same five steps that makes it a bug rather than a
 policy.
 
@@ -277,32 +277,32 @@ policy.
 do not, and all five are on the architecture-lint baseline
 (`packages/architecture-lint/src/port-module-baseline.json:21-25`):
 
-| file | lines | what it actually holds |
-|---|---|---|
-| `ports/langy-ids.port.ts` | 4 | one `as const` map. Not a port in any sense |
-| `ports/langy-effect.port.ts` | 38 | 3 constants + 2 interfaces + 1 function type |
-| `ports/langy-feedback-prompt.port.ts` | 96 | **`LangyFeedbackPromptPolicy`, a service**, plus a Redis interface |
-| `ports/langy-frame-auth.port.ts` | 139 | 5 pure crypto functions + 3 interfaces |
-| `ports/langy-conversation-process.port.ts` | 79 | zod schemas + inferred types |
+| file                                       | lines | what it actually holds                                             |
+| ------------------------------------------ | ----- | ------------------------------------------------------------------ |
+| `ports/langy-ids.port.ts`                  | 4     | one `as const` map. Not a port in any sense                        |
+| `ports/langy-effect.port.ts`               | 38    | 3 constants + 2 interfaces + 1 function type                       |
+| `ports/langy-feedback-prompt.port.ts`      | 96    | **`LangyFeedbackPromptPolicy`, a service**, plus a Redis interface |
+| `ports/langy-frame-auth.port.ts`           | 139   | 5 pure crypto functions + 3 interfaces                             |
+| `ports/langy-conversation-process.port.ts` | 79    | zod schemas + inferred types                                       |
 
 Meanwhile a real port lives in the wrong directory: `LangyPromptPort` is
 declared at `services/langy-prompt-registry.service.ts:48`.
 
 The ports that are real, with their implementation counts:
 
-| port | impls | verdict |
-|---|---|---|
-| `LangyAnalyticsEventSinkPort` | 2 — `adapters/langy-analytics-event-storage.adapter.ts:44` + `platform/app/src/runtime/app/features/langy-analytics-event.clickhouse.adapter.ts:74` | **Keep** |
-| `LangyWorkerPort` | 2 — `adapters/unavailable-langy-worker.adapter.ts:11` + `adapters/langy-worker-http.adapter.ts:64` | **Keep** |
-| `LangyWorkerMetricsPort` | 2 — `adapters/null-langy-worker-metrics.adapter.ts:3` + `platform/app/src/runtime/app/features/langy.ts:7` | **Keep** |
-| `LangyHarnessPort` | 1, cross-package (`presets.ts:2550`) | **Keep** — genuine inversion |
-| `LangyTurnContextPort` | 1, cross-package (`presets.ts:2553`) | **Keep** |
-| `LangyTurnMetricsPort` | 1, cross-package (`presets.ts:2554`) | **Keep** |
-| `LangyGithubPermitPort` | 1, cross-package (`presets.ts:2546`) | **Keep** |
-| `LangyModelPort` | 1, cross-package (`presets.ts:2532`) | **Keep** |
-| `LangyPromptPort` | 1, cross-package (`AppPromptRuntime`, `presets.ts:2531`) | **Keep**, move file |
-| `LangySessionKeyPort` | 1, **same package** — `services/langy-session-key.service.ts:60` | **Delete** |
-| the 5 abstracts in `repositories/langy.repository.ts` | 0 | **Delete** (P1) |
+| port                                                  | impls                                                                                                                                               | verdict                      |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `LangyAnalyticsEventSinkPort`                         | 2 — `adapters/langy-analytics-event-storage.adapter.ts:44` + `platform/app/src/runtime/app/features/langy-analytics-event.clickhouse.adapter.ts:74` | **Keep**                     |
+| `LangyWorkerPort`                                     | 2 — `adapters/unavailable-langy-worker.adapter.ts:11` + `adapters/langy-worker-http.adapter.ts:64`                                                  | **Keep**                     |
+| `LangyWorkerMetricsPort`                              | 2 — `adapters/null-langy-worker-metrics.adapter.ts:3` + `platform/app/src/runtime/app/features/langy.ts:7`                                          | **Keep**                     |
+| `LangyHarnessPort`                                    | 1, cross-package (`presets.ts:2550`)                                                                                                                | **Keep** — genuine inversion |
+| `LangyTurnContextPort`                                | 1, cross-package (`presets.ts:2553`)                                                                                                                | **Keep**                     |
+| `LangyTurnMetricsPort`                                | 1, cross-package (`presets.ts:2554`)                                                                                                                | **Keep**                     |
+| `LangyGithubPermitPort`                               | 1, cross-package (`presets.ts:2546`)                                                                                                                | **Keep**                     |
+| `LangyModelPort`                                      | 1, cross-package (`presets.ts:2532`)                                                                                                                | **Keep**                     |
+| `LangyPromptPort`                                     | 1, cross-package (`AppPromptRuntime`, `presets.ts:2531`)                                                                                            | **Keep**, move file          |
+| `LangySessionKeyPort`                                 | 1, **same package** — `services/langy-session-key.service.ts:60`                                                                                    | **Delete**                   |
+| the 5 abstracts in `repositories/langy.repository.ts` | 0                                                                                                                                                   | **Delete** (P1)              |
 
 One shape note, not a defect: the five cross-package ports are declared as
 `abstract class` yet satisfied by object literals in `presets.ts`. The `abstract
@@ -322,21 +322,21 @@ structurally.
   §2 authorisation) is worth keeping in some form; the incident narrative and
   the cross-service plumbing history are ADR material.
 - **`contract/src/cards/derived-safe.ts:1-66`** — 66 lines, `── WHY AN
-  ALLOWLIST AT ALL ──` plus a wire-compatibility note on `blockId`. Already
+ALLOWLIST AT ALL ──` plus a wire-compatibility note on `blockId`. Already
   cites ADR-060 §3; the prose largely restates it.
 
 Files where comment outweighs code:
 
-| file | comment | code | ratio |
-|---|---|---|---|
-| `streaming/langy-streaming.constants.ts` | 49 | 19 | **2.6** |
-| `services/langy-prompt-registry.service.ts` | 66 | 52 | 1.3 |
-| `ports/langy-conversation-process.port.ts` | 38 | 34 | 1.1 |
-| `ports/langy-frame-auth.port.ts` | 64 | 64 | 1.0 |
-| `services/langy-conversation-memory.service.ts` | 187 | 188 | 0.99 |
-| `streaming/langy-turn-order.ts` | 37 | 38 | 0.97 |
-| `streaming/langy-relay-frame.ts` | 113 | 117 | 0.96 |
-| `transport/api-trpc/langy-egress.api.ts` | 55 | 66 | 0.83 |
+| file                                            | comment | code | ratio   |
+| ----------------------------------------------- | ------- | ---- | ------- |
+| `streaming/langy-streaming.constants.ts`        | 49      | 19   | **2.6** |
+| `services/langy-prompt-registry.service.ts`     | 66      | 52   | 1.3     |
+| `ports/langy-conversation-process.port.ts`      | 38      | 34   | 1.1     |
+| `ports/langy-frame-auth.port.ts`                | 64      | 64   | 1.0     |
+| `services/langy-conversation-memory.service.ts` | 187     | 188  | 0.99    |
+| `streaming/langy-turn-order.ts`                 | 37      | 38   | 0.97    |
+| `streaming/langy-relay-frame.ts`                | 113     | 117  | 0.96    |
+| `transport/api-trpc/langy-egress.api.ts`        | 55      | 66   | 0.83    |
 
 `services/langy-prompt-registry.service.ts:1-37` is the clearest ADR candidate:
 37 lines describing where prompt rows live, which is explicitly "a deployment
@@ -425,13 +425,13 @@ It is also the only file in the package with a 28-line mid-file comment block
 
 Beyond P7's mint, five blocks are near-verbatim copies:
 
-| what | warm | start (via preparation) | divergence |
-|---|---|---|---|
-| base-dependency resolve | `langy-turn-warm.service.ts:61-70` | `langy-turn-start.service.ts:47-56` | warm adopts any requested id; start requires `adoptConversationId` |
-| model selection | `langy-turn-warm.service.ts:73` | `langy-turn-start.service.ts:120` | warm returns `{warmed:false}`; start throws `LangyModelNotConfiguredError` |
-| models allow-list | `langy-turn-warm.service.ts:76-82` | `langy-turn-preparation.service.ts:115-118, 147-163` | warm returns false; start throws `LangyModelNotAllowedError` |
-| GitHub permit + credential strip | `langy-turn-warm.service.ts:83-86` | `langy-turn-preparation.service.ts:182-184, 200-202` | warm `check`, start `reserve` |
-| probe → mint → mutate credentials | `langy-turn-warm.service.ts:87-104` | `langy-turn-preparation.service.ts:212-232` | **P7** |
+| what                              | warm                                | start (via preparation)                              | divergence                                                                 |
+| --------------------------------- | ----------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------- |
+| base-dependency resolve           | `langy-turn-warm.service.ts:61-70`  | `langy-turn-start.service.ts:47-56`                  | warm adopts any requested id; start requires `adoptConversationId`         |
+| model selection                   | `langy-turn-warm.service.ts:73`     | `langy-turn-start.service.ts:120`                    | warm returns `{warmed:false}`; start throws `LangyModelNotConfiguredError` |
+| models allow-list                 | `langy-turn-warm.service.ts:76-82`  | `langy-turn-preparation.service.ts:115-118, 147-163` | warm returns false; start throws `LangyModelNotAllowedError`               |
+| GitHub permit + credential strip  | `langy-turn-warm.service.ts:83-86`  | `langy-turn-preparation.service.ts:182-184, 200-202` | warm `check`, start `reserve`                                              |
+| probe → mint → mutate credentials | `langy-turn-warm.service.ts:87-104` | `langy-turn-preparation.service.ts:212-232`          | **P7**                                                                     |
 
 Some divergence is intentional (warm must never fail a page load). But five
 copies with four intentional differences and one unintentional one is the shape
@@ -443,12 +443,12 @@ that produced P7, and will produce the next one.
 set. The contract already exports one, `CLI_COLLECTION_VERBS`
 (`contract/src/cards/registry.ts:245-255`). They are not the same set any more:
 
-| verb | server copy | contract |
-|---|---|---|
-| `search` `query` `list` `versions` `list-runs` `records` | yes | yes |
-| `results` | **yes** | no |
-| `tag` | no | **yes** |
-| `types` | no | **yes** |
+| verb                                                     | server copy | contract |
+| -------------------------------------------------------- | ----------- | -------- |
+| `search` `query` `list` `versions` `list-runs` `records` | yes         | yes      |
+| `results`                                                | **yes**     | no       |
+| `tag`                                                    | no          | **yes**  |
+| `types`                                                  | no          | **yes**  |
 
 The web side imports the contract's copy
 (`web/src/behaviour/langy-capability-registry.ts:42`), so **server and browser
@@ -493,8 +493,8 @@ shape and are correct. Two of the seven free-function modules are R2 hits:
   lifecycle itself — `:182` `input.redis.duplicate()`, `:190`
   `blockingRedis.disconnect()`. `{ langy, redis }` are the constructor fields
   that were never written.
-- `streaming/langy-turn-tail.ts` — the shared bundle is *already declared as a
-  type*: `interface TailDeps` at `:83-93`, spread into `followLiveEdge`
+- `streaming/langy-turn-tail.ts` — the shared bundle is _already declared as a
+  type_: `interface TailDeps` at `:83-93`, spread into `followLiveEdge`
   (`:107-119`) and `streamTurnEntries` (`:185-188`). `TailDeps` is the missing
   constructor, written out longhand.
 
@@ -508,7 +508,7 @@ behavioural ports, and `:364-367` explicitly says the link cache is not an
 instance field.
 
 R7 in `streaming/`: two blocks of 20+ lines. `streaming/langy-turn-order.ts:1-22`
-is pure incident history (the durable record *used to* store tool calls before
+is pure incident history (the durable record _used to_ store tool calls before
 text, so a refreshing reader lost the middle of a turn) — ADR material.
 `streaming/langy-turn-relay.ts:1-20` is legitimate module orientation; keep it.
 Three sub-threshold blocks are also post-mortems rather than explanations:
@@ -660,13 +660,20 @@ export class LangyApp {
   // … the 23 methods it already has, minus the getter …
 
   /** The worker posting its result back over /api/internal/langy. */
-  turnExists(input: { projectId: string; conversationId: string; turnId: string }): Promise<boolean> {
+  turnExists(input: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
     return this.recording.turnExists(input);
   }
   ingestAgentTurnResult(input: LangyTurnResultInput): Promise<void> {
     return this.recording.ingestAgentTurnResult(input);
   }
-  revokeWorkerSessionKey(input: { apiKeyId: string; projectId: string }): Promise<LangySessionKeyRevocation> {
+  revokeWorkerSessionKey(input: {
+    apiKeyId: string;
+    projectId: string;
+  }): Promise<LangySessionKeyRevocation> {
     return this.credentials.revokeWorkerSessionKey(input);
   }
   openRelayConnection(): LangyRelayConnection {
@@ -733,7 +740,7 @@ async ensureWorkerCredentials(args: {
   `$transaction`, `$executeRaw` or `$queryRaw`. The only mentions in all 85
   server files are the eleven type positions in
   `repositories/prisma/langy-database.port.ts:1-17`, which is the repository
-  layer's own narrow database surface. This is what dataset is being fixed *to*.
+  layer's own narrow database surface. This is what dataset is being fixed _to_.
 - **R6 is clean.** All 18 contract error classes (`contract/src/langy.errors.ts:39-382`)
   and all 10 server ones (`adapters/langy.turn-errors.adapter.ts:33-241`) extend
   `HandledError` with a stable code. There is **no** `Record<string, {status}>`
@@ -784,6 +791,7 @@ async ensureWorkerCredentials(args: {
   imports that predate the guard. That entry is stale and should be dropped —
   the enforcing test, `platform/app/src/server/__tests__/frontend-boundary.unit.test.ts`,
   walks the real graph, so nothing has regressed; only the prose is out of date.
+
 - **`contract/src/event-sourcing/` and `contract/src/inline-channel/`** — folds,
   cursors and the fence parser, each with its own unit test. Correct as they are.
 - **`web/`** — 80 files, 12,801 lines. Outside this review's scope beyond P10.
@@ -845,11 +853,11 @@ Seven commits, smallest risk first, each leaving the suite green.
 
 Non-test files outside `packages/features/langy/` that import each package:
 
-| package | importers |
-|---|---|
-| `@langwatch/langy-web` | 93 |
-| `@langwatch/langy-contract` | 49 |
-| `@langwatch/langy-server` | 17 |
+| package                     | importers |
+| --------------------------- | --------- |
+| `@langwatch/langy-web`      | 93        |
+| `@langwatch/langy-contract` | 49        |
+| `@langwatch/langy-server`   | 17        |
 
 The 17 server importers:
 

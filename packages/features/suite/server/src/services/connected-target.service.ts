@@ -13,7 +13,11 @@
  * @see dev/docs/adr/128-connected-agents.md
  */
 
-import { AgentOwnerOnlyError, isConnectedAgentStale, parseConnectedReference } from "@langwatch/agent-contract";
+import {
+  AgentOwnerOnlyError,
+  isConnectedAgentStale,
+  parseConnectedReference,
+} from "@langwatch/agent-contract";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
 import {
@@ -34,10 +38,7 @@ export type ConnectedTargetAgent = {
 type ConnectedAgentRow = { id: string; ownerUserId?: string | null };
 
 /** The read `resolveConnectedReferences` needs, and nothing more. */
-export type ConnectedTargetReferenceReader = Pick<
-  AgentService,
-  "getConnectedByNameAndEnvironment"
->;
+export type ConnectedTargetReferenceReader = Pick<AgentService, "getConnectedByNameAndEnvironment">;
 
 /**
  * The display names of the owners of the personal agents among these.
@@ -93,9 +94,7 @@ export async function assertConnectedAgentsRunnable({
  * `ownerNamesOf` read `prisma.user` directly; the branch already has this
  * read as a service method, so the module wraps it instead of restating it.
  */
-export function agentOwnerNameReader(
-  agents: Pick<AgentService, "ownersOf">,
-): AgentOwnerNameReader {
+export function agentOwnerNameReader(agents: Pick<AgentService, "ownersOf">): AgentOwnerNameReader {
   return {
     async findNamesByIds(ids) {
       const owners = await agents.ownersOf(ids.map((ownerUserId) => ({ ownerUserId })));

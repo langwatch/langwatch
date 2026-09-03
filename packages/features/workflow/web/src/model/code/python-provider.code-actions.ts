@@ -16,10 +16,7 @@ import {
  * lightbulb on lines that have a matching marker; clicking it offers the
  * actions we return from here.
  */
-export function registerCodeActions(
-  monaco: Monaco,
-  contractRef: ContractRef,
-): IDisposable {
+export function registerCodeActions(monaco: Monaco, contractRef: ContractRef): IDisposable {
   return monaco.languages.registerCodeActionProvider("python", {
     provideCodeActions: (
       model: editor.ITextModel,
@@ -44,14 +41,11 @@ export function registerCodeActions(
       const hasTrailingNewline = source.length === 0 || source.endsWith("\n");
 
       for (const marker of matching) {
-        const markerCode =
-          typeof marker.code === "string" ? marker.code : marker.code?.value;
+        const markerCode = typeof marker.code === "string" ? marker.code : marker.code?.value;
         if (markerCode === MISSING_CLASS_CODE) {
           // Prepend the full class scaffold to the existing buffer so any
           // helper imports the user has at the top are preserved.
-          const text = hasTrailingNewline
-            ? CODE_SCAFFOLD_SNIPPET
-            : "\n" + CODE_SCAFFOLD_SNIPPET;
+          const text = hasTrailingNewline ? CODE_SCAFFOLD_SNIPPET : "\n" + CODE_SCAFFOLD_SNIPPET;
           actions.push({
             title: "Insert `class Code` scaffold",
             kind: "quickfix",
@@ -119,8 +113,7 @@ export function registerCodeActions(
           // scaffold quick fix to land them in a known state first).
           const outputName = markerCode.slice(MISSING_OUTPUT_KEY.length + 1);
           const outputType =
-            contractRef.current.outputs.find((o) => o.identifier === outputName)?.type ??
-            "str";
+            contractRef.current.outputs.find((o) => o.identifier === outputName)?.type ?? "str";
           const defaultLit = defaultValueLiteralFor(outputType);
           const returnRe = /(return\s*\{)([^}]*)\}/g;
           let lastMatch: RegExpExecArray | null = null;

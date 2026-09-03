@@ -13,10 +13,7 @@ import { useUIStore } from "../../../../index";
  */
 export type SearchBarStatus = { kind: "ok" } | { kind: "error"; message: string };
 
-const STATUS_PALETTE: Record<
-  "error",
-  { fg: string; bg: string; border: string; label: string }
-> = {
+const STATUS_PALETTE: Record<"error", { fg: string; bg: string; border: string; label: string }> = {
   error: {
     fg: "red.fg",
     bg: "red.subtle",

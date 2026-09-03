@@ -20,7 +20,8 @@ import { createScenarioRunPlatformUrlBuilder } from "../scenario-run-platform-ur
 
 function harness() {
   const platformUrl = vi.fn(
-    (({ projectSlug, path }) => `https://app.langwatch.ai/${projectSlug}${path}`) as PlatformUrlBuilder,
+    (({ projectSlug, path }) =>
+      `https://app.langwatch.ai/${projectSlug}${path}`) as PlatformUrlBuilder,
   );
   return { platformUrl, build: createScenarioRunPlatformUrlBuilder(platformUrl) };
 }

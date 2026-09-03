@@ -23,10 +23,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     return rows.map((row) => departmentSchema.parse(row));
   }
 
-  async tryGetById(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<Department | null> {
+  async tryGetById(input: { id: string; organizationId: string }): Promise<Department | null> {
     const row = await this.prisma.department.findFirst({
       where: { ...input, archivedAt: null },
     });
@@ -80,10 +77,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     try {
       return await this.create(input);
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         const winner = await this.tryFindActiveByName(input);
         if (winner) return winner;
       }
@@ -91,11 +85,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     }
   }
 
-  async rename(input: {
-    id: string;
-    organizationId: string;
-    name: string;
-  }): Promise<boolean> {
+  async rename(input: { id: string; organizationId: string; name: string }): Promise<boolean> {
     const result = await this.prisma.department.updateMany({
       where: {
         id: input.id,

@@ -70,9 +70,7 @@ describe("<ExportConfigDialog/>", () => {
     it("shows description for Full mode", () => {
       render(<ExportConfigDialog {...defaultProps} />, { wrapper: Wrapper });
 
-      expect(
-        screen.getByText("One row per span, includes inputs/outputs"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("One row per span, includes inputs/outputs")).toBeInTheDocument();
     });
 
     it("has Cancel and Export buttons", () => {
@@ -85,10 +83,9 @@ describe("<ExportConfigDialog/>", () => {
 
   describe("when isSelectedExport is true", () => {
     it("displays 'X selected traces' in the subtitle", () => {
-      render(
-        <ExportConfigDialog {...defaultProps} traceCount={5} isSelectedExport={true} />,
-        { wrapper: Wrapper },
-      );
+      render(<ExportConfigDialog {...defaultProps} traceCount={5} isSelectedExport={true} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("5 selected traces")).toBeInTheDocument();
     });

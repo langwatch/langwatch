@@ -12,10 +12,7 @@ import {
 } from "@langwatch/authz-contract";
 import { nanoid } from "nanoid";
 import type { ShareLink } from "@langwatch/share-contract";
-import type {
-  ShareDatabase,
-  ShareTransactionDatabase,
-} from "../../ports/share-database.port";
+import type { ShareDatabase, ShareTransactionDatabase } from "../../ports/share-database.port";
 import {
   ShareRepository,
   type CreateShareLinkParams,
@@ -27,12 +24,7 @@ import {
 const SYSTEM_ACTOR: LedgerActor = { type: "system", id: null };
 
 function idFromRow(row: unknown): string {
-  if (
-    typeof row !== "object" ||
-    row === null ||
-    !("id" in row) ||
-    typeof row.id !== "string"
-  ) {
+  if (typeof row !== "object" || row === null || !("id" in row) || typeof row.id !== "string") {
     throw new Error("Share id query returned an invalid row");
   }
 
@@ -60,24 +52,14 @@ function organizationIdFromProject(row: unknown): string | null {
 /** Prisma's unique-constraint failure, read off the code so it survives a
  *  client instance boundary. */
 function isUniqueConstraintViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "P2002"
-  );
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
 /** Prisma's record-not-found failure (P2025) — what a conditioned `update`
  *  raises when its filter matches no row, read off the code for the same
  *  reason as above. */
 function isRecordNotFound(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "P2025"
-  );
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
 }
 
 export class LedgerShareRepository extends ShareRepository {
@@ -112,10 +94,7 @@ export class LedgerShareRepository extends ShareRepository {
     return this.legacy.tryFindByToken(token);
   }
 
-  async tryFindById(params: {
-    id: string;
-    projectId: string;
-  }): Promise<ShareWithProject | null> {
+  async tryFindById(params: { id: string; projectId: string }): Promise<ShareWithProject | null> {
     return this.legacy.tryFindById(params);
   }
 
@@ -164,9 +143,7 @@ export class LedgerShareRepository extends ShareRepository {
         ...(params.maxViews != null ? { maxViews: params.maxViews } : {}),
         ...(params.userId ? { createdByUserId: params.userId } : {}),
       },
-      actor: params.userId
-        ? { type: "user", id: params.userId }
-        : { type: "system", id: null },
+      actor: params.userId ? { type: "user", id: params.userId } : { type: "system", id: null },
     });
 
     const row = await this.legacy.tryFindById({

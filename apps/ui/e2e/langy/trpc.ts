@@ -55,26 +55,18 @@ export function getSessionCookie(): Promise<string> {
         // in chunks) can land on the auth rate limiter. That is the runner
         // being throttled, not a scenario failing: wait out the window.
         if (res.status !== 429 || attempt >= 6) break;
-        console.log(
-          `[scenario] sign-in rate-limited (429), waiting 20s (attempt ${attempt})`,
-        );
+        console.log(`[scenario] sign-in rate-limited (429), waiting 20s (attempt ${attempt})`);
         await new Promise((resolve) => setTimeout(resolve, 20_000));
       }
       if (!res.ok) {
-        throw new Error(
-          `Langy test sign-in failed: ${res.status} ${await res.text()}`,
-        );
+        throw new Error(`Langy test sign-in failed: ${res.status} ${await res.text()}`);
       }
       const setCookie = res.headers.get("set-cookie") ?? "";
       // better-auth only applies the __Secure- prefix on HTTPS origins, so a
       // plain-http local stack sets the bare cookie name. Accept both.
-      const match = /(?:__Secure-)?better-auth\.session_token=[^;]+/.exec(
-        setCookie,
-      );
+      const match = /(?:__Secure-)?better-auth\.session_token=[^;]+/.exec(setCookie);
       if (!match) {
-        throw new Error(
-          "Langy test sign-in: no better-auth session cookie in response",
-        );
+        throw new Error("Langy test sign-in: no better-auth session cookie in response");
       }
       return match[0];
     } catch (error) {

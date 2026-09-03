@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  DEMO_HTTP_AGENT_CONFIG,
-  DEMO_PROMPT_CONFIG_DATA,
-} from "../demo-platform-ids";
+import { DEMO_HTTP_AGENT_CONFIG, DEMO_PROMPT_CONFIG_DATA } from "../demo-platform-ids";
 import { httpComponentSchema } from "@langwatch/workflow-contract";
 import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
 

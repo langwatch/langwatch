@@ -31,8 +31,7 @@ describe("Experiments Skill for a domain-specific RAG agent", () => {
           const result = await scenario.run({
             setId: SKILL_TESTS_SET_ID,
             name: "RAG agent domain-specific evaluation",
-            description:
-              "Creating an evaluation experiment for a farm advisory RAG agent.",
+            description: "Creating an evaluation experiment for a farm advisory RAG agent.",
             agents: [
               createClaudeCodeAgent({
                 workingDirectory,

@@ -148,11 +148,7 @@ export function CommandPalette({
   const openDrawer = host.openDrawer.bind(host);
   const deployment = host.deployment();
   const { setTheme } = useTheme();
-  const {
-    idResult,
-    searchResults,
-    isLoading: searchLoading,
-  } = useCommandSearch(query, active);
+  const { idResult, searchResults, isLoading: searchLoading } = useCommandSearch(query, active);
   const { groupedItems, addRecentItem } = useRecentItems();
 
   const fallbackInputRef = useRef<HTMLInputElement>(null);
@@ -178,8 +174,7 @@ export function CommandPalette({
 
   // Detect platform for keyboard hints
   const isMac =
-    typeof navigator !== "undefined" &&
-    navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+    typeof navigator !== "undefined" && navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 
   const filteredCommands = useFilteredCommands(
     query,
@@ -187,12 +182,7 @@ export function CommandPalette({
     project?.id,
     deployment.isDevelopment,
   );
-  const filteredProjects = useFilteredProjects(
-    query,
-    organizations,
-    project?.slug,
-    currentUserId,
-  );
+  const filteredProjects = useFilteredProjects(query, organizations, project?.slug, currentUserId);
 
   const {
     allItems,

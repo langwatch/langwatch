@@ -20,7 +20,5 @@ export interface MfaEnrollmentRepository {
    * to name WHICH organization is asking, and a caller that computed it
    * itself could be working from a stale membership list.
    */
-  findRequiringOrganizationSlugs(args: {
-    userId: string;
-  }): Promise<readonly string[]>;
+  findRequiringOrganizationSlugs(args: { userId: string }): Promise<readonly string[]>;
 }

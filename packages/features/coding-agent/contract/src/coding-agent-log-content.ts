@@ -146,9 +146,10 @@ const ALL_CONTENT_KEYS: readonly string[] = [
  * through the gate untouched — the same bypass shape a namespaced event had.
  * The side is unknown, so every one of them needs BOTH categories.
  */
-const UNKNOWN_EVENT_CONTENT_KEYS: readonly LogContentKey[] = ALL_CONTENT_KEYS.map(
-  (key) => ({ key, category: SESSION_FREE_TEXT }),
-);
+const UNKNOWN_EVENT_CONTENT_KEYS: readonly LogContentKey[] = ALL_CONTENT_KEYS.map((key) => ({
+  key,
+  category: SESSION_FREE_TEXT,
+}));
 
 /** The table entry for an event, or undefined when neither table places it. */
 function knownContentKeys(eventName: string): readonly LogContentKey[] | undefined {

@@ -86,10 +86,14 @@ export function preloadDrawer({
   const factory = chunkFactories.get(component);
   if (!factory) return Promise.resolve();
 
-  const load = warm ?? ((run: () => Promise<unknown>) => run().then(() => true, () => false));
-  return load(factory).then((loaded) =>
-    loaded ? primeLazyComponent(component) : undefined,
-  );
+  const load =
+    warm ??
+    ((run: () => Promise<unknown>) =>
+      run().then(
+        () => true,
+        () => false,
+      ));
+  return load(factory).then((loaded) => (loaded ? primeLazyComponent(component) : undefined));
 }
 
 /**
@@ -163,10 +167,9 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
 export type DrawerTypeOf<R extends UiDrawerRegistry> = keyof R & string;
 
 /** The props of one named drawer in a registry. */
-export type DrawerPropsOf<
-  R extends UiDrawerRegistry,
-  T extends DrawerTypeOf<R>,
-> = ComponentProps<R[T]>;
+export type DrawerPropsOf<R extends UiDrawerRegistry, T extends DrawerTypeOf<R>> = ComponentProps<
+  R[T]
+>;
 
 /**
  * Only the callback (function) props of one named drawer.
@@ -174,11 +177,13 @@ export type DrawerPropsOf<
  * Used for type-safe flow callback registration.
  */
 export type DrawerCallbacksOf<R extends UiDrawerRegistry, T extends DrawerTypeOf<R>> = {
-  [K in keyof DrawerPropsOf<R, T> as DrawerPropsOf<R, T>[K] extends
-    // oxlint-disable-next-line no-explicit-any
-    ((...args: any[]) => any) | undefined
-    ? K
-    : never]?: DrawerPropsOf<R, T>[K];
+  [
+    K in keyof DrawerPropsOf<R, T> as DrawerPropsOf<R, T>[K] extends
+      // oxlint-disable-next-line no-explicit-any
+      ((...args: any[]) => any) | undefined
+      ? K
+      : never
+  ]?: DrawerPropsOf<R, T>[K];
 };
 
 /** Maps drawer names to their callback props. */

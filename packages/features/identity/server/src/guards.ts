@@ -24,10 +24,7 @@ import {
   userErasureFacts,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
-import {
-  computeIdentifierHash,
-  deriveIdentifierId,
-} from "./crypto/identifier-identity";
+import { computeIdentifierHash, deriveIdentifierId } from "./crypto/identifier-identity";
 import type { IdentityHeadsRepository } from "./identity-heads.repository";
 import type { IdentityReservationRepository } from "./identity-reservations.repository";
 import type { IdentityUsersRepository } from "./identity-users.repository";
@@ -114,9 +111,7 @@ export class IdentityGuards {
       normalizedValue,
     });
     if (held) return;
-    throw new IdentityEmailInUseError(
-      `${verb}: another user holds the lock on this address`,
-    );
+    throw new IdentityEmailInUseError(`${verb}: another user holds the lock on this address`);
   }
 
   /**
@@ -152,9 +147,7 @@ export class IdentityGuards {
     );
   }
 
-  async attachIdentifier(
-    data: AttachIdentifierCommandData,
-  ): Promise<IdentityFactInput[]> {
+  async attachIdentifier(data: AttachIdentifierCommandData): Promise<IdentityFactInput[]> {
     const {
       userId,
       accountId,
@@ -212,9 +205,7 @@ export class IdentityGuards {
         providerAccountId,
         value: normalizedValue,
         identifierHash:
-          userHashKey === null
-            ? null
-            : computeIdentifierHash({ userHashKey, normalizedValue }),
+          userHashKey === null ? null : computeIdentifierHash({ userHashKey, normalizedValue }),
         domain: identifierDomain(normalizedValue),
         connectionId: null,
         state,
@@ -233,11 +224,8 @@ export class IdentityGuards {
     return [attached(arrivalState)];
   }
 
-  async verifyIdentifier(
-    data: VerifyIdentifierCommandData,
-  ): Promise<IdentityFactInput[]> {
-    const { userId, identifierId, verificationId, method, commandId, actor } =
-      data;
+  async verifyIdentifier(data: VerifyIdentifierCommandData): Promise<IdentityFactInput[]> {
+    const { userId, identifierId, verificationId, method, commandId, actor } = data;
     const heads = await this.heads.findHeads({ userId });
     const head = heads.identifiers[identifierId];
     if (!head) {
@@ -325,9 +313,7 @@ export class IdentityGuards {
     return primaryChangeFacts({ heads, identifierId, actor });
   }
 
-  async detachIdentifier(
-    data: DetachIdentifierCommandData,
-  ): Promise<IdentityFactInput[]> {
+  async detachIdentifier(data: DetachIdentifierCommandData): Promise<IdentityFactInput[]> {
     const { userId, identifierId, actor } = data;
     const heads = await this.heads.findHeads({ userId });
     const head = heads.identifiers[identifierId];
@@ -367,9 +353,7 @@ export class IdentityGuards {
         );
       }
     }
-    return [
-      { type: IDENTIFIER_DETACHED_EVENT_TYPE, data: { identifierId, actor } },
-    ];
+    return [{ type: IDENTIFIER_DETACHED_EVENT_TYPE, data: { identifierId, actor } }];
   }
 
   async eraseUser(data: EraseUserCommandData): Promise<IdentityFactInput[]> {
@@ -399,16 +383,8 @@ export class IdentityGuards {
    * rather than reading heads it would not use.
    */
   async proposeLink(data: ProposeLinkCommandData): Promise<IdentityFactInput[]> {
-    const {
-      proposalId,
-      userId,
-      connectionId,
-      provider,
-      providerAccountId,
-      value,
-      reason,
-      actor,
-    } = data;
+    const { proposalId, userId, connectionId, provider, providerAccountId, value, reason, actor } =
+      data;
     const normalizedValue = normalizeIdentifierValue(value);
     return [
       {

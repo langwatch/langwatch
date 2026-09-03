@@ -1,10 +1,7 @@
 import { Box, HStack } from "@chakra-ui/react";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids";
-import {
-  type TraceAnchor,
-  useAnchoredAnnotations,
-} from "../../hooks/use-anchored-annotations";
+import { type TraceAnchor, useAnchoredAnnotations } from "../../hooks/use-anchored-annotations";
 import { AnchorCommentButton } from "../anchored-comments/anchor-comment-button";
 import { TranscriptRenderProvider } from "../../../../../index";
 

@@ -48,13 +48,7 @@ type SliderControlProps = {
   minOverride?: number;
 };
 
-function SliderControl({
-  config,
-  value,
-  onChange,
-  maxOverride,
-  minOverride,
-}: SliderControlProps) {
+function SliderControl({ config, value, onChange, maxOverride, minOverride }: SliderControlProps) {
   const {
     effectiveMin,
     effectiveMax,

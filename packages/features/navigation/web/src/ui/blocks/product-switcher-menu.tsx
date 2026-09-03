@@ -102,12 +102,7 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
                       </Box>
                     )}
                   </HStack>
-                  <Text
-                    fontSize="11px"
-                    lineHeight="short"
-                    color="fg.muted"
-                    paddingLeft="21px"
-                  >
+                  <Text fontSize="11px" lineHeight="short" color="fg.muted" paddingLeft="21px">
                     {product.pitch}
                   </Text>
                 </VStack>

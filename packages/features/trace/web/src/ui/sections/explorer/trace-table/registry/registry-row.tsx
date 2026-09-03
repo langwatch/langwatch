@@ -103,9 +103,7 @@ function RegistryRowComponent<TRow>({
   const langy = useLangyContextTarget(langyTarget);
   const tokens = useDensityTokens();
   const densityMode = useDensityStore((s) => s.density);
-  const isPulsing = useRowPulseStore(
-    (s) => !isLoading && !!rowDomId && s.pulsingIds.has(rowDomId),
-  );
+  const isPulsing = useRowPulseStore((s) => !isLoading && !!rowDomId && s.pulsingIds.has(rowDomId));
 
   const variant = rowVariantFor({ isSelected, status });
   const style = ROW_STYLES[variant];
@@ -163,8 +161,7 @@ function RegistryRowComponent<TRow>({
     () => renderedAddons[0]?.id === "io-preview",
     [renderedAddons],
   );
-  const evalsRowSpansIntoIOPreview =
-    !isLoading && evalsCellIdx >= 0 && ioPreviewWillRender;
+  const evalsRowSpansIntoIOPreview = !isLoading && evalsCellIdx >= 0 && ioPreviewWillRender;
   const rowSpanClaimedIndices = useMemo(
     () => (evalsRowSpansIntoIOPreview ? [evalsCellIdx] : []),
     [evalsRowSpansIntoIOPreview, evalsCellIdx],
@@ -191,24 +188,14 @@ function RegistryRowComponent<TRow>({
       outlineColor={isFocused ? "blue.fg" : undefined}
       cursor={onSelect || onToggleExpand ? "pointer" : "default"}
       onClick={hoverScope === "split" ? handleRowClick : undefined}
-      bg={
-        hoverScope === "split"
-          ? showExpandedBg
-            ? expandedBg!.surface
-            : style.bg
-          : undefined
-      }
+      bg={hoverScope === "split" ? (showExpandedBg ? expandedBg!.surface : style.bg) : undefined}
       // Reveal opt-in subdued content (e.g. trace ID in TraceCell)
       // only while the row is hovered. Children mark themselves with
       // `data-row-hover-reveal` and start at opacity 0 — the CSS rule
       // here lifts them to 1 when the parent row is hovered.
       css={{ "&:hover [data-row-hover-reveal]": { opacity: 1 } }}
       _hover={
-        hoverScope === "split"
-          ? showExpandedBg
-            ? undefined
-            : { bg: style.hoverBg }
-          : undefined
+        hoverScope === "split" ? (showExpandedBg ? undefined : { bg: style.hoverBg }) : undefined
       }
     >
       {visibleCells.map((cell, i) => {
@@ -224,9 +211,7 @@ function RegistryRowComponent<TRow>({
             // expanded recessed surface goes on inline to keep that cell in
             // step with the rest of the header row.
             style={
-              i === 0 && showExpandedBg
-                ? { backgroundColor: expandedBg!.firstCell }
-                : undefined
+              i === 0 && showExpandedBg ? { backgroundColor: expandedBg!.firstCell } : undefined
             }
             // When this cell rowSpans into the IO preview row below, it
             // needs to paint the bottom border that the IO preview row
@@ -373,11 +358,7 @@ function RegistryRowComponent<TRow>({
   }
 
   return (
-    <Tbody
-      ref={ref}
-      data-index={dataIndex}
-      css={{ "& > tr, & > tr > td": { transition: "none" } }}
-    >
+    <Tbody ref={ref} data-index={dataIndex} css={{ "& > tr, & > tr > td": { transition: "none" } }}>
       {mainRow}
       {addonRows}
     </Tbody>

@@ -15,14 +15,8 @@ import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
 import { makeLangyAdapter } from "./langy-agent";
-import {
-  LANGY_CORE_RULE_CRITERIA,
-  LANGY_EVALUATOR_INFERENCE_CRITERIA,
-} from "./langy-rules";
-import {
-  runBootstrapScenario,
-  seedWithoutEvaluator,
-} from "./optimization-bootstrap-harness";
+import { LANGY_CORE_RULE_CRITERIA, LANGY_EVALUATOR_INFERENCE_CRITERIA } from "./langy-rules";
+import { runBootstrapScenario, seedWithoutEvaluator } from "./optimization-bootstrap-harness";
 import { runScenarioAndLog } from "./scenario-logger";
 import { getWorkbenchState } from "./seed-optimization-workbench";
 

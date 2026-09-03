@@ -168,9 +168,7 @@ const send = (
 ) =>
   hono.request(path, {
     method,
-    ...(body === undefined
-      ? {}
-      : { headers: jsonHeaders, body: JSON.stringify(body) }),
+    ...(body === undefined ? {} : { headers: jsonHeaders, body: JSON.stringify(body) }),
   });
 
 describe("createDatasetRestApp", () => {

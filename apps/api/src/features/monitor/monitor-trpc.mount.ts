@@ -32,9 +32,7 @@ export function createMonitorTrpcRouter<
   TContext extends MonitorTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
->(
-  options: TrpcApiMount<TContext, TOptions, TRoot> & Readonly<{ ports: MonitorTrpcPorts }>,
-) {
+>(options: TrpcApiMount<TContext, TOptions, TRoot> & Readonly<{ ports: MonitorTrpcPorts }>) {
   const service = createTrpcApiService(options);
   const alsoRequire =
     (permission: AuthzPermission) =>

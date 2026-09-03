@@ -45,9 +45,7 @@ describe("nanoUsdToDecimalString", () => {
     }
     // Past the safe integer range the string still reads, because it is
     // digits rather than a JSON number.
-    expect(nanoUsdToDecimalString(999_999_999_999_999_999_000n)).toBe(
-      "999999999999.999999",
-    );
+    expect(nanoUsdToDecimalString(999_999_999_999_999_999_000n)).toBe("999999999999.999999");
     expect(nanoUsdToDecimalString(-1_500_000_000n)).toBe("-1.5");
   });
 });

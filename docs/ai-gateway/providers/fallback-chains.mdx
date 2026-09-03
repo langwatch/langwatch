@@ -74,9 +74,9 @@ Fallback attribution today:
 - Request-id correlation via `X-LangWatch-Gateway-Request-Id`, join the metric + log line back to the specific trace.
 
 <Info>
-  Per-attempt nested spans (`langwatch.fallback.attempt`, `.reason` attrs) are a v1.1
-  observability follow-up. In v1, the counter + header give you the aggregate picture;
-  per-attempt reasoning lives in the gateway log line for that request-id.
+  Per-attempt nested spans (`langwatch.fallback.attempt`, `.reason` attrs) are a v1.1 observability
+  follow-up. In v1, the counter + header give you the aggregate picture; per-attempt reasoning lives
+  in the gateway log line for that request-id.
 </Info>
 
 If **all** attempts in the chain fail, the gateway returns the last provider's error envelope mapped to the OpenAI-compatible shape (`provider_error` or `upstream_timeout` as the `type`).

@@ -55,15 +55,7 @@ describe("formatLoginCeremony", () => {
         const lines = formatLoginCeremony(baseInput);
         const toolLines = lines.filter(isToolCommand);
         expect(toolLines).toHaveLength(7);
-        for (const slug of [
-          "claude",
-          "codex",
-          "copilot",
-          "code",
-          "cursor",
-          "gemini",
-          "opencode",
-        ]) {
+        for (const slug of ["claude", "codex", "copilot", "code", "cursor", "gemini", "opencode"]) {
           expect(toolLines.some((line) => getCommandSlug(line) === slug)).toBe(true);
         }
       });

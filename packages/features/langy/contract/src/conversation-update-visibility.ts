@@ -26,9 +26,7 @@ export function isLangyConversationUpdateVisibleToUser(input: {
 }): boolean {
   if (typeof input.eventPayload !== "string") return false;
   try {
-    const parsed = langyConversationUpdateAuthFieldsSchema.parse(
-      JSON.parse(input.eventPayload),
-    );
+    const parsed = langyConversationUpdateAuthFieldsSchema.parse(JSON.parse(input.eventPayload));
     return canUserSeeLangyConversationUpdate({ ...parsed, userId: input.userId });
   } catch {
     return false;

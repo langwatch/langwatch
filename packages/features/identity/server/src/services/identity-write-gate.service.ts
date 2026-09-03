@@ -89,9 +89,7 @@ const anyoneGate = perSubjectCachedFlag({
   maxEntries: 1,
 });
 
-async function readAnyoneOnIdentityWrites(
-  state: SystemMigrationStateRepository,
-): Promise<boolean> {
+async function readAnyoneOnIdentityWrites(state: SystemMigrationStateRepository): Promise<boolean> {
   try {
     return await state.hasFinalizedTenant({
       migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,

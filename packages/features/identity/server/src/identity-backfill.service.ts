@@ -5,18 +5,12 @@ import {
   orphanedIdentifierRows,
 } from "@langwatch/identity-contract";
 import { mintUserHashKey } from "./crypto/user-hash-key";
-import {
-  type PlannedIdentifier,
-  planIdentifiers,
-} from "./identity-backfill-plan";
+import { type PlannedIdentifier, planIdentifiers } from "./identity-backfill-plan";
 import type {
   BackfillAccountRow,
   IdentityBackfillRepository,
 } from "./identity-backfill.repository";
-import {
-  detachOrphanCommandId,
-  establishUserEmailCommandId,
-} from "./identity-command-id";
+import { detachOrphanCommandId, establishUserEmailCommandId } from "./identity-command-id";
 import type { IdentitySecretCarryService } from "./identity-secret-carry.service";
 import type { IdentityUsersRepository } from "./identity-users.repository";
 import type { IdentityAdoptionWrites } from "./identity-writes";
@@ -82,11 +76,7 @@ export class IdentityBackfillService {
     this.now = deps.now ?? Date.now;
   }
 
-  async migrateUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<IdentityBackfillOutcome> {
+  async migrateUser({ userId }: { userId: string }): Promise<IdentityBackfillOutcome> {
     const user = await this.reads.tryFindUser({ userId });
     if (!user) {
       // A vanished user has no history to adopt and no gate to open that

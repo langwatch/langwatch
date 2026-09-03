@@ -1,17 +1,8 @@
 import chalk from "chalk";
-import type {
-  RunPlanScope,
-  RunPlanTarget,
-} from "@/client-sdk/services/run-plans";
+import type { RunPlanScope, RunPlanTarget } from "@/client-sdk/services/run-plans";
 import type { TestSuitesApiService } from "@/client-sdk/services/test-suites";
-import {
-  coerceParameterValue,
-  type RunParameterValue,
-} from "../../utils/keyValueFlags";
-import {
-  resolveSuiteReference,
-  SuiteReferenceError,
-} from "../test-suites/resolveSuite";
+import { coerceParameterValue, type RunParameterValue } from "../../utils/keyValueFlags";
+import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite";
 
 /** The four scope flags a run takes. They answer one question, so only one may be given. */
 export interface ScopeOptions {
@@ -51,9 +42,7 @@ export async function buildScope(
 
   if (chosen.length === 0) {
     console.error(
-      chalk.red(
-        "Error: say what to run with one of --all, --test-suite, --label or --scenario.",
-      ),
+      chalk.red("Error: say what to run with one of --all, --test-suite, --label or --scenario."),
     );
     process.exit(1);
   }
@@ -144,13 +133,7 @@ const rejectTarget = (message: string): never => {
 };
 
 /** Percent-decode one half of a query pair, naming the target when it cannot be read. */
-function decodeQueryPart({
-  part,
-  target,
-}: {
-  part: string;
-  target: string;
-}): string {
+function decodeQueryPart({ part, target }: { part: string; target: string }): string {
   try {
     return decodeURIComponent(part);
   } catch {
@@ -212,9 +195,7 @@ function parseTargetParameters({
  *
  * @see specs/features/run-plan-cli.feature
  */
-export function parseTargets(
-  targetStrings: string[] | undefined,
-): ParsedRunTarget[] {
+export function parseTargets(targetStrings: string[] | undefined): ParsedRunTarget[] {
   if (!targetStrings || targetStrings.length === 0) {
     console.error(
       chalk.red(
@@ -284,9 +265,7 @@ export function parseRepeat(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const repeat = Number.parseInt(value, 10);
   if (!Number.isInteger(repeat) || repeat < 1 || repeat > 5) {
-    console.error(
-      chalk.red(`Error: --repeat takes a whole number from 1 to 5, not "${value}".`),
-    );
+    console.error(chalk.red(`Error: --repeat takes a whole number from 1 to 5, not "${value}".`));
     process.exit(1);
   }
   return repeat;

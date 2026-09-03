@@ -106,9 +106,7 @@ describe("TracesMapping evaluations dropdown (integration)", () => {
       // Open the searchable key dropdown (shows "* (any evaluation)" until opened).
       await user.click(await screen.findByText("* (any evaluation)"));
 
-      expect(
-        await screen.findByRole("option", { name: "PII Check" }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole("option", { name: "PII Check" })).toBeInTheDocument();
     });
   });
 
@@ -130,9 +128,7 @@ describe("TracesMapping evaluations dropdown (integration)", () => {
       expect(subkeySelect).not.toBeNull();
 
       for (const subfield of ["passed", "score", "label", "details", "status", "error"]) {
-        expect(
-          within(subkeySelect!).getByRole("option", { name: subfield }),
-        ).toBeInTheDocument();
+        expect(within(subkeySelect!).getByRole("option", { name: subfield })).toBeInTheDocument();
       }
     });
   });

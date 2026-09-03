@@ -88,9 +88,7 @@ describe("parseLLMSpanMessages()", () => {
       const attrs = {
         "langwatch.output": JSON.stringify({ content: "hello" }),
       };
-      expect(parseLLMSpanMessages(attrs)).toEqual([
-        { role: "assistant", content: "hello" },
-      ]);
+      expect(parseLLMSpanMessages(attrs)).toEqual([{ role: "assistant", content: "hello" }]);
     });
   });
 
@@ -145,9 +143,7 @@ describe("parseLLMSpanMessages()", () => {
   describe("when input is unparseable JSON", () => {
     it("wraps the raw string as a single user message instead of throwing", () => {
       const attrs = { "langwatch.input": "not valid json {" };
-      expect(parseLLMSpanMessages(attrs)).toEqual([
-        { role: "user", content: "not valid json {" },
-      ]);
+      expect(parseLLMSpanMessages(attrs)).toEqual([{ role: "user", content: "not valid json {" }]);
     });
   });
 

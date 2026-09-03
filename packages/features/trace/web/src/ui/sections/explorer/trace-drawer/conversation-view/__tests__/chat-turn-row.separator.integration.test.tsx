@@ -18,15 +18,18 @@ vi.mock("../../scenario-roles", async () => {
   return { ...actual, useIsScenarioRole: () => false };
 });
 
-vi.mock("../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context", () => ({
-  useConversationExpand: () => ({
-    isExpandable: false,
-    shouldExpandAll: false,
+vi.mock(
+  "../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context",
+  () => ({
+    useConversationExpand: () => ({
+      isExpandable: false,
+      shouldExpandAll: false,
+    }),
+    ConversationExpandContext: {
+      Provider: ({ children }: { children: unknown }) => children,
+    },
   }),
-  ConversationExpandContext: {
-    Provider: ({ children }: { children: unknown }) => children,
-  },
-}));
+);
 
 vi.mock("../../../hooks/use-text-translation", () => ({
   useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({

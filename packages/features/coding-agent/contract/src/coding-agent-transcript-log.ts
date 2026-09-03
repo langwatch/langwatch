@@ -74,10 +74,7 @@ function userPromptEntry(attrs: Record<string, unknown>, atMs: number): Transcri
   return { kind: "user_prompt", atMs, text, chars };
 }
 
-function assistantResponseEntry(
-  attrs: Record<string, unknown>,
-  atMs: number,
-): TranscriptEntry {
+function assistantResponseEntry(attrs: Record<string, unknown>, atMs: number): TranscriptEntry {
   return {
     kind: "assistant_message",
     atMs,
@@ -86,10 +83,7 @@ function assistantResponseEntry(
   };
 }
 
-function apiResponseEntry(
-  attrs: Record<string, unknown>,
-  atMs: number,
-): TranscriptEntry | null {
+function apiResponseEntry(attrs: Record<string, unknown>, atMs: number): TranscriptEntry | null {
   const role = readString(attrs, "role");
   if (role !== null && role !== "main") return null;
 
@@ -114,8 +108,7 @@ function toolResultEntry({
   claimedToolCalls: ClaimedToolCalls;
 }): TranscriptEntry | null {
   const callId = readString(attrs, "call_id");
-  const isCodex =
-    callId !== null && readString(attrs, "event.name") === "codex.tool_result";
+  const isCodex = callId !== null && readString(attrs, "event.name") === "codex.tool_result";
   if (isCodex) return codexToolResultEntry({ attrs, atMs, callId, claimedToolCalls });
 
   const name = readString(attrs, "function_name");
@@ -178,10 +171,7 @@ function codexToolResultEntry({
   };
 }
 
-function toolDecisionEntry(
-  attrs: Record<string, unknown>,
-  atMs: number,
-): TranscriptEntry | null {
+function toolDecisionEntry(attrs: Record<string, unknown>, atMs: number): TranscriptEntry | null {
   const decision = readString(attrs, "decision");
   if (decision === null || decision === "accept") return null;
 

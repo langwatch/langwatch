@@ -1,10 +1,4 @@
-import type {
-  Component,
-  Field,
-  StudioEdge,
-  StudioNode,
-  StudioPosition,
-} from "./studio-workflow";
+import type { Component, Field, StudioEdge, StudioNode, StudioPosition } from "./studio-workflow";
 
 const camelCaseToSnakeCase = (value: string) =>
   value.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
@@ -90,8 +84,7 @@ export const getEntryInputs = (
 
   const entryInputs = entryEdges
     .filter(
-      (edge, index, self) =>
-        self.findIndex((e) => e.sourceHandle === edge.sourceHandle) === index,
+      (edge, index, self) => self.findIndex((e) => e.sourceHandle === edge.sourceHandle) === index,
     )
     .map((edge) => {
       if (!evaluators?.some((evaluator) => evaluator.id === edge.target)) {
@@ -152,9 +145,7 @@ export const getMappingSurfaceInputs = (
       (edge) => edge.source === "entry" && edge.sourceHandle === `outputs.${identifier}`,
     );
 
-    const hasNonEvaluatorTarget = fieldEdges.some(
-      (edge) => !evaluatorIds.has(edge.target),
-    );
+    const hasNonEvaluatorTarget = fieldEdges.some((edge) => !evaluatorIds.has(edge.target));
 
     const evaluatorOnly = fieldEdges.length > 0 && !hasNonEvaluatorTarget;
 
@@ -175,8 +166,7 @@ export const getInputsOutputs = (edges: StudioEdge[], nodes: StudioNode[]) => {
     ...(edge.optional ? { optional: true } : {}),
   }));
 
-  const outputs = nodes.find((node) => node.type === "end" || node.id === "end")?.data
-    .inputs;
+  const outputs = nodes.find((node) => node.type === "end" || node.id === "end")?.data.inputs;
 
   return { inputs, outputs };
 };

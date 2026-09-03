@@ -2,11 +2,7 @@ import { HStack, Text } from "@chakra-ui/react";
 import { Keyboard } from "lucide-react";
 import type { ReactNode } from "react";
 
-export function DejaViewKeyboardHints({
-  renderKey,
-}: {
-  renderKey: (label: string) => ReactNode;
-}) {
+export function DejaViewKeyboardHints({ renderKey }: { renderKey: (label: string) => ReactNode }) {
   return (
     <HStack
       paddingX={4}

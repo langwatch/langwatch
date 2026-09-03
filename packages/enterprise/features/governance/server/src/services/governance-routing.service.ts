@@ -25,8 +25,7 @@ import type { RoutingPolicyRepository } from "../ports/routing-policy.port";
 const MOVING_MODEL_NAME = /^(openai|anthropic|gemini)\/(latest|latest-mini)$/;
 
 export class DefaultGovernanceRoutingPolicyService {
-  private constructor(private readonly repository: RoutingPolicyRepository) {
-  }
+  private constructor(private readonly repository: RoutingPolicyRepository) {}
 
   static create(options: {
     repository: RoutingPolicyRepository;
@@ -87,9 +86,7 @@ export class DefaultGovernanceRoutingPolicyService {
     return this.repository.delete(parsed);
   }
 
-  tryResolveDefaultForUser(
-    input: ResolveDefaultRoutingPolicyInput,
-  ): Promise<RoutingPolicy | null> {
+  tryResolveDefaultForUser(input: ResolveDefaultRoutingPolicyInput): Promise<RoutingPolicy | null> {
     return this.repository.tryResolveDefaultForUser(
       resolveDefaultRoutingPolicyInputSchema.parse(input),
     );

@@ -152,9 +152,7 @@ export const pilotDefinition: ProcessDefinition<PilotState> = {
 
 let eventCounter = 0;
 
-export function pilotEvent(
-  overrides: Partial<ProcessEventEnvelope> = {},
-): ProcessEventEnvelope {
+export function pilotEvent(overrides: Partial<ProcessEventEnvelope> = {}): ProcessEventEnvelope {
   eventCounter += 1;
   return {
     eventId: `evt_${eventCounter}`,

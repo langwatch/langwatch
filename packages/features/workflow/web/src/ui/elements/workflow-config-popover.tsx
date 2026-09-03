@@ -36,13 +36,7 @@ export function WorkflowConfigPopover({
       }}
       positioning={{ placement: "bottom" }}
     >
-      <PopoverTrigger
-        position="absolute"
-        left={0}
-        width="100%"
-        height="32px"
-        zIndex={-1}
-      />
+      <PopoverTrigger position="absolute" left={0} width="100%" height="32px" zIndex={-1} />
       {unstyled ? (
         children
       ) : (

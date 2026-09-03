@@ -44,9 +44,7 @@ export function spendTargetsForBudgets({
           scopeId: `${b.scopeId}:`,
           window: b.window,
           match: "prefix" as const,
-          bucketSuffix: b.providerKey
-            ? `${PROVIDER_BUCKET_SEPARATOR}${b.providerKey}`
-            : null,
+          bucketSuffix: b.providerKey ? `${PROVIDER_BUCKET_SEPARATOR}${b.providerKey}` : null,
           // MANUAL windows, anchored cycles and mid-period resets all move
           // the boundary; the list must total the CURRENT period, same as
           // enforcement does.

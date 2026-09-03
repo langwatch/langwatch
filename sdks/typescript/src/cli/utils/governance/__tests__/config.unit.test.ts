@@ -136,9 +136,7 @@ describe("governance config persistence", () => {
       // Kept, the codex entry would hand `Bearer undefined` to every reader
       // that trusts the declared type.
       expect(loaded.tool_project_keys?.codex).toBeUndefined();
-      expect(loaded.tool_project_keys?.claude?.secret).toBe(
-        "ik-lw-pin0000000000000_secret",
-      );
+      expect(loaded.tool_project_keys?.claude?.secret).toBe("ik-lw-pin0000000000000_secret");
     });
   });
 

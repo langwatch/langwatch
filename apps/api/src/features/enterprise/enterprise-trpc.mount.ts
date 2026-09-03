@@ -35,11 +35,7 @@ import {
   INSTANCE_LICENSE_NO_PERMISSION,
   type EnterpriseTrpcContext,
 } from "@langwatch/enterprise-api";
-import {
-  appTrpcNoPermissionPolicy,
-  appTrpcPolicy,
-  type TrpcApiMount,
-} from "@langwatch/api/trpc";
+import { appTrpcNoPermissionPolicy, appTrpcPolicy, type TrpcApiMount } from "@langwatch/api/trpc";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /**
@@ -56,27 +52,21 @@ export function createEnterpriseTrpcRouters<
   TContext extends EnterpriseTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
->(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> & Readonly<{ ports: EnterpriseTrpcMountPorts }>,
-) {
+>(mount: TrpcApiMount<TContext, TOptions, TRoot> & Readonly<{ ports: EnterpriseTrpcMountPorts }>) {
   const noPermission = appTrpcNoPermissionPolicy(mount.middlewares);
-  const {
-    license,
-    licenseEnforcement,
-    scimToken,
-    ssoConnections,
-  } = EnterpriseTrpcComposition.create({
-    root: mount.root,
-    protectedProcedure: mount.protectedProcedure,
-    policy: appTrpcPolicy(mount.middlewares),
-    instanceLicensePolicy: noPermission(INSTANCE_LICENSE_NO_PERMISSION),
-    currencyPolicy: noPermission(CURRENCY_NO_PERMISSION),
-    backOfficePolicy: noPermission(BACK_OFFICE_NO_PERMISSION),
-    backOfficePolicyForOrganization: noPermission(BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION),
-    // See the module docblock: this process bills nothing and quotes nobody.
-    saasBilling: false,
-    ports: mount.ports,
-  });
+  const { license, licenseEnforcement, scimToken, ssoConnections } =
+    EnterpriseTrpcComposition.create({
+      root: mount.root,
+      protectedProcedure: mount.protectedProcedure,
+      policy: appTrpcPolicy(mount.middlewares),
+      instanceLicensePolicy: noPermission(INSTANCE_LICENSE_NO_PERMISSION),
+      currencyPolicy: noPermission(CURRENCY_NO_PERMISSION),
+      backOfficePolicy: noPermission(BACK_OFFICE_NO_PERMISSION),
+      backOfficePolicyForOrganization: noPermission(BACK_OFFICE_NO_PERMISSION_FOR_ORGANIZATION),
+      // See the module docblock: this process bills nothing and quotes nobody.
+      saasBilling: false,
+      ports: mount.ports,
+    });
 
   return { license, licenseEnforcement, scimToken, ssoConnections };
 }

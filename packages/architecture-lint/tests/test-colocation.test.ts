@@ -80,11 +80,15 @@ describe("chooseSubject", () => {
 
     it("falls back to the directory the old mirror path named", () => {
       expect(
-        chooseSubject("/p/tests/services/lifecycle.unit.test.ts", "services/lifecycle.unit.test.ts", [
-          "/p/src/adapters/a.adapter.ts",
-          "/p/src/adapters/b.adapter.ts",
-          "/p/src/services/agent.service.ts",
-        ]),
+        chooseSubject(
+          "/p/tests/services/lifecycle.unit.test.ts",
+          "services/lifecycle.unit.test.ts",
+          [
+            "/p/src/adapters/a.adapter.ts",
+            "/p/src/adapters/b.adapter.ts",
+            "/p/src/services/agent.service.ts",
+          ],
+        ),
       ).toBe("/p/src/services/agent.service.ts");
     });
 
@@ -274,9 +278,7 @@ describe("planTestColocation", () => {
       const plan = planTestColocation(root);
       const [move] = plan.moves;
 
-      expect(plan.edits.get(move!.from)).toBe(
-        'import { AgentService } from "../agent.service";\n',
-      );
+      expect(plan.edits.get(move!.from)).toBe('import { AgentService } from "../agent.service";\n');
     });
   });
 

@@ -33,9 +33,7 @@ export const RUN_ID_WAIT_MS = 30_000;
 export function startAndIdentifyRun({
   start,
 }: {
-  start: (
-    onRunStarted: (runId: string | undefined) => void,
-  ) => Promise<void> | void;
+  start: (onRunStarted: (runId: string | undefined) => void) => Promise<void> | void;
 }): Promise<string | undefined> {
   return new Promise((resolve) => {
     let settled = false;

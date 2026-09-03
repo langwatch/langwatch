@@ -23,8 +23,7 @@ let canManagePlan = true;
 vi.mock("../../../../../behavior/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "acme" },
-    hasOrgPermission: (permission: string) =>
-      permission === "organization:manage" && canManagePlan,
+    hasOrgPermission: (permission: string) => permission === "organization:manage" && canManagePlan,
   }),
 }));
 
@@ -95,9 +94,7 @@ describe("a tool call refused on a plan limit", () => {
   it("says the plan ran out, not that the access did", () => {
     renderTurn();
     const card = screen.getByRole("alert");
-    expect(card.textContent).toContain(
-      "Your plan includes 3 scenarios, and all 3 are in use.",
-    );
+    expect(card.textContent).toContain("Your plan includes 3 scenarios, and all 3 are in use.");
     expect(card.textContent).not.toContain(
       "Your access in this project doesn't cover this action.",
     );

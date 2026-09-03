@@ -80,23 +80,15 @@ export const evaluateResponseSchema = z.union([
       .object({ currency: z.string(), amount: z.number() })
       .optional()
       .describe("What running the evaluator cost"),
-    raw_response: z
-      .unknown()
-      .optional()
-      .describe("The evaluator's own output, unprocessed"),
+    raw_response: z.unknown().optional().describe("The evaluator's own output, unprocessed"),
   }),
   z.object({
     status: z.literal("skipped"),
-    details: z
-      .string()
-      .optional()
-      .describe("Why the evaluator declined to score this input"),
+    details: z.string().optional().describe("Why the evaluator declined to score this input"),
     cost: z
       .object({ currency: z.string(), amount: z.number() })
       .optional()
-      .describe(
-        "What the attempt cost, when the evaluator spent money before declining to score",
-      ),
+      .describe("What the attempt cost, when the evaluator spent money before declining to score"),
     passed: z
       .boolean()
       .optional()
@@ -125,10 +117,7 @@ export const evaluateResponseSchema = z.union([
  */
 export const evaluateErrorSchema = z.object({
   error: z.string().describe("The failure, as a sentence"),
-  kind: z
-    .string()
-    .optional()
-    .describe("Stable failure code, on the failures that carry one"),
+  kind: z.string().optional().describe("Stable failure code, on the failures that carry one"),
   meta: z
     .record(z.string(), z.unknown())
     .optional()
@@ -140,25 +129,15 @@ const evaluatorSettingsSchema = z.object({
   description: z.string(),
   category: z.string(),
   docsUrl: z.string().optional(),
-  isGuardrail: z
-    .boolean()
-    .describe("Whether this evaluator can gate a request as a guardrail"),
-  requiredFields: z
-    .array(z.string())
-    .describe("`data` keys the evaluate call must supply"),
+  isGuardrail: z.boolean().describe("Whether this evaluator can gate a request as a guardrail"),
+  requiredFields: z.array(z.string()).describe("`data` keys the evaluate call must supply"),
   optionalFields: z.array(z.string()),
-  settings: z
-    .record(z.string(), z.unknown())
-    .describe("Each setting's default and description"),
+  settings: z.record(z.string(), z.unknown()).describe("Each setting's default and description"),
   settings_json_schema: z
     .record(z.string(), z.unknown())
     .describe("JSON Schema for this evaluator's settings object"),
-  envVars: z
-    .array(z.string())
-    .describe("Server-side variables the evaluator needs configured"),
-  result: z
-    .record(z.string(), z.unknown())
-    .describe("What its score, passed and label mean"),
+  envVars: z.array(z.string()).describe("Server-side variables the evaluator needs configured"),
+  result: z.record(z.string(), z.unknown()).describe("What its score, passed and label mean"),
 });
 
 export const evaluatorCatalogueResponseSchema = z.object({
@@ -177,9 +156,7 @@ export const evaluatorCatalogueResponseSchema = z.object({
 export const datasetEvaluateRequestSchema = z.object({
   evaluation: z
     .string()
-    .describe(
-      "Which evaluator to run, addressed the same way the evaluate endpoints address it",
-    ),
+    .describe("Which evaluator to run, addressed the same way the evaluate endpoints address it"),
   datasetSlug: z.string().describe("The saved dataset to evaluate"),
   experimentSlug: z
     .string()
@@ -268,14 +245,8 @@ export const requestBodySchema = (schema: z.ZodType): RequestBodySchema =>
  * branch on here, so a caller has the status and the sentence.
  */
 export const legacySentenceErrorSchema = z.object({
-  message: z
-    .string()
-    .optional()
-    .describe("Set when the request was rejected before validation"),
-  error: z
-    .string()
-    .optional()
-    .describe("Set when the body parsed and then failed validation"),
+  message: z.string().optional().describe("Set when the request was rejected before validation"),
+  error: z.string().optional().describe("Set when the body parsed and then failed validation"),
 });
 
 /** What an accepted write answers with when there is nothing to return. */

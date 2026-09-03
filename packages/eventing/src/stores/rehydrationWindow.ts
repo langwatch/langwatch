@@ -18,14 +18,13 @@ import type { AggregateType } from "../domain/aggregateType";
  * here if every event of such an aggregate is guaranteed to occur within
  * REHYDRATION_WINDOW_MS of any other event of the same aggregate.
  */
-export const TIME_LOCAL_AGGREGATE_TYPES: ReadonlySet<AggregateType> =
-  new Set<AggregateType>([
-    "trace",
-    "evaluation",
-    "experiment_run",
-    "simulation_run",
-    "suite_run",
-  ]);
+export const TIME_LOCAL_AGGREGATE_TYPES: ReadonlySet<AggregateType> = new Set<AggregateType>([
+  "trace",
+  "evaluation",
+  "experiment_run",
+  "simulation_run",
+  "suite_run",
+]);
 
 /**
  * Lower-bound window subtracted from the anchor (the triggering event's

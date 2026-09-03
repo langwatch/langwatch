@@ -112,9 +112,7 @@ function migrateField({
   if (value.length === 0) return null;
 
   // Filter out registry models and convert the rest
-  const filtered = (value as string[]).filter(
-    (modelId) => !registryModelIds.has(modelId),
-  );
+  const filtered = (value as string[]).filter((modelId) => !registryModelIds.has(modelId));
 
   return filtered.map((modelId) => convertStringToEntry({ modelId, mode }));
 }
@@ -132,9 +130,7 @@ export function migrateCustomModelsRow({
   row: ModelProviderRow;
   registryLookup: RegistryLookup;
 }): MigrationResult {
-  const chatRegistryIds = new Set(
-    registryLookup(row.provider, "chat").map((m) => m.value),
-  );
+  const chatRegistryIds = new Set(registryLookup(row.provider, "chat").map((m) => m.value));
   const embeddingRegistryIds = new Set(
     registryLookup(row.provider, "embedding").map((m) => m.value),
   );

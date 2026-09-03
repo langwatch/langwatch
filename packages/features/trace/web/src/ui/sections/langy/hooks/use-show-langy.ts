@@ -75,8 +75,7 @@ export function useLangyVisibility(): LangyVisibility {
   // otherwise read as a match and hide Langy for a user who was never
   // anywhere near the demo project.
   const isDemoProject =
-    !!publicEnv.data?.DEMO_PROJECT_SLUG &&
-    publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
+    !!publicEnv.data?.DEMO_PROJECT_SLUG && publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
   const isOnOwnPersonalProject = !!team?.isPersonal && team.ownerUserId === user?.id;
   const userIsPartOfTeam =
     isOnOwnPersonalProject ||
@@ -90,14 +89,11 @@ export function useLangyVisibility(): LangyVisibility {
   // to an organization only matches when organizationId is in the evaluation
   // context, so omitting it would hide the panel for an org that has actually
   // been rolled out.
-  const { enabled: releaseLangy, isLoading: flagLoading } = useFeatureFlag(
-    LANGY_RELEASE_FLAG,
-    {
-      projectId: project?.id,
-      organizationId: organization?.id,
-      enabled: mayReadLangy,
-    },
-  );
+  const { enabled: releaseLangy, isLoading: flagLoading } = useFeatureFlag(LANGY_RELEASE_FLAG, {
+    projectId: project?.id,
+    organizationId: organization?.id,
+    enabled: mayReadLangy,
+  });
 
   // Deliberately never waits on something that may never arrive: a reader with
   // no project at all is DECIDED (they cannot have Langy), not pending. Only

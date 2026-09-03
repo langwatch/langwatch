@@ -3,13 +3,7 @@ import { GroupsApiService } from "@/client-sdk/services/groups/groups-api.servic
 import { formatTable } from "../../utils/formatting";
 import { parseCount } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import {
-  counted,
-  orDash,
-  printEmpty,
-  runManagement,
-  withParsedFlags,
-} from "../management/_shared";
+import { counted, orDash, printEmpty, runManagement, withParsedFlags } from "../management/_shared";
 
 export const listGroupsCommand = async (
   options: { page?: string; limit?: string } = {},

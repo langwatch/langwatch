@@ -71,7 +71,5 @@ export const TraceAccordions = memo(function TraceAccordions({
       </Box>
     );
   }
-  return (
-    <TraceSummaryAccordions trace={trace} spans={spans} onSelectSpan={onSelectSpan} />
-  );
+  return <TraceSummaryAccordions trace={trace} spans={spans} onSelectSpan={onSelectSpan} />;
 });

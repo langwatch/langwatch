@@ -113,11 +113,7 @@ export class RedisOpsSnapshotRepository extends OpsSnapshotRepository {
    * not the writer id, is what lands in the lease key — see `LeaseState.token`
    * for why a stable per-pod value cannot fence a write.
    */
-  async acquireOrRenewLease({
-    writerId,
-  }: {
-    writerId: string;
-  }): Promise<OpsSnapshotLease> {
+  async acquireOrRenewLease({ writerId }: { writerId: string }): Promise<OpsSnapshotLease> {
     if (this.currentToken) {
       const renewed = await this.redis.eval(
         RENEW_LUA,
@@ -139,13 +135,7 @@ export class RedisOpsSnapshotRepository extends OpsSnapshotRepository {
     }
 
     const token = `${writerId}:${randomUUID()}`;
-    const acquired = await this.redis.set(
-      SNAPSHOT_LEASE_KEY,
-      token,
-      "EX",
-      LEASE_TTL_SECONDS,
-      "NX",
-    );
+    const acquired = await this.redis.set(SNAPSHOT_LEASE_KEY, token, "EX", LEASE_TTL_SECONDS, "NX");
     if (acquired !== "OK") {
       return { isHeld: false, epoch: this.currentEpoch, token: null };
     }

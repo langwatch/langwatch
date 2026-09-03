@@ -4,10 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DatasetColumn } from "../types";
-import {
-  convertInlineToRowRecords,
-  filterEmptyRows,
-} from "../dataset-conversion";
+import { convertInlineToRowRecords, filterEmptyRows } from "../dataset-conversion";
 
 describe("Save as dataset utilities", () => {
   describe("filterEmptyRows", () => {
@@ -133,9 +130,7 @@ describe("Save as dataset utilities", () => {
     });
 
     it("returns empty array if all rows are empty", () => {
-      const columns: DatasetColumn[] = [
-        { id: "input", name: "input", type: "string" },
-      ];
+      const columns: DatasetColumn[] = [{ id: "input", name: "input", type: "string" }];
       const records = {
         input: ["", "", ""],
       };

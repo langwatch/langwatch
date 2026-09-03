@@ -7,10 +7,7 @@ import type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**

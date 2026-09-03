@@ -43,21 +43,8 @@ const ActionButton = forwardRef<
  */
 export function PlaygroundButton({ href }: { href: string }) {
   return (
-    <Button
-      asChild
-      size="xs"
-      variant="ghost"
-      color="fg.muted"
-      gap={1.5}
-      paddingX={2}
-      height="22px"
-    >
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer noopener"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Button asChild size="xs" variant="ghost" color="fg.muted" gap={1.5} paddingX={2} height="22px">
+      <a href={href} target="_blank" rel="noreferrer noopener" onClick={(e) => e.stopPropagation()}>
         <Icon as={LuPlay} boxSize={3} />
         Open in Playground
       </a>
@@ -142,11 +129,7 @@ export function CopyButton({ text }: { text: string }) {
       minWidth="auto"
       height="auto"
     >
-      <Icon
-        as={copied ? LuCheck : LuCopy}
-        boxSize={3}
-        color={copied ? "green.fg" : "fg.subtle"}
-      />
+      <Icon as={copied ? LuCheck : LuCopy} boxSize={3} color={copied ? "green.fg" : "fg.subtle"} />
     </Button>
   );
 }

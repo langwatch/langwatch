@@ -1,23 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  CreateNotificationCommand,
-  Notification,
-} from "@langwatch/notification-contract";
+import type { CreateNotificationCommand, Notification } from "@langwatch/notification-contract";
 import { NotificationRepository } from "../notification.repository";
 import { NotificationService } from "../../services/notification.service";
 
 class InMemoryNotificationRepository extends NotificationRepository {
   private readonly records: Notification[] = [];
 
-  listRecentByOrganization = vi.fn(
-    async (input: { organizationId: string; since: Date }) =>
-      this.records
-        .filter(
-          (record) =>
-            record.organizationId === input.organizationId &&
-            record.sentAt >= input.since,
-        )
-        .sort((left, right) => right.sentAt.getTime() - left.sentAt.getTime()),
+  listRecentByOrganization = vi.fn(async (input: { organizationId: string; since: Date }) =>
+    this.records
+      .filter(
+        (record) => record.organizationId === input.organizationId && record.sentAt >= input.since,
+      )
+      .sort((left, right) => right.sentAt.getTime() - left.sentAt.getTime()),
   );
 
   create = vi.fn(async (input: CreateNotificationCommand) => {

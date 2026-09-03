@@ -9,7 +9,12 @@ import {
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
-import type { MarkdownConfig, SpanDetailLevel, SpanLayout, SpanScope } from "../../../model/markdown/types";
+import type {
+  MarkdownConfig,
+  SpanDetailLevel,
+  SpanLayout,
+  SpanScope,
+} from "../../../model/markdown/types";
 
 export function MarkdownConfigurePopover({
   config,

@@ -31,9 +31,9 @@ describe("langyChoiceSelectionSchema", () => {
 
   describe("given a selection that answers nothing", () => {
     it("refuses an empty selection", () => {
-      expect(
-        langyChoiceSelectionSchema.safeParse({ blockId: "b1", optionIds: [] }).success,
-      ).toBe(false);
+      expect(langyChoiceSelectionSchema.safeParse({ blockId: "b1", optionIds: [] }).success).toBe(
+        false,
+      );
     });
 
     it("refuses whitespace-only other-text", () => {
@@ -49,9 +49,7 @@ describe("langyChoiceSelectionSchema", () => {
 
   describe("given a selection without a blockId", () => {
     it("refuses it — the answer must bind to its exact question", () => {
-      expect(langyChoiceSelectionSchema.safeParse({ optionIds: ["a"] }).success).toBe(
-        false,
-      );
+      expect(langyChoiceSelectionSchema.safeParse({ optionIds: ["a"] }).success).toBe(false);
     });
   });
 });
@@ -156,9 +154,9 @@ describe("deriveLangyChoicesLockState", () => {
 
   describe("when the question is not on the timeline at all", () => {
     it("derives superseded — nothing unrecorded is answerable", () => {
-      expect(
-        deriveLangyChoicesLockState({ blockId: "ghost", timeline: [message] }),
-      ).toEqual({ status: "superseded" });
+      expect(deriveLangyChoicesLockState({ blockId: "ghost", timeline: [message] })).toEqual({
+        status: "superseded",
+      });
     });
   });
 

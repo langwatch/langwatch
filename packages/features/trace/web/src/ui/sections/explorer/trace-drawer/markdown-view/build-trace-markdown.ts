@@ -1,8 +1,4 @@
-import type {
-  SpanDetail as FullSpan,
-  SpanTreeNode,
-  TraceHeader,
-} from "@langwatch/trace-contract";
+import type { SpanDetail as FullSpan, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import { formatCost, formatDuration, type MarkdownConfig } from "../../../../../index";
 
@@ -356,8 +352,7 @@ function renderToolCallBlock(block: Block, lines: string[]): void {
 }
 
 function renderToolResultBlock(block: Block, lines: string[]): void {
-  const id =
-    typeof block.tool_use_id === "string" ? ` (${block.tool_use_id.slice(0, 8)})` : "";
+  const id = typeof block.tool_use_id === "string" ? ` (${block.tool_use_id.slice(0, 8)})` : "";
   lines.push(`tool_result${id}:`);
   const result = block.content;
   if (typeof result === "string") {
@@ -423,8 +418,7 @@ function renderMessageBlocks(content: unknown): string[] {
     }
     if (!b || typeof b !== "object") continue;
     const block = b as Block;
-    const renderer =
-      typeof block.type === "string" ? BLOCK_RENDERERS[block.type] : undefined;
+    const renderer = typeof block.type === "string" ? BLOCK_RENDERERS[block.type] : undefined;
     if (renderer) {
       renderer(block, lines);
     } else {
@@ -731,9 +725,7 @@ export function buildTraceMarkdown(
       const filteredIds = new Set(filtered.map((s) => s.spanId));
       for (const span of filtered) {
         const parent =
-          span.parentSpanId && filteredIds.has(span.parentSpanId)
-            ? span.parentSpanId
-            : null;
+          span.parentSpanId && filteredIds.has(span.parentSpanId) ? span.parentSpanId : null;
         const arr = childrenByParent.get(parent) ?? [];
         arr.push(span);
         childrenByParent.set(parent, arr);

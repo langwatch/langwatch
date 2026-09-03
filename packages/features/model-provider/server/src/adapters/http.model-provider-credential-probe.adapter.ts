@@ -215,19 +215,15 @@ export class ProviderKeyInvalidError extends HandledError {
 /** The credential is fine; the API it needs is switched off for its project. */
 export class ProviderServiceDisabledError extends HandledError {
   constructor({ provider }: { provider: string }) {
-    super(
-      "provider_service_disabled",
-      `${provider} reports the required API is not enabled`,
-      {
-        fault: "customer",
-        httpStatus: 403,
-        meta: { provider },
-        tips: [
-          "Enable the Generative Language API in the Google Cloud console.",
-          "Or configure a Vertex AI provider, which uses service-account credentials.",
-        ],
-      },
-    );
+    super("provider_service_disabled", `${provider} reports the required API is not enabled`, {
+      fault: "customer",
+      httpStatus: 403,
+      meta: { provider },
+      tips: [
+        "Enable the Generative Language API in the Google Cloud console.",
+        "Or configure a Vertex AI provider, which uses service-account credentials.",
+      ],
+    });
   }
 }
 
@@ -368,10 +364,7 @@ const MAX_UPSTREAM_DETAIL_LENGTH = 300;
  */
 const GEMINI_REASON_ERRORS: Record<
   string,
-  (args: {
-    provider: string;
-    googleDoor?: "gemini-api" | "agent-platform";
-  }) => HandledError
+  (args: { provider: string; googleDoor?: "gemini-api" | "agent-platform" }) => HandledError
 > = {
   API_KEY_INVALID: ({ provider }) => new ProviderKeyInvalidError({ provider }),
   SERVICE_DISABLED: ({ provider }) => new ProviderServiceDisabledError({ provider }),
@@ -531,9 +524,7 @@ function geminiReasonRefusal({
     error,
     // Only a reason naming something else is worth outranking the provider's
     // own verdict that the key itself is wrong.
-    error.code === "provider_key_invalid"
-      ? FAILURE_RANK.definitive
-      : FAILURE_RANK.actionable,
+    error.code === "provider_key_invalid" ? FAILURE_RANK.definitive : FAILURE_RANK.actionable,
   );
 }
 
@@ -880,9 +871,7 @@ async function probeOnce({
   context: ProbeContext;
   deadline: AbortSignal;
   egress: ModelProviderEgressPort;
-}): Promise<
-  { accepted: true; failure?: undefined } | { accepted: false; failure: RankedFailure }
-> {
+}): Promise<{ accepted: true; failure?: undefined } | { accepted: false; failure: RankedFailure }> {
   let response: ProbeResponse;
   try {
     // Through the SSRF validator, not bare `fetch`.
@@ -1266,8 +1255,7 @@ function googleDoorFor({
     return {};
   }
   return {
-    googleDoor:
-      agentPlatform.project && agentPlatform.location ? "agent-platform" : "gemini-api",
+    googleDoor: agentPlatform.project && agentPlatform.location ? "agent-platform" : "gemini-api",
   };
 }
 

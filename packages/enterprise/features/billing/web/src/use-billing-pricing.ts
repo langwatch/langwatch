@@ -7,7 +7,6 @@ import {
 } from "./billing-plans";
 import { countFullMembers } from "./subscription-types";
 
-
 interface HasMemberType {
   memberType: MemberType;
 }
@@ -25,9 +24,7 @@ export function useBillingPricing({
 }) {
   const priceCents = getGrowthSeatPriceCents();
   const seatCents =
-    billingPeriod === "annual"
-      ? priceCents[currency].annual
-      : priceCents[currency].monthly;
+    billingPeriod === "annual" ? priceCents[currency].annual : priceCents[currency].monthly;
   const periodSuffix = billingPeriod === "annual" ? "/yr" : "/mo";
 
   const totalFullMembers = countFullMembers(users) + countFullMembers(plannedUsers);

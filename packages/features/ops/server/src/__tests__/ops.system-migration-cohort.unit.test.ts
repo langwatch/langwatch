@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { migrationRunsOnThisInstallation, organizationMigrates } from "../ops.system-migration-cohort";
+import {
+  migrationRunsOnThisInstallation,
+  organizationMigrates,
+} from "../ops.system-migration-cohort";
 
 /** The cohort question for a migration enrollment still paces. */
 function paced(args: Partial<Parameters<typeof organizationMigrates>[0]>): boolean {

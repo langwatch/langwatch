@@ -36,9 +36,7 @@ export function buildAvailableSources({
     const currentNode = toVisit.shift();
     if (!currentNode || downstreamNodes.has(currentNode)) continue;
     downstreamNodes.add(currentNode);
-    toVisit.push(
-      ...edges.filter((edge) => edge.source === currentNode).map((edge) => edge.target),
-    );
+    toVisit.push(...edges.filter((edge) => edge.source === currentNode).map((edge) => edge.target));
   }
 
   return nodes

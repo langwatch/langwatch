@@ -182,18 +182,15 @@ export const WORKBENCH_ACTIONS = {
 
 export type WorkbenchActionKind = keyof typeof WORKBENCH_ACTIONS;
 
-export const WORKBENCH_ACTION_KINDS = Object.keys(
-  WORKBENCH_ACTIONS,
-) as WorkbenchActionKind[];
+export const WORKBENCH_ACTION_KINDS = Object.keys(WORKBENCH_ACTIONS) as WorkbenchActionKind[];
 
 /**
  * Own properties only: `kind` arrives from the wire, and `in` would accept
  * `constructor` or `toString` through `Object.prototype` and hand the executor
  * a kind with no action definition behind it.
  */
-export const isWorkbenchActionKind = (
-  kind: string,
-): kind is WorkbenchActionKind => Object.hasOwn(WORKBENCH_ACTIONS, kind);
+export const isWorkbenchActionKind = (kind: string): kind is WorkbenchActionKind =>
+  Object.hasOwn(WORKBENCH_ACTIONS, kind);
 
 /** The parsed payload type for one action kind. */
 export type WorkbenchActionPayload<Kind extends WorkbenchActionKind> = z.infer<

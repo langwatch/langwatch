@@ -40,11 +40,10 @@ https://your-langwatch-domain.com/api/auth/callback/{provider}
 Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, `okta`, `onelogin`, or `oidc`. This is the same value you set as `NEXTAUTH_PROVIDER`.
 
 <Note>
-  A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client
-  credentials are missing, starts the deployment in email mode and logs which provider it
-  could not mount. That keeps a licensed deployment signable-in while you correct the
-  value, rather than pointing the sign-in page at an identity provider that was never
-  wired up.
+  A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are
+  missing, starts the deployment in email mode and logs which provider it could not mount. That
+  keeps a licensed deployment signable-in while you correct the value, rather than pointing the
+  sign-in page at an identity provider that was never wired up.
 </Note>
 
 ## Provider Setup
@@ -149,9 +148,8 @@ app:
 ```
 
 <Note>
-  The provider is `azure-ad` while its credentials sit under `providers.azureAd`. The
-  first is the value LangWatch selects on, the second is the chart's key for the
-  `AZURE_AD_*` variables.
+  The provider is `azure-ad` while its credentials sit under `providers.azureAd`. The first is the
+  value LangWatch selects on, the second is the chart's key for the `AZURE_AD_*` variables.
 </Note>
 
 | Variable                 | Value                   |
@@ -262,9 +260,9 @@ app:
 | `ONELOGIN_ISSUER`        | `https://your-subdomain.onelogin.com/oidc/2` |
 
 <Note>
-  If OneLogin sits behind another identity provider, for example a Cognito user pool that
-  federates to it, point LangWatch at whichever one it talks to directly and let that one
-  handle the hop. LangWatch only needs one OIDC issuer.
+  If OneLogin sits behind another identity provider, for example a Cognito user pool that federates
+  to it, point LangWatch at whichever one it talks to directly and let that one handle the hop.
+  LangWatch only needs one OIDC issuer.
 </Note>
 
 ### Any other OpenID Connect provider
@@ -334,6 +332,6 @@ WHERE "email" LIKE '%@yourcompany.com';
 3. When flagged users next sign in via SSO, their accounts are automatically linked
 
 <Note>
-  Users keep their existing data, projects, and permissions after the SSO migration. The
-  migration only changes their authentication method.
+  Users keep their existing data, projects, and permissions after the SSO migration. The migration
+  only changes their authentication method.
 </Note>

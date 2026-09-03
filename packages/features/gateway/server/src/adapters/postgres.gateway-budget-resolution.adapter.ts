@@ -44,9 +44,7 @@ export class PostgresGatewayBudgetResolutionAdapter extends GatewayServiceContra
     super();
   }
 
-  resolveApplicableBudgets(
-    input: GatewayBudgetResolutionTarget,
-  ): Promise<GatewayResolvedBudget[]> {
+  resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]> {
     return this.budgets.resolveApplicableBudgets(input);
   }
 

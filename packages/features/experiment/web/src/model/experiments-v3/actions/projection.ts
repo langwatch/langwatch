@@ -1,12 +1,5 @@
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
-import type {
-  ComparisonEvaluatorConfig,
-  DatasetReference,
-  EvaluationResults,
-} from "../types";
+import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
+import type { ComparisonEvaluatorConfig, DatasetReference, EvaluationResults } from "../types";
 import { computeTargetAggregates } from "../compute-aggregates";
 import { toComparisonConfig } from "@langwatch/experiment-contract";
 import { disambiguateNames } from "@langwatch/experiment-contract";
@@ -172,11 +165,8 @@ const datasetRowCount = (dataset: DatasetReference): number => {
 };
 
 const truncateCell = (value: unknown): string => {
-  const text =
-    typeof value === "string" ? value : value == null ? "" : String(value);
-  return text.length > SAMPLE_CELL_MAX_CHARS
-    ? `${text.slice(0, SAMPLE_CELL_MAX_CHARS)}…`
-    : text;
+  const text = typeof value === "string" ? value : value == null ? "" : String(value);
+  return text.length > SAMPLE_CELL_MAX_CHARS ? `${text.slice(0, SAMPLE_CELL_MAX_CHARS)}…` : text;
 };
 
 const sampleRowsOf = (dataset: DatasetReference): Record<string, string>[] => {
@@ -196,21 +186,13 @@ const sampleRowsOf = (dataset: DatasetReference): Record<string, string>[] => {
   return rows;
 };
 
-const countTargetMappings = (
-  mappings: Record<string, Record<string, unknown>>,
-): number =>
-  Object.values(mappings).reduce(
-    (sum, byField) => sum + Object.keys(byField).length,
-    0,
-  );
+const countTargetMappings = (mappings: Record<string, Record<string, unknown>>): number =>
+  Object.values(mappings).reduce((sum, byField) => sum + Object.keys(byField).length, 0);
 
 const countEvaluatorMappings = (
   mappings: Record<string, Record<string, Record<string, unknown>>>,
 ): number =>
-  Object.values(mappings).reduce(
-    (sum, byTarget) => sum + countTargetMappings(byTarget),
-    0,
-  );
+  Object.values(mappings).reduce((sum, byTarget) => sum + countTargetMappings(byTarget), 0);
 
 const utf8Encoder = new TextEncoder();
 
@@ -257,23 +239,14 @@ const nameTargets = ({
     (target) =>
       // An empty resolved name is "not known yet", which is the caller's
       // loading state and not a name to number as a duplicate.
-      targetNames?.[target.id] ||
-      target.localEvaluatorConfig?.name ||
-      target.id,
+      targetNames?.[target.id] || target.localEvaluatorConfig?.name || target.id,
   );
   const disambiguated = disambiguateNames(raw);
-  return new Map(
-    targets.map((target, index) => [
-      target.id,
-      disambiguated[index] ?? target.id,
-    ]),
-  );
+  return new Map(targets.map((target, index) => [target.id, disambiguated[index] ?? target.id]));
 };
 
 /** What an evaluator is called: its own name, then the catalog's. */
-const evaluatorName = (
-  evaluator: WorkbenchState["evaluators"][number],
-): string =>
+const evaluatorName = (evaluator: WorkbenchState["evaluators"][number]): string =>
   evaluator.localEvaluatorConfig?.name ??
   // A project's own evaluators carry a `custom/<id>` type the catalog has no
   // entry for, and fall through to the type itself.
@@ -288,9 +261,7 @@ const projectComparison = ({
   names: Map<string, string>;
 }): ProjectedComparison => ({
   variants: comparison.variants,
-  variantNames: comparison.variants.map(
-    (variant) => names.get(variant) ?? variant,
-  ),
+  variantNames: comparison.variants.map((variant) => names.get(variant) ?? variant),
   hasGoldenAnswer: comparison.hasGoldenAnswer,
   ...(comparison.goldenField ? { goldenField: comparison.goldenField } : {}),
 });
@@ -314,9 +285,7 @@ const projectTarget = ({
     targetEvaluatorId: target.targetEvaluatorId,
     inputs: (target.inputs ?? []).map((input) => input.identifier),
     outputs: (target.outputs ?? []).map((output) => output.identifier),
-    ...(comparison
-      ? { comparison: projectComparison({ comparison, names }) }
-      : {}),
+    ...(comparison ? { comparison: projectComparison({ comparison, names }) } : {}),
     mappings: target.mappings,
   };
 };
@@ -335,9 +304,7 @@ const projectEvaluator = ({
     evaluatorType: evaluator.evaluatorType,
     dbEvaluatorId: evaluator.dbEvaluatorId,
     inputs: evaluator.inputs.map((input) => input.identifier),
-    ...(comparison
-      ? { comparison: projectComparison({ comparison, names }) }
-      : {}),
+    ...(comparison ? { comparison: projectComparison({ comparison, names }) } : {}),
     mappings: evaluator.mappings,
   };
 };
@@ -383,26 +350,19 @@ const sampleErrorTypes = ({
     .slice(0, rowCount)
     .map((error, index) =>
       error
-        ? (metadata[index]?.domainError?.code ??
-          error.slice(0, ERROR_SAMPLE_MAX_CHARS))
+        ? (metadata[index]?.domainError?.code ?? error.slice(0, ERROR_SAMPLE_MAX_CHARS))
         : undefined,
     );
 
-  const evaluatorKinds = Object.values(
-    results.evaluatorResults[targetId] ?? {},
-  ).flatMap((rows) =>
+  const evaluatorKinds = Object.values(results.evaluatorResults[targetId] ?? {}).flatMap((rows) =>
     rows.slice(0, rowCount).map((row) => {
       const parsed = row as { status?: string; error_type?: string } | null;
-      return parsed?.status === "error"
-        ? (parsed.error_type ?? "EvaluatorError")
-        : undefined;
+      return parsed?.status === "error" ? (parsed.error_type ?? "EvaluatorError") : undefined;
     }),
   );
 
   const seen = new Set(
-    [...targetKinds, ...evaluatorKinds].filter(
-      (kind): kind is string => kind !== undefined,
-    ),
+    [...targetKinds, ...evaluatorKinds].filter((kind): kind is string => kind !== undefined),
   );
   return [...seen].slice(0, ERROR_SAMPLE_LIMIT);
 };
@@ -421,12 +381,7 @@ const projectResults = ({
   runId: results.runId,
   status: results.status,
   targets: state.targets.map((target) => {
-    const aggregate = computeTargetAggregates(
-      target.id,
-      results,
-      state.evaluators,
-      activeRowCount,
-    );
+    const aggregate = computeTargetAggregates(target.id, results, state.evaluators, activeRowCount);
     const errorTypes = sampleErrorTypes({
       results,
       targetId: target.id,
@@ -462,10 +417,7 @@ const projectResults = ({
   }),
 });
 
-const evaluatorNameById = (
-  state: WorkbenchState,
-  evaluatorId: string,
-): string => {
+const evaluatorNameById = (state: WorkbenchState, evaluatorId: string): string => {
   const evaluator = state.evaluators.find((entry) => entry.id === evaluatorId);
   return evaluator ? evaluatorName(evaluator) : evaluatorId;
 };
@@ -489,8 +441,7 @@ const trimEntries = (projection: ProjectedWorkbenchState): void => {
     {
       items: projection.datasets,
       countOmitted: (omitted) => {
-        projection.omittedDatasets =
-          (projection.omittedDatasets ?? 0) + omitted;
+        projection.omittedDatasets = (projection.omittedDatasets ?? 0) + omitted;
       },
     },
     {
@@ -502,8 +453,7 @@ const trimEntries = (projection: ProjectedWorkbenchState): void => {
     {
       items: projection.evaluators,
       countOmitted: (omitted) => {
-        projection.omittedEvaluators =
-          (projection.omittedEvaluators ?? 0) + omitted;
+        projection.omittedEvaluators = (projection.omittedEvaluators ?? 0) + omitted;
       },
     },
   ];
@@ -547,9 +497,7 @@ const dropResultsDetail = (projection: ProjectedWorkbenchState): void => {
  * Drop detail until the projection fits the budget, in order of what an agent
  * can most easily ask for again. Mutates and returns the same object.
  */
-const fitToBudget = (
-  projection: ProjectedWorkbenchState,
-): ProjectedWorkbenchState => {
+const fitToBudget = (projection: ProjectedWorkbenchState): ProjectedWorkbenchState => {
   if (isWithinBudget(projection)) {
     return projection;
   }
@@ -615,8 +563,7 @@ export const projectWorkbenchState = ({
   targetNames?: TargetNames;
 }): ProjectedWorkbenchState => {
   const activeDataset =
-    state.datasets.find((d) => d.id === state.activeDatasetId) ??
-    state.datasets[0];
+    state.datasets.find((d) => d.id === state.activeDatasetId) ?? state.datasets[0];
   const activeRowCount = activeDataset ? datasetRowCount(activeDataset) : 0;
   const names = nameTargets({ targets: state.targets, targetNames });
 
@@ -625,9 +572,7 @@ export const projectWorkbenchState = ({
     activeDatasetId: state.activeDatasetId,
     datasets: state.datasets.map(projectDataset),
     targets: state.targets.map((target) => projectTarget({ target, names })),
-    evaluators: state.evaluators.map((evaluator) =>
-      projectEvaluator({ evaluator, names }),
-    ),
+    evaluators: state.evaluators.map((evaluator) => projectEvaluator({ evaluator, names })),
   };
 
   if (results) {

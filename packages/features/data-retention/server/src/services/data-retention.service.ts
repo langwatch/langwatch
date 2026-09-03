@@ -53,8 +53,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
       platformDefaultRetentionDaysSchema.parse(options.defaultRetentionDays),
       options.pinRepository,
       options.retroactiveRepository ?? null,
-      options.storageMeter ??
-        StorageMeterService.create({ resolveClickHouseClient: null }),
+      options.storageMeter ?? StorageMeterService.create({ resolveClickHouseClient: null }),
       options.cache,
     );
   }
@@ -109,9 +108,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
     return retention[input.category];
   }
 
-  async previewScopeRemoval(input: {
-    scope: ScopeAssignment;
-  }): Promise<ResolvedRetention> {
+  async previewScopeRemoval(input: { scope: ScopeAssignment }): Promise<ResolvedRetention> {
     const resolvedScope = await this.tryResolveScope(input.scope);
     if (!resolvedScope) {
       return this.defaultRetention();
@@ -121,8 +118,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
       organizationId: resolvedScope.organizationId,
     });
     const remaining = rows.filter(
-      (row) =>
-        !(row.scopeType === input.scope.scopeType && row.scopeId === input.scope.scopeId),
+      (row) => !(row.scopeType === input.scope.scopeType && row.scopeId === input.scope.scopeId),
     );
     return resolveRetention({
       rows: remaining,
@@ -193,16 +189,13 @@ export class DataRetentionService extends DataRetentionServiceContract {
 
   async isPinned(input: UnpinTraceInput): Promise<boolean> {
     return (
-      (await this.pinRepository.tryFindByProjectAndTrace(
-        unpinTraceInputSchema.parse(input),
-      )) != null
+      (await this.pinRepository.tryFindByProjectAndTrace(unpinTraceInputSchema.parse(input))) !=
+      null
     );
   }
 
   async tryGetPin(input: UnpinTraceInput): Promise<PinnedTrace | null> {
-    return this.pinRepository.tryFindByProjectAndTrace(
-      unpinTraceInputSchema.parse(input),
-    );
+    return this.pinRepository.tryFindByProjectAndTrace(unpinTraceInputSchema.parse(input));
   }
 
   listByProject(input: { projectId: string }): Promise<PinnedTrace[]> {

@@ -13,15 +13,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  Archive,
-  Eye,
-  Gauge,
-  MoreVertical,
-  Pencil,
-  Plus,
-  TriangleAlert,
-} from "lucide-react";
+import { Archive, Eye, Gauge, MoreVertical, Pencil, Plus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import AiGatewayLayout from "../../ui/sections/gateway-layout";
 import { BudgetCreateDrawer } from "../../features/budgets/ui/sections/budget-create-drawer";
@@ -130,16 +122,12 @@ function BudgetsPage() {
                 </EmptyState.Indicator>
                 <EmptyState.Title>No budgets yet</EmptyState.Title>
                 <EmptyState.Description>
-                  Budgets enforce a spend ceiling on any dimension: organization, group,
-                  team, project, member, or virtual key; each optionally limited to a
-                  single provider. Create one to start governing cost.
+                  Budgets enforce a spend ceiling on any dimension: organization, group, team,
+                  project, member, or virtual key; each optionally limited to a single provider.
+                  Create one to start governing cost.
                 </EmptyState.Description>
                 {canCreate && (
-                  <Button
-                    colorPalette="orange"
-                    onClick={() => setCreateOpen(true)}
-                    mt={2}
-                  >
+                  <Button colorPalette="orange" onClick={() => setCreateOpen(true)} mt={2}>
                     <Plus size={14} /> New budget
                   </Button>
                 )}
@@ -153,8 +141,8 @@ function BudgetsPage() {
                   <Alert.Content>
                     <Alert.Title>Spend figures are unavailable</Alert.Title>
                     <Alert.Description>
-                      Spend cannot be totalled right now, so these budgets are not
-                      stopping or warning about anything.
+                      Spend cannot be totalled right now, so these budgets are not stopping or
+                      warning about anything.
                     </Alert.Description>
                   </Alert.Content>
                 </Alert.Root>
@@ -183,9 +171,9 @@ function BudgetsPage() {
                           <Tooltip
                             content={
                               <Text fontSize="xs">
-                                WARN: emits 402-equivalent warning header + audit event,
-                                request proceeds.{"\n"}BLOCK: the gateway returns HTTP 402
-                                and refuses to dispatch once the limit is crossed.
+                                WARN: emits 402-equivalent warning header + audit event, request
+                                proceeds.{"\n"}BLOCK: the gateway returns HTTP 402 and refuses to
+                                dispatch once the limit is crossed.
                               </Text>
                             }
                           >
@@ -206,8 +194,7 @@ function BudgetsPage() {
                         // rather than a dash that reads as broken.
                         const seatsSeen = b.endUsersSeen ?? 0;
                         const seatsOver = b.endUsersOver ?? 0;
-                        const seatsOverPct =
-                          seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
+                        const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
                         return (
                           <Table.Row
                             key={b.id}
@@ -242,8 +229,7 @@ function BudgetsPage() {
                                       fontSize="2xs"
                                       data-testid="budget-unreachable-badge"
                                     >
-                                      <TriangleAlert size={10} /> No key sends traffic
-                                      here
+                                      <TriangleAlert size={10} /> No key sends traffic here
                                     </Badge>
                                   </Tooltip>
                                 )}
@@ -266,24 +252,16 @@ function BudgetsPage() {
                                 // spend together, so it is labelled as exactly
                                 // that. Per-member standing lives on the detail
                                 // page and in the key drawer's applies list.
-                                <VStack
-                                  align="stretch"
-                                  gap={0.5}
-                                  data-testid="budget-group-spend"
-                                >
+                                <VStack align="stretch" gap={0.5} data-testid="budget-group-spend">
                                   <HStack fontSize="xs" gap={1}>
-                                    <Text fontWeight="medium">
-                                      {formatBudgetUsd(spent)}
-                                    </Text>
+                                    <Text fontWeight="medium">{formatBudgetUsd(spent)}</Text>
                                     <Text color="fg.muted">group total</Text>
                                   </HStack>
                                   <Text fontSize="2xs" color="fg.muted">
                                     {formatBudgetUsd(limit)} per member
                                     {typeof b.scopeTarget?.memberCount === "number"
                                       ? ` · ${b.scopeTarget.memberCount} ${
-                                          b.scopeTarget.memberCount === 1
-                                            ? "member"
-                                            : "members"
+                                          b.scopeTarget.memberCount === 1 ? "member" : "members"
                                         }`
                                       : ""}
                                   </Text>
@@ -300,9 +278,7 @@ function BudgetsPage() {
                                   data-testid="budget-attributed-user-spend"
                                 >
                                   <HStack fontSize="xs" gap={1}>
-                                    <Text fontWeight="medium">
-                                      {formatBudgetUsd(limit)}
-                                    </Text>
+                                    <Text fontWeight="medium">{formatBudgetUsd(limit)}</Text>
                                     <Text color="fg.muted">per person</Text>
                                   </HStack>
                                   <Text fontSize="2xs" color="fg.muted">
@@ -321,21 +297,13 @@ function BudgetsPage() {
                               ) : (
                                 <VStack align="stretch" gap={1}>
                                   <HStack fontSize="xs">
-                                    <Text fontWeight="medium">
-                                      {formatBudgetUsd(spent)}
-                                    </Text>
-                                    <Text color="fg.muted">
-                                      / {formatBudgetUsd(limit)}
-                                    </Text>
+                                    <Text fontWeight="medium">{formatBudgetUsd(spent)}</Text>
+                                    <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
                                     <Spacer />
                                     <Badge
                                       variant="outline"
                                       colorPalette={
-                                        pct >= 100
-                                          ? "red"
-                                          : pct >= 80
-                                            ? "orange"
-                                            : "green"
+                                        pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
                                       }
                                       fontSize="2xs"
                                     >
@@ -357,9 +325,7 @@ function BudgetsPage() {
                               )}
                             </Table.Cell>
                             <Table.Cell>
-                              <Badge
-                                colorPalette={b.onBreach === "BLOCK" ? "red" : "yellow"}
-                              >
+                              <Badge colorPalette={b.onBreach === "BLOCK" ? "red" : "yellow"}>
                                 {b.onBreach.toLowerCase()}
                               </Badge>
                             </Table.Cell>
@@ -376,10 +342,7 @@ function BudgetsPage() {
                                 </Tooltip>
                               )}
                             </Table.Cell>
-                            <Table.Cell
-                              onClick={(e) => e.stopPropagation()}
-                              cursor="default"
-                            >
+                            <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
                               <Menu.Root>
                                 <Menu.Trigger asChild>
                                   <Button variant="ghost" size="xs" aria-label="Actions">
@@ -389,9 +352,7 @@ function BudgetsPage() {
                                 <Menu.Content>
                                   <Menu.Item
                                     value="details"
-                                    onClick={() =>
-                                      void router.push(`/gateway/budgets/${b.id}`)
-                                    }
+                                    onClick={() => void router.push(`/gateway/budgets/${b.id}`)}
                                   >
                                     <Eye size={14} /> Details
                                   </Menu.Item>
@@ -401,10 +362,7 @@ function BudgetsPage() {
                                     </Menu.Item>
                                   )}
                                   {canDelete && (
-                                    <Menu.Item
-                                      value="archive"
-                                      onClick={() => setArchiving(b)}
-                                    >
+                                    <Menu.Item value="archive" onClick={() => setArchiving(b)}>
                                       <Archive size={14} /> Archive
                                     </Menu.Item>
                                   )}
@@ -478,9 +436,7 @@ export function scopeChipDetail(scopeTarget: ScopeTarget | null): string | undef
   if (scopeTarget.secondary) parts.push(scopeTarget.secondary);
   if (typeof scopeTarget.memberCount === "number") {
     parts.push(
-      `${scopeTarget.memberCount} ${
-        scopeTarget.memberCount === 1 ? "member" : "members"
-      }`,
+      `${scopeTarget.memberCount} ${scopeTarget.memberCount === 1 ? "member" : "members"}`,
     );
   }
   return parts.length > 0 ? parts.join(" · ") : undefined;
@@ -518,11 +474,7 @@ function ScopeCell({
       />
       {scopeType === "GROUP" && (
         <Tooltip content="Each member of the group gets this limit individually.">
-          <Badge
-            colorPalette="cyan"
-            variant="subtle"
-            data-testid="budget-per-member-badge"
-          >
+          <Badge colorPalette="cyan" variant="subtle" data-testid="budget-per-member-badge">
             per member
           </Badge>
         </Tooltip>

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  personalUsageQueryInputSchema,
-  personalUsageSummarySchema,
-} from "../personal-usage";
+import { personalUsageQueryInputSchema, personalUsageSummarySchema } from "../personal-usage";
 
 describe("personal usage contract", () => {
   it("accepts a portable epoch-millisecond window", () => {

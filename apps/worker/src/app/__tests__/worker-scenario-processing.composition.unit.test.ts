@@ -52,11 +52,7 @@ function compose() {
     traceSummaryStore: { get: async () => null, save: async () => undefined } as never,
     eventStore: { getEvents: async () => [] } as never,
     broadcast: {
-      broadcastToTenant: async (input: {
-        tenantId: string;
-        event: string;
-        eventType: string;
-      }) => {
+      broadcastToTenant: async (input: { tenantId: string; event: string; eventType: string }) => {
         RECORDED.broadcasts.push(input);
       },
     } as never,
@@ -189,9 +185,7 @@ describe("given the simulation pipeline this process composes for itself", () =>
         { tenantId: "project-1", aggregateId: "run-1" } as never,
       );
 
-      expect(RECORDED.suite.map((entry) => entry.command)).toEqual([
-        "recordSuiteRunItemStarted",
-      ]);
+      expect(RECORDED.suite.map((entry) => entry.command)).toEqual(["recordSuiteRunItemStarted"]);
     });
   });
 

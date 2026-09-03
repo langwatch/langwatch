@@ -5,7 +5,5 @@ import { TraceFindBar } from "../../../../index";
 export function FindBar() {
   const { data: traces } = useTraceList();
 
-  return (
-    <TraceFindBar traces={traces} renderShortcutKey={(label) => <Kbd>{label}</Kbd>} />
-  );
+  return <TraceFindBar traces={traces} renderShortcutKey={(label) => <Kbd>{label}</Kbd>} />;
 }

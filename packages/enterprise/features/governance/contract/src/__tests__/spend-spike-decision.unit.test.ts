@@ -52,9 +52,7 @@ describe("evaluateSpendSpike — pure decision logic", () => {
   describe("when current spend is well above baseline + ratio", () => {
     /** @scenario "Spend spike decisions are deterministic" */
     it("fires when current >= baseline * ratio with baseline above minimum", () => {
-      const result = evaluateSpendSpike(
-        input({ currentSpendUsd: 10, baselineSpendUsd: 2 }),
-      );
+      const result = evaluateSpendSpike(input({ currentSpendUsd: 10, baselineSpendUsd: 2 }));
       expect(result.decision).toBe("fire");
       expect(result.currentSpendUsd).toBe(10);
       expect(result.baselineSpendUsd).toBe(2);
@@ -62,9 +60,7 @@ describe("evaluateSpendSpike — pure decision logic", () => {
     });
 
     it("fires at exact threshold equality", () => {
-      const result = evaluateSpendSpike(
-        input({ currentSpendUsd: 4, baselineSpendUsd: 2 }),
-      );
+      const result = evaluateSpendSpike(input({ currentSpendUsd: 4, baselineSpendUsd: 2 }));
       expect(result.decision).toBe("fire");
     });
   });
@@ -84,18 +80,14 @@ describe("evaluateSpendSpike — pure decision logic", () => {
     });
 
     it("skips when both baseline and current are zero", () => {
-      const result = evaluateSpendSpike(
-        input({ currentSpendUsd: 0, baselineSpendUsd: 0 }),
-      );
+      const result = evaluateSpendSpike(input({ currentSpendUsd: 0, baselineSpendUsd: 0 }));
       expect(result.decision).toBe("skip_below_baseline");
     });
   });
 
   describe("when current spend is below threshold", () => {
     it("skips 'below_threshold' — current < baseline * ratio", () => {
-      const result = evaluateSpendSpike(
-        input({ currentSpendUsd: 3, baselineSpendUsd: 2 }),
-      );
+      const result = evaluateSpendSpike(input({ currentSpendUsd: 3, baselineSpendUsd: 2 }));
       expect(result.decision).toBe("skip_below_threshold");
       expect(result.reason).toMatch(/Current.*<.*threshold/);
     });
@@ -182,9 +174,7 @@ describe("evaluateSpendSpike — pure decision logic", () => {
     });
 
     it("returns the windowStart/End unchanged in the result", () => {
-      const result = evaluateSpendSpike(
-        input({ currentSpendUsd: 10, baselineSpendUsd: 2 }),
-      );
+      const result = evaluateSpendSpike(input({ currentSpendUsd: 10, baselineSpendUsd: 2 }));
       expect(result.windowStart).toBe(FIXED_WINDOW_START);
       expect(result.windowEnd).toBe(FIXED_WINDOW_END);
     });

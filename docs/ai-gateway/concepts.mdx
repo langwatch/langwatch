@@ -157,12 +157,11 @@ When a bundle-baked cache rule matches: `langwatch.cache.rule_id`, `.rule_priori
 
 <Info>
   Previously-documented per-feature attrs (`langwatch.fallback.attempt`, `.reason`,
-  `langwatch.policy.blocked`, `langwatch.budget.breached_scope`,
-  `langwatch.guardrail.post_flag`, `.verdict`) are **not emitted in v1**. For per-feature
-  signals today, use the Prometheus counters + correlate via
-  `X-LangWatch-Gateway-Request-Id`. See [Observability → Per-feature
-  attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the v1
-  ↔ v1.1 breakdown.
+  `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `langwatch.guardrail.post_flag`,
+  `.verdict`) are **not emitted in v1**. For per-feature signals today, use the Prometheus counters
+  + correlate via `X-LangWatch-Gateway-Request-Id`. See [Observability → Per-feature
+  attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the v1 ↔ v1.1
+  breakdown.
 </Info>
 
 ## Request id

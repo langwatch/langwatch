@@ -73,9 +73,7 @@ describe("useGitHubConnectPopup", () => {
     );
 
     const sentinel = Symbol("pending");
-    await expect(Promise.race([connected, Promise.resolve(sentinel)])).resolves.toBe(
-      sentinel,
-    );
+    await expect(Promise.race([connected, Promise.resolve(sentinel)])).resolves.toBe(sentinel);
     unmount();
   });
 });

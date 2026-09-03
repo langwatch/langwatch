@@ -41,14 +41,7 @@ export function useReportPageActivityToLangy({
       ? narrateWorkbenchRun({ targetName: runTargetName, completed, total })
       : actionActivity;
     setPageActivity(activity);
-  }, [
-    isRunning,
-    runTargetName,
-    completed,
-    total,
-    actionActivity,
-    setPageActivity,
-  ]);
+  }, [isRunning, runTargetName, completed, total, actionActivity, setPageActivity]);
 
   // Leaving the page ends anything it was reporting. Without this the panel
   // keeps naming a run on a workbench the reader has navigated away from,

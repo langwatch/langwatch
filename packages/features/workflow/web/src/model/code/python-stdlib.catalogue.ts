@@ -44,11 +44,7 @@ export const PYTHON_STDLIB_MODULES: PyModule[] = [
       fn("atan2", "atan2(y, x)", "arctan(y/x), full quadrant."),
       fn("isnan", "isnan(x)", "True if x is NaN."),
       fn("isinf", "isinf(x)", "True if x is infinite."),
-      fn(
-        "isclose",
-        "isclose(a, b, *, rel_tol=1e-9, abs_tol=0.0)",
-        "Approximate equality.",
-      ),
+      fn("isclose", "isclose(a, b, *, rel_tol=1e-9, abs_tol=0.0)", "Approximate equality."),
       fn("gcd", "gcd(*integers)", "Greatest common divisor."),
       fn("lcm", "lcm(*integers)", "Least common multiple."),
       con("pi", "Mathematical constant π."),
@@ -70,11 +66,7 @@ export const PYTHON_STDLIB_MODULES: PyModule[] = [
       fn("loads", "loads(s)", "Parse JSON string."),
       fn("dump", "dump(obj, fp, *, indent=None)", "Serialize to file."),
       fn("load", "load(fp)", "Parse JSON from file."),
-      cls(
-        "JSONDecodeError",
-        "JSONDecodeError(msg, doc, pos)",
-        "Raised on parse failure.",
-      ),
+      cls("JSONDecodeError", "JSONDecodeError(msg, doc, pos)", "Raised on parse failure."),
     ],
   },
   {
@@ -86,11 +78,7 @@ export const PYTHON_STDLIB_MODULES: PyModule[] = [
       fn("findall", "findall(pattern, string, flags=0)", "All non-overlapping matches."),
       fn("finditer", "finditer(pattern, string, flags=0)", "Iterator over matches."),
       fn("sub", "sub(pattern, repl, string, count=0, flags=0)", "Replace matches."),
-      fn(
-        "subn",
-        "subn(pattern, repl, string, count=0, flags=0)",
-        "Replace, return count.",
-      ),
+      fn("subn", "subn(pattern, repl, string, count=0, flags=0)", "Replace, return count."),
       fn("split", "split(pattern, string, maxsplit=0, flags=0)", "Split by pattern."),
       fn("compile", "compile(pattern, flags=0)", "Compile a Pattern object."),
       fn("escape", "escape(pattern)", "Escape regex metacharacters."),
@@ -142,11 +130,7 @@ export const PYTHON_STDLIB_MODULES: PyModule[] = [
     doc: "Specialized container datatypes.",
     members: [
       cls("OrderedDict", "OrderedDict(...)", "Dict that remembers insertion order."),
-      cls(
-        "defaultdict",
-        "defaultdict(default_factory, ...)",
-        "Dict with default factory.",
-      ),
+      cls("defaultdict", "defaultdict(default_factory, ...)", "Dict with default factory."),
       cls("Counter", "Counter(iterable=None)", "Count hashable objects."),
       cls("deque", "deque(iterable=(), maxlen=None)", "Double-ended queue."),
       cls("namedtuple", "namedtuple(typename, field_names)", "Named tuple factory."),
@@ -185,35 +169,19 @@ export const PYTHON_STDLIB_MODULES: PyModule[] = [
       fn("takewhile", "takewhile(predicate, iterable)", "Take while true."),
       fn("starmap", "starmap(function, iterable)", "Map with unpacked args."),
       fn("tee", "tee(iterable, n=2)", "Split iterator into n."),
-      fn(
-        "zip_longest",
-        "zip_longest(*iterables, fillvalue=None)",
-        "Zip filling shorter.",
-      ),
+      fn("zip_longest", "zip_longest(*iterables, fillvalue=None)", "Zip filling shorter."),
     ],
   },
   {
     name: "functools",
     doc: "Higher-order functions and operations on callables.",
     members: [
-      fn(
-        "reduce",
-        "reduce(function, iterable, initializer=...)",
-        "Apply function cumulatively.",
-      ),
+      fn("reduce", "reduce(function, iterable, initializer=...)", "Apply function cumulatively."),
       fn("cache", "@cache", "Unbounded function-result cache."),
-      fn(
-        "lru_cache",
-        "@lru_cache(maxsize=128, typed=False)",
-        "Least-recently-used cache.",
-      ),
+      fn("lru_cache", "@lru_cache(maxsize=128, typed=False)", "Least-recently-used cache."),
       fn("partial", "partial(func, *args, **kwargs)", "Bind arguments."),
       fn("wraps", "@wraps(wrapped)", "Decorator helper."),
-      cls(
-        "partialmethod",
-        "partialmethod(func, *args, **kwargs)",
-        "Method version of partial.",
-      ),
+      cls("partialmethod", "partialmethod(func, *args, **kwargs)", "Method version of partial."),
     ],
   },
   {
@@ -223,11 +191,7 @@ export const PYTHON_STDLIB_MODULES: PyModule[] = [
       fn("random", "random()", "Float in [0.0, 1.0)."),
       fn("uniform", "uniform(a, b)", "Float in [a, b]."),
       fn("randint", "randint(a, b)", "Int in [a, b]."),
-      fn(
-        "randrange",
-        "randrange(stop) | randrange(start, stop[, step])",
-        "Random range.",
-      ),
+      fn("randrange", "randrange(stop) | randrange(start, stop[, step])", "Random range."),
       fn("choice", "choice(seq)", "Random element of seq."),
       fn("choices", "choices(population, weights=None, *, k=1)", "k random selections."),
       fn("sample", "sample(population, k)", "k unique random elements."),
@@ -257,11 +221,7 @@ export const PYTHON_STDLIB_MODULES: PyModule[] = [
     doc: "RFC 3548 Base16, Base32, Base64 codecs.",
     members: [
       fn("b64encode", "b64encode(s, altchars=None)", "Standard Base64 encode."),
-      fn(
-        "b64decode",
-        "b64decode(s, altchars=None, validate=False)",
-        "Standard Base64 decode.",
-      ),
+      fn("b64decode", "b64decode(s, altchars=None, validate=False)", "Standard Base64 decode."),
       fn("urlsafe_b64encode", "urlsafe_b64encode(s)", "URL-safe Base64 encode."),
       fn("urlsafe_b64decode", "urlsafe_b64decode(s)", "URL-safe Base64 decode."),
       fn("b32encode", "b32encode(s)", "Base32 encode."),
@@ -329,11 +289,7 @@ export const PYTHON_STDLIB_MODULES: PyModule[] = [
     doc: "Fixed and floating point arithmetic.",
     members: [
       cls("Decimal", "Decimal(value='0')", "Decimal floating-point number."),
-      cls(
-        "Context",
-        "Context(prec=28, rounding=ROUND_HALF_EVEN, ...)",
-        "Computational context.",
-      ),
+      cls("Context", "Context(prec=28, rounding=ROUND_HALF_EVEN, ...)", "Computational context."),
       fn("getcontext", "getcontext()", "Return current context."),
       fn("setcontext", "setcontext(ctx)", "Set current context."),
     ],
@@ -344,11 +300,7 @@ export const PYTHON_STDLIB_MODULES: PyModule[] = [
     members: [
       fn("urlparse", "urlparse(url)", "Parse URL into 6-tuple."),
       fn("urlunparse", "urlunparse(parts)", "Re-assemble parsed URL."),
-      fn(
-        "urlencode",
-        "urlencode(query, doseq=False)",
-        "Encode mapping/sequence to query string.",
-      ),
+      fn("urlencode", "urlencode(query, doseq=False)", "Encode mapping/sequence to query string."),
       fn("quote", "quote(string, safe='/')", "Percent-encode."),
       fn("quote_plus", "quote_plus(string)", "Percent-encode with spaces as +."),
       fn("unquote", "unquote(string)", "Percent-decode."),

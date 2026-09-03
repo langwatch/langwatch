@@ -107,9 +107,7 @@ describe("given the composer follows the recorded turn", () => {
       const onSend = vi.fn();
       // The record says a turn is running — folded from the durable tail, the
       // way the freshness coordinator applies it.
-      useLangyStore
-        .getState()
-        .applyTurnEvents([turnAccepted({ id: "event-1", createdAt: 1_000 })]);
+      useLangyStore.getState().applyTurnEvents([turnAccepted({ id: "event-1", createdAt: 1_000 })]);
       useLangyStore.getState().setDraft("what changed in p95?");
 
       const { container } = renderComposer(onSend);

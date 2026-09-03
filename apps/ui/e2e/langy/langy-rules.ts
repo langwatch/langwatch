@@ -103,9 +103,7 @@ export const LANGY_EVAL_CREATION_CRITERIA = [
   "Langy does not run any create command (evaluator, monitor, or experiment) before the user has answered the experiment-vs-evaluator question.",
   "After the user answers, Langy runs the matching create. A batch answer ends with a successful creation naming the thing created. A live answer ends with BOTH the evaluator and the monitor created and named. A silent stop, an unexplained drop of the request, or stopping at the evaluator because the monitor was treated as out of reach all fail this.",
   "If a create is rejected over an invalid field value and the error names the accepted values, Langy corrects that exact field from the error's expected list and retries once within the same turn. It never asks the user to pick a type slug and never abandons the create over a fixable field. A run where no create is rejected satisfies this criterion; do not mark it inconclusive.",
-  ...LANGY_CORE_RULE_CRITERIA.filter(
-    (criterion) => criterion !== LANGY_DECISIVENESS_CRITERION,
-  ),
+  ...LANGY_CORE_RULE_CRITERIA.filter((criterion) => criterion !== LANGY_DECISIVENESS_CRITERION),
 ];
 
 /**

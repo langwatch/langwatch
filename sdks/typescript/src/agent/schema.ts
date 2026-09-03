@@ -64,7 +64,9 @@ export interface StandardJsonSchema<O = unknown> {
 }
 
 /** The `params` type a Standard Schema object gives the handler: its parsed output. */
-export type InferStandardOutput<S> = S extends { readonly "~standard": { readonly types?: infer T } }
+export type InferStandardOutput<S> = S extends {
+  readonly "~standard": { readonly types?: infer T };
+}
   ? [NonNullable<T>] extends [never]
     ? Record<string, AgentParameterValue>
     : NonNullable<T> extends { readonly output: infer O }
@@ -144,10 +146,14 @@ const readStandardJsonSchema = (input: StandardJsonSchema): JsonSchemaObject => 
   const options = { target: "draft-2020-12" };
   const schema = converter.input?.(options) ?? converter.output?.(options);
   if (schema === undefined) {
-    throw new AgentParameterError(`the "~standard".jsonSchema converter has no input function; ${ACCEPTED_FORMS}`);
+    throw new AgentParameterError(
+      `the "~standard".jsonSchema converter has no input function; ${ACCEPTED_FORMS}`,
+    );
   }
   if (!isRecord(schema)) {
-    throw new AgentParameterError(`the "~standard".jsonSchema converter returned no object; ${ACCEPTED_FORMS}`);
+    throw new AgentParameterError(
+      `the "~standard".jsonSchema converter returned no object; ${ACCEPTED_FORMS}`,
+    );
   }
   return schema;
 };
@@ -212,7 +218,9 @@ const coerce = ({
   if (spec.type === "number") {
     const asNumber = typeof value === "number" ? value : Number(value);
     if (typeof value === "boolean" || !Number.isFinite(asNumber) || String(value).trim() === "") {
-      throw new AgentParameterError(`parameter "${spec.name}" must be a number, got ${JSON.stringify(value)}`);
+      throw new AgentParameterError(
+        `parameter "${spec.name}" must be a number, got ${JSON.stringify(value)}`,
+      );
     }
     return asNumber;
   }
@@ -220,7 +228,9 @@ const coerce = ({
     if (typeof value === "boolean") return value;
     if (value === "true") return true;
     if (value === "false") return false;
-    throw new AgentParameterError(`parameter "${spec.name}" must be true or false, got ${JSON.stringify(value)}`);
+    throw new AgentParameterError(
+      `parameter "${spec.name}" must be true or false, got ${JSON.stringify(value)}`,
+    );
   }
   const asString = typeof value === "string" ? value : String(value);
   if (spec.options && !spec.options.includes(asString)) {
@@ -253,7 +263,9 @@ export function resolveParameterValues({
         continue;
       }
       if (!spec.required) continue;
-      throw new AgentParameterError(`parameter "${spec.name}" is required and the run did not supply it`);
+      throw new AgentParameterError(
+        `parameter "${spec.name}" is required and the run did not supply it`,
+      );
     }
     values[spec.name] = coerce({ spec, value });
   }
@@ -292,7 +304,9 @@ export async function validateParameterValues({
       .join("; ");
     throw new AgentParameterError(`parameters refused by the schema: ${detail}`);
   }
-  const parsed = isRecord(result.value) ? (result.value as Record<string, AgentParameterValue>) : {};
+  const parsed = isRecord(result.value)
+    ? (result.value as Record<string, AgentParameterValue>)
+    : {};
   return { ...values, ...parsed };
 }
 

@@ -45,9 +45,7 @@ describe("PrismaMfaEnrollmentRepository", () => {
             { organization: { slug: "globex" } },
           ],
         });
-        const repository = PrismaMfaEnrollmentRepository.create(
-          prisma as unknown as PrismaClient,
-        );
+        const repository = PrismaMfaEnrollmentRepository.create(prisma as unknown as PrismaClient);
 
         const slugs = await repository.findRequiringOrganizationSlugs({
           userId: "user_1",
@@ -59,9 +57,7 @@ describe("PrismaMfaEnrollmentRepository", () => {
 
       it("answers empty for somebody the row lookup does not find", async () => {
         const prisma = makeGuardedPrisma(null);
-        const repository = PrismaMfaEnrollmentRepository.create(
-          prisma as unknown as PrismaClient,
-        );
+        const repository = PrismaMfaEnrollmentRepository.create(prisma as unknown as PrismaClient);
 
         const slugs = await repository.findRequiringOrganizationSlugs({
           userId: "user_missing",

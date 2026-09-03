@@ -97,11 +97,7 @@ export function LangySkillChipView({
     // Collapsed: the whole pill is one button that expands. No nested
     // interactive children, so a plain <button> is valid here.
     return (
-      <Tooltip
-        openDelay={250}
-        positioning={{ placement: "top" }}
-        content={tooltipContent}
-      >
+      <Tooltip openDelay={250} positioning={{ placement: "top" }} content={tooltipContent}>
         <chakra.button
           type="button"
           onClick={() => setExpanded(true)}

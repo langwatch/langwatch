@@ -10,9 +10,7 @@ export abstract class DataRetentionRepository {
     organizationId: string;
     scopes: ScopeAssignment[];
   }): Promise<RetentionRow[]>;
-  abstract findAllInOrganization(input: {
-    organizationId: string;
-  }): Promise<RetentionPolicy[]>;
+  abstract findAllInOrganization(input: { organizationId: string }): Promise<RetentionPolicy[]>;
   abstract tryFindById(input: { id: string }): Promise<RetentionPolicy | null>;
   abstract upsertForScope(input: {
     organizationId: string;

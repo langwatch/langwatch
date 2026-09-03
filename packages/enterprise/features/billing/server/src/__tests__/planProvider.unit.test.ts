@@ -46,25 +46,15 @@ const createMockDb = ({
 type OrderableRow = { id: string; createdAt: Date };
 type OrderByClause = Record<string, "asc" | "desc">;
 
-const compareByClause = (
-  a: OrderableRow,
-  b: OrderableRow,
-  clause: OrderByClause,
-): number => {
-  const [field, direction] = Object.entries(clause)[0] as [
-    "id" | "createdAt",
-    "asc" | "desc",
-  ];
+const compareByClause = (a: OrderableRow, b: OrderableRow, clause: OrderByClause): number => {
+  const [field, direction] = Object.entries(clause)[0] as ["id" | "createdAt", "asc" | "desc"];
   const left = a[field];
   const right = b[field];
   const ascending = left < right ? -1 : left > right ? 1 : 0;
   return direction === "desc" ? -ascending : ascending;
 };
 
-const firstUnder = <T extends OrderableRow>(
-  rows: T[],
-  orderBy: OrderByClause[],
-): T | null => {
+const firstUnder = <T extends OrderableRow>(rows: T[], orderBy: OrderByClause[]): T | null => {
   const ordered = [...rows].sort((a, b) => {
     for (const clause of orderBy) {
       const settled = compareByClause(a, b, clause);
@@ -75,9 +65,7 @@ const firstUnder = <T extends OrderableRow>(
   return ordered[0] ?? null;
 };
 
-const dbHolding = (
-  rows: Array<OrderableRow & { plan: string; status: string }>,
-): PrismaClient =>
+const dbHolding = (rows: Array<OrderableRow & { plan: string; status: string }>): PrismaClient =>
   ({
     subscription: {
       findFirst: vi.fn(async (query?: { orderBy?: OrderByClause[] }) =>
@@ -260,10 +248,7 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           maxMembersLite: 25,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map((f) => [
-              f,
-              null,
-            ]),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map((f) => [f, null]),
           ),
         };
 
@@ -305,10 +290,7 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           maxMembersLite: 50,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map((f) => [
-              f,
-              null,
-            ]),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map((f) => [f, null]),
           ),
         };
 
@@ -328,9 +310,10 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           maxMessagesPerMonth: 500_000,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMessagesPerMonth").map(
-              (f) => [f, null],
-            ),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMessagesPerMonth").map((f) => [
+              f,
+              null,
+            ]),
           ),
         };
 
@@ -355,10 +338,7 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           ...overrides,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => !(f in overrides)).map((f) => [
-              f,
-              null,
-            ]),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => !(f in overrides)).map((f) => [f, null]),
           ),
         };
 
@@ -373,9 +353,7 @@ describe("createSaaSPlanProvider", () => {
         const basePlan = PLAN_LIMITS[PlanTypes.LAUNCH];
         for (const field of NUMERIC_OVERRIDE_FIELDS) {
           if (field in overrides) continue;
-          expect(plan[field], `expected ${field} to match plan default`).toBe(
-            basePlan[field],
-          );
+          expect(plan[field], `expected ${field} to match plan default`).toBe(basePlan[field]);
         }
       });
     });
@@ -394,9 +372,7 @@ describe("createSaaSPlanProvider", () => {
 
         const basePlan = PLAN_LIMITS[PlanTypes.LAUNCH];
         for (const field of NUMERIC_OVERRIDE_FIELDS) {
-          expect(plan[field], `expected ${field} to match plan default`).toBe(
-            basePlan[field],
-          );
+          expect(plan[field], `expected ${field} to match plan default`).toBe(basePlan[field]);
         }
       });
     });
@@ -423,10 +399,7 @@ describe("createSaaSPlanProvider", () => {
           status: SubscriptionStatus.ACTIVE,
           maxMembersLite: 50,
           ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map((f) => [
-              f,
-              null,
-            ]),
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembersLite").map((f) => [f, null]),
           ),
         };
 
@@ -465,10 +438,7 @@ describe("createSaaSPlanProvider", () => {
             status: SubscriptionStatus.ACTIVE,
             maxMembers: 15,
             ...Object.fromEntries(
-              NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembers").map((f) => [
-                f,
-                null,
-              ]),
+              NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembers").map((f) => [f, null]),
             ),
           };
 

@@ -42,9 +42,7 @@ export const useEvaluationMappings = (
     useShallow((state) => ({
       activeDatasetId: state.activeDatasetId,
       datasets: state.datasets,
-      target: targetId
-        ? state.targets.find((r) => r.id === targetId)
-        : undefined,
+      target: targetId ? state.targets.find((r) => r.id === targetId) : undefined,
     })),
   );
 

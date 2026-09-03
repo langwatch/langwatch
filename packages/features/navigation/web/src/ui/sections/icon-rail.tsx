@@ -55,9 +55,7 @@ function RailTile({
       boxShadow={isActive ? "0 1px 3px rgba(26, 26, 46, 0.09)" : undefined}
       color={isActive ? "fg" : "gray.400"}
       transition="all 0.15s ease-in-out"
-      _hover={
-        isActive ? undefined : { backgroundColor: "bg.panel/50", color: "fg.muted" }
-      }
+      _hover={isActive ? undefined : { backgroundColor: "bg.panel/50", color: "fg.muted" }}
       aria-label={label}
       aria-current={isActive ? "page" : undefined}
       title={title}

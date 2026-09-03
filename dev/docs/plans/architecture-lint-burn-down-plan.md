@@ -10,7 +10,7 @@
 roughly 90 false positives and re-tiered the comment scan, so the first step
 for any resumed slice is a fresh `pnpm --filter @langwatch/architecture-lint
 lint > before.log 2>&1` and a re-derivation of that policy's rows. Use the
-tables below for the *transformation* to apply, not for the number of rows.
+tables below for the _transformation_ to apply, not for the number of rows.
 
 Lanes that own parts of this surface and are referenced, not re-planned:
 **I** = `install-composition-review-2026-09-03.md` (landed; its `./install`
@@ -71,7 +71,7 @@ identity ADR-129 refactor.
 - **R8 — the expiring boundary-edge baseline** (decision 2a, approved):
   `src/boundary-edge-baseline.ts` + `src/boundary-edge-baseline.json`, shaped
   like `comment-block-roots.json` — `{version, edges: [{kind, from, to,
-  expires}]}`, `kind` one of `cross-feature` | `private-runtime-export`. An
+expires}]}`, `kind` one of `cross-feature` | `private-runtime-export`. An
   unlisted edge fails as today; a listed, unexpired edge is silenced by
   `filterBaselinedBoundaryEdges` (wired into `cli.ts`'s main path over
   `lintWorkspace`'s own output, the same way `commentBlockRoots.entries` gates
@@ -131,7 +131,7 @@ above; R8 likewise). Nothing is open here any more.
    class, the agent reports it and stops; it does not invent a placement.
 6. **Diff the violation list, not the total.** Every slice ends with
    `pnpm --filter @langwatch/architecture-lint lint > after.log 2>&1; diff
-   <(grep '^\[' before.log) <(grep '^\[' after.log)`; a slice that adds any
+<(grep '^\[' before.log) <(grep '^\[' after.log)`; a slice that adds any
    line is not done.
 7. The root session runs the typecheck named per slice
    (`pnpm --filter <pkg> typecheck`), never a whole-tree one. Agents run the
@@ -234,22 +234,23 @@ implementations, callers); the `try*` methods returning a non-nullable drop the
 prefix. **Behaviour is not changed**: no throw is added, no `!` is added. If
 both `x` and `tryX` exist on one class, the agent stops and reports. **A9a
 trace**, **A9b organization + identity + auth**, **A9c ops + gateway + billing
-+ the singletons**. Mechanical; independent of R7.
+
+- the singletons**. Mechanical; independent of R7.
 
 ### Feature source layout
 
 Class table the agents apply; a file matching no class is reported, not placed.
 
-| Class | Pattern today | Destination |
-| --- | --- | --- |
-| A | `api/<x>/<subject>.api.ts` | `transport/api-rest/<subject>.api.ts` (`transport/api-trpc/` when it builds a router) |
-| B | `ports/<subject>.repository.ts`, `ports/*.ports.ts`, `ports/*.sink.ts`, `ports/*.service.ts`, `repositories/prisma/*.port.ts` | `ports/<subject>.port.ts` exporting one `abstract class <Subject>Port`; a file holding several interfaces becomes several port files |
-| C | `*.schemas.ts`, `*.types.ts`, `*.errors.ts`, `*.constants.ts`, `*.vocabulary.ts`, `*.trpc-context.ts`, `*.wire.ts` | the feature's **contract** package as `<subject>.{queries,commands,errors}.ts`; server-only error classes stay as `<subject>.errors.ts` **in the contract** (the client presentation registry needs the code) |
-| D | pure functions: `*.rules.ts`, `*.canonicaliser.ts`, `*-guards.ts`, `*-id.ts`, `*.codec.ts`, `*.policy.ts`, `query-builders/*`, `clickhouse/*translator.ts`, `crypto/*`, `*.tripwire.ts`, `*.resolver.ts` | `rules/<subject>.rules.ts` (R7); if R7 is refused, private methods of the calling service |
-| E | `*.openapi.ts`, `*.routes.ts`, `*.gates.ts`, `*.read-back.ts`, `*.error-handler.ts`, `*.tools.ts` and friends under `transport/<surface>/` | folded into the `<subject>.api.ts` they serve (private functions), or class C/D when they are schema or pure |
-| F | flat `src/<x>.service.ts` / `.repository.ts` / `.ts` | `services/`, `repositories/<tech>/<tech>.<subject>.repository.ts`, `stores/`, `adapters/<tech>.<subject>.adapter.ts` by what the file is |
-| G | `stores/*.bag.ts`, `repositories/clickhouse/*.{row,types,codec}.ts`, `repositories/*-parser.ts`, `*.clickhouse.mapper.ts` | `repositories/<tech>/<tech>.<subject>.mapper.ts` (a bag is the in-memory collector → `stores/memory/memory.<subject>.store.ts`) |
-| H | `jobs/*.job.ts`, `workers/*.contribution.ts`, `adapters/*.{installer,command,registry,runtime}.ts`, `*.generated.ts` in services | `tasks/<subject>.task.ts`, `adapters/<tech>.<subject>.adapter.ts`, `intents/<subject>.intent.ts`; generated files move under `generated/` |
+| Class | Pattern today                                                                                                                                                                                            | Destination                                                                                                                                                                                                   |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A     | `api/<x>/<subject>.api.ts`                                                                                                                                                                               | `transport/api-rest/<subject>.api.ts` (`transport/api-trpc/` when it builds a router)                                                                                                                         |
+| B     | `ports/<subject>.repository.ts`, `ports/*.ports.ts`, `ports/*.sink.ts`, `ports/*.service.ts`, `repositories/prisma/*.port.ts`                                                                            | `ports/<subject>.port.ts` exporting one `abstract class <Subject>Port`; a file holding several interfaces becomes several port files                                                                          |
+| C     | `*.schemas.ts`, `*.types.ts`, `*.errors.ts`, `*.constants.ts`, `*.vocabulary.ts`, `*.trpc-context.ts`, `*.wire.ts`                                                                                       | the feature's **contract** package as `<subject>.{queries,commands,errors}.ts`; server-only error classes stay as `<subject>.errors.ts` **in the contract** (the client presentation registry needs the code) |
+| D     | pure functions: `*.rules.ts`, `*.canonicaliser.ts`, `*-guards.ts`, `*-id.ts`, `*.codec.ts`, `*.policy.ts`, `query-builders/*`, `clickhouse/*translator.ts`, `crypto/*`, `*.tripwire.ts`, `*.resolver.ts` | `rules/<subject>.rules.ts` (R7); if R7 is refused, private methods of the calling service                                                                                                                     |
+| E     | `*.openapi.ts`, `*.routes.ts`, `*.gates.ts`, `*.read-back.ts`, `*.error-handler.ts`, `*.tools.ts` and friends under `transport/<surface>/`                                                               | folded into the `<subject>.api.ts` they serve (private functions), or class C/D when they are schema or pure                                                                                                  |
+| F     | flat `src/<x>.service.ts` / `.repository.ts` / `.ts`                                                                                                                                                     | `services/`, `repositories/<tech>/<tech>.<subject>.repository.ts`, `stores/`, `adapters/<tech>.<subject>.adapter.ts` by what the file is                                                                      |
+| G     | `stores/*.bag.ts`, `repositories/clickhouse/*.{row,types,codec}.ts`, `repositories/*-parser.ts`, `*.clickhouse.mapper.ts`                                                                                | `repositories/<tech>/<tech>.<subject>.mapper.ts` (a bag is the in-memory collector → `stores/memory/memory.<subject>.store.ts`)                                                                               |
+| H     | `jobs/*.job.ts`, `workers/*.contribution.ts`, `adapters/*.{installer,command,registry,runtime}.ts`, `*.generated.ts` in services                                                                         | `tasks/<subject>.task.ts`, `adapters/<tech>.<subject>.adapter.ts`, `intents/<subject>.intent.ts`; generated files move under `generated/`                                                                     |
 
 **L1 — classes A, B, C, G across all packages + the `feature-source-subject`
 renames.** **L2 — class D, after R7** (split L2a trace, L2b analytics +
@@ -279,8 +280,8 @@ three hooks, the `utils/*` helpers, two `ui/elements/*`). `git mv` keeping file
 names, add the export row on `design-system`, repoint every consumer, delete
 the row from `workflow-web`. Anything in the moved set that imports tRPC, the
 router, or a feature package is **not** design-system material and goes to W2.
-**W2 — `studio-host/*` → `packages/ui-host`.** *In progress in the working
-tree.* **W3 — `workflow-web/model/prisma-types` and the remaining export
+**W2 — `studio-host/*` → `packages/ui-host`.** _In progress in the working
+tree._ **W3 — `workflow-web/model/prisma-types` and the remaining export
 rows.** Each consumer's Prisma type becomes the contract type for that subject
 (same table as A7).
 
@@ -401,15 +402,15 @@ page of the wave's file list, produced by
 (regenerate with `pnpm --filter @langwatch/architecture-lint review:comment-blocks`).
 The file list is the slice; the agent does not choose.
 
-| Wave | Roots | Blocks (2026-09-03) | Slices |
-| --- | --- | ---: | ---: |
-| C0 | the branch's own changed-file set | 671 | 4 |
-| C1 | `apps/api` · `apps/worker` · `apps/ui` (the composition roots carry the worst narrative) | 2,564 | 13 |
-| C2 | `packages/features/*/server` + `packages/enterprise/features/*/server` | ~6,300 | 34 |
-| C3 | `packages/features/*/web` + `*/contract` | ~7,600 | 40 |
-| C4 | shared packages (`eventing`, `api`, `group-queue`, `architecture-lint`, `clickhouse-client`, …) | ~1,900 | 10 |
-| C5 | `sdks/typescript` · `apps/server` · `mcp` · `skills` · `dev/`, `tools/` | ~1,650 | 9 |
-| | | **20,137** | **~110** |
+| Wave | Roots                                                                                           | Blocks (2026-09-03) |   Slices |
+| ---- | ----------------------------------------------------------------------------------------------- | ------------------: | -------: |
+| C0   | the branch's own changed-file set                                                               |                 671 |        4 |
+| C1   | `apps/api` · `apps/worker` · `apps/ui` (the composition roots carry the worst narrative)        |               2,564 |       13 |
+| C2   | `packages/features/*/server` + `packages/enterprise/features/*/server`                          |              ~6,300 |       34 |
+| C3   | `packages/features/*/web` + `*/contract`                                                        |              ~7,600 |       40 |
+| C4   | shared packages (`eventing`, `api`, `group-queue`, `architecture-lint`, `clickhouse-client`, …) |              ~1,900 |       10 |
+| C5   | `sdks/typescript` · `apps/server` · `mcp` · `skills` · `dev/`, `tools/`                         |              ~1,650 |        9 |
+|      |                                                                                                 |          **20,137** | **~110** |
 
 C0 and C1 go first because they are the files this branch and the three
 applications own. C2 before C3 because server files are moving in L1–L6 and the

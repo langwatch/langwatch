@@ -18,9 +18,7 @@ import type { PrismaClient, SsoConnection } from "@langwatch/prisma-client/gener
  * what lets the picker say "your organization has paused this" instead of
  * silently offering a password form.
  */
-export class SsoConnectionDomainRoutingRepository
-  implements SignInDomainRoutingPort
-{
+export class SsoConnectionDomainRoutingRepository implements SignInDomainRoutingPort {
   constructor(
     private readonly prisma: PrismaClient,
     /** Whether this deployment actually mounted a method id. Injected rather

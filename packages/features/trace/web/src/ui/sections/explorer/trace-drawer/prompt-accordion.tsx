@@ -51,8 +51,8 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
     return (
       <Box paddingX={2} paddingY={3}>
         <Text textStyle="xs" color="fg.muted">
-          Span carries prompt metadata but no parseable handle or variables — likely an
-          incomplete SDK emit.
+          Span carries prompt metadata but no parseable handle or variables — likely an incomplete
+          SDK emit.
         </Text>
       </Box>
     );
@@ -176,11 +176,7 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
               kept identical here so behavior is predictable
               wherever a prompt is surfaced. */}
           {buildUrl(span.spanId) && (
-            <Link
-              href={buildUrl(span.spanId)?.toString() ?? ""}
-              isExternal
-              variant="plain"
-            >
+            <Link href={buildUrl(span.spanId)?.toString() ?? ""} isExternal variant="plain">
               <Button size="xs" variant="ghost" gap={1}>
                 <Icon as={LuExternalLink} boxSize={3} />
                 Open in Playground

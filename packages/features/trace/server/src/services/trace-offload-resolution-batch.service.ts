@@ -21,10 +21,7 @@
  * field and trace still resolves.
  */
 import type { BlobStore } from "./trace-blob-store.service";
-import {
-  BlobFieldNotFoundError,
-  BlobNotFoundError,
-} from "./trace-blob-store.service";
+import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
 import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
 import { hasEventRefs, parseSpanEventRefs } from "./trace-eventref-parsing.service";
@@ -173,8 +170,7 @@ export async function resolveOffloadedTracesBatch({
         return { cleanedAttrs: attrs, refs: [], hadRefs: false };
       }
 
-      const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
-        parseSpanEventRefs(attrs);
+      const { cleanedAttrs, eventrefEntries, missingEventIdKeys } = parseSpanEventRefs(attrs);
 
       for (const attrKey of missingEventIdKeys) {
         logger.warn(
@@ -199,24 +195,20 @@ export async function resolveOffloadedTracesBatch({
 
   // ----- Phase 2: fetch each distinct ref once, bounded concurrency.
   const fetchResults = new Map<string, FetchResult>();
-  await forEachWithConcurrency(
-    [...fetchTasks.entries()],
-    concurrency,
-    async ([fetchKey, task]) => {
-      try {
-        const value = await blobStore.getFromEventLog({
-          eventId: task.eventId,
-          field: task.field,
-          tenantId: projectId,
-          aggregateType,
-          aggregateId: task.aggregateId,
-        });
-        fetchResults.set(fetchKey, { ok: true, value });
-      } catch (error) {
-        fetchResults.set(fetchKey, { ok: false, error });
-      }
-    },
-  );
+  await forEachWithConcurrency([...fetchTasks.entries()], concurrency, async ([fetchKey, task]) => {
+    try {
+      const value = await blobStore.getFromEventLog({
+        eventId: task.eventId,
+        field: task.field,
+        tenantId: projectId,
+        aggregateType,
+        aggregateId: task.aggregateId,
+      });
+      fetchResults.set(fetchKey, { ok: true, value });
+    } catch (error) {
+      fetchResults.set(fetchKey, { ok: false, error });
+    }
+  });
 
   // ----- Phase 3: assemble resolved spans + recompute IO per trace.
   return tracePlans.map((spanPlans, traceIdx) => {

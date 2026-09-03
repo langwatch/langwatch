@@ -292,10 +292,7 @@ describe("synchronous external process signals", () => {
         service.handleSignal({ signal: signal(), now: T0 + 1 }),
       ]);
 
-      expect([first.outcome, second.outcome].sort()).toEqual([
-        "committed",
-        "duplicateSignal",
-      ]);
+      expect([first.outcome, second.outcome].sort()).toEqual(["committed", "duplicateSignal"]);
       expect(await store.findByRef({ ref })).toMatchObject({ revision: 2 });
       expect(await store.findMessagesByRef({ ref })).toHaveLength(1);
     });
@@ -323,8 +320,7 @@ describe("synchronous external process signals", () => {
           return result;
         };
 
-        const runSignal = () =>
-          service.handleSignal({ signal: signal(), now: T0 + 30 * 60_000 });
+        const runSignal = () => service.handleSignal({ signal: signal(), now: T0 + 30 * 60_000 });
         const runWake = () =>
           service.handleWake({
             wake: {

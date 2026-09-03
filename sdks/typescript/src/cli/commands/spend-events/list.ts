@@ -39,9 +39,7 @@ export const listSpendEventsCommand = async (options: {
   // The pull is a ranged read by contract; default to the last 24 hours.
   const now = Date.now();
   const from =
-    options.from !== undefined
-      ? parseInstant(options.from, "--from")
-      : now - 24 * 60 * 60 * 1000;
+    options.from !== undefined ? parseInstant(options.from, "--from") : now - 24 * 60 * 60 * 1000;
   const to = options.to !== undefined ? parseInstant(options.to, "--to") : now;
   const limit =
     options.limit !== undefined ? parsePositiveInt(options.limit, "--limit") : undefined;

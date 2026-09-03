@@ -29,9 +29,9 @@ interface ProductSelectionScreenWithAnalyticsProps {
   onSelectProduct: (product: ProductSelection) => void;
 }
 
-const ProductSelectionScreenWithAnalytics: React.FC<
-  ProductSelectionScreenWithAnalyticsProps
-> = ({ onSelectProduct }) => {
+const ProductSelectionScreenWithAnalytics: React.FC<ProductSelectionScreenWithAnalyticsProps> = ({
+  onSelectProduct,
+}) => {
   const { emit } = useAnalytics();
   return (
     <ProductSelectionScreen

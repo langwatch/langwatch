@@ -78,14 +78,14 @@ function harness() {
     },
   };
 
-  const identity = new IdentityService(new IdentityGuards(heads, users, new InMemoryReservations()), ledger);
-  const ceremonies = new IdentityCeremonies(
-    heads,
-    users,
-    identity,
-    async () => gateOpen.value,
-    { now: () => T0, newCommandId: newIdentityCommandId },
+  const identity = new IdentityService(
+    new IdentityGuards(heads, users, new InMemoryReservations()),
+    ledger,
   );
+  const ceremonies = new IdentityCeremonies(heads, users, identity, async () => gateOpen.value, {
+    now: () => T0,
+    newCommandId: newIdentityCommandId,
+  });
 
   const auth = betterAuth({
     baseURL: "http://localhost:3000",
@@ -129,9 +129,7 @@ async function signUp(h: Harness, email: string): Promise<string> {
 }
 
 const statedIdentifiers = (h: Harness) =>
-  [...h.heads.heads.values()].flatMap((heads) =>
-    Object.values(heads.identifiers),
-  );
+  [...h.heads.heads.values()].flatMap((heads) => Object.values(heads.identifiers));
 
 describe("better-auth over the databaseHooks seam", () => {
   let h: Harness;
@@ -238,20 +236,16 @@ describe("better-auth over the databaseHooks seam", () => {
           accountId: "sub-google-1",
         });
 
-        expect(
-          h.commands.slice(before).map((command) => command.type),
-        ).toEqual(["lw.identity.attach_identifier"]);
+        expect(h.commands.slice(before).map((command) => command.type)).toEqual([
+          "lw.identity.attach_identifier",
+        ]);
 
-        const google = statedIdentifiers(h).find(
-          (identifier) => identifier.provider === "google",
-        );
+        const google = statedIdentifiers(h).find((identifier) => identifier.provider === "google");
         expect(google).toMatchObject({ providerAccountId: "sub-google-1" });
         // The id the ceremony pinned IS the row's id. That is what lets the
         // fold project onto the row better-auth wrote (ADR-116 §5) rather
         // than creating a second one beside it.
-        expect(h.db.account?.map((row) => row.id)).toContain(
-          google?.accountId,
-        );
+        expect(h.db.account?.map((row) => row.id)).toContain(google?.accountId);
       });
     });
 
@@ -263,9 +257,7 @@ describe("better-auth over the databaseHooks seam", () => {
 
         await (await h.auth.$context).internalAdapter.deleteUser(userId);
 
-        expect(h.commands.map((command) => command.type)).toContain(
-          "lw.identity.erase_user",
-        );
+        expect(h.commands.map((command) => command.type)).toContain("lw.identity.erase_user");
       });
     });
   });

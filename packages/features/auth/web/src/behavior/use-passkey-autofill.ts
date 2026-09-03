@@ -18,8 +18,7 @@ async function offerPasskeyFromAutofill({
   callbackUrl?: string;
 }): Promise<void> {
   try {
-    const available =
-      await window.PublicKeyCredential?.isConditionalMediationAvailable?.();
+    const available = await window.PublicKeyCredential?.isConditionalMediationAvailable?.();
     if (!available || !isLive()) return;
 
     const result = await authClient.signIn.passkey({ autoFill: true });
@@ -91,8 +90,7 @@ export function usePasskeyAutofill({
     let interacted = false;
 
     const isWebauthnField = (target: EventTarget | null): boolean =>
-      target instanceof HTMLInputElement &&
-      target.matches('input[autocomplete~="webauthn"]');
+      target instanceof HTMLInputElement && target.matches('input[autocomplete~="webauthn"]');
 
     const offerOnce = () => {
       if (offered || !live) return;
@@ -114,10 +112,7 @@ export function usePasskeyAutofill({
       interacted = true;
       // A click straight into the field, or a keystroke while already in it
       // (the entrance autofocuses, so typing is often the FIRST gesture).
-      if (
-        isWebauthnField(event.target) ||
-        isWebauthnField(document.activeElement)
-      ) {
+      if (isWebauthnField(event.target) || isWebauthnField(document.activeElement)) {
         offerOnce();
       }
     };

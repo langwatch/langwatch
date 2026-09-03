@@ -10,7 +10,10 @@ import {
   CODING_AGENT_SESSION_SEEN_WINDOW_MS,
   CodingAgentSessionSeenService,
 } from "../coding-agent-session-seen.service";
-import { TestClock, TestProjectService } from "../../repositories/__tests__/fixtures/coding-agent.fixture";
+import {
+  TestClock,
+  TestProjectService,
+} from "../../repositories/__tests__/fixtures/coding-agent.fixture";
 
 function createFixture(at = 1_000_000) {
   const clock = new TestClock(at);

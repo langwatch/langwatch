@@ -8,10 +8,7 @@ import {
   type AnnotationFormState,
 } from "@langwatch/annotation-web";
 import { useEffect } from "react";
-import {
-  type AnnotationDraft,
-  useAnnotationDraftStore,
-} from "../../../../../index";
+import { type AnnotationDraft, useAnnotationDraftStore } from "../../../../../index";
 import { useAnnotationMutations } from "./use-annotation-form";
 
 interface AnnotationEditorCardProps {
@@ -97,11 +94,7 @@ function buildComposerFormState({
  * (the draft store, so they survive the turn scrolling out of view) and that it
  * takes its place in the column rather than floating over the conversation.
  */
-export function AnnotationEditorCard({
-  draft,
-  input,
-  output,
-}: AnnotationEditorCardProps) {
+export function AnnotationEditorCard({ draft, input, output }: AnnotationEditorCardProps) {
   const patchDraft = useAnnotationDraftStore((s) => s.patchDraft);
   const closeDraft = useAnnotationDraftStore((s) => s.closeDraft);
 

@@ -193,12 +193,7 @@ class ProducerOnlyPiiRedaction extends TraceSpanPiiRedactionPort {
     super();
   }
 
-  redact(
-    _span: unknown,
-    _resource: unknown,
-    _level: unknown,
-    _tenantId: TenantId,
-  ): Promise<void> {
+  redact(_span: unknown, _resource: unknown, _level: unknown, _tenantId: TenantId): Promise<void> {
     return Promise.reject(producerOnly(this.processName, "redact a span"));
   }
 }

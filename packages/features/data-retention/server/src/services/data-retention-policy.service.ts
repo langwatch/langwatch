@@ -202,8 +202,7 @@ export class DataRetentionPolicyService {
     throw new TRPCError({
       code: "FORBIDDEN",
       message:
-        "Only platform administrators can disable data retention " +
-        "(keep data indefinitely).",
+        "Only platform administrators can disable data retention " + "(keep data indefinitely).",
     });
   }
 
@@ -223,10 +222,7 @@ export class DataRetentionPolicyService {
   }
 
   /** Plan-gate a project-targeted mutation via the project's owning organization. */
-  async assertPlanForProject(input: {
-    actor: RetentionActor;
-    projectId: string;
-  }): Promise<void> {
+  async assertPlanForProject(input: { actor: RetentionActor; projectId: string }): Promise<void> {
     const lineage = await this.options.directory.tryGetProjectLineage({
       projectId: input.projectId,
     });

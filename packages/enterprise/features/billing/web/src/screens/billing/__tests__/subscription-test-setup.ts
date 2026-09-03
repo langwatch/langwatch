@@ -119,9 +119,7 @@ export const mockAddTeamMemberOrEvents = vi.fn(() => ({
 
 export const mockManageSubscription = vi.fn(() => ({
   mutate: vi.fn(),
-  mutateAsync: vi
-    .fn()
-    .mockResolvedValue({ url: "https://billing.stripe.com/session/test" }),
+  mutateAsync: vi.fn().mockResolvedValue({ url: "https://billing.stripe.com/session/test" }),
   isLoading: false,
   isPending: false,
 }));

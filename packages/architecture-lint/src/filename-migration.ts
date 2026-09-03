@@ -115,9 +115,7 @@ function relativeModuleTarget(file: string, specifier: string): string | undefin
   if (!specifier.startsWith(".")) return void 0;
   const base = resolve(dirname(file), specifier);
   const javascriptExtension = specifier.match(/\.(?:m?js|cjs)$/)?.[0];
-  const extensionless = javascriptExtension
-    ? base.slice(0, -javascriptExtension.length)
-    : base;
+  const extensionless = javascriptExtension ? base.slice(0, -javascriptExtension.length) : base;
   const typedCandidates = [".ts", ".tsx", ".mts", ".cts"].map(
     (extension) => `${extensionless}${extension}`,
   );
@@ -127,8 +125,8 @@ function relativeModuleTarget(file: string, specifier: string): string | undefin
     ...[".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"].map(
       (extension) => `${base}${extension}`,
     ),
-    ...["index.ts", "index.tsx", "index.mts", "index.cts", "index.js", "index.jsx"].map(
-      (index) => resolve(base, index),
+    ...["index.ts", "index.tsx", "index.mts", "index.cts", "index.js", "index.jsx"].map((index) =>
+      resolve(base, index),
     ),
   ];
   return candidates.find((candidate) => existsSync(candidate));
@@ -142,24 +140,19 @@ function moduleSpecifierNodes(sourceFile: ts.SourceFile): ts.StringLiteral[] {
       return;
     }
     const parent = node.parent;
-    const isImportDeclaration =
-      ts.isImportDeclaration(parent) && parent.moduleSpecifier === node;
-    const isExportDeclaration =
-      ts.isExportDeclaration(parent) && parent.moduleSpecifier === node;
+    const isImportDeclaration = ts.isImportDeclaration(parent) && parent.moduleSpecifier === node;
+    const isExportDeclaration = ts.isExportDeclaration(parent) && parent.moduleSpecifier === node;
     const isImportType =
       ts.isImportTypeNode(parent) &&
       ts.isLiteralTypeNode(parent.argument) &&
       parent.argument.literal === node;
-    const isExternalModule =
-      ts.isExternalModuleReference(parent) && parent.expression === node;
-    const isCallWithFirstArgument =
-      ts.isCallExpression(parent) && parent.arguments[0] === node;
+    const isExternalModule = ts.isExternalModuleReference(parent) && parent.expression === node;
+    const isCallWithFirstArgument = ts.isCallExpression(parent) && parent.arguments[0] === node;
     const isDynamicImport =
       isCallWithFirstArgument && parent.expression.kind === ts.SyntaxKind.ImportKeyword;
     const isRequireCall = isCallWithFirstArgument && ts.isIdentifier(parent.expression);
     const isNamedRequire = isRequireCall && parent.expression.text === "require";
-    const isDeclarationSpecifier =
-      isImportDeclaration || isExportDeclaration || isImportType;
+    const isDeclarationSpecifier = isImportDeclaration || isExportDeclaration || isImportType;
     const isRuntimeSpecifier = isExternalModule || isDynamicImport || isNamedRequire;
     if (isDeclarationSpecifier || isRuntimeSpecifier) {
       literals.push(node);
@@ -209,11 +202,7 @@ function applyReplacements(
     }, source);
 }
 
-function replaceJsonPaths(
-  file: string,
-  source: string,
-  mappings: FilenameRename[],
-): string {
+function replaceJsonPaths(file: string, source: string, mappings: FilenameRename[]): string {
   const sourceFile = ts.parseJsonText(file, source);
   const replacements: Array<{ start: number; end: number; text: string }> = [];
   const pathMap = new Map<string, string>();
@@ -341,9 +330,7 @@ export function planFilenameMigration(rootInput: string): FilenameMigrationPlan 
     const source = readFileSync(file, "utf8");
     const output = replaceDocumentationPaths(root, source, mappings);
     if (output !== source) edits.set(file, output);
-    remainingTextualReferences.push(
-      ...documentationPathReferences(root, output, file, mappings),
-    );
+    remainingTextualReferences.push(...documentationPathReferences(root, output, file, mappings));
   }
 
   for (const mapping of mappings) {
@@ -353,18 +340,10 @@ export function planFilenameMigration(rootInput: string): FilenameMigrationPlan 
 }
 
 export function applyFilenameMigration(plan: FilenameMigrationPlan): void {
-  if (
-    plan.collisions.length ||
-    plan.unresolved.length ||
-    plan.remainingTextualReferences.length
-  ) {
-    throw new Error(
-      "Cannot apply filename migration with collisions or unresolved mappings.",
-    );
+  if (plan.collisions.length || plan.unresolved.length || plan.remainingTextualReferences.length) {
+    throw new Error("Cannot apply filename migration with collisions or unresolved mappings.");
   }
-  const moves = [...plan.mappings].sort(
-    (left, right) => right.from.length - left.from.length,
-  );
+  const moves = [...plan.mappings].sort((left, right) => right.from.length - left.from.length);
   for (const mapping of moves) renameSync(mapping.from, mapping.to);
   for (const [file, source] of plan.edits) {
     const target = plan.mappings.find((mapping) => mapping.from === file)?.to ?? file;

@@ -71,7 +71,9 @@ import type { ApiGatewayGroupCollaborators } from "./api-trpc-collaborators.gate
  * own signature, so a process that composes no provider service simply passes
  * nothing and the route refuses by name.
  */
-export type ApiGatewayCodexRefresh = (input: { providerRowId: string }) => Promise<
+export type ApiGatewayCodexRefresh = (input: {
+  providerRowId: string;
+}) => Promise<
   | { status: "refreshed"; accessToken: string; accountId: string }
   | { status: "not_connected" }
   | { status: "session_expired" }

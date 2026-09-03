@@ -66,13 +66,7 @@ export function CopyableInputWithPrefix({
         {getMaskedValue()}
       </Box>
 
-      <HStack
-        position="absolute"
-        top="50%"
-        right={2}
-        transform="translateY(-50%)"
-        gap="0.5"
-      >
+      <HStack position="absolute" top="50%" right={2} transform="translateY(-50%)" gap="0.5">
         {showVisibilityToggle && (
           <Tooltip content={isVisible ? "Hide" : "Show"} openDelay={0} showArrow>
             <IconButton

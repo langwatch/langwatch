@@ -24,10 +24,7 @@ const TOOL_SPAN_NAMES = new Set([TOOL_SPAN, GENIE_QUERY_SPAN]);
  * of 1 is the root alone — a message that generated no SQL — and mounting the
  * strip there would announce steps and then find none.
  */
-export function turnHasGenieSteps(turn: {
-  traceName?: string | null;
-  spanCount: number;
-}): boolean {
+export function turnHasGenieSteps(turn: { traceName?: string | null; spanCount: number }): boolean {
   return turn.traceName === GENIE_MESSAGE_SPAN && turn.spanCount > 1;
 }
 
@@ -91,12 +88,7 @@ export const TurnSteps = memo(function TurnSteps({
       </Button>
 
       {isOpen && (
-        <Box
-          borderLeftWidth="1px"
-          borderColor="border.muted"
-          paddingLeft={3}
-          paddingY={1}
-        >
+        <Box borderLeftWidth="1px" borderColor="border.muted" paddingLeft={3} paddingY={1}>
           {query.isLoading ? (
             <VStack align="stretch" gap={1.5} aria-busy="true">
               {["55%", "70%", "40%"].map((w) => (
@@ -138,10 +130,7 @@ interface Step {
 /** The turn's model calls and tool runs, in the order they happened. */
 function selectSteps(spans: SpanDetail[]): Step[] {
   return spans
-    .filter(
-      (span) =>
-        span.name === LLM_REQUEST_SPAN || TOOL_SPAN_NAMES.has(span.name),
-    )
+    .filter((span) => span.name === LLM_REQUEST_SPAN || TOOL_SPAN_NAMES.has(span.name))
     .slice()
     .sort((a, b) => a.startTimeMs - b.startTimeMs)
     .map((span) => {
@@ -151,9 +140,7 @@ function selectSteps(spans: SpanDetail[]): Step[] {
         spanId: span.spanId,
         kind: isTool ? ("tool" as const) : ("model" as const),
         label: isTool ? (asString(params.tool_name) ?? "Tool") : (span.model ?? "model"),
-        arg: isTool
-          ? (asString(params.full_command) ?? asString(params.file_path))
-          : null,
+        arg: isTool ? (asString(params.full_command) ?? asString(params.file_path)) : null,
         durationMs: span.durationMs,
         isError: span.status === "error",
         tokens: (span.metrics?.promptTokens ?? 0) + (span.metrics?.completionTokens ?? 0),

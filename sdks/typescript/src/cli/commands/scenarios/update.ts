@@ -5,10 +5,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { createCliScenariosService } from "./cli-scenarios-service";
-import {
-  resolveSuiteReference,
-  SuiteReferenceError,
-} from "../test-suites/resolveSuite";
+import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite";
 
 export const updateScenarioCommand = async (
   id: string,
@@ -26,11 +23,7 @@ export const updateScenarioCommand = async (
   // One of the two says where the scenario goes, so a line carrying both says
   // two different things. It is refused before the scenario is touched.
   if (options.testSuite !== undefined && options.noTestSuite) {
-    console.error(
-      chalk.red(
-        "Error: --test-suite and --no-test-suite cannot be used together.",
-      ),
-    );
+    console.error(chalk.red("Error: --test-suite and --no-test-suite cannot be used together."));
     process.exit(1);
   }
 
@@ -63,8 +56,7 @@ export const updateScenarioCommand = async (
     if (options.situation !== undefined) body.situation = options.situation;
     if (options.criteria !== undefined)
       body.criteria = options.criteria.split(",").map((c) => c.trim());
-    if (options.labels !== undefined)
-      body.labels = options.labels.split(",").map((l) => l.trim());
+    if (options.labels !== undefined) body.labels = options.labels.split(",").map((l) => l.trim());
     if (testSuiteId !== undefined) body.testSuiteId = testSuiteId;
 
     const scenario = await service.update(id, body);

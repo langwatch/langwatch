@@ -3,7 +3,10 @@ import { Ban, Minus } from "lucide-react";
 import { memo, useCallback } from "react";
 import { useFacetHoverStore } from "../../../../index";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button";
-import type { FacetItem, FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types";
+import type {
+  FacetItem,
+  FacetValueState,
+} from "../../../../behavior/explorer/filter-sidebar/types";
 import { formatCount, paletteFromColor } from "./utils";
 
 const MIN_VISIBLE_FILL_PCT = 4;
@@ -181,9 +184,7 @@ export const FacetRow = memo(function FacetRow({
             child — you can't nest a <button> inside the row's <button>. */}
         <chakra.button
           type="button"
-          aria-label={
-            isExclude ? `Stop excluding ${item.label}` : `Exclude ${item.label}`
-          }
+          aria-label={isExclude ? `Stop excluding ${item.label}` : `Exclude ${item.label}`}
           title={isExclude ? "Stop excluding" : "Exclude (NOT)"}
           aria-pressed={isExclude}
           data-facet-exclude

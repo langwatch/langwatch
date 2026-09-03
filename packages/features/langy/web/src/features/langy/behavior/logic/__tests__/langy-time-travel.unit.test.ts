@@ -91,9 +91,7 @@ const historyRow = (
 
 describe("buildTimeTravelView", () => {
   it("returns null on LIVE — nothing substitutes when the scrubber is home", () => {
-    expect(
-      buildTimeTravelView({ records: [], scrubSeq: null, historyMessages: [] }),
-    ).toBeNull();
+    expect(buildTimeTravelView({ records: [], scrubSeq: null, historyMessages: [] })).toBeNull();
   });
 
   describe("scrubbed to mid-turn", () => {
@@ -119,9 +117,7 @@ describe("buildTimeTravelView", () => {
       expect(view!.signals.status).toBe("Thinking about light…");
       const roles = view!.messages.map((m) => m.role);
       expect(roles).toEqual(["user", "assistant"]);
-      expect(view!.messages[1]!.parts).toEqual([
-        { type: "text", text: "Rayleigh scattering" },
-      ]);
+      expect(view!.messages[1]!.parts).toEqual([{ type: "text", text: "Rayleigh scattering" }]);
     });
   });
 

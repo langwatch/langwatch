@@ -8,13 +8,7 @@ import { describe, expect, it } from "vitest";
 import { IdentityGuards } from "../guards";
 import type { IdentityLedger } from "../identity-ledger";
 import { IdentityService } from "../identity.service";
-import {
-  ACTOR,
-  attachData,
-  InMemoryHeads,
-  T0,
-  USER,
-} from "./support/in-memory-heads";
+import { ACTOR, attachData, InMemoryHeads, T0, USER } from "./support/in-memory-heads";
 import { InMemoryUsers } from "./support/in-memory-users";
 import { InMemoryReservations } from "./support/in-memory-reservations";
 
@@ -25,13 +19,7 @@ const users = new InMemoryUsers();
 class RecordingLedger implements IdentityLedger {
   commits: { command: IdentityCommand; facts: IdentityFactInput[] }[] = [];
 
-  async commit({
-    command,
-    facts,
-  }: {
-    command: IdentityCommand;
-    facts: IdentityFactInput[];
-  }) {
+  async commit({ command, facts }: { command: IdentityCommand; facts: IdentityFactInput[] }) {
     this.commits.push({ command, facts });
     return facts.map((fact) => ({
       ...fact,
@@ -43,7 +31,10 @@ class RecordingLedger implements IdentityLedger {
 function harness() {
   const heads = new InMemoryHeads();
   const ledger = new RecordingLedger();
-  const service = new IdentityService(new IdentityGuards(heads, users, new InMemoryReservations()), ledger);
+  const service = new IdentityService(
+    new IdentityGuards(heads, users, new InMemoryReservations()),
+    ledger,
+  );
   return { heads, ledger, service };
 }
 
@@ -69,9 +60,7 @@ describe("IdentityService", () => {
       heads.fold(USER, await service.attachIdentifier(attachData()));
       ledger.commits.length = 0;
 
-      const restated = await service.attachIdentifier(
-        attachData({ commandId: "backfill:acc_1" }),
-      );
+      const restated = await service.attachIdentifier(attachData({ commandId: "backfill:acc_1" }));
 
       expect(restated).toEqual([]);
       expect(ledger.commits).toEqual([]);
@@ -120,9 +109,8 @@ describe("IdentityService", () => {
     it("stages the same command type and command id", async () => {
       const { heads, ledger, service } = harness();
       heads.fold(USER, await service.attachIdentifier(attachData()));
-      const identifierId = (
-        ledger.commits[0]!.facts[0]!.data as { identifierId: string }
-      ).identifierId;
+      const identifierId = (ledger.commits[0]!.facts[0]!.data as { identifierId: string })
+        .identifierId;
       const verify = {
         tenantId: USER,
         userId: USER,

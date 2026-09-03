@@ -11,9 +11,7 @@ describe("throttledPerWindow", () => {
     });
 
     it("defaults the dedup ttl to the window", () => {
-      expect(
-        throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication?.ttlMs,
-      ).toBe(5_000);
+      expect(throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication?.ttlMs).toBe(5_000);
     });
 
     describe("when the suppression must outlast the firing delay", () => {
@@ -35,15 +33,11 @@ describe("throttledPerWindow", () => {
       // Extending would re-arm the deadline against each newer event, so an
       // aggregate receiving a continuous stream would defer its own job for
       // as long as the stream lasts and the subscriber would never fire.
-      expect(
-        throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication?.extend,
-      ).toBe(false);
+      expect(throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication?.extend).toBe(false);
     });
 
     it("still carries the newest payload when it fires", () => {
-      expect(
-        throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication?.replace,
-      ).toBe(true);
+      expect(throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication?.replace).toBe(true);
     });
   });
 
@@ -66,8 +60,7 @@ describe("throttledPerWindow", () => {
       // after dispatch would leave whatever partial state the dispatched job
       // wrote as the last word.
       expect(
-        throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication
-          ?.shouldSurviveDispatch,
+        throttledPerWindow({ makeJobId, windowMs: 5_000 }).deduplication?.shouldSurviveDispatch,
       ).toBe(false);
     });
   });

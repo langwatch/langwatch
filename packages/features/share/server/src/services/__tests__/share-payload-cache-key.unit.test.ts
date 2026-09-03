@@ -51,9 +51,9 @@ describe("buildSharedTraceCacheKey", () => {
     it("builds different keys for a content-visible viewer", () => {
       const withContent = { ...anonymous, canSeeCapturedInput: true };
 
-      expect(
-        buildSharedTraceCacheKey({ token: "tok", protections: withContent }),
-      ).not.toBe(buildSharedTraceCacheKey({ token: "tok", protections: anonymous }));
+      expect(buildSharedTraceCacheKey({ token: "tok", protections: withContent })).not.toBe(
+        buildSharedTraceCacheKey({ token: "tok", protections: anonymous }),
+      );
     });
 
     it("builds different keys for a narrower visibility window", () => {
@@ -67,9 +67,9 @@ describe("buildSharedTraceCacheKey", () => {
 
   describe("given different tokens", () => {
     it("builds different keys", () => {
-      expect(
-        buildSharedTraceCacheKey({ token: "tok_a", protections: anonymous }),
-      ).not.toBe(buildSharedTraceCacheKey({ token: "tok_b", protections: anonymous }));
+      expect(buildSharedTraceCacheKey({ token: "tok_a", protections: anonymous })).not.toBe(
+        buildSharedTraceCacheKey({ token: "tok_b", protections: anonymous }),
+      );
     });
   });
 });

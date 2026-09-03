@@ -6,10 +6,7 @@ interface AISparklesLoaderProps {
   color?: string;
 }
 
-export const AISparklesLoader = ({
-  size = 24,
-  color = "blue.400",
-}: AISparklesLoaderProps) => {
+export const AISparklesLoader = ({ size = 24, color = "blue.400" }: AISparklesLoaderProps) => {
   const color_ = getRawColorValue(color);
 
   return (

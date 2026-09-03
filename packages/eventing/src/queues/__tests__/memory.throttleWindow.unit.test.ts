@@ -109,12 +109,10 @@ describe("EventSourcedQueueProcessorMemory throttle window", () => {
         options: { concurrency: 1 },
       });
 
-      const delayed = queue
-        .send({ id: "slow", value: "delayed" }, { delay: 200 })
-        .catch(() => {
-          // Rejected by close() below; the point is only that it never
-          // blocked the slot.
-        });
+      const delayed = queue.send({ id: "slow", value: "delayed" }, { delay: 200 }).catch(() => {
+        // Rejected by close() below; the point is only that it never
+        // blocked the slot.
+      });
       await queue.send({ id: "fast", value: "immediate" });
 
       await settle(60);
@@ -199,9 +197,7 @@ describe("EventSourcedQueueProcessorMemory throttle window", () => {
         deduplication: { makeId: (payload) => payload.id, ttlMs: 20 },
       });
 
-      await expect(queue.send({ id: "same", value: "only" })).rejects.toThrow(
-        "insert failed",
-      );
+      await expect(queue.send({ id: "same", value: "only" })).rejects.toThrow("insert failed");
 
       await queue.close();
     });

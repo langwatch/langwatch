@@ -60,8 +60,7 @@ export class LangyConversationTurnFoldProjection
     "LastEventOccurredAt",
     StateProjectionStore<LangyConversationTurnData>
   >
-  implements
-    FoldEventHandlers<typeof langyConversationTurnEvents, LangyConversationTurnData>
+  implements FoldEventHandlers<typeof langyConversationTurnEvents, LangyConversationTurnData>
 {
   readonly name = "langyConversationTurn";
   readonly version = LANGY_CONVERSATION_PROJECTION_VERSIONS.CONVERSATION_TURN;

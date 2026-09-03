@@ -21,18 +21,14 @@ const GROUPING_OPTIONS: Record<GroupingMode, string> = {
   "by-model": "By Model",
 };
 
-export const GroupingSelector: React.FC<{ compact?: boolean }> = ({
-  compact = false,
-}) => {
+export const GroupingSelector: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const grouping = useViewStore((s) => s.grouping);
   const setGrouping = useViewStore((s) => s.setGrouping);
 
   return (
     <MenuRoot>
       <Tooltip
-        content={
-          grouping === "flat" ? "Group rows" : `Grouped: ${GROUPING_OPTIONS[grouping]}`
-        }
+        content={grouping === "flat" ? "Group rows" : `Grouped: ${GROUPING_OPTIONS[grouping]}`}
         positioning={{ placement: "bottom" }}
       >
         <TriggerAnchor>
@@ -51,12 +47,7 @@ export const GroupingSelector: React.FC<{ compact?: boolean }> = ({
         </TriggerAnchor>
       </Tooltip>
       <MenuContent minWidth="160px" textStyle="xs" paddingY={1}>
-        <Box
-          paddingX={3}
-          paddingY={2}
-          borderBottomWidth="1px"
-          borderColor="border.subtle"
-        >
+        <Box paddingX={3} paddingY={2} borderBottomWidth="1px" borderColor="border.subtle">
           <Text
             textStyle="2xs"
             fontWeight="semibold"

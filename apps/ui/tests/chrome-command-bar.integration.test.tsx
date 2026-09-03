@@ -48,9 +48,9 @@ const graph = vi.hoisted(() => ({ organizations: [] as unknown[] }));
  * client. `Provider` is the actual one for that reason.
  */
 vi.mock("@langwatch/navigation-web/screens/landing", async () => {
-  const actual = await vi.importActual<
-    typeof import("@langwatch/navigation-web/screens/landing")
-  >("@langwatch/navigation-web/screens/landing");
+  const actual = await vi.importActual<typeof import("@langwatch/navigation-web/screens/landing")>(
+    "@langwatch/navigation-web/screens/landing",
+  );
   return {
     ...actual,
     // A Proxy rather than a spread: the procedure map is built lazily, so
@@ -246,9 +246,7 @@ describe("given the chrome mounts the search palette", () => {
 
       fireEvent.click(await screen.findByLabelText("Quick Search"));
 
-      expect(
-        await screen.findByPlaceholderText("Where would you like to go?"),
-      ).toBeTruthy();
+      expect(await screen.findByPlaceholderText("Where would you like to go?")).toBeTruthy();
     });
   });
 
@@ -281,9 +279,7 @@ describe("given the chrome mounts the search palette", () => {
       fireEvent.keyDown(field, { key: "Enter" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("address").textContent).toContain(
-          "drawer.open=promptEditor",
-        );
+        expect(screen.getByTestId("address").textContent).toContain("drawer.open=promptEditor");
       });
     });
   });

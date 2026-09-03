@@ -119,9 +119,7 @@ interface StartTurnResponse {
  * through the store. The durable truth is reloaded by the `messages` query when
  * `onTurnSettled` fires.
  */
-export function createLangyChatTransport(
-  deps: LangyChatTransportDeps,
-): ChatTransport<UIMessage> {
+export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTransport<UIMessage> {
   return {
     async sendMessages(options) {
       const ctx = deps.getContext();
@@ -131,9 +129,7 @@ export function createLangyChatTransport(
       // title generated from it, with the old exchange. Every user message was
       // the same failure with the answers stripped out: the old questions still
       // went through.
-      const lastUserMessage = options.messages.findLast(
-        (message) => message.role === "user",
-      );
+      const lastUserMessage = options.messages.findLast((message) => message.role === "user");
       const turnInput = {
         // One logical send, one identity: minted fresh on every sendMessages
         // call (each composer submit / regenerate re-arms with a new key), so
@@ -159,9 +155,7 @@ export function createLangyChatTransport(
             messages: lastUserMessage ? [lastUserMessage] : [],
             // Adopt the warmed conversation when the panel holds one, so the
             // first turn reuses the worker the panel open already booted.
-            ...(ctx.pendingConversationId
-              ? { conversationId: ctx.pendingConversationId }
-              : {}),
+            ...(ctx.pendingConversationId ? { conversationId: ctx.pendingConversationId } : {}),
           });
       deps.onIds({ conversationId, turnId });
 

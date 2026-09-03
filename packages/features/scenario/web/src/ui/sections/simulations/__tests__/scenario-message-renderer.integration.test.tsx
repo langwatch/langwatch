@@ -19,13 +19,7 @@ import { ScenarioMessageRenderer } from "../scenario-message-renderer";
 // harness — mock the module so the renderer's grouping contract (one
 // separator per traced turn) is what these tests exercise.
 vi.mock("../run-turn-separator", () => ({
-  RunTurnSeparator: ({
-    index,
-    traceId,
-  }: {
-    index: number;
-    traceId: string;
-  }) => (
+  RunTurnSeparator: ({ index, traceId }: { index: number; traceId: string }) => (
     <div data-testid="run-turn-separator" data-trace-id={traceId}>
       Turn {index}
     </div>
@@ -38,30 +32,18 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 
 const PROJECT_ID = "proj_test";
 
-const renderWith = (
-  messages: SimulationMessage[],
-): void => {
+const renderWith = (messages: SimulationMessage[]): void => {
   render(
     <Wrapper>
-      <ScenarioMessageRenderer
-        messages={messages}
-        variant="drawer"
-        projectId={PROJECT_ID}
-      />
+      <ScenarioMessageRenderer messages={messages} variant="drawer" projectId={PROJECT_ID} />
     </Wrapper>,
   );
 };
 
-const renderWithGrid = (
-  messages: SimulationMessage[],
-): void => {
+const renderWithGrid = (messages: SimulationMessage[]): void => {
   render(
     <Wrapper>
-      <ScenarioMessageRenderer
-        messages={messages}
-        variant="grid"
-        projectId={PROJECT_ID}
-      />
+      <ScenarioMessageRenderer messages={messages} variant="grid" projectId={PROJECT_ID} />
     </Wrapper>,
   );
 };
@@ -156,8 +138,7 @@ describe("<ScenarioMessageRenderer/>", () => {
           id: "msg_audio_trace",
           role: "assistant",
           trace_id: "trace_abc123",
-          content:
-            '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
+          content: '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
         } as SimulationMessage,
       ]);
 
@@ -176,8 +157,7 @@ describe("<ScenarioMessageRenderer/>", () => {
         {
           id: "msg_audio_no_trace",
           role: "assistant",
-          content:
-            '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
+          content: '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
         } as SimulationMessage,
       ]);
 
@@ -194,8 +174,7 @@ describe("<ScenarioMessageRenderer/>", () => {
           id: "msg_audio_user_trace",
           role: "user",
           trace_id: "trace_xyz",
-          content:
-            '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
+          content: '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
         } as SimulationMessage,
       ]);
 
@@ -213,8 +192,7 @@ describe("<ScenarioMessageRenderer/>", () => {
           id: "msg_audio_grid",
           role: "assistant",
           trace_id: "trace_grid",
-          content:
-            '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
+          content: '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
         } as SimulationMessage,
       ]);
 
@@ -268,9 +246,7 @@ describe("<ScenarioMessageRenderer/>", () => {
       const separators = screen.getAllByTestId("run-turn-separator");
       expect(separators).toHaveLength(3);
 
-      const traceIds = separators.map((separator) =>
-        separator.getAttribute("data-trace-id"),
-      );
+      const traceIds = separators.map((separator) => separator.getAttribute("data-trace-id"));
       expect(traceIds).toContain("trace_text");
       expect(traceIds).toContain("trace_tool_call");
       expect(traceIds).toContain("trace_tool_result");
@@ -378,10 +354,7 @@ describe("<ScenarioMessageRenderer/>", () => {
       // The filename query gives downloads from the opened viewer the
       // original name (stored objects are content-addressed, no name of
       // their own).
-      expect(chip).toHaveAttribute(
-        "href",
-        "/api/files/proj_test/so_123?filename=document.pdf",
-      );
+      expect(chip).toHaveAttribute("href", "/api/files/proj_test/so_123?filename=document.pdf");
       expect(chip).toHaveAttribute("target", "_blank");
       expect(chip).toHaveAttribute("rel", "noopener noreferrer");
       expect(chip).not.toHaveAttribute("download");
@@ -394,10 +367,7 @@ describe("<ScenarioMessageRenderer/>", () => {
       // user bubble (audio players stretch instead — see data-media-align).
       const mediaWrapper = chip.closest("[data-media-align]");
       expect(mediaWrapper).toHaveAttribute("data-media-align", "flex-end");
-      expect(chip.closest("[data-align]")).toHaveAttribute(
-        "data-align",
-        "flex-end",
-      );
+      expect(chip.closest("[data-align]")).toHaveAttribute("data-align", "flex-end");
     });
 
     it("falls back to a download link for legacy inline base64 attachments", () => {

@@ -67,8 +67,7 @@ async function seedFailingApplicationTraces(): Promise<void> {
     {
       traceId: `langy-dogfood-error-schema-${FIXTURE_RUN_STAMP}`,
       user: "Extract the invoice fields as JSON.",
-      error:
-        'Output validation failed: expected key "total_amount" missing from model response',
+      error: 'Output validation failed: expected key "total_amount" missing from model response',
       startedAt: now - 30 * 60 * 1000,
       durationMs: 2_400,
     },
@@ -167,9 +166,7 @@ async function seedNavigablePrompt(): Promise<void> {
       continue;
     }
     if (res.ok || res.status === 409) return;
-    throw new Error(
-      `Seeding the navigable prompt failed: ${res.status} ${await res.text()}`,
-    );
+    throw new Error(`Seeding the navigable prompt failed: ${res.status} ${await res.text()}`);
   }
   throw lastError;
 }
@@ -269,12 +266,8 @@ describe("Langy dogfood: named flows", () => {
       // Layer 2: the seeded fixture traces the reply reports on really exist,
       // through the same REST surface any integration uses. Grounding is a
       // hard fact, so it is asserted here, not delegated to the LLM judge.
-      expect(await traceExists(`langy-dogfood-error-timeout-${FIXTURE_RUN_STAMP}`)).toBe(
-        true,
-      );
-      expect(await traceExists(`langy-dogfood-error-schema-${FIXTURE_RUN_STAMP}`)).toBe(
-        true,
-      );
+      expect(await traceExists(`langy-dogfood-error-timeout-${FIXTURE_RUN_STAMP}`)).toBe(true);
+      expect(await traceExists(`langy-dogfood-error-schema-${FIXTURE_RUN_STAMP}`)).toBe(true);
     });
 
     /** @scenario A multi-turn scenario checks that Langy drills in using prior context */
@@ -394,9 +387,7 @@ describe("Langy dogfood: named flows", () => {
       // Word boundaries cover both edges: a hand-rolled class needed a leading
       // space injected into every command, and still missed `cd repo && git`,
       // where the tool name is the last token.
-      expect(
-        langy.state.toolCommands.some((command) => /\b(gh|git)\b/.test(command)),
-      ).toBe(true);
+      expect(langy.state.toolCommands.some((command) => /\b(gh|git)\b/.test(command))).toBe(true);
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
     });
@@ -419,9 +410,7 @@ describe("Langy dogfood: named flows", () => {
       const langy = makeLangyAdapter();
       // A leftover dataset with this name turns the scenario's create into an
       // "already exists" reply and fails it for the wrong reason.
-      const stale = (await listDatasets()).filter(
-        (d) => d.name === "langy-dogfood-reply-check",
-      );
+      const stale = (await listDatasets()).filter((d) => d.name === "langy-dogfood-reply-check");
       await Promise.all(
         stale.map((d) =>
           fetch(`${LW_BASE_URL}/api/dataset/${d.id}`, {
@@ -654,9 +643,7 @@ describe("Langy dogfood: named flows", () => {
       // Layer 2, the hard fact this scenario exists for: a navigate entry
       // really landed on the turn stream, addressing the prompts page. Words
       // alone (the old silent-drop failure) do not pass this.
-      expect(langy.state.navigateHrefs.some((href) => href.includes("/prompts"))).toBe(
-        true,
-      );
+      expect(langy.state.navigateHrefs.some((href) => href.includes("/prompts"))).toBe(true);
     });
   });
 });

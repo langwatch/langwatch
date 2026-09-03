@@ -7,10 +7,10 @@ sidebarTitle: Helm
 The AI Gateway ships as a sub-chart (`charts/gateway/`) of the LangWatch umbrella chart (`charts/langwatch/`). Installing the umbrella with `gateway.chartManaged: true` (the default) lifts the gateway pod alongside `langwatch-app` in the same release. The gateway runs as a separate Kubernetes Deployment (own pod, own container, own service) and reaches the LangWatch control plane for VK resolution, budget enforcement, and guardrail execution.
 
 <Note>
-  The gateway sub-chart's `version` and `appVersion` are bumped in **lockstep** with the
-  umbrella `langwatch` chart by release-please (`.github/release-please-config.json` `.`
-  package extra-files). `helm install langwatch/langwatch@3.x` always pulls a matching
-  gateway sub-chart, operators should never need to pin them separately.
+  The gateway sub-chart's `version` and `appVersion` are bumped in **lockstep** with the umbrella
+  `langwatch` chart by release-please (`.github/release-please-config.json` `.` package
+  extra-files). `helm install langwatch/langwatch@3.x` always pulls a matching gateway sub-chart,
+  operators should never need to pin them separately.
 </Note>
 
 ## Pre-create the runtime secrets
@@ -184,10 +184,10 @@ See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration and replic
 The gateway binary exposes Prometheus metrics at `/metrics` (port 5563). For the metric names + labels, see [Observability](/ai-gateway/observability).
 
 <Note>
-  The chart does not currently render a `ServiceMonitor` object. Scrape via your own
-  ServiceMonitor pointed at the gateway Service (port 80, target 5563), or via Pod-level
-  annotations if your Prometheus uses the legacy annotation-based discovery. Chart-managed
-  `ServiceMonitor` is on the v1.1 roadmap.
+  The chart does not currently render a `ServiceMonitor` object. Scrape via your own ServiceMonitor
+  pointed at the gateway Service (port 80, target 5563), or via Pod-level annotations if your
+  Prometheus uses the legacy annotation-based discovery. Chart-managed `ServiceMonitor` is on the
+  v1.1 roadmap.
 </Note>
 
 ## Probes
@@ -222,12 +222,12 @@ The probe is disabled by default (empty list) so greenfield and air-gapped-via-f
 ## Admin listener
 
 <Note>
-  **v1 status:** the chart's `gateway.admin.*` value keys are forward-compat surface, the
-  v1 gateway binary does not expose an admin/pprof listener and the deployment template
-  does not inject `GATEWAY_ADMIN_ADDR`, `GATEWAY_ADMIN_AUTH_TOKEN` (see the rationale
-  comment in `charts/gateway/templates/deployment.yaml`). The three postures below
-  describe the planned v1.1 contract; setting the values today is a no-op. For live
-  diagnostics in v1, fall back to `kubectl exec` + the production-runbook recipes.
+  **v1 status:** the chart's `gateway.admin.*` value keys are forward-compat surface, the v1 gateway
+  binary does not expose an admin/pprof listener and the deployment template does not inject
+  `GATEWAY_ADMIN_ADDR`, `GATEWAY_ADMIN_AUTH_TOKEN` (see the rationale comment in
+  `charts/gateway/templates/deployment.yaml`). The three postures below describe the planned v1.1
+  contract; setting the values today is a no-op. For live diagnostics in v1, fall back to `kubectl
+  exec` + the production-runbook recipes.
 </Note>
 
 The gateway's `net/http/pprof` diagnostic surface (v1.1) will ship behind a dedicated listener. Three deployment postures, pick the one that matches your cluster:
@@ -360,11 +360,10 @@ Everything else is rejected, including traffic from other namespaces, lateral po
 - Provider upstreams on `:443`, default `any IP EXCEPT RFC1918` (10/8, 172.16/12, 192.168/16). Teams with explicit compliance posture should override `egressToProviders` with a concrete CIDR allowlist.
 
 <Note>
-  The "any IP except RFC1918" default is a compromise: allowing any IP locks lateral
-  movement out of the pod (no hitting internal services by accident) while still working
-  for OpenAI/Anthropic/Bedrock/Vertex/Gemini without operators having to pin CIDR ranges
-  per provider. If your cluster's CNI enforces egress strictly, you can tighten this via
-  `egressToProviders`.
+  The "any IP except RFC1918" default is a compromise: allowing any IP locks lateral movement out of
+  the pod (no hitting internal services by accident) while still working for
+  OpenAI/Anthropic/Bedrock/Vertex/Gemini without operators having to pin CIDR ranges per provider.
+  If your cluster's CNI enforces egress strictly, you can tighten this via `egressToProviders`.
 </Note>
 
 ### Verifying the policy rendered

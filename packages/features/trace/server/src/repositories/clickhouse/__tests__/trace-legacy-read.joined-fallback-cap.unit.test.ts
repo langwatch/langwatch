@@ -27,9 +27,7 @@ const mockClickHouseQuery = vi.hoisted(() => vi.fn());
  * repository takes the resolver instead, so the fake is stated where every
  * other dependency of the read is.
  */
-const testResolveClickHouseClient = () =>
-  Promise.resolve({ query: mockClickHouseQuery } as never);
-
+const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -133,8 +131,7 @@ function clickHouseThatOOMsThenBatches({ spansPerTrace }: { spansPerTrace: numbe
           rowCount > maxResultRows
         ) {
           throw new Error(
-            "Code: 396. DB::Exception: Limit for result exceeded: " +
-              "TOO_MANY_ROWS_OR_BYTES",
+            "Code: 396. DB::Exception: Limit for result exceeded: " + "TOO_MANY_ROWS_OR_BYTES",
           );
         }
 
@@ -191,7 +188,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
       // 400 traces x 200 spans = 80,000 spans, past the 50,000 cap.
       clickHouseThatOOMsThenBatches({ spansPerTrace: 200 });
       const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+        resolveClickHouseClient: testResolveClickHouseClient,
         prisma: {} as never,
         traceCanonicalisation,
       });
@@ -207,7 +204,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
     it("names the traces it had already materialised", async () => {
       clickHouseThatOOMsThenBatches({ spansPerTrace: 200 });
       const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+        resolveClickHouseClient: testResolveClickHouseClient,
         prisma: {} as never,
         traceCanonicalisation,
       });
@@ -235,7 +232,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
         spansPerTrace: 10_000,
       });
       const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+        resolveClickHouseClient: testResolveClickHouseClient,
         prisma: {} as never,
         traceCanonicalisation,
       });
@@ -254,14 +251,12 @@ describe("the traces-with-spans memory-limit fallback", () => {
         spansPerTrace: 10_000,
       });
       const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+        resolveClickHouseClient: testResolveClickHouseClient,
         prisma: {} as never,
         traceCanonicalisation,
       });
 
-      await rejectionChain(
-        service.getTracesWithSpans(PROJECT, traceIds(400), openProtections),
-      );
+      await rejectionChain(service.getTracesWithSpans(PROJECT, traceIds(400), openProtections));
 
       expect(spanReadSettings[0]).toMatchObject({
         max_result_rows: String(50_000 + 1),
@@ -275,16 +270,12 @@ describe("the traces-with-spans memory-limit fallback", () => {
     it("returns every requested trace", async () => {
       clickHouseThatOOMsThenBatches({ spansPerTrace: 1 });
       const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+        resolveClickHouseClient: testResolveClickHouseClient,
         prisma: {} as never,
         traceCanonicalisation,
       });
 
-      const traces = await service.getTracesWithSpans(
-        PROJECT,
-        traceIds(60),
-        openProtections,
-      );
+      const traces = await service.getTracesWithSpans(PROJECT, traceIds(60), openProtections);
 
       expect(traces).toHaveLength(60);
     });

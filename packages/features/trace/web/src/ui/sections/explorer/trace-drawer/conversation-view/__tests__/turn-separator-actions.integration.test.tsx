@@ -114,8 +114,7 @@ const editTrace = () => screen.getByRole("button", { name: "Edit trace" });
 const turnActions = () => screen.getByRole("group", { name: "Turn actions" });
 
 /** The separator the actions belong to, and the hover group they answer. */
-const separator = () =>
-  screen.getByText("Turn 1").closest('[role="group"]') as HTMLElement;
+const separator = () => screen.getByText("Turn 1").closest('[role="group"]') as HTMLElement;
 
 const sessionCheckbox = () =>
   screen.getByRole("checkbox", {
@@ -337,8 +336,7 @@ describe("given a queue being walked", () => {
 
       expect(leadingSlot.contains(tick)).toBe(true);
       expect(
-        tick.compareDocumentPosition(screen.getByText("Turn 1")) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        tick.compareDocumentPosition(screen.getByText("Turn 1")) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
   });
@@ -350,9 +348,7 @@ describe("given a queue being walked", () => {
 
       await userEvent.click(sessionCheckbox());
 
-      expect(
-        isSessionMarked(useAnnotationQueueSessionStore.getState().marks, TRACE_ID),
-      ).toBe(true);
+      expect(isSessionMarked(useAnnotationQueueSessionStore.getState().marks, TRACE_ID)).toBe(true);
     });
 
     /** @scenario "Reviewing and explicitly selecting traces builds the dataset set" */

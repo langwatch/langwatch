@@ -10,9 +10,7 @@ describe("ClickHouse migrations", () => {
       .map((file) => file.match(/^(\d+)_.*\.sql$/)?.[1])
       .filter((version): version is string => version != null);
 
-    const duplicates = versions.filter(
-      (version, index) => versions.indexOf(version) !== index,
-    );
+    const duplicates = versions.filter((version, index) => versions.indexOf(version) !== index);
 
     expect(duplicates).toEqual([]);
   });
@@ -35,8 +33,8 @@ describe("ClickHouse migrations", () => {
     // to "Pulled cost never blocks spending" in pulledUsageLedger.integration.
     const sql = readFileSync(
       resolve(
-    import.meta.dirname,
-    "../../../migrations",
+        import.meta.dirname,
+        "../../../migrations",
         ".",
         "00082_gateway_budget_scope_totals_exclude_pulled.sql",
       ),

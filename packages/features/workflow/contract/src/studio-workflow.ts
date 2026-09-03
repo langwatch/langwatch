@@ -472,9 +472,7 @@ const studioNodeSchema = z.looseObject({
   data: studioComponentSchema,
   selected: z.boolean().optional(),
   dragging: z.boolean().optional(),
-  measured: z
-    .object({ width: z.number().optional(), height: z.number().optional() })
-    .optional(),
+  measured: z.object({ width: z.number().optional(), height: z.number().optional() }).optional(),
 });
 
 const studioEdgeSchema = z.looseObject({

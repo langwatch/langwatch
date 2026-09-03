@@ -10,13 +10,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioForm, UNFILED_OPTION_LABEL } from "../../../../elements/scenario-form";
@@ -46,12 +40,10 @@ const emptyQuery = vi.hoisted(() => () => ({
   data: undefined,
   isLoading: false,
 }));
-const mutation = vi.hoisted(
-  () => (mutate: (...args: unknown[]) => void) => () => ({
-    mutate,
-    isPending: false,
-  }),
-);
+const mutation = vi.hoisted(() => (mutate: (...args: unknown[]) => void) => () => ({
+  mutate,
+  isPending: false,
+}));
 
 vi.mock("../../../../../behavior/scenario-api", () => ({
   api: {
@@ -223,15 +215,9 @@ describe("the Scenarios tab", () => {
     renderTab();
 
     const empty = screen.getByTestId("agent-testing-first-case-empty");
-    expect(
-      within(empty).getByText("Write your first scenario"),
-    ).toBeInTheDocument();
-    expect(empty).toHaveTextContent(
-      /A scenario is one situation you put your agent in/,
-    );
-    expect(
-      within(empty).getByRole("button", { name: "New scenario" }),
-    ).toBeInTheDocument();
+    expect(within(empty).getByText("Write your first scenario")).toBeInTheDocument();
+    expect(empty).toHaveTextContent(/A scenario is one situation you put your agent in/);
+    expect(within(empty).getByRole("button", { name: "New scenario" })).toBeInTheDocument();
     expect(caseEditor().open).toBe(false);
   });
 
@@ -245,16 +231,10 @@ describe("the Scenarios tab", () => {
     });
     renderTab();
 
-    await user.click(
-      screen.getByRole("button", { name: "Actions for Double charge" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Actions for Double charge" }));
 
-    expect(
-      await screen.findByRole("menuitem", { name: "Edit" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: "History" }),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Edit" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "History" })).not.toBeInTheDocument();
   });
 
   /** @scenario "A scenario created from inside a suite is filed into that suite" */
@@ -263,12 +243,8 @@ describe("the Scenarios tab", () => {
     renderTab();
 
     await user.click(screen.getByTestId("suite-rail-item-Refunds"));
-    await user.click(
-      screen.getByRole("button", { name: "Actions for Refunds" }),
-    );
-    await user.click(
-      await screen.findByRole("menuitem", { name: "New scenario" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Actions for Refunds" }));
+    await user.click(await screen.findByRole("menuitem", { name: "New scenario" }));
 
     expect(caseEditor()).toEqual({
       open: true,
@@ -305,9 +281,7 @@ describe("the Scenarios tab", () => {
     });
     renderTab();
 
-    await user.click(
-      screen.getByRole("button", { name: "Actions for Double charge" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Actions for Double charge" }));
     await user.click(await screen.findByRole("menuitem", { name: "Archive" }));
 
     const dialog = await screen.findByRole("dialog");

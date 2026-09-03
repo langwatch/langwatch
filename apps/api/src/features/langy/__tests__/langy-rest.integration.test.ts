@@ -354,7 +354,10 @@ function langyWorld(
           revoked.push(input);
           return "revoked" as const;
         },
-        openRelayConnection: () => ({ pinnedTurn: null, handle: async () => ({ status: "applied" }) }),
+        openRelayConnection: () => ({
+          pinnedTurn: null,
+          handle: async () => ({ status: "applied" }),
+        }),
       },
       tryFindVisible: async () => null,
     } as never,

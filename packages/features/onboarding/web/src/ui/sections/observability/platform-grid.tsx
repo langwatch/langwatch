@@ -29,8 +29,7 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
           Select your platform or language
         </Text>
         <Text fontSize="xs" color="fg.muted" lineHeight="tall">
-          Choose the platform or language you are using to see a guide on how to
-          instrument it.
+          Choose the platform or language you are using to see a guide on how to instrument it.
         </Text>
       </VStack>
       <HStack gap={3} rowGap={4} wrap="wrap" pb={1}>

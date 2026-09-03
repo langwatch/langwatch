@@ -28,9 +28,7 @@ describe("backfill parity", () => {
   describe("when the heads carry exactly what the legacy rows imply", () => {
     /** @scenario "The backfill adopts existing accounts and proves itself per user" */
     it("reports no diff", () => {
-      expect(
-        backfillParityDiffs({ rows: [row({})], expected: [EMAIL] }),
-      ).toEqual([]);
+      expect(backfillParityDiffs({ rows: [row({})], expected: [EMAIL] })).toEqual([]);
     });
 
     it("accepts PRIMARY for VERIFIED, and any live state for ATTACHED", () => {
@@ -85,9 +83,7 @@ describe("backfill parity", () => {
 
     it("names a live row nothing implies, and ignores surplus tombstones", () => {
       const stale = row({ id: "idf_stale", value: "old@acme.com" });
-      expect(
-        backfillParityDiffs({ rows: [row({}), stale], expected: [EMAIL] }),
-      ).toEqual([
+      expect(backfillParityDiffs({ rows: [row({}), stale], expected: [EMAIL] })).toEqual([
         expect.objectContaining({
           kind: "surplus_row",
           identifierId: "idf_stale",

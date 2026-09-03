@@ -68,9 +68,7 @@ export function PinnedMetricPill({
   const tooltipBody = (
     <VStack align="stretch" gap={0.5} minWidth="180px" maxWidth="320px">
       <TooltipRow
-        label={
-          auto ? "Auto-pinned" : pin.source === "resource" ? "Resource" : "Attribute"
-        }
+        label={auto ? "Auto-pinned" : pin.source === "resource" ? "Resource" : "Attribute"}
         value={pin.key}
       />
       <TooltipRow label="Value" value={display} />

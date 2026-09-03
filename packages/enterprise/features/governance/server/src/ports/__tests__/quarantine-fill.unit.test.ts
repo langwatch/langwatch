@@ -3,10 +3,7 @@ import {
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  QuarantineTenantPort,
-  QuarantineTraceActivityPort,
-} from "../quarantine-fill.port";
+import { QuarantineTenantPort, QuarantineTraceActivityPort } from "../quarantine-fill.port";
 import { QuarantineFillEvaluatorService } from "../../services/quarantine-fill.service";
 
 const ORGANIZATION_ID = "org-qfe-unit";
@@ -27,9 +24,7 @@ class StubTraceActivityPort extends QuarantineTraceActivityPort {
   }
 }
 
-const evaluator = (
-  traceActivity?: QuarantineTraceActivityPort,
-): QuarantineFillEvaluatorService =>
+const evaluator = (traceActivity?: QuarantineTraceActivityPort): QuarantineFillEvaluatorService =>
   QuarantineFillEvaluatorService.create({
     tenant: new FixedTenantPort(),
     traceActivity,
@@ -107,8 +102,8 @@ describe("QuarantineFillEvaluatorService", () => {
 
   /** @scenario "Governance evaluates quarantine fill without owning trace storage" */
   it("rejects composition without a ClickHouse capability", async () => {
-    await expect(
-      evaluator().evaluate({ organizationId: ORGANIZATION_ID }),
-    ).rejects.toThrow("ClickHouse client is not available");
+    await expect(evaluator().evaluate({ organizationId: ORGANIZATION_ID })).rejects.toThrow(
+      "ClickHouse client is not available",
+    );
   });
 });

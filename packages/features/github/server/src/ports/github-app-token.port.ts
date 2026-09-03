@@ -48,9 +48,7 @@ export abstract class GithubAppTokenPort {
   abstract mintInstallationToken(
     input: MintInstallationTokenInput,
   ): Promise<GithubInstallationToken>;
-  abstract listInstallationRepositories(
-    installationId: string,
-  ): Promise<GithubRepository[]>;
+  abstract listInstallationRepositories(installationId: string): Promise<GithubRepository[]>;
   abstract listPullRequestsForHead(input: {
     installationId: string;
     repositoryId: string;
@@ -73,11 +71,7 @@ export abstract class GithubAppTokenPort {
 
 export abstract class GithubRedisPort {
   abstract tryGet(key: string): Promise<string | null>;
-  abstract trySet(
-    key: string,
-    value: string,
-    ...args: (string | number)[]
-  ): Promise<string | null>;
+  abstract trySet(key: string, value: string, ...args: (string | number)[]): Promise<string | null>;
   abstract delete(key: string): Promise<number>;
   abstract tryGetDelete(key: string): Promise<string | null>;
   abstract tryEval(

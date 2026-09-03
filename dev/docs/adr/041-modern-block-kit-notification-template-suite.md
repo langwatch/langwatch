@@ -27,13 +27,7 @@ Nine curated Block Kit presets in `src/automations/providers/definitions/slack/t
 The allowlist gating every rendered payload is `src/shared/templating/blockKitAllowlist.ts:18-24`:
 
 ```ts
-export const ALLOWED_BLOCK_TYPES = [
-  "section",
-  "divider",
-  "context",
-  "header",
-  "markdown",
-] as const;
+export const ALLOWED_BLOCK_TYPES = ["section", "divider", "context", "header", "markdown"] as const;
 ```
 
 with three hard security rails, all pinned by `__tests__/blockKitAllowlist.unit.test.ts`:

@@ -98,9 +98,9 @@ describe("LangyTurnStopService.stopTurn", () => {
     it("refuses with a handled not-owned error and records no terminal", async () => {
       const { deps, mocks } = makeStopDeps({ isTurnActor: false, isOwn: false });
 
-      await expect(
-        LangyTurnStopService.create(deps).stopTurn(stopArgs),
-      ).rejects.toBeInstanceOf(LangyConversationNotOwnedError);
+      await expect(LangyTurnStopService.create(deps).stopTurn(stopArgs)).rejects.toBeInstanceOf(
+        LangyConversationNotOwnedError,
+      );
       expect(mocks.finalizeTurn).not.toHaveBeenCalled();
       expect(mocks.cancel).not.toHaveBeenCalled();
       expect(mocks.markEnd).not.toHaveBeenCalled();
@@ -129,9 +129,9 @@ describe("LangyTurnStopService.stopTurn", () => {
           currentTurnId: "some-other-turn",
         });
 
-        await expect(
-          LangyTurnStopService.create(deps).stopTurn(stopArgs),
-        ).rejects.toBeInstanceOf(LangyTurnNotStoppableError);
+        await expect(LangyTurnStopService.create(deps).stopTurn(stopArgs)).rejects.toBeInstanceOf(
+          LangyTurnNotStoppableError,
+        );
         expect(mocks.finalizeTurn).not.toHaveBeenCalled();
         expect(mocks.markEnd).not.toHaveBeenCalled();
         expect(mocks.cancel).not.toHaveBeenCalled();
@@ -144,9 +144,9 @@ describe("LangyTurnStopService.stopTurn", () => {
           currentTurnId: null,
         });
 
-        await expect(
-          LangyTurnStopService.create(deps).stopTurn(stopArgs),
-        ).rejects.toBeInstanceOf(LangyTurnNotStoppableError);
+        await expect(LangyTurnStopService.create(deps).stopTurn(stopArgs)).rejects.toBeInstanceOf(
+          LangyTurnNotStoppableError,
+        );
       });
     });
   });

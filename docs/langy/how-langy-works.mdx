@@ -57,27 +57,26 @@ The worker has exactly three ways out:
 
 <Steps>
   <Step title="You ask">
-    You send a turn in plain language. The control plane admits it and dispatches it to
-    the manager, which spawns (or reuses a warm) worker for that conversation with the
-    turn's credentials bound at spawn.
+    You send a turn in plain language. The control plane admits it and dispatches it to the manager,
+    which spawns (or reuses a warm) worker for that conversation with the turn's credentials bound
+    at spawn.
   </Step>
   <Step title="Langy reads the traces and evals">
-    The worker runs `langwatch` CLI commands to pull the traces, analytics, and evals your
-    question points at. Each command streams back into the conversation as an activity
-    card, so you see what it searched.
+    The worker runs `langwatch` CLI commands to pull the traces, analytics, and evals your question
+    points at. Each command streams back into the conversation as an activity card, so you see what
+    it searched.
   </Step>
   <Step title="It writes a failing Scenario test or evaluation">
-    When the answer is a code change, Langy writes a Scenario multi-turn simulation or an
-    evaluation that captures the problem, so the fix has something to prove against.
+    When the answer is a code change, Langy writes a Scenario multi-turn simulation or an evaluation
+    that captures the problem, so the fix has something to prove against.
   </Step>
   <Step title="It drafts a fix and opens a pull request">
-    Langy clones the installed repo inside the worker, drafts the change, and opens a
-    bot-authored pull request. The clone lives only in the worker's home and is wiped when
-    the worker is reaped.
+    Langy clones the installed repo inside the worker, drafts the change, and opens a bot-authored
+    pull request. The clone lives only in the worker's home and is wiped when the worker is reaped.
   </Step>
   <Step title="Your CI runs the tests it wrote">
-    The Scenario tests Langy wrote run in your CI on that PR. The PR card returns with the
-    result, so you see the diff and the check status together.
+    The Scenario tests Langy wrote run in your CI on that PR. The PR card returns with the result,
+    so you see the diff and the check status together.
   </Step>
   <Step title="A human reviews and merges">
     You read the PR and merge it. Langy never merges its own PR.
@@ -85,9 +84,8 @@ The worker has exactly three ways out:
 </Steps>
 
 <Note>
-  Every turn Langy takes re-enters LangWatch as its own traced, costed run in your
-  project. You debug Langy with the same traces and evals you use to debug your own
-  agents.
+  Every turn Langy takes re-enters LangWatch as its own traced, costed run in your project. You
+  debug Langy with the same traces and evals you use to debug your own agents.
 </Note>
 
 For how the sandbox isolates each worker and exactly what it can and cannot reach on the network, see [Security and the sandbox](/langy/security/sandbox). For running this stack yourself, see the [self-hosting overview](/self-hosting/langy/overview).

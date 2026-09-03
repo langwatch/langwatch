@@ -7,7 +7,7 @@ example: [`dataset.md`](./dataset.md).
 **This is the authorization engine (ADR-092, ADR-110). Nothing below proposes
 changing when a permission is granted or denied.** The two findings that touch
 decision behaviour — P6's fail-open default and P7's dead-path comments about
-the cutover — are flagged as such and are *tightening*, not relaxing. The
+the cutover — are flagged as such and are _tightening_, not relaxing. The
 dual-head cutover machinery (~4,500 lines) is explicitly on the keep list: its
 retirement is a rollout decision that the code cannot prove.
 
@@ -73,11 +73,11 @@ is 19 and 19 (`contract/src/authz-grants.service.ts:39-93`,
 
 32 methods. **13 are one-line delegations that hold no rule of their own:**
 
-| Lines | Count | Delegates to |
-|---|---|---|
-| `services/authz.service.ts:683-721` | 8 | `this.options.listing.find*` |
-| `services/authz.service.ts:723-742` | 4 | `this.bindingReader.*` |
-| `services/authz.service.ts:497-499` | 1 | `this.scopeLineage.check` |
+| Lines                               | Count | Delegates to                 |
+| ----------------------------------- | ----- | ---------------------------- |
+| `services/authz.service.ts:683-721` | 8     | `this.options.listing.find*` |
+| `services/authz.service.ts:723-742` | 4     | `this.bindingReader.*`       |
+| `services/authz.service.ts:497-499` | 1     | `this.scopeLineage.check`    |
 
 ```ts
 // services/authz.service.ts:683
@@ -100,12 +100,12 @@ touches `this.engine`, `this.collector` or `this.snapshots`.
 
 ### P2 — Four contract methods have no production caller, and six files pay for all 32 (breaks R8)
 
-| Method | Non-test callers anywhere |
-|---|---|
-| `checkDetailed` (`contract/src/authz.service.ts:80`) | **none** |
-| `explainDecision` (`:106`) | **none** |
-| `authorizePermission` (`:122`) | **none** |
-| `listUserAndGroupBindings` (`:144`) | **none** |
+| Method                                               | Non-test callers anywhere |
+| ---------------------------------------------------- | ------------------------- |
+| `checkDetailed` (`contract/src/authz.service.ts:80`) | **none**                  |
+| `explainDecision` (`:106`)                           | **none**                  |
+| `authorizePermission` (`:122`)                       | **none**                  |
+| `listUserAndGroupBindings` (`:144`)                  | **none**                  |
 
 `checkDetailed`'s own docstring says otherwise —
 `server/src/services/authz.service.ts:146`:
@@ -121,7 +121,7 @@ Because `AuthzService` is an abstract class, **every** test double must
 implement all 32. Six files do:
 
 - `packages/features/api-key/server/src/transport/api-rest/__tests__/support/test-authz-service.ts`
-  — a 42-line file that is *nothing but* 32 `unsupported<…>()` assignments
+  — a 42-line file that is _nothing but_ 32 `unsupported<…>()` assignments
 - `packages/features/model-provider/server/src/ports/__tests__/model-provider.service.test.ts:132-275`
   — a 144-line `class Authorization extends AuthzService` with 31
   `return this.notUsed()` bodies for 1 real method
@@ -152,7 +152,7 @@ Nothing calls `.parse` or `.safeParse` on any of them; no route registers one;
 builds its own eight (`server/src/transport/api-rest/role-binding.api.ts:46-99`).
 
 The contrast is the proof this is not a house rule: in the sibling file
-`contract/src/authz.commands.ts`, **26 of 45** schemas *are* consumed — the
+`contract/src/authz.commands.ts`, **26 of 45** schemas _are_ consumed — the
 Eventing command handlers pass them to `AuthzEventingCommandMapper.schema`
 (`server/src/adapters/eventing.authz.adapter.ts:113`). Commands earn their
 schemas. Queries do not.
@@ -179,13 +179,13 @@ Four more at `:332-346` delegate to `this.bindingWriter`. Six methods
 
 ### P5 — `AuthzCompatibilityLedgerPort` has one implementation, in the same package (breaks R4)
 
-| Port | Implementations | Verdict |
-|---|---|---|
-| `AuthzGrantsCommandDispatcher` (`ports/authz-grants-command-dispatcher.port.ts:25`) | 1, in `platform/app/src/runtime/app/features/authz.ts:37` | **Keep** — cross-package inversion |
-| `AuthzRevocationTelemetry` (`ports/authz-revocation-telemetry.port.ts:3`) | 1, in `platform/app/src/runtime/app/features/authz.ts:69` | **Keep** — cross-package inversion |
-| `AuthzEpochPort` (`ports/authz-epoch.port.ts:2`) | 1 real (`adapters/redis.authz-epoch.adapter.ts:17`) + a test stub | **Keep** — its `redis: null` branch is a real second behaviour |
-| `AuthzCompatibilityLedgerPort` (`ports/authz-compatibility-ledger.port.ts:20`) | 1 — `adapters/eventing.authz-ledger.adapter.ts:194`, same package | **Delete** |
-| `PostgresAuthzDatabase` (`ports/postgres-authz-database.port.ts:18`) | structural type, 0 classes | see P6 |
+| Port                                                                                | Implementations                                                   | Verdict                                                        |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
+| `AuthzGrantsCommandDispatcher` (`ports/authz-grants-command-dispatcher.port.ts:25`) | 1, in `platform/app/src/runtime/app/features/authz.ts:37`         | **Keep** — cross-package inversion                             |
+| `AuthzRevocationTelemetry` (`ports/authz-revocation-telemetry.port.ts:3`)           | 1, in `platform/app/src/runtime/app/features/authz.ts:69`         | **Keep** — cross-package inversion                             |
+| `AuthzEpochPort` (`ports/authz-epoch.port.ts:2`)                                    | 1 real (`adapters/redis.authz-epoch.adapter.ts:17`) + a test stub | **Keep** — its `redis: null` branch is a real second behaviour |
+| `AuthzCompatibilityLedgerPort` (`ports/authz-compatibility-ledger.port.ts:20`)      | 1 — `adapters/eventing.authz-ledger.adapter.ts:194`, same package | **Delete**                                                     |
+| `PostgresAuthzDatabase` (`ports/postgres-authz-database.port.ts:18`)                | structural type, 0 classes                                        | see P6                                                         |
 
 The compatibility port is a nine-method abstract class whose only reason to
 exist is so `AuthzGrantsService` can hold it as a field — and holding it is
@@ -202,6 +202,7 @@ It is then cast at both ends:
 // platform/app/src/runtime/app/features/authz.ts:99
 database: context.database as unknown as PostgresAuthzDatabase,
 ```
+
 ```ts
 // server/src/adapters/postgres.authz.adapter.ts:163
 const database = this.options.database as unknown as InternalPostgresAuthzDatabase;
@@ -231,14 +232,14 @@ for convenience; update the importers.
 optional. The build at `adapters/postgres.authz.adapter.ts:195-217` passes
 **all** of them:
 
-| Field | Declared | Supplied by the build | Absent-case behaviour |
-|---|---|---|---|
-| `epoch` | `:99` optional | `:205` always | snapshot cache silently off (`authz-grant-snapshot.service.ts:55`) |
-| `isOnEngine` | `:109` optional | `:206` always | **`?? true` — every organization reads as on-engine** (`:184`) |
-| `tryGetEngineCutoverAt` | `:111` optional | `:207` always | `?? null` (`:191`) |
-| `cacheEnabled` | `:101` optional | `:210` when set — and `AuthzRuntimeContext.cacheEnabled` is **required** (`platform/app/src/runtime/app/features/authz.ts:31`) | cache off |
-| `demoProjectId` | `:104` optional | `:213`, same, required at `:32` | demo off |
-| `cacheMaxAgeMs` | `:106` optional | never passed | genuinely optional — 30s default |
+| Field                   | Declared        | Supplied by the build                                                                                                          | Absent-case behaviour                                              |
+| ----------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `epoch`                 | `:99` optional  | `:205` always                                                                                                                  | snapshot cache silently off (`authz-grant-snapshot.service.ts:55`) |
+| `isOnEngine`            | `:109` optional | `:206` always                                                                                                                  | **`?? true` — every organization reads as on-engine** (`:184`)     |
+| `tryGetEngineCutoverAt` | `:111` optional | `:207` always                                                                                                                  | `?? null` (`:191`)                                                 |
+| `cacheEnabled`          | `:101` optional | `:210` when set — and `AuthzRuntimeContext.cacheEnabled` is **required** (`platform/app/src/runtime/app/features/authz.ts:31`) | cache off                                                          |
+| `demoProjectId`         | `:104` optional | `:213`, same, required at `:32`                                                                                                | demo off                                                           |
+| `cacheMaxAgeMs`         | `:106` optional | never passed                                                                                                                   | genuinely optional — 30s default                                   |
 
 All three composition sites pass `cacheEnabled` and `demoProjectId`:
 `platform/app/src/server/app-layer/presets.ts:1132-1141`, `:2985-2991`, and
@@ -268,16 +269,16 @@ removes the question; do not merely flip the default.**
 Seven distinct dead paths, each verified absent from `packages/`, `platform/`,
 `apps/`, `services/`, `mcp/` and `sdks/`:
 
-| Citation | Names | Exists? |
-|---|---|---|
-| `services/authz-grants.service.ts:266` | `./offboard.ts` | no — the code is `services/authz-offboarding.service.ts` |
-| `migrations/legacy-import.authz-grant.migration.ts:7` | `engine-gate.ts` | no |
-| `adapters/eventing.authz-ledger.adapter.ts:805` | `engine-gate.ts` | no |
-| `adapters/eventing.authz-ledger.adapter.ts:894` | `genesis-import.migration.ts` | no |
-| `repositories/prisma/prisma.authz-grant.mapper.ts:22,379` | `cutover.migration.ts` | no |
-| `repositories/prisma/prisma.authz-grant.mapper.ts:58` | `authz-read.grants.repository.ts` | no |
-| `repositories/routed/routed.authz-read.repository.ts:34` | `authz/runtime.ts`'s `authzCollector` | no — ADR-001 removed it |
-| `repositories/eventing/eventing.authz-grant.repository.ts:89` | `prismaProcessStore.ts` | no |
+| Citation                                                      | Names                                 | Exists?                                                  |
+| ------------------------------------------------------------- | ------------------------------------- | -------------------------------------------------------- |
+| `services/authz-grants.service.ts:266`                        | `./offboard.ts`                       | no — the code is `services/authz-offboarding.service.ts` |
+| `migrations/legacy-import.authz-grant.migration.ts:7`         | `engine-gate.ts`                      | no                                                       |
+| `adapters/eventing.authz-ledger.adapter.ts:805`               | `engine-gate.ts`                      | no                                                       |
+| `adapters/eventing.authz-ledger.adapter.ts:894`               | `genesis-import.migration.ts`         | no                                                       |
+| `repositories/prisma/prisma.authz-grant.mapper.ts:22,379`     | `cutover.migration.ts`                | no                                                       |
+| `repositories/prisma/prisma.authz-grant.mapper.ts:58`         | `authz-read.grants.repository.ts`     | no                                                       |
+| `repositories/routed/routed.authz-read.repository.ts:34`      | `authz/runtime.ts`'s `authzCollector` | no — ADR-001 removed it                                  |
+| `repositories/eventing/eventing.authz-grant.repository.ts:89` | `prismaProcessStore.ts`               | no                                                       |
 
 `routed.authz-read.repository.ts:40` also says "like everything else under
 `./authz`" — that directory is now a package.
@@ -285,12 +286,12 @@ Seven distinct dead paths, each verified absent from `packages/`, `platform/`,
 Separately, the contract carries **six line-number citations into a
 2,239-line file** that have drifted:
 
-| Citation | Claims | `platform/app/src/server/api/rbac.ts` actually has |
-|---|---|---|
-| `contract/src/matchers.ts:79` | `rbac.ts:765` — the chain | `throw new TRPCError({` |
-| `contract/src/matchers.ts:81` | `rbac.ts:1094-1110` | `async function resolveProjectPermissionContext(` starts at 1094 |
-| `contract/src/walk.ts:69` | `resolveProjectPermissionContext, rbac.ts:1083` | blank line |
-| `contract/src/walk.ts:101` | `floor, rbac.ts:1058` | blank line |
+| Citation                      | Claims                                          | `platform/app/src/server/api/rbac.ts` actually has               |
+| ----------------------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
+| `contract/src/matchers.ts:79` | `rbac.ts:765` — the chain                       | `throw new TRPCError({`                                          |
+| `contract/src/matchers.ts:81` | `rbac.ts:1094-1110`                             | `async function resolveProjectPermissionContext(` starts at 1094 |
+| `contract/src/walk.ts:69`     | `resolveProjectPermissionContext, rbac.ts:1083` | blank line                                                       |
+| `contract/src/walk.ts:101`    | `floor, rbac.ts:1058`                           | blank line                                                       |
 
 `contract/src/engine.ts:9` points at `types.ts`, which does not exist in
 `contract/src/`.
@@ -490,7 +491,7 @@ consumer:
 ```ts
 export type AuthzGrantsServiceOptions = {
   repository: AuthzGrantRepository;
-  ledger: EventingAuthzLedgerAdapter;   // the concrete class, one implementation
+  ledger: EventingAuthzLedgerAdapter; // the concrete class, one implementation
   epoch: AuthzEpochPort;
   newBindingId: () => string;
   bindings: AuthzBindingRepository;
@@ -510,12 +511,12 @@ export type AuthzServiceOptions = {
   repository: AuthzReadRepository;
   listing: AuthzListingRepository;
   bindings: AuthzBindingRepository;
-  epoch: AuthzEpochPort;                                   // was optional
-  cacheEnabled: () => boolean;                             // was optional
-  demoProjectId: () => string | undefined;                 // was optional
-  isOnEngine: (organizationId: string) => Promise<boolean>;// was optional — see P7
+  epoch: AuthzEpochPort; // was optional
+  cacheEnabled: () => boolean; // was optional
+  demoProjectId: () => string | undefined; // was optional
+  isOnEngine: (organizationId: string) => Promise<boolean>; // was optional — see P7
   tryGetEngineCutoverAt: (organizationId: string) => Promise<Date | null>;
-  cacheMaxAgeMs?: number;                                  // genuinely optional
+  cacheMaxAgeMs?: number; // genuinely optional
 };
 ```
 
@@ -624,16 +625,16 @@ Commits 1–4 are independent. 5 depends on 2. 6 is independent of all of them.
 
 **`@langwatch/authz-server` — 8 non-test files import it:**
 
-| File | Symbols |
-|---|---|
-| `platform/app/src/runtime/app/features/authz.ts` | `AuthzPipeline`, `AuthzGrantsCommandDispatcher`, `AuthzGrantsCommandSenders`, `AuthzLedgerUnavailableError`, `AuthzRevocationTelemetry`, `deriveAuthzGrantId`, `LEDGER_APP_HANDLE_WAIT_MS`, `ObservabilityAuthzCutoverAdapter`, `PostgresAuthzAdapter`, `PostgresAuthzDatabase` |
-| `platform/app/src/server/app-layer/app.ts` | `AuthzApp` |
-| `apps/api/src/app-rest/app-rest.features.ts` | `createRoleBindingsRestApp` |
-| `apps/api/src/index.ts` | `createRoleBindingsRestApp` (re-export) |
-| `apps/api/src/features/authz/authz-trpc.mount.ts` | `AuthzTrpcApi`, `AuthzTrpcContext` |
-| `apps/worker/src/features/authz/authz-worker-feature.installer.ts` | `AuthzGrantsCommandSenders`, `AuthzPipeline` |
-| `packages/system-migrations/src/system-migration.ts` | prose reference only |
-| `platform/app/src/server/app-layer/authz/__tests__/grant-provenance.unit.test.ts` | test |
+| File                                                                              | Symbols                                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `platform/app/src/runtime/app/features/authz.ts`                                  | `AuthzPipeline`, `AuthzGrantsCommandDispatcher`, `AuthzGrantsCommandSenders`, `AuthzLedgerUnavailableError`, `AuthzRevocationTelemetry`, `deriveAuthzGrantId`, `LEDGER_APP_HANDLE_WAIT_MS`, `ObservabilityAuthzCutoverAdapter`, `PostgresAuthzAdapter`, `PostgresAuthzDatabase` |
+| `platform/app/src/server/app-layer/app.ts`                                        | `AuthzApp`                                                                                                                                                                                                                                                                      |
+| `apps/api/src/app-rest/app-rest.features.ts`                                      | `createRoleBindingsRestApp`                                                                                                                                                                                                                                                     |
+| `apps/api/src/index.ts`                                                           | `createRoleBindingsRestApp` (re-export)                                                                                                                                                                                                                                         |
+| `apps/api/src/features/authz/authz-trpc.mount.ts`                                 | `AuthzTrpcApi`, `AuthzTrpcContext`                                                                                                                                                                                                                                              |
+| `apps/worker/src/features/authz/authz-worker-feature.installer.ts`                | `AuthzGrantsCommandSenders`, `AuthzPipeline`                                                                                                                                                                                                                                    |
+| `packages/system-migrations/src/system-migration.ts`                              | prose reference only                                                                                                                                                                                                                                                            |
+| `platform/app/src/server/app-layer/authz/__tests__/grant-provenance.unit.test.ts` | test                                                                                                                                                                                                                                                                            |
 
 `index.ts` exports 15 symbol groups (`server/src/index.ts:1-33`); every one has
 at least one external consumer. That surface is already the right size.

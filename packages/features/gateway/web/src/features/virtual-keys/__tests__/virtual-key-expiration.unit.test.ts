@@ -40,9 +40,9 @@ describe("resolveExpiresAt", () => {
     it("offers a period for every option the select lists", () => {
       for (const option of VIRTUAL_KEY_EXPIRATION_OPTIONS) {
         if (option.value === "" || option.value === "custom") continue;
-        expect(
-          resolveExpiresAt({ preset: option.value, now })!.getTime(),
-        ).toBeGreaterThan(now.getTime());
+        expect(resolveExpiresAt({ preset: option.value, now })!.getTime()).toBeGreaterThan(
+          now.getTime(),
+        );
       }
     });
   });
@@ -60,9 +60,7 @@ describe("resolveExpiresAt", () => {
 
     it("resolves to nothing while no date has been typed yet", () => {
       expect(resolveExpiresAt({ preset: "custom", now })).toBeNull();
-      expect(
-        resolveExpiresAt({ preset: "custom", customDate: "not-a-date", now }),
-      ).toBeNull();
+      expect(resolveExpiresAt({ preset: "custom", customDate: "not-a-date", now })).toBeNull();
     });
   });
 });
@@ -78,9 +76,7 @@ describe("earliestCustomDate", () => {
 describe("formatExpiry", () => {
   describe("when the stored instant sits at the end of its day", () => {
     it("names the day that was picked, not the one a timezone rolls it into", () => {
-      expect(formatExpiry(new Date("2026-08-20T23:59:59.999Z"))).toBe(
-        "Thu, Aug 20, 2026",
-      );
+      expect(formatExpiry(new Date("2026-08-20T23:59:59.999Z"))).toBe("Thu, Aug 20, 2026");
     });
   });
 });

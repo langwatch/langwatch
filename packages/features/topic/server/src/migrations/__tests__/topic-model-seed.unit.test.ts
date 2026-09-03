@@ -235,9 +235,7 @@ describe("seedTopicModelHistory", () => {
 
         // A `topics: { some }` EXISTS filter selects the fleet — the same set
         // as a distinct-projectId scan of Topic, but off the global model…
-        expect(pageArgs[0]?.where).toEqual(
-          expect.objectContaining({ topics: { some: {} } }),
-        );
+        expect(pageArgs[0]?.where).toEqual(expect.objectContaining({ topics: { some: {} } }));
         // …and it carries no projectId of its own: Project is global, so the
         // guard never asks for one (that is the whole reason this walk works).
         expect(pageArgs[0]?.where?.["projectId"]).toBeUndefined();
@@ -322,9 +320,7 @@ describe("seedTopicModelHistory", () => {
 
         expect(summary).toEqual({ seeded: 1, skipped: 1 });
         expect(recordTopics).toHaveBeenCalledTimes(1);
-        expect(recordTopics).toHaveBeenCalledWith(
-          expect.objectContaining({ tenantId: "p2" }),
-        );
+        expect(recordTopics).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "p2" }));
       });
     });
   });

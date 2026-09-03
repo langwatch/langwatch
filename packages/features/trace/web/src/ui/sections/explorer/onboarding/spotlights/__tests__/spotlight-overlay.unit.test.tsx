@@ -118,9 +118,7 @@ describe("<SpotlightOverlay />", () => {
 
       it("renders the spotlight popover", async () => {
         renderOverlay();
-        await waitFor(() =>
-          expect(screen.getByTestId("spotlight-popover")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByTestId("spotlight-popover")).toBeInTheDocument());
       });
 
       it("shows the spotlight title", async () => {
@@ -134,9 +132,7 @@ describe("<SpotlightOverlay />", () => {
       it("shows a Next button (not Done) because there are more spotlights", async () => {
         renderOverlay();
         await waitFor(() =>
-          expect(
-            screen.getByRole("button", { name: /next spotlight/i }),
-          ).toBeInTheDocument(),
+          expect(screen.getByRole("button", { name: /next spotlight/i })).toBeInTheDocument(),
         );
       });
     });
@@ -154,9 +150,7 @@ describe("<SpotlightOverlay />", () => {
           screen.getByRole("button", { name: /next spotlight/i }),
         );
         fireEvent.click(nextBtn);
-        expect(mockSetCurrentSpotlightId).toHaveBeenCalledWith(
-          TRACE_EXPLORER_SPOTLIGHTS[1]!.id,
-        );
+        expect(mockSetCurrentSpotlightId).toHaveBeenCalledWith(TRACE_EXPLORER_SPOTLIGHTS[1]!.id);
       });
     });
 
@@ -187,9 +181,7 @@ describe("<SpotlightOverlay />", () => {
 
       it("persists dismissal for the authenticated user", async () => {
         renderOverlay();
-        const skipButton = await waitFor(() =>
-          screen.getByRole("button", { name: /skip tour/i }),
-        );
+        const skipButton = await waitFor(() => screen.getByRole("button", { name: /skip tour/i }));
         fireEvent.click(skipButton);
         expect(mockPersistDismissal).toHaveBeenCalledOnce();
       });
@@ -207,9 +199,7 @@ describe("<SpotlightOverlay />", () => {
 
       it("dismisses the tour", async () => {
         renderOverlay();
-        const doneBtn = await waitFor(() =>
-          screen.getByRole("button", { name: /finish tour/i }),
-        );
+        const doneBtn = await waitFor(() => screen.getByRole("button", { name: /finish tour/i }));
         fireEvent.click(doneBtn);
         expect(mockSetSpotlightsActive).toHaveBeenCalledWith(false);
         expect(mockPersistDismissal).toHaveBeenCalledOnce();
@@ -247,9 +237,7 @@ describe("<SpotlightOverlay />", () => {
 
       it("renders the spotlight against the fallback anchor", async () => {
         renderOverlay();
-        await waitFor(() =>
-          expect(screen.getByTestId("spotlight-popover")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByTestId("spotlight-popover")).toBeInTheDocument());
         expect(screen.getByText("Evaluator drilldown")).toBeInTheDocument();
       });
     });
@@ -264,9 +252,7 @@ describe("<SpotlightOverlay />", () => {
       it("dismisses the tour", async () => {
         renderOverlay();
         // Wait for the overlay to become visible first
-        await waitFor(() =>
-          expect(screen.getByTestId("spotlight-popover")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByTestId("spotlight-popover")).toBeInTheDocument());
         fireEvent.keyDown(window, { key: "Escape" });
         expect(mockSetSpotlightsActive).toHaveBeenCalledWith(false);
         expect(mockPersistDismissal).toHaveBeenCalledOnce();
@@ -328,9 +314,7 @@ describe("anchor settle predicates", () => {
 
     describe("given the anchor moved since the last frame", () => {
       it("is not settled (still riding in)", () => {
-        expect(isAnchorSettled(rect({ left: 200 }), rect({ left: 260 }), VW, 0)).toBe(
-          false,
-        );
+        expect(isAnchorSettled(rect({ left: 200 }), rect({ left: 260 }), VW, 0)).toBe(false);
       });
     });
 

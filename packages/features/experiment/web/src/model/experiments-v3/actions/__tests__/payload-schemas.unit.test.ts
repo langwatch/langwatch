@@ -143,9 +143,8 @@ describe("payload schemas", () => {
     describe("when the evaluator is the comparison judge", () => {
       it("accepts it", () => {
         expect(
-          addEvaluatorPayloadSchema.safeParse(
-            withComparison("langevals/select_best_compare"),
-          ).success,
+          addEvaluatorPayloadSchema.safeParse(withComparison("langevals/select_best_compare"))
+            .success,
         ).toBe(true);
       });
     });
@@ -153,15 +152,11 @@ describe("payload schemas", () => {
     describe("when the evaluator is any other type", () => {
       /** @scenario "Only the comparison judge can be a standalone comparison column" */
       it("refuses it on the comparison field", () => {
-        const result = addEvaluatorPayloadSchema.safeParse(
-          withComparison("langevals/exact_match"),
-        );
+        const result = addEvaluatorPayloadSchema.safeParse(withComparison("langevals/exact_match"));
 
         expect(result.success).toBe(false);
         expect(
-          result.success
-            ? []
-            : result.error.issues.map((issue) => issue.path.join(".")),
+          result.success ? [] : result.error.issues.map((issue) => issue.path.join(".")),
         ).toContain("comparison");
       });
     });
@@ -178,9 +173,7 @@ describe("payload schemas", () => {
 
       expect(result.success).toBe(false);
       expect(
-        result.success
-          ? []
-          : result.error.issues.map((issue) => issue.path.join(".")),
+        result.success ? [] : result.error.issues.map((issue) => issue.path.join(".")),
       ).toContain("evaluatorType");
     });
   });
@@ -248,9 +241,7 @@ describe("payload schemas", () => {
     it("says what leaving the comparison config out does", () => {
       const description = addEvaluatorPayloadSchema.description ?? "";
 
-      expect(description).toContain(
-        "attaches to EVERY target column as a score",
-      );
+      expect(description).toContain("attaches to EVERY target column as a score");
       expect(description).toContain(COMPARISON_EVALUATOR_TYPE);
     });
 

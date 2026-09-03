@@ -88,14 +88,8 @@ export class TurnEventMapper {
   map(event: SessionEventLike): WorkerEvent[] {
     switch (event.type) {
       case "message_update": {
-        const delta = event.assistantMessageEvent as
-          | { type?: string; delta?: string }
-          | undefined;
-        if (
-          delta?.type === "text_delta" &&
-          typeof delta.delta === "string" &&
-          delta.delta !== ""
-        ) {
+        const delta = event.assistantMessageEvent as { type?: string; delta?: string } | undefined;
+        if (delta?.type === "text_delta" && typeof delta.delta === "string" && delta.delta !== "") {
           return [
             {
               type: "delta",

@@ -88,9 +88,7 @@ function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
 export class PrismaLangyConversationTurnProjectionRepository implements StateProjectionStore<LangyConversationTurnData> {
   constructor(private readonly prisma: LangyDatabase) {}
 
-  static create(
-    database: LangyDatabase,
-  ): PrismaLangyConversationTurnProjectionRepository {
+  static create(database: LangyDatabase): PrismaLangyConversationTurnProjectionRepository {
     return new PrismaLangyConversationTurnProjectionRepository(database);
   }
 
@@ -99,8 +97,7 @@ export class PrismaLangyConversationTurnProjectionRepository implements StatePro
     context: ProjectionStoreContext,
   ): Promise<StoredProjection<LangyConversationTurnData> | null> {
     const projectId = String(context.tenantId);
-    const { conversationId: ConversationId, turnId: TurnId } =
-      parseConversationTurnKey(key);
+    const { conversationId: ConversationId, turnId: TurnId } = parseConversationTurnKey(key);
     const row = await this.prisma.langyConversationTurnProjection.findUnique({
       where: {
         // Keep the tenant predicate explicit for the Prisma tenancy guard;
@@ -122,8 +119,7 @@ export class PrismaLangyConversationTurnProjectionRepository implements StatePro
   ): Promise<void> {
     const projectId = String(context.tenantId);
     const key = context.key ?? context.aggregateId;
-    const { conversationId: ConversationId, turnId: TurnId } =
-      parseConversationTurnKey(key);
+    const { conversationId: ConversationId, turnId: TurnId } = parseConversationTurnKey(key);
     const {
       LastEventOccurredAt: _checkpoint,
       QuestionParts,

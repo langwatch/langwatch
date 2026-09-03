@@ -129,9 +129,7 @@ describe("mintInstallationToken", () => {
 
       expect(result.token).toBe("ghs_minted");
       // Exactly one GitHub call (the mint) and the request scopes the token.
-      const mintCall = fetchMock.mock.calls.find((c) =>
-        String(c[0]).includes("/access_tokens"),
-      );
+      const mintCall = fetchMock.mock.calls.find((c) => String(c[0]).includes("/access_tokens"));
       expect(mintCall).toBeDefined();
       const body = JSON.parse(String(mintCall?.[1]?.body));
       expect(body.repository_ids).toEqual([42]);
@@ -161,9 +159,7 @@ describe("mintInstallationToken", () => {
       await svc.mintInstallationToken({ installationId: "5" });
       await svc.mintInstallationToken({ installationId: "5" });
 
-      const mintCalls = fetchMock.mock.calls.filter((c) =>
-        String(c[0]).includes("/access_tokens"),
-      );
+      const mintCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes("/access_tokens"));
       expect(mintCalls).toHaveLength(1);
     });
   });
@@ -189,9 +185,7 @@ describe("mintInstallationToken", () => {
         repositoryIds: ["7"],
       });
 
-      const mintCalls = fetchMock.mock.calls.filter((c) =>
-        String(c[0]).includes("/access_tokens"),
-      );
+      const mintCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes("/access_tokens"));
       expect(mintCalls).toHaveLength(2);
     });
   });
@@ -268,17 +262,15 @@ describe("mintInstallationToken", () => {
       const scope = GithubAppTokenAdapter.computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(async () => {
-        return new Response(
-          JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       });
       vi.stubGlobal("fetch", fetchMock);
 
       const results = await Promise.all(
-        Array.from({ length: 5 }, () =>
-          svc.mintInstallationToken({ installationId: "5" }),
-        ),
+        Array.from({ length: 5 }, () => svc.mintInstallationToken({ installationId: "5" })),
       );
 
       expect(results.every((r) => r.token === "ghs_cached")).toBe(true);
@@ -296,10 +288,10 @@ describe("mintInstallationToken", () => {
       const scope = GithubAppTokenAdapter.computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(async () => {
-        return new Response(
-          JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       });
       vi.stubGlobal("fetch", fetchMock);
 
@@ -323,10 +315,10 @@ describe("mintInstallationToken", () => {
       const scope = GithubAppTokenAdapter.computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
       const fetchMock = vi.fn<typeof fetch>(async () => {
-        return new Response(
-          JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       });
       vi.stubGlobal("fetch", fetchMock);
 
@@ -347,9 +339,7 @@ describe("mintInstallationToken", () => {
       const svc = GithubAppTokenAdapter.create("app-1", privateKey, redis);
       const scope = GithubAppTokenAdapter.computeRepoScopeKey({});
       redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
-      const fetchMock = vi.fn<typeof fetch>(
-        async () => new Response("boom", { status: 500 }),
-      );
+      const fetchMock = vi.fn<typeof fetch>(async () => new Response("boom", { status: 500 }));
       vi.stubGlobal("fetch", fetchMock);
 
       const first = await svc.mintInstallationToken({ installationId: "5" });
@@ -395,9 +385,7 @@ describe("listPullRequestsForHead", () => {
         branch: "feature/thing",
       });
 
-      const mintCall = fetchMock.mock.calls.find((c) =>
-        String(c[0]).includes("/access_tokens"),
-      );
+      const mintCall = fetchMock.mock.calls.find((c) => String(c[0]).includes("/access_tokens"));
       const body = JSON.parse(String(mintCall?.[1]?.body));
       expect(body.permissions).toEqual(GITHUB_READ_PULL_PERMISSIONS);
       expect(body.permissions).not.toHaveProperty("contents");

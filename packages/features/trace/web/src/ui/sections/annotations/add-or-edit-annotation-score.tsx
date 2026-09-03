@@ -2,11 +2,7 @@ import { Input, Textarea } from "@chakra-ui/react";
 import { AnnotationScoreEditor } from "@langwatch/annotation-web";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import {
-  applyHandledErrorToForm,
-  FormServerError,
-  showErrorToast,
-} from "../errors";
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../errors";
 import { AnnotationScoreDataType } from "../../../model/prisma-types";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { api } from "../trace-api";
@@ -82,8 +78,7 @@ export const AddOrEditAnnotationScore = ({
       setScoreTypeOptions(
         existingAnnotationScore.data.options
           .filter(
-            (o): o is { value: string } =>
-              o !== null && typeof o === "object" && "value" in o,
+            (o): o is { value: string } => o !== null && typeof o === "object" && "value" in o,
           )
           .map((o) => o.value),
       );
@@ -118,9 +113,7 @@ export const AddOrEditAnnotationScore = ({
       return;
     }
 
-    const trimmedRadioCheckboxOptions = scoreTypeOptions.filter(
-      (opt) => opt.trim() !== "",
-    );
+    const trimmedRadioCheckboxOptions = scoreTypeOptions.filter((opt) => opt.trim() !== "");
 
     const normalizedOptions = trimmedRadioCheckboxOptions.map((opt) => opt.toLowerCase());
     if (normalizedOptions.length !== new Set(normalizedOptions).size) {
@@ -150,9 +143,7 @@ export const AddOrEditAnnotationScore = ({
       {
         onSuccess: (data) => {
           toaster.create({
-            title: annotationScoreId
-              ? "Annotation Score Updated"
-              : "Annotation Score Created",
+            title: annotationScoreId ? "Annotation Score Updated" : "Annotation Score Created",
             description: `Successfully ${annotationScoreId ? "updated" : "created"} ${data.name} annotation score`,
             type: "success",
           });
@@ -200,9 +191,7 @@ export const AddOrEditAnnotationScore = ({
           setScoreTypeOptions(nextOptions);
         }}
         onOptionRemove={(index) =>
-          setScoreTypeOptions(
-            scoreTypeOptions.filter((_, optionIndex) => optionIndex !== index),
-          )
+          setScoreTypeOptions(scoreTypeOptions.filter((_, optionIndex) => optionIndex !== index))
         }
         onOptionAdd={() => setScoreTypeOptions([...scoreTypeOptions, ""])}
         defaultRadioOption={defaultRadioOption}

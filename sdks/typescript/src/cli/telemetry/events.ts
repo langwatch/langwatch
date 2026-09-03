@@ -61,12 +61,7 @@ export interface CommandEvents {
   /** A headline number is known — the stat card's value. */
   count: (args: { count: number; total?: number; message: string }) => void;
   /** The command advanced. `progress` is a 0..1 fraction; out-of-range is clamped. */
-  progress: (args: {
-    progress: number;
-    count?: number;
-    total?: number;
-    message: string;
-  }) => void;
+  progress: (args: { progress: number; count?: number; total?: number; message: string }) => void;
   /** The command succeeded. Duration is measured from `createCommandEvents`. */
   completed: (args: { count?: number; total?: number; message: string }) => void;
   /**
@@ -96,10 +91,7 @@ const isTruthy = (value: string | undefined): boolean =>
   value !== undefined && ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 
 /** Which transport, if any, this environment is asking for. */
-export type Transport =
-  | { kind: "ipc"; path: string }
-  | { kind: "otlp"; endpoint: string }
-  | null;
+export type Transport = { kind: "ipc"; path: string } | { kind: "otlp"; endpoint: string } | null;
 
 /**
  * Resolve the transport. A pure env read — this is the gate that keeps a disabled
@@ -123,9 +115,7 @@ export const areEventsEnabled = (env: NodeJS.ProcessEnv = process.env): boolean 
   resolveTransport(env) !== null;
 
 const truncate = (value: string): string =>
-  value.length <= MAX_MESSAGE_LENGTH
-    ? value
-    : `${value.slice(0, MAX_MESSAGE_LENGTH - 1)}…`;
+  value.length <= MAX_MESSAGE_LENGTH ? value : `${value.slice(0, MAX_MESSAGE_LENGTH - 1)}…`;
 
 /** Env vars whose *values* must never appear in an outbound message. */
 const SECRET_ENV_VARS = [
@@ -148,10 +138,7 @@ const SECRET_PATTERNS: RegExp[] = [
  * an API key echoed back by a server is caught by value whatever shape it has —
  * then anything that merely LOOKS like a credential.
  */
-export const redactSecrets = (
-  message: string,
-  env: NodeJS.ProcessEnv = process.env,
-): string => {
+export const redactSecrets = (message: string, env: NodeJS.ProcessEnv = process.env): string => {
   let scrubbed = message;
 
   for (const name of SECRET_ENV_VARS) {

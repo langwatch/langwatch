@@ -31,35 +31,25 @@ describe("useSuiteForm() — agent type filtering for availableTargets", () => {
 
     describe("when availableTargets is derived", () => {
       it("includes the http agent", () => {
-        const { result } = renderHook(() =>
-          useSuiteForm({ ...baseParams, agents: mixedAgents }),
-        );
+        const { result } = renderHook(() => useSuiteForm({ ...baseParams, agents: mixedAgents }));
 
-        const httpTargets = result.current.availableTargets.filter(
-          (t) => t.type === "http",
-        );
+        const httpTargets = result.current.availableTargets.filter((t) => t.type === "http");
 
         expect(httpTargets).toHaveLength(1);
         expect(httpTargets[0]?.referenceId).toBe("agent_http");
       });
 
       it("includes the code agent", () => {
-        const { result } = renderHook(() =>
-          useSuiteForm({ ...baseParams, agents: mixedAgents }),
-        );
+        const { result } = renderHook(() => useSuiteForm({ ...baseParams, agents: mixedAgents }));
 
-        const codeTargets = result.current.availableTargets.filter(
-          (t) => t.type === "code",
-        );
+        const codeTargets = result.current.availableTargets.filter((t) => t.type === "code");
 
         expect(codeTargets).toHaveLength(1);
         expect(codeTargets[0]?.referenceId).toBe("agent_code");
       });
 
       it("excludes the signature agent", () => {
-        const { result } = renderHook(() =>
-          useSuiteForm({ ...baseParams, agents: mixedAgents }),
-        );
+        const { result } = renderHook(() => useSuiteForm({ ...baseParams, agents: mixedAgents }));
 
         const referenceIds = result.current.availableTargets.map((t) => t.referenceId);
 
@@ -67,9 +57,7 @@ describe("useSuiteForm() — agent type filtering for availableTargets", () => {
       });
 
       it("includes the workflow agent", () => {
-        const { result } = renderHook(() =>
-          useSuiteForm({ ...baseParams, agents: mixedAgents }),
-        );
+        const { result } = renderHook(() => useSuiteForm({ ...baseParams, agents: mixedAgents }));
 
         const workflowTargets = result.current.availableTargets.filter(
           (t) => t.type === "workflow",
@@ -93,15 +81,10 @@ describe("useSuiteForm() — agent type filtering for availableTargets", () => {
           useSuiteForm({ ...baseParams, agents: codeOnlyAgents }),
         );
 
-        const codeTargets = result.current.availableTargets.filter(
-          (t) => t.type === "code",
-        );
+        const codeTargets = result.current.availableTargets.filter((t) => t.type === "code");
 
         expect(codeTargets).toHaveLength(2);
-        expect(codeTargets.map((t) => t.referenceId)).toEqual([
-          "agent_code_1",
-          "agent_code_2",
-        ]);
+        expect(codeTargets.map((t) => t.referenceId)).toEqual(["agent_code_1", "agent_code_2"]);
       });
     });
   });
@@ -118,15 +101,10 @@ describe("useSuiteForm() — agent type filtering for availableTargets", () => {
           useSuiteForm({ ...baseParams, agents: httpOnlyAgents }),
         );
 
-        const httpTargets = result.current.availableTargets.filter(
-          (t) => t.type === "http",
-        );
+        const httpTargets = result.current.availableTargets.filter((t) => t.type === "http");
 
         expect(httpTargets).toHaveLength(2);
-        expect(httpTargets.map((t) => t.referenceId)).toEqual([
-          "agent_http_1",
-          "agent_http_2",
-        ]);
+        expect(httpTargets.map((t) => t.referenceId)).toEqual(["agent_http_1", "agent_http_2"]);
       });
     });
   });

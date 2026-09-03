@@ -232,28 +232,26 @@ export default function UsageScreen() {
         >
           <Card.Body paddingY={5} paddingX={6}>
             <Text color="colorPalette.fg" fontSize="sm">
-              Unable to load resource limits. Please refresh the page or contact support
-              if the issue persists.
+              Unable to load resource limits. Please refresh the page or contact support if the
+              issue persists.
             </Text>
           </Card.Body>
         </Card.Root>
       )}
 
       {/* Self-hosted: Valid license */}
-      {hasValidLicense &&
-        licenseStatus.data &&
-        "currentMembers" in licenseStatus.data && (
-          <ResourceLimitsCard
-            planLabel="Licensed"
-            planColorPalette="green"
-            subtitle="Current resource usage"
-            limits={mapLicenseStatusToLimits(licenseStatus.data)}
-            showLiteMembers={showLiteMembers}
-            actionHref={planManagementHref}
-            actionLabel={licensedActionLabel}
-            messagesLabel={messagesLabel}
-          />
-        )}
+      {hasValidLicense && licenseStatus.data && "currentMembers" in licenseStatus.data && (
+        <ResourceLimitsCard
+          planLabel="Licensed"
+          planColorPalette="green"
+          subtitle="Current resource usage"
+          limits={mapLicenseStatusToLimits(licenseStatus.data)}
+          showLiteMembers={showLiteMembers}
+          actionHref={planManagementHref}
+          actionLabel={licensedActionLabel}
+          messagesLabel={messagesLabel}
+        />
+      )}
 
       {/* Self-hosted without a license: the Open Source baseline, uncapped */}
       {isUnlicensed && (

@@ -186,9 +186,9 @@ describe("ApiKeysApiService", () => {
       });
 
       it("throws LangWatchHandledError", async () => {
-        await expect(
-          service.create({ name: "Nope", keyType: "personal" }),
-        ).rejects.toThrow(LangWatchHandledError);
+        await expect(service.create({ name: "Nope", keyType: "personal" })).rejects.toThrow(
+          LangWatchHandledError,
+        );
       });
     });
   });
@@ -222,9 +222,7 @@ describe("ApiKeysApiService", () => {
       });
 
       it("throws LangWatchHandledError", async () => {
-        await expect(service.revoke("nonexistent")).rejects.toThrow(
-          LangWatchHandledError,
-        );
+        await expect(service.revoke("nonexistent")).rejects.toThrow(LangWatchHandledError);
       });
     });
 
@@ -241,9 +239,7 @@ describe("ApiKeysApiService", () => {
       });
 
       it("throws LangWatchHandledError", async () => {
-        await expect(service.revoke("key_revoked")).rejects.toThrow(
-          LangWatchHandledError,
-        );
+        await expect(service.revoke("key_revoked")).rejects.toThrow(LangWatchHandledError);
       });
     });
   });

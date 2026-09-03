@@ -56,9 +56,9 @@ function LapsedLicenseNotice({ maxMembers }: { maxMembers: number }) {
       _dark={{ backgroundColor: "orange.950" }}
     >
       <Text fontSize="sm" color="orange.700" _dark={{ color: "orange.200" }}>
-        Your license reached its end date. Nothing was switched off: everyone keeps their
-        access and your {maxMembers} {maxMembers === 1 ? "seat" : "seats"} and enterprise
-        capabilities stay as they are. Renew to add members again.
+        Your license reached its end date. Nothing was switched off: everyone keeps their access and
+        your {maxMembers} {maxMembers === 1 ? "seat" : "seats"} and enterprise capabilities stay as
+        they are. Renew to add members again.
       </Text>
     </Box>
   );
@@ -75,11 +75,7 @@ function InvalidLicenseNotice() {
   );
 }
 
-export function LicenseDetailsCard({
-  status,
-  onRemove,
-  isRemoving,
-}: LicenseDetailsCardProps) {
+export function LicenseDetailsCard({ status, onRemove, isRemoving }: LicenseDetailsCardProps) {
   const isCorrupted = isCorruptedLicense(status);
   const isValid = status.valid;
   const isExpired = isLicenseExpired(status);
@@ -96,8 +92,8 @@ export function LicenseDetailsCard({
 
           <Box backgroundColor="red.50" padding={3} borderRadius="md" width="full">
             <Text fontSize="sm" color="red.600">
-              Your license file is corrupted and cannot be read. Please upload a valid
-              license or contact support.
+              Your license file is corrupted and cannot be read. Please upload a valid license or
+              contact support.
             </Text>
           </Box>
 
@@ -166,11 +162,7 @@ export function LicenseDetailsCard({
             <Text fontSize="sm" color="fg.muted" width="120px">
               Expires:
             </Text>
-            <Text
-              fontSize="sm"
-              fontWeight="medium"
-              color={isExpired ? "orange.600" : undefined}
-            >
+            <Text fontSize="sm" fontWeight="medium" color={isExpired ? "orange.600" : undefined}>
               {formatLicenseDate(status.expiresAt)}
             </Text>
           </HStack>

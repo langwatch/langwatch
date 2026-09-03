@@ -26,12 +26,8 @@ type StaticEnvironmentResult = {
   isLoading: false;
 };
 
-export function usePublicEnv(options: {
-  includeCapabilities: true;
-}): CapabilityEnvironmentQuery;
-export function usePublicEnv(options?: {
-  includeCapabilities?: false;
-}): StaticEnvironmentResult;
+export function usePublicEnv(options: { includeCapabilities: true }): CapabilityEnvironmentQuery;
+export function usePublicEnv(options?: { includeCapabilities?: false }): StaticEnvironmentResult;
 export function usePublicEnv(
   options: { includeCapabilities?: boolean } = {},
 ): CapabilityEnvironmentQuery | StaticEnvironmentResult {

@@ -20,13 +20,7 @@ import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl
 const logger = createLogger("langwatch:experiment:execution-data");
 
 // Column types that store JSON and need parsing
-const JSON_COLUMN_TYPES = [
-  "chat_messages",
-  "json",
-  "list",
-  "spans",
-  "rag_contexts",
-] as const;
+const JSON_COLUMN_TYPES = ["chat_messages", "json", "list", "spans", "rag_contexts"] as const;
 
 /**
  * Parses JSON string values in specified columns.
@@ -185,11 +179,7 @@ export const applyParametersToRows = ({
 
   const existingNames = new Set(columns.map((c) => c.name));
   const parameterColumnType = (value: string | number | boolean): string =>
-    typeof value === "number"
-      ? "number"
-      : typeof value === "boolean"
-        ? "boolean"
-        : "string";
+    typeof value === "number" ? "number" : typeof value === "boolean" ? "boolean" : "string";
   // A parameter overriding an existing column rewrites every row's value below,
   // so the column's declared type must follow the parameter or the rows and the
   // column metadata would disagree (e.g. a number written into a "string" column).
@@ -279,8 +269,7 @@ export const workflowLoadKey = (target: {
 export const promptLoadKey = (target: {
   promptId?: string;
   promptVersionNumber?: number;
-}): string =>
-  `${target.promptId ?? ""}@${target.promptVersionNumber ?? "latest"}`;
+}): string => `${target.promptId ?? ""}@${target.promptVersionNumber ?? "latest"}`;
 
 export type LoadedExecutionData = {
   datasetRows: Array<Record<string, unknown>>;

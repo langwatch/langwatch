@@ -37,13 +37,7 @@ export class StoredObjectsRepository {
    *
    * Wrapped in a CLIENT span so ClickHouse latency is visible in traces.
    */
-  async insert({
-    projectId,
-    row,
-  }: {
-    projectId: string;
-    row: StoredObject;
-  }): Promise<void> {
+  async insert({ projectId, row }: { projectId: string; row: StoredObject }): Promise<void> {
     return tracer.withActiveSpan(
       "StoredObjectsRepository.insert",
       {
@@ -432,13 +426,7 @@ export class StoredObjectsRepository {
    * Same caveats as `deleteByProject`: callers MUST have already deleted
    * the underlying bytes for the ids passed here.
    */
-  async deleteByIds({
-    projectId,
-    ids,
-  }: {
-    projectId: string;
-    ids: string[];
-  }): Promise<void> {
+  async deleteByIds({ projectId, ids }: { projectId: string; ids: string[] }): Promise<void> {
     if (ids.length === 0) return;
     return tracer.withActiveSpan(
       "StoredObjectsRepository.deleteByIds",

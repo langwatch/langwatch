@@ -13,15 +13,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer";
 import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-web";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
@@ -89,8 +81,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
 }));
 
 vi.mock("../../scenarios/scenario-form-drawer", () => ({
-  ScenarioFormDrawer: ({ open }: { open?: boolean }) =>
-    open ? <div>Edit Scenario</div> : null,
+  ScenarioFormDrawer: ({ open }: { open?: boolean }) => (open ? <div>Edit Scenario</div> : null),
 }));
 
 vi.mock("../../scenarios/run-scenario-modal", () => ({
@@ -205,10 +196,7 @@ function makeRunState(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function setRunState(
-  state: Record<string, unknown> | undefined,
-  error?: unknown,
-) {
+function setRunState(state: Record<string, unknown> | undefined, error?: unknown) {
   mockGetRunState.mockReturnValue({ data: state, error: error ?? null });
 }
 
@@ -273,12 +261,8 @@ describe("the wide run detail drawer", () => {
     // Left column first, results beside it at the same height.
     expect(grid.firstElementChild).toBe(conversation);
     expect(conversation.nextElementSibling).toBe(results);
-    expect(
-      within(conversation).getByText("I want my money back"),
-    ).toBeInTheDocument();
-    expect(
-      within(results).getByTestId("run-verdict-status-line"),
-    ).toBeInTheDocument();
+    expect(within(conversation).getByText("I want my money back")).toBeInTheDocument();
+    expect(within(results).getByTestId("run-verdict-status-line")).toBeInTheDocument();
   });
 
   /** @scenario "On a narrow screen the results stay under the conversation" */
@@ -287,14 +271,10 @@ describe("the wide run detail drawer", () => {
     renderWide();
 
     const stacked = screen.getByTestId("wide-drawer-stacked");
-    expect(
-      screen.queryByTestId("wide-drawer-side-by-side"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("wide-drawer-side-by-side")).not.toBeInTheDocument();
     const text = stacked.textContent ?? "";
     expect(text.indexOf("I want my money back")).toBeGreaterThanOrEqual(0);
-    expect(text.indexOf("I want my money back")).toBeLessThan(
-      text.indexOf("Verdict:"),
-    );
+    expect(text.indexOf("I want my money back")).toBeLessThan(text.indexOf("Verdict:"));
   });
 
   /** @scenario "The messages carry no heading and no line beside the results" */
@@ -318,12 +298,8 @@ describe("the wide run detail drawer", () => {
     });
 
     const stacked = screen.getByTestId("wide-drawer-stacked");
-    expect(
-      within(stacked).getByText("I want my money back"),
-    ).toBeInTheDocument();
-    expect(
-      within(stacked).getByTestId("run-verdict-status-line"),
-    ).toBeInTheDocument();
+    expect(within(stacked).getByText("I want my money back")).toBeInTheDocument();
+    expect(within(stacked).getByTestId("run-verdict-status-line")).toBeInTheDocument();
   });
 
   /** @scenario "Both parts scroll on their own in the side-by-side layout" */
@@ -367,12 +343,8 @@ describe("the wide run detail drawer", () => {
     const user = userEvent.setup();
     renderWide();
 
-    expect(
-      screen.queryByRole("button", { name: "Run again" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Edit scenario" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Run again" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit scenario" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Edit Scenario" }));
 
@@ -544,9 +516,7 @@ describe("the wide run detail drawer", () => {
       /plays the simulated user/,
     );
     expect(screen.getByTestId("run-verdict-error-hint")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("run-verdict-error-detail"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-verdict-error-detail")).not.toBeInTheDocument();
     expect(screen.queryByText(/ScenarioExecution\.callAgent/)).toBeNull();
   });
 
@@ -571,9 +541,7 @@ describe("the wide run detail drawer", () => {
     // The line breaks the runner recorded are kept rather than collapsed.
     expect(detail.textContent).toContain("\n");
     expect(detail).toHaveStyle({ overflow: "auto" });
-    expect(screen.getByTestId("run-verdict-error-toggle")).toHaveTextContent(
-      "Hide details",
-    );
+    expect(screen.getByTestId("run-verdict-error-toggle")).toHaveTextContent("Hide details");
   });
 
   /** @scenario "A run that failed before anyone spoke says so" */
@@ -592,9 +560,7 @@ describe("the wide run detail drawer", () => {
     );
     renderWide();
 
-    expect(screen.getByTestId("scenario-run-failed-empty")).toHaveTextContent(
-      "Simulation failed",
-    );
+    expect(screen.getByTestId("scenario-run-failed-empty")).toHaveTextContent("Simulation failed");
     expect(screen.queryByText("Waiting for the first message")).toBeNull();
   });
 
@@ -611,9 +577,7 @@ describe("the wide run detail drawer", () => {
 
     const queued = screen.getByTestId("wide-drawer-queued");
     expect(queued).toHaveTextContent("Queued");
-    expect(
-      queued.parentElement?.querySelector(".chakra-spinner"),
-    ).toBeInTheDocument();
+    expect(queued.parentElement?.querySelector(".chakra-spinner")).toBeInTheDocument();
     expect(screen.getByTestId("wide-drawer-side-by-side")).toBeInTheDocument();
     expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
       "Waiting for the run to start",
@@ -628,9 +592,7 @@ describe("the wide run detail drawer", () => {
     setRunState(undefined, { data: { code: "NOT_FOUND" } });
     renderWide();
 
-    expect(screen.getByTestId("wide-drawer-queued")).toHaveTextContent(
-      "Queued",
-    );
+    expect(screen.getByTestId("wide-drawer-queued")).toHaveTextContent("Queued");
     expect(screen.getByTestId("wide-drawer-side-by-side")).toBeInTheDocument();
     expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
       "Waiting for the run to start",
@@ -702,11 +664,7 @@ describe("the wide run detail drawer", () => {
         name: "Angry refund request",
         version: 6,
         archivedAt: null,
-        criteria: [
-          "stays polite",
-          "names the refund window",
-          "offers the refund",
-        ],
+        criteria: ["stays polite", "names the refund window", "offers the refund"],
       },
       isLoading: false,
     });
@@ -733,15 +691,11 @@ describe("the wide run detail drawer", () => {
       passedText.indexOf("offers the refund"),
     );
     // The failed section holds only its own criteria.
-    expect(
-      within(failed).getByText("names the refund window"),
-    ).toBeInTheDocument();
+    expect(within(failed).getByText("names the refund window")).toBeInTheDocument();
     expect(within(failed).queryByText("stays polite")).not.toBeInTheDocument();
     // Failed sits above passed: it is what the reader opened the run for.
     const text = panel.textContent ?? "";
-    expect(text.indexOf("Failed criteria")).toBeLessThan(
-      text.indexOf("Passed criteria"),
-    );
+    expect(text.indexOf("Failed criteria")).toBeLessThan(text.indexOf("Passed criteria"));
     // Icons match: two green checks, one red cross.
     expect(panel.querySelectorAll("svg.lucide-circle-check")).toHaveLength(2);
     expect(panel.querySelectorAll("svg.lucide-circle-x")).toHaveLength(1);
@@ -762,15 +716,9 @@ describe("the wide run detail drawer", () => {
     renderWide();
 
     const panel = screen.getByTestId("run-verdict-panel");
-    expect(
-      within(panel).getByTestId("run-verdict-passed-criteria"),
-    ).toBeInTheDocument();
-    expect(
-      within(panel).queryByTestId("run-verdict-failed-criteria"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(panel).queryByText("Failed criteria"),
-    ).not.toBeInTheDocument();
+    expect(within(panel).getByTestId("run-verdict-passed-criteria")).toBeInTheDocument();
+    expect(within(panel).queryByTestId("run-verdict-failed-criteria")).not.toBeInTheDocument();
+    expect(within(panel).queryByText("Failed criteria")).not.toBeInTheDocument();
   });
 
   /** @scenario "A fail run hides the Passed criteria section" */
@@ -788,15 +736,9 @@ describe("the wide run detail drawer", () => {
     renderWide();
 
     const panel = screen.getByTestId("run-verdict-panel");
-    expect(
-      within(panel).getByTestId("run-verdict-failed-criteria"),
-    ).toBeInTheDocument();
-    expect(
-      within(panel).queryByTestId("run-verdict-passed-criteria"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(panel).queryByText("Passed criteria"),
-    ).not.toBeInTheDocument();
+    expect(within(panel).getByTestId("run-verdict-failed-criteria")).toBeInTheDocument();
+    expect(within(panel).queryByTestId("run-verdict-passed-criteria")).not.toBeInTheDocument();
+    expect(within(panel).queryByText("Passed criteria")).not.toBeInTheDocument();
   });
 
   /** @scenario "The verdict line reads over the criteria" */
@@ -806,16 +748,12 @@ describe("the wide run detail drawer", () => {
     const panel = screen.getByTestId("run-verdict-panel");
     const statusLine = within(panel).getByTestId("run-verdict-status-line");
     expect(within(statusLine).getByText("Verdict:")).toBeInTheDocument();
-    expect(
-      within(statusLine).getByTestId("run-verdict-status-passed"),
-    ).toHaveTextContent("PASSED");
+    expect(within(statusLine).getByTestId("run-verdict-status-passed")).toHaveTextContent("PASSED");
     // The verdict is the answer, so it reads first; the criteria under it
     // are how the judge got there.
     const text = panel.textContent ?? "";
     expect(text.indexOf("Verdict:")).toBeGreaterThanOrEqual(0);
-    expect(text.indexOf("Verdict:")).toBeLessThan(
-      text.indexOf("Passed criteria"),
-    );
+    expect(text.indexOf("Verdict:")).toBeLessThan(text.indexOf("Passed criteria"));
     expect(panel).not.toHaveTextContent(/LLM judge/i);
     expect(panel).not.toHaveTextContent(/success rate/i);
     expect(panel).not.toHaveTextContent("6.3s");
@@ -835,12 +773,10 @@ describe("the wide run detail drawer", () => {
       color: passedColor,
     });
 
-    const passedSection = within(panel).getByTestId(
-      "run-verdict-passed-criteria",
-    );
-    expect(
-      within(passedSection).getByText("Passed criteria").parentElement,
-    ).toHaveStyle({ color: passedColor });
+    const passedSection = within(panel).getByTestId("run-verdict-passed-criteria");
+    expect(within(passedSection).getByText("Passed criteria").parentElement).toHaveStyle({
+      color: passedColor,
+    });
   });
 
   /** @scenario "A failed run reads FAILED in the verdict line" */
@@ -879,16 +815,12 @@ describe("the wide run detail drawer", () => {
 
     const panel = screen.getByTestId("run-verdict-panel");
     const reasoning = within(panel).getByTestId("run-verdict-reasoning");
-    expect(reasoning).toHaveTextContent(
-      "The agent stayed calm and answered the refund question.",
-    );
+    expect(reasoning).toHaveTextContent("The agent stayed calm and answered the refund question.");
     expect(within(panel).getByText("Judge reasoning")).toBeInTheDocument();
     // The breaks the judge wrote are kept, and the text still wraps.
     expect(window.getComputedStyle(reasoning).whiteSpace).toBe("pre-wrap");
     const text = panel.textContent ?? "";
-    expect(text.indexOf("stays polite")).toBeLessThan(
-      text.indexOf("The agent stayed calm"),
-    );
+    expect(text.indexOf("stays polite")).toBeLessThan(text.indexOf("The agent stayed calm"));
   });
 
   // --- The version the run used ---
@@ -914,10 +846,7 @@ describe("the wide run detail drawer", () => {
 
     // The history belongs to the scenario, so the chip is a fact of the run and
     // opens nothing.
-    expect(mockOpenDrawer).not.toHaveBeenCalledWith(
-      "scenarioVersionHistory",
-      expect.anything(),
-    );
+    expect(mockOpenDrawer).not.toHaveBeenCalledWith("scenarioVersionHistory", expect.anything());
   });
 
   /** @scenario "A run made before versions were recorded shows no version" */
@@ -964,12 +893,8 @@ describe("the classic run detail drawer", () => {
 
     // None of the wide furniture: no wide shell, no side-by-side grid, no
     // version chip, no History control.
-    expect(
-      screen.queryByTestId("agent-testing-run-drawer"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("wide-drawer-side-by-side"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-testing-run-drawer")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("wide-drawer-side-by-side")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-drawer-history")).not.toBeInTheDocument();
 
     // The results read under the conversation, in their accordion section.

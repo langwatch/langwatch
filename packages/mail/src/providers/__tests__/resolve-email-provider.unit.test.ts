@@ -80,9 +80,7 @@ describe("resolveEmailProviderName", () => {
 
     /** @scenario "Existing deployments keep working without naming a provider" */
     it("infers SendGrid from a lone API key", () => {
-      expect(resolveEmailProviderName(configWith({ sendgridApiKey: "SG.test" }))).toBe(
-        "sendgrid",
-      );
+      expect(resolveEmailProviderName(configWith({ sendgridApiKey: "SG.test" }))).toBe("sendgrid");
     });
 
     it("prefers SES when both legacy providers are configured", () => {

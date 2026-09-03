@@ -2,11 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import {
-  isStableAuthError,
-  normalizeErrorCode,
-  STABLE_AUTH_ERRORS,
-} from "../sign-in-error.screen";
+import { isStableAuthError, normalizeErrorCode, STABLE_AUTH_ERRORS } from "../sign-in-error.screen";
 
 describe("normalizeErrorCode", () => {
   describe("when given null or undefined", () => {
@@ -18,9 +14,7 @@ describe("normalizeErrorCode", () => {
 
   describe("when given a BetterAuth different-email error", () => {
     it("maps email_doesn't_match to DIFFERENT_EMAIL_NOT_ALLOWED", () => {
-      expect(normalizeErrorCode("email_doesn't_match")).toBe(
-        "DIFFERENT_EMAIL_NOT_ALLOWED",
-      );
+      expect(normalizeErrorCode("email_doesn't_match")).toBe("DIFFERENT_EMAIL_NOT_ALLOWED");
     });
 
     it("maps LINKING_DIFFERENT_EMAILS_NOT_ALLOWED to DIFFERENT_EMAIL_NOT_ALLOWED", () => {
@@ -40,15 +34,11 @@ describe("normalizeErrorCode", () => {
 
   describe("when given a NextAuth-era code that's already correct", () => {
     it("passes SSO_PROVIDER_NOT_ALLOWED through unchanged", () => {
-      expect(normalizeErrorCode("SSO_PROVIDER_NOT_ALLOWED")).toBe(
-        "SSO_PROVIDER_NOT_ALLOWED",
-      );
+      expect(normalizeErrorCode("SSO_PROVIDER_NOT_ALLOWED")).toBe("SSO_PROVIDER_NOT_ALLOWED");
     });
 
     it("passes DIFFERENT_EMAIL_NOT_ALLOWED through unchanged", () => {
-      expect(normalizeErrorCode("DIFFERENT_EMAIL_NOT_ALLOWED")).toBe(
-        "DIFFERENT_EMAIL_NOT_ALLOWED",
-      );
+      expect(normalizeErrorCode("DIFFERENT_EMAIL_NOT_ALLOWED")).toBe("DIFFERENT_EMAIL_NOT_ALLOWED");
     });
 
     it("passes OAuthAccountNotLinked through unchanged", () => {

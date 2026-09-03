@@ -159,9 +159,7 @@ export function buildExplorerQuery(search: TraceSearchQuery): string | null {
   // `origin:" evaluation "` — a padded facet value that matches nothing, which
   // is the one direction this module must never fail in (a lost filter widens
   // the result set; an unmatchable one empties it).
-  const origins = search.origins
-    ?.map((origin) => origin.trim())
-    .filter((origin) => origin !== "");
+  const origins = search.origins?.map((origin) => origin.trim()).filter((origin) => origin !== "");
   if (origins && origins.length > 0) {
     const group = origins.map((origin) => `origin:${escapeValue(origin)}`).join(" OR ");
     clauses.push(origins.length > 1 ? `(${group})` : group);
@@ -203,10 +201,7 @@ export type UnstatedWindow = "cli-last-24h" | "unknown";
  * search, so the Explorer behind a drawer and the Explorer behind the card's
  * own button are always showing the same result set.
  */
-function explorerFragment(
-  search: TraceSearchQuery,
-  unstatedWindow: UnstatedWindow,
-): string {
+function explorerFragment(search: TraceSearchQuery, unstatedWindow: UnstatedWindow): string {
   const fragmentParams = new URLSearchParams();
   const query = buildExplorerQuery(search);
   if (query) fragmentParams.set("q", query);

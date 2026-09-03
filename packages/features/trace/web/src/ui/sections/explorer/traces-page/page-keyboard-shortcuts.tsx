@@ -2,10 +2,7 @@ import { useMemo } from "react";
 import { LuSearch } from "react-icons/lu";
 import { useUIStore } from "../../../../index";
 import { useAskLangyFromSearch } from "../search-bar/use-ask-langy-from-search";
-import {
-  KeyboardShortcutsHelp,
-  type ShortcutGroup,
-} from "../trace-drawer/keyboard-shortcuts-help";
+import { KeyboardShortcutsHelp, type ShortcutGroup } from "../trace-drawer/keyboard-shortcuts-help";
 
 // ⌘I fires the search bar's ask affordance, which belongs to Langy when
 // Langy is available — so the dialog names whoever will actually answer.
@@ -83,14 +80,9 @@ export const PageKeyboardShortcuts: React.FC = () => {
   const setOpen = useUIStore((s) => s.setShortcutsHelpOpen);
   const { langyRoutesAsk } = useAskLangyFromSearch();
   const groups = useMemo(
-    () =>
-      pageGroups(
-        langyRoutesAsk ? "Ask Langy about these traces" : "Ask AI to build a query",
-      ),
+    () => pageGroups(langyRoutesAsk ? "Ask Langy about these traces" : "Ask AI to build a query"),
     [langyRoutesAsk],
   );
 
-  return (
-    <KeyboardShortcutsHelp open={open} onClose={() => setOpen(false)} groups={groups} />
-  );
+  return <KeyboardShortcutsHelp open={open} onClose={() => setOpen(false)} groups={groups} />;
 };

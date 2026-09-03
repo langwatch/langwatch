@@ -41,23 +41,18 @@ const saveNow = vi.hoisted(() =>
 );
 
 const executeEvaluation = vi.hoisted(() =>
-  vi.fn(
-    async (
-      _scope?: unknown,
-      options?: { onRunStarted?: (id: string) => void },
-    ) => {
-      calls.push("run");
-      // The real hook names the run from the stream's FIRST FRAME, which lands
-      // after the request opens. Naming it in the same tick would let a handler
-      // that never awaited the stream look correct here and answer `undefined`
-      // against the real one.
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      options?.onRunStarted?.("swift-bold-fox");
-      // The run then keeps streaming. The handler must answer while it does,
-      // which is what "without waiting for the run" means.
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    },
-  ),
+  vi.fn(async (_scope?: unknown, options?: { onRunStarted?: (id: string) => void }) => {
+    calls.push("run");
+    // The real hook names the run from the stream's FIRST FRAME, which lands
+    // after the request opens. Naming it in the same tick would let a handler
+    // that never awaited the stream look correct here and answer `undefined`
+    // against the real one.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    options?.onRunStarted?.("swift-bold-fox");
+    // The run then keeps streaming. The handler must answer while it does,
+    // which is what "without waiting for the run" means.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }),
 );
 
 vi.mock("@langwatch/workflow-web/studio-host/next-router", () => ({
@@ -236,9 +231,7 @@ describe("given the page holds an edit the agent has just made", () => {
         </ChakraProvider>,
       );
 
-      const answer = await captured.handlers?.["workbench.run"]?.run(
-        {} as never,
-      );
+      const answer = await captured.handlers?.["workbench.run"]?.run({} as never);
 
       expect(answer).toEqual({
         runId: "swift-bold-fox",

@@ -75,9 +75,7 @@ describe("Recipes", () => {
   it.skipIf(isCI)(
     "generates a RAG evaluation dataset from the TerraVerde knowledge base",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-recipe-rag-dataset-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-recipe-rag-dataset-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "python-rag-agent",
@@ -135,10 +133,9 @@ describe("Recipes", () => {
               allContent.includes("crop") ||
               allContent.includes("apple") ||
               allContent.includes("harvest");
-            expect(
-              hasDomainTerms,
-              "Expected dataset to contain agricultural domain terms",
-            ).toBe(true);
+            expect(hasDomainTerms, "Expected dataset to contain agricultural domain terms").toBe(
+              true,
+            );
 
             // Verify diverse question types
             const hasQuestionTypes =
@@ -148,17 +145,13 @@ describe("Recipes", () => {
               allContent.includes("edge") ||
               allContent.includes("negative") ||
               allContent.includes("question_type");
-            expect(
-              hasQuestionTypes,
-              "Expected dataset to include diverse question types",
-            ).toBe(true);
+            expect(hasQuestionTypes, "Expected dataset to include diverse question types").toBe(
+              true,
+            );
 
             // Verify context column is present
             const hasContext = allContent.includes("context");
-            expect(
-              hasContext,
-              "Expected dataset to include context column or field",
-            ).toBe(true);
+            expect(hasContext, "Expected dataset to include context column or field").toBe(true);
           },
           scenario.judge(),
         ],
@@ -172,9 +165,7 @@ describe("Recipes", () => {
   it.skipIf(isCI)(
     "creates compliance scenario tests for the health agent",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-recipe-compliance-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-recipe-compliance-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "python-health-agent",
@@ -299,9 +290,7 @@ describe("Recipes", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "check my langwatch traces and see if there's anything to improve",
-          ),
+          scenario.user("check my langwatch traces and see if there's anything to improve"),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
@@ -309,9 +298,7 @@ describe("Recipes", () => {
 
             // Verify the agent used the langwatch CLI for trace inspection
             const allContent = state.messages
-              .map((m) =>
-                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(

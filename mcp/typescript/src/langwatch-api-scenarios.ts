@@ -26,10 +26,7 @@ export async function listScenarios(): Promise<ScenarioSummary[]> {
 
 /** Retrieves a single scenario by ID. */
 export async function getScenario(id: string): Promise<ScenarioSummary> {
-  return makeRequest(
-    "GET",
-    `/api/scenarios/${encodeURIComponent(id)}`,
-  ) as Promise<ScenarioSummary>;
+  return makeRequest("GET", `/api/scenarios/${encodeURIComponent(id)}`) as Promise<ScenarioSummary>;
 }
 
 /** Creates a new scenario. */

@@ -31,11 +31,7 @@ export type WorkflowDatabase = {
 
 type WorkflowRow = Omit<
   Workflow,
-  | "latestVersionId"
-  | "currentVersionId"
-  | "publishedId"
-  | "publishedById"
-  | "copiedFromWorkflowId"
+  "latestVersionId" | "currentVersionId" | "publishedId" | "publishedById" | "copiedFromWorkflowId"
 > & {
   latestVersionId?: string | null;
   currentVersionId?: string | null;
@@ -89,9 +85,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
         projectId: input.projectId,
         ...(input.includeArchived ? {} : { archivedAt: null }),
       },
-      ...(input.includeVersion
-        ? { include: { currentVersion: true, latestVersion: true } }
-        : {}),
+      ...(input.includeVersion ? { include: { currentVersion: true, latestVersion: true } } : {}),
     });
     if (!row) return null;
     const value = row as { currentVersion?: unknown; latestVersion?: unknown };
@@ -99,9 +93,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
       ...mapWorkflow(row),
       ...(input.includeVersion
         ? {
-            currentVersion: value.currentVersion
-              ? mapVersion(value.currentVersion)
-              : null,
+            currentVersion: value.currentVersion ? mapVersion(value.currentVersion) : null,
             latestVersion: value.latestVersion ? mapVersion(value.latestVersion) : null,
           }
         : {}),
@@ -251,9 +243,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
       where: { id: input.id, projectId: input.projectId },
       data: {
         currentVersionId: input.currentVersionId,
-        ...(input.latestVersionId !== undefined
-          ? { latestVersionId: input.latestVersionId }
-          : {}),
+        ...(input.latestVersionId !== undefined ? { latestVersionId: input.latestVersionId } : {}),
       },
     });
   }
@@ -275,10 +265,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     );
   }
 
-  async findCopies(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<Workflow[]> {
+  async findCopies(input: { workflowId: string; projectId: string }): Promise<Workflow[]> {
     const rows = await this.database.workflow.findMany({
       where: { copiedFromWorkflowId: input.workflowId, archivedAt: null },
     });

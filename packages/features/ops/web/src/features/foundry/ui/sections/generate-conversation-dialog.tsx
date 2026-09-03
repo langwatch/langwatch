@@ -88,8 +88,8 @@ export function GenerateConversationDialog() {
             Send a fake conversation
           </Text>
           <Text fontSize="xs" color="fg.muted" mb={3}>
-            Each turn is its own trace, sharing a thread ID. Input grows with the chat
-            history; output is the latest assistant reply.
+            Each turn is its own trace, sharing a thread ID. Input grows with the chat history;
+            output is the latest assistant reply.
           </Text>
 
           <VStack gap={4} align="stretch">

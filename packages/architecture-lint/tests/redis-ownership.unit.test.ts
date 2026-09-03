@@ -67,9 +67,10 @@ type SourceEntry = { file: string; text: string };
 let sourceEntries: SourceEntry[] | undefined;
 
 function allSources(): SourceEntry[] {
-  sourceEntries ??= [...walkFiles(APPS_ROOT, isSourceFile), ...walkFiles(PACKAGES_ROOT, isSourceFile)].map(
-    (file) => ({ file, text: readFileSync(file, "utf8") }),
-  );
+  sourceEntries ??= [
+    ...walkFiles(APPS_ROOT, isSourceFile),
+    ...walkFiles(PACKAGES_ROOT, isSourceFile),
+  ].map((file) => ({ file, text: readFileSync(file, "utf8") }));
   return sourceEntries;
 }
 

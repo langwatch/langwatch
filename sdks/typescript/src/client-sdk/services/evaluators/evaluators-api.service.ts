@@ -51,8 +51,7 @@ export class EvaluatorsApiService {
     const { data, error } = await this.apiClient.GET("/api/evaluators/{idOrSlug}", {
       params: { path: { idOrSlug } },
     });
-    if (error)
-      this.handleApiError(`fetch evaluator with ID or slug "${idOrSlug}"`, error);
+    if (error) this.handleApiError(`fetch evaluator with ID or slug "${idOrSlug}"`, error);
     return data;
   }
 

@@ -6,15 +6,10 @@ import {
 import { vi } from "vitest";
 
 type ScenarioHttpRequest = Parameters<ScenarioHttpPort["fetch"]>[0];
-type ScenarioHttpAdapterOptions = ConstructorParameters<
-  typeof SerializedHttpAgentAdapter
->[0];
+type ScenarioHttpAdapterOptions = ConstructorParameters<typeof SerializedHttpAgentAdapter>[0];
 
 export const mockScenarioHttpFetch = vi.fn(
-  async (
-    _url: string,
-    _init: ScenarioHttpRequest["init"],
-  ): Promise<ScenarioHttpResponse> => {
+  async (_url: string, _init: ScenarioHttpRequest["init"]): Promise<ScenarioHttpResponse> => {
     throw new Error("Scenario HTTP response was not configured");
   },
 );

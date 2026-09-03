@@ -293,26 +293,14 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     }
   }
 
-  async deleteStaged({
-    projectId,
-    key,
-  }: {
-    projectId: string;
-    key: string;
-  }): Promise<void> {
+  async deleteStaged({ projectId, key }: { projectId: string; key: string }): Promise<void> {
     assertKeyWithinProject(projectId, key);
     const { driver, accountName, container } = await this.resolver.resolve(projectId);
     const uri = this.uriFor({ accountName, container, key });
     await driver.delete(uri);
   }
 
-  async streamStaged({
-    projectId,
-    key,
-  }: {
-    projectId: string;
-    key: string;
-  }): Promise<Readable> {
+  async streamStaged({ projectId, key }: { projectId: string; key: string }): Promise<Readable> {
     assertKeyWithinProject(projectId, key);
     const { driver, accountName, container } = await this.resolver.resolve(projectId);
     const uri = this.uriFor({ accountName, container, key });

@@ -133,10 +133,7 @@ export function useColumnSort<Column extends string, Row, T extends Row>({
 } {
   const [sort, setSort] = useState<ColumnSortState<Column>>(rules.defaultSort);
 
-  const sorted = useMemo(
-    () => sortRowsByColumn({ rows, sort, rules }),
-    [rows, sort, rules],
-  );
+  const sorted = useMemo(() => sortRowsByColumn({ rows, sort, rules }), [rows, sort, rules]);
 
   const onSort = useCallback(
     (column: Column) => setSort((current) => nextColumnSort({ current, column, rules })),

@@ -20,8 +20,7 @@ export async function handleGetSimulationRun(params: {
   lines.push(`**Batch ID**: ${run.batchRunId}`);
   lines.push(`**Status**: ${run.status}`);
 
-  const duration =
-    run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
+  const duration = run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
   lines.push(`**Duration**: ${duration}`);
   if (run.totalCost) {
     lines.push(`**Cost**: $${run.totalCost.toFixed(4)}`);
@@ -53,8 +52,7 @@ export async function handleGetSimulationRun(params: {
   if (run.messages && run.messages.length > 0) {
     lines.push("\n## Conversation");
     for (const msg of run.messages) {
-      const content =
-        msg.content.length > 300 ? msg.content.slice(0, 300) + "..." : msg.content;
+      const content = msg.content.length > 300 ? msg.content.slice(0, 300) + "..." : msg.content;
       lines.push(`**[${msg.role}]**: ${content}`);
     }
   }

@@ -63,9 +63,7 @@ describe("ExperimentsApiService list endpoints", () => {
 
       describe("when called with pageSize and page", () => {
         it("includes them in the query string", async () => {
-          mockFetch.mockResolvedValueOnce(
-            jsonResponse({ experiments: [], pagination: {} }),
-          );
+          mockFetch.mockResolvedValueOnce(jsonResponse({ experiments: [], pagination: {} }));
 
           const service = new ExperimentsApiService();
           await service.listExperiments({ pageSize: 10, page: 2 });
@@ -116,9 +114,7 @@ describe("ExperimentsApiService list endpoints", () => {
           });
 
           expect(result).toEqual(payload);
-          expect(fetchedUrl()).toContain(
-            "/api/experiments/runs?experimentSlug=checkout-flow",
-          );
+          expect(fetchedUrl()).toContain("/api/experiments/runs?experimentSlug=checkout-flow");
         });
       });
     });
@@ -131,9 +127,7 @@ describe("ExperimentsApiService list endpoints", () => {
           );
 
           const service = new ExperimentsApiService();
-          const err = await service
-            .listRuns({ experimentSlug: "missing" })
-            .catch((e) => e);
+          const err = await service.listRuns({ experimentSlug: "missing" }).catch((e) => e);
 
           expect(err).toBeInstanceOf(ExperimentsApiServiceError);
           expect((err as ExperimentsApiServiceError).operation).toContain("missing");
@@ -146,9 +140,7 @@ describe("ExperimentsApiService list endpoints", () => {
         it("wraps the error as ExperimentsApiServiceError", async () => {
           mockFetch.mockRejectedValueOnce(new Error("ECONNRESET"));
           const service = new ExperimentsApiService();
-          const err = await service
-            .listRuns({ experimentSlug: "checkout-flow" })
-            .catch((e) => e);
+          const err = await service.listRuns({ experimentSlug: "checkout-flow" }).catch((e) => e);
           expect(err).toBeInstanceOf(ExperimentsApiServiceError);
         });
       });

@@ -15,10 +15,7 @@ import type {
   GatewaySpendFailedEvent,
   GatewaySpendSettledEvent,
 } from "@langwatch/gateway-server";
-import {
-  GatewaySpendFoldProjection,
-  type GatewaySpendState,
-} from "../gateway-spend.projection";
+import { GatewaySpendFoldProjection, type GatewaySpendState } from "../gateway-spend.projection";
 
 const TENANT = "proj_test";
 const REQUEST = "01K1REQUESTULID";
@@ -283,12 +280,8 @@ describe("gatewaySpend fold", () => {
       confirmed(),
       projection.handleGatewaySpendAdmitted(admitted(), initial()),
     );
-    expect(projection.handleGatewaySpendFailed(failed(), confirmedState)).toEqual(
-      confirmedState,
-    );
-    expect(projection.handleGatewaySpendSettled(settled(), confirmedState)).toEqual(
-      confirmedState,
-    );
+    expect(projection.handleGatewaySpendFailed(failed(), confirmedState)).toEqual(confirmedState);
+    expect(projection.handleGatewaySpendSettled(settled(), confirmedState)).toEqual(confirmedState);
   });
 
   /** @scenario An outcome racing ahead of its admission keeps its status */
@@ -376,9 +369,7 @@ describe("gatewaySpend fold", () => {
       T0,
     );
 
-    expect(projection.handleGatewaySpendAdmitted(admitWithoutTrace, early).traceId).toBe(
-      "trace-1",
-    );
+    expect(projection.handleGatewaySpendAdmitted(admitWithoutTrace, early).traceId).toBe("trace-1");
   });
 
   /** @scenario An outcome states the attribution its admission has not delivered */
@@ -398,8 +389,6 @@ describe("gatewaySpend fold", () => {
     expect(early.organizationId).toBe("org_stale");
 
     // Admission is the authority. The outcome only fills a gap.
-    expect(projection.handleGatewaySpendAdmitted(admitted(), early).organizationId).toBe(
-      "org_1",
-    );
+    expect(projection.handleGatewaySpendAdmitted(admitted(), early).organizationId).toBe("org_1");
   });
 });

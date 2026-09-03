@@ -96,9 +96,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
       by: ["migrationName"],
       _count: { organizationId: true },
     });
-    return new Map(
-      groups.map((group) => [group.migrationName, group._count.organizationId]),
-    );
+    return new Map(groups.map((group) => [group.migrationName, group._count.organizationId]));
   }
 
   /** Every organization on the installation - the enrollment ceiling. */
@@ -178,10 +176,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
       where: {
         id: {
           ...(pool === undefined ? {} : { in: pool }),
-          notIn: [
-            ...excludeOrganizationIds,
-            ...enrolled.map((row) => row.organizationId),
-          ],
+          notIn: [...excludeOrganizationIds, ...enrolled.map((row) => row.organizationId)],
         },
         // PENDING rides along with ACTIVE: a just-signed enterprise whose
         // subscription has not settled is exactly the organization the
@@ -249,10 +244,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
         data: { organizationId, migrationName, enrolledByUserId },
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new MigrationEnrollmentAlreadyExistsError({ migrationName });
       }
       throw error;
@@ -273,10 +265,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
         },
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2025"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
         throw new MigrationEnrollmentNotFoundError({ migrationName });
       }
       throw error;

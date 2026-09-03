@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  collectionOf,
-  countResults,
-  totalOf,
-} from "../langy-cli-result-document";
+import { collectionOf, countResults, totalOf } from "../langy-cli-result-document";
 
 describe("collectionOf", () => {
   describe("given a recognised collection key", () => {
@@ -23,15 +19,11 @@ describe("collectionOf", () => {
     });
 
     it("reads a document that holds nothing but the one list", () => {
-      expect(collectionOf({ versions: [{ version: 1 }] })).toEqual([
-        { version: 1 },
-      ]);
+      expect(collectionOf({ versions: [{ version: 1 }] })).toEqual([{ version: 1 }]);
     });
 
     it("stays null when two arrays make the list ambiguous", () => {
-      expect(
-        collectionOf({ targets: [1], evaluations: [2], pagination: {} }),
-      ).toBeNull();
+      expect(collectionOf({ targets: [1], evaluations: [2], pagination: {} })).toBeNull();
     });
 
     it("stays null for an unpaginated array beside other fields", () => {
@@ -53,19 +45,13 @@ describe("countResults", () => {
       pagination: { page: 1, pageSize: 50, totalHits: 7, hasMore: true },
     });
     expect(countResults(output)).toBe(7);
-    expect(
-      totalOf({ pagination: { page: 1, pageSize: 50, totalHits: 7 } }),
-    ).toBe(7);
+    expect(totalOf({ pagination: { page: 1, pageSize: 50, totalHits: 7 } })).toBe(7);
   });
 });
 
 describe("totalOf and collectionOf over a reduced list", () => {
   describe("given a list the reduction cut down", () => {
-    const reduced = [
-      { id: "prompt_1" },
-      { id: "prompt_2" },
-      "… 29 more items truncated",
-    ];
+    const reduced = [{ id: "prompt_1" }, { id: "prompt_2" }, "… 29 more items truncated"];
 
     describe("when the list states no total of its own", () => {
       /** @scenario A list too large for the chat counts the rows the reduction removed */
@@ -76,10 +62,7 @@ describe("totalOf and collectionOf over a reduced list", () => {
 
       /** @scenario A list too large for the chat counts the rows the reduction removed */
       it("keeps the marker out of the rows a card draws", () => {
-        expect(collectionOf(reduced)).toEqual([
-          { id: "prompt_1" },
-          { id: "prompt_2" },
-        ]);
+        expect(collectionOf(reduced)).toEqual([{ id: "prompt_1" }, { id: "prompt_2" }]);
       });
 
       it("reads the newer marker form that states the total", () => {
@@ -89,10 +72,7 @@ describe("totalOf and collectionOf over a reduced list", () => {
           "… 42 more items truncated, 44 total",
         ];
         expect(totalOf(stated)).toBe(44);
-        expect(collectionOf(stated)).toEqual([
-          { id: "prompt_1" },
-          { id: "prompt_2" },
-        ]);
+        expect(collectionOf(stated)).toEqual([{ id: "prompt_1" }, { id: "prompt_2" }]);
       });
 
       it("reads the marker inside a resource-named envelope too", () => {

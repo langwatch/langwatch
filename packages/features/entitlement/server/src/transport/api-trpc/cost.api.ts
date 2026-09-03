@@ -21,7 +21,12 @@
  * reader.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { TRPCError, type AnyTRPCRootTypes, type TRPCRootObject, type TRPCRuntimeConfigOptions } from "@trpc/server";
+import {
+  TRPCError,
+  type AnyTRPCRootTypes,
+  type TRPCRootObject,
+  type TRPCRuntimeConfigOptions,
+} from "@trpc/server";
 import { z } from "zod";
 
 /** The process supplies authentication; authorization arrives as `policy`. */
@@ -104,8 +109,7 @@ export class CostTrpcApi {
         if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
         const now = Date.now();
-        const endDate =
-          now - input.endDate < RECENT_WINDOW_MS ? now : input.endDate;
+        const endDate = now - input.endDate < RECENT_WINDOW_MS ? now : input.endDate;
 
         return ports.readOrganizationSpend({
           organizationId: input.organizationId,

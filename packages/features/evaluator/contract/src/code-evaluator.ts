@@ -52,6 +52,4 @@ export const CODE_EVALUATOR_CHECK_PREFIX = "code/";
 export const isCodeEvaluatorCheckType = (value: string): boolean =>
   value.startsWith(CODE_EVALUATOR_CHECK_PREFIX);
 export const codeEvaluatorIdFromCheckType = (value: string): string | undefined =>
-  isCodeEvaluatorCheckType(value)
-    ? value.slice(CODE_EVALUATOR_CHECK_PREFIX.length)
-    : undefined;
+  isCodeEvaluatorCheckType(value) ? value.slice(CODE_EVALUATOR_CHECK_PREFIX.length) : undefined;

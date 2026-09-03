@@ -24,9 +24,7 @@ export const createScimTokenCommand = async (
     succeed: () => "Created SCIM token",
     table: (token) => {
       console.log();
-      console.log(
-        chalk.bold.yellow("⚠  Save the token below NOW. It will not be shown again."),
-      );
+      console.log(chalk.bold.yellow("⚠  Save the token below NOW. It will not be shown again."));
       console.log();
       console.log(`  ${chalk.green(token.token)}`);
       console.log();
@@ -34,9 +32,7 @@ export const createScimTokenCommand = async (
       console.log(chalk.gray("Description: ") + (token.description ?? "—"));
       console.log();
       console.log(
-        chalk.gray(
-          "Give this to your identity provider as the bearer token for /api/scim/v2.",
-        ),
+        chalk.gray("Give this to your identity provider as the bearer token for /api/scim/v2."),
       );
       console.log();
     },

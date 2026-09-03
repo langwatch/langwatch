@@ -65,10 +65,7 @@ const SPEND_ROW = {
 };
 
 function renderPage() {
-  renderWithGatewayHost(
-    <BillingEventsPage />,
-    { host },
-  );
+  renderWithGatewayHost(<BillingEventsPage />, { host });
 }
 
 afterEach(() => cleanup());

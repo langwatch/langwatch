@@ -83,9 +83,7 @@ describe("BlobLeases", () => {
 
         expect(await redis.zcard(LEASE_KEY)).toBe(1);
         expect(renewedDeadline).toBeGreaterThanOrEqual(firstDeadline);
-        expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(
-          1,
-        );
+        expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(1);
       });
     });
   });
@@ -114,9 +112,7 @@ describe("BlobLeases", () => {
           tier: "redis",
         });
 
-        expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(
-          0,
-        );
+        expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(0);
         expect(await redis.exists(BLOB_KEY)).toBe(1);
       });
     });
@@ -135,12 +131,8 @@ describe("BlobLeases", () => {
           });
         }
 
-        expect(await redis.keys(`${PREFIX}blob:${PROJECT}/${HASH}`)).toEqual([
-          BLOB_KEY,
-        ]);
-        expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(
-          3,
-        );
+        expect(await redis.keys(`${PREFIX}blob:${PROJECT}/${HASH}`)).toEqual([BLOB_KEY]);
+        expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(3);
       });
     });
   });
@@ -172,9 +164,7 @@ describe("BlobLeases", () => {
           tier: "redis",
         });
 
-        expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(
-          1,
-        );
+        expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(1);
         expect(await redis.zrange(LEASE_KEY, 0, -1)).toEqual(["live"]);
         expect(await redis.exists(BLOB_KEY)).toBe(1);
         expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(10);
@@ -193,9 +183,7 @@ describe("BlobLeases", () => {
         });
         await redis.zadd(LEASE_KEY, (await redisNowMs()) - 1, "dead");
 
-        expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(
-          0,
-        );
+        expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(0);
         expect(await redis.exists(LEASE_KEY)).toBe(0);
       });
     });
@@ -250,9 +238,7 @@ describe("BlobLeases", () => {
         expect(outcome).toBe(0);
         expect(await redis.exists(BLOB_KEY)).toBe(1);
         expect(await redis.zscore(LEASE_KEY, "slot-1")).not.toBeNull();
-        expect(await redis.smembers(LEGACY_HOLDER_KEY)).toEqual([
-          LEGACY_HOLDER_LEASE_GUARD,
-        ]);
+        expect(await redis.smembers(LEGACY_HOLDER_KEY)).toEqual([LEGACY_HOLDER_LEASE_GUARD]);
       });
     });
   });
@@ -281,9 +267,7 @@ describe("BlobLeases", () => {
 
           expect(graced).toBe(true);
           expect(await redis.exists(BLOB_KEY)).toBe(1);
-          expect(await redis.ttl(BLOB_KEY)).toBeLessThanOrEqual(
-            BLOB_RELEASE_GRACE_TTL_SECONDS,
-          );
+          expect(await redis.ttl(BLOB_KEY)).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
           expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(0);
         });
       });
@@ -311,9 +295,7 @@ describe("BlobLeases", () => {
           });
 
           expect(graced).toBe(false);
-          expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(
-            BLOB_RELEASE_GRACE_TTL_SECONDS,
-          );
+          expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
         });
       });
     });
@@ -346,12 +328,8 @@ describe("BlobLeases", () => {
             tier: "redis",
           });
 
-          expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(
-            BLOB_RELEASE_GRACE_TTL_SECONDS,
-          );
-          expect(
-            await leases.countLive({ projectId: PROJECT, hash: HASH }),
-          ).toBe(1);
+          expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+          expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(1);
         });
       });
     });
@@ -377,9 +355,7 @@ describe("BlobLeases", () => {
           });
 
           expect(graced).toBe(false);
-          expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(
-            BLOB_RELEASE_GRACE_TTL_SECONDS,
-          );
+          expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
         });
       });
     });
@@ -389,18 +365,8 @@ describe("BlobLeases", () => {
         it("graces the displaced blob and leaves the replacement's backstop", async () => {
           const otherHash = "replacementhash";
           const otherBlobKey = `${PREFIX}blob:${PROJECT}/${otherHash}`;
-          await redis.set(
-            BLOB_KEY,
-            "old body",
-            "EX",
-            BLOB_BACKSTOP_TTL_SECONDS,
-          );
-          await redis.set(
-            otherBlobKey,
-            "new body",
-            "EX",
-            BLOB_BACKSTOP_TTL_SECONDS,
-          );
+          await redis.set(BLOB_KEY, "old body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+          await redis.set(otherBlobKey, "new body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
           await leases.take({
             projectId: PROJECT,
             hash: HASH,
@@ -420,12 +386,8 @@ describe("BlobLeases", () => {
 
           expect(graced).toBe(true);
           expect(await redis.exists(BLOB_KEY)).toBe(1);
-          expect(await redis.ttl(BLOB_KEY)).toBeLessThanOrEqual(
-            BLOB_RELEASE_GRACE_TTL_SECONDS,
-          );
-          expect(await redis.ttl(otherBlobKey)).toBeGreaterThan(
-            BLOB_RELEASE_GRACE_TTL_SECONDS,
-          );
+          expect(await redis.ttl(BLOB_KEY)).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
+          expect(await redis.ttl(otherBlobKey)).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
         });
       });
     });
@@ -452,9 +414,7 @@ describe("BlobLeases", () => {
           });
 
           expect(graced).toBe(false);
-          expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(
-            BLOB_RELEASE_GRACE_TTL_SECONDS,
-          );
+          expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
         });
       });
     });

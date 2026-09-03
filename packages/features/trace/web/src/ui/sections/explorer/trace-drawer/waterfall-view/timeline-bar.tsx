@@ -46,8 +46,7 @@ export const TimelineBar = memo(function TimelineBar({
   const color = getSpanBarColor(span.type, span.name);
   const isZeroDuration = duration === 0;
 
-  const leftPct =
-    rootDuration > 0 ? ((span.startTimeMs - rootStart) / rootDuration) * 100 : 0;
+  const leftPct = rootDuration > 0 ? ((span.startTimeMs - rootStart) / rootDuration) * 100 : 0;
   const widthPct = rootDuration > 0 ? (duration / rootDuration) * 100 : 50;
 
   return (
@@ -111,9 +110,7 @@ export const TimelineBar = memo(function TimelineBar({
             bg={color}
             opacity={isSelected ? 0.95 : isHovered ? 0.85 : 0.7}
             borderWidth={isError ? "1.5px" : isSelected ? "1px" : "0px"}
-            borderColor={
-              isError ? "red.solid" : isSelected ? "border.emphasized" : undefined
-            }
+            borderColor={isError ? "red.solid" : isSelected ? "border.emphasized" : undefined}
             transition="opacity 0.1s ease"
             boxShadow={
               isSelected
@@ -139,10 +136,8 @@ export const GroupTimelineBar = memo(function GroupTimelineBar({
   rootDuration: number;
 }) {
   const color = getSpanBarColor(group.type, group.name);
-  const leftPct =
-    rootDuration > 0 ? ((group.minStart - rootStart) / rootDuration) * 100 : 0;
-  const widthPct =
-    rootDuration > 0 ? ((group.maxEnd - group.minStart) / rootDuration) * 100 : 50;
+  const leftPct = rootDuration > 0 ? ((group.minStart - rootStart) / rootDuration) * 100 : 0;
+  const widthPct = rootDuration > 0 ? ((group.maxEnd - group.minStart) / rootDuration) * 100 : 50;
 
   return (
     <Flex height={`${GROUP_ROW_HEIGHT}px`} align="center" position="relative">

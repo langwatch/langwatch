@@ -23,18 +23,12 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
     private readonly defaultTraceRetentionDays: number,
   ) {}
 
-  async ensure(
-    records: CodingAgentTraceSessionRecord[],
-    retentionDays?: number,
-  ): Promise<void> {
+  async ensure(records: CodingAgentTraceSessionRecord[], retentionDays?: number): Promise<void> {
     const [first] = records;
     if (!first) return;
 
     const tenantId = first.tenantId;
-    EventUtils.validateTenantId(
-      { tenantId },
-      "CodingAgentTraceSessionClickHouseRepository.ensure",
-    );
+    EventUtils.validateTenantId({ tenantId }, "CodingAgentTraceSessionClickHouseRepository.ensure");
     // A batch insert resolves ONE client, so a row from another tenant would
     // be written into this tenant's ClickHouse. Refuse rather than cross the
     // line.

@@ -5,11 +5,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import type { CodingAgentSessionDisplay } from "./session-display";
 import { formatCost } from "@langwatch/design-system/display-formatters";
-import {
-  contextHealthBand,
-  contextWindowCeiling,
-  type ContextHealthTone,
-} from "./context-health";
+import { contextHealthBand, contextWindowCeiling, type ContextHealthTone } from "./context-health";
 import {
   deriveSessionSignals,
   formatCompact,
@@ -45,14 +41,8 @@ interface SessionViewProps {
 
 export function SessionView({ session, entries }: SessionViewProps) {
   const signals = useMemo(() => deriveSessionSignals(session), [session]);
-  const tokenTimeline = useMemo(
-    () => (entries ? deriveTokenTimeline(entries) : []),
-    [entries],
-  );
-  const cacheRebuilds = useMemo(
-    () => (entries ? findCacheRebuilds(entries) : []),
-    [entries],
-  );
+  const tokenTimeline = useMemo(() => (entries ? deriveTokenTimeline(entries) : []), [entries]);
+  const cacheRebuilds = useMemo(() => (entries ? findCacheRebuilds(entries) : []), [entries]);
 
   return (
     <Box height="full" overflowY="auto">
@@ -134,11 +124,7 @@ function Headline({ session }: { session: CodingAgentSessionDisplay }) {
         </HStack>
       )}
 
-      <Grid
-        templateColumns="repeat(auto-fit, minmax(120px, 1fr))"
-        gap={3}
-        alignItems="stretch"
-      >
+      <Grid templateColumns="repeat(auto-fit, minmax(120px, 1fr))" gap={3} alignItems="stretch">
         <Stat label="Cost" value={formatCost(session.costUsd)} emphasis />
         <Stat label="Model calls" value={String(session.modelCalls)} />
         <Stat label="Tools run" value={String(session.toolCalls)} />
@@ -280,8 +266,7 @@ function TimeBreakdown({ session }: { session: CodingAgentSessionDisplay }) {
     );
   }
 
-  const meanTtft =
-    session.ttftSamples > 0 ? session.ttftMsTotal / session.ttftSamples : null;
+  const meanTtft = session.ttftSamples > 0 ? session.ttftMsTotal / session.ttftSamples : null;
 
   return (
     <VStack align="stretch" gap={2}>
@@ -332,14 +317,7 @@ function ToolTable({
     <VStack align="stretch" gap={1}>
       {rows.map(([tool, count]) => (
         <HStack key={tool} gap={3}>
-          <Text
-            textStyle="xs"
-            fontFamily="mono"
-            color="fg"
-            width="140px"
-            flexShrink={0}
-            truncate
-          >
+          <Text textStyle="xs" fontFamily="mono" color="fg" width="140px" flexShrink={0} truncate>
             {tool}
           </Text>
           {/* The bar is the point: it says at a glance which tool the session
@@ -355,13 +333,7 @@ function ToolTable({
           <Text textStyle="xs" color="fg" width="40px" textAlign="right">
             {count}
           </Text>
-          <Text
-            textStyle="xs"
-            color="fg.subtle"
-            width="60px"
-            textAlign="right"
-            flexShrink={0}
-          >
+          <Text textStyle="xs" color="fg.subtle" width="60px" textAlign="right" flexShrink={0}>
             {durations[tool] ? formatShortDuration(durations[tool]) : "—"}
           </Text>
         </HStack>
@@ -418,8 +390,8 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
         </Grid>
         {session.largestCacheRebuildTokens > 0 && (
           <Text textStyle="xs" color="fg.muted">
-            Biggest single rebuild: {formatCompact(session.largestCacheRebuildTokens)}{" "}
-            tokens re-sent instead of being reused from cache.
+            Biggest single rebuild: {formatCompact(session.largestCacheRebuildTokens)} tokens
+            re-sent instead of being reused from cache.
           </Text>
         )}
       </VStack>
@@ -441,13 +413,12 @@ function ContextNoise({ session }: { session: CodingAgentSessionDisplay }) {
     <Section title="Context noise">
       <VStack align="stretch" gap={1}>
         <Text textStyle="sm" color="fg">
-          Compacted {session.compactions}× —{" "}
-          {formatCompact(session.compactionTokensBefore)} →{" "}
+          Compacted {session.compactions}× — {formatCompact(session.compactionTokensBefore)} →{" "}
           {formatCompact(session.compactionTokensAfter)} tokens.
         </Text>
         <Text textStyle="xs" color="fg.muted">
-          Older detail gets summarised away once the context outgrows the window. Anything
-          the agent forgot after this point, it forgot here.
+          Older detail gets summarised away once the context outgrows the window. Anything the agent
+          forgot after this point, it forgot here.
         </Text>
       </VStack>
     </Section>
@@ -478,13 +449,7 @@ function Extensions({ session }: { session: CodingAgentSessionDisplay }) {
       <VStack align="stretch" gap={2}>
         {groups.map((group) => (
           <HStack key={group.label} align="start" gap={3}>
-            <Text
-              textStyle="xs"
-              color="fg.muted"
-              width="100px"
-              flexShrink={0}
-              paddingTop={1}
-            >
+            <Text textStyle="xs" color="fg.muted" width="100px" flexShrink={0} paddingTop={1}>
               {group.label}
             </Text>
             <HStack gap={1} flexWrap="wrap">
@@ -521,21 +486,18 @@ function Outcome({ session }: { session: CodingAgentSessionDisplay }) {
             </Text>
             <Text textStyle="xs" color="fg.muted">
               lines
-              {session.languagesEdited.length > 0 &&
-                ` of ${session.languagesEdited.join(", ")}`}
+              {session.languagesEdited.length > 0 && ` of ${session.languagesEdited.join(", ")}`}
             </Text>
           </HStack>
         )}
-        {session.commits > 0 && (
-          <Stat label="Commits" value={String(session.commits)} compact />
-        )}
+        {session.commits > 0 && <Stat label="Commits" value={String(session.commits)} compact />}
         {session.pullRequests > 0 && (
           <Stat label="Pull requests" value={String(session.pullRequests)} compact />
         )}
         {hasReview && (
           <Text textStyle="xs" color="fg.muted">
-            You kept {session.editsAccepted} of{" "}
-            {session.editsAccepted + session.editsRejected} suggested edits
+            You kept {session.editsAccepted} of {session.editsAccepted + session.editsRejected}{" "}
+            suggested edits
           </Text>
         )}
       </HStack>
@@ -565,10 +527,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** Border / background / text colour for a toned Stat — one place, so Cache health and Context noise read consistently with the existing warning-only stats. */
-const STAT_TONE_COLORS: Record<
-  ContextHealthTone,
-  { border: string; bg: string; fg: string }
-> = {
+const STAT_TONE_COLORS: Record<ContextHealthTone, { border: string; bg: string; fg: string }> = {
   success: { border: "green.solid/30", bg: "green.solid/8", fg: "green.fg" },
   info: { border: "border", bg: "bg.subtle", fg: "fg" },
   warning: { border: "yellow.solid/30", bg: "yellow.solid/8", fg: "yellow.fg" },

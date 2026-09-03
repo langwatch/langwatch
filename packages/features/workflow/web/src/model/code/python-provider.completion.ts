@@ -57,10 +57,7 @@ function memberCompletion(
   };
 }
 
-export function registerCompletion(
-  monaco: Monaco,
-  contractRef: ContractRef,
-): IDisposable {
+export function registerCompletion(monaco: Monaco, contractRef: ContractRef): IDisposable {
   return monaco.languages.registerCompletionItemProvider("python", {
     // Only trigger on `.` for attribute access. Triggering on space pops the
     // suggest widget on every whitespace and (in some browsers) intercepts the
@@ -90,9 +87,7 @@ export function registerCompletion(
         const mod = moduleName ? PYTHON_STDLIB_MODULE_BY_NAME.get(moduleName) : void 0;
         if (mod) {
           return {
-            suggestions: mod.members.map((m) =>
-              memberCompletion(monaco, mod, m, replaceRange),
-            ),
+            suggestions: mod.members.map((m) => memberCompletion(monaco, mod, m, replaceRange)),
           };
         }
       }
@@ -138,9 +133,7 @@ export function registerCompletion(
         const mod = imports.get(owner);
         if (mod) {
           return {
-            suggestions: mod.members.map((m) =>
-              memberCompletion(monaco, mod, m, replaceRange),
-            ),
+            suggestions: mod.members.map((m) => memberCompletion(monaco, mod, m, replaceRange)),
           };
         }
         return { suggestions: [] };

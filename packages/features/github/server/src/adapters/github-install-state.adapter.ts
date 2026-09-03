@@ -81,9 +81,7 @@ export class GithubInstallStateAdapter extends GithubInstallStatePort {
     }
 
     const body = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-    const signature = createHmac("sha256", this.signingKey)
-      .update(body)
-      .digest("base64url");
+    const signature = createHmac("sha256", this.signingKey).update(body).digest("base64url");
 
     return `${body}.${signature}`;
   }

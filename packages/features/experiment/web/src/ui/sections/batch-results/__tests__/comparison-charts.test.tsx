@@ -12,11 +12,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  ComparisonCharts,
-  computeRunMetrics,
-  computeTargetMetrics,
-} from "../comparison-charts";
+import { ComparisonCharts, computeRunMetrics, computeTargetMetrics } from "../comparison-charts";
 import type { BatchEvaluationData, ComparisonRunData } from "@langwatch/experiment-web";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -36,12 +32,7 @@ const createMockRunData = (
   createdAt: number,
   options?: MockRunOptions,
 ): ComparisonRunData => {
-  const {
-    targetCount = 2,
-    hasScores = true,
-    hasPassRates = true,
-    metadata,
-  } = options ?? {};
+  const { targetCount = 2, hasScores = true, hasPassRates = true, metadata } = options ?? {};
 
   const defaultMetadata = (i: number) => ({
     model: i === 0 ? "openai/gpt-4" : "openai/gpt-3.5-turbo",
@@ -426,14 +417,11 @@ describe("ComparisonCharts", () => {
             },
           };
 
-          render(
-            <ComparisonCharts comparisonData={[evaluatorOnlyRun]} isVisible={true} />,
-            { wrapper: Wrapper },
-          );
+          render(<ComparisonCharts comparisonData={[evaluatorOnlyRun]} isVisible={true} />, {
+            wrapper: Wrapper,
+          });
 
-          expect(screen.getByTestId("group-by-button")).toHaveTextContent(
-            "Group by: Runs",
-          );
+          expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Runs");
         });
 
         it("defaults group by to runs for virtual _eval_ targets", () => {
@@ -471,14 +459,11 @@ describe("ComparisonCharts", () => {
             },
           };
 
-          render(
-            <ComparisonCharts comparisonData={[virtualEvalRun]} isVisible={true} />,
-            { wrapper: Wrapper },
-          );
+          render(<ComparisonCharts comparisonData={[virtualEvalRun]} isVisible={true} />, {
+            wrapper: Wrapper,
+          });
 
-          expect(screen.getByTestId("group-by-button")).toHaveTextContent(
-            "Group by: Runs",
-          );
+          expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Runs");
         });
       });
     });
@@ -1021,9 +1006,7 @@ describe("ComparisonCharts", () => {
         });
 
         // For single run with multiple targets, defaults to "Target" grouping
-        expect(screen.getByTestId("group-by-button")).toHaveTextContent(
-          "Group by: Target",
-        );
+        expect(screen.getByTestId("group-by-button")).toHaveTextContent("Group by: Target");
 
         // Charts should render
         expect(screen.getByTestId("chart-score-response_quality")).toBeInTheDocument();

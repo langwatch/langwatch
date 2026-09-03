@@ -13,13 +13,11 @@ import { useProductFlow } from "../../behavior/use-product-flow";
 import { useCreateProductScreens } from "./create-product-screens";
 
 export const ProductScreen: React.FC = () => {
-  const { currentScreenIndex, flow, navigation, canGoBack, handleSelectProduct } =
-    useProductFlow();
+  const { currentScreenIndex, flow, navigation, canGoBack, handleSelectProduct } = useProductFlow();
   const { organization, isLoading } = useOrganizationTeamProject({
     redirectToOnboarding: true,
   });
-  const { project: activeProject, slug: skipSlug } =
-    useProjectBySlugOrLatest(organization);
+  const { project: activeProject, slug: skipSlug } = useProjectBySlugOrLatest(organization);
 
   // Delay showing skeleton to avoid flicker on fast loads
   const [delayedLoading, setDelayedLoading] = useState(false);
@@ -70,11 +68,7 @@ export const ProductScreen: React.FC = () => {
         <Box w="full">
           <ActiveProjectProvider value={{ project: activeProject, organization }}>
             {!isLoading && currentScreen.component ? (
-              <AnalyticsBoundary
-                key={currentScreen.id}
-                name={currentScreen.id}
-                sendViewedEvent
-              >
+              <AnalyticsBoundary key={currentScreen.id} name={currentScreen.id} sendViewedEvent>
                 <ScreenLifecycle />
                 <currentScreen.component />
               </AnalyticsBoundary>

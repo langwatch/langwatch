@@ -10,12 +10,11 @@ import type { Transform } from "./types";
  * mapping filed under an id that resolves to nothing is wiring a run can never
  * apply.
  */
-export const setTargetMapping: Transform<
-  SetMappingPayload,
-  { targetId: string }
-> = ({ state, payload }) => {
-  const { targetId, datasetId, inputField, mapping } =
-    setMappingPayloadSchema.parse(payload);
+export const setTargetMapping: Transform<SetMappingPayload, { targetId: string }> = ({
+  state,
+  payload,
+}) => {
+  const { targetId, datasetId, inputField, mapping } = setMappingPayloadSchema.parse(payload);
   requireTarget({ state, targetId });
   requireDataset({ state, datasetId });
 

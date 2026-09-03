@@ -105,20 +105,20 @@ Where an ADR states one, the ADR is the authority and this is the index.
 Everything scoped to `platform/app` closed with the tree. These are the ones
 still reachable in current code, re-verified 2026-09-03.
 
-| ID | Finding | Where it goes now |
-| --- | --- | --- |
-| `F-API-01` / `F-API-07` | The checked-in OpenAPI artefacts are stale, and the frozen document lists 22 operations no composition mounts (`/api/v1/agents*`, `/api/v1/run-plans*`, `/api/v1/test-suites*`). Regeneration must happen last, on the merged branch. | `restructure-bug-hunt-2026-09-03.md` |
-| `F-LINT-01` | Full architecture lint is red. Superseded: the whole surface is planned slice by slice. | `architecture-lint-burn-down-plan.md` |
-| `F-TRACE-01` | The extracted full-read path trusts a stale storage-anchor hint. Verify against the legacy mapper characterisation before the read stack is treated as parity-proven. | open, unowned |
-| `F-GATEWAY-CAT-01` | **Still live.** `toLegacyCompatibleCustomModels` (`packages/features/model-provider/contract/src/custom-model.ts:45-57`) `safeParse`s each entry against a `.strict()` schema and `flatMap`s failures away, so a stored `customModels` entry carrying an unrecognised key is silently dropped and the model becomes unroutable with no error. | open, unowned |
-| `F-HOME-01` | `user.homePagePickerState`'s first-project port and `governance.resolveHome`'s first-project query disagree: the resolver excludes personal workspaces (ADR-038 v6), the picker does not, so the picker can offer a personal-workspace slug the resolver will never route to. | open, unowned |
-| `F-WEBHOOK-01` | Eight callbacks in the webhook/gateway REST integration files assert nothing the deterministic test-quality review can recognise as observable behaviour. | folds into the burn-down's `test-quality` slice (A19) |
-| `F-AGENT-01` | `specs/agents/AUDIT_MANIFEST.md` still points at deleted management UI paths and does not bind the moved scenario tests. | refresh with the connected-agents parity sweep (Slice 9) |
-| `F-AGENT-02` | Agent management replacement coverage does not directly assert every former dialog success/close/toast/invalidation outcome. | open, low priority |
-| `F-DATASET-01` | The standalone dataset backfill task has a generated-Prisma to `DatasetMigrationDatabasePort` aggregate promise mismatch. | folds into the `dataset-content-backfill` wiring (`tasks-lane-review.md`) |
-| `F-SPEC-GOV-01` | `specs/ai-gateway/governance/admin-trace-access.feature` had no binding tags, so it enforced nothing. **Now carries six** — confirm with `check:feature-parity` and close. | close on the next parity run |
-| `F-BRANCH-01` / `F-CI-01` | No gate in this plan was ever checked by CI. PR #7536 is still a **draft**, and drafts skip the build and race jobs — a green draft is not evidence. | mark ready before reading any check as proof |
-| `F-LINT-02` | Wire `oxlint-tsgolint`. It restores all four type-aware rules lost when Biome was removed (`noFloatingPromises`, `noMisusedPromises`, `useOptionalChain`, `useLiteralKeys`) in one move. `noImplicitAnyLet` and `noEvolvingTypes` have no oxlint equivalent at all and need TypeScript semantics. | open, needs a machine that can run a type-aware lint over the tree |
+| ID                        | Finding                                                                                                                                                                                                                                                                                                                                       | Where it goes now                                                         |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `F-API-01` / `F-API-07`   | The checked-in OpenAPI artefacts are stale, and the frozen document lists 22 operations no composition mounts (`/api/v1/agents*`, `/api/v1/run-plans*`, `/api/v1/test-suites*`). Regeneration must happen last, on the merged branch.                                                                                                         | `restructure-bug-hunt-2026-09-03.md`                                      |
+| `F-LINT-01`               | Full architecture lint is red. Superseded: the whole surface is planned slice by slice.                                                                                                                                                                                                                                                       | `architecture-lint-burn-down-plan.md`                                     |
+| `F-TRACE-01`              | The extracted full-read path trusts a stale storage-anchor hint. Verify against the legacy mapper characterisation before the read stack is treated as parity-proven.                                                                                                                                                                         | open, unowned                                                             |
+| `F-GATEWAY-CAT-01`        | **Still live.** `toLegacyCompatibleCustomModels` (`packages/features/model-provider/contract/src/custom-model.ts:45-57`) `safeParse`s each entry against a `.strict()` schema and `flatMap`s failures away, so a stored `customModels` entry carrying an unrecognised key is silently dropped and the model becomes unroutable with no error. | open, unowned                                                             |
+| `F-HOME-01`               | `user.homePagePickerState`'s first-project port and `governance.resolveHome`'s first-project query disagree: the resolver excludes personal workspaces (ADR-038 v6), the picker does not, so the picker can offer a personal-workspace slug the resolver will never route to.                                                                 | open, unowned                                                             |
+| `F-WEBHOOK-01`            | Eight callbacks in the webhook/gateway REST integration files assert nothing the deterministic test-quality review can recognise as observable behaviour.                                                                                                                                                                                     | folds into the burn-down's `test-quality` slice (A19)                     |
+| `F-AGENT-01`              | `specs/agents/AUDIT_MANIFEST.md` still points at deleted management UI paths and does not bind the moved scenario tests.                                                                                                                                                                                                                      | refresh with the connected-agents parity sweep (Slice 9)                  |
+| `F-AGENT-02`              | Agent management replacement coverage does not directly assert every former dialog success/close/toast/invalidation outcome.                                                                                                                                                                                                                  | open, low priority                                                        |
+| `F-DATASET-01`            | The standalone dataset backfill task has a generated-Prisma to `DatasetMigrationDatabasePort` aggregate promise mismatch.                                                                                                                                                                                                                     | folds into the `dataset-content-backfill` wiring (`tasks-lane-review.md`) |
+| `F-SPEC-GOV-01`           | `specs/ai-gateway/governance/admin-trace-access.feature` had no binding tags, so it enforced nothing. **Now carries six** — confirm with `check:feature-parity` and close.                                                                                                                                                                    | close on the next parity run                                              |
+| `F-BRANCH-01` / `F-CI-01` | No gate in this plan was ever checked by CI. PR #7536 is still a **draft**, and drafts skip the build and race jobs — a green draft is not evidence.                                                                                                                                                                                          | mark ready before reading any check as proof                              |
+| `F-LINT-02`               | Wire `oxlint-tsgolint`. It restores all four type-aware rules lost when Biome was removed (`noFloatingPromises`, `noMisusedPromises`, `useOptionalChain`, `useLiteralKeys`) in one move. `noImplicitAnyLet` and `noEvolvingTypes` have no oxlint equivalent at all and need TypeScript semantics.                                             | open, needs a machine that can run a type-aware lint over the tree        |
 
 ## Decisions still approaching
 
@@ -133,17 +133,17 @@ temporary feature host adapters are deleted (`268eb2ed83`).
 
 ## Where the live work is now
 
-| Lane | Document |
-| --- | --- |
-| Composition and install simplification | `composition-simplification-options.md` |
-| Architecture-lint burn-down | `architecture-lint-burn-down-plan.md`, `architecture-lint-review-2026-09-03.md` |
-| tRPC flatten (steps C and D) | `trpc-flatten-design.md`, `trpc-flatten-review.md` |
-| Install and api-map retirement | `install-composition-review-2026-09-03.md` |
-| Connected agents (ADR-128) | `connected-agents-restore-plan.md` |
-| Suite run plans | `suite-restore-review.md` |
-| Tasks and langwatch-saas | `tasks-launch-interface-and-saas.md`, `tasks-lane-review.md` |
-| Unserved surfaces and restored bugs | `restructure-bug-hunt-2026-09-03.md` |
-| Everything needing Alex | `open-decisions-2026-09-03.md` |
+| Lane                                   | Document                                                                        |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| Composition and install simplification | `composition-simplification-options.md`                                         |
+| Architecture-lint burn-down            | `architecture-lint-burn-down-plan.md`, `architecture-lint-review-2026-09-03.md` |
+| tRPC flatten (steps C and D)           | `trpc-flatten-design.md`, `trpc-flatten-review.md`                              |
+| Install and api-map retirement         | `install-composition-review-2026-09-03.md`                                      |
+| Connected agents (ADR-128)             | `connected-agents-restore-plan.md`                                              |
+| Suite run plans                        | `suite-restore-review.md`                                                       |
+| Tasks and langwatch-saas               | `tasks-launch-interface-and-saas.md`, `tasks-lane-review.md`                    |
+| Unserved surfaces and restored bugs    | `restructure-bug-hunt-2026-09-03.md`                                            |
+| Everything needing Alex                | `open-decisions-2026-09-03.md`                                                  |
 
 The shorter operational restart notes remain in
 [core hand-off](core-application-feature-extraction-handoff.md) and

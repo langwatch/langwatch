@@ -254,8 +254,7 @@ export type ExperimentRestoreVersionResponse =
 export type ExperimentVersionsResponse =
   paths["/api/experiments/{slug}/versions"]["get"]["responses"]["200"]["content"]["application/json"];
 
-export type ExperimentVersionSummary =
-  ExperimentVersionsResponse["versions"][number];
+export type ExperimentVersionSummary = ExperimentVersionsResponse["versions"][number];
 
 export class ExperimentsApiServiceError extends Error {
   constructor(
@@ -410,15 +409,12 @@ export class ExperimentsApiService {
     slug: string;
     fields?: "version";
   }): Promise<ExperimentWorkbenchStateResponse | ExperimentWorkbenchVersionProbe> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/experiments/{slug}/workbench-state",
-      {
-        params: {
-          path: { slug },
-          ...(fields !== undefined ? { query: { fields } } : {}),
-        },
+    const { data, error } = await this.apiClient.GET("/api/experiments/{slug}/workbench-state", {
+      params: {
+        path: { slug },
+        ...(fields !== undefined ? { query: { fields } } : {}),
       },
-    );
+    });
     if (error) {
       this.handleApiError(`get workbench state for "${slug}"`, error);
     }
@@ -443,17 +439,14 @@ export class ExperimentsApiService {
     expectedVersion?: number;
     commitMessage?: string;
   }): Promise<ExperimentSaveWorkbenchStateResponse> {
-    const { data, error } = await this.apiClient.PUT(
-      "/api/experiments/{slug}/workbench-state",
-      {
-        params: { path: { slug } },
-        body: {
-          state,
-          ...(expectedVersion !== undefined ? { expectedVersion } : {}),
-          ...(commitMessage !== undefined ? { commitMessage } : {}),
-        },
+    const { data, error } = await this.apiClient.PUT("/api/experiments/{slug}/workbench-state", {
+      params: { path: { slug } },
+      body: {
+        state,
+        ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+        ...(commitMessage !== undefined ? { commitMessage } : {}),
       },
-    );
+    });
     if (error) {
       this.handleApiError(`save workbench state for "${slug}"`, error);
     }
@@ -470,18 +463,15 @@ export class ExperimentsApiService {
     limit?: number;
     cursor?: number;
   }): Promise<ExperimentVersionsResponse> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/experiments/{slug}/versions",
-      {
-        params: {
-          path: { slug },
-          query: {
-            ...(limit !== undefined ? { limit } : {}),
-            ...(cursor !== undefined ? { cursor } : {}),
-          },
+    const { data, error } = await this.apiClient.GET("/api/experiments/{slug}/versions", {
+      params: {
+        path: { slug },
+        query: {
+          ...(limit !== undefined ? { limit } : {}),
+          ...(cursor !== undefined ? { cursor } : {}),
         },
       },
-    );
+    });
     if (error) {
       this.handleApiError(`list versions for experiment "${slug}"`, error);
     }
@@ -504,10 +494,7 @@ export class ExperimentsApiService {
       { params: { path: { slug, version } } },
     );
     if (error) {
-      this.handleApiError(
-        `restore version ${version} of experiment "${slug}"`,
-        error,
-      );
+      this.handleApiError(`restore version ${version} of experiment "${slug}"`, error);
     }
     return data;
   }

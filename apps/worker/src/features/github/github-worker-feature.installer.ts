@@ -1,8 +1,5 @@
 import { EventingGithubMaintenanceAdapter } from "@langwatch/github-server";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** The sweep, so a caller can supply one without a GitHub App or a database. */

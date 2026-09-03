@@ -47,11 +47,7 @@ describe("langyThinkingLine", () => {
       // wait is the model working. "Preparing Langy's workspace…" here would
       // claim a boot that is not happening.
       const line = langyThinkingLine({
-        messages: [
-          user,
-          assistant([{ type: "text", text: "Yes, how can I help?" }]),
-          user,
-        ],
+        messages: [user, assistant([{ type: "text", text: "Yes, how can I help?" }]), user],
         elapsedMs: 3_000,
       });
       expect(line?.text).toBe("Thinking…");
@@ -88,11 +84,7 @@ describe("langyThinkingLine", () => {
       // used to make the line claim "Writing…" for a turn that had produced
       // nothing.
       const line = langyThinkingLine({
-        messages: [
-          user,
-          assistant([{ type: "text", text: "Done, anything else?" }]),
-          user,
-        ],
+        messages: [user, assistant([{ type: "text", text: "Done, anything else?" }]), user],
         elapsedMs: 1_000,
       });
       expect(line?.text).not.toBe("Writing…");
@@ -152,12 +144,9 @@ describe("langyThinkingLine", () => {
     });
 
     it("escalates monotonically — it never gets less worried with time", () => {
-      const tones = [
-        0,
-        THINKING_STILL_STARTING_MS,
-        THINKING_SLOW_MS,
-        THINKING_STUCK_MS,
-      ].map((elapsedMs) => langyThinkingLine({ messages: [user], elapsedMs })?.tone);
+      const tones = [0, THINKING_STILL_STARTING_MS, THINKING_SLOW_MS, THINKING_STUCK_MS].map(
+        (elapsedMs) => langyThinkingLine({ messages: [user], elapsedMs })?.tone,
+      );
       expect(tones).toEqual(["waiting", "waiting", "waiting", "stuck"]);
     });
   });
@@ -368,17 +357,9 @@ describe("langyThinkingLine", () => {
 
     /** @scenario "Page activity survives the turn falling quiet between steps" */
     it("outranks the between-steps thinking line", () => {
-      const messages = [
-        user,
-        assistant([{ type: "tool-bash", state: "output-available" }]),
-      ];
-      expect(langyThinkingLine({ messages, elapsedMs: 3_000 })?.text).toBe(
-        "Thinking…",
-      );
-      expect(
-        langyThinkingLine({ messages, elapsedMs: 3_000, pageActivity: RUN })
-          ?.text,
-      ).toBe(RUN);
+      const messages = [user, assistant([{ type: "tool-bash", state: "output-available" }])];
+      expect(langyThinkingLine({ messages, elapsedMs: 3_000 })?.text).toBe("Thinking…");
+      expect(langyThinkingLine({ messages, elapsedMs: 3_000, pageActivity: RUN })?.text).toBe(RUN);
     });
 
     /** @scenario "A finished run releases the line" */

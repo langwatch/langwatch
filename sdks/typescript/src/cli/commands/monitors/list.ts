@@ -50,9 +50,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
       sample: number;
     }>;
 
-    spinner.succeed(
-      `Found ${monitors.length} monitor${monitors.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${monitors.length} monitor${monitors.length !== 1 ? "s" : ""}`);
   } catch (error) {
     // No explicit `format`: see traces/search.ts — the preAction hook covers
     // every spelling; the `-f` commander default must not override it.
@@ -68,9 +66,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
         console.log(chalk.gray("No monitors found."));
         console.log(chalk.gray("Create one with:"));
         console.log(
-          chalk.cyan(
-            '  langwatch monitor create "Toxicity Check" --check-type ragas/toxicity',
-          ),
+          chalk.cyan('  langwatch monitor create "Toxicity Check" --check-type ragas/toxicity'),
         );
         return;
       }

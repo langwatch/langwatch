@@ -568,7 +568,11 @@ export function composeApiExecutionCollaborators(
           return await workflowApp.copyStudioWorkflow(input);
         } catch (error) {
           if (error instanceof WorkflowVersionRequiredError) {
-            throw new NotFoundError("workflow_version_not_found", "Workflow version", input.workflow.id);
+            throw new NotFoundError(
+              "workflow_version_not_found",
+              "Workflow version",
+              input.workflow.id,
+            );
           }
           throw error;
         }
@@ -602,10 +606,7 @@ export function composeApiExecutionCollaborators(
        * Spec: specs/evaluators/azure-safety-byok-gating.feature.
        */
       tryResolveAzureSafetyEnv: async (_ctx, input) => {
-        const providers = await getProjectModelProviders(
-          options.modelProviders,
-          input.projectId,
-        );
+        const providers = await getProjectModelProviders(options.modelProviders, input.projectId);
         const provider = providers[AZURE_SAFETY_PROVIDER_KEY];
         if (!provider?.enabled) return null;
 
@@ -623,8 +624,7 @@ export function composeApiExecutionCollaborators(
       evaluatorUnavailability: (input) =>
         evaluatorUnavailability({ evaluatorType: input.evaluatorType, environment }),
 
-      missingEnvironmentVariables: (envVars) =>
-        [...envVars].filter((name) => !environment[name]),
+      missingEnvironmentVariables: (envVars) => [...envVars].filter((name) => !environment[name]),
 
       runEvaluationForTrace: async (ctx, input) => {
         if (!options.runEvaluationForTrace) {
@@ -690,7 +690,7 @@ function composeReportEvaluation(input: {
   const sender = (registered.commands as Record<string, unknown>).reportEvaluation;
   if (!isSender(sender)) {
     throw new Error(
-      "The evaluation_processing registration produced no \"reportEvaluation\" command sender; the pipeline was registered incompletely.",
+      'The evaluation_processing registration produced no "reportEvaluation" command sender; the pipeline was registered incompletely.',
     );
   }
   return (data) => sender.send(data);
@@ -757,9 +757,7 @@ const NO_BROADCAST: ExperimentBroadcast = (() => {
  * why their run will not start. The provider rows themselves never leave here.
  */
 class ApiWorkflowLlmParametersAdapter extends WorkflowLlmParametersPort {
-  static create(input: {
-    modelProviders: ModelProviderService;
-  }): ApiWorkflowLlmParametersAdapter {
+  static create(input: { modelProviders: ModelProviderService }): ApiWorkflowLlmParametersAdapter {
     return new ApiWorkflowLlmParametersAdapter(input.modelProviders);
   }
 
@@ -862,4 +860,3 @@ class LoggedExperimentRunHistoryTelemetry {
     this.logger.warn(input, message);
   }
 }
-

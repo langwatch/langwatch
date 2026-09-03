@@ -4,12 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  getTypeLabel,
-  TYPE_LABELS,
-  VariableTypeBadge,
-  VariableTypeIcon,
-} from "../index";
+import { getTypeLabel, TYPE_LABELS, VariableTypeBadge, VariableTypeIcon } from "../index";
 
 describe("TYPE_LABELS", () => {
   it("maps str to Text", () => {

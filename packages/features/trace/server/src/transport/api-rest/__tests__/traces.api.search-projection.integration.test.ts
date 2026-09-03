@@ -34,9 +34,7 @@ import {
 
 vi.mock("#services/trace-formatting.service", () => ({
   generateAsciiTree: vi.fn().mockReturnValue("ascii tree"),
-  formatTraceSummaryDigest: vi
-    .fn()
-    .mockReturnValue("Input: hello\nOutput: world"),
+  formatTraceSummaryDigest: vi.fn().mockReturnValue("Input: hello\nOutput: world"),
 }));
 
 vi.mock("#services/trace-readable-span.service", () => ({
@@ -111,7 +109,10 @@ const searchBodySchema = z
     pageSize: z.number().optional(),
     ...traceSearchBodyExtensions,
   })
-  .catchall(z.unknown()) as unknown as TracesRestPorts<TraceSearchBody, unknown>["searchBodySchema"];
+  .catchall(z.unknown()) as unknown as TracesRestPorts<
+  TraceSearchBody,
+  unknown
+>["searchBodySchema"];
 
 function buildApi() {
   const ports: TracesRestPorts<TraceSearchBody, unknown> = {
@@ -128,7 +129,8 @@ function buildApi() {
   const app = createTracesRestApp({ security: testSecurity(), ports });
 
   return {
-    fetch: (path: string, init?: RequestInit) => app.hono.fetch(new Request(`http://api.test${path}`, init)),
+    fetch: (path: string, init?: RequestInit) =>
+      app.hono.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
 
@@ -385,7 +387,11 @@ describe("given POST /api/traces/search", () => {
     /** @scenario "Invalid dateField value returns 422" */
     it("rejects an unsupported date axis with 422", async () => {
       const api = buildApi();
-      const res = await searchRequest(api, { startDate: 1000, endDate: 5000, dateField: "created" });
+      const res = await searchRequest(api, {
+        startDate: 1000,
+        endDate: 5000,
+        dateField: "created",
+      });
       expect(res.status).toBe(422);
     });
   });

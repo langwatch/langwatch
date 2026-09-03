@@ -16,12 +16,7 @@ import type {
 
 export const TODOWRITE_TOOL_NAME = "todowrite";
 
-export const TODO_STATUSES = [
-  "pending",
-  "in_progress",
-  "completed",
-  "cancelled",
-] as const;
+export const TODO_STATUSES = ["pending", "in_progress", "completed", "cancelled"] as const;
 export type TodoStatus = (typeof TODO_STATUSES)[number];
 
 export type TodoItem = { content: string; status: TodoStatus };
@@ -94,8 +89,7 @@ export function createTodowriteExtension(): InlineExtension {
             toolName?: string;
             details?: { todos?: TodoItem[] };
           };
-          if (message.role !== "toolResult" || message.toolName !== TODOWRITE_TOOL_NAME)
-            continue;
+          if (message.role !== "toolResult" || message.toolName !== TODOWRITE_TOOL_NAME) continue;
           // A session file written by another worker version can carry statuses
           // this build does not know, so it is validated and copied, not adopted.
           if (Array.isArray(message.details?.todos)) {

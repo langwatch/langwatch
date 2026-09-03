@@ -33,9 +33,7 @@ const TEAM_ID = "team-platform";
 const PROJECT_ID = "project-doc-chat";
 
 const availableTeams = [{ id: TEAM_ID, name: "platform" }];
-const availableProjects = [
-  { id: PROJECT_ID, name: "Doc Chat · platform", teamId: TEAM_ID },
-];
+const availableProjects = [{ id: PROJECT_ID, name: "Doc Chat · platform", teamId: TEAM_ID }];
 const projectScope = [{ scopeType: "PROJECT" as const, scopeId: PROJECT_ID }];
 
 const ORG_PROVIDER_ID = "mp-org-alpha";

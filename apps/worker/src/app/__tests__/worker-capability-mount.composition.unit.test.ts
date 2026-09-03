@@ -96,7 +96,9 @@ function frozenRegistryKeys(): string[] {
     ...registry.pipelines.flatMap((pipeline) =>
       pipeline.jobs.map((job) => `${pipeline.name}:${job}`),
     ),
-    ...registry.globalProjections.jobs.map((job) => `${registry.globalProjections.pipeline}:${job}`),
+    ...registry.globalProjections.jobs.map(
+      (job) => `${registry.globalProjections.pipeline}:${job}`,
+    ),
   ].sort();
 }
 
@@ -222,7 +224,8 @@ describe("given a worker that composes every capability for itself", () => {
     } as unknown as ModelProviderService;
     const execution = createWorkerTopicClusteringExecution({
       config: resolveWorkerConfig({ NODE_ENV: "test" }),
-      resolveClickHouseClient: async () => ({ query: async () => ({ json: async () => [] }) }) as never,
+      resolveClickHouseClient: async () =>
+        ({ query: async () => ({ json: async () => [] }) }) as never,
       modelProviders,
     });
 
@@ -259,7 +262,8 @@ describe("given a worker that composes every capability for itself", () => {
   it("refuses every clustering model resolution by name", async () => {
     const execution = createWorkerTopicClusteringExecution({
       config: resolveWorkerConfig({ NODE_ENV: "test" }),
-      resolveClickHouseClient: async () => ({ query: async () => ({ json: async () => [] }) }) as never,
+      resolveClickHouseClient: async () =>
+        ({ query: async () => ({ json: async () => [] }) }) as never,
     });
 
     await expect(execution.models.resolveClusteringModel("project-1")).rejects.toThrow(
@@ -284,7 +288,8 @@ describe("given a worker that composes every capability for itself", () => {
         NODE_ENV: "test",
         LANGEVALS_ENDPOINT: "https://langevals.example.test",
       }),
-      resolveClickHouseClient: async () => ({ query: async () => ({ json: async () => [] }) }) as never,
+      resolveClickHouseClient: async () =>
+        ({ query: async () => ({ json: async () => [] }) }) as never,
       fetch: fetchImpl,
     });
 

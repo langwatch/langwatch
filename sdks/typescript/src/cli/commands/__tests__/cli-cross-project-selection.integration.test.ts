@@ -31,9 +31,7 @@ describe("given a login key that reaches the whole organization", () => {
       });
 
       expect(result.exitCode).toBe(0);
-      expect(recorded.searchAuth).toBe(
-        basicFor({ projectId: "proj-b", apiKey: LOGIN_KEY }),
-      );
+      expect(recorded.searchAuth).toBe(basicFor({ projectId: "proj-b", apiKey: LOGIN_KEY }));
     });
   });
 

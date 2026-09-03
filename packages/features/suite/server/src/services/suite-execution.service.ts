@@ -70,7 +70,12 @@ export class SuiteExecutionService extends SuiteExecutionPort {
      */
     resolveRunModels?: SuiteRunModelsResolver;
   }): SuiteExecutionService {
-    return new SuiteExecutionService(input.commands, input.ids, input.scenarios, input.resolveRunModels);
+    return new SuiteExecutionService(
+      input.commands,
+      input.ids,
+      input.scenarios,
+      input.resolveRunModels,
+    );
   }
 
   private constructor(
@@ -160,7 +165,10 @@ export class SuiteExecutionService extends SuiteExecutionPort {
         values: { ...input.parameters, ...target.runParameters },
       });
 
-      parameters.set(targetKey, new Map(resolved.map((item) => [item.scenarioId, item.parameters])));
+      parameters.set(
+        targetKey,
+        new Map(resolved.map((item) => [item.scenarioId, item.parameters])),
+      );
       secrets ??= new Map(
         resolved
           .filter((item) => Object.keys(item.secretParameters).length > 0)

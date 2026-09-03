@@ -31,12 +31,7 @@ export function LeftPanel({
       bg="bg.surface"
     >
       <VStack align="stretch" gap={0}>
-        <Box
-          paddingX={3}
-          paddingY={2}
-          borderBottom="1px solid"
-          borderBottomColor="border"
-        >
+        <Box paddingX={3} paddingY={2} borderBottom="1px solid" borderBottomColor="border">
           <Text
             textStyle="xs"
             fontWeight="semibold"
@@ -74,9 +69,7 @@ export function LeftPanel({
                 borderBottom="1px solid"
                 borderBottomColor="border"
                 aria-pressed={isSelected}
-                onClick={() =>
-                  onSelectProjection(isSelected ? null : proj.projectionName)
-                }
+                onClick={() => onSelectProjection(isSelected ? null : proj.projectionName)}
               >
                 <HStack gap={2}>
                   <Circle size={8} fill="currentColor" color="green.500" />

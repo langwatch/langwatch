@@ -121,8 +121,7 @@ export async function refreshSession(
     applyRefreshResult(cfg, await refreshImpl(opts, attempted), saveImpl);
     return { status: "refreshed" };
   } catch (err) {
-    const rejected =
-      err instanceof deviceFlow.DeviceFlowError && err.kind === "unauthorized";
+    const rejected = err instanceof deviceFlow.DeviceFlowError && err.kind === "unauthorized";
     if (!rejected) {
       return { status: "failed", message: messageOf(err) };
     }
@@ -142,8 +141,7 @@ export async function refreshSession(
       applyRefreshResult(cfg, await refreshImpl(opts, rotated), saveImpl);
       return { status: "refreshed" };
     } catch (err2) {
-      const rejected2 =
-        err2 instanceof deviceFlow.DeviceFlowError && err2.kind === "unauthorized";
+      const rejected2 = err2 instanceof deviceFlow.DeviceFlowError && err2.kind === "unauthorized";
       return {
         status: rejected2 ? "rejected" : "failed",
         message: messageOf(err2),

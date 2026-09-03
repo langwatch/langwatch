@@ -5,7 +5,4 @@ export {
   OutboxDispatcherService,
   type OutboxDispatcherServiceOptions,
 } from "./outboxDispatcherService";
-export {
-  ProcessOutboxWorker,
-  type ProcessOutboxWorkerOptions,
-} from "./processOutboxWorker";
+export { ProcessOutboxWorker, type ProcessOutboxWorkerOptions } from "./processOutboxWorker";

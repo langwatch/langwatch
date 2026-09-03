@@ -60,16 +60,13 @@ describe("the real command tree", () => {
       ["scenario", "run"],
     ];
 
-    it.each(wired)(
-      "marks `%s %s` as speaking the output contract",
-      async (group, name) => {
-        const { buildProgram } = await import("../../program.js");
-        const command = findCommand(buildProgram(), [group, name]);
+    it.each(wired)("marks `%s %s` as speaking the output contract", async (group, name) => {
+      const { buildProgram } = await import("../../program.js");
+      const command = findCommand(buildProgram(), [group, name]);
 
-        expect(command).toBeDefined();
-        expect(isOutputAware(command!)).toBe(true);
-      },
-    );
+      expect(command).toBeDefined();
+      expect(isOutputAware(command!)).toBe(true);
+    });
   });
 
   describe("when a command still prints its own output", () => {
@@ -137,13 +134,16 @@ describe("the real command tree", () => {
       ["workbench", "get-state"],
     ];
 
-    it.each(agentDriven)("lets `%s %s` be asked for json the way the skills ask", async (group, name) => {
-      const { buildProgram } = await import("../../program.js");
-      const command = findCommand(buildProgram(), [group, name]);
+    it.each(agentDriven)(
+      "lets `%s %s` be asked for json the way the skills ask",
+      async (group, name) => {
+        const { buildProgram } = await import("../../program.js");
+        const command = findCommand(buildProgram(), [group, name]);
 
-      expect(command).toBeDefined();
-      expect(command!.options.map((option) => option.long)).toContain("--format");
-    });
+        expect(command).toBeDefined();
+        expect(command!.options.map((option) => option.long)).toContain("--format");
+      },
+    );
   });
 
   describe("every leaf command", () => {
@@ -159,16 +159,7 @@ describe("the real command tree", () => {
 
       // Launchers and passthroughs: they exec another tool and own its stdio.
       ...(
-        [
-          "claude",
-          "codex",
-          "cursor",
-          "gemini",
-          "opencode",
-          "copilot",
-          "code",
-          "open",
-        ] as const
+        ["claude", "codex", "cursor", "gemini", "opencode", "copilot", "code", "open"] as const
       ).map((n) => [n, "launches another tool and owns its stdio"] as const),
       // Local machine setup: mints a key and installs an OS login agent;
       // progress prose, no structured result document.
@@ -197,13 +188,7 @@ describe("the real command tree", () => {
         (n) => [n, "owns its --json"] as const,
       ),
       ...(
-        [
-          "ingest codex",
-          "ingest health",
-          "ingest install",
-          "ingest list",
-          "ingest tail",
-        ] as const
+        ["ingest codex", "ingest health", "ingest install", "ingest list", "ingest tail"] as const
       ).map((n) => [n, "owns its --json"] as const),
       ["governance status", "owns its --json"],
       ...(
@@ -249,8 +234,7 @@ describe("the real command tree", () => {
       const root = buildProgram();
 
       const unaccounted = leafPaths(root).filter(
-        (path) =>
-          !holdouts.has(path) && !isOutputAware(findCommand(root, path.split(" "))!),
+        (path) => !holdouts.has(path) && !isOutputAware(findCommand(root, path.split(" "))!),
       );
 
       expect(

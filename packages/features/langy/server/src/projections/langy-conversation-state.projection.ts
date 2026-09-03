@@ -85,8 +85,7 @@ export class LangyConversationStateFoldProjection
     "LastEventOccurredAt",
     StateProjectionStore<LangyConversationStateData>
   >
-  implements
-    FoldEventHandlers<typeof langyConversationEvents, LangyConversationStateData>
+  implements FoldEventHandlers<typeof langyConversationEvents, LangyConversationStateData>
 {
   readonly name = "langyConversationState";
   readonly version = LANGY_CONVERSATION_PROJECTION_VERSIONS.CONVERSATION_STATE;

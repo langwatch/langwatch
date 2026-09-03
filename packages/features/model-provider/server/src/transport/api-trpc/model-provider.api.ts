@@ -136,7 +136,10 @@ type ModelProviderTrpcProcedures<
  * lets inference fill them from the object the process actually passes, and
  * the verdict union reaches the browser.
  */
-export type ModelProviderTrpcPorts<TApiKeyValidation = unknown, TStoredKeyValidation = unknown> = Readonly<{
+export type ModelProviderTrpcPorts<
+  TApiKeyValidation = unknown,
+  TStoredKeyValidation = unknown,
+> = Readonly<{
   /** Probes a caller-supplied credential against the provider. */
   validateProviderApiKey(
     provider: string,

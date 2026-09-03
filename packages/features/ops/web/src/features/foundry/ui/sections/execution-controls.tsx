@@ -50,8 +50,7 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
             error: err instanceof Error ? err.message : "Send failed",
           });
         }
-        if (staggerMs > 0 && i < batchCount - 1)
-          await new Promise((r) => setTimeout(r, staggerMs));
+        if (staggerMs > 0 && i < batchCount - 1) await new Promise((r) => setTimeout(r, staggerMs));
       }
     } finally {
       setRunning(false);

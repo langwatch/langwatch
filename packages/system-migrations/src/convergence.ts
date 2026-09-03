@@ -6,9 +6,7 @@ import type { MigrationPassSummary } from "./types";
  * its repositories, the registered migrations and whatever Redis the lease
  * uses; this loop only decides whether another pass is worth running.
  */
-export type SystemMigrationPass = (input: {
-  signal: AbortSignal;
-}) => Promise<MigrationPassSummary>;
+export type SystemMigrationPass = (input: { signal: AbortSignal }) => Promise<MigrationPassSummary>;
 
 const logger = createLogger("langwatch:system-migrations:boot");
 
@@ -72,9 +70,9 @@ const MAX_PASSES = 25;
  * Composed by the app layer (presets.ts) alongside the other worker-only
  * background loops, and torn down through the App's graceful closeables.
  */
-export function startSystemMigrations(args: {
-  runPass: SystemMigrationPass;
-}): { stop: () => Promise<void> } {
+export function startSystemMigrations(args: { runPass: SystemMigrationPass }): {
+  stop: () => Promise<void>;
+} {
   const controller = new AbortController();
   const loop = driveUntilConverged({
     signal: controller.signal,
@@ -188,13 +186,7 @@ function converged(summary: MigrationPassSummary): boolean {
 }
 
 /** Waits, or returns early the moment the signal aborts. */
-function sleep({
-  ms,
-  signal,
-}: {
-  ms: number;
-  signal: AbortSignal;
-}): Promise<void> {
+function sleep({ ms, signal }: { ms: number; signal: AbortSignal }): Promise<void> {
   if (signal.aborted) return Promise.resolve();
   return new Promise<void>((resolve) => {
     const done = (): void => {

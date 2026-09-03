@@ -28,9 +28,7 @@ describe("useRollingWindow", () => {
     // Frozen, this would still be asking for yesterday's window, and spend
     // recorded since would look like it had not arrived.
     expect(result.current.toIso).not.toBe(firstEnd);
-    expect(new Date(result.current.toIso).getTime()).toBeGreaterThan(
-      new Date(firstEnd).getTime(),
-    );
+    expect(new Date(result.current.toIso).getTime()).toBeGreaterThan(new Date(firstEnd).getTime());
   });
 
   describe("given the month-to-date range", () => {
@@ -58,8 +56,7 @@ describe("useRollingWindow", () => {
   it("keeps the window the requested number of days wide", () => {
     const { result } = renderHook(() => useRollingWindow(7));
     const width =
-      new Date(result.current.toIso).getTime() -
-      new Date(result.current.fromIso).getTime();
+      new Date(result.current.toIso).getTime() - new Date(result.current.fromIso).getTime();
     expect(width).toBe(7 * 24 * 60 * 60 * 1000);
   });
 });

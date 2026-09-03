@@ -123,8 +123,7 @@ export const TracesPage: React.FC = () => {
   // Phase 2 routing: for no-traces users without the legacy journey running,
   // show the IntegratePane hero unless they've explicitly opted into sample
   // preview. Once real traces arrive, always show ResultsPane.
-  const showIntegratePane =
-    !showEmptyState && hasAnyTraces === false && !showSamplePreview;
+  const showIntegratePane = !showEmptyState && hasAnyTraces === false && !showSamplePreview;
 
   // First-real-trace one-shot: when `hasAnyTraces` flips false → true
   // for this project AND we haven't auto-fired the spotlight tour for
@@ -208,12 +207,7 @@ export const TracesPage: React.FC = () => {
                 // unscrollable on shorter viewports. Constraining the
                 // wrapper here lets the inner VStack's `overflowY="auto"`
                 // actually kick in.
-                <Box
-                  flexShrink={0}
-                  data-tour-target="sidebar"
-                  height="full"
-                  overflow="hidden"
-                >
+                <Box flexShrink={0} data-tour-target="sidebar" height="full" overflow="hidden">
                   <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
                 </Box>
               )}
@@ -316,9 +310,7 @@ const FilterAside: React.FC<{
     { base: true, md: false },
     { fallback: "md" },
   );
-  const collapsed = forceCollapsedSmallScreen
-    ? !mobileExpandedOverride
-    : persistedCollapsed;
+  const collapsed = forceCollapsedSmallScreen ? !mobileExpandedOverride : persistedCollapsed;
   // When the operator collapses the sidebar we drop the aside from the
   // DOM entirely — no narrow rail, no icon strip. The "expand" affordance
   // lives in the table footer (see `Pagination`) so the page is one
@@ -483,9 +475,7 @@ const ResultsPane: React.FC = React.memo(() => {
         traceNamesById={traceNamesById}
         onExportSelected={(ids) => {
           // In all-matching mode, omit traceIds so the export reuses filters.
-          openExportDialog(
-            selectionMode === "all-matching" ? {} : { selectedTraceIds: ids },
-          );
+          openExportDialog(selectionMode === "all-matching" ? {} : { selectedTraceIds: ids });
         }}
       />
       <Box flex={1} minHeight={0} position="relative">

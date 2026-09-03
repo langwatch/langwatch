@@ -1,13 +1,4 @@
-import {
-  Accordion,
-  Badge,
-  Box,
-  Field,
-  HStack,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Accordion, Badge, Box, Field, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { Control, UseFormRegister } from "react-hook-form";
@@ -33,8 +24,7 @@ const DIMENSION_COPY: Record<
   },
   mcp: {
     label: "MCP servers",
-    description:
-      "Matched against the name and address of every MCP server a request names.",
+    description: "Matched against the name and address of every MCP server a request names.",
     denyPlaceholder: "unapproved\\.example\\.com",
   },
   urls: {
@@ -114,8 +104,8 @@ export function RestrictionsSection({
         <Accordion.ItemContent>
           <VStack align="stretch" gap={4} paddingTop={2} width="full">
             <Text fontSize="xs" color="fg.muted">
-              One pattern per line. A pattern the platform cannot read refuses the request
-              rather than letting it through.
+              One pattern per line. A pattern the platform cannot read refuses the request rather
+              than letting it through.
             </Text>
             {RESTRICTION_DIMENSIONS.map((dimension) => (
               <Box key={dimension}>

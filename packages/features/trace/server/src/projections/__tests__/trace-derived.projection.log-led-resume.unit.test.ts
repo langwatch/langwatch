@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { LOG_RECORD_RECEIVED_EVENT_TYPE, TOPIC_ASSIGNED_EVENT_TYPE } from "@langwatch/trace-contract";
+import {
+  LOG_RECORD_RECEIVED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_TYPE,
+} from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -7,7 +10,11 @@ import {
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
 } from "../trace-derived.projection";
-import { createSpanReceivedEvent, createTestRuntime, msToUnixNano } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createSpanReceivedEvent,
+  createTestRuntime,
+  msToUnixNano,
+} from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * The storage anchor and the span timing baseline, resumed across a
@@ -51,7 +58,13 @@ function foldAll(events: readonly FoldEvent[], from: TraceAnalyticsData): TraceA
   return events.reduce((state, event) => projection.apply(state, event as never), from);
 }
 
-function logRecordEvent({ eventId, occurredAt }: { eventId: string; occurredAt: number }): FoldEvent {
+function logRecordEvent({
+  eventId,
+  occurredAt,
+}: {
+  eventId: string;
+  occurredAt: number;
+}): FoldEvent {
   return {
     id: eventId,
     type: LOG_RECORD_RECEIVED_EVENT_TYPE,

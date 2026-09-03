@@ -40,11 +40,7 @@
  */
 import { buildAutomationHref, readTraceSearchQuery } from "../../../../index";
 import type { TraceSearchQuery, UnstatedWindow } from "../../../../index";
-import {
-  buildSurfaceHref,
-  SURFACE_BY_FEATURE,
-  SURFACE_LABEL,
-} from "./capability-registry";
+import { buildSurfaceHref, SURFACE_BY_FEATURE, SURFACE_LABEL } from "./capability-registry";
 import { followUpsForResult } from "./cli-follow-ups";
 
 /**
@@ -172,7 +168,5 @@ export function deriveFollowUpChips({
 
   // Carried offers first — a chip that brings the data with it is worth more
   // than one that merely opens a page — then cap.
-  return chips
-    .sort((a, b) => Number(b.carried) - Number(a.carried))
-    .slice(0, MAX_FOLLOW_UP_CHIPS);
+  return chips.sort((a, b) => Number(b.carried) - Number(a.carried)).slice(0, MAX_FOLLOW_UP_CHIPS);
 }

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  parseJsonStringValues,
-  sanitizeInvalidJsonEscapes,
-} from "../otlp-trace-request.rules";
+import { parseJsonStringValues, sanitizeInvalidJsonEscapes } from "../otlp-trace-request.rules";
 
 describe("parseJsonStringValues", () => {
   describe("when given JSON object strings", () => {

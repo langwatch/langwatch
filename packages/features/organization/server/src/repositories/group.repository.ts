@@ -1,17 +1,11 @@
-import type {
-  OrganizationGroup,
-  OrganizationGroupMember,
-} from "@langwatch/organization-contract";
+import type { OrganizationGroup, OrganizationGroupMember } from "@langwatch/organization-contract";
 
 export type OrganizationGroupWithMemberCount = OrganizationGroup & {
   memberCount: number;
 };
 
 export abstract class GroupRepository {
-  abstract get(input: {
-    groupId: string;
-    organizationId: string;
-  }): Promise<OrganizationGroup>;
+  abstract get(input: { groupId: string; organizationId: string }): Promise<OrganizationGroup>;
   abstract list(input: { organizationId: string; page: number; limit: number }): Promise<{
     data: OrganizationGroupWithMemberCount[];
     pagination: { page: number; limit: number; total: number };

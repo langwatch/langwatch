@@ -30,9 +30,7 @@ export const useParagraphDragDrop = ({
   const [dropTargetParagraph, setDropTargetParagraph] = useState<number | null>(null);
 
   // Store paragraph positions in a ref to avoid re-renders during typing
-  const paragraphPositionsRef = useRef<
-    Array<{ top: number; height: number; text?: string }>
-  >([]);
+  const paragraphPositionsRef = useRef<Array<{ top: number; height: number; text?: string }>>([]);
 
   // Clear cached positions when text changes so they get recalculated
   useEffect(() => {

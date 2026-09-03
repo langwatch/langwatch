@@ -23,15 +23,11 @@ import { identityActorSchema } from "./vocabulary";
 
 export const MFA_ENROLLED_EVENT_TYPE = "lw.identity.mfa_enrolled" as const;
 export const MFA_CONFIRMED_EVENT_TYPE = "lw.identity.mfa_confirmed" as const;
-export const MFA_ENROLLMENT_EXPIRED_EVENT_TYPE =
-  "lw.identity.mfa_enrollment_expired" as const;
+export const MFA_ENROLLMENT_EXPIRED_EVENT_TYPE = "lw.identity.mfa_enrollment_expired" as const;
 export const MFA_DISABLED_EVENT_TYPE = "lw.identity.mfa_disabled" as const;
-export const BACKUP_CODE_CONSUMED_EVENT_TYPE =
-  "lw.identity.backup_code_consumed" as const;
-export const BACKUP_CODES_REGENERATED_EVENT_TYPE =
-  "lw.identity.backup_codes_regenerated" as const;
-export const MFA_VERIFICATION_FAILED_EVENT_TYPE =
-  "lw.identity.mfa_verification_failed" as const;
+export const BACKUP_CODE_CONSUMED_EVENT_TYPE = "lw.identity.backup_code_consumed" as const;
+export const BACKUP_CODES_REGENERATED_EVENT_TYPE = "lw.identity.backup_codes_regenerated" as const;
+export const MFA_VERIFICATION_FAILED_EVENT_TYPE = "lw.identity.mfa_verification_failed" as const;
 
 export const MFA_EVENT_TYPES = [
   MFA_ENROLLED_EVENT_TYPE,
@@ -166,13 +162,7 @@ export type MfaFactOf<T extends MfaEventType> = Extract<MfaFact, { type: T }>;
  * `NONE` is the state of somebody who never started one; it is a real value
  * rather than a null so every read answers the same question the same way.
  */
-export const MFA_ENROLLMENT_STATES = [
-  "NONE",
-  "PENDING",
-  "ENABLED",
-  "EXPIRED",
-  "DISABLED",
-] as const;
+export const MFA_ENROLLMENT_STATES = ["NONE", "PENDING", "ENABLED", "EXPIRED", "DISABLED"] as const;
 export type MfaEnrollmentLifecycleState = (typeof MFA_ENROLLMENT_STATES)[number];
 
 /**
@@ -200,11 +190,7 @@ export interface MfaEnrollmentState {
   failedCount: number;
 }
 
-export function emptyMfaEnrollment({
-  userId,
-}: {
-  userId: string;
-}): MfaEnrollmentState {
+export function emptyMfaEnrollment({ userId }: { userId: string }): MfaEnrollmentState {
   return {
     userId,
     enrollmentId: null,
@@ -223,10 +209,7 @@ export function emptyMfaEnrollment({
 
 /** How many backup codes the person can still use. */
 export function remainingBackupCodes(state: MfaEnrollmentState): number {
-  return Math.max(
-    0,
-    state.backupCodeCount - state.consumedBackupCodeIndexes.length,
-  );
+  return Math.max(0, state.backupCodeCount - state.consumedBackupCodeIndexes.length);
 }
 
 /**
@@ -291,10 +274,9 @@ export function reduceMfaEnrollment({
       if (state.consumedBackupCodeIndexes.includes(codeIndex)) return state;
       return {
         ...state,
-        consumedBackupCodeIndexes: [
-          ...state.consumedBackupCodeIndexes,
-          codeIndex,
-        ].sort((a, b) => a - b),
+        consumedBackupCodeIndexes: [...state.consumedBackupCodeIndexes, codeIndex].sort(
+          (a, b) => a - b,
+        ),
         failedCount: 0,
       };
     }
@@ -315,13 +297,10 @@ export function reduceMfaEnrollment({
 
 export const ENROLL_MFA_COMMAND_TYPE = "lw.identity.enroll_mfa" as const;
 export const CONFIRM_MFA_COMMAND_TYPE = "lw.identity.confirm_mfa" as const;
-export const EXPIRE_MFA_ENROLLMENT_COMMAND_TYPE =
-  "lw.identity.expire_mfa_enrollment" as const;
+export const EXPIRE_MFA_ENROLLMENT_COMMAND_TYPE = "lw.identity.expire_mfa_enrollment" as const;
 export const DISABLE_MFA_COMMAND_TYPE = "lw.identity.disable_mfa" as const;
-export const CONSUME_BACKUP_CODE_COMMAND_TYPE =
-  "lw.identity.consume_backup_code" as const;
-export const REGENERATE_BACKUP_CODES_COMMAND_TYPE =
-  "lw.identity.regenerate_backup_codes" as const;
+export const CONSUME_BACKUP_CODE_COMMAND_TYPE = "lw.identity.consume_backup_code" as const;
+export const REGENERATE_BACKUP_CODES_COMMAND_TYPE = "lw.identity.regenerate_backup_codes" as const;
 export const RECORD_MFA_VERIFICATION_FAILURE_COMMAND_TYPE =
   "lw.identity.record_mfa_verification_failure" as const;
 
@@ -356,9 +335,7 @@ export const expireMfaEnrollmentCommandDataSchema = userTenantedCommandSchema({
   enrollmentId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
 });
-export type ExpireMfaEnrollmentCommandData = z.infer<
-  typeof expireMfaEnrollmentCommandDataSchema
->;
+export type ExpireMfaEnrollmentCommandData = z.infer<typeof expireMfaEnrollmentCommandDataSchema>;
 
 export const disableMfaCommandDataSchema = userTenantedCommandSchema({
   via: mfaDisableViaSchema,
@@ -378,27 +355,22 @@ export const consumeBackupCodeCommandDataSchema = userTenantedCommandSchema({
   codeIndex: z.number().int().nonnegative(),
   occurredAtMs: z.number().int().nonnegative(),
 });
-export type ConsumeBackupCodeCommandData = z.infer<
-  typeof consumeBackupCodeCommandDataSchema
->;
+export type ConsumeBackupCodeCommandData = z.infer<typeof consumeBackupCodeCommandDataSchema>;
 
-export const regenerateBackupCodesCommandDataSchema = userTenantedCommandSchema(
-  {
-    backupCodeCount: z.number().int().positive(),
-    occurredAtMs: z.number().int().nonnegative(),
-    actor: identityActorSchema,
-  },
-);
+export const regenerateBackupCodesCommandDataSchema = userTenantedCommandSchema({
+  backupCodeCount: z.number().int().positive(),
+  occurredAtMs: z.number().int().nonnegative(),
+  actor: identityActorSchema,
+});
 export type RegenerateBackupCodesCommandData = z.infer<
   typeof regenerateBackupCodesCommandDataSchema
 >;
 
-export const recordMfaVerificationFailureCommandDataSchema =
-  userTenantedCommandSchema({
-    /** The plugin's own count after the attempt. */
-    failedCount: z.number().int().nonnegative(),
-    occurredAtMs: z.number().int().nonnegative(),
-  });
+export const recordMfaVerificationFailureCommandDataSchema = userTenantedCommandSchema({
+  /** The plugin's own count after the attempt. */
+  failedCount: z.number().int().nonnegative(),
+  occurredAtMs: z.number().int().nonnegative(),
+});
 export type RecordMfaVerificationFailureCommandData = z.infer<
   typeof recordMfaVerificationFailureCommandDataSchema
 >;

@@ -20,10 +20,7 @@ import {
 } from "../projections/scim-sync-state.projection";
 import { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
 
-export {
-  type ScimSyncEvent,
-  scimSyncEventsFor,
-} from "../projections/scim-sync-state.projection";
+export { type ScimSyncEvent, scimSyncEventsFor } from "../projections/scim-sync-state.projection";
 
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by

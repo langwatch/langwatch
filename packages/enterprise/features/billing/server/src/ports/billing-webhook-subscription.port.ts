@@ -8,10 +8,7 @@ export type CancelledSubscription = { stripeSubscriptionId: string | null };
 export interface SubscriptionRepository {
   findLastNonCancelled(organizationId: string): Promise<Subscription | null>;
 
-  createPending(input: {
-    organizationId: string;
-    plan: string;
-  }): Promise<Subscription | null>;
+  createPending(input: { organizationId: string; plan: string }): Promise<Subscription | null>;
 
   updateStatus(input: { id: string; status: string }): Promise<Subscription | null>;
 
@@ -21,15 +18,9 @@ export interface SubscriptionRepository {
 
   findByStripeId(stripeSubscriptionId: string): Promise<Subscription | null>;
 
-  linkStripeId(input: {
-    id: string;
-    stripeSubscriptionId: string;
-  }): Promise<{ count: number }>;
+  linkStripeId(input: { id: string; stripeSubscriptionId: string }): Promise<{ count: number }>;
 
-  activate(input: {
-    id: string;
-    previousStatus: string;
-  }): Promise<SubscriptionWithOrg | null>;
+  activate(input: { id: string; previousStatus: string }): Promise<SubscriptionWithOrg | null>;
 
   recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void>;
 
@@ -61,10 +52,7 @@ export class NullSubscriptionRepository implements SubscriptionRepository {
     return null;
   }
 
-  async updateStatus(_input: {
-    id: string;
-    status: string;
-  }): Promise<Subscription | null> {
+  async updateStatus(_input: { id: string; status: string }): Promise<Subscription | null> {
     return null;
   }
 
@@ -90,10 +78,7 @@ export class NullSubscriptionRepository implements SubscriptionRepository {
     return null;
   }
 
-  async recordPaymentFailure(_input: {
-    id: string;
-    currentStatus: string;
-  }): Promise<void> {}
+  async recordPaymentFailure(_input: { id: string; currentStatus: string }): Promise<void> {}
 
   async cancel(_input: { id: string }): Promise<void> {}
 

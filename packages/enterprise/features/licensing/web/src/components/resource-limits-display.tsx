@@ -63,9 +63,7 @@ interface UsageData {
  * Maps license status data to ResourceLimits format.
  * Used when displaying limits for organizations with a valid license.
  */
-export function mapLicenseStatusToLimits(
-  licenseData: LicenseStatusWithPlan,
-): ResourceLimits {
+export function mapLicenseStatusToLimits(licenseData: LicenseStatusWithPlan): ResourceLimits {
   return {
     members: {
       current: licenseData.currentMembers,
@@ -126,9 +124,7 @@ export function ResourceLimitsDisplay({
       {visibleKeys.map((key) => {
         const hideMax = !showLimits;
         const label =
-          key === "messagesPerMonth" && messagesLabel
-            ? messagesLabel
-            : RESOURCE_LABELS[key];
+          key === "messagesPerMonth" && messagesLabel ? messagesLabel : RESOURCE_LABELS[key];
         return (
           <ResourceLimitRow
             key={key}

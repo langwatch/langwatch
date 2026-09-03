@@ -24,7 +24,4 @@ export type LLMConfigValues = {
   // Unified reasoning parameter (replaces provider-specific fields)
   reasoning?: string;
   verbosity?: string;
-} & (
-  | { max_tokens?: number; maxTokens?: never }
-  | { maxTokens?: number; max_tokens?: never }
-);
+} & ({ max_tokens?: number; maxTokens?: never } | { maxTokens?: number; max_tokens?: never });

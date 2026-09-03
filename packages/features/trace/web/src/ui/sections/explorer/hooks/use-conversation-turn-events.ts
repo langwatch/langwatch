@@ -25,10 +25,7 @@ export function useConversationTurnEvents(turns: TraceListItem[]): TraceListItem
   // Deduplicated and sorted so two renders of the same thread ask for the same
   // ids in the same order, which is what lets them share a query key: the key
   // is compared structurally, not by identity.
-  const traceIds = useMemo(
-    () => [...new Set(turns.map((turn) => turn.traceId))].sort(),
-    [turns],
-  );
+  const traceIds = useMemo(() => [...new Set(turns.map((turn) => turn.traceId))].sort(), [turns]);
 
   const timeRange = useMemo(() => {
     if (turns.length === 0) return { from: 0, to: 0 };

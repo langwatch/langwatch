@@ -30,9 +30,7 @@ export const experimentRunStartedEventSchema = EventSchema.extend({
   metadata: experimentRunEventMetadataSchema.optional(),
 });
 
-export type ExperimentRunStartedEventData = z.infer<
-  typeof experimentRunStartedEventDataSchema
->;
+export type ExperimentRunStartedEventData = z.infer<typeof experimentRunStartedEventDataSchema>;
 export type ExperimentRunStartedEvent = z.infer<typeof experimentRunStartedEventSchema>;
 
 /**
@@ -62,9 +60,7 @@ export const targetResultEventDataSchema = z.object({
    * was not built with is worse than one that keeps them.
    */
   domainError: z
-    .custom<SerializedHandledError>(
-      (value) => typeof value === "object" && value !== null,
-    )
+    .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
     .nullable()
     .optional(),
   traceId: z.string().nullable().optional(),
@@ -146,9 +142,7 @@ export const traceMetricsComputedEventSchema = EventSchema.extend({
   metadata: experimentRunEventMetadataSchema.optional(),
 });
 
-export type TraceMetricsComputedEventData = z.infer<
-  typeof traceMetricsComputedEventDataSchema
->;
+export type TraceMetricsComputedEventData = z.infer<typeof traceMetricsComputedEventDataSchema>;
 export type TraceMetricsComputedEvent = z.infer<typeof traceMetricsComputedEventSchema>;
 
 /**
@@ -167,12 +161,8 @@ export const experimentRunCompletedEventSchema = EventSchema.extend({
   metadata: experimentRunEventMetadataSchema.optional(),
 });
 
-export type ExperimentRunCompletedEventData = z.infer<
-  typeof experimentRunCompletedEventDataSchema
->;
-export type ExperimentRunCompletedEvent = z.infer<
-  typeof experimentRunCompletedEventSchema
->;
+export type ExperimentRunCompletedEventData = z.infer<typeof experimentRunCompletedEventDataSchema>;
+export type ExperimentRunCompletedEvent = z.infer<typeof experimentRunCompletedEventSchema>;
 
 /**
  * Union of all experiment run processing event types.

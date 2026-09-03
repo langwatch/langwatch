@@ -145,9 +145,8 @@ await tracer.withActiveSpan("custom-operation", async (span) => {
 ```
 
 <Tip>
-  For consistent attribute naming and TypeScript autocomplete support, use semantic
-  conventions. See our [Semantic
-  Conventions](/integration/typescript/tutorials/semantic-conventions) guide for best
+  For consistent attribute naming and TypeScript autocomplete support, use semantic conventions. See
+  our [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) guide for best
   practices.
 </Tip>
 
@@ -418,8 +417,8 @@ const handle = setupObservability({
 When using manual span management, consider these performance implications:
 
 <Warning>
-  Manual span management requires careful attention to memory usage and proper cleanup to
-  avoid memory leaks.
+  Manual span management requires careful attention to memory usage and proper cleanup to avoid
+  memory leaks.
 </Warning>
 
 1. **Memory Usage**: Manually created spans consume memory until explicitly ended
@@ -443,18 +442,18 @@ When using manual span management, consider these performance implications:
 </Card>
 
 <Card title="Context Management" icon="context">
-  - Propagate span context across async boundaries - Use context.with() for async
-  operations - Maintain span hierarchy properly
+  - Propagate span context across async boundaries - Use context.with() for async operations -
+  Maintain span hierarchy properly
 </Card>
 
 <Card title="Attributes and Events" icon="attributes">
-  - Add meaningful custom attributes for filtering - Use consistent attribute naming
-  conventions - Include relevant business context
+  - Add meaningful custom attributes for filtering - Use consistent attribute naming conventions -
+  Include relevant business context
 </Card>
 
 <Card title="Performance" icon="performance">
-  - Implement appropriate sampling strategies - Use batch processors for high volume -
-  Monitor observability overhead
+  - Implement appropriate sampling strategies - Use batch processors for high volume - Monitor
+  observability overhead
 </Card>
 
 <Card title="Error Handling" icon="error">
@@ -530,9 +529,9 @@ try {
 </Tabs>
 
 <Info>
-  The `withActiveSpan` method provides the best balance of ease of use, safety, and
-  functionality. Only use manual span management when you need specific control over span
-  lifecycle or context propagation that `withActiveSpan` cannot provide.
+  The `withActiveSpan` method provides the best balance of ease of use, safety, and functionality.
+  Only use manual span management when you need specific control over span lifecycle or context
+  propagation that `withActiveSpan` cannot provide.
 </Info>
 
 ## Related Documentation
@@ -547,6 +546,6 @@ For more advanced observability patterns and best practices:
 
 <Tip>
   Combine manual instrumentation with [Semantic
-  Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent,
-  maintainable observability across your application.
+  Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent, maintainable
+  observability across your application.
 </Tip>

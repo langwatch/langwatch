@@ -19,9 +19,7 @@ async function main(): Promise<void> {
   }
 
   process.on("uncaughtException", (error) => {
-    process.stderr.write(
-      `langy-worker: uncaught exception: ${error.stack ?? error.message}\n`,
-    );
+    process.stderr.write(`langy-worker: uncaught exception: ${error.stack ?? error.message}\n`);
     process.exit(1);
   });
   process.on("unhandledRejection", (reason) => {

@@ -80,9 +80,8 @@ function singularIdKeys(resource: string): string[] {
   const words = resource.split("-").filter(Boolean);
   const snake = `${words.join("_")}_id`;
   const camel =
-    words
-      .map((word, i) => (i === 0 ? word : word[0]!.toUpperCase() + word.slice(1)))
-      .join("") + "Id";
+    words.map((word, i) => (i === 0 ? word : word[0]!.toUpperCase() + word.slice(1))).join("") +
+    "Id";
   return [snake, camel];
 }
 
@@ -146,9 +145,7 @@ function paginationOf(document: unknown): Pagination | undefined {
     return undefined;
   }
   const { pagination } = document as { pagination?: unknown };
-  return pagination && typeof pagination === "object"
-    ? (pagination as Pagination)
-    : undefined;
+  return pagination && typeof pagination === "object" ? (pagination as Pagination) : undefined;
 }
 
 /** The JSON document behind an output that may still carry console noise. */
@@ -202,9 +199,7 @@ export function extractDigest({
   const rows = collectionRowsOf(document);
 
   if (rows) {
-    const ids = rows
-      .map((row) => idOf(row, idKeys))
-      .filter((id): id is string => id !== undefined);
+    const ids = rows.map((row) => idOf(row, idKeys)).filter((id): id is string => id !== undefined);
     const counts = {
       returned: rows.length,
       total: resolveTotal({

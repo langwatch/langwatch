@@ -27,9 +27,9 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
 
   describe("error handling", () => {
     it("throws ExperimentNotFoundError for non-existent slug", async () => {
-      await expect(
-        langwatch.experiments.run("non-existent-evaluation-slug-12345"),
-      ).rejects.toThrow(ExperimentNotFoundError);
+      await expect(langwatch.experiments.run("non-existent-evaluation-slug-12345")).rejects.toThrow(
+        ExperimentNotFoundError,
+      );
     });
 
     it("throws ExperimentsApiError with invalid API key", async () => {
@@ -38,9 +38,7 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
         endpoint: process.env.LANGWATCH_ENDPOINT,
       });
 
-      await expect(invalidClient.experiments.run(testSlug)).rejects.toThrow(
-        ExperimentsApiError,
-      );
+      await expect(invalidClient.experiments.run(testSlug)).rejects.toThrow(ExperimentsApiError);
     });
   });
 

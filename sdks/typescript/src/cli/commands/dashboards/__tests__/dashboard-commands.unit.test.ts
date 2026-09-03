@@ -1,17 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DashboardsApiError } from "@/client-sdk/services/dashboards/dashboards-api.service";
 
-vi.mock(
-  "@/client-sdk/services/dashboards/dashboards-api.service",
-  async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    const actual = (await importOriginal()) as Record<string, unknown>;
-    return {
-      ...actual,
-      DashboardsApiService: vi.fn(),
-    };
-  },
-);
+vi.mock("@/client-sdk/services/dashboards/dashboards-api.service", async (importOriginal) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    DashboardsApiService: vi.fn(),
+  };
+});
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -104,9 +101,7 @@ describe("listDashboardsCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      mockList.mockRejectedValue(
-        new DashboardsApiError("Network error", "list dashboards"),
-      );
+      mockList.mockRejectedValue(new DashboardsApiError("Network error", "list dashboards"));
 
       await expect(listDashboardsCommand()).rejects.toThrow(ProcessExitError);
     });
@@ -145,13 +140,9 @@ describe("createDashboardCommand()", () => {
 
   describe("when creation fails", () => {
     it("exits with code 1", async () => {
-      mockCreate.mockRejectedValue(
-        new DashboardsApiError("Limit reached", "create dashboard"),
-      );
+      mockCreate.mockRejectedValue(new DashboardsApiError("Limit reached", "create dashboard"));
 
-      await expect(createDashboardCommand("My Dashboard")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(createDashboardCommand("My Dashboard")).rejects.toThrow(ProcessExitError);
     });
   });
 });
@@ -188,13 +179,9 @@ describe("deleteDashboardCommand()", () => {
 
   describe("when deletion fails", () => {
     it("exits with code 1", async () => {
-      mockDelete.mockRejectedValue(
-        new DashboardsApiError("Not found", "delete dashboard"),
-      );
+      mockDelete.mockRejectedValue(new DashboardsApiError("Not found", "delete dashboard"));
 
-      await expect(deleteDashboardCommand("nonexistent")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(deleteDashboardCommand("nonexistent")).rejects.toThrow(ProcessExitError);
     });
   });
 });

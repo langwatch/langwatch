@@ -62,7 +62,11 @@ function redisDouble() {
 
 function clickHouseDouble() {
   return async () => ({
-    insert: async (input: { table: string; values: readonly unknown[]; clickhouse_settings?: unknown }) => {
+    insert: async (input: {
+      table: string;
+      values: readonly unknown[];
+      clickhouse_settings?: unknown;
+    }) => {
       RECORDED.inserted.push({
         table: input.table,
         values: input.values,
@@ -95,11 +99,7 @@ function compose(source: Record<string, unknown> = {}, titleModels?: LangyTitleM
     resolveClickHouseClient: clickHouseDouble(),
     defaultRetentionDays: 90,
     broadcast: {
-      broadcastToTenant: async (input: {
-        tenantId: string;
-        event: string;
-        eventType: string;
-      }) => {
+      broadcastToTenant: async (input: { tenantId: string; event: string; eventType: string }) => {
         RECORDED.published.push({
           channel: `broadcast:${input.eventType}`,
           message: JSON.stringify({ tenantId: input.tenantId, event: input.event }),
@@ -116,7 +116,9 @@ function frozenLangyRoutingKeys(): string[] {
   const registry = JSON.parse(
     readFileSync(new URL("../../features/job-registry.json", import.meta.url), "utf8"),
   ) as { pipelines: Array<{ name: string; jobs: string[] }> };
-  const pipeline = registry.pipelines.find((entry) => entry.name === "langy_conversation_processing");
+  const pipeline = registry.pipelines.find(
+    (entry) => entry.name === "langy_conversation_processing",
+  );
   if (!pipeline) throw new Error("langy_conversation_processing is absent from the job registry");
   return pipeline.jobs;
 }
@@ -300,9 +302,7 @@ describe("given the langy conversation pipeline this process composes for itself
       reset();
       const without = compose().buildProcessing() as never;
 
-      expect([...registeredKeys(withGateway)].sort()).toEqual(
-        [...registeredKeys(without)].sort(),
-      );
+      expect([...registeredKeys(withGateway)].sort()).toEqual([...registeredKeys(without)].sort());
     });
   });
 });

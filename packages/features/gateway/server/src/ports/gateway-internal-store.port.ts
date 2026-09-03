@@ -56,9 +56,7 @@ export abstract class GatewayInternalStorePort {
    * carries the result from then on, so nothing downstream re-reads identity
    * per request.
    */
-  abstract findVirtualKeysForAttribution(
-    virtualKeyIds: readonly string[],
-  ): Promise<
+  abstract findVirtualKeysForAttribution(virtualKeyIds: readonly string[]): Promise<
     Array<{
       id: string;
       organizationId: string;

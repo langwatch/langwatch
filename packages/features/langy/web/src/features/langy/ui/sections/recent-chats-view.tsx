@@ -36,15 +36,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  ArrowLeft,
-  Check,
-  MoreHorizontal,
-  Pencil,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Check, MoreHorizontal, Pencil, Search, Trash2, X } from "lucide-react";
 import type React from "react";
 import {
   Fragment,
@@ -85,16 +77,8 @@ function chatGroupFor(timestampMs: number, nowMs = Date.now()): ChatGroup {
   if (!Number.isFinite(timestampMs) || timestampMs <= 0) return "Older";
   const date = new Date(timestampMs);
   const now = new Date(nowMs);
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  ).getTime();
-  const startOfDate = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  ).getTime();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   const dayDifference = Math.round((startOfToday - startOfDate) / DAY_MS);
   if (dayDifference <= 0) return "Today";
   if (dayDifference === 1) return "Yesterday";
@@ -121,9 +105,7 @@ interface ChatItem {
  * with fresh inline closures — a page of thirty rows re-rendered three times
  * over on every list refresh without it (profiled at ~8ms per row).
  */
-function useStableHandler<A extends unknown[], R>(
-  handler: (...args: A) => R,
-): (...args: A) => R {
+function useStableHandler<A extends unknown[], R>(handler: (...args: A) => R): (...args: A) => R {
   const ref = useRef(handler);
   useLayoutEffect(() => {
     ref.current = handler;
@@ -201,8 +183,7 @@ export function RecentChatsView({
     return q ? allItems.filter((item) => item.searchText.includes(q)) : allItems;
   }, [allItems, query]);
 
-  const searchable =
-    allItems.length >= SEARCH_FROM || history.hasNextPage || query.length > 0;
+  const searchable = allItems.length >= SEARCH_FROM || history.hasNextPage || query.length > 0;
 
   // Every row handler below is render-stable (useCallback on setState only, or
   // useStableHandler around the panel's own inline closures), so the memoized
@@ -295,12 +276,7 @@ export function RecentChatsView({
       ) : null}
 
       {isLoading ? (
-        <HStack
-          gap={2}
-          paddingX={pad}
-          paddingY={1.5}
-          aria-label="Loading recent conversations"
-        >
+        <HStack gap={2} paddingX={pad} paddingY={1.5} aria-label="Loading recent conversations">
           <Spinner size="xs" />
           <Text textStyle="xs" color="fg.muted">
             Loading…
@@ -644,11 +620,7 @@ const ChatRow = memo(function ChatRow({
       )}
       {/* lazyMount + unmountOnExit: a page of rows must not mount thirty menu
           subtrees nobody has opened — the content renders on first open. */}
-      <Menu.Root
-        positioning={{ placement: "bottom-end", gutter: 4 }}
-        lazyMount
-        unmountOnExit
-      >
+      <Menu.Root positioning={{ placement: "bottom-end", gutter: 4 }} lazyMount unmountOnExit>
         <Menu.Trigger asChild>
           <IconButton
             className="row-actions"

@@ -69,13 +69,7 @@ const lastOpts = () => harness.useQuery.mock.calls.at(-1)?.[1];
  * Answers the query with `data`, plus whichever React Query flags the case is
  * about (`isPlaceholderData` for a page turn, `isError` for a failed read).
  */
-function resolveWith({
-  data,
-  extra = {},
-}: {
-  data: unknown;
-  extra?: Record<string, unknown>;
-}) {
+function resolveWith({ data, extra = {} }: { data: unknown; extra?: Record<string, unknown> }) {
   harness.useQuery.mockImplementation(() => ({
     data,
     isLoading: false,
@@ -121,9 +115,7 @@ describe("useTraceListEvents", () => {
           },
         });
 
-        const { result } = renderHook(() =>
-          useTraceListEvents({ rows: [row("t1"), row("t2")] }),
-        );
+        const { result } = renderHook(() => useTraceListEvents({ rows: [row("t1"), row("t2")] }));
 
         expect(result.current[0]?.events).toEqual({
           groups: [{ name: "thumbs_up_down", count: 1, firstTimestamp: 5 }],

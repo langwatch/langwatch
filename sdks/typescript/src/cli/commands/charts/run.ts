@@ -48,17 +48,13 @@ export const runChartCommand = async (
   await resolveCredentials({ project: options.project });
 
   if ((options.start === undefined) !== (options.end === undefined)) {
-    console.error(
-      chalk.red("Error: --start and --end must be given together"),
-    );
+    console.error(chalk.red("Error: --start and --end must be given together"));
     process.exit(1);
   }
   let granularitySeconds: ChartRunGranularitySeconds | undefined;
   if (options.granularity !== undefined) {
     const requested = Number(options.granularity);
-    if (
-      !(OFFERED_GRANULARITY_STEPS as readonly number[]).includes(requested)
-    ) {
+    if (!(OFFERED_GRANULARITY_STEPS as readonly number[]).includes(requested)) {
       console.error(
         chalk.red(
           `Error: --granularity must be one of the offered steps: ${OFFERED_GRANULARITY_STEP_NAMES}`,
@@ -79,10 +75,7 @@ export const runChartCommand = async (
     const chart = await service.get(id);
     const result = await service.runQuery({
       sql: chart.definition.sql,
-      parameters: chart.definition.parameters as Record<
-        string,
-        ChartParameterValue
-      >,
+      parameters: chart.definition.parameters as Record<string, ChartParameterValue>,
       ...(options.start !== undefined && options.end !== undefined
         ? { timeWindow: { start: options.start, end: options.end } }
         : {}),

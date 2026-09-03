@@ -9,12 +9,12 @@ and [`overengineering.md`](../../best_practices/overengineering.md); shape follo
 **`packages/features/model-provider/` — 10,610 non-test lines over 62 files, plus a
 544 KB model catalogue.**
 
-| Surface | Files | Lines |
-|---|---|---|
-| `server/src` (non-test) | 33 | 6,595 |
-| `server/src/**/__tests__` | 7 | 3,153 |
-| `contract/src` (non-test) | 29 | 4,015 |
-| `contract/src/catalog/model-catalog{,.overlay}.json` | 2 | 569 KB |
+| Surface                                              | Files | Lines  |
+| ---------------------------------------------------- | ----- | ------ |
+| `server/src` (non-test)                              | 33    | 6,595  |
+| `server/src/**/__tests__`                            | 7     | 3,153  |
+| `contract/src` (non-test)                            | 29    | 4,015  |
+| `contract/src/catalog/model-catalog{,.overlay}.json` | 2     | 569 KB |
 
 There is **no `web/` package**. `feature.json` is `{"layoutVersion": 0}` and the
 feature's eight UI files are still in `platform/app`, recorded as legacy fragments
@@ -89,7 +89,7 @@ The feature appears in **none** of `overengineering-baseline.json`,
 `services/model-provider.service.ts:164-315` — **27 of 28 methods are one-line
 delegations.** Only `translate` (`:298-315`) holds behaviour.
 
-`layer-class` misses it. The policy counts *same-name* forwards at a 0.6 ratio
+`layer-class` misses it. The policy counts _same-name_ forwards at a 0.6 ratio
 (`packages/architecture-lint/src/overengineering.ts:33-34`), and only 12 of the
 28 keep their name:
 
@@ -115,15 +115,15 @@ into `this.options.catalog`, so the class holds a dependency for one forward.
 (`contract/src/model-provider.ts:119,145,158,170,366,378,386,456,473`). Nine
 guards are written `if (actorId)`:
 
-| Site | On missing `actorId` |
-|---|---|
-| `services/model-provider-command.service.ts:258-260` | write authorization **skipped** |
-| `services/model-provider-command.service.ts:116-121` | delete authorization **skipped** |
-| `services/model-provider-command.service.ts:158-163` | probe authorization **skipped** |
+| Site                                                                            | On missing `actorId`                       |
+| ------------------------------------------------------------------------------- | ------------------------------------------ |
+| `services/model-provider-command.service.ts:258-260`                            | write authorization **skipped**            |
+| `services/model-provider-command.service.ts:116-121`                            | delete authorization **skipped**           |
+| `services/model-provider-command.service.ts:158-163`                            | probe authorization **skipped**            |
 | `services/model-provider-defaults-write.service.ts:49-53,93-97,119-123,148-152` | default-write authorization **skipped** ×4 |
-| `services/model-provider-costs.service.ts:122-124` | cost-scope authorization **skipped** |
-| `services/model-provider-defaults.service.ts:156-158` | returns **every** config, unfiltered |
-| `services/model-provider-defaults.service.ts:378-380` | returns **no** writable scope |
+| `services/model-provider-costs.service.ts:122-124`                              | cost-scope authorization **skipped**       |
+| `services/model-provider-defaults.service.ts:156-158`                           | returns **every** config, unfiltered       |
+| `services/model-provider-defaults.service.ts:378-380`                           | returns **no** writable scope              |
 
 The last two are in one file, 220 lines apart, and answer the same missing value
 in opposite directions — one fails open, one fails closed. Nothing in the types
@@ -190,11 +190,11 @@ two answers.
 19 `HandledError`**. Three of their codes are in neither `codes.ts` nor
 `presentation.ts`:
 
-| Code | Declared | Throw sites |
-|---|---|---|
-| `model_provider_invalid` | `model-provider.errors.ts:143` | **14** |
-| `model_default_not_found` | `model-provider.errors.ts:276` | 4 |
-| `model_cost_not_found` | `model-provider.errors.ts:336` | 3 |
+| Code                      | Declared                       | Throw sites |
+| ------------------------- | ------------------------------ | ----------- |
+| `model_provider_invalid`  | `model-provider.errors.ts:143` | **14**      |
+| `model_default_not_found` | `model-provider.errors.ts:276` | 4           |
+| `model_cost_not_found`    | `model-provider.errors.ts:336` | 3           |
 
 They sit on the frozen backlog at
 `platform/app/src/features/errors/logic/__tests__/codes.unit.test.ts:284-286`,
@@ -228,8 +228,8 @@ even explains why, and is right to.
 306 lines, **10 exported abstract classes, 35 abstract signatures**. Exactly one
 is named `*Port` — `ModelTranslationPort:294`. That single name is what carries
 the file past `strict-port-module`
-(`packages/architecture-lint/src/port-modules.ts:70-89`: the rule requires *at
-least one* `Port`-named export and that every `Port`-named export be an abstract
+(`packages/architecture-lint/src/port-modules.ts:70-89`: the rule requires _at
+least one_ `Port`-named export and that every `Port`-named export be an abstract
 class). The other nine boundaries dodge the convention by not using the word.
 
 `ModelProviderCatalog:142-292` is not a port at all. It has 3 abstract methods and
@@ -252,8 +252,8 @@ of the 18 members; the other 13 are shared implementation nobody can substitute.
 ### P8 — `ModelProviderCredentialPolicy` is a seam to nowhere (R4)
 
 Its only implementation is `ModelProviderKeysService`
-(`services/model-provider-keys.service.ts:14`) — same package, and a *service*
-extending a *port*. `adapters/postgres.model-provider.adapter.ts:50` hardcodes
+(`services/model-provider-keys.service.ts:14`) — same package, and a _service_
+extending a _port_. `adapters/postgres.model-provider.adapter.ts:50` hardcodes
 `ModelProviderKeysService.create()`, so nothing can swap it. The port adds an
 8-method restatement of a class that sits two directories away.
 
@@ -276,7 +276,7 @@ Same at `prisma.model-cost.repository.ts:19-21` and
 `prisma.model-default.repository.ts:27-29`, and the shape propagates up through
 `adapters/postgres.model-provider.adapter.ts:20`. ADR-001 asks for "an opaque
 database object", which a structural `Pick<PrismaClient, "modelProvider" |
-"gatewayChangeEvent" | "$transaction">` — the type the file *already declares* at
+"gatewayChangeEvent" | "$transaction">` — the type the file _already declares_ at
 `prisma.model-provider.repository.ts:19-22` — satisfies while staying
 compile-checked. Both composition roots pass `PrismaClient`
 (`presets.ts:1237`, `presets.ts:3126`).
@@ -369,7 +369,7 @@ whole service and repository layer. What is undocumented there is not obvious:
   then `fallbackPriorityGlobal`, then `createdAt`. Four tiebreakers, no note.
 - `services/model-provider-keys.service.ts:38-60` — `merge` decides which stored
   secrets survive an edit. The `isSecretCredentialField(key) && value !== "" &&
-  value != null` branch at `:56` is the rule that stops a partial form submit
+value != null` branch at `:56` is the rule that stops a partial form submit
   wiping a stored key. Unexplained.
 - `services/model-provider-keys.service.ts:120-141` — `mergeHeaders` falls back
   to matching a masked header **by array position** when the key changed. That
@@ -586,7 +586,7 @@ Deleting the catch is the fix. `model-defaults.routes.ts:26-38` loses its
   explain decisions a reader cannot recover from the code — why the policy is
   applied after `.input()`, why `providerService` is an accessor rather than a
   generic wrapper, why a missing feature-registry entry stays a plain `Error`.
-  P13 is about the *services*, not these.
+  P13 is about the _services_, not these.
 - **`toLegacyExecutionProvider` / `toLegacyProviderSummary`**
   (`adapters/legacy-model-provider.adapter.ts:152-164`). Two one-line functions
   with identical bodies, kept apart so a decrypted `ModelProviderExecution` and a
@@ -613,31 +613,31 @@ Five commits, smallest risk first, each leaving the suite green.
    `presentation.ts` entries; remove them from `UNCOPIED_CODES_BACKLOG`. Fix the
    REST catch at `model-provider.api.ts:187-192`. Convert the seven plain
    `Error`s from P6. No structural change, and the highest customer-visible
-   return in the feature. *(P4, P5, P6)*
+   return in the feature. _(P4, P5, P6)_
 2. **Make the caller explicit.** Introduce `ModelProviderActor`, replace the
    nine `if (actorId)` guards with one `kind === "system"` branch, and give
    `defaults.service.ts:156` a stated direction. Point both REST apps at
    `ModelProviderApp` and delete the four hand-stamps in
-   `model-defaults.routes.ts`. *(P2, P3)*
+   `model-defaults.routes.ts`. _(P2, P3)_
 3. **Split the port file.** `ModelProviderCatalog`'s 15 concrete methods →
    `utils/model-provider-catalog-rules.ts`; the ten classes → six `*.port.ts`
    files named for what they are; delete `ModelProviderCredentialPolicy` and let
    `ModelProviderCredentialService` stand alone. Add
    `packages/features/model-provider/server/src/ports/*.port.ts` entries as they
    land — the baseline may only shrink, so each new file must already comply.
-   *(P7, P8)*
+   _(P7, P8)_
 4. **Collapse the layer.** Delete `services/model-provider.service.ts`, move its
    composition into `ModelProviderApp`, delete
    `adapters/postgres.model-provider.adapter.ts` and `AppModelProviderRuntime`,
    and give the repositories their structural `Pick<PrismaClient, …>` type back.
    Drop the unwired `modelClient` option and the dead parameters from P12.
-   *(P1, P9, P12)*
+   _(P1, P9, P12)_
 5. **De-duplicate and document.** One permission mapper, one onboarding-plan
    filter, one `tryGetModelProviderDefinition`; merge the two authorization
    services; `resolve-max-tokens-ceiling` → `utils/`; fold
    `model-provider-defaults-scopes.service.ts` into its one caller. Write the
    five explanations P13 names, fix the two rotted paths, and trim both
-   `index.ts` files to what is imported. *(P10, P11, P13, P14, P15)*
+   `index.ts` files to what is imported. _(P10, P11, P13, P14, P15)_
 
 Commit 4 is the only one that moves a public symbol; everything before it is
 internal or additive.
@@ -647,16 +647,16 @@ internal or additive.
 **22 files outside the feature import `@langwatch/model-provider-server`**
 (15 source, 7 test). By symbol:
 
-| Symbol | Files |
-|---|---|
-| `getProjectModelProviders` | 7 |
-| `prepareLitellmParams`, `LegacyModelProviderExecution` | 3 each |
-| `ModelProviderApp`, `resolveMaxTokensCeiling` | 2 each |
-| `PostgresModelProviderAdapter`, `ModelProviderCatalog`, `ModelProviderCredentialCodec`, `ModelProviderConnectionRateLimiter`, `ModelProviderIdService`, `ModelTranslationPort`, `CodexTokenRefresher` | 1 each — all in `platform/app/src/runtime/app/features/model-provider.ts` |
-| `createModelProvidersRestApp`, `createModelDefaultsRestApp` | 1 each — `apps/api/src/app-rest/app-rest.features.ts:481-489`, re-exported at `apps/api/src/index.ts:176-177` |
-| `ModelProviderTrpcApi`, `LlmModelCostTrpcApi`, `TranslateTrpcApi` + its 2 types | 1 each — `platform/app/src/runtime/app/internal-api/model-provider.router.ts`, `apps/api/src/features/model-provider/translate-trpc.mount.ts` |
-| `ModelProviderExecutionAdapter` | 1 — `platform/app/src/runtime/app/features/topic.ts` |
-| `ModelProviderKeysService`, `prepareEnvKeys`, `getProjectModelProvidersForFrontend`, `getModelMetadataForFrontend`, `mergeCustomModelMetadata`, `listOrgModelProvidersForFrontend` | 1 each |
+| Symbol                                                                                                                                                                                                | Files                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getProjectModelProviders`                                                                                                                                                                            | 7                                                                                                                                             |
+| `prepareLitellmParams`, `LegacyModelProviderExecution`                                                                                                                                                | 3 each                                                                                                                                        |
+| `ModelProviderApp`, `resolveMaxTokensCeiling`                                                                                                                                                         | 2 each                                                                                                                                        |
+| `PostgresModelProviderAdapter`, `ModelProviderCatalog`, `ModelProviderCredentialCodec`, `ModelProviderConnectionRateLimiter`, `ModelProviderIdService`, `ModelTranslationPort`, `CodexTokenRefresher` | 1 each — all in `platform/app/src/runtime/app/features/model-provider.ts`                                                                     |
+| `createModelProvidersRestApp`, `createModelDefaultsRestApp`                                                                                                                                           | 1 each — `apps/api/src/app-rest/app-rest.features.ts:481-489`, re-exported at `apps/api/src/index.ts:176-177`                                 |
+| `ModelProviderTrpcApi`, `LlmModelCostTrpcApi`, `TranslateTrpcApi` + its 2 types                                                                                                                       | 1 each — `platform/app/src/runtime/app/internal-api/model-provider.router.ts`, `apps/api/src/features/model-provider/translate-trpc.mount.ts` |
+| `ModelProviderExecutionAdapter`                                                                                                                                                                       | 1 — `platform/app/src/runtime/app/features/topic.ts`                                                                                          |
+| `ModelProviderKeysService`, `prepareEnvKeys`, `getProjectModelProvidersForFrontend`, `getModelMetadataForFrontend`, `mergeCustomModelMetadata`, `listOrgModelProvidersForFrontend`                    | 1 each                                                                                                                                        |
 
 Commits 1–3 and 5 touch none of these except the two `index.ts` trims (which
 only remove symbols nothing imports). Commit 4 removes

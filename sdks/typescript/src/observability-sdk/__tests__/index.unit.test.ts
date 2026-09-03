@@ -33,9 +33,7 @@ describe("index.ts", () => {
     it("exports getLangWatchTracerFromProvider function", () => {
       expect(indexModule.getLangWatchTracerFromProvider).toBeDefined();
       expect(typeof indexModule.getLangWatchTracerFromProvider).toBe("function");
-      expect(indexModule.getLangWatchTracerFromProvider).toBe(
-        getLangWatchTracerFromProvider,
-      );
+      expect(indexModule.getLangWatchTracerFromProvider).toBe(getLangWatchTracerFromProvider);
     });
 
     it("exports FilterableBatchSpanProcessor", () => {
@@ -148,9 +146,7 @@ describe("index.ts", () => {
     it("exports FilterableBatchSpanProcessor class", () => {
       expect(indexModule.FilterableBatchSpanProcessor).toBeDefined();
       expect(typeof indexModule.FilterableBatchSpanProcessor).toBe("function");
-      expect(indexModule.FilterableBatchSpanProcessor.name).toBe(
-        "FilterableBatchSpanProcessor",
-      );
+      expect(indexModule.FilterableBatchSpanProcessor.name).toBe("FilterableBatchSpanProcessor");
     });
 
     it("exports LangWatchTraceExporter class", () => {
@@ -178,9 +174,7 @@ describe("index.ts", () => {
     it("res-export the same functions from their original modules", () => {
       expect(indexModule.createLangWatchSpan).toBe(createLangWatchSpan);
       expect(indexModule.getLangWatchTracer).toBe(getLangWatchTracer);
-      expect(indexModule.getLangWatchTracerFromProvider).toBe(
-        getLangWatchTracerFromProvider,
-      );
+      expect(indexModule.getLangWatchTracerFromProvider).toBe(getLangWatchTracerFromProvider);
       expect(indexModule.FilterableBatchSpanProcessor).toBe(FilterableBatchSpanProcessor);
       expect(indexModule.LangWatchExporter).toBe(LangWatchExporter);
     });
@@ -230,10 +224,7 @@ describe("index.ts", () => {
   describe("component integration", () => {
     it("allows creating spans from tracer and enhancing them", () => {
       const mockProvider = new MockTracerProvider();
-      const tracer = indexModule.getLangWatchTracerFromProvider(
-        mockProvider,
-        "integration-test",
-      );
+      const tracer = indexModule.getLangWatchTracerFromProvider(mockProvider, "integration-test");
 
       // Create span through tracer
       const span = tracer.startSpan("integration-span");
@@ -304,10 +295,7 @@ describe("index.ts", () => {
   describe("workflow integration", () => {
     it("supports complete span lifecycle with all components", () => {
       const mockProvider = new MockTracerProvider();
-      const tracer = indexModule.getLangWatchTracerFromProvider(
-        mockProvider,
-        "workflow-test",
-      );
+      const tracer = indexModule.getLangWatchTracerFromProvider(mockProvider, "workflow-test");
       const mockTracer = mockProvider.getTracerByName("workflow-test")!;
 
       // Create and configure span
@@ -341,9 +329,9 @@ describe("index.ts", () => {
       expect(createdSpan?.ended).toBe(true);
 
       // Verify attributes were set
-      expect(
-        createdSpan?.getAttributeValue(indexModule.attributes.ATTR_LANGWATCH_SPAN_TYPE),
-      ).toBe("workflow");
+      expect(createdSpan?.getAttributeValue(indexModule.attributes.ATTR_LANGWATCH_SPAN_TYPE)).toBe(
+        "workflow",
+      );
       expect(
         createdSpan?.getAttributeValue(indexModule.attributes.ATTR_LANGWATCH_INPUT),
       ).toBeDefined();
@@ -377,10 +365,7 @@ describe("index.ts", () => {
 
     it("handles nested spans with proper attribution", async () => {
       const mockProvider = new MockTracerProvider();
-      const tracer = indexModule.getLangWatchTracerFromProvider(
-        mockProvider,
-        "nested-test",
-      );
+      const tracer = indexModule.getLangWatchTracerFromProvider(mockProvider, "nested-test");
       const mockTracer = mockProvider.getTracerByName("nested-test")!;
 
       await tracer.withActiveSpan("parent-task", async (parent) => {
@@ -445,10 +430,7 @@ describe("index.ts", () => {
 
     it("maintains data integrity on errors", async () => {
       const mockProvider = new MockTracerProvider();
-      const tracer = indexModule.getLangWatchTracerFromProvider(
-        mockProvider,
-        "integrity-test",
-      );
+      const tracer = indexModule.getLangWatchTracerFromProvider(mockProvider, "integrity-test");
       const mockTracer = mockProvider.getTracerByName("integrity-test")!;
 
       try {
@@ -465,9 +447,7 @@ describe("index.ts", () => {
       const span = mockTracer.getSpan("integrity-span");
       expect(span).toBeDefined();
       expect(span?.ended).toBe(true);
-      expect(
-        span?.getAttributeValue(indexModule.attributes.ATTR_LANGWATCH_SPAN_TYPE),
-      ).toBe("llm");
+      expect(span?.getAttributeValue(indexModule.attributes.ATTR_LANGWATCH_SPAN_TYPE)).toBe("llm");
       expect(span?.hasEvent("content-is-parsed")).toBe(true);
     });
   });
@@ -475,10 +455,7 @@ describe("index.ts", () => {
   describe("performance integration", () => {
     it("handles rapid span creation efficiently", () => {
       const mockProvider = new MockTracerProvider();
-      const tracer = indexModule.getLangWatchTracerFromProvider(
-        mockProvider,
-        "perf-test",
-      );
+      const tracer = indexModule.getLangWatchTracerFromProvider(mockProvider, "perf-test");
       const mockTracer = mockProvider.getTracerByName("perf-test")!;
 
       const spanCount = 50;

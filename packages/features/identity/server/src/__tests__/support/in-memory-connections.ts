@@ -54,8 +54,7 @@ export class InMemoryConnections implements SsoConnectionReadRepository {
     facts: SsoConnectionFactInput[];
     occurredAt: number;
   }): SsoConnectionState {
-    let state =
-      this.states.get(connectionId) ?? emptySsoConnection({ connectionId });
+    let state = this.states.get(connectionId) ?? emptySsoConnection({ connectionId });
     for (const fact of facts) {
       state = reduceSsoConnection({ state, fact: { ...fact, occurredAt } });
     }

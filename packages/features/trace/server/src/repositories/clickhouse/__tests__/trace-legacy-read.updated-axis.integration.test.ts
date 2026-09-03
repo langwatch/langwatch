@@ -35,7 +35,10 @@ import { TraceCanonicalisationService } from "../../../services/trace-canonicali
 import type { GetAllTracesForProjectInput } from "../../../services/trace-legacy-read.types";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
 import { ClickHouseTraceService } from "../trace-legacy-read.repository";
-import { createTestClickHouseClient, testClickHouseUrl } from "./support/clickhouse-endpoint.support";
+import {
+  createTestClickHouseClient,
+  testClickHouseUrl,
+} from "./support/clickhouse-endpoint.support";
 import { openProtections } from "./open-protections";
 
 const clickHouseUrl = testClickHouseUrl();
@@ -142,11 +145,15 @@ async function fetchUpdatedAxisPage(
   pageSize: number,
   scrollId?: string | null,
 ): Promise<TracesForProjectResult> {
-  const results = await service.getAllTracesForProject(makeQueryInput({ pageSize }), openProtections, {
-    downloadMode: true,
-    dateField: "updated",
-    scrollId,
-  });
+  const results = await service.getAllTracesForProject(
+    makeQueryInput({ pageSize }),
+    openProtections,
+    {
+      downloadMode: true,
+      dateField: "updated",
+      scrollId,
+    },
+  );
   expect(results).not.toBeNull();
   return results as TracesForProjectResult;
 }
@@ -265,10 +272,14 @@ integration("updated date-axis pagination (integration)", () => {
   // version matching the search would wrongly include the trace.
   describe("given a trace whose latest version no longer matches a search term", () => {
     const fetchDrift = (query: string) =>
-      service.getAllTracesForProject(makeQueryInput({ projectId: filterTenant, query }), openProtections, {
-        downloadMode: true,
-        dateField: "updated",
-      });
+      service.getAllTracesForProject(
+        makeQueryInput({ projectId: filterTenant, query }),
+        openProtections,
+        {
+          downloadMode: true,
+          dateField: "updated",
+        },
+      );
 
     describe("when the search term only matches the stale version", () => {
       it("excludes the trace (search runs on the latest version)", async () => {

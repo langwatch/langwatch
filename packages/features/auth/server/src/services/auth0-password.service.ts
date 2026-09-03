@@ -21,12 +21,7 @@ export class Auth0ApiError extends Error {
   readonly code: Auth0ErrorCode;
   readonly body: unknown;
 
-  constructor(args: {
-    status: number;
-    code: Auth0ErrorCode;
-    message: string;
-    body?: unknown;
-  }) {
+  constructor(args: { status: number; code: Auth0ErrorCode; message: string; body?: unknown }) {
     super(args.message);
     this.name = "Auth0ApiError";
     this.status = args.status;
@@ -119,10 +114,7 @@ const AUTH0_HTTP_TIMEOUT_MS = 10_000;
  *      `Auth0ApiError` — callers depend on `instanceof Auth0ApiError` to
  *      surface the right operator message.
  */
-async function fetchAuth0(
-  url: string,
-  init: Omit<RequestInit, "signal">,
-): Promise<Response> {
+async function fetchAuth0(url: string, init: Omit<RequestInit, "signal">): Promise<Response> {
   try {
     return await fetch(url, {
       ...init,
@@ -295,10 +287,7 @@ export async function updateUserPassword(args: {
     });
   }
 
-  logger.error(
-    { status: res.status, body },
-    "Auth0 Management API password update failed",
-  );
+  logger.error({ status: res.status, body }, "Auth0 Management API password update failed");
   throw new Auth0ApiError({
     status: res.status,
     code: "unknown",

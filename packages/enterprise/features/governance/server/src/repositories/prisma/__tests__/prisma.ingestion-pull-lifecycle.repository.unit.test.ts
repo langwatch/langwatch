@@ -30,10 +30,7 @@ describe("PrismaIngestionPullLifecycleRepository", () => {
     });
     expect(sourceFindMany).toHaveBeenCalledWith({
       where: {
-        OR: [
-          { pullSchedule: { not: null } },
-          { id: { in: ["source-with-removed-schedule"] } },
-        ],
+        OR: [{ pullSchedule: { not: null } }, { id: { in: ["source-with-removed-schedule"] } }],
       },
     });
   });

@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import type { DatasetColumn, DatasetReference, SavedRecord } from "../../model/experiments-v3/types";
+import type {
+  DatasetColumn,
+  DatasetReference,
+  SavedRecord,
+} from "../../model/experiments-v3/types";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 
 /**
@@ -10,17 +14,12 @@ import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
  * Each saved dataset tab should use this hook to declaratively fetch its data.
  * tRPC handles batching multiple queries automatically.
  */
-export const useSavedDatasetRecords = (
-  dataset: DatasetReference | undefined,
-) => {
+export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) => {
   const { project } = useOrganizationTeamProject();
-  const setSavedDatasetRecords = useEvaluationsV3Store(
-    (state) => state.setSavedDatasetRecords,
-  );
+  const setSavedDatasetRecords = useEvaluationsV3Store((state) => state.setSavedDatasetRecords);
   const hasLoadedRef = useRef(false);
 
-  const isSavedDataset =
-    dataset?.type === "saved" && Boolean(dataset.datasetId);
+  const isSavedDataset = dataset?.type === "saved" && Boolean(dataset.datasetId);
   const needsLoading = isSavedDataset && !dataset.savedRecords;
 
   // Declarative query - tRPC batches these automatically
@@ -35,8 +34,7 @@ export const useSavedDatasetRecords = (
       // PRECONDITION_FAILED. Don't retry it — the dataset simply has no rows to
       // load yet (the effect below no-ops while `query.data` is undefined).
       retry: (failureCount, error) =>
-        (error as { data?: { code?: string } })?.data?.code ===
-        "PRECONDITION_FAILED"
+        (error as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED"
           ? false
           : failureCount < 3,
     },
@@ -44,8 +42,7 @@ export const useSavedDatasetRecords = (
 
   // Sync to store when data arrives
   useEffect(() => {
-    if (!dataset || !needsLoading || !query.data || hasLoadedRef.current)
-      return;
+    if (!dataset || !needsLoading || !query.data || hasLoadedRef.current) return;
 
     hasLoadedRef.current = true;
 
@@ -122,8 +119,7 @@ export const useDatasetSelectionLoader = ({
   setActiveDataset,
 }: UseDatasetSelectionLoaderParams) => {
   // State to track pending dataset loads
-  const [pendingDatasetLoad, setPendingDatasetLoad] =
-    useState<PendingDatasetLoad | null>(null);
+  const [pendingDatasetLoad, setPendingDatasetLoad] = useState<PendingDatasetLoad | null>(null);
 
   // Query to load dataset records when adding a saved dataset
   const savedDatasetRecords = api.datasetRecord.getAll.useQuery(
@@ -136,8 +132,7 @@ export const useDatasetSelectionLoader = ({
       // ADR-032 I-READY: don't retry a not-ready dataset read; it has no rows
       // to add yet (PRECONDITION_FAILED).
       retry: (failureCount, error) =>
-        (error as { data?: { code?: string } })?.data?.code ===
-        "PRECONDITION_FAILED"
+        (error as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED"
           ? false
           : failureCount < 3,
     },
@@ -145,11 +140,7 @@ export const useDatasetSelectionLoader = ({
 
   // Effect to handle when saved dataset records finish loading
   useEffect(() => {
-    if (
-      pendingDatasetLoad &&
-      savedDatasetRecords.data &&
-      !savedDatasetRecords.isLoading
-    ) {
+    if (pendingDatasetLoad && savedDatasetRecords.data && !savedDatasetRecords.isLoading) {
       const { datasetId, name, columnTypes } = pendingDatasetLoad;
 
       // Build columns
@@ -160,20 +151,20 @@ export const useDatasetSelectionLoader = ({
       }));
 
       // Transform records to SavedRecord format
-      const savedRecords: SavedRecord[] = (
-        savedDatasetRecords.data?.datasetRecords ?? []
-      ).map((record: { id: string; entry: unknown }) => ({
-        id: record.id,
-        ...Object.fromEntries(
-          columnTypes.map((col) => {
-            const value = (record.entry as Record<string, unknown>)?.[col.name];
-            if (value === null || value === undefined) return [col.name, ""];
-            if (typeof value === "string") return [col.name, value];
-            // Properly stringify objects/arrays instead of [object Object]
-            return [col.name, JSON.stringify(value)];
-          }),
-        ),
-      }));
+      const savedRecords: SavedRecord[] = (savedDatasetRecords.data?.datasetRecords ?? []).map(
+        (record: { id: string; entry: unknown }) => ({
+          id: record.id,
+          ...Object.fromEntries(
+            columnTypes.map((col) => {
+              const value = (record.entry as Record<string, unknown>)?.[col.name];
+              if (value === null || value === undefined) return [col.name, ""];
+              if (typeof value === "string") return [col.name, value];
+              // Properly stringify objects/arrays instead of [object Object]
+              return [col.name, JSON.stringify(value)];
+            }),
+          ),
+        }),
+      );
 
       const newDataset: DatasetReference = {
         id: `saved_${datasetId}`,

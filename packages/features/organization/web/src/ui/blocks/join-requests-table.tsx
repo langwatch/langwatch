@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Button, Card, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { RandomColorAvatar } from "../../ui/elements/random-color-avatar";
 import type { PendingJoinRequest } from "../../model/pending-join-request";
 
@@ -48,8 +39,8 @@ export function JoinRequestsTable({
     <VStack align="start" gap={4} paddingTop={4} width="full">
       <Heading>Requests to join</Heading>
       <Text color="fg.muted" fontSize="sm">
-        People with a verified address on your domain who asked to join.
-        Approving adds them with your default role.
+        People with a verified address on your domain who asked to join. Approving adds them with
+        your default role.
       </Text>
 
       <Card.Root width="full" overflow="hidden">
@@ -107,9 +98,7 @@ function JoinRequestRow({
         <Badge>{request.domain}</Badge>
       </Table.Cell>
       <Table.Cell>{formatDay(request.requestedAt)}</Table.Cell>
-      <Table.Cell>
-        {request.expiresAt ? formatDay(request.expiresAt) : "—"}
-      </Table.Cell>
+      <Table.Cell>{request.expiresAt ? formatDay(request.expiresAt) : "—"}</Table.Cell>
       <Table.Cell>
         {isAdmin ? (
           <HStack gap={2} justifyContent="flex-end">

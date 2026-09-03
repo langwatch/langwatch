@@ -38,11 +38,7 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import {
-  PromptApp,
-  PromptHasNoCopiesError,
-  PromptNoCopiesSelectedError,
-} from "#app/prompt.app";
+import { PromptApp, PromptHasNoCopiesError, PromptNoCopiesSelectedError } from "#app/prompt.app";
 import type {
   PromptTrpcContext,
   PromptTrpcPorts,

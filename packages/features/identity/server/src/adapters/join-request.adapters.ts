@@ -30,7 +30,6 @@ const logger = createLogger("langwatch:identity:join-request-adapters");
  */
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 
-
 /**
  * How a join approval becomes a membership: the `OrganizationUser` row plus
  * the organization-scoped grant, in the SAME two-step shape an invitation
@@ -235,9 +234,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
     await this.fanOut({
       joinRequestId,
       what: "requestApproved",
-      sends: [
-        this.mail.sendRequestApproved({ requesterEmail, organizationName }),
-      ],
+      sends: [this.mail.sendRequestApproved({ requesterEmail, organizationName })],
     });
   }
 
@@ -258,9 +255,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
     await this.fanOut({
       joinRequestId,
       what: "requestRejected",
-      sends: [
-        this.mail.sendRequestRejected({ requesterEmail, organizationName }),
-      ],
+      sends: [this.mail.sendRequestRejected({ requesterEmail, organizationName })],
     });
   }
 
@@ -281,9 +276,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
     await this.fanOut({
       joinRequestId,
       what: "requestExpired",
-      sends: [
-        this.mail.sendRequestExpired({ requesterEmail, organizationName }),
-      ],
+      sends: [this.mail.sendRequestExpired({ requesterEmail, organizationName })],
     });
   }
 

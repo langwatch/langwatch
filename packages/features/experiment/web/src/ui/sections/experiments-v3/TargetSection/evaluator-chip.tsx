@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Circle,
-  HStack,
-  Icon,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Circle, HStack, Icon, Spinner, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { useState } from "react";
 import {
@@ -85,8 +76,7 @@ export function EvaluatorChip({
 
   // Use explicit isRunning state from store (set when target output arrives, cleared when evaluator result arrives)
   // If result already exists, it overrides isRunning (evaluator completed)
-  const status =
-    isRunning && parsed.status === "pending" ? "running" : parsed.status;
+  const status = isRunning && parsed.status === "pending" ? "running" : parsed.status;
   const { score, label, details } = parsed;
 
   const statusColor = EVALUATION_STATUS_COLORS[status];
@@ -209,12 +199,7 @@ export function EvaluatorChip({
         {status !== "pending" && (
           <>
             <Box paddingX={3} paddingY={2}>
-              <Text
-                fontSize="11px"
-                fontWeight="semibold"
-                color="fg.muted"
-                marginBottom={1}
-              >
+              <Text fontSize="11px" fontWeight="semibold" color="fg.muted" marginBottom={1}>
                 Result
               </Text>
               <VStack align="stretch" gap={1}>
@@ -242,11 +227,7 @@ export function EvaluatorChip({
                   <Text fontSize="12px" color="fg.muted">
                     Status:
                   </Text>
-                  <Text
-                    fontSize="12px"
-                    fontWeight="semibold"
-                    color={statusColor}
-                  >
+                  <Text fontSize="12px" fontWeight="semibold" color={statusColor}>
                     {getStatusLabel(status)}
                   </Text>
                 </HStack>
@@ -293,10 +274,7 @@ export function EvaluatorChip({
         )}
         {/* "Rerun" for completed/error evaluators (not pending, not running) */}
         {status !== "pending" && status !== "running" && onRerun && (
-          <Menu.Item
-            value="rerun"
-            onClick={hasMissingMappings ? onEdit : onRerun}
-          >
+          <Menu.Item value="rerun" onClick={hasMissingMappings ? onEdit : onRerun}>
             <HStack gap={2}>
               <LuRefreshCw size={14} />
               <Text>Rerun</Text>

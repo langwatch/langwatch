@@ -438,10 +438,7 @@ langwatch.setup(
 
 ```typescript TypeScript Sampling Configuration
 import { setupObservability } from "langwatch/observability/node";
-import {
-  TraceIdRatioBasedSampler,
-  ParentBasedSampler,
-} from "@opentelemetry/sdk-trace-base";
+import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace-base";
 
 const handle = setupObservability({
   langwatch: {
@@ -647,10 +644,7 @@ async function retrieveDocuments(query: string): Promise<string[]> {
 }
 
 // 3. Define Background Task
-async function processResultBackground(
-  resultId: string,
-  llmOutput: string,
-): Promise<string> {
+async function processResultBackground(resultId: string, llmOutput: string): Promise<string> {
   return tracer.startActiveSpan("background-processing", async (span) => {
     try {
       span.setType("background_job");

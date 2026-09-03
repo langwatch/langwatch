@@ -33,8 +33,7 @@ export function createTenantId(value: string): TenantId {
     if (error instanceof z.ZodError) {
       // Extract the error message from the first issue
       const message =
-        error.issues[0]?.message ??
-        "TenantId must be a non-empty string for tenant isolation";
+        error.issues[0]?.message ?? "TenantId must be a non-empty string for tenant isolation";
       throw new SecurityError("createTenantId", message);
     }
     throw error;

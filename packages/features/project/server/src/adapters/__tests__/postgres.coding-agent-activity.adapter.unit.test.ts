@@ -95,9 +95,7 @@ describe("PostgresCodingAgentActivityAdapter", () => {
     it("answers the team's organization, reading only an active project", async () => {
       const { activity, findUnique } = compose();
 
-      await expect(activity.getOrganizationId("project_alpha")).resolves.toBe(
-        "organization_acme",
-      );
+      await expect(activity.getOrganizationId("project_alpha")).resolves.toBe("organization_acme");
       expect(findUnique).toHaveBeenCalledWith({
         where: { id: "project_alpha", archivedAt: null },
         select: { team: { select: { organizationId: true } } },

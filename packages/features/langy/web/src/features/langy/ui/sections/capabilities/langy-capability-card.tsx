@@ -54,13 +54,7 @@ export function LangyCapabilityCard({
       </HStack>
     ) : null;
 
-  return (
-    <LangyCapabilityCardPresentation
-      {...presentation}
-      surface={surface}
-      footer={footer}
-    />
-  );
+  return <LangyCapabilityCardPresentation {...presentation} surface={surface} footer={footer} />;
 }
 
 function CapabilityDeepLinkChip({
@@ -75,9 +69,7 @@ function CapabilityDeepLinkChip({
   platformUrl?: string | null;
 }) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const preciseHref = platformUrl
-    ? toRelativeSameOriginHref({ url: platformUrl, origin })
-    : null;
+  const preciseHref = platformUrl ? toRelativeSameOriginHref({ url: platformUrl, origin }) : null;
   const href = preciseHref ?? buildSurfaceHref({ surface, projectSlug, resourceId });
   const onClick = useSpaLinkClick(href ?? "");
   if (!href) return null;

@@ -141,9 +141,7 @@ describe("impersonateUser", () => {
   let fetchMock: Mock;
 
   beforeEach(() => {
-    fetchMock = vi.fn(
-      async () => new Response(JSON.stringify({ message: "ok" }), { status: 200 }),
-    );
+    fetchMock = vi.fn(async () => new Response(JSON.stringify({ message: "ok" }), { status: 200 }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
   });
 

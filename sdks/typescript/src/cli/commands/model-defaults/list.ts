@@ -23,9 +23,7 @@ export const listModelDefaultsCommand = async (): Promise<CommandResult | void> 
   try {
     const snapshot = await service.getSnapshot();
 
-    spinner.succeed(
-      `Default-model snapshot for project ${chalk.cyan(snapshot.scope.projectId)}`,
-    );
+    spinner.succeed(`Default-model snapshot for project ${chalk.cyan(snapshot.scope.projectId)}`);
 
     return {
       data: snapshot,
@@ -56,9 +54,7 @@ export const listModelDefaultsCommand = async (): Promise<CommandResult | void> 
         }
 
         for (const c of snapshot.configs) {
-          const scopesStr = c.scopes
-            .map((s) => `${s.type.toLowerCase()}:${s.name}`)
-            .join(", ");
+          const scopesStr = c.scopes.map((s) => `${s.type.toLowerCase()}:${s.name}`).join(", ");
           console.log();
           console.log(`  ${chalk.gray("ID:")}     ${chalk.green(c.id)}`);
           console.log(`  ${chalk.gray("Scopes:")} ${scopesStr}`);

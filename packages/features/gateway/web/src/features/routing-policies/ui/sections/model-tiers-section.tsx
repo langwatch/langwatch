@@ -1,13 +1,4 @@
-import {
-  Box,
-  Code,
-  Field,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Code, Field, HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { type Control, useWatch } from "react-hook-form";
 
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
@@ -83,9 +74,9 @@ export function ModelTiersSection({
           onChange={(event) => onDefaultModelChange(event.target.value)}
         />
         <Field.HelperText>
-          Answers any tier above you have not pointed somewhere specific. It applies to
-          the tier names only, so a model name a client gets wrong is still rejected
-          rather than quietly served.
+          Answers any tier above you have not pointed somewhere specific. It applies to the tier
+          names only, so a model name a client gets wrong is still rejected rather than quietly
+          served.
         </Field.HelperText>
       </Field.Root>
 
@@ -155,9 +146,7 @@ function TierRow({
             onChange={(event) => onChange(event.target.value)}
           >
             <option value="">
-              {fallbackModel
-                ? `Use the default model (${fallbackModel})`
-                : "No model yet"}
+              {fallbackModel ? `Use the default model (${fallbackModel})` : "No model yet"}
             </option>
             {options.map((option) => (
               <option key={option.modelId} value={option.modelId}>

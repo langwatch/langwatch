@@ -88,9 +88,7 @@ export class SsoConnectionBackofficeService {
       }),
       this.deps.prisma.ssoConnection.count({ where }),
     ]);
-    const names = await this.organizationNames(
-      rows.map((row) => row.organizationId),
-    );
+    const names = await this.organizationNames(rows.map((row) => row.organizationId));
     return {
       connections: rows.map((row) =>
         toBackofficeConnection({
@@ -176,9 +174,7 @@ export class SsoConnectionBackofficeService {
     });
   }
 
-  async rejectDomainClaim(
-    args: DomainCommandArgs & { note: string },
-  ): Promise<void> {
+  async rejectDomainClaim(args: DomainCommandArgs & { note: string }): Promise<void> {
     await this.deps.connections().rejectDomainClaim({
       ...this.command(args),
       domain: args.domain,
@@ -202,9 +198,7 @@ export class SsoConnectionBackofficeService {
     });
   }
 
-  async suspendConnection(
-    args: ConnectionCommandArgs & { reason: string | null },
-  ): Promise<void> {
+  async suspendConnection(args: ConnectionCommandArgs & { reason: string | null }): Promise<void> {
     await this.deps.connections().suspendConnection({
       ...this.command(args),
       reason: args.reason,
@@ -230,11 +224,7 @@ export class SsoConnectionBackofficeService {
    * can supply an actor — the operator the surface authenticated is the
    * actor, and the history says so.
    */
-  private command({
-    organizationId,
-    connectionId,
-    operator,
-  }: ConnectionCommandArgs) {
+  private command({ organizationId, connectionId, operator }: ConnectionCommandArgs) {
     return {
       tenantId: organizationId,
       organizationId,
@@ -246,9 +236,7 @@ export class SsoConnectionBackofficeService {
     };
   }
 
-  private async organizationNames(
-    organizationIds: string[],
-  ): Promise<Map<string, string>> {
+  private async organizationNames(organizationIds: string[]): Promise<Map<string, string>> {
     const unique = [...new Set(organizationIds)];
     if (unique.length === 0) return new Map();
     const rows = await this.deps.prisma.organization.findMany({

@@ -196,9 +196,7 @@ describe("resolvePlanDefaults", () => {
 });
 
 describe("resolvePlanDefaults and the webhook endpoints entitlement", () => {
-  const licenseWith = (
-    overrides: Partial<LicensePlanLimits> = {},
-  ): LicensePlanLimits => ({
+  const licenseWith = (overrides: Partial<LicensePlanLimits> = {}): LicensePlanLimits => ({
     type: "ENTERPRISE",
     name: "Enterprise",
     maxMembers: 100,
@@ -224,8 +222,7 @@ describe("resolvePlanDefaults and the webhook endpoints entitlement", () => {
 
     it("keeps a stated true", () => {
       expect(
-        resolvePlanDefaults(licenseWith({ webhookEndpointsEnabled: true }))
-          .webhookEndpointsEnabled,
+        resolvePlanDefaults(licenseWith({ webhookEndpointsEnabled: true })).webhookEndpointsEnabled,
       ).toBe(true);
     });
   });

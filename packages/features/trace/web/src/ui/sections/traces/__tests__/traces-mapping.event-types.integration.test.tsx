@@ -105,9 +105,7 @@ describe("TracesMapping events dropdown (integration)", () => {
       // Open the searchable key dropdown (shows "* (any event)" until opened).
       await user.click(await screen.findByText("* (any event)"));
 
-      expect(
-        await screen.findByRole("option", { name: "thumbs_up" }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole("option", { name: "thumbs_up" })).toBeInTheDocument();
     });
   });
 });

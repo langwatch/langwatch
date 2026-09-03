@@ -9,9 +9,7 @@ import { ExperimentExecutionPort } from "../ports/experiment-execution.port";
 /** Refuses execution where the application composes no Eventing pipeline. */
 export class UnavailableExperimentExecutionAdapter extends ExperimentExecutionPort {
   private unavailable(): never {
-    throw new Error(
-      "Experiment execution is not configured for this application instance",
-    );
+    throw new Error("Experiment execution is not configured for this application instance");
   }
 
   async startExperimentRun(_input: StartExperimentRunInput): Promise<void> {

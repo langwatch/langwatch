@@ -10,15 +10,11 @@ export type ExperimentEventingClickHouseResolver = (
 
 /** Binds the port to the application's tenant-scoped client resolver. */
 export class ExperimentClickHouseAdapter extends ExperimentClickHousePort {
-  private constructor(
-    private readonly resolver: ExperimentEventingClickHouseResolver,
-  ) {
+  private constructor(private readonly resolver: ExperimentEventingClickHouseResolver) {
     super();
   }
 
-  static create(
-    resolver: ExperimentEventingClickHouseResolver,
-  ): ExperimentClickHouseAdapter {
+  static create(resolver: ExperimentEventingClickHouseResolver): ExperimentClickHouseAdapter {
     return new ExperimentClickHouseAdapter(resolver);
   }
 

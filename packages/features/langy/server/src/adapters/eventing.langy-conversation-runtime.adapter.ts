@@ -102,9 +102,7 @@ export class EventingLangyConversationAdapter {
     }) => Promise<void>
   >("langyGenerateTitle");
 
-  private constructor(
-    private readonly options: EventingLangyConversationAdapterOptions,
-  ) {}
+  private constructor(private readonly options: EventingLangyConversationAdapterOptions) {}
 
   buildProcessing() {
     const options = this.options;

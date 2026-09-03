@@ -123,12 +123,9 @@ export function AICreateModal({
     }
   }, [open]);
 
-  const handleDescriptionChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setDescription(e.target.value);
-    },
-    [],
-  );
+  const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDescription(e.target.value);
+  }, []);
 
   const handleExampleClick = useCallback((templateText: string) => {
     setDescription(templateText);
@@ -567,12 +564,7 @@ interface IdleFooterProps {
   footerHint?: React.ReactNode;
 }
 
-function IdleFooter({
-  onSkip,
-  onGenerate,
-  isGenerateDisabled,
-  footerHint,
-}: IdleFooterProps) {
+function IdleFooter({ onSkip, onGenerate, isGenerateDisabled, footerHint }: IdleFooterProps) {
   return (
     <HStack
       gap={2}
@@ -620,11 +612,7 @@ function StartModeToggle({
       borderRadius="full"
       bg="bg.subtle"
     >
-      <StartModeButton
-        active={mode === "assist"}
-        accent
-        onClick={() => onChange("assist")}
-      >
+      <StartModeButton active={mode === "assist"} accent onClick={() => onChange("assist")}>
         <Sparkles size={13} />
         With {assistantName}
       </StartModeButton>
@@ -676,13 +664,7 @@ function StartModeButton({
 /** The manual path body: a plain, un-accented "you're in control" panel. */
 function ManualStartState({ assistantName }: { assistantName: string }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      bg="bg.surface"
-      padding={5}
-    >
+    <Box borderWidth="1px" borderColor="border" borderRadius="xl" bg="bg.surface" padding={5}>
       <HStack align="start" gap={3}>
         <Box
           display="grid"
@@ -701,9 +683,8 @@ function ManualStartState({ assistantName }: { assistantName: string }) {
         <VStack align="start" gap={1}>
           <Text fontWeight="semibold">Build it yourself</Text>
           <Text color="fg.muted" fontSize="sm" lineHeight="tall">
-            Open a blank scenario and write the situation and success criteria by hand —
-            no model involved. You can hand it to {assistantName} for a draft at any
-            point.
+            Open a blank scenario and write the situation and success criteria by hand — no model
+            involved. You can hand it to {assistantName} for a draft at any point.
           </Text>
         </VStack>
       </HStack>
@@ -733,8 +714,7 @@ interface ErrorFooterProps {
 function ErrorFooter({ error, onSkip, onTryAgain, assistant }: ErrorFooterProps) {
   const classified = classifyGenerationError(error);
 
-  const showConfigure =
-    classified.cta === "configure" || classified.cta === "configure-and-retry";
+  const showConfigure = classified.cta === "configure" || classified.cta === "configure-and-retry";
   const showRetry =
     classified.cta === "retry" ||
     classified.cta === "configure-and-retry" ||

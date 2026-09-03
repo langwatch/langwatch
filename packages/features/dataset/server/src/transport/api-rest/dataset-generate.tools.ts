@@ -10,9 +10,7 @@ export const tools = (dataset: string) => {
     description:
       "Adds a SINGLE row to the dataset. To add multiple rows, call this tool multiple times. The row is an object with values for each column (excluding the id column which is auto-generated).",
     inputSchema: z.object({
-      row: z.object(
-        Object.fromEntries(columnNames?.map((column) => [column, z.string()]) ?? []),
-      ),
+      row: z.object(Object.fromEntries(columnNames?.map((column) => [column, z.string()]) ?? [])),
     }),
   });
 
@@ -21,9 +19,7 @@ export const tools = (dataset: string) => {
       "Updates a row in the dataset, each row is an array of values matching each column of the dataset EXCEPT the id column",
     inputSchema: z.object({
       id: z.string(),
-      row: z.object(
-        Object.fromEntries(columnNames?.map((column) => [column, z.string()]) ?? []),
-      ),
+      row: z.object(Object.fromEntries(columnNames?.map((column) => [column, z.string()]) ?? [])),
     }),
   });
 

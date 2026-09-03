@@ -52,9 +52,7 @@ export function feedLangyDerivedCardPreview(
  * blockId — the block's identity from emission to durable part — never by
  * position or timing.
  */
-export function reconcileLangyDerivedCardPreviews<
-  P extends { card: LangyDerivedCard | null },
->({
+export function reconcileLangyDerivedCardPreviews<P extends { card: LangyDerivedCard | null }>({
   previews,
   settledCardIds,
 }: {

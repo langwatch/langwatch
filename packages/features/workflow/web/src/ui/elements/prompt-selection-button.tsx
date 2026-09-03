@@ -14,12 +14,7 @@ export function PromptSelectionButton({ onClick }: PromptSelectionButtonProps) {
       openDelay={0}
       showArrow
     >
-      <Button
-        onClick={onClick}
-        justifyContent="space-between"
-        variant="outline"
-        background="bg"
-      >
+      <Button onClick={onClick} justifyContent="space-between" variant="outline" background="bg">
         <LuFolder size={16} />
       </Button>
     </Tooltip>

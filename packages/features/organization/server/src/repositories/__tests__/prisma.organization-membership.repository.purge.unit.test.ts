@@ -41,9 +41,7 @@ function purgingPrisma() {
   ];
   const transaction = vi.fn((operations: unknown[]) => Promise.resolve(operations));
   const prisma = {
-    ...Object.fromEntries(
-      models.map((model) => [model, { deleteMany: deleteManyFor(model) }]),
-    ),
+    ...Object.fromEntries(models.map((model) => [model, { deleteMany: deleteManyFor(model) }])),
     $transaction: transaction,
   } as unknown as PrismaClient;
   return { prisma, deletions, transaction };

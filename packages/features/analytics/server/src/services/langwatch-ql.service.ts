@@ -22,7 +22,10 @@ import {
   lwqlVisibleViews,
 } from "../langwatch-ql/catalog/types";
 import { lwqlDiagnostics } from "../langwatch-ql/diagnostics";
-import { LangWatchQLParameterMissingError, LangWatchQLUnavailableError } from "../langwatch-ql/errors";
+import {
+  LangWatchQLParameterMissingError,
+  LangWatchQLUnavailableError,
+} from "../langwatch-ql/errors";
 import {
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,

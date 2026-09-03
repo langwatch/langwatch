@@ -78,10 +78,7 @@ describe("Media rendering in trace views", () => {
       { wrapper: Wrapper },
     );
 
-    expect(screen.getByTestId("media-part-image")).toHaveAttribute(
-      "src",
-      "/api/files/p1/img1",
-    );
+    expect(screen.getByTestId("media-part-image")).toHaveAttribute("src", "/api/files/p1/img1");
     const chip = screen.getByTestId("media-part-binary");
     expect(chip).toBeInTheDocument();
     expect(chip).toHaveTextContent("report.pdf");

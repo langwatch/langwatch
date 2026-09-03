@@ -83,8 +83,8 @@ Created without a user association (`userId: null`). Scoped to specific projects
 ```
 
 <Info>
-  Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific
-  projects when possible.
+  Service keys without `projectIds` get org-wide ADMIN access. Always scope to specific projects
+  when possible.
 </Info>
 
 Because a service key has no person capping it, and a key minted for somebody else is capped by their access rather than yours, both are reserved for organization administrators. A caller who holds `organization:manage` without being an administrator is refused with 403. Minting a personal key for yourself is always allowed: your own access caps it.

@@ -75,10 +75,12 @@ export function isNodeDataEqual(
   nodeData1: Node<LlmPromptConfigComponent>["data"],
   nodeData2: Node<LlmPromptConfigComponent>["data"],
 ): boolean {
-  const demo1 = nodeData1.parameters.find((p) => p.identifier === "demonstrations")
-    ?.value as NodeDataset | undefined;
-  const demo2 = nodeData2.parameters.find((p) => p.identifier === "demonstrations")
-    ?.value as NodeDataset | undefined;
+  const demo1 = nodeData1.parameters.find((p) => p.identifier === "demonstrations")?.value as
+    | NodeDataset
+    | undefined;
+  const demo2 = nodeData2.parameters.find((p) => p.identifier === "demonstrations")?.value as
+    | NodeDataset
+    | undefined;
 
   const includeDemonstrations = hasRecords(demo1) || hasRecords(demo2);
 

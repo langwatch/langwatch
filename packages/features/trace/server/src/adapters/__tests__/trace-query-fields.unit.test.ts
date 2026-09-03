@@ -2,11 +2,7 @@ import { parseTraceQuerySyntax, type TagToken } from "@langwatch/trace-contract"
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { FIELD_DEFS, KNOWN_FIELDS } from "../trace-query-fields.clickhouse.adapter";
-import {
-  type FieldDef,
-  type InMemoryTrace,
-  UNSUPPORTED,
-} from "../trace-query-evaluation.adapter";
+import { type FieldDef, type InMemoryTrace, UNSUPPORTED } from "../trace-query-evaluation.adapter";
 
 const summary = {
   traceId: "trace-1",

@@ -16,12 +16,12 @@ Four kinds of patterns:
 Each has a `deny` list and an optional `allow` list.
 
 <Note>
-  **Enforcement point:** policy-rule checks run immediately after authentication and rate
-  limiting, **before** guardrails, budget reconciliation, or the upstream provider. The
-  tools, MCP, and URL dimensions judge the request body as sent. The models dimension runs
-  one step later, at model resolution, and judges the resolved model. A blocked request
-  never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This
-  is the cheapest possible reject path in the dispatcher.
+  **Enforcement point:** policy-rule checks run immediately after authentication and rate limiting,
+  **before** guardrails, budget reconciliation, or the upstream provider. The tools, MCP, and URL
+  dimensions judge the request body as sent. The models dimension runs one step later, at model
+  resolution, and judges the resolved model. A blocked request never incurs a provider token cost, a
+  guardrail evaluator run, or a budget debit. This is the cheapest possible reject path in the
+  dispatcher.
 </Note>
 
 ## How it works
@@ -77,11 +77,11 @@ Blocked → `403 tool_not_allowed` (we conflate MCP denials with tool denials fo
 First URL that hits a deny rule (or falls outside a non-null `allow` list) → `403 url_not_allowed` before the request reaches any upstream provider. Attribution via request-id correlation (see [§Tools](#tools) above).
 
 <Note>
-  **Enforcement vs egress control.** This layer stops a *request* from reaching a provider
-  when it contains a disallowed URL. It does **not** prevent a provider from returning a
-  URL that a downstream tool-runner then fetches, that requires an egress proxy on the
-  node running the tool call, which is out of scope for the gateway. Pair blocked URLs
-  with egress controls for defence in depth.
+  **Enforcement vs egress control.** This layer stops a *request* from reaching a provider when it
+  contains a disallowed URL. It does **not** prevent a provider from returning a URL that a
+  downstream tool-runner then fetches, that requires an egress proxy on the node running the tool
+  call, which is out of scope for the gateway. Pair blocked URLs with egress controls for defence in
+  depth.
 </Note>
 
 ### Models

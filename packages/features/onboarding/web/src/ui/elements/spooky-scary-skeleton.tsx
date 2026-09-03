@@ -22,13 +22,7 @@ const SpookyScarySkeleton: React.FC<SpookyScarySkeletonProps> = ({ loading }) =>
         <Box />
 
         <HStack gap={3}>
-          <Skeleton
-            loading={loading}
-            h="40px"
-            w="80px"
-            borderRadius="lg"
-            variant="shine"
-          />
+          <Skeleton loading={loading} h="40px" w="80px" borderRadius="lg" variant="shine" />
         </HStack>
       </HStack>
     </VStack>

@@ -4,9 +4,7 @@ import { AdminAccessService } from "../admin-access.service";
 describe("AdminAccessService", () => {
   it("normalizes the configured comma-separated allow-list", () => {
     expect(
-      AdminAccessService.parseEmails(
-        " Root@Langwatch.ai , ops@langwatch.ai,, second@Example.com ",
-      ),
+      AdminAccessService.parseEmails(" Root@Langwatch.ai , ops@langwatch.ai,, second@Example.com "),
     ).toEqual(["root@langwatch.ai", "ops@langwatch.ai", "second@example.com"]);
   });
 

@@ -206,11 +206,7 @@ export interface ScheduledJobStore {
   tryFindByIdForOps(params: { id: string }): Promise<ScheduledJobRecord | null>;
 
   /** Pause or resume a schedule. Never touches an in-flight slot. */
-  setActiveForOps(params: {
-    id: string;
-    projectId: string;
-    active: boolean;
-  }): Promise<boolean>;
+  setActiveForOps(params: { id: string; projectId: string; active: boolean }): Promise<boolean>;
 
   /**
    * Release a slot whose worker never settled it, and make the schedule

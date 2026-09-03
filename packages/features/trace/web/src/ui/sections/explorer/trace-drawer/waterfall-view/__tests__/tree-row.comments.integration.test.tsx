@@ -160,9 +160,7 @@ describe("given a span that carries two comments", () => {
   it("shows on the row that the span carries two comments", () => {
     renderRow(comments);
 
-    expect(
-      screen.getByRole("button", { name: "2 comments on web_search" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2 comments on web_search" })).toBeInTheDocument();
   });
 
   /** @scenario "A commented span carries a count on its row and opens its thread there" */
@@ -190,9 +188,7 @@ describe("given a span with nothing said about it", () => {
   it("names the span in the action that has no room for a label", () => {
     const { container } = renderRow([]);
 
-    expect(
-      container.querySelector('[aria-label="Comment on web_search"]'),
-    ).toBeInTheDocument();
+    expect(container.querySelector('[aria-label="Comment on web_search"]')).toBeInTheDocument();
   });
 
   /** @scenario "A comment action with no room for a label names the row it acts on" */
@@ -212,9 +208,10 @@ describe("given a span whose name fills its column", () => {
       const { container } = renderRow([]);
 
       expect(restingMarks()).not.toBeInTheDocument();
-      expect(
-        container.querySelector('[aria-label="Comment on web_search"]'),
-      ).toHaveAttribute("aria-hidden", "true");
+      expect(container.querySelector('[aria-label="Comment on web_search"]')).toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
     });
   });
 
@@ -226,9 +223,10 @@ describe("given a span whose name fills its column", () => {
 
       await user.hover(rowOf(container));
 
-      expect(
-        container.querySelector('[aria-label="Comment on web_search"]'),
-      ).not.toHaveAttribute("aria-hidden", "true");
+      expect(container.querySelector('[aria-label="Comment on web_search"]')).not.toHaveAttribute(
+        "aria-hidden",
+        "true",
+      );
     });
 
     /** @scenario "The actions the pointer asks for read below the span's name" */
@@ -254,9 +252,10 @@ describe("given a row that carries a mark of its own", () => {
 
     expect(restingMarks()).toBeInTheDocument();
     expect(restingMarks()?.contains(hoverActions())).toBe(false);
-    expect(
-      container.querySelector('[aria-label="1 comment on web_search"]'),
-    ).not.toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector('[aria-label="1 comment on web_search"]')).not.toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
   });
 
   /** @scenario "The actions the pointer asks for read below the span's name" */
@@ -266,9 +265,7 @@ describe("given a row that carries a mark of its own", () => {
 
     await user.hover(rowOf(container));
 
-    expect(
-      container.querySelectorAll('[aria-label="1 comment on web_search"]'),
-    ).toHaveLength(1);
+    expect(container.querySelectorAll('[aria-label="1 comment on web_search"]')).toHaveLength(1);
   });
 });
 
@@ -277,12 +274,8 @@ describe("given a span that is pinned as a tab", () => {
   it("offers no pinning on its row and shows no pinned mark", () => {
     const { container } = renderRow([]);
 
-    expect(
-      container.querySelector('[aria-label="Pin span tab"]'),
-    ).not.toBeInTheDocument();
-    expect(
-      container.querySelector('[aria-label="Unpin span tab"]'),
-    ).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-label="Pin span tab"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-label="Unpin span tab"]')).not.toBeInTheDocument();
   });
 });
 
@@ -295,9 +288,7 @@ describe("when the reader may read annotations but not write them", () => {
   it("offers no comment action on a span with nothing said about it", () => {
     const { container } = renderRow([]);
 
-    expect(
-      container.querySelector('[aria-label="Comment on web_search"]'),
-    ).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-label="Comment on web_search"]')).not.toBeInTheDocument();
   });
 
   /** @scenario "A reviewer who may only read annotations is offered no comment action" */

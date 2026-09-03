@@ -3,8 +3,7 @@ import type { DatasetColumns } from "./dataset";
 
 const getSafeColumnName = (columnName: string, existingNames: Set<string>): string => {
   const reserved = (value: string) => value === "id" || value === "selected";
-  if (!reserved(columnName.toLowerCase()) && !existingNames.has(columnName))
-    return columnName;
+  if (!reserved(columnName.toLowerCase()) && !existingNames.has(columnName)) return columnName;
   let candidate = `${columnName}_`;
   let counter = 0;
   while (reserved(candidate.toLowerCase()) || existingNames.has(candidate)) {
@@ -188,11 +187,7 @@ export function convertValueToColumnType(
   if (type === "boolean") {
     const strValue = `${value ?? ""}`.toLowerCase();
     if (["true", "1", "yes", "y", "on", "ok"].includes(strValue)) return true;
-    if (
-      ["false", "0", "null", "undefined", "nan", "inf", "no", "n", "off"].includes(
-        strValue,
-      )
-    ) {
+    if (["false", "0", "null", "undefined", "nan", "inf", "no", "n", "off"].includes(strValue)) {
       return false;
     }
     return value;
@@ -230,9 +225,7 @@ export function convertRowsToColumnTypes(
   rows: Record<string, unknown>[],
   columnTypes: DatasetColumns,
 ): Record<string, unknown>[] {
-  const typeForColumn = Object.fromEntries(
-    columnTypes.map((col) => [col.name, col.type]),
-  );
+  const typeForColumn = Object.fromEntries(columnTypes.map((col) => [col.name, col.type]));
 
   return rows.map((record) => {
     const convertedRecord = { ...record };

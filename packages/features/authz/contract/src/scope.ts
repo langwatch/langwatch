@@ -4,12 +4,7 @@
  * it, the organization it belongs to, and whether an audience covers the
  * caller. No walk logic lives here.
  */
-import type {
-  AuthzScopeRef,
-  CollectedGrants,
-  GrantAudience,
-  RoleBindingScopeType,
-} from "./authz";
+import type { AuthzScopeRef, CollectedGrants, GrantAudience, RoleBindingScopeType } from "./authz";
 
 /** One link of a scope chain: a binding scope that can grant at the scope. */
 export type ScopeChainLink = {

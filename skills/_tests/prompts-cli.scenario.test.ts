@@ -37,9 +37,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
   it.skipIf(isCI)(
     "agent discovers and uses CLI to version prompts from scratch",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-prompts-version-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-prompts-version-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "cli-prompts/python-with-prompts",
@@ -86,9 +84,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
               fs
                 .readdirSync(promptsDir)
                 .some((f) => f.endsWith(".prompt.yaml") || f.endsWith(".prompt.yml"));
-            expect(hasYaml, "Expected at least one .prompt.yaml file in prompts/").toBe(
-              true,
-            );
+            expect(hasYaml, "Expected at least one .prompt.yaml file in prompts/").toBe(true);
 
             assertNoInteractiveWorkarounds(state);
           },
@@ -104,18 +100,13 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
   it.skipIf(isCI)(
     "agent creates a specific named prompt via CLI",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-prompts-create-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-prompts-create-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
         `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
-      fs.writeFileSync(
-        path.join(tempFolder, "prompts.json"),
-        JSON.stringify({ prompts: {} }),
-      );
+      fs.writeFileSync(path.join(tempFolder, "prompts.json"), JSON.stringify({ prompts: {} }));
       fs.writeFileSync(
         path.join(tempFolder, "prompts-lock.json"),
         JSON.stringify({ lockfileVersion: 1, prompts: {} }),
@@ -173,19 +164,14 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
   it.skipIf(isCI)(
     "agent uses push --force-local to resolve conflicts non-interactively",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-prompts-push-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-prompts-push-"));
 
       // Set up a project with a prompt that exists both locally and remotely (simulate conflict scenario)
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
         `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
-      fs.writeFileSync(
-        path.join(tempFolder, "prompts.json"),
-        JSON.stringify({ prompts: {} }),
-      );
+      fs.writeFileSync(path.join(tempFolder, "prompts.json"), JSON.stringify({ prompts: {} }));
       fs.writeFileSync(
         path.join(tempFolder, "prompts-lock.json"),
         JSON.stringify({ lockfileVersion: 1, prompts: {} }),
@@ -246,10 +232,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         path.join(tempFolder, ".env"),
         `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
-      fs.writeFileSync(
-        path.join(tempFolder, "prompts.json"),
-        JSON.stringify({ prompts: {} }),
-      );
+      fs.writeFileSync(path.join(tempFolder, "prompts.json"), JSON.stringify({ prompts: {} }));
       fs.writeFileSync(
         path.join(tempFolder, "prompts-lock.json"),
         JSON.stringify({ lockfileVersion: 1, prompts: {} }),

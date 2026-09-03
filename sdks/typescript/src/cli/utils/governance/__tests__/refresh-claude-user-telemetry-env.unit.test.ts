@@ -40,9 +40,7 @@ describe("refreshClaudeUserTelemetryEnv", () => {
         });
 
         expect(label).toContain("~/.claude/settings.json");
-        const written = JSON.parse(
-          fs.readFileSync(appSettingsTargetFor("claude")!.path, "utf8"),
-        );
+        const written = JSON.parse(fs.readFileSync(appSettingsTargetFor("claude")!.path, "utf8"));
         expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(CURRENT_ENDPOINT);
         expect(written.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
           `Authorization=Bearer ${CURRENT_TOKEN}`,
@@ -91,12 +89,7 @@ describe("refreshClaudeUserTelemetryEnv", () => {
 
   describe("given the device carries the LangWatch Claude Code plugin", () => {
     beforeEach(() => {
-      const installedPlugins = path.join(
-        home.home,
-        ".claude",
-        "plugins",
-        "installed_plugins.json",
-      );
+      const installedPlugins = path.join(home.home, ".claude", "plugins", "installed_plugins.json");
       fs.mkdirSync(path.dirname(installedPlugins), { recursive: true });
       fs.writeFileSync(
         installedPlugins,

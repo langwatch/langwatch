@@ -38,8 +38,8 @@ For production, use your cloud provider's built-in backup features:
 - **Azure Database**: Enable geo-redundant backups
 
 <Tip>
-  Always test your restore procedure before you need it. Schedule a quarterly restore
-  drill to validate your backups.
+  Always test your restore procedure before you need it. Schedule a quarterly restore drill to
+  validate your backups.
 </Tip>
 
 ## ClickHouse Backups
@@ -126,8 +126,8 @@ kubectl exec -n langwatch langwatch-clickhouse-0 -- \
 ```
 
 <Warning>
-  Restoring a backup overwrites existing data in the target database. Always verify you're
-  restoring to the correct environment.
+  Restoring a backup overwrites existing data in the target database. Always verify you're restoring
+  to the correct environment.
 </Warning>
 
 ## ClickHouse Cold Storage
@@ -156,9 +156,9 @@ clickhouse:
 ```
 
 <Note>
-  We recommend setting the TTL to a multiple of 7 (e.g., 7, 14, 28, 49) to align with
-  ClickHouse's weekly partition boundaries for more efficient data management. The default
-  of 49 days means data stays on fast local storage for ~7 weeks before moving to S3.
+  We recommend setting the TTL to a multiple of 7 (e.g., 7, 14, 28, 49) to align with ClickHouse's
+  weekly partition boundaries for more efficient data management. The default of 49 days means data
+  stays on fast local storage for ~7 weeks before moving to S3.
 </Note>
 
 ### Cost Savings

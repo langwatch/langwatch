@@ -106,8 +106,7 @@ describe("<EvaluationStatusItem /> error rendering", () => {
         status: "error",
         passed: undefined,
         score: undefined,
-        details:
-          "Legacy path: Azure returned 401 Unauthorized — invalid subscription key",
+        details: "Legacy path: Azure returned 401 Unauthorized — invalid subscription key",
       });
 
       render(<EvaluationStatusItem check={check} />, { wrapper: Wrapper });

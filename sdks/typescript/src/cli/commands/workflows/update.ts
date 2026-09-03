@@ -29,9 +29,7 @@ export const updateWorkflowCommand = async (
     if (Object.keys(body).length === 0) {
       failSpinner({
         spinner,
-        error: commandValidationError(
-          "No fields to update. Use --name, --icon, or --description.",
-        ),
+        error: commandValidationError("No fields to update. Use --name, --icon, or --description."),
         action: "update workflow",
       });
       process.exit(1);
@@ -67,12 +65,8 @@ export const updateWorkflowCommand = async (
         console.log();
         console.log(`  ${chalk.gray("ID:")}          ${chalk.green(workflow.id)}`);
         console.log(`  ${chalk.gray("Name:")}        ${chalk.cyan(workflow.name)}`);
-        console.log(
-          `  ${chalk.gray("Icon:")}        ${workflow.icon ?? chalk.gray("—")}`,
-        );
-        console.log(
-          `  ${chalk.gray("Description:")} ${workflow.description ?? chalk.gray("—")}`,
-        );
+        console.log(`  ${chalk.gray("Icon:")}        ${workflow.icon ?? chalk.gray("—")}`);
+        console.log(`  ${chalk.gray("Description:")} ${workflow.description ?? chalk.gray("—")}`);
         console.log();
       },
     };

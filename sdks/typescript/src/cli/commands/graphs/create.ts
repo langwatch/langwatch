@@ -70,9 +70,7 @@ export const createGraphCommand = async (
       table: () => {
         console.log();
         console.log(`  ${chalk.gray("ID:")}        ${chalk.green(graph.id)}`);
-        console.log(
-          `  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`,
-        );
+        console.log(`  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`);
         console.log();
       },
     };

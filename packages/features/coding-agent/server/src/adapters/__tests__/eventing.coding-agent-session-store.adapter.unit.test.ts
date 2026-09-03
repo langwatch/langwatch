@@ -8,7 +8,10 @@
  * @see specs/coding-agent/session-aggregate.feature
  */
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
-import type { CodingAgentProjectionPersistence, CodingAgentSession } from "@langwatch/coding-agent-contract";
+import type {
+  CodingAgentProjectionPersistence,
+  CodingAgentSession,
+} from "@langwatch/coding-agent-contract";
 import { describe, expect, it } from "vitest";
 import { EventingCodingAgentSessionStoreAdapter } from "../eventing.coding-agent-session-store.adapter";
 import {
@@ -121,7 +124,10 @@ describe("the session persist gate", () => {
       const persistence = new FakePersistence();
       const store = storeWith(persistence);
 
-      await store.store(makeState({ prompts: 0, apiErrors: 4 }), context({ appliedEventIds: ["e1"] }));
+      await store.store(
+        makeState({ prompts: 0, apiErrors: 4 }),
+        context({ appliedEventIds: ["e1"] }),
+      );
 
       expect(persistence.upsertCalls).toEqual([]);
     });
@@ -170,10 +176,7 @@ describe("the session persist gate", () => {
       const persistence = new FakePersistence();
       const store = storeWith(persistence);
 
-      await store.store(
-        makeState({ prompts: 0, inputTokens: 1_200, outputTokens: 90 }),
-        context(),
-      );
+      await store.store(makeState({ prompts: 0, inputTokens: 1_200, outputTokens: 90 }), context());
 
       expect(persistence.upsertCalls).toHaveLength(1);
     });

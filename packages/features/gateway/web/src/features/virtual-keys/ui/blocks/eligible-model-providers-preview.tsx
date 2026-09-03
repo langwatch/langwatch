@@ -178,17 +178,9 @@ export function EligibleModelProvidersPreview({
             gap={2}
             cursor={interactive ? "pointer" : "default"}
             background={isSelected ? "blue.50" : undefined}
-            _hover={
-              interactive
-                ? { background: isSelected ? "blue.50" : "bg.subtle" }
-                : undefined
-            }
-            onClick={
-              interactive ? () => onSelectProviderModel?.(mp.defaultModel) : undefined
-            }
-            title={
-              interactive ? `Use ${mp.defaultModel} in the snippet above` : undefined
-            }
+            _hover={interactive ? { background: isSelected ? "blue.50" : "bg.subtle" } : undefined}
+            onClick={interactive ? () => onSelectProviderModel?.(mp.defaultModel) : undefined}
+            title={interactive ? `Use ${mp.defaultModel} in the snippet above` : undefined}
           >
             <Box
               width="16px"
@@ -300,10 +292,7 @@ export function EligibleModelProvidersSummary({
     <Text fontSize="xs" color="fg.muted">
       This key works in {scopeSummary} and can route to{" "}
       {eligible.length === 1 ? "1 provider" : `${eligible.length} providers`}
-      {totalModels > 0
-        ? ` (${totalModels} ${totalModels === 1 ? "model" : "models"})`
-        : ""}
-      .
+      {totalModels > 0 ? ` (${totalModels} ${totalModels === 1 ? "model" : "models"})` : ""}.
     </Text>
   );
 }
@@ -318,11 +307,7 @@ export function EligibleModelProvidersSummary({
  * if it doesn't, the user still arrives at the right page (option-a per
  * the bug-10 split — full hydrate lands as a follow-up).
  */
-export function ConfigureModelProvidersLink({
-  scopes,
-}: {
-  scopes: VirtualKeyScopeEntry[];
-}) {
+export function ConfigureModelProvidersLink({ scopes }: { scopes: VirtualKeyScopeEntry[] }) {
   const href = useMemo(() => {
     if (scopes.length === 0) return "/settings/model-providers";
     const params = new URLSearchParams();
@@ -333,13 +318,7 @@ export function ConfigureModelProvidersLink({
   }, [scopes]);
 
   return (
-    <Link
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      color="blue.600"
-      fontSize="xs"
-    >
+    <Link href={href} target="_blank" rel="noopener noreferrer" color="blue.600" fontSize="xs">
       <HStack gap={1} alignItems="center">
         <Text as="span">Configure</Text>
         <ExternalLink size={11} />

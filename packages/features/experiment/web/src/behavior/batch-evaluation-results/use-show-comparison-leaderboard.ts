@@ -7,8 +7,7 @@ import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
  * Registered with `defaultValue: false`, so every organization keeps the
  * plain win-rate chart until the flag is explicitly turned on for it.
  */
-export const COMPARISON_LEADERBOARD_FLAG =
-  "release_ui_comparison_leaderboard_enabled" as const;
+export const COMPARISON_LEADERBOARD_FLAG = "release_ui_comparison_leaderboard_enabled" as const;
 
 /**
  * Whether this reader gets the leaderboard at all

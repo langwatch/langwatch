@@ -7,10 +7,7 @@ import { useScenarioSelection } from "../behavior/use-scenario-selection";
 describe("Scenario web hooks", () => {
   it("collects sorted labels and toggles only the labels filter", () => {
     const { result } = renderHook(() =>
-      useScenarioLabelFilter([
-        { labels: ["zebra", "alpha"] },
-        { labels: ["alpha", "beta"] },
-      ]),
+      useScenarioLabelFilter([{ labels: ["zebra", "alpha"] }, { labels: ["alpha", "beta"] }]),
     );
 
     expect(result.current.allLabels).toEqual(["alpha", "beta", "zebra"]);
@@ -38,9 +35,7 @@ describe("Scenario web hooks", () => {
 
   it("shows the first-run welcome before opening the create flow", () => {
     window.localStorage.clear();
-    const { result } = renderHook(() =>
-      useNewScenarioFlow({ scenarioCount: 0, isLoading: false }),
-    );
+    const { result } = renderHook(() => useNewScenarioFlow({ scenarioCount: 0, isLoading: false }));
 
     expect(result.current.showInlineWelcome).toBe(true);
 

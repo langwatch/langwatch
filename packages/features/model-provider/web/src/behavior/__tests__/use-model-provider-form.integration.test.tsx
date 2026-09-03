@@ -33,21 +33,21 @@ const mockApi = {
       },
     },
   }),
-    modelProvider: {
-      update: {
-        useMutation: () => ({
-          mutateAsync: mockMutateAsync,
-        }),
-      },
-      // B3 redesign: `useProviderFormSubmit` replays the user's "Set as
-      // default" picks into ModelDefault via this mutation; stub it so
-      // the hook can render.
-      setRoleAssignmentForScope: {
-        useMutation: () => ({
-          mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
-        }),
-      },
+  modelProvider: {
+    update: {
+      useMutation: () => ({
+        mutateAsync: mockMutateAsync,
+      }),
     },
+    // B3 redesign: `useProviderFormSubmit` replays the user's "Set as
+    // default" picks into ModelDefault via this mutation; stub it so
+    // the hook can render.
+    setRoleAssignmentForScope: {
+      useMutation: () => ({
+        mutateAsync: vi.fn().mockResolvedValue({ ok: true }),
+      }),
+    },
+  },
 };
 
 // Getters, so the factory reads the map after this module has initialised it:
@@ -173,12 +173,8 @@ describe("useModelProviderForm()", () => {
       );
 
       // Keys should be masked
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        MASKED_KEY_PLACEHOLDER,
-      );
-      expect(result.current[0].customKeys.OPENAI_BASE_URL).toBe(
-        "https://api.openai.com/v1",
-      );
+      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
+      expect(result.current[0].customKeys.OPENAI_BASE_URL).toBe("https://api.openai.com/v1");
     });
 
     it("shows MASKED_KEY_PLACEHOLDER for enabled provider without stored keys (env vars)", () => {
@@ -196,9 +192,7 @@ describe("useModelProviderForm()", () => {
       );
 
       // API key should be masked since provider is enabled
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        MASKED_KEY_PLACEHOLDER,
-      );
+      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
       // URL fields are not masked
       expect(result.current[0].customKeys.OPENAI_BASE_URL).toBe("");
     });
@@ -238,16 +232,11 @@ describe("useModelProviderForm()", () => {
 
       act(() => {
         result.current[1].setCustomKey("OPENAI_API_KEY", "sk-key");
-        result.current[1].setCustomKey(
-          "OPENAI_BASE_URL",
-          "https://custom.example.com",
-        );
+        result.current[1].setCustomKey("OPENAI_BASE_URL", "https://custom.example.com");
       });
 
       expect(result.current[0].customKeys.OPENAI_API_KEY).toBe("sk-key");
-      expect(result.current[0].customKeys.OPENAI_BASE_URL).toBe(
-        "https://custom.example.com",
-      );
+      expect(result.current[0].customKeys.OPENAI_BASE_URL).toBe("https://custom.example.com");
     });
   });
 
@@ -329,8 +318,7 @@ describe("useModelProviderForm()", () => {
         }),
       );
     };
-    const withHeader = () =>
-      openForm([{ key: "api-key", value: MASKED_KEY_PLACEHOLDER }]);
+    const withHeader = () => openForm([{ key: "api-key", value: MASKED_KEY_PLACEHOLDER }]);
 
     describe("when the drawer has just opened and nothing was touched", () => {
       /** @scenario A stored extra header does not make the form dirty on open */
@@ -540,9 +528,7 @@ describe("useModelProviderForm()", () => {
         );
 
         expect(result.current[0].customModels).toEqual(storedModels);
-        expect(result.current[0].customEmbeddingsModels).toEqual(
-          storedEmbeddings,
-        );
+        expect(result.current[0].customEmbeddingsModels).toEqual(storedEmbeddings);
       });
     });
 
@@ -586,9 +572,7 @@ describe("useModelProviderForm()", () => {
         });
 
         expect(result.current[0].customModels).toHaveLength(1);
-        expect(result.current[0].customModels[0]!.displayName).toBe(
-          "My Fine-Tuned GPT-4o",
-        );
+        expect(result.current[0].customModels[0]!.displayName).toBe("My Fine-Tuned GPT-4o");
       });
     });
 
@@ -633,9 +617,7 @@ describe("useModelProviderForm()", () => {
         });
 
         expect(result.current[0].customEmbeddingsModels).toHaveLength(1);
-        expect(result.current[0].customEmbeddingsModels[0]).toEqual(
-          embeddingsModelEntry,
-        );
+        expect(result.current[0].customEmbeddingsModels[0]).toEqual(embeddingsModelEntry);
       });
 
       it("does not add duplicate embeddings models with the same modelId", () => {
@@ -675,9 +657,7 @@ describe("useModelProviderForm()", () => {
         expect(result.current[0].customEmbeddingsModels).toHaveLength(1);
 
         act(() => {
-          result.current[1].removeCustomEmbeddingsModel(
-            embeddingsModelEntry.modelId,
-          );
+          result.current[1].removeCustomEmbeddingsModel(embeddingsModelEntry.modelId);
         });
 
         expect(result.current[0].customEmbeddingsModels).toHaveLength(0);
@@ -799,21 +779,15 @@ describe("useModelProviderForm()", () => {
       );
 
       expect(result.current[0].useApiGateway).toBe(false);
-      expect(result.current[0].displayKeys).toHaveProperty(
-        "AZURE_OPENAI_API_KEY",
-      );
+      expect(result.current[0].displayKeys).toHaveProperty("AZURE_OPENAI_API_KEY");
 
       act(() => {
         result.current[1].setUseApiGateway(true);
       });
 
       expect(result.current[0].useApiGateway).toBe(true);
-      expect(result.current[0].displayKeys).toHaveProperty(
-        "AZURE_API_GATEWAY_BASE_URL",
-      );
-      expect(result.current[0].displayKeys).not.toHaveProperty(
-        "AZURE_OPENAI_API_KEY",
-      );
+      expect(result.current[0].displayKeys).toHaveProperty("AZURE_API_GATEWAY_BASE_URL");
+      expect(result.current[0].displayKeys).not.toHaveProperty("AZURE_OPENAI_API_KEY");
     });
 
     it("adds api-key extra header when enabling API Gateway on Azure", () => {

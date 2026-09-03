@@ -176,8 +176,7 @@ function parseSignatureHeader(
  * already recorded.
  */
 function echoedSessionId(payload: z.infer<typeof postCallSchema>): string | undefined {
-  const value =
-    payload.data?.conversation_initiation_client_data?.dynamic_variables?.lw_session_id;
+  const value = payload.data?.conversation_initiation_client_data?.dynamic_variables?.lw_session_id;
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
@@ -212,8 +211,7 @@ async function handleElevenLabsWebhook(
   if (
     !verifyElevenLabsSignature({
       rawBody,
-      header:
-        c.req.header("elevenlabs-signature") ?? c.req.header("ElevenLabs-Signature"),
+      header: c.req.header("elevenlabs-signature") ?? c.req.header("ElevenLabs-Signature"),
       secret: configured.secret,
     })
   ) {
@@ -326,8 +324,6 @@ export function createElevenLabsWebhookRestApp(options: {
   const secured = options.security.createServiceApp({ basePath: "/api" });
   secured
     .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
-    .post("/elevenlabs/webhook/:modelProviderId", (c) =>
-      handleElevenLabsWebhook(c, options.ports),
-    );
+    .post("/elevenlabs/webhook/:modelProviderId", (c) => handleElevenLabsWebhook(c, options.ports));
   return secured.hono;
 }

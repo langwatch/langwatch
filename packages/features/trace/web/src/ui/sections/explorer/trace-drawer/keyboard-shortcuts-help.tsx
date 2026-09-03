@@ -158,11 +158,7 @@ export function KeyboardShortcutsHelp({
                           {item.keys.map((k, i) => (
                             <HStack key={`${k}-${i}`} gap={1}>
                               {i > 0 ? (
-                                <Text
-                                  textStyle="2xs"
-                                  color="fg.subtle"
-                                  fontWeight="medium"
-                                >
+                                <Text textStyle="2xs" color="fg.subtle" fontWeight="medium">
                                   or
                                 </Text>
                               ) : null}

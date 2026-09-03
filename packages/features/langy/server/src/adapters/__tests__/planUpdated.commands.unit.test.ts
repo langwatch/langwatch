@@ -48,9 +48,7 @@ describe("UpdatePlan command", () => {
 
     it("scopes the plan slot to the turn so different turns never collide", async () => {
       const [turn1] = await new UpdatePlanCommand().handle(envelope({}) as never);
-      const [turn2] = await new UpdatePlanCommand().handle(
-        envelope({ turnId: "turn-2" }) as never,
-      );
+      const [turn2] = await new UpdatePlanCommand().handle(envelope({ turnId: "turn-2" }) as never);
       expect(turn1!.idempotencyKey).not.toBe(turn2!.idempotencyKey);
     });
   });

@@ -85,9 +85,7 @@ describe("useSuiteRouting()", () => {
 
       const { result } = renderHook(() => useSuiteRouting());
 
-      expect(result.current.selectedSuiteSlug).toBe(
-        `${EXTERNAL_SET_PREFIX}python-examples`,
-      );
+      expect(result.current.selectedSuiteSlug).toBe(`${EXTERNAL_SET_PREFIX}python-examples`);
       expect(result.current.highlightBatchId).toBeNull();
     });
   });
@@ -101,9 +99,7 @@ describe("useSuiteRouting()", () => {
 
       const { result } = renderHook(() => useSuiteRouting());
 
-      expect(result.current.selectedSuiteSlug).toBe(
-        `${EXTERNAL_SET_PREFIX}python-examples`,
-      );
+      expect(result.current.selectedSuiteSlug).toBe(`${EXTERNAL_SET_PREFIX}python-examples`);
       expect(result.current.highlightBatchId).toBe("batch_xyz");
     });
   });

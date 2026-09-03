@@ -26,13 +26,7 @@ export const SPAN_TYPES = [
 
 export type SpanType = (typeof SPAN_TYPES)[number];
 
-export const INPUT_OUTPUT_TYPES = [
-  "text",
-  "raw",
-  "chat_messages",
-  "json",
-  "list",
-] as const;
+export const INPUT_OUTPUT_TYPES = ["text", "raw", "chat_messages", "json", "list"] as const;
 
 export type InputOutputType = (typeof INPUT_OUTPUT_TYPES)[number];
 

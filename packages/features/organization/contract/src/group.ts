@@ -2,19 +2,10 @@ import { z } from "zod";
 import { organizationIdSchema } from "./organization";
 import { organizationLedgerActorSchema } from "./team";
 
-export const organizationGroupRoleSchema = z.enum([
-  "ADMIN",
-  "MEMBER",
-  "VIEWER",
-  "CUSTOM",
-]);
+export const organizationGroupRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type OrganizationGroupRole = z.infer<typeof organizationGroupRoleSchema>;
 
-export const organizationGroupScopeTypeSchema = z.enum([
-  "ORGANIZATION",
-  "TEAM",
-  "PROJECT",
-]);
+export const organizationGroupScopeTypeSchema = z.enum(["ORGANIZATION", "TEAM", "PROJECT"]);
 export type OrganizationGroupScopeType = z.infer<typeof organizationGroupScopeTypeSchema>;
 
 export const organizationGroupBindingSchema = z
@@ -87,9 +78,7 @@ export const organizationGroupBindingInputSchema = z
     scopeId: z.string().min(1),
   })
   .strict();
-export type OrganizationGroupBindingInput = z.infer<
-  typeof organizationGroupBindingInputSchema
->;
+export type OrganizationGroupBindingInput = z.infer<typeof organizationGroupBindingInputSchema>;
 
 export const getOrganizationGroupInputSchema = z
   .object({
@@ -106,9 +95,7 @@ export const listOrganizationGroupsInputSchema = z
     limit: z.number().int().positive().max(1_000),
   })
   .strict();
-export type ListOrganizationGroupsInput = z.infer<
-  typeof listOrganizationGroupsInputSchema
->;
+export type ListOrganizationGroupsInput = z.infer<typeof listOrganizationGroupsInputSchema>;
 
 export const listMemberOrganizationGroupsInputSchema = z
   .object({
@@ -129,38 +116,30 @@ export const createOrganizationGroupInputSchema = z
     actor: organizationLedgerActorSchema,
   })
   .strict();
-export type CreateOrganizationGroupInput = z.infer<
-  typeof createOrganizationGroupInputSchema
->;
+export type CreateOrganizationGroupInput = z.infer<typeof createOrganizationGroupInputSchema>;
 
 export const renameOrganizationGroupInputSchema = getOrganizationGroupInputSchema.extend({
   name: z.string().trim().min(1).max(100),
 });
-export type RenameOrganizationGroupInput = z.infer<
-  typeof renameOrganizationGroupInputSchema
->;
+export type RenameOrganizationGroupInput = z.infer<typeof renameOrganizationGroupInputSchema>;
 
 export const deleteOrganizationGroupInputSchema = getOrganizationGroupInputSchema.extend({
   actor: organizationLedgerActorSchema,
   allowScimManaged: z.boolean().optional(),
 });
-export type DeleteOrganizationGroupInput = z.infer<
-  typeof deleteOrganizationGroupInputSchema
->;
+export type DeleteOrganizationGroupInput = z.infer<typeof deleteOrganizationGroupInputSchema>;
 
-export const changeOrganizationGroupMemberInputSchema =
-  getOrganizationGroupInputSchema.extend({
-    userId: z.string().min(1),
-  });
+export const changeOrganizationGroupMemberInputSchema = getOrganizationGroupInputSchema.extend({
+  userId: z.string().min(1),
+});
 export type ChangeOrganizationGroupMemberInput = z.infer<
   typeof changeOrganizationGroupMemberInputSchema
 >;
 
-export const addOrganizationGroupBindingInputSchema =
-  getOrganizationGroupInputSchema.extend({
-    binding: organizationGroupBindingInputSchema,
-    actor: organizationLedgerActorSchema,
-  });
+export const addOrganizationGroupBindingInputSchema = getOrganizationGroupInputSchema.extend({
+  binding: organizationGroupBindingInputSchema,
+  actor: organizationLedgerActorSchema,
+});
 export type AddOrganizationGroupBindingInput = z.infer<
   typeof addOrganizationGroupBindingInputSchema
 >;
@@ -177,19 +156,18 @@ export type RemoveOrganizationGroupBindingInput = z.infer<
   typeof removeOrganizationGroupBindingInputSchema
 >;
 
-export const applyOrganizationGroupEditsInputSchema =
-  getOrganizationGroupInputSchema.extend({
-    rename: z
-      .object({ name: z.string().trim().min(1).max(100) })
-      .strict()
-      .nullable()
-      .optional(),
-    bindingIdsToDelete: z.array(z.string().min(1)),
-    bindingsToCreate: z.array(organizationGroupBindingInputSchema),
-    memberUserIdsToAdd: z.array(z.string().min(1)),
-    memberUserIdsToRemove: z.array(z.string().min(1)),
-    actor: organizationLedgerActorSchema,
-  });
+export const applyOrganizationGroupEditsInputSchema = getOrganizationGroupInputSchema.extend({
+  rename: z
+    .object({ name: z.string().trim().min(1).max(100) })
+    .strict()
+    .nullable()
+    .optional(),
+  bindingIdsToDelete: z.array(z.string().min(1)),
+  bindingsToCreate: z.array(organizationGroupBindingInputSchema),
+  memberUserIdsToAdd: z.array(z.string().min(1)),
+  memberUserIdsToRemove: z.array(z.string().min(1)),
+  actor: organizationLedgerActorSchema,
+});
 export type ApplyOrganizationGroupEditsInput = z.infer<
   typeof applyOrganizationGroupEditsInputSchema
 >;

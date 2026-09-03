@@ -132,9 +132,7 @@ describe("<FacetSection /> row ordering", () => {
       enterSection(section);
       const searchToggle = getByLabelText("Search ORIGIN values");
       fireEvent.click(searchToggle);
-      const input = container.querySelector(
-        'input[placeholder^="Search"]',
-      ) as HTMLInputElement;
+      const input = container.querySelector('input[placeholder^="Search"]') as HTMLInputElement;
       expect(input).toBeTruthy();
       fireEvent.change(input, { target: { value: "bra" } });
 
@@ -149,9 +147,7 @@ describe("<FacetSection /> row ordering", () => {
 
       enterSection(section);
       fireEvent.click(getByLabelText("Search ORIGIN values"));
-      const input = container.querySelector(
-        'input[placeholder^="Search"]',
-      ) as HTMLInputElement;
+      const input = container.querySelector('input[placeholder^="Search"]') as HTMLInputElement;
       fireEvent.change(input, { target: { value: "zzz-no-match" } });
 
       // No rows AND empty-state hint visible — they used to be inconsistent

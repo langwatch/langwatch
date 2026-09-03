@@ -16,11 +16,7 @@
  * side — enough for a preview, never a payload.
  */
 
-import {
-  isMediaPartRole,
-  type MediaPartRole,
-  type TraceMediaRef,
-} from "@langwatch/trace-contract";
+import { isMediaPartRole, type MediaPartRole, type TraceMediaRef } from "@langwatch/trace-contract";
 import { collectAnnotatedMediaParts } from "./media-parts";
 
 /** Which summary strip a ref belongs on. */

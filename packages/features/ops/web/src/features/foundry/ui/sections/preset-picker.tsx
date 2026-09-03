@@ -188,14 +188,7 @@ export function PresetPicker() {
             ))}
             {userPresets.length > 0 && (
               <>
-                <Text
-                  fontSize="xs"
-                  fontWeight="medium"
-                  color="fg.muted"
-                  px={2}
-                  py={1}
-                  mt={1}
-                >
+                <Text fontSize="xs" fontWeight="medium" color="fg.muted" px={2} py={1} mt={1}>
                   Your Presets
                 </Text>
                 {userPresets.map((preset) => (

@@ -348,9 +348,7 @@ describe("ProcessManagerService", () => {
           now: T0,
         }),
       ).rejects.toBeInstanceOf(JsonSafetyError);
-      expect(
-        await store.findByRef({ ref: { ...pilotRef, processName: "bad" } }),
-      ).toBeNull();
+      expect(await store.findByRef({ ref: { ...pilotRef, processName: "bad" } })).toBeNull();
     });
   });
 

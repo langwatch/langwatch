@@ -81,13 +81,7 @@ function isPrivateToThisUser(dir: string): boolean {
 }
 
 /** One entry per agent and session, so a newer declaration replaces an older. */
-export function spoolFileName({
-  agent,
-  sessionId,
-}: {
-  agent: string;
-  sessionId: string;
-}): string {
+export function spoolFileName({ agent, sessionId }: { agent: string; sessionId: string }): string {
   const name = `${agent}-${sessionId}`.replace(/[^A-Za-z0-9._-]/g, "_");
   return `${name.slice(0, 128)}.json`;
 }
@@ -228,13 +222,7 @@ export function readSpooledDeclarations({
 }
 
 /** Keep the directory small: the newest entries are the ones worth keeping. */
-export function pruneSpool({
-  stateDir,
-  now,
-}: {
-  stateDir: string;
-  now: () => number;
-}): void {
+export function pruneSpool({ stateDir, now }: { stateDir: string; now: () => number }): void {
   try {
     const entries = readSpooledDeclarations({ stateDir, now });
     for (const entry of entries.slice(0, -SPOOL_MAX_ENTRIES)) {

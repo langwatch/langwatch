@@ -48,9 +48,7 @@ describe("given a trace that was already corrected once", () => {
   beforeEach(() => {
     mocks.storedPatch = storedCorrection;
     useDrawerStore.getState().setIsEditing(true);
-    useTraceEditStore
-      .getState()
-      .startEditing({ traceId: "trace-1", basePatch: storedCorrection });
+    useTraceEditStore.getState().startEditing({ traceId: "trace-1", basePatch: storedCorrection });
   });
 
   describe("when a second correction is being written", () => {

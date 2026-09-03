@@ -26,9 +26,7 @@ describe("isRunFinished", () => {
 
   describe("when both finishedAt and stoppedAt are set", () => {
     it("returns true", () => {
-      expect(isRunFinished({ finishedAt: 1705312800000, stoppedAt: 1705312800000 })).toBe(
-        true,
-      );
+      expect(isRunFinished({ finishedAt: 1705312800000, stoppedAt: 1705312800000 })).toBe(true);
     });
   });
 

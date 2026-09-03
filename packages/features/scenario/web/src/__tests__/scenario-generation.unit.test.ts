@@ -104,24 +104,18 @@ describe("generateScenarioWithAI()", () => {
     });
 
     it("does not leak a raw JSON.parse error to the caller", async () => {
-      const error = await generateScenarioWithAI(
-        "test prompt",
-        "project-123",
-        null,
-      ).catch((e: unknown) => e);
+      const error = await generateScenarioWithAI("test prompt", "project-123", null).catch(
+        (e: unknown) => e,
+      );
 
       expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).not.toMatch(
-        /Unexpected token|is not valid JSON|DOCTYPE/i,
-      );
+      expect((error as Error).message).not.toMatch(/Unexpected token|is not valid JSON|DOCTYPE/i);
     });
 
     it("surfaces the HTTP status so the failure is actionable", async () => {
-      const error = await generateScenarioWithAI(
-        "test prompt",
-        "project-123",
-        null,
-      ).catch((e: unknown) => e);
+      const error = await generateScenarioWithAI("test prompt", "project-123", null).catch(
+        (e: unknown) => e,
+      );
 
       expect((error as Error).message).toContain("502");
     });
@@ -134,9 +128,9 @@ describe("generateScenarioWithAI()", () => {
         json: () => Promise.resolve({ error: "Custom error message" }),
       });
 
-      await expect(
-        generateScenarioWithAI("test prompt", "project-123", null),
-      ).rejects.toThrow("Custom error message");
+      await expect(generateScenarioWithAI("test prompt", "project-123", null)).rejects.toThrow(
+        "Custom error message",
+      );
     });
 
     it("throws default error when API error message is missing", async () => {
@@ -145,9 +139,9 @@ describe("generateScenarioWithAI()", () => {
         json: () => Promise.resolve({}),
       });
 
-      await expect(
-        generateScenarioWithAI("test prompt", "project-123", null),
-      ).rejects.toThrow("Failed to generate scenario");
+      await expect(generateScenarioWithAI("test prompt", "project-123", null)).rejects.toThrow(
+        "Failed to generate scenario",
+      );
     });
   });
 
@@ -166,11 +160,9 @@ describe("generateScenarioWithAI()", () => {
           }),
       });
 
-      const error = await generateScenarioWithAI(
-        "test prompt",
-        "project-123",
-        null,
-      ).catch((e: unknown) => e);
+      const error = await generateScenarioWithAI("test prompt", "project-123", null).catch(
+        (e: unknown) => e,
+      );
 
       expect(error).toBeInstanceOf(ScenarioGenerationError);
       expect((error as ScenarioGenerationError).kind).toBe("missing_provider");
@@ -187,9 +179,9 @@ describe("generateScenarioWithAI()", () => {
         json: () => Promise.resolve({}),
       });
 
-      await expect(
-        generateScenarioWithAI("test prompt", "project-123", null),
-      ).rejects.toThrow("Invalid response: missing scenario data");
+      await expect(generateScenarioWithAI("test prompt", "project-123", null)).rejects.toThrow(
+        "Invalid response: missing scenario data",
+      );
     });
 
     it("throws error when criteria contains objects instead of strings", async () => {
@@ -207,9 +199,9 @@ describe("generateScenarioWithAI()", () => {
         json: () => Promise.resolve({ scenario: malformedScenario }),
       });
 
-      await expect(
-        generateScenarioWithAI("test prompt", "project-123", null),
-      ).rejects.toThrow("Invalid scenario data");
+      await expect(generateScenarioWithAI("test prompt", "project-123", null)).rejects.toThrow(
+        "Invalid scenario data",
+      );
     });
 
     it("throws error when name is missing", async () => {
@@ -223,9 +215,9 @@ describe("generateScenarioWithAI()", () => {
         json: () => Promise.resolve({ scenario: malformedScenario }),
       });
 
-      await expect(
-        generateScenarioWithAI("test prompt", "project-123", null),
-      ).rejects.toThrow("Invalid scenario data");
+      await expect(generateScenarioWithAI("test prompt", "project-123", null)).rejects.toThrow(
+        "Invalid scenario data",
+      );
     });
   });
 });

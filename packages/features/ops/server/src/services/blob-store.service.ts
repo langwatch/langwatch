@@ -103,10 +103,7 @@ export class BlobStoreService {
     return { deleted: result.deleted };
   }
 
-  async runCleanup(params: {
-    dryRun: boolean;
-    requestedBy: string;
-  }): Promise<BlobSweepReport> {
+  async runCleanup(params: { dryRun: boolean; requestedBy: string }): Promise<BlobSweepReport> {
     const report = await this.repo.runCleanup({ dryRun: params.dryRun });
     logger.info(
       {

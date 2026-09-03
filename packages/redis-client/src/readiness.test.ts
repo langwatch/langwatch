@@ -23,10 +23,7 @@ describe("RedisReadinessService", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(logger.info).toHaveBeenCalledWith(
-        { target: "redis://localhost:6379" },
-        "redis ready",
-      );
+      expect(logger.info).toHaveBeenCalledWith({ target: "redis://localhost:6379" }, "redis ready");
       expect(logger.error).not.toHaveBeenCalled();
     });
   });
@@ -98,10 +95,7 @@ describe("RedisReadinessService", () => {
         target: "one:6379,two:6380",
       });
 
-      expect(logger.info).toHaveBeenCalledWith(
-        { target: "one:6379,two:6380" },
-        "redis ready",
-      );
+      expect(logger.info).toHaveBeenCalledWith({ target: "one:6379,two:6380" }, "redis ready");
     });
   });
 

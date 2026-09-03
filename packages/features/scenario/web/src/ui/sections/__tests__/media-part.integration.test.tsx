@@ -277,9 +277,7 @@ describe("<MediaPart/>", () => {
       expect(screen.getByTestId("media-part-missing")).toHaveTextContent(
         "This audio is no longer available",
       );
-      expect(screen.getByTestId("media-part-missing")).toHaveTextContent(
-        "missing",
-      );
+      expect(screen.getByTestId("media-part-missing")).toHaveTextContent("missing");
       // The dead player is gone: a lost recording must not look like a
       // silent one.
       expect(screen.queryByTestId("media-part-audio")).not.toBeInTheDocument();
@@ -310,9 +308,7 @@ describe("<MediaPart/>", () => {
       expect(placeholder).toHaveTextContent("2.56KB");
       // "no longer available" would send the reader looking for bytes that
       // were never stored.
-      expect(
-        screen.queryByTestId("media-part-missing"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
     });
   });
 
@@ -378,9 +374,7 @@ describe("<MediaPart/>", () => {
       );
       expect(screen.getByTestId("media-part-error")).toHaveTextContent("error");
       // The "missing" placeholder must NOT be shown — that's a different state.
-      expect(
-        screen.queryByTestId("media-part-missing"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
     });
   });
 
@@ -476,9 +470,7 @@ describe("<MediaPart/>", () => {
       expect(screen.getByTestId("media-part-error")).toHaveTextContent(
         "This image could not be loaded",
       );
-      expect(
-        screen.queryByTestId("media-part-probing"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("media-part-probing")).not.toBeInTheDocument();
     });
   });
 
@@ -529,9 +521,7 @@ describe("<MediaPart/>", () => {
       expect(audio).toHaveAttribute("controls");
 
       // The "missing" / "error" placeholders must NOT appear.
-      expect(
-        screen.queryByTestId("media-part-missing"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
       expect(screen.queryByTestId("media-part-error")).not.toBeInTheDocument();
     });
   });

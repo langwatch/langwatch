@@ -37,9 +37,7 @@ export type IngestionPullEventingAdapterOptions = {
 export class IngestionPullEventingAdapter {
   private constructor(private readonly options: IngestionPullEventingAdapterOptions) {}
 
-  static create(
-    options: IngestionPullEventingAdapterOptions,
-  ): IngestionPullEventingAdapter {
+  static create(options: IngestionPullEventingAdapterOptions): IngestionPullEventingAdapter {
     return new IngestionPullEventingAdapter(options);
   }
 
@@ -67,10 +65,7 @@ export class IngestionPullEventingAdapter {
       .withCommand("disable", DisableIngestionPullCommand)
       .withCommand("recordRunCompleted", RecordIngestionPullRunCompletedCommand)
       .withCommand("recordRunFailed", RecordIngestionPullRunFailedCommand)
-      .withProcessManager(
-        INGESTION_PULL_PROCESS_NAME,
-        this.options.process.processManager(),
-      )
+      .withProcessManager(INGESTION_PULL_PROCESS_NAME, this.options.process.processManager())
       .build();
   }
 }
@@ -82,8 +77,7 @@ const ConfigureIngestionPullCommand = defineCommand({
   aggregateType: INGESTION_PULL_AGGREGATE_TYPE,
   schema: ingestionPullConfiguredCommandDataSchema,
   aggregateId: (data) => data.sourceId,
-  idempotencyKey: (data) =>
-    `${data.sourceId}:ingestion_pull:configure:${data.configVersion}`,
+  idempotencyKey: (data) => `${data.sourceId}:ingestion_pull:configure:${data.configVersion}`,
   spanAttributes: (data) => ({ "payload.source_id": data.sourceId }),
   makeJobId: (data) => `${data.sourceId}:ingestion_pull:configure:${data.configVersion}`,
 });
@@ -95,8 +89,7 @@ const DisableIngestionPullCommand = defineCommand({
   aggregateType: INGESTION_PULL_AGGREGATE_TYPE,
   schema: ingestionPullDisabledEventDataSchema,
   aggregateId: (data) => data.sourceId,
-  idempotencyKey: (data) =>
-    `${data.sourceId}:ingestion_pull:disable:${data.configVersion}`,
+  idempotencyKey: (data) => `${data.sourceId}:ingestion_pull:disable:${data.configVersion}`,
   spanAttributes: (data) => ({ "payload.source_id": data.sourceId }),
   makeJobId: (data) => `${data.sourceId}:ingestion_pull:disable:${data.configVersion}`,
 });

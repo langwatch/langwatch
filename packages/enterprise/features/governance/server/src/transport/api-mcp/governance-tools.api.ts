@@ -45,14 +45,8 @@ type ToolCallback = (
  * value verbatim without an `as` cast.
  */
 type McpServerLike = {
-  tool(
-    name: string,
-    description: string,
-    inputSchema: ZodRawShape,
-    cb: ToolCallback,
-  ): unknown;
+  tool(name: string, description: string, inputSchema: ZodRawShape, cb: ToolCallback): unknown;
 };
-
 
 /**
  * Whether the caller holds a permission on an organization.
@@ -99,10 +93,7 @@ interface ResolvedContext {
  * McpServer. Resolves the caller's organization from the apiKey lazily on
  * the first tool invocation and caches per-session.
  */
-export function registerGovernanceMcpTools(
-  server: McpServerLike,
-  ctx: GovernanceMcpContext,
-): void {
+export function registerGovernanceMcpTools(server: McpServerLike, ctx: GovernanceMcpContext): void {
   let resolvedPromise: Promise<ResolvedContext> | null = null;
   const resolve = async (): Promise<ResolvedContext> => {
     if (!resolvedPromise) {

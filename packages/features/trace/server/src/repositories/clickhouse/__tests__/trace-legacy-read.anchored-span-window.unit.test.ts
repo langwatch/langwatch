@@ -31,9 +31,7 @@ const traceCanonicalisation = TraceCanonicalisationService.create();
  * repository takes the resolver instead, so the fake is stated where every
  * other dependency of the read is.
  */
-const testResolveClickHouseClient = () =>
-  Promise.resolve({ query: mockClickHouseQuery } as never);
-
+const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
 vi.mock("~/server/filters/clickhouse", () => ({
   generateClickHouseFilterConditions: () => ({
@@ -148,7 +146,7 @@ function matchRows({
 async function readTraces(traceIds: string[]) {
   const { ClickHouseTraceService } = await import("../trace-legacy-read.repository");
   const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+    resolveClickHouseClient: testResolveClickHouseClient,
     prisma: {
       project: { findUnique: vi.fn() },
     } as never,
@@ -242,8 +240,6 @@ describe("given the light resolve that bounds a hint-less batch read", () => {
       String(args.query).includes("AS fromMs"),
     );
     expect(resolveCall).toBeDefined();
-    expect(String(resolveCall![0].query)).toContain(
-      "OccurredAt > fromUnixTimestamp64Milli(0)",
-    );
+    expect(String(resolveCall![0].query)).toContain("OccurredAt > fromUnixTimestamp64Milli(0)");
   });
 });

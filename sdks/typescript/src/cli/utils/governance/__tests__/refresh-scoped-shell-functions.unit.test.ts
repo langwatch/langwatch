@@ -10,12 +10,7 @@ import * as fs from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { buildOtelEnvBlock } from "../otel-env-block";
-import {
-  buildScopedToolFunction,
-  persistBlockToRc,
-  rcPath,
-  toolMarkers,
-} from "../shell-rc";
+import { buildScopedToolFunction, persistBlockToRc, rcPath, toolMarkers } from "../shell-rc";
 import { refreshScopedShellFunctions } from "../telemetry-refresh";
 import {
   CURRENT_ENDPOINT,

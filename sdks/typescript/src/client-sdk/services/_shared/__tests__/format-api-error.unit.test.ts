@@ -92,10 +92,9 @@ describe("formatApiErrorMessage", () => {
       const cause = Object.assign(new Error("Invalid URL"), {
         code: "ERR_INVALID_URL",
       });
-      const err = Object.assign(
-        new TypeError("Failed to parse URL from not a url/api/prompts"),
-        { cause },
-      );
+      const err = Object.assign(new TypeError("Failed to parse URL from not a url/api/prompts"), {
+        cause,
+      });
       const out = formatApiErrorMessage({ error: err });
       expect(out).toContain("LANGWATCH_ENDPOINT");
       expect(out).toContain("http://");
@@ -197,9 +196,7 @@ describe("formatApiErrorMessage", () => {
           code: "BAD_REQUEST",
         },
       };
-      expect(formatApiErrorMessage({ error: body })).toBe(
-        "validation failed: name is required",
-      );
+      expect(formatApiErrorMessage({ error: body })).toBe("validation failed: name is required");
     });
 
     it("ignores fields with empty strings", () => {
@@ -258,9 +255,7 @@ describe("given a handled-error envelope whose message is just the code", () => 
           operation: "fetch the organization",
           error: body,
         }),
-      ).toBe(
-        "Failed to fetch the organization: This capability needs the Enterprise plan",
-      );
+      ).toBe("Failed to fetch the organization: This capability needs the Enterprise plan");
     });
   });
 

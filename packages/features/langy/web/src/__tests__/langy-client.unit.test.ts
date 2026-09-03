@@ -23,8 +23,6 @@ describe("LangyClient", () => {
       userId: "user_1",
       limit: 1,
     });
-    expect(() =>
-      client.listConversations({ projectId: "", userId: "user_1", limit: 1 }),
-    ).toThrow();
+    expect(() => client.listConversations({ projectId: "", userId: "user_1", limit: 1 })).toThrow();
   });
 });

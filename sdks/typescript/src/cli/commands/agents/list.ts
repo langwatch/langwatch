@@ -55,7 +55,11 @@ export const listAgentsCommand = async (): Promise<CommandResult | void> => {
         if (agents.length === 0) {
           console.log();
           console.log(chalk.gray("No agents found in this project."));
-          console.log(chalk.gray("Connect one from code with connectAgent (langwatch/agent), or create an HTTP agent with:"));
+          console.log(
+            chalk.gray(
+              "Connect one from code with connectAgent (langwatch/agent), or create an HTTP agent with:",
+            ),
+          );
           console.log(
             chalk.cyan(
               '  langwatch agent create "My Agent" --type http --config \'{"url":"https://..."}\'',
@@ -89,9 +93,7 @@ export const listAgentsCommand = async (): Promise<CommandResult | void> => {
 
         console.log();
         console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch agent get <id>")} to view agent details`,
-          ),
+          chalk.gray(`Use ${chalk.cyan("langwatch agent get <id>")} to view agent details`),
         );
       },
     };

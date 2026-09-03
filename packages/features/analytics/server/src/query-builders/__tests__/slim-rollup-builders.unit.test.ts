@@ -66,9 +66,7 @@ describe("buildRollupTimeseriesQuery", () => {
         series: [{ metric: "performance.completion_time", aggregation: "avg" }],
         timeScale: 60,
       });
-      expect(avgSql).toContain(
-        "sum(ra.DurationSum) / nullIf(sum(ra.TraceCount), 0)",
-      );
+      expect(avgSql).toContain("sum(ra.DurationSum) / nullIf(sum(ra.TraceCount), 0)");
     });
   });
 
@@ -85,18 +83,12 @@ describe("buildRollupTimeseriesQuery", () => {
     });
 
     it("throws on any group-by — per-span attribution and root-only Duration/TraceCount diverge from legacy", () => {
-      for (const groupBy of [
-        "metadata.model",
-        "metadata.span_type",
-        "topics.topics",
-      ]) {
+      for (const groupBy of ["metadata.model", "metadata.span_type", "topics.topics"]) {
         expect(() =>
           buildRollupTimeseriesQuery({
             projectId: "tenant-rollup",
             ...baseDates,
-            series: [
-              { metric: "performance.completion_time", aggregation: "avg" },
-            ],
+            series: [{ metric: "performance.completion_time", aggregation: "avg" }],
             groupBy,
             timeScale: 60,
           }),
@@ -119,9 +111,7 @@ describe("buildRollupTimeseriesQuery", () => {
   });
 
   it("uses toStartOfInterval on BucketStart for hourly buckets", () => {
-    expect(sql).toMatch(
-      /toStartOfInterval\(ra\.BucketStart,\s*INTERVAL\s*1\s*HOUR/,
-    );
+    expect(sql).toMatch(/toStartOfInterval\(ra\.BucketStart,\s*INTERVAL\s*1\s*HOUR/);
   });
 });
 
@@ -206,9 +196,7 @@ describe("buildSlimTimeseriesQuery", () => {
   it("passes the user-filter values through a parameter binding", () => {
     const userParam = Object.entries(params).find(
       ([k, v]) =>
-        k.startsWith("slim_user_") &&
-        Array.isArray(v) &&
-        (v as string[]).includes("alice"),
+        k.startsWith("slim_user_") && Array.isArray(v) && (v as string[]).includes("alice"),
     );
     expect(userParam).toBeDefined();
   });

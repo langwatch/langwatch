@@ -7,11 +7,7 @@ import {
   formatDistanceToNow,
 } from "date-fns";
 
-export const formatTimeAgo = (
-  timestamp: number,
-  dateFormat = "dd/MMM HH:mm",
-  maxHours = 24,
-) => {
+export const formatTimeAgo = (timestamp: number, dateFormat = "dd/MMM HH:mm", maxHours = 24) => {
   const timestampDate = timestamp ? new Date(timestamp) : undefined;
   const timeAgo = timestampDate
     ? timestampDate.getTime() < Date.now() - 1000 * 60 * 60 * maxHours

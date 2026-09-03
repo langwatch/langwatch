@@ -14,7 +14,11 @@
  */
 import { AgentTestPort, type AgentTestActor } from "@langwatch/agent-server";
 import type { AgentWithFields } from "@langwatch/agent-contract";
-import type { AgentTestRunResult, AgentTestService, AgentTestTurnResult } from "@langwatch/scenario-server";
+import type {
+  AgentTestRunResult,
+  AgentTestService,
+  AgentTestTurnResult,
+} from "@langwatch/scenario-server";
 
 export class ApiAgentTestAdapter extends AgentTestPort {
   static create(options: {

@@ -38,9 +38,7 @@ describe("shouldHideBreakMarker", () => {
   describe("given the cell is truncated", () => {
     describe("when the marker is on a fully-visible earlier line", () => {
       it("keeps the marker visible so the break is still signalled", () => {
-        expect(
-          shouldHideBreakMarker({ truncated: true, markerTop: 0, clampHeight }),
-        ).toBe(false);
+        expect(shouldHideBreakMarker({ truncated: true, markerTop: 0, clampHeight })).toBe(false);
       });
     });
 

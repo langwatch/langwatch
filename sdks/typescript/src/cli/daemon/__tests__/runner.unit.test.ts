@@ -72,9 +72,7 @@ const collect = (): {
   return {
     sink: (stream, chunk) => chunks.push({ stream, data: chunk }),
     stderr: () =>
-      Buffer.concat(
-        chunks.filter((c) => c.stream === "stderr").map((c) => c.data),
-      ).toString(),
+      Buffer.concat(chunks.filter((c) => c.stream === "stderr").map((c) => c.data)).toString(),
   };
 };
 
@@ -156,9 +154,7 @@ describe("createCommandExecutor", () => {
         requestTimeoutMs: 5_000,
       });
 
-      const running = executor(
-        request({ requestId: "r1", cwd: doomed, sink: collect().sink }),
-      );
+      const running = executor(request({ requestId: "r1", cwd: doomed, sink: collect().sink }));
 
       await expect(running.completed).rejects.toThrow();
       // The command never started: no program was built, no window is held.
@@ -222,16 +218,12 @@ describe("createCommandExecutor", () => {
         onWedged: vi.fn(),
       });
 
-      const first = executor(
-        request({ requestId: "r1", cwd: dirA, sink: collect().sink }),
-      );
+      const first = executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink }));
       await expect(first.completed).resolves.toBe(124);
 
       // A different-tuple caller arrives while the abandoned work runs on.
       mockedBuildProgram.mockReturnValue(okProgram());
-      const second = executor(
-        request({ requestId: "r2", cwd: dirB, sink: collect().sink }),
-      );
+      const second = executor(request({ requestId: "r2", cwd: dirB, sink: collect().sink }));
       await new Promise((resolve) => setTimeout(resolve, 20));
 
       // It waits its turn rather than moving the ground under r1.
@@ -257,9 +249,7 @@ describe("createCommandExecutor", () => {
         onWedged: vi.fn(),
       });
 
-      const running = executor(
-        request({ requestId: "r1", cwd: dirA, sink: collect().sink }),
-      );
+      const running = executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink }));
       // Let the command actually start and take the window.
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(window.inflightCount).toBe(1);
@@ -343,9 +333,7 @@ describe("createCommandExecutor", () => {
         onWedged: wedged,
       });
 
-      const running = executor(
-        request({ requestId: "r1", cwd: dirA, sink: collect().sink }),
-      );
+      const running = executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink }));
       // Let the executor reach its `await window.acquire(...)`.
       await Promise.resolve();
 
@@ -380,16 +368,12 @@ describe("createCommandExecutor", () => {
         onWedged: vi.fn(),
       });
 
-      const first = executor(
-        request({ requestId: "r1", cwd: dirA, sink: collect().sink }),
-      );
+      const first = executor(request({ requestId: "r1", cwd: dirA, sink: collect().sink }));
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(window.inflightCount).toBe(1);
 
       // Different cwd: queues behind the hung window-A request.
-      const second = executor(
-        request({ requestId: "r2", cwd: dirB, sink: collect().sink }),
-      );
+      const second = executor(request({ requestId: "r2", cwd: dirB, sink: collect().sink }));
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(window.queuedCount).toBe(1);
 

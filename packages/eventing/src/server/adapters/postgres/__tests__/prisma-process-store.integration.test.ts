@@ -44,17 +44,11 @@ let prisma: PrismaClient;
 let store: PrismaProcessStore;
 let processName: string;
 
-function ref(
-  processKey = "conversation-1",
-  projectId = "project-1",
-): ProcessRef {
+function ref(processKey = "conversation-1", projectId = "project-1"): ProcessRef {
   return { processName, projectId, processKey };
 }
 
-function message(
-  messageKey: string,
-  overrides: Partial<NewOutboxMessage> = {},
-): NewOutboxMessage {
+function message(messageKey: string, overrides: Partial<NewOutboxMessage> = {}): NewOutboxMessage {
   return {
     messageKey,
     intentType: "langy.test.intent",
@@ -155,10 +149,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
       ),
     ]);
 
-    expect(results.map((result) => result.outcome).sort()).toEqual([
-      "committed",
-      "duplicateEvent",
-    ]);
+    expect(results.map((result) => result.outcome).sort()).toEqual(["committed", "duplicateEvent"]);
     expect(
       await prisma.processManagerInstance.count({
         where: { processName, projectId: "project-1" },
@@ -192,11 +183,9 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     expect(await store.findByRef({ ref: ref() })).toEqual(
       expect.objectContaining({ state: { step: 1 }, revision: 1 }),
     );
-    expect(
-      (await store.findMessagesByRef({ ref: ref() })).map(
-        (row) => row.messageKey,
-      ),
-    ).toEqual(["message-1"]);
+    expect((await store.findMessagesByRef({ ref: ref() })).map((row) => row.messageKey)).toEqual([
+      "message-1",
+    ]);
   });
 
   it("allows exactly one concurrent revision CAS and rolls back the loser", async () => {
@@ -227,9 +216,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
       "committed",
       "revisionConflict",
     ]);
-    const conflictIndex = results.findIndex(
-      (result) => result.outcome === "revisionConflict",
-    );
+    const conflictIndex = results.findIndex((result) => result.outcome === "revisionConflict");
     const losingEvent = conflictIndex === 0 ? "event-a" : "event-b";
     const losingMessage = conflictIndex === 0 ? "message-a" : "message-b";
     expect(
@@ -453,9 +440,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
       leaseDurationMs: 30_000,
     });
     const retryLease = initialLeases.find((row) => row.messageKey === "retry")!;
-    const successLease = initialLeases.find(
-      (row) => row.messageKey === "success",
-    )!;
+    const successLease = initialLeases.find((row) => row.messageKey === "success")!;
 
     await store.markFailed({
       identity: {
@@ -541,9 +526,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
   });
 
   it("returns only due wakes with the revision that scheduled them", async () => {
-    await store.commit(
-      commit({ target: ref("due"), nextWakeAt: 1_500, messages: [] }),
-    );
+    await store.commit(commit({ target: ref("due"), nextWakeAt: 1_500, messages: [] }));
     await store.commit(
       commit({
         target: ref("future"),
@@ -691,8 +674,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
       limit: 10,
       leaseDurationMs: 30_000,
     });
-    const leaseFor = (messageKey: string) =>
-      leased.find((row) => row.messageKey === messageKey)!;
+    const leaseFor = (messageKey: string) => leased.find((row) => row.messageKey === messageKey)!;
 
     await store.markDispatched({
       identity: {
@@ -750,9 +732,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
       },
       orderBy: { messageKey: "asc" },
     });
-    expect(
-      remaining.map((row) => ({ key: row.messageKey, status: row.status })),
-    ).toEqual([
+    expect(remaining.map((row) => ({ key: row.messageKey, status: row.status }))).toEqual([
       { key: "dead-letter-msg", status: "dead" },
       { key: "fresh-dispatched-msg", status: "dispatched" },
       { key: "still-pending-msg", status: "pending" },
@@ -812,9 +792,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     describe("when the process commits its consumption of the event", () => {
       /** @scenario A source event id far past the index limit is still consumed */
       it("commits instead of failing on the index row size", async () => {
-        const result = await store.commit(
-          commit({ sourceEventId: oversized(), messages: [] }),
-        );
+        const result = await store.commit(commit({ sourceEventId: oversized(), messages: [] }));
 
         expect(result.outcome).toBe("committed");
       });
@@ -849,10 +827,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
           }),
         );
 
-        expect([first.outcome, second.outcome]).toEqual([
-          "committed",
-          "committed",
-        ]);
+        expect([first.outcome, second.outcome]).toEqual(["committed", "committed"]);
         expect(
           await prisma.processManagerInbox.count({
             where: { processName, projectId: "project-1" },
@@ -883,9 +858,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     describe("when a later event arrives for the same process", () => {
       /** @scenario A long source event id no longer blocks the process */
       it("processes the later event instead of wedging on the oversized one", async () => {
-        const first = await store.commit(
-          commit({ sourceEventId: oversized(), messages: [] }),
-        );
+        const first = await store.commit(commit({ sourceEventId: oversized(), messages: [] }));
         expect(first.outcome).toBe("committed");
 
         const later = await store.commit(
@@ -1002,9 +975,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
         leaseDurationMs: 30_000,
         processNames: [processName],
       });
-      expect(leased.map((m) => m.messageKey)).toEqual([
-        "send:endpoint-b:222222",
-      ]);
+      expect(leased.map((m) => m.messageKey)).toEqual(["send:endpoint-b:222222"]);
     });
   });
 
@@ -1088,9 +1059,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
           where: { processName, projectId: "project-1" },
           select: { messageKey: true },
         });
-        expect(remaining.map((row) => row.messageKey)).toEqual([
-          "inside-window-msg",
-        ]);
+        expect(remaining.map((row) => row.messageKey)).toEqual(["inside-window-msg"]);
       });
 
       /** @scenario "Pending outbox rows are never swept" */
@@ -1110,9 +1079,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
             limit: 5_000,
           }),
         ).toBe(0);
-        expect(
-          await store.deleteDeadOutboxBatch({ before: cutoff, limit: 5_000 }),
-        ).toBe(0);
+        expect(await store.deleteDeadOutboxBatch({ before: cutoff, limit: 5_000 })).toBe(0);
 
         const leased = await store.leaseDueMessages({
           now: recent,
@@ -1160,18 +1127,14 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
             limit: 5_000,
           }),
         ).toBe(0);
-        expect(
-          await store.deleteDeadOutboxBatch({ before: deadAt, limit: 5_000 }),
-        ).toBe(0);
+        expect(await store.deleteDeadOutboxBatch({ before: deadAt, limit: 5_000 })).toBe(0);
         expect(
           await prisma.processManagerOutbox.count({
             where: { processName, projectId: "project-1" },
           }),
         ).toBe(1);
 
-        expect(
-          await store.deleteDeadOutboxBatch({ before: recent, limit: 5_000 }),
-        ).toBe(1);
+        expect(await store.deleteDeadOutboxBatch({ before: recent, limit: 5_000 })).toBe(1);
         expect(
           await prisma.processManagerOutbox.count({
             where: { processName, projectId: "project-1" },
@@ -1208,9 +1171,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
           where: { processName, projectId: "project-1" },
           select: { sourceEventId: true },
         });
-        expect(remaining.map((row) => row.sourceEventId)).toEqual([
-          "event-recent-inbox",
-        ]);
+        expect(remaining.map((row) => row.sourceEventId)).toEqual(["event-recent-inbox"]);
       });
 
       /** @scenario "The sweep reaches process names that never registered retention" */
@@ -1276,15 +1237,9 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
           });
         }
 
-        expect(
-          await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 }),
-        ).toBe(2);
-        expect(
-          await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 }),
-        ).toBe(1);
-        expect(
-          await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 }),
-        ).toBe(0);
+        expect(await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 })).toBe(2);
+        expect(await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 })).toBe(1);
+        expect(await store.deleteDispatchedOutboxBatch({ before: cutoff, limit: 2 })).toBe(0);
       });
     });
   });

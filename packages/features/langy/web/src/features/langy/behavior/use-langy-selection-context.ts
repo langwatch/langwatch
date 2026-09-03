@@ -1,13 +1,6 @@
 import { useMemo } from "react";
-import {
-  SELECT_ALL_MATCHING_CAP,
-  useFilterStore,
-  useSelectionStore,
-} from "@langwatch/trace-web";
-import {
-  ALL_MATCHING_PREFIX,
-  type LangyContextChip,
-} from "../../../index";
+import { SELECT_ALL_MATCHING_CAP, useFilterStore, useSelectionStore } from "@langwatch/trace-web";
+import { ALL_MATCHING_PREFIX, type LangyContextChip } from "../../../index";
 
 /**
  * Turns the Trace Explorer's bulk-selection (the row checkboxes) into a Langy

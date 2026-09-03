@@ -1,8 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import {
-  ScenarioTabRegistry,
-  type ScenarioTabRegistration,
-} from "@langwatch/scenario-contract";
+import { ScenarioTabRegistry, type ScenarioTabRegistration } from "@langwatch/scenario-contract";
 import type { ScenarioClockPort } from "../ports/scenario-clock.port";
 import type { ScenarioTabStorePort } from "../ports/scenario-tab-store.port";
 
@@ -76,11 +73,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
     );
   }
 
-  async hasLiveTab(input: {
-    projectId: string;
-    tabKey: string;
-    now?: number;
-  }): Promise<boolean> {
+  async hasLiveTab(input: { projectId: string; tabKey: string; now?: number }): Promise<boolean> {
     const key = ScenarioTabRegistryService.tabSetKey(input.projectId, input.tabKey);
     const now = input.now ?? this.options.clock.now().getTime();
     const cutoff = now - SCENARIO_TAB_TTL_SECONDS * 1000;

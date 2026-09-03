@@ -73,10 +73,7 @@ import { TRPCError } from "@trpc/server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import {
-  assertNoPersonalTeamScope,
-  type TeamTrpcPorts,
-} from "@langwatch/organization-server";
+import { assertNoPersonalTeamScope, type TeamTrpcPorts } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import {
@@ -485,7 +482,6 @@ function isCustomRole(role: string): boolean {
   return !BUILT_IN_TEAM_ROLES.has(role);
 }
 
-
 /**
  * The personal-workspace fence a role binding is refused at, over this
  * process's own connection.
@@ -558,9 +554,7 @@ class OrgExclusivePermissionScopeError extends HandledError {
  * the workflow application's copy: its dataset copier, its DSL rewrite, its
  * version parentage. None of it belongs to an evaluator.
  */
-function composeEvaluatorPorts(
-  options: ApiProductGroupCollaboratorsOptions,
-): EvaluatorTrpcPorts {
+function composeEvaluatorPorts(options: ApiProductGroupCollaboratorsOptions): EvaluatorTrpcPorts {
   const { prisma, workflows } = options;
 
   const deleteReplicatedWorkflow = async (

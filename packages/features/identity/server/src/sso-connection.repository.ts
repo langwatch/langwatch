@@ -12,9 +12,7 @@ import type { SsoConnectionState } from "@langwatch/identity-contract";
  */
 export interface SsoConnectionReadRepository {
   /** One connection's folded state, or null when it has no history yet. */
-  findConnection(args: {
-    connectionId: string;
-  }): Promise<SsoConnectionState | null>;
+  findConnection(args: { connectionId: string }): Promise<SsoConnectionState | null>;
 
   /**
    * The connection that already holds a domain as VERIFIED on an ACTIVE

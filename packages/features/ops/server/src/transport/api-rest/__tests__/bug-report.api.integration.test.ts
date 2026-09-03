@@ -20,7 +20,10 @@ import type { BugReport, PrismaClient } from "@langwatch/prisma-client/generated
 import type { ErrorHandler } from "hono";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { BugReportRateLimitedError, submitBugReport } from "../../../services/bug-report-intake.service";
+import {
+  BugReportRateLimitedError,
+  submitBugReport,
+} from "../../../services/bug-report-intake.service";
 import type {
   BugReportNotifierPort,
   BugReportRateLimiterPort,

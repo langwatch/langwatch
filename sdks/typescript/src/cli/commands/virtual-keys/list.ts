@@ -52,16 +52,7 @@ export const listVirtualKeysCommand = async (): Promise<CommandResult | void> =>
 
         formatTable({
           data: tableData,
-          headers: [
-            "ID",
-            "Name",
-            "Status",
-            "Prefix",
-            "Scopes",
-            "Routing",
-            "Purpose",
-            "Last used",
-          ],
+          headers: ["ID", "Name", "Status", "Prefix", "Scopes", "Routing", "Purpose", "Last used"],
           colorMap: {
             Name: chalk.cyan,
             ID: chalk.gray,

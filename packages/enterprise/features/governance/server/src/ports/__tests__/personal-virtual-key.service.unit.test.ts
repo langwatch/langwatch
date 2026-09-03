@@ -88,9 +88,7 @@ describe("DefaultGovernancePersonalVirtualKeyService", () => {
       label: "default",
     });
     expect(issued.routingPolicyId).toBeNull();
-    expect(issuer.issue).toHaveBeenCalledWith(
-      expect.objectContaining({ routingPolicyId: null }),
-    );
+    expect(issuer.issue).toHaveBeenCalledWith(expect.objectContaining({ routingPolicyId: null }));
   });
 
   it("refuses a key when neither policy nor provider exists", async () => {

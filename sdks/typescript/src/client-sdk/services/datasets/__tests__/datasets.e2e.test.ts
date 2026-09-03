@@ -109,9 +109,7 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       const idx = createdSlugs.indexOf(datasetSlug);
       if (idx !== -1) createdSlugs.splice(idx, 1);
 
-      await expect(langwatch.datasets.get(datasetSlug)).rejects.toThrow(
-        DatasetNotFoundError,
-      );
+      await expect(langwatch.datasets.get(datasetSlug)).rejects.toThrow(DatasetNotFoundError);
     });
   });
 
@@ -262,15 +260,13 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
 
   describe("Error handling", () => {
     it("throws DatasetNotFoundError for non-existent dataset", async () => {
-      await expect(
-        langwatch.datasets.get("does-not-exist-ever-" + Date.now()),
-      ).rejects.toThrow(DatasetNotFoundError);
+      await expect(langwatch.datasets.get("does-not-exist-ever-" + Date.now())).rejects.toThrow(
+        DatasetNotFoundError,
+      );
     });
 
     it("throws DatasetValidationError for create with empty name", () => {
-      expect(() => langwatch.datasets.create({ name: "" })).toThrow(
-        DatasetValidationError,
-      );
+      expect(() => langwatch.datasets.create({ name: "" })).toThrow(DatasetValidationError);
     });
   });
 });

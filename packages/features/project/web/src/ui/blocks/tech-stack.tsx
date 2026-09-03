@@ -181,8 +181,7 @@ export function TechStackSelector<T extends { language: string; framework: strin
     );
   };
 
-  const currentLanguage =
-    form.watch("language") || Object.keys(techStackLanguageOptions)[0];
+  const currentLanguage = form.watch("language") || Object.keys(techStackLanguageOptions)[0];
 
   const handleLanguageChange = (value: string) => {
     const availableForLanguage = Object.entries(techStackFrameworkOptions).filter(
@@ -260,13 +259,7 @@ export function TechStackSelector<T extends { language: string; framework: strin
 export const ProjectTechStackIcon = ({ project }: { project: Project }) => {
   const IconWrapper = ({ children }: PropsWithChildren) => {
     return (
-      <Box
-        width="16px"
-        height="16px"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
+      <Box width="16px" height="16px" display="flex" alignItems="center" justifyContent="center">
         {children}
       </Box>
     );

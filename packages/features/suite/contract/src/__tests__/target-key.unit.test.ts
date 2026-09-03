@@ -30,9 +30,7 @@ describe("targetKeyOf", () => {
     /** @scenario "A target with no overrides keys as its reference id alone" */
     it("keys as the reference id alone", () => {
       expect(targetKeyOf({ referenceId: "prod-agent" })).toBe("prod-agent");
-      expect(
-        targetKeyOf({ referenceId: "prod-agent", runParameters: {} }),
-      ).toBe("prod-agent");
+      expect(targetKeyOf({ referenceId: "prod-agent", runParameters: {} })).toBe("prod-agent");
     });
   });
 
@@ -84,9 +82,7 @@ describe("targetKeyOf", () => {
       ];
       for (const runParameters of cases) {
         const expected = referenceHash(canonicalParameters(runParameters));
-        expect(targetKeyOf({ referenceId: "a", runParameters })).toBe(
-          `a#${expected}`,
-        );
+        expect(targetKeyOf({ referenceId: "a", runParameters })).toBe(`a#${expected}`);
       }
     });
 
@@ -162,9 +158,7 @@ describe("targetIdentityKey", () => {
       };
 
       expect(targetSortKey(oneValue)).toBe(targetSortKey(twoValues));
-      expect(targetIdentityKey(oneValue)).not.toBe(
-        targetIdentityKey(twoValues),
-      );
+      expect(targetIdentityKey(oneValue)).not.toBe(targetIdentityKey(twoValues));
     });
   });
 
@@ -235,17 +229,13 @@ describe("targetSortKey", () => {
         runParameters: { model: "gpt-5-mini" },
       };
 
-      expect(targetSortKey(target)).not.toContain(
-        splitTargetKey(targetKeyOf(target)).hash,
-      );
+      expect(targetSortKey(target)).not.toContain(splitTargetKey(targetKeyOf(target)).hash);
     });
   });
 
   describe("when the target carries none", () => {
     it("ends at the bar", () => {
-      expect(targetSortKey({ type: "http", referenceId: "prod-agent" })).toBe(
-        "http:prod-agent|",
-      );
+      expect(targetSortKey({ type: "http", referenceId: "prod-agent" })).toBe("http:prod-agent|");
       expect(
         targetSortKey({
           type: "http",
@@ -371,18 +361,13 @@ describe("targetLabels", () => {
         agent_prod: { environment: "production", ownerName: null },
         agent_dev: { environment: "development", ownerName: "Rogerio" },
       } as const;
-      const targets = [
-        { referenceId: "agent_prod" },
-        { referenceId: "agent_dev" },
-      ];
+      const targets = [{ referenceId: "agent_prod" }, { referenceId: "agent_dev" }];
 
       const labels = targetLabels({
         targets,
         nameOf: () => "support-agent",
-        environmentOf: (target) =>
-          facts[target.referenceId as keyof typeof facts].environment,
-        ownerNameOf: (target) =>
-          facts[target.referenceId as keyof typeof facts].ownerName,
+        environmentOf: (target) => facts[target.referenceId as keyof typeof facts].environment,
+        ownerNameOf: (target) => facts[target.referenceId as keyof typeof facts].ownerName,
       });
 
       expect(labels).toEqual([
@@ -431,21 +416,17 @@ describe("canonicalOverrides", () => {
     });
 
     it("tells the string of a number from the number", () => {
-      expect(
-        canonicalOverrides({ runParameters: { seats: "12" }, defaults }),
-      ).toEqual({ seats: "12" });
+      expect(canonicalOverrides({ runParameters: { seats: "12" }, defaults })).toEqual({
+        seats: "12",
+      });
     });
   });
 
   describe("when every value is its default", () => {
     /** @scenario "A typed default is not an override" */
     it("reads nothing", () => {
-      expect(
-        canonicalOverrides({ runParameters: { locale: "en" }, defaults }),
-      ).toBeUndefined();
-      expect(
-        canonicalOverrides({ runParameters: {}, defaults }),
-      ).toBeUndefined();
+      expect(canonicalOverrides({ runParameters: { locale: "en" }, defaults })).toBeUndefined();
+      expect(canonicalOverrides({ runParameters: {}, defaults })).toBeUndefined();
       expect(canonicalOverrides({ defaults })).toBeUndefined();
     });
   });

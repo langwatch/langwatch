@@ -71,14 +71,12 @@ describe("given an attribute holding a chat-shaped value", () => {
     });
 
     await openValue({ user, preview: /Detected format: chat/ });
-    await user.click(
-      await screen.findByRole("button", { name: "Attribute value format" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "Attribute value format" }));
     await user.click(await screen.findByRole("menuitem", { name: "Text" }));
 
-    expect(
-      screen.getByRole("button", { name: "Attribute value format" }),
-    ).toHaveTextContent("Text");
+    expect(screen.getByRole("button", { name: "Attribute value format" })).toHaveTextContent(
+      "Text",
+    );
   });
 });
 
@@ -96,8 +94,8 @@ describe("given an attribute whose value is JSON inside a string", () => {
 
     await openValue({ user, preview: /Detected format: json/ });
 
-    expect(
-      await screen.findByRole("button", { name: "Attribute value format" }),
-    ).toHaveTextContent("JSON");
+    expect(await screen.findByRole("button", { name: "Attribute value format" })).toHaveTextContent(
+      "JSON",
+    );
   });
 });

@@ -499,10 +499,7 @@ export {
  * package stays framework-free so the frontend can import it verbatim.
  */
 export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./identity-events";
-export {
-  JOIN_REQUEST_AGGREGATE_TYPE,
-  JOIN_REQUEST_PIPELINE_NAME,
-} from "./join-request-events";
+export { JOIN_REQUEST_AGGREGATE_TYPE, JOIN_REQUEST_PIPELINE_NAME } from "./join-request-events";
 export { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "./scim-sync-events";
 export {
   SSO_CONNECTION_AGGREGATE_TYPE,

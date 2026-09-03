@@ -103,9 +103,7 @@ export function useNavigationShellState({
     status: "ready",
     user,
     project,
-    currentRoute: projectNavItemAt(
-      toProjectRoutePattern({ pathname, projectSlug: project?.slug }),
-    ),
+    currentRoute: projectNavItemAt(toProjectRoutePattern({ pathname, projectSlug: project?.slug })),
     activeProductId: route.activeProductId,
     isSettingsRoute: route.isSettingsRoute,
     isDevelopment: host.deployment().isDevelopment,

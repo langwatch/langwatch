@@ -39,10 +39,9 @@ vi.mock("../../../hooks/use-anchored-annotations", () => ({
 
 // The comment action on each row carries its own composer, which reads over
 // tRPC. It has its own tests; this suite is about the correction.
-vi.mock(
-  "../../anchored-comments/anchor-comment-button",
-  () => ({ AnchorCommentButton: () => null }),
-);
+vi.mock("../../anchored-comments/anchor-comment-button", () => ({
+  AnchorCommentButton: () => null,
+}));
 
 vi.mock("../../../hooks/use-trace-header", () => ({
   useTraceHeaderCanonical: () => ({ data: undefined }),
@@ -216,9 +215,7 @@ describe("correcting the trace's own fields in the summary", () => {
       it("offers no editor for them and still edits labels", () => {
         renderSummary();
 
-        expect(
-          screen.queryByLabelText("Edit gen_ai.conversation.id"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByLabelText("Edit gen_ai.conversation.id")).not.toBeInTheDocument();
         expect(screen.queryByLabelText("Edit scenario.run_id")).not.toBeInTheDocument();
         expect(screen.queryByLabelText("Edit langwatch.origin")).not.toBeInTheDocument();
         expect(screen.getByLabelText("Edit langwatch.labels")).toBeInTheDocument();

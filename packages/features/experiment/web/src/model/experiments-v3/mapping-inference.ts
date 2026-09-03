@@ -134,9 +134,7 @@ export const findMatchingColumn = (
   // 2. Normalized match (camelCase/snake_case equivalence)
   // e.g., "threadId" matches "thread_id"
   const fieldNormalized = normalizeForComparison(fieldName);
-  const normalizedMatch = columns.find(
-    (c) => normalizeForComparison(c.name) === fieldNormalized,
-  );
+  const normalizedMatch = columns.find((c) => normalizeForComparison(c.name) === fieldNormalized);
   if (normalizedMatch) {
     return normalizedMatch.name;
   }
@@ -156,9 +154,7 @@ export const findMatchingColumn = (
   }
 
   for (const potentialName of potentialMatches) {
-    const match = columns.find(
-      (c) => c.name.toLowerCase() === potentialName.toLowerCase(),
-    );
+    const match = columns.find((c) => c.name.toLowerCase() === potentialName.toLowerCase());
     if (match) {
       return match.name;
     }
@@ -271,13 +267,7 @@ export const propagateMappingsToNewDataset = (
  * letting an evaluator's `output` map back to a dataset column produces the
  * very tautology the user did not want (grading the dataset against itself).
  */
-const TARGET_OUTPUT_FIELDS = new Set([
-  "output",
-  "response",
-  "answer",
-  "result",
-  "generated",
-]);
+const TARGET_OUTPUT_FIELDS = new Set(["output", "response", "answer", "result", "generated"]);
 
 /**
  * Identifiers whose only sensible source is the dataset. The heuristic never
@@ -365,8 +355,7 @@ export const inferEvaluatorMappings = (
       // field, so auto-map to it (the single-output classifier case where the
       // sole output is named e.g. "category", not "output").
       const m =
-        targetMatch() ??
-        (target.outputs.length === 1 ? target.outputs[0]?.identifier : undefined);
+        targetMatch() ?? (target.outputs.length === 1 ? target.outputs[0]?.identifier : undefined);
       if (m) {
         newMappings[input.identifier] = {
           type: "source",
@@ -433,11 +422,7 @@ export const inferAllTargetMappings = (
 
   for (const dataset of datasets) {
     const existingDatasetMappings = result[dataset.id] ?? {};
-    const newMappings = inferTargetMappings(
-      target.inputs,
-      dataset,
-      existingDatasetMappings,
-    );
+    const newMappings = inferTargetMappings(target.inputs, dataset, existingDatasetMappings);
 
     if (Object.keys(newMappings).length > 0) {
       result[dataset.id] = {
@@ -520,8 +505,7 @@ export const deriveComparisonTargetMappings = (
   // Explicit input context wins; otherwise auto-map "input" to the most
   // likely dataset column so the user doesn't have to re-pick something
   // obvious. Skips when there's no plausible match — `input` is optional.
-  const inputColumn =
-    comparison.inputField ?? findMatchingColumn("input", dataset.columns);
+  const inputColumn = comparison.inputField ?? findMatchingColumn("input", dataset.columns);
   if (inputColumn) {
     mappings.input = {
       type: "source",

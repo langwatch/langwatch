@@ -76,8 +76,7 @@ export function registerHover(monaco: Monaco, contractRef: ContractRef): IDispos
               value: "```python\n" + `${output.identifier}: ${output.type}\n` + "```",
             },
             {
-              value:
-                "Declared in the Outputs section — return it as a key in the `__call__` dict.",
+              value: "Declared in the Outputs section — return it as a key in the `__call__` dict.",
             },
           ],
         };

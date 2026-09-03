@@ -8,16 +8,16 @@ Reference feature: **`secret`**.
 
 The framework you are asking for mostly exists. It is not being used.
 
-| | Exists | Adoption |
-| --- | --- | --- |
-| REST endpoint builder with type-state (`createRestService`) | yes | **3 files** |
-| REST legacy path (`security.createProjectApp`, raw Hono, hand-written `Variables`) | yes | **39 files** |
-| tRPC procedure builder with type-state (`PendingPermissionProcedureBuilder`) | yes | in use |
-| Per-feature application bag on the context | as a structural type, declared **inline and privately** in each api file | 75 files |
-| Per-feature application **class** | no | 0 |
-| `app/` directory kind in the layout grammar | added this session | 1 (`user`) |
+|                                                                                    | Exists                                                                   | Adoption     |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------ |
+| REST endpoint builder with type-state (`createRestService`)                        | yes                                                                      | **3 files**  |
+| REST legacy path (`security.createProjectApp`, raw Hono, hand-written `Variables`) | yes                                                                      | **39 files** |
+| tRPC procedure builder with type-state (`PendingPermissionProcedureBuilder`)       | yes                                                                      | in use       |
+| Per-feature application bag on the context                                         | as a structural type, declared **inline and privately** in each api file | 75 files     |
+| Per-feature application **class**                                                  | no                                                                       | 0            |
+| `app/` directory kind in the layout grammar                                        | added this session                                                       | 1 (`user`)   |
 
-The REST builder already does the hard part. `RestService<TApp, TPermission, TRateLimit, TResourceLimit>` carries type-state booleans, and `define` must return an endpoint with all of them `true` — so an endpoint with no declared permission, rate limit or resource limit **cannot compile**. `TApp` is already threaded to the handler as `c.app`. The tRPC side does the same trick differently: `PendingPermissionProcedureBuilder` will not yield a usable procedure until `.input()` and a *declared* authz middleware have both been supplied.
+The REST builder already does the hard part. `RestService<TApp, TPermission, TRateLimit, TResourceLimit>` carries type-state booleans, and `define` must return an endpoint with all of them `true` — so an endpoint with no declared permission, rate limit or resource limit **cannot compile**. `TApp` is already threaded to the handler as `c.app`. The tRPC side does the same trick differently: `PendingPermissionProcedureBuilder` will not yield a usable procedure until `.input()` and a _declared_ authz middleware have both been supplied.
 
 So this is not "build a framework". It is: **give both builders the same context, give the feature something worth putting in it, and move 39 families onto the path that already exists.**
 
@@ -59,18 +59,18 @@ export class SecretApp {
 }
 ```
 
-A door shapes what it *asks for* — the public REST door caps its limit lower and pages by cursor, the internal tRPC door pages by offset — by passing different arguments. It does not get a different operation. **Sub-apps stay out of the design until a case appears that arguments cannot express**; splitting `SecretApp` into `SecretRestApp`/`SecretTrpcApp` on day one would recreate the two-implementations problem the class exists to remove. If one arrives, it splits then, and the split is visible.
+A door shapes what it _asks for_ — the public REST door caps its limit lower and pages by cursor, the internal tRPC door pages by offset — by passing different arguments. It does not get a different operation. **Sub-apps stay out of the design until a case appears that arguments cannot express**; splitting `SecretApp` into `SecretRestApp`/`SecretTrpcApp` on day one would recreate the two-implementations problem the class exists to remove. If one arrives, it splits then, and the split is visible.
 
 ### The context
 
 ```ts
 type FeatureContext<TApp, TAuth> = {
-  readonly app: TApp;     // what the composition root constructed
-  readonly auth: TAuth;   // what authentication resolved
+  readonly app: TApp; // what the composition root constructed
+  readonly auth: TAuth; // what authentication resolved
 };
 ```
 
-Both transports take the same pair. `TAuth` is *derived*, not written: the authentication port stops being an opaque `MiddlewareHandler` and declares what it resolves, so `AppRestProjectVariables` and every hand-written `<Feature>TrpcContext` session shape are deleted rather than maintained.
+Both transports take the same pair. `TAuth` is _derived_, not written: the authentication port stops being an opaque `MiddlewareHandler` and declares what it resolves, so `AppRestProjectVariables` and every hand-written `<Feature>TrpcContext` session shape are deleted rather than maintained.
 
 `c.auth` carries the caller and the scope the credential resolved to — for a project-scoped REST request, the `ProjectIdentity` and the actor; for a tRPC session, the session's user. What it carries is whatever the process's authentication returns, and the handler sees exactly that.
 
@@ -79,12 +79,14 @@ Both transports take the same pair. `TAuth` is *derived*, not written: the authe
 Unchanged for REST — this is already the shape:
 
 ```ts
-rest.get("/secrets", "2026-08-07", (e) => e
-  .withDocs({ summary: "List secrets" })
-  .withPermission("project:view")
-  .withInput(listSecretsInput)
-  .withOutput(secretListOutput)
-  .handle((c, input) => c.app.listForProject({ projectId: c.auth.project.id, page: input })));
+rest.get("/secrets", "2026-08-07", (e) =>
+  e
+    .withDocs({ summary: "List secrets" })
+    .withPermission("project:view")
+    .withInput(listSecretsInput)
+    .withOutput(secretListOutput)
+    .handle((c, input) => c.app.listForProject({ projectId: c.auth.project.id, page: input })),
+);
 ```
 
 tRPC keeps its own spelling (`.input()` then a declared authz middleware then `.query`/`.mutation`) because its type-state machinery is built on tRPC 11's builder and cannot be replaced without forking it. **What converges is the declaration order and the handler body, not the punctuation**: input, then output, then policy, then a handler that calls `c.app` and returns a value.
@@ -99,22 +101,20 @@ of those and tighten one.
 ### 1–3. The handler's shape follows the schemas
 
 ```ts
-type HandlerFor<TApp, TAuth, TInput, TOutput> =
-  TInput extends z.ZodObject
-    ? (c: Context<TApp, TAuth>, input: z.output<TInput>) => Returns<TOutput>
-    : (c: Context<TApp, TAuth>) => Returns<TOutput>;
+type HandlerFor<TApp, TAuth, TInput, TOutput> = TInput extends z.ZodObject
+  ? (c: Context<TApp, TAuth>, input: z.output<TInput>) => Returns<TOutput>
+  : (c: Context<TApp, TAuth>) => Returns<TOutput>;
 
-type Returns<TOutput> =
-  TOutput extends z.ZodType
-    ? z.input<TOutput> | Promise<z.input<TOutput>>
-    : void | Promise<void>;
+type Returns<TOutput> = TOutput extends z.ZodType
+  ? z.input<TOutput> | Promise<z.input<TOutput>>
+  : void | Promise<void>;
 ```
 
 - No `.withInput()` → the handler has **no second parameter**. Declaring one is
   a compile error, so it cannot read input that was never validated.
 - No `.withOutput()` → the handler returns `void`. Returning a value is a
   compile error, and the endpoint answers 204 / `undefined`.
-- Returning a value therefore *requires* `.withOutput()`, which is the same
+- Returning a value therefore _requires_ `.withOutput()`, which is the same
   rule stated from the other side.
 
 A `GET` that takes nothing stops needing a dummy schema, and a `DELETE` that
@@ -132,10 +132,10 @@ the gap it closes is bigger than a missing opt-out.**
 
 The two transports do not authorize the same way:
 
-| | What the permission is checked against |
-| --- | --- |
+|      | What the permission is checked against                                                                     |
+| ---- | ---------------------------------------------------------------------------------------------------------- |
 | tRPC | `scopeLineageGuard(declaration)` runs **after** `.input()` and reads the scope id **from validated input** |
-| REST | `permissionEnforcer: (permission) => MiddlewareHandler` — the **credential's** scope only |
+| REST | `permissionEnforcer: (permission) => MiddlewareHandler` — the **credential's** scope only                  |
 
 REST does have a comparison, and it is worth being exact about it because the
 first draft of this document was not. `assertAuthorizedProjectInput`
@@ -149,7 +149,7 @@ Three facts about it:
 - It knows only `projectId`. `teamId`, `organizationId` and `userId` are not
   compared by anything.
 - It is a service-wide flag, not a per-endpoint declaration, so it cannot say
-  *which* field an endpoint's permission is about.
+  _which_ field an endpoint's permission is about.
 
 So the mechanism exists and is correct where it is switched on; what is missing
 is that it is not the default, is not general, and is not declared where the
@@ -176,8 +176,9 @@ Enforced by type-state over the input schema's own keys:
 
 ```ts
 type ScopeIdKey = "projectId" | "teamId" | "organizationId" | "userId";
-type ScopeIdsIn<TInput> =
-  TInput extends z.ZodObject ? Extract<keyof TInput["shape"], ScopeIdKey> : never;
+type ScopeIdsIn<TInput> = TInput extends z.ZodObject
+  ? Extract<keyof TInput["shape"], ScopeIdKey>
+  : never;
 ```
 
 If `ScopeIdsIn<TInput>` is not `never`, `.handle()` requires the bound form, and
@@ -218,14 +219,14 @@ binding tRPC already has instead of growing a second, differently-wrong copy.
 
 `secret` because it is the only feature already on the modern REST path, it has both doors in-package (`api/app-trpc/secret.api.ts`, `api/public-rest/secret.api.ts`), it has a complete service/port/repository/adapter, and it has specs (`specs/secrets/`). Its REST family is ~1 screen, not 2,000 lines.
 
-| # | Step | Touches | Proves |
-| --- | --- | --- | --- |
-| 1 | `app/secret.app.ts` — `SecretApp` holding `SecretService` and the feature's ports | 1 new file | The App exists and is composable |
-| 2 | Move the two doors' shared logic onto it; handlers become delegation | 2 api files | One rule, two doors |
-| 3 | Bind `TApp = SecretApp` in the REST service config, replacing the ad-hoc literal | 1 composition site | `c.app` typed from the composition root |
-| 4 | Give the authentication port a declared resolution; derive `c.auth` | `packages/api/src/rest/security/*` | `c.auth` typed, not restated |
-| 5 | Same context pair on the tRPC door; delete `SecretTrpcContext`'s hand-written bag | 1 api file | Both doors, one shape |
-| 6 | Bind the spec: replace `@unimplemented` with real tags, add `@scenario` annotations | spec + tests | Not vacuously bound |
+| #   | Step                                                                                | Touches                            | Proves                                  |
+| --- | ----------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------------- |
+| 1   | `app/secret.app.ts` — `SecretApp` holding `SecretService` and the feature's ports   | 1 new file                         | The App exists and is composable        |
+| 2   | Move the two doors' shared logic onto it; handlers become delegation                | 2 api files                        | One rule, two doors                     |
+| 3   | Bind `TApp = SecretApp` in the REST service config, replacing the ad-hoc literal    | 1 composition site                 | `c.app` typed from the composition root |
+| 4   | Give the authentication port a declared resolution; derive `c.auth`                 | `packages/api/src/rest/security/*` | `c.auth` typed, not restated            |
+| 5   | Same context pair on the tRPC door; delete `SecretTrpcContext`'s hand-written bag   | 1 api file                         | Both doors, one shape                   |
+| 6   | Bind the spec: replace `@unimplemented` with real tags, add `@scenario` annotations | spec + tests                       | Not vacuously bound                     |
 
 Step 4 is the one with blast radius beyond `secret` — it changes a shared port signature. If that turns out to be larger than it looks, steps 1–3 and 5 still stand on their own and `c.auth` lands separately.
 

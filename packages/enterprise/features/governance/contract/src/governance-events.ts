@@ -3,13 +3,10 @@ import { z } from "zod";
 /** Content-free governance facts delivered by the webhook platform. */
 export const GOVERNANCE_EVENTS_PIPELINE_NAME = "governance_events_processing" as const;
 export const GOVERNANCE_EVENTS_AGGREGATE_TYPE = "governance_subject" as const;
-export const RECORD_VK_LIFECYCLE_COMMAND_TYPE =
-  "lw.governance.record_vk_lifecycle" as const;
-export const RECORD_BUDGET_CROSSING_COMMAND_TYPE =
-  "lw.governance.record_budget_crossing" as const;
+export const RECORD_VK_LIFECYCLE_COMMAND_TYPE = "lw.governance.record_vk_lifecycle" as const;
+export const RECORD_BUDGET_CROSSING_COMMAND_TYPE = "lw.governance.record_budget_crossing" as const;
 export const GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE = "lw.governance.vk_lifecycle" as const;
-export const GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE =
-  "lw.governance.budget_crossing" as const;
+export const GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE = "lw.governance.budget_crossing" as const;
 export const GOVERNANCE_EVENTS_EVENT_VERSION_LATEST = "2026-07-31" as const;
 export const GOVERNANCE_EVENTS_COMMAND_TYPES = [
   RECORD_VK_LIFECYCLE_COMMAND_TYPE,
@@ -39,9 +36,7 @@ export const recordVkLifecycleCommandDataSchema = z.object({
   reason: z.string().nullable().default(null),
   occurred_at: z.number().int().positive(),
 });
-export type RecordVkLifecycleCommandData = z.infer<
-  typeof recordVkLifecycleCommandDataSchema
->;
+export type RecordVkLifecycleCommandData = z.infer<typeof recordVkLifecycleCommandDataSchema>;
 
 export const budgetCrossingKindSchema = z.enum(["threshold_crossed", "breached"]);
 export type BudgetCrossingKind = z.infer<typeof budgetCrossingKindSchema>;
@@ -63,6 +58,4 @@ export const recordBudgetCrossingCommandDataSchema = z.object({
   on_breach: z.enum(["block", "warn"]),
   occurred_at: z.number().int().positive(),
 });
-export type RecordBudgetCrossingCommandData = z.infer<
-  typeof recordBudgetCrossingCommandDataSchema
->;
+export type RecordBudgetCrossingCommandData = z.infer<typeof recordBudgetCrossingCommandDataSchema>;

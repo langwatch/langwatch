@@ -82,12 +82,7 @@ describe("workflowStoreCore - branch convergence on connect", () => {
     /** @scenario Concurrent outputs cannot converge on one input */
     it("rejects the second connection with a clear message", () => {
       store.setState({
-        nodes: [
-          node("entry", "entry"),
-          node("x", "code"),
-          node("y", "code"),
-          node("end", "end"),
-        ],
+        nodes: [node("entry", "entry"), node("x", "code"), node("y", "code"), node("end", "end")],
         edges: [
           edge("e1", "entry", "q", "x", "in"),
           edge("e2", "entry", "q", "y", "in"),

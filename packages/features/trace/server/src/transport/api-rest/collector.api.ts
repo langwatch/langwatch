@@ -73,9 +73,7 @@ export type CollectorCredential =
   | Readonly<{ ok: false; kind: "ceiling"; status: ContentfulStatusCode; body: object }>;
 
 /** How this process turns a request into a project credential. */
-export type CollectorCredentialPort = (input: {
-  request: Request;
-}) => Promise<CollectorCredential>;
+export type CollectorCredentialPort = (input: { request: Request }) => Promise<CollectorCredential>;
 
 /**
  * The plan allowance, enforced before the body is reshaped.
@@ -87,9 +85,7 @@ export type CollectorCredentialPort = (input: {
  * every other outcome INCLUDING a lookup that failed, which is the behaviour
  * this path has always had.
  */
-export type CollectorUsageLimitPort = (input: {
-  project: CollectorProject;
-}) => Promise<void>;
+export type CollectorUsageLimitPort = (input: { project: CollectorProject }) => Promise<void>;
 
 /** One already-normalized span, handed to the ingestion pipeline. */
 export type CollectorSpanIngestPort = (input: {
@@ -279,8 +275,7 @@ export function createCollectorRestApp(options: {
 
           return c.json(
             {
-              error:
-                "Either `passed`, `score` or `label` field must be defined for evaluations",
+              error: "Either `passed`, `score` or `label` field must be defined for evaluations",
             },
             400,
           );
@@ -417,17 +412,12 @@ export function createCollectorRestApp(options: {
         // Metadata is customer-authored key/value content, so the values stay
         // out. The rejected KEY names do not: a key refused across many
         // projects is how we learn our reserved-metadata list is too narrow.
-        logger.warn(
-          { projectId: project.id, ...validation },
-          "invalid metadata received",
-        );
+        logger.warn({ projectId: project.id, ...validation }, "invalid metadata received");
 
         return c.json({ error: validationError.message }, 400);
       }
 
-      const spanFields = langWatchSpanSchema.options.flatMap((option) =>
-        Object.keys(option.shape),
-      );
+      const spanFields = langWatchSpanSchema.options.flatMap((option) => Object.keys(option.shape));
       const spans = ((body as Record<string, any>).spans ?? []) as Span[];
       spans.forEach((span) => {
         // We changed "id" to "span_id", but we still want to support "id" for retrocompatibility for a while
@@ -507,10 +497,7 @@ export function createCollectorRestApp(options: {
         new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id)),
       );
       if (traceIds[0] && (traceIds.length > 1 || traceIds[0] != traceId)) {
-        logger.error(
-          { projectId: project.id, traceId, traceIds },
-          "trace ids are not the same",
-        );
+        logger.error({ projectId: project.id, traceId, traceIds }, "trace ids are not the same");
 
         return c.json({ message: "All spans must have the same trace id" }, 400);
       }
@@ -542,10 +529,7 @@ export function createCollectorRestApp(options: {
 
           const validationError = fromZodError(error as ZodError);
 
-          logger.warn(
-            { projectId: project.id, index, ...validation },
-            "invalid span received",
-          );
+          logger.warn({ projectId: project.id, index, ...validation }, "invalid span received");
 
           return c.json(
             {
@@ -556,10 +540,8 @@ export function createCollectorRestApp(options: {
         }
 
         if (
-          (span.timestamps.started_at &&
-            span.timestamps.started_at.toString().length !== 13) ||
-          (span.timestamps.finished_at &&
-            span.timestamps.finished_at.toString().length !== 13) ||
+          (span.timestamps.started_at && span.timestamps.started_at.toString().length !== 13) ||
+          (span.timestamps.finished_at && span.timestamps.finished_at.toString().length !== 13) ||
           (span.timestamps.first_token_at &&
             span.timestamps.first_token_at.toString().length !== 13)
         ) {
@@ -602,9 +584,7 @@ export function createCollectorRestApp(options: {
       let dispatchFailures = 0;
       let rejectionErrors: string[] =
         droppedOldSpans > 0
-          ? [
-              `${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`,
-            ]
+          ? [`${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`]
           : [];
       try {
         const resource = CollectorSpanUtils.buildResource({
@@ -639,9 +619,7 @@ export function createCollectorRestApp(options: {
             if (r.status === "rejected") {
               return r.reason instanceof Error ? r.reason.message : String(r.reason);
             }
-            return r.value.status === "failed"
-              ? (r.value.error ?? "span ingestion failed")
-              : null;
+            return r.value.status === "failed" ? (r.value.error ?? "span ingestion failed") : null;
           })
           .filter((e): e is string => e !== null);
         dispatchFailures = failureErrors.length;
@@ -719,8 +697,7 @@ export function createCollectorRestApp(options: {
               const evaluationId = evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`;
               const evaluatorId =
                 evaluation.evaluator_id ?? ports.deriveEvaluatorId(evaluation.name);
-              const status =
-                evaluation.status ?? (evaluation.error ? "error" : "processed");
+              const status = evaluation.status ?? (evaluation.error ? "error" : "processed");
               // A verdict is only real when the evaluator ran to completion —
               // an errored/skipped run's stray passed/score/label must not
               // reach analytics or triggers as a real result (#6833). Same
@@ -773,4 +750,3 @@ export function createCollectorRestApp(options: {
 
   return secured;
 }
-

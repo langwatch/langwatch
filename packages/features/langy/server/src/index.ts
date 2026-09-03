@@ -60,11 +60,7 @@ export {
   SetupSkillsTrpcApi,
   type SetupSkillsTrpcContext,
 } from "./transport/api-trpc/setup-skills.api";
-export {
-  isSetupSkillId,
-  setupSkillBody,
-  type SetupSkillId,
-} from "./services/setup-skills.service";
+export { isSetupSkillId, setupSkillBody, type SetupSkillId } from "./services/setup-skills.service";
 // The agent-to-page UI-action channel. Moved here whole from the application
 // that used to hold it; the one thing it could not bring is the workbench's
 // action manifest, which arrives as {@link LangyUiActionCatalogPort}.

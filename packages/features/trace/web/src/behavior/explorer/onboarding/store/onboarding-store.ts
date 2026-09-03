@@ -1,5 +1,8 @@
 import { create } from "zustand";
-import { INITIAL_STAGE, type StageId } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
+import {
+  INITIAL_STAGE,
+  type StageId,
+} from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
 
 /**
  * Consolidated onboarding state. Combines the stage state-machine, the
@@ -196,10 +199,7 @@ function loadPersisted(): PersistedShape {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as Partial<PersistedShape>;
-      if (
-        parsed.setupDismissedByProject &&
-        typeof parsed.setupDismissedByProject === "object"
-      ) {
+      if (parsed.setupDismissedByProject && typeof parsed.setupDismissedByProject === "object") {
         return {
           setupDismissedByProject: parsed.setupDismissedByProject,
           integrationCtaDismissedAtByProject:
@@ -222,10 +222,7 @@ function loadPersisted(): PersistedShape {
     const legacy = localStorage.getItem(LEGACY_UI_STORE_KEY);
     if (legacy) {
       const parsed = JSON.parse(legacy) as Partial<PersistedShape>;
-      if (
-        parsed.setupDismissedByProject &&
-        typeof parsed.setupDismissedByProject === "object"
-      ) {
+      if (parsed.setupDismissedByProject && typeof parsed.setupDismissedByProject === "object") {
         return {
           setupDismissedByProject: parsed.setupDismissedByProject,
           integrationCtaDismissedAtByProject: {},
@@ -287,9 +284,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
             stage,
             history: [...s.history, s.stage],
             arrivedAt:
-              stage === "auroraArrival" && s.stage !== "auroraArrival"
-                ? Date.now()
-                : s.arrivedAt,
+              stage === "auroraArrival" && s.stage !== "auroraArrival" ? Date.now() : s.arrivedAt,
           },
     ),
 
@@ -309,8 +304,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
 
   replayStage: () => set((s) => ({ replayToken: s.replayToken + 1 })),
 
-  reset: () =>
-    set({ stage: INITIAL_STAGE, arrivedAt: null, history: [], replayToken: 0 }),
+  reset: () => set({ stage: INITIAL_STAGE, arrivedAt: null, history: [], replayToken: 0 }),
 
   setSetupDismissedForProject: (projectId, dismissed) => {
     const next = { ...get().setupDismissedByProject };

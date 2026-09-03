@@ -14,8 +14,7 @@ export const DRAWER_WIDTH = 456;
  * Keep the two sites in lock-step — clicking the alert jumps the user to the
  * mappings editor in both cases.
  */
-export const TARGET_MISSING_MAPPING_TOOLTIP =
-  "Missing variable mappings - Click to configure";
+export const TARGET_MISSING_MAPPING_TOOLTIP = "Missing variable mappings - Click to configure";
 
 /**
  * The reason an autosave carries when the seam refused it for a newer version

@@ -21,9 +21,7 @@ import {
 export type LangyTransport = {
   listConversations(input: LangyConversationListInput): Promise<LangyConversationPage>;
   getConversation(input: LangyConversationInput): Promise<LangyConversation>;
-  startTurn(
-    input: LangyTurnInput,
-  ): Promise<{ conversation: LangyConversation; turnId: string }>;
+  startTurn(input: LangyTurnInput): Promise<{ conversation: LangyConversation; turnId: string }>;
   listMessages(input: LangyMessageInput): Promise<readonly unknown[]>;
   resolveCredential(input: LangyCredentialInput): Promise<LangyCredential>;
   stopTurn(input: LangyStopTurnInput): Promise<void>;
@@ -35,18 +33,14 @@ export class LangyClient {
   constructor(private readonly transport: LangyTransport) {}
 
   listConversations(input: LangyConversationListInput): Promise<LangyConversationPage> {
-    return this.transport.listConversations(
-      langyConversationListInputSchema.parse(input),
-    );
+    return this.transport.listConversations(langyConversationListInputSchema.parse(input));
   }
 
   getConversation(input: LangyConversationInput): Promise<LangyConversation> {
     return this.transport.getConversation(langyConversationInputSchema.parse(input));
   }
 
-  startTurn(
-    input: LangyTurnInput,
-  ): Promise<{ conversation: LangyConversation; turnId: string }> {
+  startTurn(input: LangyTurnInput): Promise<{ conversation: LangyConversation; turnId: string }> {
     return this.transport.startTurn(langyTurnInputSchema.parse(input));
   }
 

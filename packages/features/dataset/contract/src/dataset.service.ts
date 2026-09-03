@@ -34,19 +34,14 @@ export abstract class DatasetService {
   abstract validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult>;
   abstract findNextAvailableName(input: DatasetNameInput): Promise<string>;
   abstract getBySlugOrId(input: DatasetLookupInput): Promise<Dataset>;
-  abstract getByIds(input: {
-    projectId: string;
-    datasetIds: string[];
-  }): Promise<Dataset[]>;
+  abstract getByIds(input: { projectId: string; datasetIds: string[] }): Promise<Dataset[]>;
   abstract renameDataset(input: {
     datasetId: string;
     projectId: string;
     name: string;
   }): Promise<Dataset>;
   abstract listDatasets(input: ListDatasetsInput): Promise<DatasetListResult>;
-  abstract archiveDataset(
-    input: DatasetLookupInput,
-  ): Promise<{ id: string; archived: true }>;
+  abstract archiveDataset(input: DatasetLookupInput): Promise<{ id: string; archived: true }>;
   abstract restoreDataset(input: {
     datasetId: string;
     projectId: string;

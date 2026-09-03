@@ -180,9 +180,7 @@ describe("the Identifier projection", () => {
         attached("idf_email", { occurredAt: T0 + 1000 }),
       ]);
 
-      const email = replayed.find(
-        (row: IdentifierRow) => row.id === "idf_email",
-      );
+      const email = replayed.find((row: IdentifierRow) => row.id === "idf_email");
       expect(email?.state).toBe("PRIMARY");
     });
   });

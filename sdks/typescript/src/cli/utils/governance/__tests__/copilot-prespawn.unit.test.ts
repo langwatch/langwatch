@@ -29,10 +29,7 @@ describe("copilotPrespawnWarnings()", () => {
     /** @scenario A managed OTel pin produces a one-line warning and the run continues */
     it("warns that enterprise policy routes telemetry elsewhere", () => {
       const managed = path.join(tmpDir, "managed-settings.json");
-      fs.writeFileSync(
-        managed,
-        JSON.stringify({ otel: { endpoint: "https://corp-collector" } }),
-      );
+      fs.writeFileSync(managed, JSON.stringify({ otel: { endpoint: "https://corp-collector" } }));
       const warnings = copilotPrespawnWarnings({
         managedPaths: [managed],
         readVersionImpl: versionOk,
@@ -58,10 +55,7 @@ describe("copilotPrespawnWarnings()", () => {
     it("scans a policy.d directory for otel-bearing json documents", () => {
       const policyDir = path.join(tmpDir, "policy.d");
       fs.mkdirSync(policyDir);
-      fs.writeFileSync(
-        path.join(policyDir, "corp.json"),
-        `{"otel":{"endpoint":"https://corp"}}`,
-      );
+      fs.writeFileSync(path.join(policyDir, "corp.json"), `{"otel":{"endpoint":"https://corp"}}`);
       expect(detectManagedOtelPin([policyDir])).toContain("corp.json");
     });
   });
@@ -142,9 +136,7 @@ describe("copilotManagedSettingsPaths()", () => {
   });
 
   it("targets the policy.d directory on linux", () => {
-    expect(copilotManagedSettingsPaths("linux")).toEqual([
-      "/etc/github-copilot/policy.d",
-    ]);
+    expect(copilotManagedSettingsPaths("linux")).toEqual(["/etc/github-copilot/policy.d"]);
   });
 
   it("builds the managed-settings path from ProgramData on windows", () => {
@@ -173,15 +165,11 @@ describe("copilotGatewayModelPreflight", () => {
 
   describe("when a model is provided", () => {
     it("accepts --model in the args", () => {
-      expect(
-        copilotGatewayModelPreflight({ args: ["--model", "gpt-5"], env: {} }),
-      ).toBeNull();
+      expect(copilotGatewayModelPreflight({ args: ["--model", "gpt-5"], env: {} })).toBeNull();
     });
 
     it("accepts --model=<id> in the args", () => {
-      expect(
-        copilotGatewayModelPreflight({ args: ["--model=gpt-5"], env: {} }),
-      ).toBeNull();
+      expect(copilotGatewayModelPreflight({ args: ["--model=gpt-5"], env: {} })).toBeNull();
     });
 
     it("accepts COPILOT_MODEL in the environment", () => {

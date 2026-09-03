@@ -35,11 +35,7 @@ const AnnotationsCellView: React.FC<{
     }
     if (row.annotationsUnavailable) {
       return (
-        <Text
-          textStyle={textStyle}
-          color="fg.subtle"
-          title="Annotations could not be loaded"
-        >
+        <Text textStyle={textStyle} color="fg.subtle" title="Annotations could not be loaded">
           Unavailable
         </Text>
       );
@@ -59,10 +55,7 @@ const AnnotationsCellView: React.FC<{
  * looked up for the rows that carry a review, rather than for every row of a
  * page where most traces have none.
  */
-const AnnotationCounts: React.FC<{ row: TraceListItem; density: Density }> = ({
-  row,
-  density,
-}) => {
+const AnnotationCounts: React.FC<{ row: TraceListItem; density: Density }> = ({ row, density }) => {
   const scoreNamesById = useScoreNamesById();
   const annotations = row.annotations ?? [];
   const thumbsUp = annotations.filter((a) => a.isThumbsUp === true).length;
@@ -88,10 +81,7 @@ const AnnotationCounts: React.FC<{ row: TraceListItem; density: Density }> = ({
  * reviews, so without it a row where everyone only rated would read as if
  * nobody had looked at the trace.
  */
-const ThumbsCount: React.FC<{ count: number; verdict: "up" | "down" }> = ({
-  count,
-  verdict,
-}) => {
+const ThumbsCount: React.FC<{ count: number; verdict: "up" | "down" }> = ({ count, verdict }) => {
   if (count === 0) return null;
   const label = `${count} thumbs ${verdict}`;
   const Icon = verdict === "up" ? ThumbsUp : ThumbsDown;

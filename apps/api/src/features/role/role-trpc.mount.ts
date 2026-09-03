@@ -87,7 +87,9 @@ function roleOrganizationCheck(
       next: () => Promise<unknown>;
     }) => {
       const role = await ctx.app.roles.getRole({ roleId: input.roleId });
-      if (!(await ports.probeOrganizationPermission(ctx, role.organizationId, options.permission))) {
+      if (
+        !(await ports.probeOrganizationPermission(ctx, role.organizationId, options.permission))
+      ) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
       if (options.plan) {
@@ -148,9 +150,7 @@ export function createRoleTrpcRouter<
     // manage. The bump closes a member-session direct-call path and is
     // invisible to the product.
     getAll: service.policy("organization:manage")(service.protected.input(inputs.getAll)),
-    getById: custom({ permission: "organization:view" })(
-      service.protected.input(inputs.getById),
-    ),
+    getById: custom({ permission: "organization:view" })(service.protected.input(inputs.getById)),
     create: withMiddleware(
       service.policy("organization:manage")(service.protected.input(inputs.create)),
       planGateMiddleware(mount.ports),
@@ -158,9 +158,7 @@ export function createRoleTrpcRouter<
     update: custom({ permission: "organization:manage", plan: true })(
       service.protected.input(inputs.update),
     ),
-    delete: custom({ permission: "organization:manage" })(
-      service.protected.input(inputs.delete),
-    ),
+    delete: custom({ permission: "organization:manage" })(service.protected.input(inputs.delete)),
     // The declared form of the check the assignment used to hand-roll: resolve
     // the team's organization from its id, require manage there, and only then
     // consult the plan.

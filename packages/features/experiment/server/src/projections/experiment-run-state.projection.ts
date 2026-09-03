@@ -256,8 +256,7 @@ export class ExperimentRunStateFoldProjection
     }
 
     const avgScoreBps = scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
-    const passRateBps =
-      gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
+    const passRateBps = gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
 
     return {
       ...state,

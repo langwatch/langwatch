@@ -103,9 +103,7 @@ export interface IdentityLedgerWriterDeps {
 
 export class IdentityLedgerWriter implements IdentityLedger {
   private readonly projectionStore: StateProjectionStore<IdentityFoldState>;
-  private readonly stagedSender: (
-    name: string,
-  ) => Promise<IdentityStagedSender | null>;
+  private readonly stagedSender: (name: string) => Promise<IdentityStagedSender | null>;
   private readonly convergence: { timeoutMs: number; pollMs: number };
 
   constructor(deps: IdentityLedgerWriterDeps) {
@@ -211,9 +209,7 @@ export class IdentityLedgerWriter implements IdentityLedger {
         );
         return;
       }
-      await new Promise((resolve) =>
-        setTimeout(resolve, this.convergence.pollMs),
-      );
+      await new Promise((resolve) => setTimeout(resolve, this.convergence.pollMs));
     }
   }
 

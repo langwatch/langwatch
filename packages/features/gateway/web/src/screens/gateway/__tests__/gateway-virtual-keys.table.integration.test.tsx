@@ -132,10 +132,7 @@ const host = fakeGatewayHost({
 import VirtualKeysPage from "../gateway-virtual-keys.screen";
 
 function renderPage() {
-  return renderWithGatewayHost(
-    <VirtualKeysPage />,
-    { host },
-  );
+  return renderWithGatewayHost(<VirtualKeysPage />, { host });
 }
 
 function rowFor(name: string): HTMLElement {
@@ -187,9 +184,7 @@ describe("virtual keys table", () => {
       // Amounts go through the shared gateway money formatter, the same
       // one the month total above the bar uses, so one number is never
       // written two ways inside one cell.
-      expect(bar).toHaveAccessibleName(
-        "$0.5 of $1.00 daily budget, resets in about 3 hours",
-      );
+      expect(bar).toHaveAccessibleName("$0.5 of $1.00 daily budget, resets in about 3 hours");
     });
 
     /** @scenario "Virtual key list shows a key's own budget under its month spend" */

@@ -135,10 +135,7 @@ export class DatasetsFacade {
    * @param options - Fields to update (name, columnTypes)
    * @returns The updated dataset metadata
    */
-  update = (
-    slugOrId: string,
-    options: UpdateDatasetOptions,
-  ): Promise<DatasetMetadata> => {
+  update = (slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> => {
     if (options.name == null && options.columnTypes == null) {
       throw new DatasetValidationError(
         "At least one field (name or columnTypes) must be provided for update",
@@ -197,10 +194,7 @@ export class DatasetsFacade {
    * @param recordIds - Array of record IDs to delete
    * @returns Object with the count of deleted records
    */
-  deleteRecords = (
-    slugOrId: string,
-    recordIds: string[],
-  ): Promise<DeleteRecordsResponse> => {
+  deleteRecords = (slugOrId: string, recordIds: string[]): Promise<DeleteRecordsResponse> => {
     return this.#datasetService.deleteRecords(slugOrId, recordIds);
   };
 
@@ -264,10 +258,6 @@ export class DatasetsFacade {
     if (!file) {
       throw new DatasetValidationError("File must be provided for upload");
     }
-    return this.#datasetService.uploadWithStrategy(
-      slugOrId,
-      file,
-      options?.ifExists ?? "append",
-    );
+    return this.#datasetService.uploadWithStrategy(slugOrId, file, options?.ifExists ?? "append");
   };
 }

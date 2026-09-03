@@ -669,16 +669,11 @@ function estimateTokens(text: string): number {
   return Math.max(1, Math.round(text.length / 4));
 }
 
-function estimateCost(
-  promptTokens: number,
-  completionTokens: number,
-  model: string,
-): number {
+function estimateCost(promptTokens: number, completionTokens: number, model: string): number {
   // Rough OpenAI-style pricing (USD). Good enough for fake data.
   const inputPerMillion = model.includes("mini") ? 0.15 : 2.5;
   const outputPerMillion = model.includes("mini") ? 0.6 : 10;
   return (
-    (promptTokens / 1_000_000) * inputPerMillion +
-    (completionTokens / 1_000_000) * outputPerMillion
+    (promptTokens / 1_000_000) * inputPerMillion + (completionTokens / 1_000_000) * outputPerMillion
   );
 }

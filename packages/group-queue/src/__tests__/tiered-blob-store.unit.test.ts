@@ -35,9 +35,7 @@ describe("TieredBlobStore", () => {
         const ref = await store.put({ projectId: PROJECT, data });
 
         expect(ref.tier).toBe("redis");
-        expect([...redisBlobs.store.keys()]).toEqual([
-          `${PROJECT}/${contentHash(data)}`,
-        ]);
+        expect([...redisBlobs.store.keys()]).toEqual([`${PROJECT}/${contentHash(data)}`]);
       });
 
       it("round-trips the bytes back through get", async () => {
@@ -175,10 +173,7 @@ describe("TieredBlobStore", () => {
 
         expect(a).not.toEqual(b);
         expect([...redisBlobs.store.keys()].sort()).toEqual(
-          [
-            `tenant-a/${contentHash(data)}`,
-            `tenant-b/${contentHash(data)}`,
-          ].sort(),
+          [`tenant-a/${contentHash(data)}`, `tenant-b/${contentHash(data)}`].sort(),
         );
       });
     });
@@ -204,9 +199,7 @@ describe("TieredBlobStore", () => {
     describe("when it is fetched", () => {
       it("returns null so decode reaches the missing-blob fail-safe", async () => {
         const { store, objectStore } = makeStore(8);
-        const data = Buffer.from(
-          "over the threshold so it lands in the s3 tier",
-        );
+        const data = Buffer.from("over the threshold so it lands in the s3 tier");
         const ref = await store.put({ projectId: PROJECT, data });
         objectStore.store.clear(); // the object vanished (NoSuchKey)
 
@@ -240,9 +233,7 @@ describe("TieredBlobStore", () => {
           hash: "deadbeefdeadbeef",
         };
 
-        await expect(store.get(ref)).rejects.toBeInstanceOf(
-          TransientBlobStoreError,
-        );
+        await expect(store.get(ref)).rejects.toBeInstanceOf(TransientBlobStoreError);
       });
     });
   });
@@ -267,9 +258,7 @@ describe("TieredBlobStore", () => {
           hash: "deadbeefdeadbeef",
         };
 
-        await expect(store.get(ref)).rejects.toBeInstanceOf(
-          TransientBlobStoreError,
-        );
+        await expect(store.get(ref)).rejects.toBeInstanceOf(TransientBlobStoreError);
       });
     });
   });

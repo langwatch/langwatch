@@ -101,9 +101,7 @@ import {
  * signatures cannot drift from the ones the Experiment service validates
  * against.
  */
-export type ApiExperimentRunCommands = NonNullable<
-  PostgresExperimentAdapterOptions["execution"]
->;
+export type ApiExperimentRunCommands = NonNullable<PostgresExperimentAdapterOptions["execution"]>;
 
 /**
  * Registers `experiment_run_processing` as a PRODUCER and hands back the four
@@ -339,9 +337,7 @@ export type ApiExperimentRun = Readonly<{
     input: ApiExperimentRunStartInput,
   ): Promise<{ runId: string; runUrl: string; total: number }>;
   /** Runs one committed studio workflow as an experiment. Same refusal. */
-  evaluateWorkflow(
-    input: ApiWorkflowEvaluationInput,
-  ): Promise<WorkflowEvaluationOutcome>;
+  evaluateWorkflow(input: ApiWorkflowEvaluationInput): Promise<WorkflowEvaluationOutcome>;
   /**
    * What each column of a saved workbench is called.
    *
@@ -357,9 +353,7 @@ export type ApiExperimentRun = Readonly<{
 }>;
 
 /** Composes the run loop over this process's own graph. */
-export function composeApiExperimentRun(
-  options: ApiExperimentRunOptions,
-): ApiExperimentRun {
+export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiExperimentRun {
   const workflowSource = PostgresExperimentWorkflowDslAdapter.create({
     prisma: options.prisma,
   });
@@ -459,8 +453,7 @@ export function composeApiExperimentRun(
         workflows: options.workflows,
         progress,
         baseUrl,
-        defaultConcurrency:
-          input.defaultConcurrency ?? API_EXPERIMENT_RUN_DEFAULT_CONCURRENCY,
+        defaultConcurrency: input.defaultConcurrency ?? API_EXPERIMENT_RUN_DEFAULT_CONCURRENCY,
       }),
     evaluateWorkflow: (input) => workflowEvaluation.triggerEvaluationForRest(input),
     resolveTargetNames,
@@ -527,9 +520,7 @@ class ApiExperimentStudioDispatchAdapter extends ExperimentStudioDispatchPort {
  * was free.
  */
 class ApiExperimentModelCostAdapter extends ExperimentModelCostPort {
-  static create(options: {
-    modelProviders: ModelProviderService;
-  }): ApiExperimentModelCostAdapter {
+  static create(options: { modelProviders: ModelProviderService }): ApiExperimentModelCostAdapter {
     return new ApiExperimentModelCostAdapter(options.modelProviders);
   }
 
@@ -595,14 +586,12 @@ class ApiExperimentModelCostAdapter extends ExperimentModelCostPort {
         ...(matched.cacheCreationCostPerToken == null
           ? {}
           : {
-              "langwatch.model.cacheCreationCostPerToken":
-                matched.cacheCreationCostPerToken,
+              "langwatch.model.cacheCreationCostPerToken": matched.cacheCreationCostPerToken,
             }),
         ...(matched.cacheCreation1hCostPerToken == null
           ? {}
           : {
-              "langwatch.model.cacheCreation1hCostPerToken":
-                matched.cacheCreation1hCostPerToken,
+              "langwatch.model.cacheCreation1hCostPerToken": matched.cacheCreation1hCostPerToken,
             }),
       };
     } catch {
@@ -788,9 +777,7 @@ class PostgresExperimentWorkflowDslAdapter extends ExperimentWorkflowDslPort {
  * keyed by rather than showing a blank column header.
  */
 class PostgresExperimentTargetEntityNamesAdapter extends ExperimentTargetEntityNamesPort {
-  static create(options: {
-    prisma: PrismaClient;
-  }): PostgresExperimentTargetEntityNamesAdapter {
+  static create(options: { prisma: PrismaClient }): PostgresExperimentTargetEntityNamesAdapter {
     return new PostgresExperimentTargetEntityNamesAdapter(options.prisma);
   }
 

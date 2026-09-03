@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import {
-  commandEnvelopeSchema,
-  stripEnvelope,
-  withCommandEnvelope,
-} from "../commandEnvelope";
+import { commandEnvelopeSchema, stripEnvelope, withCommandEnvelope } from "../commandEnvelope";
 
 describe("commandEnvelope", () => {
   describe("commandEnvelopeSchema", () => {

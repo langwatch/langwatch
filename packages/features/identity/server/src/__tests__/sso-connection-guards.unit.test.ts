@@ -65,11 +65,11 @@ async function run(
 }
 
 async function reachVerified(): Promise<void> {
-  await run(() => guards.registerConnection({ ...identity, type: "oidc", idp: IDP, allowsJit: true }));
-  await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
   await run(() =>
-    guards.approveDomainClaim({ ...identity, actor: OPS, domain: "acme.com" }),
+    guards.registerConnection({ ...identity, type: "oidc", idp: IDP, allowsJit: true }),
   );
+  await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
+  await run(() => guards.approveDomainClaim({ ...identity, actor: OPS, domain: "acme.com" }));
   await run(() =>
     guards.requestVerification({
       ...identity,
@@ -83,9 +83,7 @@ async function reachVerified(): Promise<void> {
 
 async function reachActive(): Promise<void> {
   await reachVerified();
-  await run(() =>
-    guards.activateConnection({ ...identity, testLoginAccountId: "acc_test" }),
-  );
+  await run(() => guards.activateConnection({ ...identity, testLoginAccountId: "acc_test" }));
 }
 
 beforeEach(() => {
@@ -158,9 +156,7 @@ describe("sso connection guards", () => {
       // Nothing routes: routing reads verified domains on an ACTIVE
       // connection, and a claim is neither.
       expect(state.verifiedDomains).toEqual([]);
-      expect(
-        await connections.findDomainOwner({ domain: "acme.com" }),
-      ).toBeNull();
+      expect(await connections.findDomainOwner({ domain: "acme.com" })).toBeNull();
     });
   });
 
@@ -211,9 +207,7 @@ describe("sso connection guards", () => {
         note: "Could not reach the listed domain owner",
       });
 
-      const reclaimed = await run(() =>
-        guards.claimDomain({ ...identity, domain: "acme.com" }),
-      );
+      const reclaimed = await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
       expect(reclaimed.facts).toHaveLength(1);
       expect(reclaimed.state.state).toBe("CLAIMED");
     });
@@ -257,9 +251,7 @@ describe("sso connection guards", () => {
       });
       // The command boundary never sees a token at all, so no fact can carry
       // one: the only field for it is the hash.
-      expect(JSON.stringify(requested.facts[0]!.data)).not.toContain(
-        "lw-verify-",
-      );
+      expect(JSON.stringify(requested.facts[0]!.data)).not.toContain("lw-verify-");
       expect(requested.state.state).toBe("VERIFICATION_PENDING");
       expect(requested.state.pendingVerification).toEqual({
         domain: "acme.com",
@@ -267,9 +259,7 @@ describe("sso connection guards", () => {
         tokenHash: "sha256:9f86d0",
       });
 
-      const verified = await run(() =>
-        guards.verifyDomain({ ...identity, domain: "acme.com" }),
-      );
+      const verified = await run(() => guards.verifyDomain({ ...identity, domain: "acme.com" }));
       expect(verified.facts[0]!.type).toBe(DOMAIN_VERIFIED_EVENT_TYPE);
       expect(verified.state.state).toBe("VERIFIED");
       expect(verified.state.verifiedDomains).toEqual(["acme.com"]);
@@ -321,9 +311,10 @@ describe("sso connection guards", () => {
       // is left exactly where it was.
       expect(held?.state).toBe("APPROVED");
       expect(held?.verifiedDomains).toEqual([]);
-      expect(await connections.findDomainOwner({ domain: "acme.com" })).toEqual(
-        { connectionId: "ssoc_first", organizationId: "org_first" },
-      );
+      expect(await connections.findDomainOwner({ domain: "acme.com" })).toEqual({
+        connectionId: "ssoc_first",
+        organizationId: "org_first",
+      });
     });
   });
 
@@ -339,9 +330,9 @@ describe("sso connection guards", () => {
           testLoginAccountId: "acc_test",
         }),
       ).rejects.toMatchObject({ code: "sso_connection_activation_blocked" });
-      expect(
-        (await connections.findConnection({ connectionId: CONNECTION }))?.state,
-      ).toBe("VERIFIED");
+      expect((await connections.findConnection({ connectionId: CONNECTION }))?.state).toBe(
+        "VERIFIED",
+      );
 
       breakGlass.set(true);
       const { facts, state } = await run(() =>
@@ -374,15 +365,14 @@ describe("sso connection guards", () => {
       expect(suspended.state.state).toBe("SUSPENDED");
       // Stops routing: ownership is scoped to ACTIVE, so a suspended
       // connection's domains answer nobody.
-      expect(
-        await connections.findDomainOwner({ domain: "acme.com" }),
-      ).toBeNull();
+      expect(await connections.findDomainOwner({ domain: "acme.com" })).toBeNull();
 
       const resumed = await run(() => guards.resumeConnection({ ...identity }));
       expect(resumed.state.state).toBe("ACTIVE");
-      expect(await connections.findDomainOwner({ domain: "acme.com" })).toEqual(
-        { connectionId: CONNECTION, organizationId: ORG },
-      );
+      expect(await connections.findDomainOwner({ domain: "acme.com" })).toEqual({
+        connectionId: CONNECTION,
+        organizationId: ORG,
+      });
     });
 
     /** @scenario "Teardown never strands a user" */
@@ -397,9 +387,9 @@ describe("sso connection guards", () => {
       ).rejects.toMatchObject({
         code: "sso_connection_teardown_strands_users",
       });
-      expect(
-        (await connections.findConnection({ connectionId: CONNECTION }))?.state,
-      ).toBe("ACTIVE");
+      expect((await connections.findConnection({ connectionId: CONNECTION }))?.state).toBe(
+        "ACTIVE",
+      );
 
       stranding.set([]);
       const { state } = await run(() =>
@@ -417,9 +407,7 @@ describe("sso connection guards", () => {
   describe("given a TEARDOWN_PENDING connection", () => {
     beforeEach(async () => {
       await reachActive();
-      await run(() =>
-        guards.requestTeardown({ ...identity, reason: null, graceMs: 1_000 }),
-      );
+      await run(() => guards.requestTeardown({ ...identity, reason: null, graceMs: 1_000 }));
     });
 
     /** @scenario "Teardown completes only after its grace period" */
@@ -435,9 +423,7 @@ describe("sso connection guards", () => {
         guards.completeTeardown({ ...identity, occurredAtMs: T0 + 1_000 }),
       );
       expect(state.state).toBe("TORN_DOWN");
-      expect(
-        await connections.findDomainOwner({ domain: "acme.com" }),
-      ).toBeNull();
+      expect(await connections.findDomainOwner({ domain: "acme.com" })).toBeNull();
     });
   });
 

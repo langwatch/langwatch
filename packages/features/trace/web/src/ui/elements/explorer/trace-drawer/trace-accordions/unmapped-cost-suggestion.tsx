@@ -49,9 +49,7 @@ export function UnmappedCostSuggestion({ model }: { model: string }) {
         variant="outline"
         colorPalette="blue"
         flexShrink={0}
-        onClick={() =>
-          window.open(modelCostMappingUrl(model), "_blank", "noopener,noreferrer")
-        }
+        onClick={() => window.open(modelCostMappingUrl(model), "_blank", "noopener,noreferrer")}
       >
         Add cost mapping
         <Icon as={LuExternalLink} boxSize={3} />

@@ -43,13 +43,10 @@ describe("StorageMeterService memory guard", () => {
 
     it("meters Langy analytics into the traces category", async () => {
       const query = vi.fn(async ({ query }: { query: string }) => ({
-        json: async () => [
-          { total: query.includes("FROM langy_analytics_events") ? "17" : "0" },
-        ],
+        json: async () => [{ total: query.includes("FROM langy_analytics_events") ? "17" : "0" }],
       }));
       const service = StorageMeterService.create({
-        resolveClickHouseClient: async () =>
-          ({ query }) satisfies StorageMeterClickHouseClient,
+        resolveClickHouseClient: async () => ({ query }) satisfies StorageMeterClickHouseClient,
       });
 
       const breakdown = await service.getStorageBreakdown({
@@ -59,9 +56,7 @@ describe("StorageMeterService memory guard", () => {
       expect(breakdown.byCategory.traces).toBe(17);
       expect(breakdown.totalBytes).toBe(17);
       expect(
-        query.mock.calls.some(([request]) =>
-          request.query.includes("FROM langy_analytics_events"),
-        ),
+        query.mock.calls.some(([request]) => request.query.includes("FROM langy_analytics_events")),
       ).toBe(true);
     });
   });
@@ -86,9 +81,7 @@ describe("StorageMeterService memory guard", () => {
         if (failing.has(tenantId)) throw new Error("cluster unreachable");
         return {
           query: vi.fn(async (arg: StorageMeterQuery) => ({
-            json: async () => [
-              { total: String(totals[String(arg.query_params.tenantId)] ?? 0) },
-            ],
+            json: async () => [{ total: String(totals[String(arg.query_params.tenantId)] ?? 0) }],
           })),
         } satisfies StorageMeterClickHouseClient;
       });
@@ -152,8 +145,7 @@ describe("StorageMeterService memory guard", () => {
         return { json: async () => [{ total: String(total) }] };
       });
       const service = StorageMeterService.create({
-        resolveClickHouseClient: async () =>
-          ({ query }) satisfies StorageMeterClickHouseClient,
+        resolveClickHouseClient: async () => ({ query }) satisfies StorageMeterClickHouseClient,
         now: () => t,
       });
       return { service, query, advance: (ms: number) => (t += ms) };

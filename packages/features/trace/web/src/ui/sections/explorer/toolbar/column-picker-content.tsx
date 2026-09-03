@@ -15,19 +15,10 @@ import {
   useViewStore,
 } from "../../../../index";
 import { evalColumnLabel } from "../trace-table/eval-columns";
-import {
-  AddEvalColumnForm,
-  COLUMN_APPENDED_HINT,
-} from "./column-picker/add-eval-column-form";
+import { AddEvalColumnForm, COLUMN_APPENDED_HINT } from "./column-picker/add-eval-column-form";
 import { VisibleOrderStrip } from "./column-picker/visible-order-strip";
 
-const SECTION_ORDER = [
-  "Standard",
-  "Trace fields",
-  "Evaluations",
-  "Events",
-  "Annotations",
-];
+const SECTION_ORDER = ["Standard", "Trace fields", "Evaluations", "Events", "Annotations"];
 
 const TIME_FORMAT_OPTIONS: { value: TimeColumnFormat; label: string }[] = [
   { value: "relative", label: "Relative" },
@@ -85,10 +76,7 @@ export const ColumnPickerContent: React.FC = () => {
       ),
     [capability.columns, evalColumnOptions, canReadAnnotations],
   );
-  const columnById = useMemo(
-    () => new Map(allColumns.map((c) => [c.id, c])),
-    [allColumns],
-  );
+  const columnById = useMemo(() => new Map(allColumns.map((c) => [c.id, c])), [allColumns]);
   const isVisible = (id: string) => columnOrder.includes(id);
 
   const handleToggle = (column: LensColumnOption) => {
@@ -122,13 +110,7 @@ export const ColumnPickerContent: React.FC = () => {
   }, [allColumns, q]);
 
   return (
-    <Stack
-      width="284px"
-      maxHeight="min(70vh, 520px)"
-      overflowY="auto"
-      gap={2.5}
-      padding={2.5}
-    >
+    <Stack width="284px" maxHeight="min(70vh, 520px)" overflowY="auto" gap={2.5} padding={2.5}>
       <HStack justify="space-between" align="baseline">
         <Text textStyle="sm" fontWeight="semibold" color="fg">
           Columns

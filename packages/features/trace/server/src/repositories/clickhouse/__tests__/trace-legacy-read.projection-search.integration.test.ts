@@ -25,7 +25,10 @@ import type { ProjectableTrace, ProjectionFrom } from "../../../services/trace-p
 import type { GetAllTracesForProjectInput } from "../../../services/trace-legacy-read.types";
 import type { Protections } from "../../../services/trace-viewer-protections.service";
 import { ClickHouseTraceService } from "../trace-legacy-read.repository";
-import { createTestClickHouseClient, testClickHouseUrl } from "./support/clickhouse-endpoint.support";
+import {
+  createTestClickHouseClient,
+  testClickHouseUrl,
+} from "./support/clickhouse-endpoint.support";
 import { openProtections } from "./open-protections";
 
 const clickHouseUrl = testClickHouseUrl();
@@ -356,13 +359,19 @@ integration("trace search projection (integration)", () => {
       it("redacts event detail values but keeps types and metrics", async () => {
         const rows = await projectedSearch({
           select: ["trace_id", "events.type", "events.metrics", "events.details"],
-          protections: { canSeeCosts: true, canSeeCapturedInput: false, canSeeCapturedOutput: true },
+          protections: {
+            canSeeCosts: true,
+            canSeeCapturedInput: false,
+            canSeeCapturedOutput: true,
+          },
         });
 
         const row = rows.find((r) => r.trace_id === traceId);
         expect(row).toEqual({
           trace_id: traceId,
-          events: [{ type: "thumbs_up_down", metrics: { vote: 1 }, details: { reason: "[REDACTED]" } }],
+          events: [
+            { type: "thumbs_up_down", metrics: { vote: 1 }, details: { reason: "[REDACTED]" } },
+          ],
         });
       });
     });
@@ -435,7 +444,10 @@ integration("trace search projection (integration)", () => {
     describe("when searching on the updated axis", () => {
       /** @scenario "Updated axis captures a late-mutated old trace" */
       it("includes the late-modified trace", async () => {
-        const rows = await projectedSearch({ select: ["trace_id", "updated_at"], dateField: "updated" });
+        const rows = await projectedSearch({
+          select: ["trace_id", "updated_at"],
+          dateField: "updated",
+        });
         expect(rows.some((r) => r.trace_id === lateTraceId)).toBe(true);
       });
     });

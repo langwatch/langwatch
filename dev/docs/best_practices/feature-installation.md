@@ -64,7 +64,7 @@ The result is keyed by namespace and spread into the router record:
 
 ```ts
 const appTrpcFeatures = createAppTrpcFeatures({ mount, ports });
-const appRouter = createTRPCRouter({ ...appTrpcFeatures, /* unmigrated */ });
+const appRouter = createTRPCRouter({ ...appTrpcFeatures /* unmigrated */ });
 ```
 
 The policy chain (tracer → logger → handled-error → scope-lineage guard →

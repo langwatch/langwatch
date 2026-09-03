@@ -21,24 +21,24 @@ rules that apply to both file types are split into `_ts` / `_tsx` siblings.
 
 ## Rules
 
-| Rule                                    | Forbids                                                                                            | Scope                                                    |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `no-explicit-any` + `-tsx`              | `: any`, `as any`                                                                                  | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
-| `no-identity-function`                  | a named function or `const` arrow that returns its own argument                                     | `packages/**`, `apps/**` `*.ts`                          |
-| `no-same-name-delegation`               | a method whose whole body forwards to the same name on a collaborator (skips `app/*.app.ts`)        | `packages/**`, `apps/**` `*.ts`                          |
-| `no-inline-dynamic-import` + `-tsx`     | inline `import(...)` outside the page-loader list / `pages/**`                                             | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
-| `no-form-watch-in-child`                | `$form.watch()` in a child receiving `form` as a prop                                              | `apps/ui/src/**`, `packages/**/web/src/**` `*.tsx`       |
-| `no-export-star-shim` + `-tsx`          | `export * from "..."`. Disable inline with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}`      | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
-| `no-localhost-fallback` + `-tsx`        | `?? "http://localhost..."` and template-literal variants                                           | `apps/**`, `packages/**` `*.{ts,tsx}`                    |
-| `no-form-disable-on-isvalid`            | `disabled={!form.formState.isValid}` on submit buttons                                             | `apps/**`, `packages/**` `*.tsx`                         |
-| `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition                         | test files under `apps/**`, `packages/**`, `sdks/typescript/**` |
-| `require-boolean-name-prefix`           | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent | `apps/**`, `packages/**` `*.ts`                          |
-| `require-fetch-timeout` + `-tsx`        | `fetch(...)` with no `signal` — a hung peer hangs the caller                                       | `apps/**`, `packages/**`, `sdks/typescript/src/**`       |
-| `no-test-without-assertion` + `-tsx`    | a test whose inline body contains no `expect`/`assert` — passes unless the code throws             | test files                                               |
-| `use-action-based-test-name` + `-tsx`   | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`)                     | test files                                               |
-| `no-tautological-assertion` + `-tsx`    | `expect(X).toBe(X)` — an assertion that cannot fail                                                | test files                                               |
-| `no-empty-test` + `-tsx`                | `it("…", () => {})` — always green, counts as coverage                                             | test files                                               |
-| `no-double-type-assertion` + `-tsx`     | `x as unknown as T` — a single `as T` still proves overlap; routing via `unknown` removes even that | `packages/**/contract/src/**` (**`error`**)              |
+| Rule                                    | Forbids                                                                                             | Scope                                                           |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `no-explicit-any` + `-tsx`              | `: any`, `as any`                                                                                   | `apps/**`, `packages/**` `*.{ts,tsx}`                           |
+| `no-identity-function`                  | a named function or `const` arrow that returns its own argument                                     | `packages/**`, `apps/**` `*.ts`                                 |
+| `no-same-name-delegation`               | a method whose whole body forwards to the same name on a collaborator (skips `app/*.app.ts`)        | `packages/**`, `apps/**` `*.ts`                                 |
+| `no-inline-dynamic-import` + `-tsx`     | inline `import(...)` outside the page-loader list / `pages/**`                                      | `apps/**`, `packages/**` `*.{ts,tsx}`                           |
+| `no-form-watch-in-child`                | `$form.watch()` in a child receiving `form` as a prop                                               | `apps/ui/src/**`, `packages/**/web/src/**` `*.tsx`              |
+| `no-export-star-shim` + `-tsx`          | `export * from "..."`. Disable inline with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}`       | `apps/**`, `packages/**` `*.{ts,tsx}`                           |
+| `no-localhost-fallback` + `-tsx`        | `?? "http://localhost..."` and template-literal variants                                            | `apps/**`, `packages/**` `*.{ts,tsx}`                           |
+| `no-form-disable-on-isvalid`            | `disabled={!form.formState.isValid}` on submit buttons                                              | `apps/**`, `packages/**` `*.tsx`                                |
+| `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition                          | test files under `apps/**`, `packages/**`, `sdks/typescript/**` |
+| `require-boolean-name-prefix`           | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent  | `apps/**`, `packages/**` `*.ts`                                 |
+| `require-fetch-timeout` + `-tsx`        | `fetch(...)` with no `signal` — a hung peer hangs the caller                                        | `apps/**`, `packages/**`, `sdks/typescript/src/**`              |
+| `no-test-without-assertion` + `-tsx`    | a test whose inline body contains no `expect`/`assert` — passes unless the code throws              | test files                                                      |
+| `use-action-based-test-name` + `-tsx`   | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`)                      | test files                                                      |
+| `no-tautological-assertion` + `-tsx`    | `expect(X).toBe(X)` — an assertion that cannot fail                                                 | test files                                                      |
+| `no-empty-test` + `-tsx`                | `it("…", () => {})` — always green, counts as coverage                                              | test files                                                      |
+| `no-double-type-assertion` + `-tsx`     | `x as unknown as T` — a single `as T` still proves overlap; routing via `unknown` removes even that | `packages/**/contract/src/**` (**`error`**)                     |
 
 The BDD/boolean/fetch trio was added because they were the three largest
 mechanically preventable clusters in a 50-PR sample of CodeRabbit comments —

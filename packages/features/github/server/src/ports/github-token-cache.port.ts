@@ -1,8 +1,5 @@
 export abstract class GithubTokenCachePort {
-  abstract tryGetToken(input: {
-    installationId: string;
-    scopeKey: string;
-  }): Promise<string | null>;
+  abstract tryGetToken(input: { installationId: string; scopeKey: string }): Promise<string | null>;
   abstract storeToken(input: {
     installationId: string;
     scopeKey: string;

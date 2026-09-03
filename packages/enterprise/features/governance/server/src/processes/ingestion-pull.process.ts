@@ -116,8 +116,7 @@ export class IngestionPullProcess {
           this.settle({
             state: {
               ...state,
-              currentRun:
-                state.currentRun?.runId === data.runId ? null : state.currentRun,
+              currentRun: state.currentRun?.runId === data.runId ? null : state.currentRun,
             },
             after: this.schedulingReference(context),
           }),

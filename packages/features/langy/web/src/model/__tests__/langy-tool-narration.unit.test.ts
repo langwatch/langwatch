@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { stripToolNarration } from "../langy-tool-narration";
 
-const strip = (text: string, hasActivity = true) =>
-  stripToolNarration({ text, hasActivity });
+const strip = (text: string, hasActivity = true) => stripToolNarration({ text, hasActivity });
 
 describe("stripToolNarration", () => {
   describe("given a turn that rendered activity cards", () => {
@@ -55,9 +54,9 @@ describe("stripToolNarration", () => {
 
     describe("when the reply stacks several openers", () => {
       it("drops all of them", () => {
-        expect(
-          strip("Using the GitHub skill.\n\nNow I'll open the PR.\n\nOpened PR #42."),
-        ).toBe("Opened PR #42.");
+        expect(strip("Using the GitHub skill.\n\nNow I'll open the PR.\n\nOpened PR #42.")).toBe(
+          "Opened PR #42.",
+        );
       });
     });
 
@@ -83,8 +82,7 @@ describe("stripToolNarration", () => {
     });
 
     it("keeps a sentence that merely starts like an opener but carries content", () => {
-      const text =
-        "Using the p95 latency you asked about, the slowest span is db.query at 1.4s.";
+      const text = "Using the p95 latency you asked about, the slowest span is db.query at 1.4s.";
       expect(strip(text)).toBe(text);
     });
 

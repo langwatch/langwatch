@@ -46,9 +46,7 @@ export function BlobStoreBody({
               <Database />
             </EmptyState.Indicator>
             <EmptyState.Title>No stored payloads</EmptyState.Title>
-            <EmptyState.Description>
-              Nothing is being held for this queue.
-            </EmptyState.Description>
+            <EmptyState.Description>Nothing is being held for this queue.</EmptyState.Description>
           </EmptyState.Content>
         </EmptyState.Root>
       </Center>
@@ -60,12 +58,7 @@ export function BlobStoreBody({
       <BlobTable blobs={blobs} canManage={canManage} onDelete={onDelete} />
       {hasMore && (
         <Flex justify="center" paddingY={4}>
-          <Button
-            size="sm"
-            variant="outline"
-            loading={isLoadingMore}
-            onClick={onLoadMore}
-          >
+          <Button size="sm" variant="outline" loading={isLoadingMore} onClick={onLoadMore}>
             Load more
           </Button>
         </Flex>

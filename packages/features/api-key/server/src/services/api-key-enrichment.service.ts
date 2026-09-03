@@ -34,15 +34,12 @@ export class ApiKeyEnrichmentService {
     const activeProjectIds = new Set<string>();
     const customRoleName = new Map<string, string>();
     const resolvedOrganizationId =
-      organizationId ??
-      bindings.find((binding) => binding.scopeType === "ORGANIZATION")?.scopeId;
+      organizationId ?? bindings.find((binding) => binding.scopeType === "ORGANIZATION")?.scopeId;
     const customRoles = resolvedOrganizationId
       ? await this.catalog.customRoles(
           [
             ...new Set(
-              bindings.flatMap((binding) =>
-                binding.customRoleId ? [binding.customRoleId] : [],
-              ),
+              bindings.flatMap((binding) => (binding.customRoleId ? [binding.customRoleId] : [])),
             ),
           ],
           resolvedOrganizationId,
@@ -85,11 +82,7 @@ export class ApiKeyEnrichmentService {
     };
   }
 
-  async enrichApiKeyList({
-    apiKeys,
-  }: {
-    apiKeys: ApiKey[];
-  }): Promise<ApiKeyListEnrichment> {
+  async enrichApiKeyList({ apiKeys }: { apiKeys: ApiKey[] }): Promise<ApiKeyListEnrichment> {
     const organizationId = apiKeys[0]?.organizationId;
     const customRoles = organizationId
       ? await this.catalog.customRoles(
@@ -111,9 +104,7 @@ export class ApiKeyEnrichmentService {
 
     const userIds = new Set(
       apiKeys.flatMap((key) =>
-        [key.userId, key.createdByUserId].filter((value): value is string =>
-          Boolean(value),
-        ),
+        [key.userId, key.createdByUserId].filter((value): value is string => Boolean(value)),
       ),
     );
     const users = (

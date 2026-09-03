@@ -31,5 +31,8 @@ export function computeSpanCost({
   promptTokens: number | null;
   completionTokens: number | null;
 }): number {
-  return estimateModelCost({ attrs, model, promptTokens, completionTokens }, getStaticModelCostRates());
+  return estimateModelCost(
+    { attrs, model, promptTokens, completionTokens },
+    getStaticModelCostRates(),
+  );
 }

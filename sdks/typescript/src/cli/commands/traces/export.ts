@@ -272,22 +272,14 @@ const serialise = ({
   return [CSV_HEADERS.join(","), ...lines].join("\n") + "\n";
 };
 
-const serialiseTrace = ({
-  trace,
-  format,
-}: {
-  trace: ExportedTrace;
-  format: string;
-}): string => {
+const serialiseTrace = ({ trace, format }: { trace: ExportedTrace; format: string }): string => {
   if (format !== "csv") return JSON.stringify(trace);
 
   return [
     trace.trace_id,
     csvEscape(trace.input?.value ?? ""),
     csvEscape(trace.output?.value ?? ""),
-    trace.timestamps?.started_at
-      ? new Date(trace.timestamps.started_at).toISOString()
-      : "",
+    trace.timestamps?.started_at ? new Date(trace.timestamps.started_at).toISOString() : "",
     trace.error ? csvEscape(JSON.stringify(trace.error)) : "",
     csvNumber(trace.metrics?.prompt_tokens),
     csvNumber(trace.metrics?.completion_tokens),

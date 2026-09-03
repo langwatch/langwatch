@@ -28,9 +28,7 @@ export interface AccountSecretPair {
 export interface IdentitySecretCarryRepository {
   /** Every `Account` row of this user, with its credential row's timestamp
    *  beside it. Reads only; the decision is this service's. */
-  findAccountSecretPairs(args: {
-    userId: string;
-  }): Promise<AccountSecretPair[]>;
+  findAccountSecretPairs(args: { userId: string }): Promise<AccountSecretPair[]>;
   /**
    * Create the credential row for an account that has none, PRESERVING the
    * `Account` row's own timestamps — the credential is a copy of a fact that
@@ -93,11 +91,7 @@ export interface IdentitySecretCarryOutcome {
 export class IdentitySecretCarryService {
   constructor(private readonly reads: IdentitySecretCarryRepository) {}
 
-  async carryForUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<IdentitySecretCarryOutcome> {
+  async carryForUser({ userId }: { userId: string }): Promise<IdentitySecretCarryOutcome> {
     const outcome: IdentitySecretCarryOutcome = { carried: 0, healed: 0 };
     for (const pair of await this.reads.findAccountSecretPairs({ userId })) {
       if (pair.credentialUpdatedAtMs === null) {

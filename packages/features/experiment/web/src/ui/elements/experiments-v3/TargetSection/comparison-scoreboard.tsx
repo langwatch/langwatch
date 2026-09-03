@@ -15,8 +15,7 @@ type ComparisonScoreboardProps = {
 };
 
 /** Keeps a long prompt handle from pushing the header's other chips off. */
-const shorten = (name: string) =>
-  name.length > 18 ? `${name.slice(0, 17)}…` : name;
+const shorten = (name: string) => (name.length > 18 ? `${name.slice(0, 17)}…` : name);
 
 /**
  * Wins this variant holds. A single run can label the same variant by its
@@ -79,8 +78,7 @@ export function ComparisonScoreboard({
   const summary = !topLabel
     ? "Tied"
     : `${shorten(
-        (winnerIndex >= 0 ? variantDisplayNames[winnerIndex] : topLabel) ??
-          topLabel,
+        (winnerIndex >= 0 ? variantDisplayNames[winnerIndex] : topLabel) ?? topLabel,
       )} wins`;
 
   const tally = variantTargets.map((target, index) => {
@@ -95,11 +93,7 @@ export function ComparisonScoreboard({
   if (ties > 0) tally.push(`${ties} ${ties === 1 ? "tie" : "ties"}`);
 
   return (
-    <Tooltip
-      content={tally.join(" · ")}
-      positioning={{ placement: "top" }}
-      openDelay={200}
-    >
+    <Tooltip content={tally.join(" · ")} positioning={{ placement: "top" }} openDelay={200}>
       <Text
         fontSize="11px"
         color="fg.muted"

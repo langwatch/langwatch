@@ -1,8 +1,5 @@
 import type { Cluster, Redis } from "ioredis";
-import {
-  CLAIM_MARKER_TTL_SECONDS,
-  DEFAULT_CONFIRMED_DEATH_THRESHOLD,
-} from "../scripts";
+import { CLAIM_MARKER_TTL_SECONDS, DEFAULT_CONFIRMED_DEATH_THRESHOLD } from "../scripts";
 
 /**
  * Shared poison-guard fixtures.

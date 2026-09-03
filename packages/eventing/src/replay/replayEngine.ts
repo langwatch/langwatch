@@ -316,9 +316,7 @@ class FoldMapReplayRun {
     // "map" for map-only runs, otherwise "fold" (fold-only and mixed runs —
     // fold is the dominant kind).
     this.runProjectionKind =
-      config.projections.length === 0 && (config.mapProjections ?? []).length > 0
-        ? "map"
-        : "fold";
+      config.projections.length === 0 && (config.mapProjections ?? []).length > 0 ? "map" : "fold";
   }
 
   async run(): Promise<ReplayResult> {
@@ -546,10 +544,7 @@ export async function optimizeTouchedTables({
 interface BatchGroups {
   projNames: string[];
   aggKeysByProjection: Map<string, string[]>;
-  byTenant: Map<
-    string,
-    Array<{ key: string; aggregateId: string; aggregateType: string }>
-  >;
+  byTenant: Map<string, Array<{ key: string; aggregateId: string; aggregateType: string }>>;
   batchAggregates: DiscoveredAggregate[];
 }
 
@@ -682,13 +677,12 @@ async function computeAndRecordCutoffs({
   await pMapLimited({
     items: [...groups.byTenant.entries()],
     fn: async ([tenantId, entries]) => {
-      const { cutoffs: tenantCutoffs, occurredAtBounds } =
-        await ctx.eventSource.getBoundedCutoffs({
-          tenantId,
-          aggregateTypes: [...new Set(entries.map((e) => e.aggregateType))],
-          aggregateIds: entries.map((e) => e.aggregateId),
-          eventTypes: selected.allEventTypes,
-        });
+      const { cutoffs: tenantCutoffs, occurredAtBounds } = await ctx.eventSource.getBoundedCutoffs({
+        tenantId,
+        aggregateTypes: [...new Set(entries.map((e) => e.aggregateType))],
+        aggregateIds: entries.map((e) => e.aggregateId),
+        eventTypes: selected.allEventTypes,
+      });
       if (!occurredAtBounds) {
         // Zero events for this tenant's aggregates (see getBoundedCutoffs) —
         // no boundsByTenant entry and no allCutoffs entries, so these
@@ -742,17 +736,15 @@ async function unpauseAll({
   log: ReplayLogWriter;
 }): Promise<void> {
   for (const p of selected.allProjectionsToPause) {
-    await unpauseProjection({ redis: ctx.redis, pauseKey: p.pauseKey }).catch(
-      (unpauseError) => {
-        log.write({
-          step: "error",
-          batch: batchNum,
-          error: `unpause failed: ${
-            unpauseError instanceof Error ? unpauseError.message : String(unpauseError)
-          }`,
-        });
-      },
-    );
+    await unpauseProjection({ redis: ctx.redis, pauseKey: p.pauseKey }).catch((unpauseError) => {
+      log.write({
+        step: "error",
+        batch: batchNum,
+        error: `unpause failed: ${
+          unpauseError instanceof Error ? unpauseError.message : String(unpauseError)
+        }`,
+      });
+    });
   }
   log.write({
     step: "unpause-batch",
@@ -824,17 +816,11 @@ function buildAccumulators({
   for (const projName of groups.projNames) {
     const foldProj = selected.projectionByName.get(projName);
     if (foldProj) {
-      foldAccumulators.set(
-        projName,
-        new FoldAccumulator(foldProj.definition, ctx.accumulatorOpts),
-      );
+      foldAccumulators.set(projName, new FoldAccumulator(foldProj.definition, ctx.accumulatorOpts));
     }
     const mapProj = selected.mapProjectionByName.get(projName);
     if (mapProj) {
-      mapAccumulators.set(
-        projName,
-        new MapAccumulator(mapProj.definition, ctx.accumulatorOpts),
-      );
+      mapAccumulators.set(projName, new MapAccumulator(mapProj.definition, ctx.accumulatorOpts));
     }
   }
   return { foldAccumulators, mapAccumulators };
@@ -949,9 +935,7 @@ async function streamApplyAndWrite({
   await pMapLimited({
     items: [...groups.byTenant.entries()],
     fn: async ([tenantId, entries]) => {
-      const aggIds = entries
-        .filter((e) => allCutoffs.has(e.key))
-        .map((e) => e.aggregateId);
+      const aggIds = entries.filter((e) => allCutoffs.has(e.key)).map((e) => e.aggregateId);
       if (aggIds.length === 0) return;
 
       await ctx.eventSource.streamEventsForAggregates({

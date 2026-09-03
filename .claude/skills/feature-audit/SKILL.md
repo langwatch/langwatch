@@ -31,7 +31,7 @@ Group the lint lines by rule name and count. Note which are in a `*-baseline.jso
 Walk `server/src` against the closed list in `references/server.md`:
 
 - Folders outside `app, services, ports, repositories, stores, projections, subscribers,
-  processes, intents, adapters, transport, migrations, fixtures`. `utils`, `lib`,
+processes, intents, adapters, transport, migrations, fixtures`. `utils`, `lib`,
   `helpers`, `domain`, `composition`, `types` are findings; say where each file belongs.
 - Filenames: dot between qualifier and subject, hyphen inside names; a `.service.ts`
   exporting no class of that name; a runtime class without `static create`.

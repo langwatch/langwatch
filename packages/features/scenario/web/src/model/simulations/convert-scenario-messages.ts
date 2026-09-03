@@ -83,9 +83,7 @@ function convertMessageContent(
   message: ScenarioMessageSnapshotEvent["messages"][0],
 ): (Message & { traceId?: string })[] {
   const content =
-    typeof message.content === "string"
-      ? message.content
-      : JSON.stringify(message.content ?? {});
+    typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? {});
   const parsedContent = safeJsonParseOrStringFallback(content);
 
   if (Array.isArray(parsedContent)) {
@@ -196,9 +194,7 @@ function createToolResultMessage(
     actionExecutionId: message.id ?? "",
     actionName: "tool",
     result: safeJsonParseOrStringFallback(
-      typeof message.content === "string"
-        ? message.content
-        : JSON.stringify(message.content ?? {}),
+      typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? {}),
     ),
   });
   resultMessage.traceId = message.trace_id;

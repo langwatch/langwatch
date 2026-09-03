@@ -5,53 +5,37 @@
       "id": "agent",
       "root": "packages/features/agent",
       "classification": "core",
-      "subjects": [
-        "agent"
-      ]
+      "subjects": ["agent"]
     },
     {
       "id": "analytics",
       "root": "packages/features/analytics",
       "classification": "core",
-      "subjects": [
-        "analytics"
-      ]
+      "subjects": ["analytics"]
     },
     {
       "id": "annotation",
       "root": "packages/features/annotation",
       "classification": "core",
-      "subjects": [
-        "annotation"
-      ]
+      "subjects": ["annotation"]
     },
     {
       "id": "api-key",
       "root": "packages/features/api-key",
       "classification": "core",
-      "subjects": [
-        "api-key"
-      ]
+      "subjects": ["api-key"]
     },
     {
       "id": "auth",
       "root": "packages/features/auth",
       "classification": "core",
-      "subjects": [
-        "auth",
-        "cli-bootstrap",
-        "cli-session",
-        "cli-token"
-      ]
+      "subjects": ["auth", "cli-bootstrap", "cli-session", "cli-token"]
     },
     {
       "id": "authz",
       "root": "packages/features/authz",
       "classification": "core",
-      "subjects": [
-        "authz",
-        "authz-grant"
-      ]
+      "subjects": ["authz", "authz-grant"]
     },
     {
       "id": "automation",
@@ -69,203 +53,139 @@
       "id": "coding-agent",
       "root": "packages/features/coding-agent",
       "classification": "core",
-      "subjects": [
-        "coding-agent"
-      ]
+      "subjects": ["coding-agent"]
     },
     {
       "id": "dashboard",
       "root": "packages/features/dashboard",
       "classification": "core",
-      "subjects": [
-        "dashboard",
-        "graph",
-        "saved-workbench-chart"
-      ]
+      "subjects": ["dashboard", "graph", "saved-workbench-chart"]
     },
     {
       "id": "data-privacy",
       "root": "packages/features/data-privacy",
       "classification": "core",
-      "subjects": [
-        "data-privacy"
-      ]
+      "subjects": ["data-privacy"]
     },
     {
       "id": "data-retention",
       "root": "packages/features/data-retention",
       "classification": "core",
-      "subjects": [
-        "data-retention"
-      ]
+      "subjects": ["data-retention"]
     },
     {
       "id": "dataset",
       "root": "packages/features/dataset",
       "classification": "core",
-      "subjects": [
-        "dataset",
-        "dataset-record"
-      ]
+      "subjects": ["dataset", "dataset-record"]
     },
     {
       "id": "entitlement",
       "root": "packages/features/entitlement",
       "classification": "core",
-      "subjects": [
-        "entitlement"
-      ]
+      "subjects": ["entitlement"]
     },
     {
       "id": "evaluation",
       "root": "packages/features/evaluation",
       "classification": "core",
-      "subjects": [
-        "evaluation"
-      ]
+      "subjects": ["evaluation"]
     },
     {
       "id": "evaluator",
       "root": "packages/features/evaluator",
       "classification": "core",
-      "subjects": [
-        "evaluator"
-      ]
+      "subjects": ["evaluator"]
     },
     {
       "id": "experiment",
       "root": "packages/features/experiment",
       "classification": "core",
-      "subjects": [
-        "experiment"
-      ]
+      "subjects": ["experiment"]
     },
     {
       "id": "feature-flag",
       "root": "packages/features/feature-flag",
       "classification": "core",
-      "subjects": [
-        "feature-flag"
-      ]
+      "subjects": ["feature-flag"]
     },
     {
       "id": "gateway",
       "root": "packages/features/gateway",
       "classification": "core",
-      "subjects": [
-        "gateway",
-        "personal-virtual-key",
-        "routing-policy",
-        "virtual-key"
-      ]
+      "subjects": ["gateway", "personal-virtual-key", "routing-policy", "virtual-key"]
     },
     {
       "id": "github",
       "root": "packages/features/github",
       "classification": "core",
-      "subjects": [
-        "github",
-        "github-installation",
-        "github-pull-request"
-      ]
+      "subjects": ["github", "github-installation", "github-pull-request"]
     },
     {
       "id": "hosted-mcp",
       "root": "packages/features/hosted-mcp",
       "classification": "core",
-      "subjects": [
-        "hosted-mcp",
-        "mcp-oauth"
-      ]
+      "subjects": ["hosted-mcp", "mcp-oauth"]
     },
     {
       "id": "identity",
       "root": "packages/features/identity",
       "classification": "core",
-      "subjects": [
-        "identity"
-      ]
+      "subjects": ["identity"]
     },
     {
       "id": "langy",
       "root": "packages/features/langy",
       "classification": "core",
-      "subjects": [
-        "conversation",
-        "credential",
-        "langy",
-        "message",
-        "relay",
-        "turn"
-      ]
+      "subjects": ["conversation", "credential", "langy", "message", "relay", "turn"]
     },
     {
       "id": "log",
       "root": "packages/features/log",
       "classification": "core",
-      "subjects": [
-        "log",
-        "log-ingestion"
-      ]
+      "subjects": ["log", "log-ingestion"]
     },
     {
       "id": "metric",
       "root": "packages/features/metric",
       "classification": "core",
-      "subjects": [
-        "metric",
-        "metric-ingestion"
-      ]
+      "subjects": ["metric", "metric-ingestion"]
     },
     {
       "id": "model-provider",
       "root": "packages/features/model-provider",
       "classification": "core",
-      "subjects": [
-        "model-provider"
-      ]
+      "subjects": ["model-provider"]
     },
     {
       "id": "monitor",
       "root": "packages/features/monitor",
       "classification": "core",
-      "subjects": [
-        "monitor"
-      ]
+      "subjects": ["monitor"]
     },
     {
       "id": "navigation",
       "root": "packages/features/navigation",
       "classification": "core",
-      "subjects": [
-        "navigation"
-      ]
+      "subjects": ["navigation"]
     },
     {
       "id": "notification",
       "root": "packages/features/notification",
       "classification": "core",
-      "subjects": [
-        "notification"
-      ]
+      "subjects": ["notification"]
     },
     {
       "id": "onboarding",
       "root": "packages/features/onboarding",
       "classification": "core",
-      "subjects": [
-        "onboarding"
-      ]
+      "subjects": ["onboarding"]
     },
     {
       "id": "ops",
       "root": "packages/features/ops",
       "classification": "core",
-      "subjects": [
-        "admin",
-        "impersonation",
-        "ops"
-      ]
+      "subjects": ["admin", "impersonation", "ops"]
     },
     {
       "id": "organization",
@@ -285,128 +205,91 @@
       "id": "presence",
       "root": "packages/features/presence",
       "classification": "core",
-      "subjects": [
-        "presence"
-      ]
+      "subjects": ["presence"]
     },
     {
       "id": "project",
       "root": "packages/features/project",
       "classification": "core",
-      "subjects": [
-        "project"
-      ]
+      "subjects": ["project"]
     },
     {
       "id": "prompt",
       "root": "packages/features/prompt",
       "classification": "core",
-      "subjects": [
-        "prompt",
-        "prompt-tag",
-        "prompt-version"
-      ]
+      "subjects": ["prompt", "prompt-tag", "prompt-version"]
     },
     {
       "id": "role",
       "root": "packages/features/role",
       "classification": "core",
-      "subjects": [
-        "custom-role",
-        "role"
-      ]
+      "subjects": ["custom-role", "role"]
     },
     {
       "id": "scenario",
       "root": "packages/features/scenario",
       "classification": "core",
-      "subjects": [
-        "scenario",
-        "simulation"
-      ]
+      "subjects": ["scenario", "simulation"]
     },
     {
       "id": "secret",
       "root": "packages/features/secret",
       "classification": "core",
-      "subjects": [
-        "secret"
-      ]
+      "subjects": ["secret"]
     },
     {
       "id": "share",
       "root": "packages/features/share",
       "classification": "core",
-      "subjects": [
-        "share"
-      ]
+      "subjects": ["share"]
     },
     {
       "id": "stored-object",
       "root": "packages/features/stored-object",
       "classification": "core",
-      "subjects": [
-        "stored-object"
-      ]
+      "subjects": ["stored-object"]
     },
     {
       "id": "suite",
       "root": "packages/features/suite",
       "classification": "core",
-      "subjects": [
-        "suite"
-      ]
+      "subjects": ["suite"]
     },
     {
       "id": "topic",
       "root": "packages/features/topic",
       "classification": "core",
-      "subjects": [
-        "topic",
-        "topic-clustering"
-      ]
+      "subjects": ["topic", "topic-clustering"]
     },
     {
       "id": "trace",
       "root": "packages/features/trace",
       "classification": "core",
-      "subjects": [
-        "trace",
-        "trace-ingestion"
-      ]
+      "subjects": ["trace", "trace-ingestion"]
     },
     {
       "id": "user",
       "root": "packages/features/user",
       "classification": "core",
-      "subjects": [
-        "user",
-        "user-avatar"
-      ]
+      "subjects": ["user", "user-avatar"]
     },
     {
       "id": "workflow",
       "root": "packages/features/workflow",
       "classification": "core",
-      "subjects": [
-        "workflow"
-      ]
+      "subjects": ["workflow"]
     },
     {
       "id": "audit-log",
       "root": "packages/enterprise/features/audit-log",
       "classification": "enterprise",
-      "subjects": [
-        "audit-log"
-      ]
+      "subjects": ["audit-log"]
     },
     {
       "id": "billing",
       "root": "packages/enterprise/features/billing",
       "classification": "enterprise",
-      "subjects": [
-        "billing"
-      ]
+      "subjects": ["billing"]
     },
     {
       "id": "governance",
@@ -441,51 +324,37 @@
       "id": "licensing",
       "root": "packages/enterprise/features/licensing",
       "classification": "enterprise",
-      "subjects": [
-        "license",
-        "licensing"
-      ]
+      "subjects": ["license", "licensing"]
     },
     {
       "id": "managed-provider",
       "root": "packages/enterprise/features/managed-provider",
       "classification": "enterprise",
-      "subjects": [
-        "managed-model-provider",
-        "managed-provider"
-      ]
+      "subjects": ["managed-model-provider", "managed-provider"]
     },
     {
       "id": "saas",
       "root": "packages/enterprise/features/saas",
       "classification": "enterprise",
-      "subjects": [
-        "saas"
-      ]
+      "subjects": ["saas"]
     },
     {
       "id": "scim",
       "root": "packages/enterprise/features/scim",
       "classification": "enterprise",
-      "subjects": [
-        "scim"
-      ]
+      "subjects": ["scim"]
     },
     {
       "id": "sso",
       "root": "packages/enterprise/features/sso",
       "classification": "enterprise",
-      "subjects": [
-        "sso"
-      ]
+      "subjects": ["sso"]
     },
     {
       "id": "webhook",
       "root": "packages/enterprise/features/webhook",
       "classification": "enterprise",
-      "subjects": [
-        "webhook"
-      ]
+      "subjects": ["webhook"]
     }
   ]
 }

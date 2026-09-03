@@ -222,12 +222,7 @@ const PeekSpanRow: React.FC<{
       borderRadius="xs"
     >
       <HStack gap={1} flexShrink={0} minWidth="180px" maxWidth="280px">
-        <Text
-          textStyle="2xs"
-          color={isError ? "red.fg" : color}
-          lineHeight={1}
-          flexShrink={0}
-        >
+        <Text textStyle="2xs" color={isError ? "red.fg" : color} lineHeight={1} flexShrink={0}>
           {icon}
         </Text>
         <Text textStyle="2xs" color={isError ? "red.fg" : "fg"} truncate>
@@ -253,13 +248,7 @@ const PeekSpanRow: React.FC<{
         />
       </Box>
 
-      <Text
-        textStyle="2xs"
-        color="fg.muted"
-        flexShrink={0}
-        width="52px"
-        textAlign="right"
-      >
+      <Text textStyle="2xs" color="fg.muted" flexShrink={0} width="52px" textAlign="right">
         {span.durationMs === 0 ? "<1ms" : formatDuration(span.durationMs)}
       </Text>
     </Flex>
@@ -291,11 +280,7 @@ const PeekEvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
         </Text>
       )}
       {eval_.passed != null && eval_.score == null && (
-        <Text
-          textStyle="2xs"
-          fontWeight="semibold"
-          color={eval_.passed ? "green.fg" : "red.fg"}
-        >
+        <Text textStyle="2xs" fontWeight="semibold" color={eval_.passed ? "green.fg" : "red.fg"}>
           {eval_.passed ? "Pass" : "Fail"}
         </Text>
       )}

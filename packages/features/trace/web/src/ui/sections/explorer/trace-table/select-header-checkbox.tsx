@@ -11,9 +11,7 @@ interface SelectHeaderCheckboxProps {
   traceIds: string[];
 }
 
-export const SelectHeaderCheckbox: React.FC<SelectHeaderCheckboxProps> = ({
-  traceIds,
-}) => {
+export const SelectHeaderCheckbox: React.FC<SelectHeaderCheckboxProps> = ({ traceIds }) => {
   const traceIdSet = useSelectionStore((s) => s.traceIds);
   const mode = useSelectionStore((s) => s.mode);
   const setMany = useSelectionStore((s) => s.setMany);

@@ -25,11 +25,11 @@
  * file once.
  */
 @font-face {
-	font-family: "Sentient";
-	src: url("/fonts/Sentient-Regular.woff2") format("woff2");
-	font-weight: 400;
-	font-style: normal;
-	font-display: swap;
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
 /*
@@ -47,36 +47,26 @@
  */
 
 :root {
-	/* The one gradient word: blue into warm orange, the site's
+  /* The one gradient word: blue into warm orange, the site's
 	   `.text-gradient`. Not a colour token - Chakra's `colors` namespace holds
 	   colours, and this is a paint. */
-	--lw-front-door-accent-gradient: linear-gradient(
-		100deg,
-		#2563eb 0%,
-		#d9531e 100%
-	);
-	/* The card's shadow: three stacked layers, which `shadows` could hold but
+  --lw-front-door-accent-gradient: linear-gradient(100deg, #2563eb 0%, #d9531e 100%);
+  /* The card's shadow: three stacked layers, which `shadows` could hold but
 	   only by splitting one effect across two token systems. It stays here,
 	   beside the glass it belongs to. */
-	--lw-front-door-card-shadow:
-		inset 0 1px 1px rgba(255, 255, 255, 0.9),
-		inset 0 0 0 0.5px rgba(255, 255, 255, 0.5),
-		0 24px 48px -20px rgba(20, 20, 23, 0.28);
+  --lw-front-door-card-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.9), inset 0 0 0 0.5px rgba(255, 255, 255, 0.5),
+    0 24px 48px -20px rgba(20, 20, 23, 0.28);
 }
 
 .dark {
-	/* The site's `.text-gradient-dark`: the same pair, lifted to read on ink. */
-	--lw-front-door-accent-gradient: linear-gradient(
-		100deg,
-		#5fa3ff 0%,
-		#ffa24d 100%
-	);
-	/* Dark glass is smoked, not clear, so the type always has a dark floor
+  /* The site's `.text-gradient-dark`: the same pair, lifted to read on ink. */
+  --lw-front-door-accent-gradient: linear-gradient(100deg, #5fa3ff 0%, #ffa24d 100%);
+  /* Dark glass is smoked, not clear, so the type always has a dark floor
 	   under it - a clear film over a bright warp left the words fighting the
 	   light behind them. */
-	--lw-front-door-card-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.06),
-		0 24px 60px -24px rgba(0, 0, 0, 0.65);
+  --lw-front-door-card-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 60px -24px rgba(0, 0, 0, 0.65);
 }
 
 /*
@@ -99,43 +89,35 @@
  * because a refusal gains nothing from being more saturated.
  */
 @media (color-gamut: p3) {
-	:root {
-		--chakra-colors-front-door-action: color(display-p3 0.706 0.325 0.055);
-		--chakra-colors-front-door-action-hover: color(display-p3 0.62 0.247 0.02);
-		--chakra-colors-front-door-ink: color(display-p3 0.62 0.247 0.02);
-		--chakra-colors-front-door-detail: color(display-p3 0.91 0.427 0.114);
-		--chakra-colors-front-door-tint: color(display-p3 0.98 0.925 0.882);
-		--chakra-colors-front-door-focus-ring: color(
-			display-p3 0.91 0.427 0.114 / 0.22
-		);
-		--chakra-colors-front-door-glow: color(display-p3 0.91 0.427 0.114 / 0.28);
-		--lw-front-door-accent-gradient: linear-gradient(
-			100deg,
-			color(display-p3 0.161 0.373 0.898) 0%,
-			color(display-p3 0.831 0.337 0.133) 100%
-		);
-	}
+  :root {
+    --chakra-colors-front-door-action: color(display-p3 0.706 0.325 0.055);
+    --chakra-colors-front-door-action-hover: color(display-p3 0.62 0.247 0.02);
+    --chakra-colors-front-door-ink: color(display-p3 0.62 0.247 0.02);
+    --chakra-colors-front-door-detail: color(display-p3 0.91 0.427 0.114);
+    --chakra-colors-front-door-tint: color(display-p3 0.98 0.925 0.882);
+    --chakra-colors-front-door-focus-ring: color(display-p3 0.91 0.427 0.114 / 0.22);
+    --chakra-colors-front-door-glow: color(display-p3 0.91 0.427 0.114 / 0.28);
+    --lw-front-door-accent-gradient: linear-gradient(
+      100deg,
+      color(display-p3 0.161 0.373 0.898) 0%,
+      color(display-p3 0.831 0.337 0.133) 100%
+    );
+  }
 
-	.dark {
-		--chakra-colors-front-door-action: color(
-			display-p3 0.91 0.427 0.114 / 0.92
-		);
-		--chakra-colors-front-door-action-hover: color(display-p3 0.98 0.549 0.259);
-		--chakra-colors-front-door-ink: color(display-p3 0.98 0.549 0.259);
-		--chakra-colors-front-door-detail: color(
-			display-p3 0.98 0.549 0.259 / 0.75
-		);
-		--chakra-colors-front-door-tint: color(display-p3 0.91 0.427 0.114 / 0.18);
-		--chakra-colors-front-door-focus-ring: color(
-			display-p3 0.98 0.549 0.259 / 0.22
-		);
-		--chakra-colors-front-door-glow: color(display-p3 0.98 0.549 0.259 / 0.22);
-		--lw-front-door-accent-gradient: linear-gradient(
-			100deg,
-			color(display-p3 0.408 0.639 1) 0%,
-			color(display-p3 1 0.639 0.318) 100%
-		);
-	}
+  .dark {
+    --chakra-colors-front-door-action: color(display-p3 0.91 0.427 0.114 / 0.92);
+    --chakra-colors-front-door-action-hover: color(display-p3 0.98 0.549 0.259);
+    --chakra-colors-front-door-ink: color(display-p3 0.98 0.549 0.259);
+    --chakra-colors-front-door-detail: color(display-p3 0.98 0.549 0.259 / 0.75);
+    --chakra-colors-front-door-tint: color(display-p3 0.91 0.427 0.114 / 0.18);
+    --chakra-colors-front-door-focus-ring: color(display-p3 0.98 0.549 0.259 / 0.22);
+    --chakra-colors-front-door-glow: color(display-p3 0.98 0.549 0.259 / 0.22);
+    --lw-front-door-accent-gradient: linear-gradient(
+      100deg,
+      color(display-p3 0.408 0.639 1) 0%,
+      color(display-p3 1 0.639 0.318) 100%
+    );
+  }
 }
 
 /*
@@ -146,36 +128,26 @@
  * high and warm low, anchored to the card's side of the page.
  */
 .lw-front-door-ambient {
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
-	overflow: hidden;
-	z-index: 0;
-	contain: layout paint;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+  contain: layout paint;
 }
 
 .lw-front-door-ambient-static {
-	position: absolute;
-	inset: 0;
-	background: linear-gradient(
-		135deg,
-		#ffffff 0%,
-		#ffaf6e 35%,
-		#cddcf9 72%,
-		#ffffff 100%
-	);
-	opacity: 0.72;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #ffffff 0%, #ffaf6e 35%, #cddcf9 72%, #ffffff 100%);
+  opacity: 0.72;
 }
 
 .dark .lw-front-door-ambient-static {
-	background:
-		radial-gradient(circle at 70% 22%, rgba(91, 141, 239, 0.4), transparent 38%),
-		radial-gradient(
-			circle at 86% 66%,
-			rgba(201, 123, 58, 0.26),
-			transparent 46%
-		);
-	opacity: 1;
+  background:
+    radial-gradient(circle at 70% 22%, rgba(91, 141, 239, 0.4), transparent 38%),
+    radial-gradient(circle at 86% 66%, rgba(201, 123, 58, 0.26), transparent 46%);
+  opacity: 1;
 }
 
 /* The live shader arrives, it never pops: the static gradient in the same
@@ -189,17 +161,17 @@
    then stops, and the pattern also silently fails wherever the override loses
    a specificity fight. Opting IN means the animation never exists for them. */
 @media (prefers-reduced-motion: no-preference) {
-	.lw-front-door-shader-arrive {
-		animation: lw-front-door-arrive 700ms ease 120ms both;
-	}
+  .lw-front-door-shader-arrive {
+    animation: lw-front-door-arrive 700ms ease 120ms both;
+  }
 }
 
 /* Only a `from`: each layer fades up to its own resting opacity — the warp
    to its 0.55, the mesh to its 0.95 — not to a hardcoded 1. */
 @keyframes lw-front-door-arrive {
-	from {
-		opacity: 0;
-	}
+  from {
+    opacity: 0;
+  }
 }
 
 /* The live dark shader sits in the site's own frame: anchored to the card's
@@ -222,31 +194,31 @@
  * anything and for a machine that never runs the component at all.
  */
 .lw-front-door-warp {
-	position: absolute;
-	top: -12%;
-	right: -12%;
-	width: calc(84% * var(--lw-ground-reach, 1));
-	height: 124%;
-	opacity: 0.55;
-	-webkit-mask-image: linear-gradient(
-		to left,
-		black 0%,
-		black var(--lw-ground-hold, 30%),
-		rgba(0, 0, 0, 0.45) 62%,
-		rgba(0, 0, 0, 0.12) 86%,
-		transparent 100%
-	);
-	mask-image: linear-gradient(
-		to left,
-		black 0%,
-		black var(--lw-ground-hold, 30%),
-		rgba(0, 0, 0, 0.45) 62%,
-		rgba(0, 0, 0, 0.12) 86%,
-		transparent 100%
-	);
-	transition:
-		width 900ms ease,
-		mask-image 900ms ease;
+  position: absolute;
+  top: -12%;
+  right: -12%;
+  width: calc(84% * var(--lw-ground-reach, 1));
+  height: 124%;
+  opacity: 0.55;
+  -webkit-mask-image: linear-gradient(
+    to left,
+    black 0%,
+    black var(--lw-ground-hold, 30%),
+    rgba(0, 0, 0, 0.45) 62%,
+    rgba(0, 0, 0, 0.12) 86%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to left,
+    black 0%,
+    black var(--lw-ground-hold, 30%),
+    rgba(0, 0, 0, 0.45) 62%,
+    rgba(0, 0, 0, 0.12) 86%,
+    transparent 100%
+  );
+  transition:
+    width 900ms ease,
+    mask-image 900ms ease;
 }
 
 /* Where the card stands alone, the glow stands behind it instead of off to
@@ -256,54 +228,46 @@
    nothing at 100% for the same reason the side one does — an edge at 85% is
    an edge. */
 .lw-front-door-warp--center {
-	top: -12%;
-	right: auto;
-	left: 50%;
-	transform: translateX(-50%);
-	width: calc(130% * var(--lw-ground-reach, 1));
-	-webkit-mask-image: radial-gradient(
-		ellipse 62% 70% at 50% 42%,
-		black 0%,
-		black var(--lw-ground-hold, 30%),
-		rgba(0, 0, 0, 0.55) 62%,
-		rgba(0, 0, 0, 0.16) 84%,
-		transparent 100%
-	);
-	mask-image: radial-gradient(
-		ellipse 62% 70% at 50% 42%,
-		black 0%,
-		black var(--lw-ground-hold, 30%),
-		rgba(0, 0, 0, 0.55) 62%,
-		rgba(0, 0, 0, 0.16) 84%,
-		transparent 100%
-	);
+  top: -12%;
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(130% * var(--lw-ground-reach, 1));
+  -webkit-mask-image: radial-gradient(
+    ellipse 62% 70% at 50% 42%,
+    black 0%,
+    black var(--lw-ground-hold, 30%),
+    rgba(0, 0, 0, 0.55) 62%,
+    rgba(0, 0, 0, 0.16) 84%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 62% 70% at 50% 42%,
+    black 0%,
+    black var(--lw-ground-hold, 30%),
+    rgba(0, 0, 0, 0.55) 62%,
+    rgba(0, 0, 0, 0.16) 84%,
+    transparent 100%
+  );
 }
 
 .dark .lw-front-door-ambient--center .lw-front-door-ambient-static {
-	background:
-		radial-gradient(
-			circle at 50% 30%,
-			rgba(91, 141, 239, 0.35),
-			transparent 42%
-		),
-		radial-gradient(
-			circle at 58% 72%,
-			rgba(201, 123, 58, 0.22),
-			transparent 48%
-		);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(91, 141, 239, 0.35), transparent 42%),
+    radial-gradient(circle at 58% 72%, rgba(201, 123, 58, 0.22), transparent 48%);
 }
 
 /* The white radial that keeps one region clean for reading. On its own layer
    so it sits over the live shader and the static band alike. */
 .lw-front-door-ambient-protect {
-	position: absolute;
-	inset: 0;
+  position: absolute;
+  inset: 0;
 }
 
 .dark .lw-front-door-ambient-protect {
-	/* A white veil is a light-mode instrument. The dark ground keeps its
+  /* A white veil is a light-mode instrument. The dark ground keeps its
 	   reading side clean by fading the glow out instead. */
-	display: none;
+  display: none;
 }
 
 /*
@@ -318,7 +282,7 @@
  * centred door has no panel, never gets the modifier, and keeps its wordmark.
  */
 .lw-front-door--split [data-auth-card-logo] {
-	display: none;
+  display: none;
 }
 
 /*
@@ -327,20 +291,20 @@
  * a void. Light mode has the mesh for a ground and shows nothing here.
  */
 .lw-front-door-signal-grid {
-	display: none;
+  display: none;
 }
 
 .dark .lw-front-door-signal-grid {
-	display: block;
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
-	background-image:
-		linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-	background-size: 72px 72px;
-	-webkit-mask-image: linear-gradient(to right, black, transparent 82%);
-	mask-image: linear-gradient(to right, black, transparent 82%);
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  -webkit-mask-image: linear-gradient(to right, black, transparent 82%);
+  mask-image: linear-gradient(to right, black, transparent 82%);
 }
 
 /*
@@ -354,32 +318,32 @@
  * only, like the grid it focuses.
  */
 .lw-front-door-lens {
-	display: none;
+  display: none;
 }
 
 .dark .lw-front-door-lens {
-	display: block;
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
-	opacity: 0;
-	transition: opacity 480ms ease;
-	background-image:
-		linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-	background-size: 72px 72px;
-	-webkit-mask-image: radial-gradient(
-		circle 200px at var(--lw-lens-x, -400px) var(--lw-lens-y, -400px),
-		black 0%,
-		rgba(0, 0, 0, 0.5) 55%,
-		transparent 100%
-	);
-	mask-image: radial-gradient(
-		circle 200px at var(--lw-lens-x, -400px) var(--lw-lens-y, -400px),
-		black 0%,
-		rgba(0, 0, 0, 0.5) 55%,
-		transparent 100%
-	);
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 480ms ease;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 72px 72px;
+  -webkit-mask-image: radial-gradient(
+    circle 200px at var(--lw-lens-x, -400px) var(--lw-lens-y, -400px),
+    black 0%,
+    rgba(0, 0, 0, 0.5) 55%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    circle 200px at var(--lw-lens-x, -400px) var(--lw-lens-y, -400px),
+    black 0%,
+    rgba(0, 0, 0, 0.5) 55%,
+    transparent 100%
+  );
 }
 /* The press: the button gives a little, springs back, and gives off a
    little of the brand's warmth — the activation a click deserves.
@@ -393,19 +357,15 @@
    pill lifts a pixel and deepens its glow, which reads on both grounds.
    No blur: the fill is effectively solid, so the blur was only cost. */
 .lw-front-door-primary {
-	background-image: linear-gradient(
-		180deg,
-		rgba(255, 255, 255, 0.14),
-		rgba(255, 255, 255, 0) 55%
-	);
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.2),
-		0 1px 2px rgba(12, 8, 5, 0.1),
-		0 10px 26px -14px var(--chakra-colors-front-door-glow);
-	transition:
-		transform 140ms ease,
-		box-shadow 260ms ease,
-		background-color 200ms ease;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 55%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 1px 2px rgba(12, 8, 5, 0.1),
+    0 10px 26px -14px var(--chakra-colors-front-door-glow);
+  transition:
+    transform 140ms ease,
+    box-shadow 260ms ease,
+    background-color 200ms ease;
 }
 
 /* The alert is glass too, for the same reason the pill is: it sits ON the
@@ -416,47 +376,47 @@
    smaller than the card's: it is a nearer layer, and the ground should move
    through it less. */
 .lw-front-door-alert {
-	/* A literal red rather than a mix of the theme's: every other colour in
+  /* A literal red rather than a mix of the theme's: every other colour in
 	   this file is a literal too, because these screens must not depend on
 	   another stylesheet's tokens having loaded. The `!important` is what
 	   takes the pane back from the component's own opaque background — the
 	   only thing being overridden. */
-	background-color: rgba(220, 62, 62, 0.1) !important;
-	background-image: linear-gradient(
-		180deg,
-		rgba(255, 255, 255, 0.14),
-		rgba(255, 255, 255, 0.03) 60%,
-		rgba(255, 255, 255, 0) 100%
-	);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-	-webkit-backdrop-filter: blur(10px) saturate(1.25);
-	backdrop-filter: blur(10px) saturate(1.25);
+  background-color: rgba(220, 62, 62, 0.1) !important;
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.03) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  -webkit-backdrop-filter: blur(10px) saturate(1.25);
+  backdrop-filter: blur(10px) saturate(1.25);
 }
 
 .lw-front-door-primary:hover {
-	transform: translateY(-1px);
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.24),
-		0 2px 4px rgba(12, 8, 5, 0.12),
-		0 8px 26px -8px var(--chakra-colors-front-door-glow);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 2px 4px rgba(12, 8, 5, 0.12),
+    0 8px 26px -8px var(--chakra-colors-front-door-glow);
 }
 
 .lw-front-door-primary:active {
-	transform: translateY(0.5px);
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.2),
-		0 1px 2px rgba(12, 8, 5, 0.12),
-		0 5px 18px -6px var(--chakra-colors-front-door-glow);
+  transform: translateY(0.5px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 1px 2px rgba(12, 8, 5, 0.12),
+    0 5px 18px -6px var(--chakra-colors-front-door-glow);
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.lw-front-door-primary {
-		transition: none;
-	}
-	.lw-front-door-primary:hover,
-	.lw-front-door-primary:active {
-		transform: none;
-	}
+  .lw-front-door-primary {
+    transition: none;
+  }
+  .lw-front-door-primary:hover,
+  .lw-front-door-primary:active {
+    transform: none;
+  }
 }
 
 /* The card: glass over the ground. The blur is what makes it glass — the
@@ -465,33 +425,33 @@
    a slow breath of the brand's light, so clicking into a field feels like
    the surface noticed. */
 .lw-front-door-card {
-	background: var(--chakra-colors-front-door-card-bg) !important;
-	border-color: var(--chakra-colors-front-door-card-border) !important;
-	box-shadow: var(--lw-front-door-card-shadow);
-	/* Recalibrated from 18px / 1.9 / brightness(1.04). That mix let the
+  background: var(--chakra-colors-front-door-card-bg) !important;
+  border-color: var(--chakra-colors-front-door-card-border) !important;
+  box-shadow: var(--lw-front-door-card-shadow);
+  /* Recalibrated from 18px / 1.9 / brightness(1.04). That mix let the
 	   ground's blue bloom come through so hot that the card's top half read
 	   as a different surface than its bottom — a band, not glass. More blur
 	   softens the ground's internal edges as they cross the card, the tamer
 	   saturation stops amplifying them, and the deeper card floor (see
 	   `cardBg` in frontDoorTheme.ts) evens the whole pane so the ground
 	   reads as light behind the glass rather than shapes stuck to it. */
-	-webkit-backdrop-filter: blur(26px) saturate(1.35);
-	backdrop-filter: blur(26px) saturate(1.35);
-	transition:
-		box-shadow 420ms ease,
-		border-color 420ms ease;
+  -webkit-backdrop-filter: blur(26px) saturate(1.35);
+  backdrop-filter: blur(26px) saturate(1.35);
+  transition:
+    box-shadow 420ms ease,
+    border-color 420ms ease;
 }
 
 .lw-front-door-card:focus-within {
-	box-shadow:
-		var(--lw-front-door-card-shadow),
-		0 0 56px -14px var(--chakra-colors-front-door-glow);
+  box-shadow:
+    var(--lw-front-door-card-shadow),
+    0 0 56px -14px var(--chakra-colors-front-door-glow);
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.lw-front-door-card {
-		transition: none;
-	}
+  .lw-front-door-card {
+    transition: none;
+  }
 }
 
 /*
@@ -502,62 +462,62 @@
  * less motion, get the ordinary instant swap.
  */
 @media (prefers-reduced-motion: no-preference) {
-	[data-auth-card] {
-		view-transition-name: lw-auth-card;
-	}
-	.lw-front-door-panel {
-		view-transition-name: lw-front-door-panel;
-	}
+  [data-auth-card] {
+    view-transition-name: lw-auth-card;
+  }
+  .lw-front-door-panel {
+    view-transition-name: lw-front-door-panel;
+  }
 }
 
 ::view-transition-group(lw-auth-card),
 ::view-transition-group(lw-front-door-panel) {
-	animation-duration: 460ms;
-	animation-timing-function: cubic-bezier(0.22, 0.8, 0.2, 1);
+  animation-duration: 460ms;
+  animation-timing-function: cubic-bezier(0.22, 0.8, 0.2, 1);
 }
 
 /* The hairline either side of the word "or". */
 .lw-front-door-hairline {
-	flex: 1;
-	height: 1px;
-	background: var(--chakra-colors-front-door-hairline);
+  flex: 1;
+  height: 1px;
+  background: var(--chakra-colors-front-door-hairline);
 }
 
 /* "Last used" floats on the shoulder of the method it belongs to. */
 .lw-front-door-badge-float {
-	position: absolute;
-	top: -9px;
-	right: 12px;
-	z-index: 1;
+  position: absolute;
+  top: -9px;
+  right: 12px;
+  z-index: 1;
 }
 
 /* One ring, once, where something just worked. */
 .lw-front-door-pulse {
-	position: relative;
-	display: inline-flex;
-	width: 8px;
-	height: 8px;
-	border-radius: 9999px;
-	background: var(--chakra-colors-front-door-detail);
+  position: relative;
+  display: inline-flex;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--chakra-colors-front-door-detail);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.lw-front-door-pulse::after {
-		content: "";
-		position: absolute;
-		inset: 0;
-		border-radius: 9999px;
-		animation: lw-front-door-boom 0.7s ease-out 1;
-	}
+  .lw-front-door-pulse::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    animation: lw-front-door-boom 0.7s ease-out 1;
+  }
 }
 
 @keyframes lw-front-door-boom {
-	from {
-		box-shadow: 0 0 0 0 rgba(245, 107, 26, 0.35);
-	}
-	to {
-		box-shadow: 0 0 0 14px rgba(245, 107, 26, 0);
-	}
+  from {
+    box-shadow: 0 0 0 0 rgba(245, 107, 26, 0.35);
+  }
+  to {
+    box-shadow: 0 0 0 14px rgba(245, 107, 26, 0);
+  }
 }
 
 /*
@@ -571,46 +531,46 @@
  * pixels of translate, and gates nothing.
  */
 @media (prefers-reduced-motion: no-preference) {
-	.lw-front-door-enter [data-auth-card] {
-		animation: lw-front-door-settle 360ms ease-out both;
-	}
+  .lw-front-door-enter [data-auth-card] {
+    animation: lw-front-door-settle 360ms ease-out both;
+  }
 
-	.lw-front-door-enter [data-auth-card-body] > * {
-		animation: lw-front-door-rise 240ms ease-out both;
-	}
+  .lw-front-door-enter [data-auth-card-body] > * {
+    animation: lw-front-door-rise 240ms ease-out both;
+  }
 
-	.lw-front-door-enter [data-auth-card-body] > *:nth-child(1) {
-		animation-delay: 120ms;
-	}
-	.lw-front-door-enter [data-auth-card-body] > *:nth-child(2) {
-		animation-delay: 170ms;
-	}
-	.lw-front-door-enter [data-auth-card-body] > *:nth-child(3) {
-		animation-delay: 220ms;
-	}
-	.lw-front-door-enter [data-auth-card-body] > *:nth-child(n + 4) {
-		animation-delay: 270ms;
-	}
+  .lw-front-door-enter [data-auth-card-body] > *:nth-child(1) {
+    animation-delay: 120ms;
+  }
+  .lw-front-door-enter [data-auth-card-body] > *:nth-child(2) {
+    animation-delay: 170ms;
+  }
+  .lw-front-door-enter [data-auth-card-body] > *:nth-child(3) {
+    animation-delay: 220ms;
+  }
+  .lw-front-door-enter [data-auth-card-body] > *:nth-child(n + 4) {
+    animation-delay: 270ms;
+  }
 }
 
 @keyframes lw-front-door-settle {
-	from {
-		opacity: 0;
-		transform: translate3d(0, 6px, 0);
-	}
-	to {
-		opacity: 1;
-		transform: translate3d(0, 0, 0);
-	}
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 @keyframes lw-front-door-rise {
-	from {
-		opacity: 0;
-		transform: translate3d(0, 8px, 0);
-	}
-	to {
-		opacity: 1;
-		transform: translate3d(0, 0, 0);
-	}
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }

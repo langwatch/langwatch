@@ -258,10 +258,7 @@ export function scaffoldEnvFile(
  * secrets, model keys, toggles, comments — is preserved byte for byte.
  * Returns the keys it rewrote.
  */
-export function reconcileEnvFile(input: {
-  ports: PortAllocation;
-  path: string;
-}): string[] {
+export function reconcileEnvFile(input: { ports: PortAllocation; path: string }): string[] {
   if (!existsSync(input.path)) return [];
   const entries = portBoundEnv(input.ports);
   const lines = readFileSync(input.path, "utf8").split("\n");
@@ -333,9 +330,7 @@ const PASSTHROUGH_ENV_KEYS = [
  * Snapshot the user's process.env for the keys we propagate to children.
  * Empty values are dropped so they don't override .env defaults.
  */
-export function captureUserEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): Record<string, string> {
+export function captureUserEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const out: Record<string, string> = {};
   for (const key of PASSTHROUGH_ENV_KEYS) {
     const value = env[key];

@@ -56,10 +56,7 @@ function deriveStoredObjectId({
  * and SHA-256 content hash. Injected into `StoredObjectsService` so tests can
  * supply a per-call stub without module-level mocking.
  */
-export type MintStorageUri = (args: {
-  projectId: string;
-  sha256: string;
-}) => Promise<string>;
+export type MintStorageUri = (args: { projectId: string; sha256: string }) => Promise<string>;
 
 type RegistryResolver =
   | StoredObjectStorageRegistry
@@ -307,9 +304,7 @@ export class StoredObjectsService {
     projectId: string;
     id: string;
   }): Promise<
-    | { row: StoredObject; stream: Readable }
-    | { row: StoredObject; status: "missing" }
-    | null
+    { row: StoredObject; stream: Readable } | { row: StoredObject; status: "missing" } | null
   > {
     return tracer.withActiveSpan(
       "StoredObjectsService.getById",

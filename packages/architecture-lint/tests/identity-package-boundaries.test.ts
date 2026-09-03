@@ -17,14 +17,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 // the one that composed identity when this guard was written, and it is gone.
 const APP_SRC = join(REPO_ROOT, "apps", "api", "src");
 const IDENTITY_SRC = join(REPO_ROOT, "packages", "features", "identity", "contract", "src");
-const IDENTITY_SERVER_SRC = join(
-  REPO_ROOT,
-  "packages",
-  "features",
-  "identity",
-  "server",
-  "src",
-);
+const IDENTITY_SERVER_SRC = join(REPO_ROOT, "packages", "features", "identity", "server", "src");
 
 function sourceFiles(root: string): string[] {
   const files: string[] = [];
@@ -44,11 +37,9 @@ function sourceFiles(root: string): string[] {
 
 function importSpecifiers(file: string): string[] {
   const source = readFileSync(file, "utf8");
-  return [
-    ...source.matchAll(
-      /^\s*(?:import|export)\s[^;]*?from\s+["']([^"']+)["']/gm,
-    ),
-  ].map((match) => match[1] as string);
+  return [...source.matchAll(/^\s*(?:import|export)\s[^;]*?from\s+["']([^"']+)["']/gm)].map(
+    (match) => match[1] as string,
+  );
 }
 
 /**
@@ -70,10 +61,7 @@ const FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE = [
 /** …plus the framework, for the pure core, which must stay isomorphic. */
 const FORBIDDEN_FRAMEWORK = [/event-sourcing/, /^@langwatch\/eventing(?:\/|$)/];
 
-const FORBIDDEN_FOR_CONTRACT = [
-  ...FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE,
-  ...FORBIDDEN_FRAMEWORK,
-];
+const FORBIDDEN_FOR_CONTRACT = [...FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE, ...FORBIDDEN_FRAMEWORK];
 
 describe("identity package boundaries", () => {
   describe("when the pure core's sources are scanned", () => {
@@ -85,8 +73,7 @@ describe("identity package boundaries", () => {
           const forbidden =
             specifier.startsWith("node:") ||
             FORBIDDEN_FOR_CONTRACT.some((pattern) => pattern.test(specifier));
-          if (forbidden)
-            offenders.push(`${relative(REPO_ROOT, file)} -> ${specifier}`);
+          if (forbidden) offenders.push(`${relative(REPO_ROOT, file)} -> ${specifier}`);
         }
       }
       expect(offenders).toEqual([]);
@@ -109,11 +96,7 @@ describe("identity package boundaries", () => {
       const offenders: string[] = [];
       for (const file of sourceFiles(IDENTITY_SERVER_SRC)) {
         for (const specifier of importSpecifiers(file)) {
-          if (
-            FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE.some((pattern) =>
-              pattern.test(specifier),
-            )
-          ) {
+          if (FORBIDDEN_FOR_EVERY_IDENTITY_PACKAGE.some((pattern) => pattern.test(specifier))) {
             offenders.push(`${relative(REPO_ROOT, file)} -> ${specifier}`);
           }
         }
@@ -136,6 +119,5 @@ describe("identity package boundaries", () => {
       }
       expect(constructors).toEqual(["app/api-trpc-collaborators.identity.composition.ts"]);
     });
-
   });
 });

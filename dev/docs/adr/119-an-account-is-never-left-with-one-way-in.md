@@ -47,7 +47,7 @@ Three parts.
 writing no row at all.
 
 This looks redundant and is the fix for the silent no-op: password reset
-updates credential rows *in place*, so recovery needs a row to land on. A row
+updates credential rows _in place_, so recovery needs a row to land on. A row
 holding a null password is refused by sign-in exactly as a missing one is —
 better-auth hashes a dummy and answers "invalid email or password", so even the
 timing does not differ — and it makes the account recoverable.

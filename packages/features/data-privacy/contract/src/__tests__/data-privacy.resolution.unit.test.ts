@@ -15,9 +15,7 @@ const facts: DataPrivacyScopeFacts = {
 
 describe("resolveDataPrivacy", () => {
   it("uses platform defaults when no scope has a rule", () => {
-    expect(resolveDataPrivacy({ rows: [], facts })).toEqual(
-      PLATFORM_DEFAULT_DATA_PRIVACY,
-    );
+    expect(resolveDataPrivacy({ rows: [], facts })).toEqual(PLATFORM_DEFAULT_DATA_PRIVACY);
   });
 
   it("resolves fields from the narrowest scope and unions patterns", () => {

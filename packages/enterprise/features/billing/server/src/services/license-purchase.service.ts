@@ -56,10 +56,7 @@ export class LicensePurchaseService {
     delivery: LicensePurchaseDelivery;
     generateLicense: LicenseGenerator;
   }): LicensePurchaseService {
-    return new LicensePurchaseService(
-      options.delivery,
-      options.generateLicense,
-    );
+    return new LicensePurchaseService(options.delivery, options.generateLicense);
   }
 
   async handle({

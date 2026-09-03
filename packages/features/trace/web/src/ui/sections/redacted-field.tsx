@@ -73,11 +73,7 @@ export const RedactedInline: React.FC<{
           <Text>{explanationFor(visibleTo)}</Text>
           {canOpenSettings && (
             <Link asChild color="inherit" textDecoration="underline">
-              <NextLink
-                href="/settings/data-privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <NextLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
                 Open privacy settings
               </NextLink>
             </Link>

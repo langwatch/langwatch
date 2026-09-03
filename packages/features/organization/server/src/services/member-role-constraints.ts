@@ -80,10 +80,7 @@ export function getAutoCorrectedTeamRoleForOrganizationRole(params: {
     return TeamUserRole.VIEWER;
   }
 
-  if (
-    organizationRole === OrganizationUserRole.MEMBER &&
-    currentTeamRole === TeamUserRole.VIEWER
-  ) {
+  if (organizationRole === OrganizationUserRole.MEMBER && currentTeamRole === TeamUserRole.VIEWER) {
     return TeamUserRole.MEMBER;
   }
 

@@ -76,9 +76,7 @@ export const mapRunResultsToRows = (
     // (matching the python builder); the length check keeps the empty-string
     // case from being collapsed by nullish coalescing.
     const name =
-      evaluation.name && evaluation.name.length > 0
-        ? evaluation.name
-        : evaluation.evaluator;
+      evaluation.name && evaluation.name.length > 0 ? evaluation.name : evaluation.evaluator;
     if (index == null || !name) continue;
 
     for (const row of rowsByIndex.get(index) ?? []) {

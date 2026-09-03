@@ -1,8 +1,14 @@
 import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ResourceScope } from "@langwatch/runtime-composition";
-import { AzureBlobStoredObjectDriver, resolveAzureCredentials } from "@langwatch/stored-object-server";
-import type { StoredObjectStorageDriver, StoredObjectStorageRuntime } from "@langwatch/stored-object-server/storage";
+import {
+  AzureBlobStoredObjectDriver,
+  resolveAzureCredentials,
+} from "@langwatch/stored-object-server";
+import type {
+  StoredObjectStorageDriver,
+  StoredObjectStorageRuntime,
+} from "@langwatch/stored-object-server/storage";
 import {
   WorkerAzureStorageFactoryPort,
   WorkerProjectS3SourcePort,
@@ -158,7 +164,10 @@ export function createWorkerObjectStorage(options: {
 class WorkerProjectS3SourceAdapter extends WorkerProjectS3SourcePort {
   static create(options: {
     database: WorkerProjectStorageDatabase;
-    routes: ReadonlyMap<string, { endpoint: string; bucket: string; accessKeyId: string; secretAccessKey: string }>;
+    routes: ReadonlyMap<
+      string,
+      { endpoint: string; bucket: string; accessKeyId: string; secretAccessKey: string }
+    >;
   }): WorkerProjectS3SourceAdapter {
     return new WorkerProjectS3SourceAdapter(options.database, options.routes);
   }

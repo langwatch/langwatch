@@ -48,11 +48,8 @@ export class CodingAgentSessionListPullRequestService {
         drives.push({
           sessionId: session.sessionId,
           startedAtMs: session.startedAtMs,
-          repositoryHost: this.dependencies.github.normalizeRepositoryHost(
-            session.repositoryHost,
-          ),
-          repositoryFullName:
-            `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase(),
+          repositoryHost: this.dependencies.github.normalizeRepositoryHost(session.repositoryHost),
+          repositoryFullName: `${session.repositoryOwner}/${session.repositoryName}`.toLowerCase(),
           headBranch,
         });
       }
@@ -68,14 +65,11 @@ export class CodingAgentSessionListPullRequestService {
       { repositoryHost: string; repositoryFullName: string; headBranch: string }
     >();
     for (const drive of drives) {
-      keys.set(
-        `${drive.repositoryHost} ${drive.repositoryFullName} ${drive.headBranch}`,
-        {
-          repositoryHost: drive.repositoryHost,
-          repositoryFullName: drive.repositoryFullName,
-          headBranch: drive.headBranch,
-        },
-      );
+      keys.set(`${drive.repositoryHost} ${drive.repositoryFullName} ${drive.headBranch}`, {
+        repositoryHost: drive.repositoryHost,
+        repositoryFullName: drive.repositoryFullName,
+        headBranch: drive.headBranch,
+      });
     }
     return [...keys.values()];
   }
@@ -84,10 +78,7 @@ export class CodingAgentSessionListPullRequestService {
     drives: readonly ListBranchDrive[],
     candidates: readonly GithubPullRequest[],
   ): Map<string, Array<{ number: number; url: string; title: string }>> {
-    const found = new Map<
-      string,
-      Map<number, { number: number; url: string; title: string }>
-    >();
+    const found = new Map<string, Map<number, { number: number; url: string; title: string }>>();
     const byRepository = new Map<string, ListBranchDrive[]>();
     for (const drive of drives) {
       const key = `${drive.repositoryHost.toLowerCase()} ${drive.repositoryFullName.toLowerCase()}`;
@@ -117,8 +108,7 @@ export class CodingAgentSessionListPullRequestService {
       });
       for (const drive of bucketDrives) {
         const candidate = bucketCandidates.find(
-          (row) =>
-            row.prNumber === assignments.get(`${drive.sessionId}\0${drive.headBranch}`),
+          (row) => row.prNumber === assignments.get(`${drive.sessionId}\0${drive.headBranch}`),
         );
         if (!candidate) continue;
         const rows = found.get(drive.sessionId) ?? new Map();

@@ -7,8 +7,8 @@ keywords: agno, openinference, langwatch, python, tracing, observability
 
 <Tip>
   **Quick setup?** Instead of following these steps manually, [copy a
-  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set
-  this up for you automatically.
+  prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up
+  for you automatically.
 </Tip>
 
 LangWatch integrates with Agno through OpenInference instrumentation to capture traces from your Agno agents automatically.
@@ -29,8 +29,7 @@ uv add langwatch agno openai openinference-instrumentation-agno
 ## Usage
 
 <Info>
-  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment
-  variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
 Use the OpenInference instrumentation for Agno by passing `AgnoInstrumentor` to `langwatch.setup()`.

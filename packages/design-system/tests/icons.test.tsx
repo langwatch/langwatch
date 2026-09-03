@@ -119,9 +119,7 @@ describe("IconGlyph", () => {
     });
 
     it("renders it at the size the caller asked for", () => {
-      const { container } = renderWithDesignSystem(
-        <IconGlyph icon={<OpenAIIcon />} size="24px" />,
-      );
+      const { container } = renderWithDesignSystem(<IconGlyph icon={<OpenAIIcon />} size="24px" />);
       const [glyph] = glyphsIn(container);
 
       expect(cssFor(glyph!)).toContain("width: 24px");
@@ -142,9 +140,7 @@ describe("IconGlyph", () => {
 
   describe("given a brand-coloured mark", () => {
     it("leaves its colours alone", () => {
-      const { container } = renderWithDesignSystem(
-        <IconGlyph icon={<MicrosoftIcon />} />,
-      );
+      const { container } = renderWithDesignSystem(<IconGlyph icon={<MicrosoftIcon />} />);
       const [glyph] = glyphsIn(container);
       const css = cssFor(glyph!);
 

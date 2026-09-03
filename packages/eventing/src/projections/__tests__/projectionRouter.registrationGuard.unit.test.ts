@@ -56,9 +56,7 @@ describe("ProjectionRouter registration guard", () => {
         });
 
         expect(() => createRouter().registerFoldProjection(fold)).toThrow(
-          new RegExp(
-            `durable-over-cap.*${MAX_APPLIED_EVENT_IDS + 1}.*${MAX_APPLIED_EVENT_IDS}`,
-          ),
+          new RegExp(`durable-over-cap.*${MAX_APPLIED_EVENT_IDS + 1}.*${MAX_APPLIED_EVENT_IDS}`),
         );
       });
     });
@@ -125,9 +123,7 @@ describe("ProjectionRouter registration guard", () => {
         expect(TIME_LOCAL_AGGREGATE_TYPES.has(TEST_CONSTANTS.AGGREGATE_TYPE)).toBe(true);
 
         expect(() =>
-          createRouter().registerFoldProjection(
-            trustedWindowedFold("trusted-on-time-local"),
-          ),
+          createRouter().registerFoldProjection(trustedWindowedFold("trusted-on-time-local")),
         ).not.toThrow();
       });
     });

@@ -4,8 +4,7 @@ import { workflowApi } from "../workflow-api";
 
 export const useLoadWorkflow = () => {
   const router = useRouter();
-  const workflowId =
-    typeof router.query.workflow === "string" ? router.query.workflow : undefined;
+  const workflowId = typeof router.query.workflow === "string" ? router.query.workflow : undefined;
   const { project } = useOrganizationTeamProject();
   const workflow = workflowApi.workflow.getById.useQuery(
     { workflowId: workflowId ?? "", projectId: project?.id ?? "" },

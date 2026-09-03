@@ -12,11 +12,7 @@
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 export type DepartmentsTrpcContext = Readonly<{
@@ -71,8 +67,7 @@ export class DepartmentsTrpcApi {
       ),
 
       assignments: policy("governance:view")(procedure.input(organizationScope)).query(
-        async ({ ctx, input }) =>
-          ctx.app.governance.departmentAssignments(input.organizationId),
+        async ({ ctx, input }) => ctx.app.governance.departmentAssignments(input.organizationId),
       ),
 
       create: policy("governance:manage")(procedure.input(createSchema)).mutation(
@@ -112,12 +107,12 @@ export class DepartmentsTrpcApi {
         },
       ),
 
-      assignProject: policy("governance:manage")(
-        procedure.input(assignProjectSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ctx.app.governance.departmentAssignProject(input);
-        return { ok: true };
-      }),
+      assignProject: policy("governance:manage")(procedure.input(assignProjectSchema)).mutation(
+        async ({ ctx, input }) => {
+          await ctx.app.governance.departmentAssignProject(input);
+          return { ok: true };
+        },
+      ),
     });
   }
 }

@@ -47,17 +47,14 @@ export const runWorkflowCommand = async ({
     const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
-    const response = await fetch(
-      `${endpoint}/api/workflows/${encodeURIComponent(id)}/run`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
-        },
-        body: JSON.stringify(input),
+    const response = await fetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}/run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildAuthHeaders({ apiKey }),
       },
-    );
+      body: JSON.stringify(input),
+    });
 
     if (!response.ok) {
       const message = await formatFetchError(response);
@@ -82,9 +79,7 @@ export const runWorkflowCommand = async ({
           console.log(`    ${output.split("\n").join("\n    ")}`);
         } else {
           console.log(chalk.bold("  Result:"));
-          console.log(
-            `    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`,
-          );
+          console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
         }
         console.log();
       },

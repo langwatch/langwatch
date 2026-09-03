@@ -199,9 +199,7 @@ describe("InviteService resilience", () => {
           }),
         );
         expect(invite.inviteCode).not.toBe("code-race-1");
-        expect(invite.expiration!.getTime()).toBeGreaterThan(
-          Date.now() + 13 * 24 * 60 * 60 * 1000,
-        );
+        expect(invite.expiration!.getTime()).toBeGreaterThan(Date.now() + 13 * 24 * 60 * 60 * 1000);
       });
 
       it("loses quietly when another admin's resend claimed the row first", async () => {
@@ -239,26 +237,20 @@ describe("InviteService resilience", () => {
     describe("when an invitation's expiry has passed", () => {
       it("derives EXPIRED from a PENDING row past its expiration", () => {
         const past = new Date(Date.now() - 1000);
-        expect(
-          resolveInviteDisplayStatus({ status: "PENDING", expiration: past }),
-        ).toBe("EXPIRED");
+        expect(resolveInviteDisplayStatus({ status: "PENDING", expiration: past })).toBe("EXPIRED");
       });
 
       it("leaves every other state alone", () => {
         const past = new Date(Date.now() - 1000);
         const future = new Date(Date.now() + 1000);
-        expect(
-          resolveInviteDisplayStatus({ status: "PENDING", expiration: future }),
-        ).toBe("PENDING");
-        expect(
-          resolveInviteDisplayStatus({ status: "PENDING", expiration: null }),
-        ).toBe("PENDING");
-        expect(
-          resolveInviteDisplayStatus({ status: "ACCEPTED", expiration: past }),
-        ).toBe("ACCEPTED");
-        expect(
-          resolveInviteDisplayStatus({ status: "REVOKED", expiration: past }),
-        ).toBe("REVOKED");
+        expect(resolveInviteDisplayStatus({ status: "PENDING", expiration: future })).toBe(
+          "PENDING",
+        );
+        expect(resolveInviteDisplayStatus({ status: "PENDING", expiration: null })).toBe("PENDING");
+        expect(resolveInviteDisplayStatus({ status: "ACCEPTED", expiration: past })).toBe(
+          "ACCEPTED",
+        );
+        expect(resolveInviteDisplayStatus({ status: "REVOKED", expiration: past })).toBe("REVOKED");
       });
     });
   });

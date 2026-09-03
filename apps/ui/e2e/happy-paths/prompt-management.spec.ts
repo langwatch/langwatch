@@ -20,9 +20,7 @@ test("Test happy paths for prompt management", async ({ page }) => {
   await page.getByText("New Prompt Config").click();
   await page.getByRole("textbox", { name: "Prompt Name" }).click();
   await page.getByRole("textbox", { name: "Prompt Name" }).press("ControlOrMeta+a");
-  await page
-    .getByRole("textbox", { name: "Prompt Name" })
-    .fill("Excellent Prompt For Testing");
+  await page.getByRole("textbox", { name: "Prompt Name" }).fill("Excellent Prompt For Testing");
   await page.getByTestId("save-version-button").click();
   await page.getByRole("textbox", { name: "Description" }).fill("save new name");
   await page.getByRole("textbox", { name: "Description" }).press("Enter");
@@ -30,11 +28,7 @@ test("Test happy paths for prompt management", async ({ page }) => {
   await page
     .getByRole("textbox", { name: "Prompt Name" })
     .fill("Excellent Prompt For Testing - New Name");
-  await page
-    .getByRole("group")
-    .filter({ hasText: "Modelgpt-5" })
-    .getByRole("button")
-    .click();
+  await page.getByRole("group").filter({ hasText: "Modelgpt-5" }).getByRole("button").click();
   await page.getByRole("combobox", { name: "Model" }).click();
   await page.getByRole("option", { name: "gpt-4-turbo", exact: true }).click();
   await page.getByRole("spinbutton", { name: "Temperature" }).click();
@@ -47,20 +41,14 @@ test("Test happy paths for prompt management", async ({ page }) => {
     .getByRole("button")
     .click();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).dblclick();
-  await page
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .press("ControlOrMeta+a");
-  await page
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .fill("You're a great prompt!");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).press("ControlOrMeta+a");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("You're a great prompt!");
   await page
     .locator("div")
     .filter({ hasText: /^Inputs$/ })
     .getByRole("button")
     .click();
-  await page
-    .locator('input[name="version\\.configData\\.inputs\\.1\\.identifier"]')
-    .click();
+  await page.locator('input[name="version\\.configData\\.inputs\\.1\\.identifier"]').click();
   await page
     .locator('input[name="version\\.configData\\.inputs\\.1\\.identifier"]')
     .fill("new_input");
@@ -69,9 +57,7 @@ test("Test happy paths for prompt management", async ({ page }) => {
     .filter({ hasText: /^Outputs$/ })
     .getByRole("button")
     .click();
-  await page
-    .locator('input[name="version\\.configData\\.outputs\\.1\\.identifier"]')
-    .click();
+  await page.locator('input[name="version\\.configData\\.outputs\\.1\\.identifier"]').click();
   await page
     .locator('input[name="version\\.configData\\.outputs\\.1\\.identifier"]')
     .fill("new_output");
@@ -90,30 +76,21 @@ test("Test happy paths for prompt management", async ({ page }) => {
   await page.locator('[id="popover\\:\\:rd\\:\\:trigger"]').click();
   await page.getByText("Prompt NameCurrent").click();
   await page.getByRole("group").filter({ hasText: "Current Versionchanged" }).click();
-  await page
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .fill("new prompt text");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("new prompt text");
   await page.getByTestId("save-version-button").click();
-  await page
-    .getByRole("textbox", { name: "Description" })
-    .fill("deleted new input and output");
+  await page.getByRole("textbox", { name: "Description" }).fill("deleted new input and output");
   await page.getByRole("textbox", { name: "Description" }).press("Enter");
   await page.locator(".css-18y9d4a > div > div:nth-child(2) > .chakra-button").click();
   await page.getByText("Excellent Prompt For Testing").click();
   await page.getByRole("textbox", { name: "Prompt Name" }).dblclick();
   await page.getByRole("textbox", { name: "Prompt Name" }).press("ControlOrMeta+a");
-  await page
-    .getByRole("textbox", { name: "Prompt Name" })
-    .fill("going to delete this prompt");
+  await page.getByRole("textbox", { name: "Prompt Name" }).fill("going to delete this prompt");
   await page.getByTestId("save-version-button").click();
   await page.getByRole("textbox", { name: "Description" }).click();
   await page.getByRole("textbox", { name: "Description" }).fill("deleting soon");
   await page.getByRole("textbox", { name: "Description" }).press("Enter");
   await page.locator(".css-18y9d4a > div > div:nth-child(2) > .chakra-button").click();
-  await page
-    .getByRole("row", { name: "going to delete this prompt" })
-    .getByRole("button")
-    .click();
+  await page.getByRole("row", { name: "going to delete this prompt" }).getByRole("button").click();
   await page.getByRole("textbox", { name: "Type 'delete' to confirm" }).fill("delete");
   await page.getByRole("textbox", { name: "Type 'delete' to confirm" }).press("Enter");
   await page.getByText("No prompt configurations", { exact: false }).click();

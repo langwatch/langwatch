@@ -27,9 +27,7 @@ import {
 
 export function SdkSetup(): React.ReactElement | null {
   const initialPlatform = PLATFORM_OPTIONS[0]?.key ?? null;
-  const [selectedPlatform, setSelectedPlatform] = useState<PlatformKey | null>(
-    initialPlatform,
-  );
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformKey | null>(initialPlatform);
   const [selectedFramework, setSelectedFramework] = useState<FrameworkKey | null>(
     initialPlatform ? (FRAMEWORKS_BY_PLATFORM[initialPlatform]?.[0]?.key ?? null) : null,
   );
@@ -64,10 +62,7 @@ export function SdkSetup(): React.ReactElement | null {
       alignItems="start"
     >
       <VStack align="stretch" gap={6} overflow="visible">
-        <PlatformGrid
-          selectedLanguage={selectedPlatform}
-          onSelectLanguage={handleSelectPlatform}
-        />
+        <PlatformGrid selectedLanguage={selectedPlatform} onSelectLanguage={handleSelectPlatform} />
 
         {hasFrameworks && (
           <FrameworkGrid
@@ -91,9 +86,7 @@ export function SdkSetup(): React.ReactElement | null {
               <FrameworkIntegrationCode
                 platform={selectedPlatform}
                 framework={selectedFramework as FrameworkKey}
-                languageIconUrl={
-                  PLATFORM_OPTIONS.find((p) => p.key === selectedPlatform)?.iconUrl
-                }
+                languageIconUrl={PLATFORM_OPTIONS.find((p) => p.key === selectedPlatform)?.iconUrl}
               />
             </Box>
             <DocsLinks docs={selectedEntry?.docs} label={selectedEntry?.label ?? ""} />

@@ -188,8 +188,8 @@ function BudgetDetailPage() {
                   <Alert.Content>
                     <Alert.Title>Spend figures are unavailable</Alert.Title>
                     <Alert.Description>
-                      Spend cannot be totalled right now, so this budget is not stopping
-                      or warning about anything.
+                      Spend cannot be totalled right now, so this budget is not stopping or warning
+                      about anything.
                     </Alert.Description>
                   </Alert.Content>
                 </Alert.Root>
@@ -200,9 +200,9 @@ function BudgetDetailPage() {
                   <Alert.Content>
                     <Alert.Title>No key sends traffic here</Alert.Title>
                     <Alert.Description>
-                      Traffic is attributed to the project a key is scoped to. No active
-                      key is scoped so that its traffic reaches this budget, so it will
-                      stay at zero and never stop a request.
+                      Traffic is attributed to the project a key is scoped to. No active key is
+                      scoped so that its traffic reaches this budget, so it will stay at zero and
+                      never stop a request.
                     </Alert.Description>
                   </Alert.Content>
                 </Alert.Root>
@@ -253,11 +253,7 @@ function BudgetDetailPage() {
                         </Text>
                         <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
                         <Spacer />
-                        <Badge
-                          colorPalette={
-                            pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
-                          }
-                        >
+                        <Badge colorPalette={pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"}>
                           {pct.toFixed(1)}% used
                         </Badge>
                       </HStack>
@@ -284,9 +280,7 @@ function BudgetDetailPage() {
                           "never"
                         ) : (
                           <Tooltip content={new Date(budget.resetsAt).toLocaleString()}>
-                            <span>
-                              {formatTimeAgo(new Date(budget.resetsAt).getTime())}
-                            </span>
+                            <span>{formatTimeAgo(new Date(budget.resetsAt).getTime())}</span>
                           </Tooltip>
                         )}
                       </strong>
@@ -309,10 +303,7 @@ function BudgetDetailPage() {
                   </DetailRow>
                 )}
                 <DetailRow label="Scope">
-                  <ScopeBadge
-                    target={budget.scopeTarget}
-                    projectSlug={project?.slug ?? null}
-                  />
+                  <ScopeBadge target={budget.scopeTarget} projectSlug={project?.slug ?? null} />
                 </DetailRow>
                 <DetailRow label="Created">
                   <Tooltip content={new Date(budget.createdAt).toLocaleString()}>
@@ -346,8 +337,8 @@ function BudgetDetailPage() {
                       </EmptyState.Indicator>
                       <EmptyState.Title>No usage yet</EmptyState.Title>
                       <EmptyState.Description>
-                        Activity shows up here after the first completed request against a
-                        virtual key in this scope.
+                        Activity shows up here after the first completed request against a virtual
+                        key in this scope.
                       </EmptyState.Description>
                     </EmptyState.Content>
                   </EmptyState.Root>
@@ -471,16 +462,9 @@ type ScopeTarget = {
   memberCount?: number;
 };
 
-function ScopeBadge({
-  target,
-  projectSlug,
-}: {
-  target: ScopeTarget;
-  projectSlug: string | null;
-}) {
+function ScopeBadge({ target, projectSlug }: { target: ScopeTarget; projectSlug: string | null }) {
   const kindLabel = target.kind.toLowerCase().replaceAll("_", " ");
-  const vkHref =
-    target.kind === "VIRTUAL_KEY" ? `/gateway/virtual-keys/${target.id}` : null;
+  const vkHref = target.kind === "VIRTUAL_KEY" ? `/gateway/virtual-keys/${target.id}` : null;
   return (
     <HStack gap={2} align="baseline">
       <Badge colorPalette="gray">{kindLabel}</Badge>
@@ -502,8 +486,8 @@ function ScopeBadge({
       )}
       {target.kind === "GROUP" && typeof target.memberCount === "number" && (
         <Text fontSize="xs" color="fg.muted">
-          {target.memberCount === 1 ? "1 member" : `${target.memberCount} members`}, each
-          with their own allowance
+          {target.memberCount === 1 ? "1 member" : `${target.memberCount} members`}, each with their
+          own allowance
         </Text>
       )}
     </HStack>

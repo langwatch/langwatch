@@ -22,8 +22,7 @@ function publicApiKey(row: StoredApiKey): ApiKey {
 
 function isApiKeyVisibleToMember(key: ApiKey, userId: string | null): boolean {
   return Boolean(
-    userId &&
-    (key.userId === userId || (key.userId === null && key.ingestSourceType === null)),
+    userId && (key.userId === userId || (key.userId === null && key.ingestSourceType === null)),
   );
 }
 
@@ -85,11 +84,7 @@ export class ApiKeyCatalogService {
     }));
   }
 
-  async getOrgProjects({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<ApiKeyProject[]> {
+  async getOrgProjects({ organizationId }: { organizationId: string }): Promise<ApiKeyProject[]> {
     const page = await this.options.projects.listByOrganization({
       organizationId,
       page: 1,
@@ -102,11 +97,7 @@ export class ApiKeyCatalogService {
     }));
   }
 
-  async getOrgTeams({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<ApiKeyTeam[]> {
+  async getOrgTeams({ organizationId }: { organizationId: string }): Promise<ApiKeyTeam[]> {
     const page = await this.options.organizations.listTeams({
       organizationId,
       page: 1,
@@ -115,11 +106,7 @@ export class ApiKeyCatalogService {
     return page.data.map((team) => ({ id: team.id, name: team.name }));
   }
 
-  async getOrgMembers({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<ApiKeyUser[]> {
+  async getOrgMembers({ organizationId }: { organizationId: string }): Promise<ApiKeyUser[]> {
     const members = new Map<string, ApiKeyUser>();
     for (const binding of await this.options.authz.listOrganizationBindings({
       organizationId,
@@ -182,10 +169,7 @@ export class ApiKeyCatalogService {
       }));
   }
 
-  private async getInOrganization(
-    id: string,
-    organizationId: string,
-  ): Promise<StoredApiKey> {
+  private async getInOrganization(id: string, organizationId: string): Promise<StoredApiKey> {
     const row = await this.repository.tryFindByIdInOrganization({
       id,
       organizationId,
@@ -196,14 +180,9 @@ export class ApiKeyCatalogService {
     return row;
   }
 
-  private async customPermissions(
-    row: StoredApiKey,
-    organizationId: string,
-  ): Promise<string[]> {
+  private async customPermissions(row: StoredApiKey, organizationId: string): Promise<string[]> {
     const ids = new Set(
-      row.roleBindings.flatMap((binding) =>
-        binding.customRoleId ? [binding.customRoleId] : [],
-      ),
+      row.roleBindings.flatMap((binding) => (binding.customRoleId ? [binding.customRoleId] : [])),
     );
     if (ids.size === 0) {
       return [];

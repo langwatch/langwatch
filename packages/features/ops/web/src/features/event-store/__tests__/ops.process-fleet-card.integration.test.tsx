@@ -48,14 +48,9 @@ describe("ProcessFleetCard", () => {
   it("labels a scheduled singleton as scheduled", () => {
     render(
       <ChakraProvider value={defaultSystem}>
-        <ProcessFleetCard
-          rows={[makeRow({ scheduled: true })]}
-          onSelect={() => undefined}
-        />
+        <ProcessFleetCard rows={[makeRow({ scheduled: true })]} onSelect={() => undefined} />
       </ChakraProvider>,
     );
-    expect(screen.getByTestId("process-row-automations").textContent).toContain(
-      "scheduled",
-    );
+    expect(screen.getByTestId("process-row-automations").textContent).toContain("scheduled");
   });
 });

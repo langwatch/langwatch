@@ -45,7 +45,7 @@ describe("PrismaSuiteRepository.resolveDynamicRunMembership", () => {
     vi.clearAllMocks();
   });
 
-  describe("given a run plan row (kind = \"run_plan\")", () => {
+  describe('given a run plan row (kind = "run_plan")', () => {
     /** @scenario "The row lock matches the row the resolution reads" */
     it("locks by id and projectId alone, not by a kind no plan row carries", async () => {
       const { repository, executeRaw } = build();

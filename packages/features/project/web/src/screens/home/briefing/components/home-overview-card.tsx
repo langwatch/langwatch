@@ -17,8 +17,7 @@ import { useProjectHomeHost } from "../../../../model/project-home-host";
  * across the login line.
  */
 
-const SERIF =
-  'var(--langy-font-serif, "Sentient", "Charter", "Source Serif Pro", Georgia, serif)';
+const SERIF = 'var(--langy-font-serif, "Sentient", "Charter", "Source Serif Pro", Georgia, serif)';
 
 export function HomeOverviewCard({
   cells,
@@ -84,12 +83,7 @@ export function HomeOverviewCard({
                 {title}
               </Text>
               {rangeLabel ? (
-                <Text
-                  fontFamily="mono"
-                  fontSize="11px"
-                  letterSpacing="0.02em"
-                  color="fg.subtle"
-                >
+                <Text fontFamily="mono" fontSize="11px" letterSpacing="0.02em" color="fg.subtle">
                   {rangeLabel}
                 </Text>
               ) : null}
@@ -188,25 +182,17 @@ function OverviewCell({ cell }: { cell: StatusCell }) {
   }, [cell.value]);
 
   const vanity = cell.tone === "vanity";
-  const dot =
-    cell.tone === "good" ? "green.solid" : cell.tone === "bad" ? "red.solid" : undefined;
+  const dot = cell.tone === "good" ? "green.solid" : cell.tone === "bad" ? "red.solid" : undefined;
   // The figures ARE the content — even the table-stakes ones render in full
   // foreground so the eye lands on the number, not the label. `vanity` keeps
   // only its smaller size and lighter weight.
-  const valueColor =
-    cell.tone === "good" ? "green.fg" : cell.tone === "bad" ? "red.fg" : "fg";
+  const valueColor = cell.tone === "good" ? "green.fg" : cell.tone === "bad" ? "red.fg" : "fg";
 
   return (
     <VStack align="start" gap={2.5}>
       <HStack gap={1.5} align="center">
         {dot ? (
-          <Box
-            width="6px"
-            height="6px"
-            borderRadius="full"
-            background={dot}
-            flexShrink={0}
-          />
+          <Box width="6px" height="6px" borderRadius="full" background={dot} flexShrink={0} />
         ) : null}
         <Text fontFamily="mono" fontSize="11.5px" letterSpacing="0.02em" color="fg.muted">
           {cell.label}

@@ -25,7 +25,7 @@ The product had three symptoms of exactly that:
 - The address field on the sign-in screen carried
   `autocomplete="username webauthn"` and had done for as long as passkeys
   existed here. That token does **nothing on its own**: it tells the browser a
-  passkey *may* be offered there, and the browser only offers one while a
+  passkey _may_ be offered there, and the browser only offers one while a
   conditional-mediation request is actually pending. Nothing ever opened one.
   The field was advertising a capability it did not have.
 - The only way in with a passkey was a button on the method rail — findable by
@@ -85,7 +85,7 @@ change the interval or the trigger, not to move it somewhere nobody looks.
 
 **"Once, then 30 days" needs somewhere to write it down.** Per-browser storage
 is the cheap answer and the wrong one — it forgets on a new device, which is
-precisely where the nudge should be *more* eager, and it makes the interval
+precisely where the nudge should be _more_ eager, and it makes the interval
 unenforceable. It belongs on the account.
 
 **Nudging the wrong people is the failure mode to watch.** Somebody who already
@@ -106,7 +106,7 @@ puts in front of them, which is a cost paid by every later thing that matters.
 
 **Only after a password sign-in.** Precisely targeted and tempting. Rejected as
 the sole trigger because it misses the social/OIDC user who has no passkey
-either — but it is the right *priority* if the nudge ever needs rationing.
+either — but it is the right _priority_ if the nudge ever needs rationing.
 
 **No nudge; rely on autofill and the sign-up step.** The honest minimum, and
 what ships first. The nudge is the part that reaches the existing population,

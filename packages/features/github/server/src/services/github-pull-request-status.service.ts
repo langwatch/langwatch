@@ -19,10 +19,7 @@
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { GithubInstallationsService } from "./github-installations.service";
-import type {
-  GithubAppTokenPort,
-  GithubPullRequestSummary,
-} from "../ports/github-app-token.port";
+import type { GithubAppTokenPort, GithubPullRequestSummary } from "../ports/github-app-token.port";
 import type {
   GithubPullRequestRow,
   GithubPullRequestsRepository,
@@ -80,9 +77,7 @@ export class GithubPullRequestStatusService {
     return "open";
   }
 
-  static create(
-    deps: GithubPullRequestStatusServiceDeps,
-  ): GithubPullRequestStatusService {
+  static create(deps: GithubPullRequestStatusServiceDeps): GithubPullRequestStatusService {
     return new GithubPullRequestStatusService(deps);
   }
 
@@ -260,9 +255,7 @@ function assertValidRefs(refs: readonly GithubPullRequestRef[]): void {
     return;
   }
   if (refs.length > MAX_STATUS_REFS) {
-    throw new ValidationError(
-      `At most ${MAX_STATUS_REFS} pull requests can be read at once`,
-    );
+    throw new ValidationError(`At most ${MAX_STATUS_REFS} pull requests can be read at once`);
   }
   for (const ref of refs) {
     const looksLikeRepository = /^[^/\s]+\/[^/\s]+$/.test(ref.repositoryFullName);

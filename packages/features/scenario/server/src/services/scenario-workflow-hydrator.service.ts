@@ -38,9 +38,7 @@ function defaultModelForDsl(
   legacyDefaultModel: string,
 ): { defaultLlm: Record<string, unknown> | null; defaultModel?: string } {
   const parsedVersion = specVersionSchema.safeParse(dsl.spec_version);
-  const specParts = parsedVersion.success
-    ? String(parsedVersion.data).split(".").map(Number)
-    : [];
+  const specParts = parsedVersion.success ? String(parsedVersion.data).split(".").map(Number) : [];
   const specMajor = specParts[0] ?? Number.NaN;
   const specMinor = specParts[1] ?? 0;
   const legacy =
@@ -69,9 +67,7 @@ function parameterModel(value: unknown, defaultModel?: string): string | undefin
 }
 
 export class ScenarioWorkflowHydratorService {
-  static create(
-    modelParameters: ScenarioModelParametersService,
-  ): ScenarioWorkflowHydratorService {
+  static create(modelParameters: ScenarioModelParametersService): ScenarioWorkflowHydratorService {
     return new ScenarioWorkflowHydratorService(modelParameters);
   }
 

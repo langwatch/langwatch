@@ -14,9 +14,7 @@ const ASSERTION: CallbackAssertion = {
   allowsJit: true,
 };
 
-function candidate(
-  overrides: Partial<CallbackUserMatch> = {},
-): CallbackUserMatch {
+function candidate(overrides: Partial<CallbackUserMatch> = {}): CallbackUserMatch {
   return {
     userId: "user_sam",
     holdsVerifiedEmail: true,
@@ -156,9 +154,9 @@ describe("the SSO callback's linking decision", () => {
     it("refuses the same way when the IdP itself asserts nothing verified", async () => {
       const { service, proposals } = build({ byEmail: [candidate()] });
 
-      await expect(
-        service.complete({ ...ASSERTION, emailVerified: false }),
-      ).rejects.toMatchObject({ code: "identity_link_proposed" });
+      await expect(service.complete({ ...ASSERTION, emailVerified: false })).rejects.toMatchObject({
+        code: "identity_link_proposed",
+      });
 
       expect(proposals.proposeLink).toHaveBeenCalledWith(
         expect.objectContaining({ reason: "unverified_orphan" }),
@@ -170,9 +168,7 @@ describe("the SSO callback's linking decision", () => {
     /** @scenario "An ambiguous match becomes a proposal, not a guess" */
     it("records a LinkProposed event and refuses with guidance", async () => {
       const { service, proposals, directory } = build({
-        byEmail: [
-          candidate({ identifierDomains: ["acme.com", "personal.example"] }),
-        ],
+        byEmail: [candidate({ identifierDomains: ["acme.com", "personal.example"] })],
       });
 
       await expect(service.complete(ASSERTION)).rejects.toMatchObject({
@@ -188,19 +184,17 @@ describe("the SSO callback's linking decision", () => {
     /** @scenario "An ambiguous match becomes a proposal, not a guess" */
     it("proposes against every candidate rather than guessing one", async () => {
       const { service, proposals } = build({
-        byEmail: [
-          candidate({ userId: "user_sam" }),
-          candidate({ userId: "user_other" }),
-        ],
+        byEmail: [candidate({ userId: "user_sam" }), candidate({ userId: "user_other" })],
       });
 
       await expect(service.complete(ASSERTION)).rejects.toMatchObject({
         code: "identity_link_proposed",
       });
 
-      expect(proposals.proposeLink.mock.calls.map(([data]) => data.userId)).toEqual(
-        ["user_sam", "user_other"],
-      );
+      expect(proposals.proposeLink.mock.calls.map(([data]) => data.userId)).toEqual([
+        "user_sam",
+        "user_other",
+      ]);
     });
 
     /** @scenario "An ambiguous match becomes a proposal, not a guess" */
@@ -244,9 +238,9 @@ describe("the SSO callback's linking decision", () => {
     it("refuses with jit_disabled on a connection that forbids it", async () => {
       const { service, directory } = build();
 
-      await expect(
-        service.complete({ ...ASSERTION, allowsJit: false }),
-      ).rejects.toMatchObject({ code: "identity_jit_disabled" });
+      await expect(service.complete({ ...ASSERTION, allowsJit: false })).rejects.toMatchObject({
+        code: "identity_jit_disabled",
+      });
 
       expect(directory.provisionUser).not.toHaveBeenCalled();
     });

@@ -76,9 +76,7 @@ const READ_ACTIONS = new Set([
  * every bound below has to narrow before it reads.
  */
 const clauseField = (clause: unknown, key: string): unknown =>
-  clause && typeof clause === "object"
-    ? (clause as Record<string, unknown>)[key]
-    : undefined;
+  clause && typeof clause === "object" ? (clause as Record<string, unknown>)[key] : undefined;
 
 /**
  * A reserved, system-managed API-key name. Only the platform can create or
@@ -100,9 +98,7 @@ const isSystemManagedKeyName = (value: unknown): boolean =>
 const isElapsedExpiryBound = (value: unknown): boolean => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const bound = value as Record<string, unknown>;
-  return (
-    Object.keys(bound).length === 2 && bound.not === null && bound.lte instanceof Date
-  );
+  return Object.keys(bound).length === 2 && bound.not === null && bound.lte instanceof Date;
 };
 
 /**
@@ -199,8 +195,7 @@ const isNonEmptyStringList = (value: any): boolean =>
 // deliberately do NOT accept `organizationId: { in: [...] }` here: a list of
 // org ids would target several organizations, which the single-organization
 // invariant forbids, and no call-site needs it.
-const hasOrganizationId = (clause: any): boolean =>
-  typeof clause?.organizationId === "string";
+const hasOrganizationId = (clause: any): boolean => typeof clause?.organizationId === "string";
 
 const hasRowId = (clause: any): boolean =>
   typeof clause?.id === "string" ||
@@ -213,9 +208,7 @@ const hasCompositeOrgKey = (clause: any): boolean => {
   if (!clause || typeof clause !== "object") return false;
   return Object.keys(clause).some((key) => {
     const value = (clause as any)[key];
-    return (
-      value && typeof value === "object" && key.split("_").includes("organizationId")
-    );
+    return value && typeof value === "object" && key.split("_").includes("organizationId");
   });
 };
 
@@ -260,8 +253,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // `organizationId`. Reachable by that or by the connection itself, which
   // belongs to exactly one organization.
   ScimSyncState: {
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "connectionId") === "string",
+    extraBound: ({ clause }) => typeof clauseField(clause, "connectionId") === "string",
   },
   RoleBinding: {
     // Reachable by its parent api key / group (each owned by one org) or by
@@ -390,8 +382,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // being replayed as an `updateMany` that rewrites every organization's
     // bookkeeping, or a `deleteMany` that erases it. The rows it reaches are
     // bookkeeping only: a repository name, a branch name and timestamps.
-    extraBound: ({ clause, action }) =>
-      action === "findMany" && isBranchRecheckSweep(clause),
+    extraBound: ({ clause, action }) => action === "findMany" && isBranchRecheckSweep(clause),
   },
 };
 

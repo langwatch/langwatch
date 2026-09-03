@@ -2,29 +2,29 @@ id: no-double-type-assertion-tsx
 snapshots:
   const a = value as unknown as Widget;:
     labels:
-    - source: value as unknown as Widget
-      style: primary
-      start: 10
-      end: 36
-    - source: unknown
-      style: secondary
-      start: 19
-      end: 26
-    - source: value as unknown
-      style: secondary
-      start: 10
-      end: 26
+      - source: value as unknown as Widget
+        style: primary
+        start: 10
+        end: 36
+      - source: unknown
+        style: secondary
+        start: 19
+        end: 26
+      - source: value as unknown
+        style: secondary
+        start: 10
+        end: 26
   const el = <div>{value as unknown as Label}</div>;:
     labels:
-    - source: value as unknown as Label
-      style: primary
-      start: 17
-      end: 42
-    - source: unknown
-      style: secondary
-      start: 26
-      end: 33
-    - source: value as unknown
-      style: secondary
-      start: 17
-      end: 33
+      - source: value as unknown as Label
+        style: primary
+        start: 17
+        end: 42
+      - source: unknown
+        style: secondary
+        start: 26
+        end: 33
+      - source: value as unknown
+        style: secondary
+        start: 17
+        end: 33

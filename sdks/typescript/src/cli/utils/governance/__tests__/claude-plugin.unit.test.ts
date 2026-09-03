@@ -124,9 +124,7 @@ describe("ensureLangwatchClaudePlugin", () => {
       const { ensureLangwatchClaudePlugin } = await loadModule();
       ensureLangwatchClaudePlugin({ interactive: true });
 
-      expect(fs.readFileSync(settingsPath(), "utf8")).not.toContain(
-        "langwatch ingest hook",
-      );
+      expect(fs.readFileSync(settingsPath(), "utf8")).not.toContain("langwatch ingest hook");
     });
   });
 
@@ -136,9 +134,7 @@ describe("ensureLangwatchClaudePlugin", () => {
       answerClaude({ pluginHelp: 1 });
       const { ensureLangwatchClaudePlugin } = await loadModule();
 
-      expect(ensureLangwatchClaudePlugin({ interactive: true }).action).toBe(
-        "unavailable",
-      );
+      expect(ensureLangwatchClaudePlugin({ interactive: true }).action).toBe("unavailable");
       expect(commandsRun()).toEqual(["plugin --help"]);
     });
 
@@ -170,9 +166,7 @@ describe("ensureLangwatchClaudePlugin", () => {
 
       const result = ensureLangwatchClaudePlugin({ interactive: true });
       expect(result.action).toBe("failed");
-      expect(commandsRun()).not.toContain(
-        "plugin install langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).not.toContain("plugin install langwatch@langwatch --scope user");
     });
   });
 

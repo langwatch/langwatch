@@ -87,11 +87,7 @@ describe("<IconCheckboxCardGroup/>", () => {
   describe("when items are selected", () => {
     it("marks selected items as checked", () => {
       render(
-        <IconCheckboxCardGroup
-          items={items}
-          value={["alpha", "gamma"]}
-          onChange={() => {}}
-        />,
+        <IconCheckboxCardGroup items={items} value={["alpha", "gamma"]} onChange={() => {}} />,
         { wrapper: Wrapper },
       );
 
@@ -107,10 +103,9 @@ describe("<IconCheckboxCardGroup/>", () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
 
-      render(
-        <IconCheckboxCardGroup items={items} value={["alpha"]} onChange={onChange} />,
-        { wrapper: Wrapper },
-      );
+      render(<IconCheckboxCardGroup items={items} value={["alpha"]} onChange={onChange} />, {
+        wrapper: Wrapper,
+      });
 
       const checkboxes = screen.getAllByRole("checkbox");
       await user.click(checkboxes[1]!);
@@ -125,11 +120,7 @@ describe("<IconCheckboxCardGroup/>", () => {
       const onChange = vi.fn();
 
       render(
-        <IconCheckboxCardGroup
-          items={items}
-          value={["alpha", "beta"]}
-          onChange={onChange}
-        />,
+        <IconCheckboxCardGroup items={items} value={["alpha", "beta"]} onChange={onChange} />,
         { wrapper: Wrapper },
       );
 

@@ -196,12 +196,7 @@ const DensityRowsPreview: React.FC<DensityRowsPreviewProps> = ({ choice, active 
             opacity={0.7}
           />
           <Box height={choice.rowHeight} flex={1} borderRadius="sm" bg="border.muted" />
-          <Box
-            height={choice.rowHeight}
-            width="14%"
-            borderRadius="sm"
-            bg="border.muted"
-          />
+          <Box height={choice.rowHeight} width="14%" borderRadius="sm" bg="border.muted" />
         </HStack>
       ))}
     </VStack>

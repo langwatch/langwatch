@@ -18,15 +18,15 @@ measured, the measurement is printed rather than described.
 
 ## 0. Rules the executor follows
 
-| Rule | What it means here |
-| --- | --- |
-| No compat re-exports | The facade never writes `export { x } from "./collaborator"` for a **value**. It declares its own function whose body calls the collaborator. `export type { … } from` for a pure type is not a compat re-export and is allowed (types have no runtime identity, and re-declaring one would duplicate it). |
-| No `as unknown as` | Two already exist (lines 1174 and 3681). Carry both **verbatim** into their new homes. Add none. |
-| Comments 5 lines max | Every comment block in every file this lane touches must be ≤5 lines. This is not stylistic — see §8; it is 61 live lint violations. |
-| `services/` holds only `<name>.service.ts` | Anything that is not a service goes to `processes/<name>.process.ts`. The rule for which is which: **a module that reaches a port is a service; a pure function of its arguments is a process.** |
-| Named parameters | Every new collaborator method takes ONE object and destructures it. The facade's exported functions keep their existing positional signatures and adapt. |
-| No typecheck | The executing agent does not run `pnpm typecheck` or `pnpm typecheck:all`. The integrator runs `pnpm typecheck:all` once, after the last slice. |
-| No git surgery | No `git add -A`, no `stash`, no `restore`, no `clean`, no `checkout --`. Stage explicit paths only. |
+| Rule                                       | What it means here                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No compat re-exports                       | The facade never writes `export { x } from "./collaborator"` for a **value**. It declares its own function whose body calls the collaborator. `export type { … } from` for a pure type is not a compat re-export and is allowed (types have no runtime identity, and re-declaring one would duplicate it). |
+| No `as unknown as`                         | Two already exist (lines 1174 and 3681). Carry both **verbatim** into their new homes. Add none.                                                                                                                                                                                                           |
+| Comments 5 lines max                       | Every comment block in every file this lane touches must be ≤5 lines. This is not stylistic — see §8; it is 61 live lint violations.                                                                                                                                                                       |
+| `services/` holds only `<name>.service.ts` | Anything that is not a service goes to `processes/<name>.process.ts`. The rule for which is which: **a module that reaches a port is a service; a pure function of its arguments is a process.**                                                                                                           |
+| Named parameters                           | Every new collaborator method takes ONE object and destructures it. The facade's exported functions keep their existing positional signatures and adapt.                                                                                                                                                   |
+| No typecheck                               | The executing agent does not run `pnpm typecheck` or `pnpm typecheck:all`. The integrator runs `pnpm typecheck:all` once, after the last slice.                                                                                                                                                            |
+| No git surgery                             | No `git add -A`, no `stash`, no `restore`, no `clean`, no `checkout --`. Stage explicit paths only.                                                                                                                                                                                                        |
 
 ---
 
@@ -211,6 +211,7 @@ So **every method below declares its return type**, private helpers stay
 answer with nothing carry `try`.
 
 ### S1 — `ExperimentCellPlanService`
+
 `services/experiment-cell-plan.service.ts`
 
 Turns a workbench state plus a run scope into the concrete phase-1 cells a run
@@ -253,6 +254,7 @@ this module. It replaces the object literal that is written out six times in
 the current file.
 
 ### S2 — `ExperimentComparisonPlanService`
+
 `services/experiment-comparison-plan.service.ts`
 
 Phase 2. For each comparison carrier the workbench holds — a chip evaluator
@@ -294,6 +296,7 @@ decision, a missing argument is an oversight, and the oversight silently
 overwrites verdicts.
 
 ### S3 — `ExperimentEvaluatorInputService`
+
 `services/experiment-evaluator-input.service.ts`
 
 What a target or an evaluator is actually handed at dispatch, and whether it
@@ -330,6 +333,7 @@ evaluatorTargetDisplayName({ target }: { target: TargetConfig }): string
 ```
 
 ### S4 — `ExperimentCellExecutionService`
+
 `services/experiment-cell-execution.service.ts`
 
 Runs one cell whose target is a studio component — a prompt, an HTTP or code
@@ -382,6 +386,7 @@ runCellEvaluators({
 extracted and exported from this module.
 
 ### S5 — `ExperimentWorkflowCellService`
+
 `services/experiment-workflow-cell.service.ts`
 
 Runs one cell whose target is a whole committed Studio workflow. The row goes
@@ -417,6 +422,7 @@ executeWorkflowCell({
 ```
 
 ### S6 — `ExperimentConnectedCellService`
+
 `services/experiment-connected-cell.service.ts`
 
 Runs one cell whose target is a connected agent (ADR-128). The agent runs in
@@ -461,6 +467,7 @@ them into `create`, so `experiment-run-orchestrator.connected-cell.integration.t
 does not change.
 
 ### S7 — `ExperimentRunSandboxKeyService`
+
 `services/experiment-run-sandbox-key.service.ts`
 
 The one agent-cache credential a run lends to the code it executes. Minted only
@@ -492,6 +499,7 @@ withSandboxApiKey({ event, sandboxApiKey }: {
 §12 before touching it.
 
 ### S8 — `ExperimentResultDispatchService`
+
 `services/experiment-result-dispatch.service.ts`
 
 Turns what a run produced into the Eventing command payloads that store it: the
@@ -547,6 +555,7 @@ function and the rule does not reach it; only the collaborator's method takes
 the prefix.
 
 ### S9 — `ExperimentCarriedBoardService`
+
 `services/experiment-carried-board.service.ts`
 
 The board cells a run carries rather than produces, so opening a run shows what
@@ -594,6 +603,7 @@ recordCarriedOverBoard({ projectId, runId, experimentId, cells, datasetRows, sta
 ```
 
 ### S10 — `ExperimentRunStorageService`
+
 `services/experiment-run-storage.service.ts`
 
 Everything one produced event does after it has been yielded. It keeps the run's
@@ -654,6 +664,7 @@ counter, logs, clears the running flag and rethrows); the clearing of the
 running flag stays in the run loop, which is what set it.
 
 ### S11 — `ExperimentRunLoopService`
+
 `services/experiment-run-loop.service.ts`
 
 The run itself. It refuses a run that names another person's development agent
@@ -733,110 +744,110 @@ export const createRunEventStream = (): RunEventStream => { … };
 Every top-level declaration of the current file, assigned to exactly one
 target. Line ranges are as the file stands today.
 
-| Lines | Symbol | Kind | Target |
-| ---: | --- | --- | --- |
-| 1-11 | module JSDoc | comment | facade (rewritten, ≤5 lines) |
-| 115 | `EVALUATION_KSUID_RESOURCE` | const | **S10** |
-| 117 | `logger` | const | every new module (§11) |
-| 128-141 | `ExperimentRunPorts` | type | **facade** (stays) |
-| 146-188 | `OrchestratorInput` | type | **facade** (stays) |
-| 201-229 | `resolveScopedRowIndices` | fn | **S1** |
-| 241-249 | `resolveMappingDatasetId` | fn | **S1** (private) |
-| 254-439 | `generateCells` | fn | **S1** |
-| 452-463 | `countScopedCells` | fn | **S1** |
-| 487-518 | `ComparisonSkipReason` | type | **P1** |
-| 521-524 | `ComparisonSetupSkip` | type | **P1** |
-| 530-533 | `formatList` | fn | **P1** |
-| 542-580 | `comparisonSkipMessage` | fn | **P1** |
-| 582-1196 | `generateComparisonCells` | fn | **S2** — split as below |
-| — 629-648 | `pickOutputPath` (inner) | closure | **P2** |
-| — 659-674 | `evaluatorScoresBlock` (inner) | closure | **P2** |
-| — 690-700 | `toCandidateText` (inner) | closure | **P2** |
-| — 711-717 | `variantIdentifierFor` (inner) | closure | **P2** |
-| — 736-741 | `buildVariantIdentifiers` (inner) | closure | **P2** |
-| — 753-765 | `variantDisplayNameFor` (inner) | closure | **P2** |
-| — 773-774 | `buildVariantDisplayNames` (inner) | closure | **P2** |
-| — 789-823 | `resolveVariants` (inner) | closure | **S2** (private) |
-| — 832-833 | `anchorVariantId` (inner) | closure | **S2** (private) |
-| — 836-858 | `pushSetupSkips` (inner) | closure | **S2** (private) |
-| — 883-889 | `isLegacyPairwiseBacked` (inner) | closure | **S2** (private) |
-| — 897-947 | `buildCandidates` (inner) | closure | **S2** (private) |
-| — 949-1011 | chip-comparison loop | block | **S2** `planChipComparisons` (private) |
-| — 1013-1194 | column-comparison loop | block | **S2** `planColumnComparisons` (private) |
-| 1206-1221 | `priceMetrics` | fn | **S4** → `tryPriceMetrics` |
-| 1224-1235 | `CellEvaluatorContext` | type | **S4** (private) |
-| 1244-1319 | `runOneCellEvaluator` | fn | **S4** (private) |
-| 1322-1342 | `evaluatorErrorResult` | fn | **P3** |
-| 1356-1384 | `runCellEvaluators` | fn | **S4** |
-| 1390-1404 | `runExecutesCode` | fn | **S7** (private) |
-| 1414-1431 | `mintRunSandboxApiKey` | fn | **S7** → `tryMintRunSandboxApiKey` |
-| 1441-1458 | `withSandboxApiKey` | fn | **S7** (§12) |
-| 1464-1667 | `executeCell` | fn | **S4** — split as below |
-| — 1469-1476 | `loadedData` inline shape | type | **S4** → exported `LoadedCellData` |
-| — 1488-1506 | evaluator-column guard | block | **S4** (private `refuseUnmappedColumn`) |
-| — 1536-1552 | precomputed-output branch | block | **S4** (private `precomputedTargetOutput`) |
-| — 1553-1630 | target dispatch + mapping | block | **S4** (private `dispatchTarget`) |
-| 1678-1901 | `executeWorkflowCell` | fn | **S5** — split as below |
-| — 1771-1834 | event fold loop | block | **S5** (private `foldFlowEvents`) |
-| — 1836-1859 | target result event | block | **S5** (private `targetResultEvent`) |
-| — 1863-1885 | attached evaluators | block | **S5** (private `gradeAttachedEvaluators`) |
-| 1904-1909 | `ConnectedDispatch` | type | **facade** (stays) |
-| 1912-1913 | `relayDispatch` | const | **S6** (private default) |
-| 1920-1931 | `dispatchAgentOf` | fn | **S6** (private) |
-| 1937-1971 | `connectedTurnParams` | fn | **S6** (private) |
-| 1979-2015 | `connectedFailureEvent` | fn | **S6** (private) |
-| 2018-2034 | `ConnectedCellInput` | type | **facade** (the facade's own arg shape) |
-| 2048-2094 | `executeConnectedCell` | fn | **S6** |
-| 2102-2141 | `connectedTurn` | fn | **S6** (private) |
-| 2149-2189 | `gradeConnectedAnswer` | fn | **S6** (private) |
-| 2199-2232 | `dispatchWithBusyRetry` | fn | **S6** (private) |
-| 2243-2261 | `busyWaitMs` | fn | **S6** (private) |
-| 2264-2268 | `busyRetryAfterMs` | fn | **S6** (private) |
-| 2276-2291 | `assignMappedInput` | fn | **S3** (private) |
-| 2306-2414 | `buildEvaluatorInputs` | fn | **S3** — split as below |
-| — 2326-2394 | comparison branch | block | **S3** (private `comparisonEvaluatorInputs`) |
-| — 2396-2412 | mapping branch | block | **S3** (private `mappedEvaluatorInputs`) |
-| 2417 | `NO_INPUTS_RESOLVED` | const | **P3** |
-| 2420-2421 | `isEmptyInputValue` | fn | **S3** (private) |
-| 2428-2431 | `catalogFields` | fn | **S3** (private) |
-| 2437-2441 | `declaredEvaluatorFields` | fn | **S3** (private) |
-| 2444-2445 | `evaluatorDisplayName` | fn | **P3** |
-| 2448 | `LoadedEvaluators` | type | `experiment-execution-data.service.ts` (§6) |
-| 2455-2468 | `evaluatorTargetFields` | fn | **S3** (private) |
-| 2471-2480 | `evaluatorTargetDisplayName` | fn | **S3** |
-| 2494-2509 | `evaluatorTargetHasNoResolvedInputs` | fn | **S3** |
-| 2512-2524 | `evaluatorTargetNoInputsResult` | fn | **P3** |
-| 2538-2558 | `hasNoResolvedInputs` | fn | **S3** |
-| 2561-2583 | `noInputsResolvedResult` | fn | **P3** |
-| 2591-2608 | `buildTargetInputs` | fn | **S3** |
-| 2620-2695 | `buildTargetMetadata` | fn | **S8** — split as below |
-| — 2621-2672 | model attribution | block | **S8** (private `targetModel`) |
-| — 2674-2683 | name attribution | block | **S8** (private `targetName`) |
-| 2717-2773 | `buildTargetResultDispatch` | fn | **S8** → `tryBuildTargetResultDispatch` |
-| 2786-2833 | `buildEvaluatorResultDispatch` | fn | **S8** |
-| 2840-2846 | `carriedCellFields` | fn | **S9** (private) |
-| 2849-2852 | `isStorableVerdict` | fn | **S9** (private) |
-| 2861-2895 | `carriedTargetResult` | fn | **S9** (private, `tryCarriedTargetResult` not needed — private) |
-| 2898-2935 | `carriedEvaluatorResults` | fn | **S9** (private) |
-| 2958-3008 | `buildCarriedOverDispatches` | fn | **S9** |
-| 3024-3094 | `recordCarriedOverBoard` | fn | **S9** |
-| 3100-3892 | `runOrchestrator` | fn | **S11** — split as below |
-| — 3101-3131 | destructure + agent admission | block | **S11** `run` |
-| — 3133-3163 | concurrency, runId, plan, register | block | **S11** `run` |
-| — 3165-3212 | counters, caches, trace seed | block | **S10** (`create` + `seedTargetOutputs` + `seedTraceIds`) |
-| — 3213-3226 | target metadata + mapper config | block | **S11** `run` (calls S8) |
-| — 3228-3235 | sandbox key mint | block | **S11** `run` (calls S7) |
-| — 3237-3268 | `startExperimentRun` + carried board | block | **S10** `startRun` + **S9** `recordCarriedOverBoard` |
-| — 3270-3400 | `processEventForStorage` | closure | **S10** `record` |
-| — 3402-3417 | execution_started + run counters | block | **S11** `run` |
-| — 3418-3458 | event queue | block | **P4** |
-| — 3459-3464 | semaphore + activeCells | block | **S11** (private `executePhaseOne`) |
-| — 3466-3613 | phase 1 loop | block | **S11** (private `executePhaseOne`, `executeOneCell`, `pickExecutor`) |
-| — 3615-3797 | phase 2 block | block | **S11** (private `executePhaseTwo`, `emitSkipReasons`, `backfillSeededOutputs`) |
-| — 3804-3845 | consume + finally | block | **S11** `run` |
-| — 3847-3891 | failure log + done summary | block | **S11** (private `summary`) |
-| 3897-3942 | `getLoadedDataForTarget` | fn | **S11** (private `loadedDataForTarget`) |
-| 3947-3955 | `requestAbort` | fn | **facade** (stays; it is already one line onto the port) |
+|       Lines | Symbol                               | Kind    | Target                                                                          |
+| ----------: | ------------------------------------ | ------- | ------------------------------------------------------------------------------- |
+|        1-11 | module JSDoc                         | comment | facade (rewritten, ≤5 lines)                                                    |
+|         115 | `EVALUATION_KSUID_RESOURCE`          | const   | **S10**                                                                         |
+|         117 | `logger`                             | const   | every new module (§11)                                                          |
+|     128-141 | `ExperimentRunPorts`                 | type    | **facade** (stays)                                                              |
+|     146-188 | `OrchestratorInput`                  | type    | **facade** (stays)                                                              |
+|     201-229 | `resolveScopedRowIndices`            | fn      | **S1**                                                                          |
+|     241-249 | `resolveMappingDatasetId`            | fn      | **S1** (private)                                                                |
+|     254-439 | `generateCells`                      | fn      | **S1**                                                                          |
+|     452-463 | `countScopedCells`                   | fn      | **S1**                                                                          |
+|     487-518 | `ComparisonSkipReason`               | type    | **P1**                                                                          |
+|     521-524 | `ComparisonSetupSkip`                | type    | **P1**                                                                          |
+|     530-533 | `formatList`                         | fn      | **P1**                                                                          |
+|     542-580 | `comparisonSkipMessage`              | fn      | **P1**                                                                          |
+|    582-1196 | `generateComparisonCells`            | fn      | **S2** — split as below                                                         |
+|   — 629-648 | `pickOutputPath` (inner)             | closure | **P2**                                                                          |
+|   — 659-674 | `evaluatorScoresBlock` (inner)       | closure | **P2**                                                                          |
+|   — 690-700 | `toCandidateText` (inner)            | closure | **P2**                                                                          |
+|   — 711-717 | `variantIdentifierFor` (inner)       | closure | **P2**                                                                          |
+|   — 736-741 | `buildVariantIdentifiers` (inner)    | closure | **P2**                                                                          |
+|   — 753-765 | `variantDisplayNameFor` (inner)      | closure | **P2**                                                                          |
+|   — 773-774 | `buildVariantDisplayNames` (inner)   | closure | **P2**                                                                          |
+|   — 789-823 | `resolveVariants` (inner)            | closure | **S2** (private)                                                                |
+|   — 832-833 | `anchorVariantId` (inner)            | closure | **S2** (private)                                                                |
+|   — 836-858 | `pushSetupSkips` (inner)             | closure | **S2** (private)                                                                |
+|   — 883-889 | `isLegacyPairwiseBacked` (inner)     | closure | **S2** (private)                                                                |
+|   — 897-947 | `buildCandidates` (inner)            | closure | **S2** (private)                                                                |
+|  — 949-1011 | chip-comparison loop                 | block   | **S2** `planChipComparisons` (private)                                          |
+| — 1013-1194 | column-comparison loop               | block   | **S2** `planColumnComparisons` (private)                                        |
+|   1206-1221 | `priceMetrics`                       | fn      | **S4** → `tryPriceMetrics`                                                      |
+|   1224-1235 | `CellEvaluatorContext`               | type    | **S4** (private)                                                                |
+|   1244-1319 | `runOneCellEvaluator`                | fn      | **S4** (private)                                                                |
+|   1322-1342 | `evaluatorErrorResult`               | fn      | **P3**                                                                          |
+|   1356-1384 | `runCellEvaluators`                  | fn      | **S4**                                                                          |
+|   1390-1404 | `runExecutesCode`                    | fn      | **S7** (private)                                                                |
+|   1414-1431 | `mintRunSandboxApiKey`               | fn      | **S7** → `tryMintRunSandboxApiKey`                                              |
+|   1441-1458 | `withSandboxApiKey`                  | fn      | **S7** (§12)                                                                    |
+|   1464-1667 | `executeCell`                        | fn      | **S4** — split as below                                                         |
+| — 1469-1476 | `loadedData` inline shape            | type    | **S4** → exported `LoadedCellData`                                              |
+| — 1488-1506 | evaluator-column guard               | block   | **S4** (private `refuseUnmappedColumn`)                                         |
+| — 1536-1552 | precomputed-output branch            | block   | **S4** (private `precomputedTargetOutput`)                                      |
+| — 1553-1630 | target dispatch + mapping            | block   | **S4** (private `dispatchTarget`)                                               |
+|   1678-1901 | `executeWorkflowCell`                | fn      | **S5** — split as below                                                         |
+| — 1771-1834 | event fold loop                      | block   | **S5** (private `foldFlowEvents`)                                               |
+| — 1836-1859 | target result event                  | block   | **S5** (private `targetResultEvent`)                                            |
+| — 1863-1885 | attached evaluators                  | block   | **S5** (private `gradeAttachedEvaluators`)                                      |
+|   1904-1909 | `ConnectedDispatch`                  | type    | **facade** (stays)                                                              |
+|   1912-1913 | `relayDispatch`                      | const   | **S6** (private default)                                                        |
+|   1920-1931 | `dispatchAgentOf`                    | fn      | **S6** (private)                                                                |
+|   1937-1971 | `connectedTurnParams`                | fn      | **S6** (private)                                                                |
+|   1979-2015 | `connectedFailureEvent`              | fn      | **S6** (private)                                                                |
+|   2018-2034 | `ConnectedCellInput`                 | type    | **facade** (the facade's own arg shape)                                         |
+|   2048-2094 | `executeConnectedCell`               | fn      | **S6**                                                                          |
+|   2102-2141 | `connectedTurn`                      | fn      | **S6** (private)                                                                |
+|   2149-2189 | `gradeConnectedAnswer`               | fn      | **S6** (private)                                                                |
+|   2199-2232 | `dispatchWithBusyRetry`              | fn      | **S6** (private)                                                                |
+|   2243-2261 | `busyWaitMs`                         | fn      | **S6** (private)                                                                |
+|   2264-2268 | `busyRetryAfterMs`                   | fn      | **S6** (private)                                                                |
+|   2276-2291 | `assignMappedInput`                  | fn      | **S3** (private)                                                                |
+|   2306-2414 | `buildEvaluatorInputs`               | fn      | **S3** — split as below                                                         |
+| — 2326-2394 | comparison branch                    | block   | **S3** (private `comparisonEvaluatorInputs`)                                    |
+| — 2396-2412 | mapping branch                       | block   | **S3** (private `mappedEvaluatorInputs`)                                        |
+|        2417 | `NO_INPUTS_RESOLVED`                 | const   | **P3**                                                                          |
+|   2420-2421 | `isEmptyInputValue`                  | fn      | **S3** (private)                                                                |
+|   2428-2431 | `catalogFields`                      | fn      | **S3** (private)                                                                |
+|   2437-2441 | `declaredEvaluatorFields`            | fn      | **S3** (private)                                                                |
+|   2444-2445 | `evaluatorDisplayName`               | fn      | **P3**                                                                          |
+|        2448 | `LoadedEvaluators`                   | type    | `experiment-execution-data.service.ts` (§6)                                     |
+|   2455-2468 | `evaluatorTargetFields`              | fn      | **S3** (private)                                                                |
+|   2471-2480 | `evaluatorTargetDisplayName`         | fn      | **S3**                                                                          |
+|   2494-2509 | `evaluatorTargetHasNoResolvedInputs` | fn      | **S3**                                                                          |
+|   2512-2524 | `evaluatorTargetNoInputsResult`      | fn      | **P3**                                                                          |
+|   2538-2558 | `hasNoResolvedInputs`                | fn      | **S3**                                                                          |
+|   2561-2583 | `noInputsResolvedResult`             | fn      | **P3**                                                                          |
+|   2591-2608 | `buildTargetInputs`                  | fn      | **S3**                                                                          |
+|   2620-2695 | `buildTargetMetadata`                | fn      | **S8** — split as below                                                         |
+| — 2621-2672 | model attribution                    | block   | **S8** (private `targetModel`)                                                  |
+| — 2674-2683 | name attribution                     | block   | **S8** (private `targetName`)                                                   |
+|   2717-2773 | `buildTargetResultDispatch`          | fn      | **S8** → `tryBuildTargetResultDispatch`                                         |
+|   2786-2833 | `buildEvaluatorResultDispatch`       | fn      | **S8**                                                                          |
+|   2840-2846 | `carriedCellFields`                  | fn      | **S9** (private)                                                                |
+|   2849-2852 | `isStorableVerdict`                  | fn      | **S9** (private)                                                                |
+|   2861-2895 | `carriedTargetResult`                | fn      | **S9** (private, `tryCarriedTargetResult` not needed — private)                 |
+|   2898-2935 | `carriedEvaluatorResults`            | fn      | **S9** (private)                                                                |
+|   2958-3008 | `buildCarriedOverDispatches`         | fn      | **S9**                                                                          |
+|   3024-3094 | `recordCarriedOverBoard`             | fn      | **S9**                                                                          |
+|   3100-3892 | `runOrchestrator`                    | fn      | **S11** — split as below                                                        |
+| — 3101-3131 | destructure + agent admission        | block   | **S11** `run`                                                                   |
+| — 3133-3163 | concurrency, runId, plan, register   | block   | **S11** `run`                                                                   |
+| — 3165-3212 | counters, caches, trace seed         | block   | **S10** (`create` + `seedTargetOutputs` + `seedTraceIds`)                       |
+| — 3213-3226 | target metadata + mapper config      | block   | **S11** `run` (calls S8)                                                        |
+| — 3228-3235 | sandbox key mint                     | block   | **S11** `run` (calls S7)                                                        |
+| — 3237-3268 | `startExperimentRun` + carried board | block   | **S10** `startRun` + **S9** `recordCarriedOverBoard`                            |
+| — 3270-3400 | `processEventForStorage`             | closure | **S10** `record`                                                                |
+| — 3402-3417 | execution_started + run counters     | block   | **S11** `run`                                                                   |
+| — 3418-3458 | event queue                          | block   | **P4**                                                                          |
+| — 3459-3464 | semaphore + activeCells              | block   | **S11** (private `executePhaseOne`)                                             |
+| — 3466-3613 | phase 1 loop                         | block   | **S11** (private `executePhaseOne`, `executeOneCell`, `pickExecutor`)           |
+| — 3615-3797 | phase 2 block                        | block   | **S11** (private `executePhaseTwo`, `emitSkipReasons`, `backfillSeededOutputs`) |
+| — 3804-3845 | consume + finally                    | block   | **S11** `run`                                                                   |
+| — 3847-3891 | failure log + done summary           | block   | **S11** (private `summary`)                                                     |
+|   3897-3942 | `getLoadedDataForTarget`             | fn      | **S11** (private `loadedDataForTarget`)                                         |
+|   3947-3955 | `requestAbort`                       | fn      | **facade** (stays; it is already one line onto the port)                        |
 
 Nothing in the current file is unassigned. `requestAbort` stays on the facade
 because wrapping a three-line delegation to `ExperimentRunAbortPort.requestAbort`
@@ -868,15 +879,15 @@ Neither is added to `src/index.ts`.
 Moving a method does not shrink it. These seven must also come apart, and the
 splits are named in §5's sub-rows. Targets after the split:
 
-| Function | Now | After | How |
-| --- | --- | --- | --- |
-| `generateCells` | m179 c29 | ≤80 / ≤24 | `generateCells` keeps the two precomputed-scope branches as `cellsForEvaluatorScope` / `cellsForEvaluatorAllRowsScope`, and the target expansion as `scopedTargetIds`; the row loop stays. |
-| `generateComparisonCells` | m581 c35 | ≤80 / ≤24 | Seven closures to P2, five to private methods, the two loops become `planChipComparisons` and `planColumnComparisons`, the synthetic column evaluator becomes `syntheticColumnEvaluator`. |
-| `executeCell` | m189 c21 | ≤80 | Three private methods per §5. |
-| `executeWorkflowCell` | m204 c29 | ≤80 / ≤24 | Three private methods per §5. |
-| `buildEvaluatorInputs` | m105 c24 | ≤80 | Two private methods per §5. |
-| `buildTargetMetadata` | m63 c27 | ≤24 | `targetModel` and `targetName` per §5. |
-| `runOrchestrator` | m791 s43 c42 | ≤80 / ≤24 / ≤24 | S10, P4 and the private methods per §5. |
+| Function                  | Now          | After           | How                                                                                                                                                                                        |
+| ------------------------- | ------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `generateCells`           | m179 c29     | ≤80 / ≤24       | `generateCells` keeps the two precomputed-scope branches as `cellsForEvaluatorScope` / `cellsForEvaluatorAllRowsScope`, and the target expansion as `scopedTargetIds`; the row loop stays. |
+| `generateComparisonCells` | m581 c35     | ≤80 / ≤24       | Seven closures to P2, five to private methods, the two loops become `planChipComparisons` and `planColumnComparisons`, the synthetic column evaluator becomes `syntheticColumnEvaluator`.  |
+| `executeCell`             | m189 c21     | ≤80             | Three private methods per §5.                                                                                                                                                              |
+| `executeWorkflowCell`     | m204 c29     | ≤80 / ≤24       | Three private methods per §5.                                                                                                                                                              |
+| `buildEvaluatorInputs`    | m105 c24     | ≤80             | Two private methods per §5.                                                                                                                                                                |
+| `buildTargetMetadata`     | m63 c27      | ≤24             | `targetModel` and `targetName` per §5.                                                                                                                                                     |
+| `runOrchestrator`         | m791 s43 c42 | ≤80 / ≤24 / ≤24 | S10, P4 and the private methods per §5.                                                                                                                                                    |
 
 One more: **line 1085** is 174 characters. Wrap the `logger.debug` message
 across two string literals so no line exceeds 160. Do not shorten the sentence.
@@ -956,11 +967,11 @@ title, so changing either silently unbinds a spec.
 **`experiment-run-orchestrator.generate-cells.unit.test.ts`** (366 lines) splits
 three ways:
 
-| Current describe / it | Goes to |
-| --- | --- |
-| `describe("generateCells with evaluator-all-rows scope")`<br>  `@scenario "Running evaluator on all rows creates one execution per row with target output"`<br>  `it("creates one cell per row that has a pre-computed target output")`<br>  `@scenario "Running evaluator on all rows creates one execution per row with target output"`<br>  `it("skips target execution for each cell")` | `__tests__/experiment-cell-plan.unit.test.ts` |
-| `describe("generateComparisonCells given a comparison the user has not finished configuring")`<br>  `describe("when fewer than two columns are picked")` → `it("reports every scoped row instead of skipping in silence")`<br>  `describe("when the golden answer is on but no column is picked for it")` → `it("reports the golden field as the thing to fix")`<br>  `describe("when a picked column no longer exists")` → `it("reports the missing column rather than judging what is left")`<br>  `describe("when the carrier is a chip evaluator on a variant column")` → `it("anchors the error on the first column it still has")`<br>  (all four carry `@scenario "A comparison the user has not finished configuring says what to fix"`) | `__tests__/experiment-comparison-plan.unit.test.ts` |
-| `describe("given two datasets where the active one is not the first")`<br>  `describe("when the run builds its cells")`<br>    `@scenario "The run reads its mappings from the dataset the rows come from"` `it("reads the mapping bucket of the active dataset")`<br>    `@scenario "The run reads its mappings from the dataset the rows come from"` `it("resolves the evaluator's inputs instead of dispatching an empty payload")` | `__tests__/experiment-run-orchestrator.seams.unit.test.ts` (new) |
+| Current describe / it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Goes to                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `describe("generateCells with evaluator-all-rows scope")`<br> `@scenario "Running evaluator on all rows creates one execution per row with target output"`<br> `it("creates one cell per row that has a pre-computed target output")`<br> `@scenario "Running evaluator on all rows creates one execution per row with target output"`<br> `it("skips target execution for each cell")`                                                                                                                                                                                                                                                                                                                                                     | `__tests__/experiment-cell-plan.unit.test.ts`                    |
+| `describe("generateComparisonCells given a comparison the user has not finished configuring")`<br> `describe("when fewer than two columns are picked")` → `it("reports every scoped row instead of skipping in silence")`<br> `describe("when the golden answer is on but no column is picked for it")` → `it("reports the golden field as the thing to fix")`<br> `describe("when a picked column no longer exists")` → `it("reports the missing column rather than judging what is left")`<br> `describe("when the carrier is a chip evaluator on a variant column")` → `it("anchors the error on the first column it still has")`<br> (all four carry `@scenario "A comparison the user has not finished configuring says what to fix"`) | `__tests__/experiment-comparison-plan.unit.test.ts`              |
+| `describe("given two datasets where the active one is not the first")`<br> `describe("when the run builds its cells")`<br> `@scenario "The run reads its mappings from the dataset the rows come from"` `it("reads the mapping bucket of the active dataset")`<br> `@scenario "The run reads its mappings from the dataset the rows come from"` `it("resolves the evaluator's inputs instead of dispatching an empty payload")`                                                                                                                                                                                                                                                                                                             | `__tests__/experiment-run-orchestrator.seams.unit.test.ts` (new) |
 
 The last one crosses two collaborators — it builds a cell with S1 and reads its
 inputs with S3 — so it becomes the facade's seam test and imports both names
@@ -1032,14 +1043,14 @@ failure mode that reads as a flake. Slice 12 greps for it.
 Three, all in `__tests__/experiment-run-orchestrator.seams.unit.test.ts`:
 
 1. The relocated `describe("given two datasets where the active one is not the
-   first")` above, verbatim.
+first")` above, verbatim.
 2. `describe("given the facade's exported surface")` →
    `it("exports every name src/index.ts and the transport import")` — asserts
    the 25 exported names of §10 are present and are values or types, so a
    delegation dropped during a later slice fails here rather than at a caller.
 3. `describe("given a run whose target is a connected agent")` →
    `it("forwards the injected dispatcher, clock and sleep into the connected
-   cell service")` — the one behaviour that moves from a per-call argument to a
+cell service")` — the one behaviour that moves from a per-call argument to a
    `create` dependency (S6), and therefore the one place the split can silently
    change what a caller gets.
 
@@ -1453,11 +1464,11 @@ for the whole repository.
 
 **Cleared by this lane:**
 
-| Policy | File | Finding today | After |
-| --- | --- | --- | --- |
-| `service-quality` | `experiment-run-orchestrator.service.ts` | `lines 3956/500, longest method 791/80, statements 43/24, complexity 42/24, line length 174/160` | gone — the facade lands at ~230 lines, longest method ~3, complexity ~2, and every new `.service.ts` is under all five defaults |
-| `comment-block-size` | same file | 61 violations (largest 23 lines) | gone after slice 1 |
-| comment-block **review** tier | same file | 30 blocks at 4–5 lines | reduced by slice 1; the tier is a review item, not a failure |
+| Policy                        | File                                     | Finding today                                                                                    | After                                                                                                                           |
+| ----------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `service-quality`             | `experiment-run-orchestrator.service.ts` | `lines 3956/500, longest method 791/80, statements 43/24, complexity 42/24, line length 174/160` | gone — the facade lands at ~230 lines, longest method ~3, complexity ~2, and every new `.service.ts` is under all five defaults |
+| `comment-block-size`          | same file                                | 61 violations (largest 23 lines)                                                                 | gone after slice 1                                                                                                              |
+| comment-block **review** tier | same file                                | 30 blocks at 4–5 lines                                                                           | reduced by slice 1; the tier is a review item, not a failure                                                                    |
 
 `service-quality-baseline.json` is **not** touched. The file has no entry today
 and gains none — the baseline is shrink-only and
@@ -1472,13 +1483,13 @@ accounting.
 
 **New policies the split brings into range, all satisfied by §4's shape:**
 
-| Policy | Applies because | How §4 satisfies it |
-| --- | --- | --- |
+| Policy                   | Applies because                                                            | How §4 satisfies it                                                                                                      |
+| ------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `fallible-result-naming` | it reads public methods of `.service.ts`, and this file has no class today | every method declares its return type; the three that can answer with nothing carry `try`; nothing is prefixed `require` |
-| `feature-source-layout` | eleven new `services/*.service.ts` and four new `processes/*.process.ts` | all are `experiment-<kebab>.<artifact>.ts` under an allowed directory |
-| `feature-source-subject` | new filenames claim a subject | every name starts `experiment-`, the subject this package owns |
-| `private-runtime-export` | `src/index.ts` is an entrypoint | `src/index.ts` does not change; no new collaborator is exported from it |
-| `test-colocation` | six test files move | every destination is `services/__tests__/` beside its subject |
+| `feature-source-layout`  | eleven new `services/*.service.ts` and four new `processes/*.process.ts`   | all are `experiment-<kebab>.<artifact>.ts` under an allowed directory                                                    |
+| `feature-source-subject` | new filenames claim a subject                                              | every name starts `experiment-`, the subject this package owns                                                           |
+| `private-runtime-export` | `src/index.ts` is an entrypoint                                            | `src/index.ts` does not change; no new collaborator is exported from it                                                  |
+| `test-colocation`        | six test files move                                                        | every destination is `services/__tests__/` beside its subject                                                            |
 
 **Not affected:** `prisma-containment` and `typed-prisma-seam` (this file names
 no `PrismaClient`), `package-cycle` (package-level, and no manifest changes),

@@ -43,8 +43,7 @@ export async function syncLangyAfterDefaultModelWrite({
   let previousDefault: string | null = null;
   let nextDefault: string | null | undefined;
   try {
-    previousDefault =
-      utils.modelProvider.getResolvedDefault.getData(resolvedInput)?.model ?? null;
+    previousDefault = utils.modelProvider.getResolvedDefault.getData(resolvedInput)?.model ?? null;
     await utils.modelProvider.invalidate();
     const resolved = await utils.modelProvider.getResolvedDefault.fetch(resolvedInput);
     nextDefault = resolved?.model ?? fallbackModel ?? previousDefault;

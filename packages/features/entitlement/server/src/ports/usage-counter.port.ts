@@ -35,7 +35,5 @@ export abstract class UsageCounterPort {
   ): Promise<UsageCount>;
 
   /** Whether this organization is metered in traces or in events. */
-  abstract getResolvedUsageUnit(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<UsageUnit>;
+  abstract getResolvedUsageUnit(input: Readonly<{ organizationId: string }>): Promise<UsageUnit>;
 }

@@ -16,8 +16,7 @@ export const OPTIMIZERS = {
   },
   MIPROv2ZeroShot: {
     name: "Prompt Only (MIPRO v2)",
-    description:
-      "Generates several prompt alternatives to try and improve the LLM performance.",
+    description: "Generates several prompt alternatives to try and improve the LLM performance.",
     minimum_train_set: 10,
     params: {
       llm: null as LLMConfig | null,

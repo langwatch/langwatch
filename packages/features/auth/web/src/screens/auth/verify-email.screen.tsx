@@ -22,12 +22,10 @@ export default function VerifyEmail() {
     <AuthCard title="Almost there">
       <VStack align="stretch" gap={3} data-testid="verify-email-landing">
         <Text>
-          Return to the window where you requested this verification to finish
-          confirming your email address.
+          Return to the window where you requested this verification to finish confirming your email
+          address.
         </Text>
-        <Text color="gray.600">
-          Opening this link on its own does not confirm anything.
-        </Text>
+        <Text color="gray.600">Opening this link on its own does not confirm anything.</Text>
       </VStack>
     </AuthCard>
   );

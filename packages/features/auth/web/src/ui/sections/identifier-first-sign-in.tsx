@@ -18,10 +18,7 @@ import {
   readLastUsedMethodId,
   rememberPendingMethod,
 } from "../../model/last-used-method";
-import {
-  signInMethodActionLabel,
-  signInMethodLabel,
-} from "../../model/method-labels";
+import { signInMethodActionLabel, signInMethodLabel } from "../../model/method-labels";
 import { CheckYourEmail } from "../elements/check-your-email";
 import { CredentialSignInForm } from "./credential-sign-in-form";
 import { FrontDoorFinePrint } from "../elements/front-door-fine-print";
@@ -65,9 +62,7 @@ export function IdentifierFirstSignIn() {
   const routing = useSignInRouting();
   const { decide } = routing;
   const askedOnMount = useRef(false);
-  const [instanceMethods, setInstanceMethods] = useState<
-    readonly SignInMethod[]
-  >([]);
+  const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
   const [signingUp, setSigningUp] = useState<string | null>(null);
   // Every failure this card can have shows in one place, at the top. A
@@ -116,14 +111,11 @@ export function IdentifierFirstSignIn() {
   // username and the server answers "Invalid email", which reads as a
   // refusal of something the person never typed. Treated as absent, so they
   // land back on the address step and can simply type it.
-  const submittedIdentifier = routing.identifier?.trim()
-    ? routing.identifier
-    : null;
+  const submittedIdentifier = routing.identifier?.trim() ? routing.identifier : null;
   // A failed decision falls back to the address form rather than showing a
   // picker built from the decision before it: the methods on offer are the
   // answer to a question that just failed to be answered.
-  const showPicker =
-    !routing.error && decision && (breakGlass || submittedIdentifier !== null);
+  const showPicker = !routing.error && decision && (breakGlass || submittedIdentifier !== null);
 
   // Told once, from the same state the returns below branch on, so the ground
   // can never be showing a step other than the one drawn over it.
@@ -227,12 +219,7 @@ export function IdentifierFirstSignIn() {
         submitLabel="Continue"
         isSubmitting={routing.isDeciding}
         onSubmit={({ email }) => decide({ identifier: email, breakGlass })}
-        footer={
-          <SignUpLink
-            callbackUrl={callbackUrl}
-            label="Don't have an account? Sign up"
-          />
-        }
+        footer={<SignUpLink callbackUrl={callbackUrl} label="Don't have an account? Sign up" />}
         alternatives={
           hasAlternativeMethods(instanceMethods) ? (
             <AlternativeMethods
@@ -316,8 +303,7 @@ function RoutedToConnection({
       <HStack gap={3}>
         <Spinner size="sm" color="orange.500" />
         <Text data-testid="routed-to-connection">
-          Taking you to your organization's sign-in with{" "}
-          {signInMethodLabel(method)}.
+          Taking you to your organization's sign-in with {signInMethodLabel(method)}.
         </Text>
       </HStack>
       <Button colorPalette="orange" onClick={() => onContinue(method)}>

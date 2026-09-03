@@ -7,8 +7,5 @@ import type { ScimSyncState } from "@langwatch/identity-contract";
  * staged re-run, and both legs have to reach the same head.
  */
 export interface ScimSyncReadRepository {
-  findSync(args: {
-    scimSyncId: string;
-    organizationId: string;
-  }): Promise<ScimSyncState | null>;
+  findSync(args: { scimSyncId: string; organizationId: string }): Promise<ScimSyncState | null>;
 }

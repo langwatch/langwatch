@@ -49,10 +49,7 @@ import type { JoinRequestReadRepository } from "./join-request.repository";
  *  in `specs/identity/join-requests.feature` is executable. PENDING is the
  *  only state anything can be done from, and the empty list is "no state at
  *  all" — a request that does not exist yet. */
-const ALLOWED_FROM: Record<
-  JoinRequestCommandType,
-  readonly JoinRequestState[]
-> = {
+const ALLOWED_FROM: Record<JoinRequestCommandType, readonly JoinRequestState[]> = {
   [REQUEST_JOIN_COMMAND_TYPE]: [],
   [APPROVE_JOIN_COMMAND_TYPE]: ["PENDING"],
   [REJECT_JOIN_COMMAND_TYPE]: ["PENDING"],
@@ -80,9 +77,7 @@ export class JoinRequestGuards {
    * `join_request_already_pending`; a public email domain is
    * `join_not_available`, the same nothing every other closed door gives.
    */
-  async requestJoin(
-    data: RequestJoinCommandData,
-  ): Promise<JoinRequestFactInput[]> {
+  async requestJoin(data: RequestJoinCommandData): Promise<JoinRequestFactInput[]> {
     const existing = await this.requests.findRequest({
       joinRequestId: data.joinRequestId,
     });
@@ -95,9 +90,7 @@ export class JoinRequestGuards {
     // matcher: a consumer mail provider is not a company, and one match on
     // one would offer strangers to each other by the million.
     if (isPublicEmailDomain(domain)) {
-      throw new JoinNotAvailableError(
-        `join request refused: ${domain} is a public email domain`,
-      );
+      throw new JoinNotAvailableError(`join request refused: ${domain} is a public email domain`);
     }
 
     const open = await this.requests.findPendingRequest({
@@ -132,9 +125,7 @@ export class JoinRequestGuards {
    * an approval grants the organization's default role, and an admin who
    * wants to hand over more sends a formal invitation instead.
    */
-  async approveJoin(
-    data: ApproveJoinCommandData,
-  ): Promise<JoinRequestFactInput[]> {
+  async approveJoin(data: ApproveJoinCommandData): Promise<JoinRequestFactInput[]> {
     const held = await this.requests.findRequest({
       joinRequestId: data.joinRequestId,
     });
@@ -170,9 +161,7 @@ export class JoinRequestGuards {
   /** Reject. No reason field: a rejection an admin has to justify is one they
    *  hesitate to make, and the requester is told only that it was not
    *  approved. */
-  async rejectJoin(
-    data: RejectJoinCommandData,
-  ): Promise<JoinRequestFactInput[]> {
+  async rejectJoin(data: RejectJoinCommandData): Promise<JoinRequestFactInput[]> {
     const state = await this.pendingOrRefuse({
       joinRequestId: data.joinRequestId,
       verb: REJECT_JOIN_COMMAND_TYPE,
@@ -192,9 +181,7 @@ export class JoinRequestGuards {
 
   /** Withdraw — the requester giving up, or an accepted invitation answering
    *  the request from the other direction, so a person never holds both. */
-  async withdrawJoin(
-    data: WithdrawJoinCommandData,
-  ): Promise<JoinRequestFactInput[]> {
+  async withdrawJoin(data: WithdrawJoinCommandData): Promise<JoinRequestFactInput[]> {
     const state = await this.pendingOrRefuse({
       joinRequestId: data.joinRequestId,
       verb: WITHDRAW_JOIN_COMMAND_TYPE,

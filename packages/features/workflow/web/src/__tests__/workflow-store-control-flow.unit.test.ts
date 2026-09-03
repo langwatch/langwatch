@@ -24,11 +24,7 @@ const node = (
   data: { name: id, inputs },
 });
 
-const baseNodes = [
-  node("entry", "entry"),
-  node("gate", "if_else"),
-  node("codeA", "code"),
-];
+const baseNodes = [node("entry", "entry"), node("gate", "if_else"), node("codeA", "code")];
 
 describe("workflowStoreCore - branch gate connections", () => {
   let store: StoreApi<WorkflowStore>;

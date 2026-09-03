@@ -149,9 +149,7 @@ describe("turnHasGenieSteps", () => {
   describe("given a turn that is not a routed Genie message", () => {
     describe("when it carries a foreign trace name", () => {
       it("refuses the turn regardless of span count", () => {
-        expect(
-          turnHasGenieSteps({ traceName: "my-app-trace", spanCount: 5 }),
-        ).toBe(false);
+        expect(turnHasGenieSteps({ traceName: "my-app-trace", spanCount: 5 })).toBe(false);
       });
     });
 

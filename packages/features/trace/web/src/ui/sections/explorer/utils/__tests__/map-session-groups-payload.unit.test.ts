@@ -5,9 +5,7 @@ import {
   type SessionGroupPayloadItem,
 } from "../map-session-groups-payload";
 
-function payloadItem(
-  overrides: Partial<SessionGroupPayloadItem> = {},
-): SessionGroupPayloadItem {
+function payloadItem(overrides: Partial<SessionGroupPayloadItem> = {}): SessionGroupPayloadItem {
   return {
     conversationId: "sess-1",
     traceCount: 42,
@@ -36,9 +34,7 @@ function payloadItem(
 type CodingAgentPayload = NonNullable<SessionGroupPayloadItem["codingAgent"]>;
 
 /** The enrichment as the sessions procedure sends it, git context and all. */
-function codingAgentPayload(
-  overrides: Partial<CodingAgentPayload> = {},
-): CodingAgentPayload {
+function codingAgentPayload(overrides: Partial<CodingAgentPayload> = {}): CodingAgentPayload {
   return {
     modelCalls: 0,
     compactions: 0,
@@ -166,12 +162,12 @@ describe("given a session group payload from the sessions procedure", () => {
     });
 
     it("derives the worst status from error and warning counts", () => {
-      expect(
-        mapSessionGroupToConversationGroup(payloadItem({ errorCount: 2 })).worstStatus,
-      ).toBe("error");
-      expect(
-        mapSessionGroupToConversationGroup(payloadItem({ warningCount: 1 })).worstStatus,
-      ).toBe("warning");
+      expect(mapSessionGroupToConversationGroup(payloadItem({ errorCount: 2 })).worstStatus).toBe(
+        "error",
+      );
+      expect(mapSessionGroupToConversationGroup(payloadItem({ warningCount: 1 })).worstStatus).toBe(
+        "warning",
+      );
     });
   });
 });

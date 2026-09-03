@@ -55,8 +55,7 @@ export type TenantScopeViolation =
     };
 
 /** `TenantId = {someName:String}`, allowing an optional table alias. */
-const BOUND_TENANT_PREDICATE =
-  /(?:^|[\s.(])TenantId\s*=\s*\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/i;
+const BOUND_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/i;
 
 /** `TenantId = 'literal'` or `= "literal"`, which is never acceptable. */
 const LITERAL_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")/i;

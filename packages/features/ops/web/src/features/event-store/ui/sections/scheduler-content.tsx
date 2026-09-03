@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Center,
-  EmptyState,
-  HStack,
-  Spinner,
-  Table,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Center, EmptyState, HStack, Spinner, Table, Text } from "@chakra-ui/react";
 import { CalendarClock } from "lucide-react";
 import type { OpsScheduledJob, SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import type { ReactNode } from "react";
@@ -42,11 +34,7 @@ export function SchedulerContentView({
   isLoading: boolean;
   hasAccess: boolean;
   now?: number;
-  renderActions?: (
-    job: OpsScheduledJob,
-    status: SchedulerJobStatus,
-    now: number,
-  ) => ReactNode;
+  renderActions?: (job: OpsScheduledJob, status: SchedulerJobStatus, now: number) => ReactNode;
 }) {
   const sorted = [...jobs].sort((a, b) => compareForAttention({ a, b, now }));
   const counts = summarize({ jobs, now });
@@ -87,11 +75,7 @@ export function SchedulerContentView({
 
   return (
     <>
-      <SchedulerHeader
-        counts={counts}
-        loopHealthy={loop.healthy}
-        lastFiredAt={loop.lastFiredAt}
-      />
+      <SchedulerHeader counts={counts} loopHealthy={loop.healthy} lastFiredAt={loop.lastFiredAt} />
       <Table.Root variant="line" size="sm">
         <Table.Header>
           <Table.Row>
@@ -130,11 +114,7 @@ function ScheduleRow({
   job: OpsScheduledJob;
   now: number;
   hasAccess: boolean;
-  renderActions?: (
-    job: OpsScheduledJob,
-    status: SchedulerJobStatus,
-    now: number,
-  ) => ReactNode;
+  renderActions?: (job: OpsScheduledJob, status: SchedulerJobStatus, now: number) => ReactNode;
 }) {
   const status = deriveStatus({ job, now });
 

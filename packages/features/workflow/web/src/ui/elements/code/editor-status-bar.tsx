@@ -113,9 +113,7 @@ export function EditorStatusBar({
         {selection > 0 ? ` (${selection} selected)` : ""}
       </Text>
       <Separator />
-      <Text
-        color={errorCount > 0 ? "red.500" : warningCount > 0 ? "orange.500" : undefined}
-      >
+      <Text color={errorCount > 0 ? "red.500" : warningCount > 0 ? "orange.500" : undefined}>
         {problemsLabel}
       </Text>
       <HStack flex={1} justify="flex-end" gap={3}>
@@ -123,12 +121,7 @@ export function EditorStatusBar({
         <Separator />
         <Text>UTF-8</Text>
         <Separator />
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={onSave}
-          data-testid="code-editor-save"
-        >
+        <Button size="xs" variant="outline" onClick={onSave} data-testid="code-editor-save">
           Save
           <ShortcutHint>{modKey}S</ShortcutHint>
         </Button>
@@ -164,14 +157,7 @@ function useModifierKeyLabel(): string {
  */
 function ShortcutHint({ children }: { children: React.ReactNode }) {
   return (
-    <Box
-      as="span"
-      ml={1.5}
-      fontFamily="mono"
-      fontSize="10px"
-      letterSpacing="tight"
-      opacity={0.6}
-    >
+    <Box as="span" ml={1.5} fontFamily="mono" fontSize="10px" letterSpacing="tight" opacity={0.6}>
       {children}
     </Box>
   );

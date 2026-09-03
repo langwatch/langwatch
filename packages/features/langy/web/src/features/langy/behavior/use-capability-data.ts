@@ -86,12 +86,9 @@ export function useCapabilityData({
   // NOT name the resource itself; resolving them as if they did would misread
   // "record not found as a dataset" as "dataset gone" — so they stay on the
   // stored-structure rendering.
-  const idsEligible =
-    digest?.strategy === "id-ref" && !CLI_SUBRESOURCE_VERBS.has(digest.verb);
+  const idsEligible = digest?.strategy === "id-ref" && !CLI_SUBRESOURCE_VERBS.has(digest.verb);
   const ids =
-    idsEligible && digest?.ids && digest.ids.length > 0
-      ? digest.ids.slice(0, maxRows)
-      : null;
+    idsEligible && digest?.ids && digest.ids.length > 0 ? digest.ids.slice(0, maxRows) : null;
   // Query-fetch is for BEFORE the result exists (start frame) and for
   // aggregates that re-run by design (`query-ref`). A settled reduced/text
   // result must NOT be silently re-run: fresh rows could contradict the
@@ -109,13 +106,7 @@ export function useCapabilityData({
   const enabled = projectId !== null && mode !== null;
 
   const result = useQuery({
-    queryKey: [
-      "langy-capability-data",
-      projectId,
-      resource,
-      mode,
-      mode === "ids" ? ids : query,
-    ],
+    queryKey: ["langy-capability-data", projectId, resource, mode, mode === "ids" ? ids : query],
     queryFn: async () => {
       if (mode === "ids") {
         return hydrator!.byIds!({ utils, projectId: projectId!, ids: ids! });

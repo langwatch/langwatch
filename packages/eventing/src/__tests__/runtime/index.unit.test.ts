@@ -173,15 +173,13 @@ describe("EventSourcingPipeline", () => {
         data: { result: number };
       }
 
-      const definition: EventSourcingPipelineDefinition<
-        Event,
-        { testProjection: TestProjection }
-      > = {
-        name: "test-pipeline",
-        aggregateType,
-        allowedEventTypes: ["test.event"],
-        eventStore: mockEventStore,
-      };
+      const definition: EventSourcingPipelineDefinition<Event, { testProjection: TestProjection }> =
+        {
+          name: "test-pipeline",
+          aggregateType,
+          allowedEventTypes: ["test.event"],
+          eventStore: mockEventStore,
+        };
 
       const pipeline = new EventSourcingPipeline(definition);
 

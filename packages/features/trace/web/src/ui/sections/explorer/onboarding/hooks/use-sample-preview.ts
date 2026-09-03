@@ -1,10 +1,7 @@
 import { useFilterStore } from "../../../../../index";
 import type { TraceListItem } from "../../types/trace";
 import { shouldShowArrivals } from "../../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
-import {
-  ARRIVAL_PREVIEW_TRACES,
-  SAMPLE_PREVIEW_TRACES,
-} from "../data/sample-preview-traces";
+import { ARRIVAL_PREVIEW_TRACES, SAMPLE_PREVIEW_TRACES } from "../data/sample-preview-traces";
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store";
 import { usePreviewTracesActive } from "../../../../../behavior/explorer/onboarding/use-preview-traces-active";
 
@@ -73,10 +70,7 @@ export function useSamplePreview(): SamplePreviewResult | null {
  * responsive without inventing a parser. Empty/whitespace returns the
  * full set.
  */
-function filterPreviewTraces(
-  traces: readonly TraceListItem[],
-  queryText: string,
-): TraceListItem[] {
+function filterPreviewTraces(traces: readonly TraceListItem[], queryText: string): TraceListItem[] {
   const trimmed = queryText.trim().toLowerCase();
   if (!trimmed) return [...traces];
   return traces.filter((t) => {

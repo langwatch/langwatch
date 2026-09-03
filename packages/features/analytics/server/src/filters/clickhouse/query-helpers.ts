@@ -16,9 +16,7 @@ export const ATTRIBUTE_KEYS = {
 /**
  * Build common WHERE conditions for trace_summaries queries.
  */
-export function buildTraceSummariesConditions(
-  _params: ClickHouseFilterQueryParams,
-): string {
+export function buildTraceSummariesConditions(_params: ClickHouseFilterQueryParams): string {
   const conditions: string[] = [
     "TenantId = {tenantId:String}",
     "OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
@@ -42,9 +40,7 @@ export function buildStoredSpansConditions(_params: ClickHouseFilterQueryParams)
 /**
  * Build common WHERE conditions for evaluation_runs queries.
  */
-export function buildEvaluationRunsConditions(
-  _params: ClickHouseFilterQueryParams,
-): string {
+export function buildEvaluationRunsConditions(_params: ClickHouseFilterQueryParams): string {
   const conditions: string[] = [
     "TenantId = {tenantId:String}",
     "ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
@@ -56,10 +52,7 @@ export function buildEvaluationRunsConditions(
 /**
  * Build a LIKE filter clause for optional query string matching.
  */
-export function buildQueryFilter(
-  column: string,
-  params: ClickHouseFilterQueryParams,
-): string {
+export function buildQueryFilter(column: string, params: ClickHouseFilterQueryParams): string {
   if (!params.query) {
     return "";
   }

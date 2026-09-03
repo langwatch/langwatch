@@ -7,35 +7,33 @@ import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { CONVERSATION_TURN_CAP } from "@langwatch/coding-agent-web";
 import { useSessionScrollback } from "../use-session-scrollback";
 
-const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoisted(
-  () => {
-    const fetchTranscript = vi.fn();
-    const fetchSpans = vi.fn();
-    const fetchEvents = vi.fn();
-    return {
-      fetchTranscript,
-      fetchSpans,
-      fetchEvents,
-      utils: {
-        tracesV2: {
-          codingAgentTranscript: { fetch: fetchTranscript },
-          spansFull: { fetch: fetchSpans },
-          traceEvents: { fetch: fetchEvents },
-        },
+const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoisted(() => {
+  const fetchTranscript = vi.fn();
+  const fetchSpans = vi.fn();
+  const fetchEvents = vi.fn();
+  return {
+    fetchTranscript,
+    fetchSpans,
+    fetchEvents,
+    utils: {
+      tracesV2: {
+        codingAgentTranscript: { fetch: fetchTranscript },
+        spansFull: { fetch: fetchSpans },
+        traceEvents: { fetch: fetchEvents },
       },
-      /** The session's turns, time ascending, as the conversation read returns them. */
-      conversation: {
-        turns: [] as Array<{
-          traceId: string;
-          timestamp: number;
-          totalTokens?: number | null;
-          totalCost?: number | null;
-        }>,
-        isLoading: false,
-      },
-    };
-  },
-);
+    },
+    /** The session's turns, time ascending, as the conversation read returns them. */
+    conversation: {
+      turns: [] as Array<{
+        traceId: string;
+        timestamp: number;
+        totalTokens?: number | null;
+        totalCost?: number | null;
+      }>,
+      isLoading: false,
+    },
+  };
+});
 
 vi.mock("../../../../trace-api", () => ({ api: { useUtils: () => utils } }));
 
@@ -73,10 +71,7 @@ interface Props {
   conversationId: string | null;
 }
 
-function setup({
-  traceId = "turn-3",
-  conversationId = "session-a",
-}: Partial<Props> = {}) {
+function setup({ traceId = "turn-3", conversationId = "session-a" }: Partial<Props> = {}) {
   return renderHook(
     (props: Props) =>
       useSessionScrollback({

@@ -39,14 +39,11 @@ describe("origin display mapping", () => {
     });
 
     describe("when the table renders the Origin column badge", () => {
-      it.each(knownOrigins)(
-        "labels and colours the %s badge from the shared table",
-        (origin) => {
-          const badge = renderOriginBadge(origin);
-          expect(badge.props.children).toBe(ORIGIN_DISPLAY[origin].label);
-          expect(badge.props.colorPalette).toBe(ORIGIN_DISPLAY[origin].colorPalette);
-        },
-      );
+      it.each(knownOrigins)("labels and colours the %s badge from the shared table", (origin) => {
+        const badge = renderOriginBadge(origin);
+        expect(badge.props.children).toBe(ORIGIN_DISPLAY[origin].label);
+        expect(badge.props.colorPalette).toBe(ORIGIN_DISPLAY[origin].colorPalette);
+      });
     });
   });
 });

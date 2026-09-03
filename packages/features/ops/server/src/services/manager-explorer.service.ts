@@ -357,9 +357,9 @@ export class ManagerExplorerService {
     projectId: string;
     aggregateId: string;
   }): Promise<AggregateProcessManager[]> {
-    const managers = this.introspection.processManagers().filter(
-      (m) => m.aggregateType === params.aggregateType && !m.scheduled,
-    );
+    const managers = this.introspection
+      .processManagers()
+      .filter((m) => m.aggregateType === params.aggregateType && !m.scheduled);
 
     return Promise.all(
       managers.map(async (m) => {

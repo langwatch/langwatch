@@ -94,10 +94,7 @@ export abstract class TraceAlertTriggerMatchPort {
 }
 
 export abstract class TraceAlertOriginGuardPort {
-  abstract passes(input: {
-    event: GovernanceTraceEvent;
-    state: GovernanceTraceSummary;
-  }): boolean;
+  abstract passes(input: { event: GovernanceTraceEvent; state: GovernanceTraceSummary }): boolean;
 }
 
 export abstract class TraceAlertMetricsPort {

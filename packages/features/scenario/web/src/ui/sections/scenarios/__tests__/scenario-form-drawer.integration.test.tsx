@@ -43,9 +43,7 @@ vi.mock("../save-and-run-menu", () => ({
       </button>
       <button
         data-testid="save-and-run-button"
-        onClick={() =>
-          onSaveAndRun?.(selectedTarget ?? { type: "http", id: "agent-1" })
-        }
+        onClick={() => onSaveAndRun?.(selectedTarget ?? { type: "http", id: "agent-1" })}
       >
         Save and Run
       </button>
@@ -62,13 +60,7 @@ vi.mock("../scenario-editor-sidebar", () => ({
 // Here it auto-confirms once on open so these flow tests exercise the
 // save → run → navigate path without driving the picker UI.
 vi.mock("../scenario-run-model-dialog", () => ({
-  ScenarioRunModelDialog: ({
-    open,
-    onConfirm,
-  }: {
-    open?: boolean;
-    onConfirm?: () => void;
-  }) => {
+  ScenarioRunModelDialog: ({ open, onConfirm }: { open?: boolean; onConfirm?: () => void }) => {
     React.useEffect(() => {
       if (open) onConfirm?.();
     }, [open]);
@@ -157,9 +149,7 @@ vi.mock("../../../../behavior/scenario-api", () => ({
           data: mocks.mockGetByIdData,
           isLoading: mocks.mockGetByIdIsLoading,
           isError: mocks.mockGetByIdHasError,
-          error: mocks.mockGetByIdHasError
-            ? new Error("scenario read failed")
-            : null,
+          error: mocks.mockGetByIdHasError ? new Error("scenario read failed") : null,
           refetch: mocks.mockGetByIdRefetch,
         }),
       },
@@ -308,12 +298,8 @@ describe("<ScenarioFormDrawer/>", () => {
       it("pre-populates the form with initial data", () => {
         render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
 
-        expect(
-          screen.getByDisplayValue("Generated Scenario"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByDisplayValue("A generated situation"),
-        ).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Generated Scenario")).toBeInTheDocument();
+        expect(screen.getByDisplayValue("A generated situation")).toBeInTheDocument();
       });
 
       it("does not create a DB record", () => {
@@ -407,10 +393,9 @@ describe("<ScenarioFormDrawer/>", () => {
     });
 
     it("displays 'Edit Scenario' heading", () => {
-      render(
-        <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" />,
-        { wrapper: Wrapper },
-      );
+      render(<ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("Edit Scenario")).toBeInTheDocument();
     });
@@ -421,11 +406,7 @@ describe("<ScenarioFormDrawer/>", () => {
         const onClose = vi.fn();
 
         render(
-          <ScenarioFormDrawer
-            open={true}
-            scenarioId="existing-scenario-id"
-            onClose={onClose}
-          />,
+          <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
           {
             wrapper: Wrapper,
           },
@@ -463,11 +444,7 @@ describe("<ScenarioFormDrawer/>", () => {
       const onClose = vi.fn();
 
       render(
-        <ScenarioFormDrawer
-          open={true}
-          scenarioId="existing-scenario-id"
-          onClose={onClose}
-        />,
+        <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
         {
           wrapper: Wrapper,
         },
@@ -488,11 +465,7 @@ describe("<ScenarioFormDrawer/>", () => {
       const user = userEvent.setup();
 
       render(
-        <ScenarioFormDrawer
-          open={true}
-          scenarioId="existing-scenario-id"
-          onClose={vi.fn()}
-        />,
+        <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={vi.fn()} />,
         {
           wrapper: Wrapper,
         },
@@ -542,11 +515,7 @@ describe("<ScenarioFormDrawer/>", () => {
         const onClose = vi.fn();
 
         render(
-          <ScenarioFormDrawer
-            open={true}
-            scenarioId="existing-scenario-id"
-            onClose={onClose}
-          />,
+          <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
           {
             wrapper: Wrapper,
           },
@@ -572,11 +541,7 @@ describe("<ScenarioFormDrawer/>", () => {
         const onClose = vi.fn();
 
         render(
-          <ScenarioFormDrawer
-            open={true}
-            scenarioId="existing-scenario-id"
-            onClose={onClose}
-          />,
+          <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
           {
             wrapper: Wrapper,
           },
@@ -597,11 +562,7 @@ describe("<ScenarioFormDrawer/>", () => {
         const onClose = vi.fn();
 
         render(
-          <ScenarioFormDrawer
-            open={true}
-            scenarioId="existing-scenario-id"
-            onClose={onClose}
-          />,
+          <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
           {
             wrapper: Wrapper,
           },
@@ -700,11 +661,7 @@ describe("<ScenarioFormDrawer/>", () => {
     it("registers onSave flow callbacks for all agent editor types", async () => {
       await clickCreateAgentButton();
 
-      for (const drawerName of [
-        "agentHttpEditor",
-        "agentCodeEditor",
-        "workflowSelector",
-      ]) {
+      for (const drawerName of ["agentHttpEditor", "agentCodeEditor", "workflowSelector"]) {
         expect(mocks.mockSetFlowCallbacks).toHaveBeenCalledWith(
           drawerName,
           expect.objectContaining({ onSave: expect.any(Function) }),
@@ -756,9 +713,7 @@ describe("<ScenarioFormDrawer/>", () => {
       });
 
       expect(screen.getByTestId("scenario-form-skeleton")).toBeInTheDocument();
-      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
-        null,
-      );
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(null);
     });
 
     /** @scenario "An unloaded scenario is still titled as an edit" */
@@ -777,10 +732,7 @@ describe("<ScenarioFormDrawer/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByTestId("save-and-run-menu")).toHaveAttribute(
-        "data-loading",
-        "true",
-      );
+      expect(screen.getByTestId("save-and-run-menu")).toHaveAttribute("data-loading", "true");
     });
   });
 
@@ -805,14 +757,9 @@ describe("<ScenarioFormDrawer/>", () => {
 
       expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
       await waitFor(() => {
-        expect(
-          screen.getByDisplayValue("Refund Request Test"),
-        ).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Refund Request Test")).toBeInTheDocument();
       });
-      expect(screen.getByTestId("save-and-run-menu")).toHaveAttribute(
-        "data-loading",
-        "false",
-      );
+      expect(screen.getByTestId("save-and-run-menu")).toHaveAttribute("data-loading", "false");
     });
   });
 
@@ -838,9 +785,7 @@ describe("<ScenarioFormDrawer/>", () => {
 
       expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
       await waitFor(() => {
-        expect(
-          screen.getByDisplayValue("Refund Request Test"),
-        ).toBeInTheDocument();
+        expect(screen.getByDisplayValue("Refund Request Test")).toBeInTheDocument();
       });
     });
   });
@@ -867,9 +812,7 @@ describe("<ScenarioFormDrawer/>", () => {
       });
 
       expect(screen.getByTestId("scenario-read-error")).toBeInTheDocument();
-      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
-        null,
-      );
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(null);
       expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
     });
 
@@ -915,9 +858,7 @@ describe("<ScenarioFormDrawer/>", () => {
       });
 
       expect(screen.getByTestId("scenario-form-skeleton")).toBeInTheDocument();
-      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(
-        null,
-      );
+      expect(screen.queryByPlaceholderText("e.g., Angry refund request")).toBe(null);
     });
   });
 
@@ -946,9 +887,7 @@ describe("<ScenarioFormDrawer/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.getByDisplayValue("Refund Request Test"),
-      ).toBeInTheDocument();
+      expect(screen.getByDisplayValue("Refund Request Test")).toBeInTheDocument();
       expect(screen.queryByTestId("scenario-read-error")).toBe(null);
     });
   });
@@ -989,9 +928,7 @@ describe("<ScenarioFormDrawer/>", () => {
       render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
 
       expect(screen.queryByTestId("scenario-form-skeleton")).toBe(null);
-      expect(
-        screen.getByPlaceholderText("e.g., Angry refund request"),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("e.g., Angry refund request")).toBeInTheDocument();
     });
   });
 });

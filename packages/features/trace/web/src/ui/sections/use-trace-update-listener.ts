@@ -147,10 +147,7 @@ export function useTraceUpdateListener({
 
   const [lastEventAt, setLastEventAt] = useState<number>(0);
 
-  const sse = useSSESubscription<
-    { event: string; timestamp: number },
-    { projectId: string }
-  >(
+  const sse = useSSESubscription<{ event: string; timestamp: number }, { projectId: string }>(
     // @ts-expect-error - tRPC subscription type mismatch with useSSESubscription hook
     api.traces.onTraceUpdate,
     { projectId },

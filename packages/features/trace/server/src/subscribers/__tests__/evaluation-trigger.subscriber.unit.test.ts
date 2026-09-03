@@ -592,7 +592,11 @@ describe("createEvaluationTriggerSubscriber — origin, cutoff and processing-ca
     it("dispatches evaluation commands", async () => {
       const { built, dispatch, listMonitors } = subscriber({});
 
-      await run(built, spanEvent(), foldState({ attributes: { "langwatch.origin": "application" } }));
+      await run(
+        built,
+        spanEvent(),
+        foldState({ attributes: { "langwatch.origin": "application" } }),
+      );
 
       expect(listMonitors).toHaveBeenCalledWith("tenant-1");
       expect(dispatch.sent).toHaveLength(1);
@@ -607,7 +611,11 @@ describe("createEvaluationTriggerSubscriber — origin, cutoff and processing-ca
       // The depth signal (per-span) is the sole hard rule.
       const { built, dispatch } = subscriber({});
 
-      await run(built, spanEvent(), foldState({ attributes: { "langwatch.origin": "evaluation" } }));
+      await run(
+        built,
+        spanEvent(),
+        foldState({ attributes: { "langwatch.origin": "evaluation" } }),
+      );
 
       expect(dispatch.sent).toHaveLength(1);
     });

@@ -216,18 +216,14 @@ const registerAutoShutdownHandlers = ({
           return;
         }
 
-        logger.debug(
-          `${signal}: flush complete and nothing else is listening, re-raising`,
-        );
+        logger.debug(`${signal}: flush complete and nothing else is listening, re-raising`);
         process.kill(process.pid, signal);
       });
     });
   }
 };
 
-export function setupObservability(
-  options: SetupObservabilityOptions = {},
-): ObservabilityHandle {
+export function setupObservability(options: SetupObservabilityOptions = {}): ObservabilityHandle {
   const logger =
     options.debug?.logger ??
     new ConsoleLogger({
@@ -495,9 +491,7 @@ export function createAndStartNodeSdk(
       "LangWatch integration disabled, using user-provided SpanProcessors and LogRecordProcessors",
     );
   } else {
-    logger.info(
-      `Using LangWatch ${langwatch.processorType} processors for tracing and logging`,
-    );
+    logger.info(`Using LangWatch ${langwatch.processorType} processors for tracing and logging`);
   }
 
   const spanProcessors: SpanProcessor[] = [];
@@ -509,12 +503,8 @@ export function createAndStartNodeSdk(
     logger.debug("Console tracing enabled; adding console span exporter");
   }
   if (options.debug?.consoleLogging) {
-    logProcessors.push(
-      new SimpleLogRecordProcessor({ exporter: new ConsoleLogRecordExporter() }),
-    );
-    logger.debug(
-      "Console recording of logs enabled; adding console log record processor",
-    );
+    logProcessors.push(new SimpleLogRecordProcessor({ exporter: new ConsoleLogRecordExporter() }));
+    logger.debug("Console recording of logs enabled; adding console log record processor");
   }
 
   if (!langwatch.disabled) {
@@ -549,9 +539,7 @@ export function createAndStartNodeSdk(
 
   if (options.spanProcessors?.length) {
     spanProcessors.push(...options.spanProcessors);
-    logger.debug(
-      `Added user-provided ${options.spanProcessors.length} SpanProcessors to SDK`,
-    );
+    logger.debug(`Added user-provided ${options.spanProcessors.length} SpanProcessors to SDK`);
   }
   if (options.logRecordProcessors?.length) {
     logProcessors.push(...options.logRecordProcessors);
@@ -613,9 +601,7 @@ export function createAndStartNodeSdk(
         if (realProvider?.constructor.name === "NodeTracerProvider") {
           // Explicitly register the real provider globally
           trace.setGlobalTracerProvider(realProvider);
-          logger.info(
-            "Successfully registered NodeTracerProvider globally for Next.js 15",
-          );
+          logger.info("Successfully registered NodeTracerProvider globally for Next.js 15");
         } else {
           logger.error(
             "Could not find NodeTracerProvider in proxy delegate - spans may not be exported",
@@ -636,8 +622,7 @@ export function createAndStartNodeSdk(
     registerAutoShutdownHandlers({
       sdk,
       logger,
-      exitProcessAfterShutdown:
-        options.advanced?.UNSAFE_exitProcessAfterAutoShutdown ?? false,
+      exitProcessAfterShutdown: options.advanced?.UNSAFE_exitProcessAfterAutoShutdown ?? false,
     });
   }
 

@@ -107,14 +107,9 @@ describe("<IntegrationCTACard />", () => {
       it("calls setIntegrationCtaDismissedAt with the project id and a timestamp", () => {
         const before = Date.now();
         renderCard();
-        fireEvent.click(
-          screen.getByRole("button", { name: /dismiss integration prompt/i }),
-        );
+        fireEvent.click(screen.getByRole("button", { name: /dismiss integration prompt/i }));
         expect(mockSetDismissedAt).toHaveBeenCalledOnce();
-        const [calledProjectId, calledTs] = mockSetDismissedAt.mock.calls[0] as [
-          string,
-          number,
-        ];
+        const [calledProjectId, calledTs] = mockSetDismissedAt.mock.calls[0] as [string, number];
         expect(calledProjectId).toBe("proj-cta-test");
         expect(calledTs).toBeGreaterThanOrEqual(before);
       });

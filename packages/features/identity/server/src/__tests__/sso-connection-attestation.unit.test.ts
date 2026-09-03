@@ -190,10 +190,9 @@ describe("operator attestation", () => {
           }),
         { connectionId: "ssoc_2" },
       );
-      await run(
-        () => guards.claimDomain({ ...second, domain: "other.example" }),
-        { connectionId: "ssoc_2" },
-      );
+      await run(() => guards.claimDomain({ ...second, domain: "other.example" }), {
+        connectionId: "ssoc_2",
+      });
       await run(
         () =>
           guards.approveDomainClaim({
@@ -217,9 +216,7 @@ describe("operator attestation", () => {
 
     /** @scenario "An attestation stands until somebody decides otherwise" */
     it("still verifies and still routes a year later, with nothing asking again", async () => {
-      await run(() =>
-        guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }),
-      );
+      await run(() => guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }));
       const { state } = await run(
         () =>
           guards.activateConnection({
@@ -390,9 +387,10 @@ describe("operator attestation", () => {
       });
       expect(held?.state).toBe("APPROVED");
       expect(held?.verifiedDomains).toEqual([]);
-      expect(await connections.findDomainOwner({ domain: "acme.com" })).toEqual(
-        { connectionId: "ssoc_first", organizationId: "org_first" },
-      );
+      expect(await connections.findDomainOwner({ domain: "acme.com" })).toEqual({
+        connectionId: "ssoc_first",
+        organizationId: "org_first",
+      });
     });
   });
 
@@ -401,9 +399,7 @@ describe("operator attestation", () => {
     /** @scenario "Which tier a connection came through stays readable afterwards" */
     it("names each domain's method and who authorized it, on the connection itself", async () => {
       await reachApproved();
-      await run(() =>
-        guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }),
-      );
+      await run(() => guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }));
 
       // A second connection, whose domain the customer proved themselves.
       const proved = { ...identity, connectionId: "ssoc_2" };
@@ -439,10 +435,9 @@ describe("operator attestation", () => {
           }),
         { connectionId: "ssoc_2" },
       );
-      await run(
-        () => guards.verifyDomain({ ...proved, domain: "beta.example" }),
-        { connectionId: "ssoc_2" },
-      );
+      await run(() => guards.verifyDomain({ ...proved, domain: "beta.example" }), {
+        connectionId: "ssoc_2",
+      });
 
       // A third, on a self-hosted installation whose licence proved it.
       const licensed = { ...identity, connectionId: "ssoc_3" };
@@ -456,10 +451,9 @@ describe("operator attestation", () => {
           }),
         { connectionId: "ssoc_3" },
       );
-      await run(
-        () => guards.claimDomain({ ...licensed, domain: "gamma.example" }),
-        { connectionId: "ssoc_3" },
-      );
+      await run(() => guards.claimDomain({ ...licensed, domain: "gamma.example" }), {
+        connectionId: "ssoc_3",
+      });
       await run(
         () =>
           guards.approveDomainClaim({
@@ -479,10 +473,9 @@ describe("operator attestation", () => {
           }),
         { connectionId: "ssoc_3" },
       );
-      await run(
-        () => guards.verifyDomain({ ...licensed, domain: "gamma.example" }),
-        { connectionId: "ssoc_3" },
-      );
+      await run(() => guards.verifyDomain({ ...licensed, domain: "gamma.example" }), {
+        connectionId: "ssoc_3",
+      });
 
       const attested = await connections.findConnection({
         connectionId: CONNECTION,
@@ -523,9 +516,7 @@ describe("operator attestation", () => {
 
       // And nothing anywhere can present the attested one as customer-proved:
       // the method is a distinct value, not an absence to be defaulted.
-      expect(
-        attested?.domainVerifications.map((entry) => entry.method),
-      ).not.toContain("dns-txt");
+      expect(attested?.domainVerifications.map((entry) => entry.method)).not.toContain("dns-txt");
     });
   });
 

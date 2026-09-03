@@ -23,7 +23,6 @@ import {
  */
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
-
 export interface MetricRequestCollectionDeps {
   metrics: MetricService;
   recordDataPoints: (data: CanonicalMetricDataPoint[]) => Promise<void>;

@@ -48,9 +48,7 @@ describe("providersWithoutRegistryModels", () => {
     });
 
     it("treats an env-fed system row the server marked as serving embeddings as available", () => {
-      expect(
-        hidden([{ provider: "gemini", enabled: true, scopeType: undefined }]),
-      ).toBe(false);
+      expect(hidden([{ provider: "gemini", enabled: true, scopeType: undefined }])).toBe(false);
     });
   });
 

@@ -15,9 +15,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import { type MappablePrompt, PromptTargetMappingSection } from "../prompt-target-mapping-section";
 
-vi.mock("@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport", () => ({
-  CodeEditor: () => null,
-}));
+vi.mock(
+  "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport",
+  () => ({
+    CodeEditor: () => null,
+  }),
+);
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

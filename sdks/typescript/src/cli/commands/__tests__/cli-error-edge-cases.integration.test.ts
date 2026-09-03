@@ -38,9 +38,7 @@ function matchKey(method: string, urlPath: string): string | undefined {
         (keyPath ?? "")
           .split("/")
           .map((segment) =>
-            segment.startsWith(":")
-              ? "[^/]+"
-              : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            segment.startsWith(":") ? "[^/]+" : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
           )
           .join("/") +
         "$",

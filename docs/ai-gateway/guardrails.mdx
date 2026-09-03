@@ -114,10 +114,10 @@ A VK can have multiple guardrails in each direction; the gateway runs them in pa
 `fail_open` is emitted on all three directions, whenever the control-plane guardrail call fails and the gateway lets the traffic through unchecked. The `request` and `response` directions do so only when the virtual key opts into fail-open; the default is fail closed and the request is refused instead. The `stream_chunk` direction always fails open by design, so a slow policy service never stalls a stream a user is already reading, which means a `direction="stream_chunk", verdict="fail_open"` series is the one to watch: it is the only signal that chunk-level policy stopped being enforced. The `langwatch.guardrail.stream_chunk_fail_open` span attribute carries the reason for an individual bypass, which the counter deliberately does not, since the reason is unbounded text.
 
 <Info>
-  `gateway_http_requests_total{(status = "403")}` is a useful cross-check: it flips on
-  every block verdict regardless of direction, so a divergence between it and
-  `sum(rate(gateway_guardrail_verdicts_total{(verdict = "block")}[5m]))` points at a
-  direction that is blocking without being counted.
+  `gateway_http_requests_total{(status = "403")}` is a useful cross-check: it flips on every block
+  verdict regardless of direction, so a divergence between it and
+  `sum(rate(gateway_guardrail_verdicts_total{(verdict = "block")}[5m]))` points at a direction that
+  is blocking without being counted.
 </Info>
 
 **Span attributes**: the gateway declares `langwatch.guardrail.verdict` as a canonical span attribute for the aggregate verdict, but it is not yet emitted from the dispatcher in v1. Per-guardrail decision detail is visible by clicking through to the evaluator's run in the LangWatch Messages view, the evaluator's own trace carries the policies triggered + reasoning.

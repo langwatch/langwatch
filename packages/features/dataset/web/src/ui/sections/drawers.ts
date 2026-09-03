@@ -6,7 +6,4 @@
  * registry, so what it may name is one entry rather than a path per component.
  */
 
-export {
-  SelectDatasetDrawer,
-  type SelectDatasetDrawerProps,
-} from "./select-dataset-drawer";
+export { SelectDatasetDrawer, type SelectDatasetDrawerProps } from "./select-dataset-drawer";

@@ -28,9 +28,7 @@ describe("decideVendorLog", () => {
       });
 
       it("drops it even when no cause is attached", () => {
-        expect(
-          decideVendorLog({ level: "error", record: { message: "boom" } }),
-        ).toBeNull();
+        expect(decideVendorLog({ level: "error", record: { message: "boom" } })).toBeNull();
       });
     });
   });

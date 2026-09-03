@@ -30,32 +30,17 @@ export function skeletonMessageCount(messageCount: number | null): number {
  * underneath it. Decorative — `aria-hidden`, with the live region that
  * announces the loaded conversation left to do the talking.
  */
-export function ConversationSkeleton({
-  count,
-  dense = false,
-}: {
-  count: number;
-  dense?: boolean;
-}) {
+export function ConversationSkeleton({ count, dense = false }: { count: number; dense?: boolean }) {
   const reduceMotion = useReducedMotion();
   const gap = dense ? "12px" : "16px";
 
   return (
-    <VStack
-      align="stretch"
-      gap={gap}
-      aria-hidden
-      data-testid="langy-conversation-skeleton"
-    >
+    <VStack align="stretch" gap={gap} aria-hidden data-testid="langy-conversation-skeleton">
       {Array.from({ length: count }, (_, index) => {
         const isQuestion = index % 2 === 0;
         return isQuestion ? (
           <Box key={index} alignSelf="flex-end" maxWidth="85%" width="55%">
-            <Skeleton
-              height="34px"
-              borderRadius="15px"
-              variant={reduceMotion ? "none" : "pulse"}
-            />
+            <Skeleton height="34px" borderRadius="15px" variant={reduceMotion ? "none" : "pulse"} />
           </Box>
         ) : (
           <VStack key={index} align="stretch" gap="8px" width="100%">

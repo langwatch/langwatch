@@ -37,21 +37,21 @@ The process connects only with an API key. The SDK reads `LANGWATCH_API_KEY` fro
 
 ### `ConnectAgentOptions`
 
-| Option | Type | Default | Effect |
-|---|---|---|---|
-| `name` | `string` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
-| `environment` | `string` | resolved, see below | The environment row this process registers under. |
-| `description` | `string` | none | One line about the agent, shown on the agents page. |
-| `parameters` | zod schema, definition map or JSON Schema | none | What the agent accepts from a run. |
-| `enabled` | `boolean` | `true`, `false` when `CI` is set | Whether this process connects. |
-| `instanceLabel` | `string` | none | A name for this instance in the instances table. |
-| `timeoutMs` | `number` | `120000` | Milliseconds one call may take. The ceiling is `300000`. |
-| `concurrency` | `number` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
-| `sticky` | `boolean` | `false` | Keep every turn of one conversation on one instance. |
-| `apiKey` | `string` | `LANGWATCH_API_KEY` | The key the connection authenticates with. |
-| `endpoint` | `string` | `LANGWATCH_ENDPOINT` | The LangWatch instance to connect to. |
-| `projectId` | `string` | none | The project, for a key that covers more than one. |
-| `transport` | `"websocket" \| "http"` | `websocket` | See [Transport](#transport). |
+| Option          | Type                                      | Default                             | Effect                                                                             |
+| --------------- | ----------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------- |
+| `name`          | `string`                                  | required                            | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
+| `environment`   | `string`                                  | resolved, see below                 | The environment row this process registers under.                                  |
+| `description`   | `string`                                  | none                                | One line about the agent, shown on the agents page.                                |
+| `parameters`    | zod schema, definition map or JSON Schema | none                                | What the agent accepts from a run.                                                 |
+| `enabled`       | `boolean`                                 | `true`, `false` when `CI` is set    | Whether this process connects.                                                     |
+| `instanceLabel` | `string`                                  | none                                | A name for this instance in the instances table.                                   |
+| `timeoutMs`     | `number`                                  | `120000`                            | Milliseconds one call may take. The ceiling is `300000`.                           |
+| `concurrency`   | `number`                                  | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time.                                        |
+| `sticky`        | `boolean`                                 | `false`                             | Keep every turn of one conversation on one instance.                               |
+| `apiKey`        | `string`                                  | `LANGWATCH_API_KEY`                 | The key the connection authenticates with.                                         |
+| `endpoint`      | `string`                                  | `LANGWATCH_ENDPOINT`                | The LangWatch instance to connect to.                                              |
+| `projectId`     | `string`                                  | none                                | The project, for a key that covers more than one.                                  |
+| `transport`     | `"websocket" \| "http"`                   | `websocket`                         | See [Transport](#transport).                                                       |
 
 ### Environment resolution
 
@@ -63,14 +63,14 @@ The process connects only with an API key. The SDK reads `LANGWATCH_API_KEY` fro
 
 The handler receives one object.
 
-| Field | Type | Value |
-|---|---|---|
-| `messages` | `Message[]` | The whole conversation so far, as OpenAI-style messages |
-| `newMessages` | `Message[]` | The messages added since the previous turn |
-| `threadId` | `string` | The platform's conversation id, the same on every turn of one run |
-| `session` | `unknown` | What the handler returned as `session` on the previous turn, `undefined` on the first |
-| `params` | typed from `parameters` | The run's values for the declared parameters |
-| `traceId` | `string` | The id of the turn's trace |
+| Field         | Type                    | Value                                                                                 |
+| ------------- | ----------------------- | ------------------------------------------------------------------------------------- |
+| `messages`    | `Message[]`             | The whole conversation so far, as OpenAI-style messages                               |
+| `newMessages` | `Message[]`             | The messages added since the previous turn                                            |
+| `threadId`    | `string`                | The platform's conversation id, the same on every turn of one run                     |
+| `session`     | `unknown`               | What the handler returned as `session` on the previous turn, `undefined` on the first |
+| `params`      | typed from `parameters` | The run's values for the declared parameters                                          |
+| `traceId`     | `string`                | The id of the turn's trace                                                            |
 
 ### `parameters`
 
@@ -83,15 +83,15 @@ parameters: z.object({
   model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
   plan: z.string().default("free").describe("Customer plan"),
   maxTools: z.number().int().default(5),
-})
+});
 ```
 
-| In the schema | Effect |
-|---|---|
-| `z.enum([...])` | A closed list of allowed values, up to 50. A value outside it is refused. |
-| `.default(value)` | The default the run dialog prefills |
-| `.describe(text)` | Shown beside the field in the run dialog |
-| `z.string()`, `z.number()`, `z.boolean()` | The parameter's type |
+| In the schema                             | Effect                                                                    |
+| ----------------------------------------- | ------------------------------------------------------------------------- |
+| `z.enum([...])`                           | A closed list of allowed values, up to 50. A value outside it is refused. |
+| `.default(value)`                         | The default the run dialog prefills                                       |
+| `.describe(text)`                         | Shown beside the field in the run dialog                                  |
+| `z.string()`, `z.number()`, `z.boolean()` | The parameter's type                                                      |
 
 Give every property a default, or the run must supply a value for it. Keep the schema flat and scalar: nested objects and arrays are not run parameters.
 
@@ -107,12 +107,12 @@ parameters: {
 }
 ```
 
-| Field | Type | Effect |
-|---|---|---|
-| `type` | `"string" \| "number" \| "boolean"` | The parameter's type. Read from `default` when absent. |
-| `default` | scalar | The default the run dialog prefills |
-| `options` | scalar array | A closed list of allowed values, up to 50 |
-| `description` | `string` | Shown beside the field in the run dialog |
+| Field         | Type                                | Effect                                                 |
+| ------------- | ----------------------------------- | ------------------------------------------------------ |
+| `type`        | `"string" \| "number" \| "boolean"` | The parameter's type. Read from `default` when absent. |
+| `default`     | scalar                              | The default the run dialog prefills                    |
+| `options`     | scalar array                        | A closed list of allowed values, up to 50              |
+| `description` | `string`                            | Shown beside the field in the run dialog               |
 
 **A plain JSON Schema object**, `{ type: "object", properties: { ... } }`.
 
@@ -120,11 +120,11 @@ Values arrive validated against the declaration. A value the declaration refuses
 
 ### Return values
 
-| Return | Meaning |
-|---|---|
-| `string` | The reply text |
-| `Message` | One message |
-| `Message[]` | Several messages |
+| Return                | Meaning                                          |
+| --------------------- | ------------------------------------------------ |
+| `string`              | The reply text                                   |
+| `Message`             | One message                                      |
+| `Message[]`           | Several messages                                 |
 | `{ output, session }` | A reply plus the session value for the next turn |
 
 `session` is an opaque JSON value the platform echoes on the next turn of the same conversation, up to 64 kilobytes.
@@ -141,15 +141,15 @@ The connection is an outbound WebSocket by default. On a network that blocks Web
 
 ### Environment variables
 
-| Variable | Effect |
-|---|---|
-| `LANGWATCH_API_KEY` | The project key. Without it, the process does not connect. |
-| `LANGWATCH_ENDPOINT` | The LangWatch instance, for a self-hosted deployment. |
-| `LANGWATCH_PROJECT_ID` | The project, for a key that covers more than one. |
-| `LANGWATCH_AGENT_ENVIRONMENT` | The environment to register under. |
-| `LANGWATCH_AGENT_CONNECT` | `0` or `false` stops this process from connecting. |
-| `LANGWATCH_AGENT_INSTANCE_LABEL` | The instance name shown in the instances table. |
-| `LANGWATCH_AGENT_TRANSPORT` | `http` uses HTTP long polling instead of the WebSocket. |
+| Variable                         | Effect                                                     |
+| -------------------------------- | ---------------------------------------------------------- |
+| `LANGWATCH_API_KEY`              | The project key. Without it, the process does not connect. |
+| `LANGWATCH_ENDPOINT`             | The LangWatch instance, for a self-hosted deployment.      |
+| `LANGWATCH_PROJECT_ID`           | The project, for a key that covers more than one.          |
+| `LANGWATCH_AGENT_ENVIRONMENT`    | The environment to register under.                         |
+| `LANGWATCH_AGENT_CONNECT`        | `0` or `false` stops this process from connecting.         |
+| `LANGWATCH_AGENT_INSTANCE_LABEL` | The instance name shown in the instances table.            |
+| `LANGWATCH_AGENT_TRANSPORT`      | `http` uses HTTP long polling instead of the WebSocket.    |
 
 ### Errors
 

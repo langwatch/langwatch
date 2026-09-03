@@ -30,14 +30,10 @@ const EVENT_TYPES = [
   },
 ];
 
-type DrawerEndpoint = NonNullable<
-  Parameters<typeof WebhookEndpointDrawer>[0]["endpoint"]
->;
+type DrawerEndpoint = NonNullable<Parameters<typeof WebhookEndpointDrawer>[0]["endpoint"]>;
 
 /** A saved queue endpoint, with only the queue half worth varying. */
-function sqsEndpoint(
-  sqs: Partial<NonNullable<DrawerEndpoint["sqs"]>> = {},
-): DrawerEndpoint {
+function sqsEndpoint(sqs: Partial<NonNullable<DrawerEndpoint["sqs"]>> = {}): DrawerEndpoint {
   return {
     id: "wh_1",
     organizationId: "org_1",
@@ -254,9 +250,7 @@ describe("WebhookSecretDialog", () => {
       // back leaves the recommended credential mode impossible to finish.
       renderDrawer({ endpoint: sqsEndpoint({ externalId: "lw-abc123" }) });
 
-      expect(screen.getByTestId("webhook-sqs-external-id")).toHaveTextContent(
-        "lw-abc123",
-      );
+      expect(screen.getByTestId("webhook-sqs-external-id")).toHaveTextContent("lw-abc123");
 
       cleanup();
       renderDrawer();

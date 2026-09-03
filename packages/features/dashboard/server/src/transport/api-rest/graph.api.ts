@@ -10,11 +10,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import {
-  DashboardNotThereError,
-  GraphNotThereError,
-  type DashboardApp,
-} from "#app/dashboard.app";
+import { DashboardNotThereError, GraphNotThereError, type DashboardApp } from "#app/dashboard.app";
 
 const logger = createLogger("langwatch:api:graphs");
 

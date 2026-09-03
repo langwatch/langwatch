@@ -51,10 +51,7 @@ function renderRow(logCount: number) {
   );
 }
 
-function renderNamed(
-  spanName: string,
-  over: Partial<Parameters<typeof TreeRow>[0]> = {},
-) {
+function renderNamed(spanName: string, over: Partial<Parameters<typeof TreeRow>[0]> = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <TreeRow node={node({ name: spanName })} logCount={0} {...baseProps} {...over} />

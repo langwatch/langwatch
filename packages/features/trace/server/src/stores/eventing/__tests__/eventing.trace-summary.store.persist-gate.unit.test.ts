@@ -39,7 +39,11 @@ function storeWithRecorder() {
   const upsert = vi.fn(async () => undefined);
   const upsertBatch = vi.fn(async () => undefined);
   const storage = { upsert, upsertBatch } as unknown as TraceSummaryProjectionPort;
-  return { store: TraceSummaryStore.create({ storage, defaultRetentionDays: 30 }), upsert, upsertBatch };
+  return {
+    store: TraceSummaryStore.create({ storage, defaultRetentionDays: 30 }),
+    upsert,
+    upsertBatch,
+  };
 }
 
 describe("the trace summary persist gate", () => {

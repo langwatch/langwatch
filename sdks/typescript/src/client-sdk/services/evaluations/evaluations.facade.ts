@@ -23,17 +23,8 @@
 
 import { trace, SpanStatusCode, context as otelContext } from "@opentelemetry/api";
 import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
-import type {
-  EvaluationResult,
-  EvaluateOptions,
-  EvaluateRequest,
-  EvaluateResponse,
-} from "./types";
-import {
-  EvaluatorCallError,
-  EvaluatorNotFoundError,
-  EvaluationsApiError,
-} from "./errors";
+import type { EvaluationResult, EvaluateOptions, EvaluateRequest, EvaluateResponse } from "./types";
+import { EvaluatorCallError, EvaluatorNotFoundError, EvaluationsApiError } from "./errors";
 import type { Logger } from "@/logger";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
@@ -92,10 +83,7 @@ export class EvaluationsFacade {
    * console.log("Details:", result.details);
    * ```
    */
-  evaluate = async (
-    slug: string,
-    options: EvaluateOptions,
-  ): Promise<EvaluationResult> => {
+  evaluate = async (slug: string, options: EvaluateOptions): Promise<EvaluationResult> => {
     const { data, name, settings, asGuardrail } = options;
     const spanName = name ?? slug;
     const spanType = asGuardrail ? "guardrail" : "evaluation";
@@ -237,10 +225,7 @@ export class EvaluationsFacade {
       }
 
       // Wrap unknown errors
-      throw new EvaluatorCallError(
-        slug,
-        error instanceof Error ? error.message : String(error),
-      );
+      throw new EvaluatorCallError(slug, error instanceof Error ? error.message : String(error));
     } finally {
       // Always end the span
       otelSpan.end();

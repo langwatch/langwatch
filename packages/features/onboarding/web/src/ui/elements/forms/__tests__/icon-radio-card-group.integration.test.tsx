@@ -32,17 +32,11 @@ describe("<IconRadioCardGroup/>", () => {
   describe("when rendered with no selection", () => {
     it("renders a radiogroup container", () => {
       render(
-        <IconRadioCardGroup
-          items={items}
-          onChange={() => {}}
-          ariaLabel="Test radio group"
-        />,
+        <IconRadioCardGroup items={items} onChange={() => {}} ariaLabel="Test radio group" />,
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByRole("radiogroup", { name: "Test radio group" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: "Test radio group" })).toBeInTheDocument();
     });
 
     it("renders all items as unchecked radios", () => {
@@ -121,16 +115,13 @@ describe("<IconRadioCardGroup/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByRole("radiogroup", { name: "Vertical group" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: "Vertical group" })).toBeInTheDocument();
     });
 
     it("renders all radio items", () => {
-      render(
-        <IconRadioCardGroup items={items} onChange={() => {}} direction="vertical" />,
-        { wrapper: Wrapper },
-      );
+      render(<IconRadioCardGroup items={items} onChange={() => {}} direction="vertical" />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getAllByRole("radio")).toHaveLength(3);
     });

@@ -177,12 +177,10 @@ describe("createLogger", () => {
   describe("when a log line is emitted in production", () => {
     it("stamps the service field fluent-bit promotes to the Loki label", () => {
       const written: string[] = [];
-      const spy = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation((chunk: unknown) => {
-          written.push(String(chunk));
-          return true;
-        });
+      const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        written.push(String(chunk));
+        return true;
+      });
 
       try {
         const logger = createLogger("service-field-test");

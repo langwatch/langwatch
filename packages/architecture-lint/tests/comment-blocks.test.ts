@@ -16,9 +16,7 @@ function lineComments(lines: number): string {
 
 function blockComment(lines: number): string {
   if (lines === 1) return "/* comment */";
-  return ["/*", ...Array.from({ length: lines - 2 }, () => " * comment"), " */"].join(
-    "\n",
-  );
+  return ["/*", ...Array.from({ length: lines - 2 }, () => " * comment"), " */"].join("\n");
 }
 
 function writeFixture(root: string, file: string, source: string): void {

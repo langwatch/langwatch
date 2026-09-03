@@ -35,8 +35,8 @@ export default function Authorize() {
         <Card.Body>
           <VStack align="start" gap={6}>
             <Text>
-              Copy your LangWatch API key below and paste it into your command line or
-              notebook to authorize it.
+              Copy your LangWatch API key below and paste it into your command line or notebook to
+              authorize it.
             </Text>
             <APIKeyCopyInput />
           </VStack>

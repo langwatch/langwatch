@@ -93,22 +93,16 @@ describe("ClickHouseImportStoredObjectMigration", () => {
       store,
     });
 
-    await expect(
-      migration.migrateTenant({ tenantId: "organization_1" }),
-    ).resolves.toMatchObject({
+    await expect(migration.migrateTenant({ tenantId: "organization_1" })).resolves.toMatchObject({
       status: "finalized",
       report: { imported: 1, drainProved: true },
     });
-    await expect(
-      store.tryFind({ tenantId: "project_1", id: "so_legacy" }),
-    ).resolves.toMatchObject({
+    await expect(store.tryFind({ tenantId: "project_1", id: "so_legacy" })).resolves.toMatchObject({
       status: "available",
       source: "imported",
       audiences: ["traces:view"],
     });
-    await expect(
-      migration.migrateTenant({ tenantId: "organization_1" }),
-    ).resolves.toMatchObject({
+    await expect(migration.migrateTenant({ tenantId: "organization_1" })).resolves.toMatchObject({
       status: "finalized",
       report: { imported: 0, unchanged: 1, drainProved: true },
     });

@@ -86,8 +86,8 @@ export function PairwiseLeaderboard({
             numbers, the per-variant figure routinely exceeds the total and
             the pair reads as a contradiction.
           */}
-          {leaderboard.comparisonCount} comparisons · min {leaderboard.minMatchups}{" "}
-          matchups per variant
+          {leaderboard.comparisonCount} comparisons · min {leaderboard.minMatchups} matchups per
+          variant
         </Text>
       </HStack>
 
@@ -97,12 +97,7 @@ export function PairwiseLeaderboard({
         showWarnings={showWarnings}
       />
 
-      <LeaderboardTable
-        sorted={sorted}
-        sortKey={sortKey}
-        sortDir={sortDir}
-        onSort={onSort}
-      />
+      <LeaderboardTable sorted={sorted} sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
 
       <WinMatrixHeatmap
         leaderboard={leaderboard}
@@ -312,15 +307,7 @@ function WarnBanner({
   const bg = tone === "warning" ? "yellow.subtle" : "blue.subtle";
   const fg = tone === "warning" ? "yellow.fg" : "blue.fg";
   return (
-    <HStack
-      gap={2}
-      paddingX={3}
-      paddingY={2}
-      borderRadius="md"
-      bg={bg}
-      color={fg}
-      fontSize="xs"
-    >
+    <HStack gap={2} paddingX={3} paddingY={2} borderRadius="md" bg={bg} color={fg} fontSize="xs">
       <Icon as={icon} boxSize="14px" />
       <Text>{text}</Text>
     </HStack>
@@ -345,9 +332,7 @@ const matchupOf = ({
   const rate = total > 0 ? wins / total : null;
   const pair = `${variantNames[rowId] ?? rowId} vs ${variantNames[colId] ?? colId}`;
   const summary =
-    rate === null
-      ? "No matchups"
-      : `${wins} wins / ${total} matchups (${Math.round(rate * 100)}%)`;
+    rate === null ? "No matchups" : `${wins} wins / ${total} matchups (${Math.round(rate * 100)}%)`;
   return { wins, total, rate, pair, summary };
 };
 
@@ -418,9 +403,7 @@ function WinMatrixCell({
       // about whose matchup it is or that activating it opens the judge's
       // reasoning.
       aria-label={
-        onClick
-          ? `${pair}: ${summary}. Show the judge's reasoning.`
-          : `${pair}: ${summary}`
+        onClick ? `${pair}: ${summary}. Show the judge's reasoning.` : `${pair}: ${summary}`
       }
       title={summary}
     >
@@ -471,9 +454,9 @@ function WinMatrixHeatmap({
       */}
       {!hasPairwiseDetail ? (
         <Text fontSize="2xs" color="fg.muted">
-          Each row here is the same number repeated — that variant&apos;s total wins, not
-          a per-opponent tally, so the counts cannot tell you who it beat. The shading
-          still can: it is how often the row variant won when those two met.
+          Each row here is the same number repeated — that variant&apos;s total wins, not a
+          per-opponent tally, so the counts cannot tell you who it beat. The shading still can: it
+          is how often the row variant won when those two met.
         </Text>
       ) : null}
       <Box overflowX="auto">
@@ -491,9 +474,7 @@ function WinMatrixHeatmap({
           <Table.Body>
             {ids.map((rowId) => (
               <Table.Row key={rowId}>
-                <Table.Cell fontWeight="medium">
-                  {variantNames[rowId] ?? rowId}
-                </Table.Cell>
+                <Table.Cell fontWeight="medium">{variantNames[rowId] ?? rowId}</Table.Cell>
                 {ids.map((colId) => (
                   <WinMatrixCell
                     key={colId}

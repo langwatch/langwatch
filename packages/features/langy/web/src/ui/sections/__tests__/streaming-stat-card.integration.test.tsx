@@ -29,9 +29,7 @@ function preferReducedMotion() {
   );
 }
 
-function renderCard(
-  metrics: Parameters<typeof StreamingStatCard>[0]["metrics"],
-) {
+function renderCard(metrics: Parameters<typeof StreamingStatCard>[0]["metrics"]) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <StreamingStatCard metrics={metrics} />

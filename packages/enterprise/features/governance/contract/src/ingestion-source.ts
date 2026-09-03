@@ -12,8 +12,6 @@ export function getStarterTemplate(_sourceType: string): readonly string[] {
   return [];
 }
 
-export function isOttlEnabledSourceType(
-  sourceType: string,
-): sourceType is OttlEnabledSourceType {
+export function isOttlEnabledSourceType(sourceType: string): sourceType is OttlEnabledSourceType {
   return ottlEnabledSourceTypeSchema.safeParse(sourceType).success;
 }

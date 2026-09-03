@@ -17,10 +17,7 @@ const prices = {
 } as StripePriceMap;
 
 import type Stripe from "stripe";
-import {
-  ANNUAL_EVENTS_BILLING_THRESHOLD,
-  AnnualEventsBillingThresholdService,
-} from "../index";
+import { ANNUAL_EVENTS_BILLING_THRESHOLD, AnnualEventsBillingThresholdService } from "../index";
 
 const applyThreshold = ({
   stripe,
@@ -200,9 +197,7 @@ describe("applyThreshold", () => {
           priceIds: ["price_seat_usd_monthly", "price_events_usd_monthly"],
         }),
       );
-      const nonGrowth = makeStripe(
-        makeStripeSubscription({ priceIds: ["price_something_else"] }),
-      );
+      const nonGrowth = makeStripe(makeStripeSubscription({ priceIds: ["price_something_else"] }));
 
       await expect(
         applyThreshold({

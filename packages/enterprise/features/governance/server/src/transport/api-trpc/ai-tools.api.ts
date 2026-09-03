@@ -34,11 +34,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 const logger = createLogger("langwatch:governance:ai-tools");
@@ -196,9 +192,7 @@ export class AiToolsTrpcApi {
        * all-placeholder template.
        */
       claudeCodeOtlpEndpoint: view(organizationScope).query(async ({ ctx, input }) => {
-        const source = (
-          await ctx.app.governance.ingestionSourceList(input.organizationId)
-        )
+        const source = (await ctx.app.governance.ingestionSourceList(input.organizationId))
           .filter(
             (candidate) =>
               candidate.sourceType === "claude_code" && candidate.status !== "disabled",

@@ -17,8 +17,7 @@ const manifestSchema = z.object({
   version: z.string().optional(),
 });
 
-const readManifest = (path: string) =>
-  manifestSchema.parse(JSON.parse(readFileSync(path, "utf8")));
+const readManifest = (path: string) => manifestSchema.parse(JSON.parse(readFileSync(path, "utf8")));
 
 describe("the analytics web Vega dependency set", () => {
   it("declares the reviewed runtime versions directly and exactly", () => {

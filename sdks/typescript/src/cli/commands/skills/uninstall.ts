@@ -16,12 +16,7 @@ import {
   resolveSkillsRoot,
   SKILLS_BUNDLE_VERSION,
 } from "./installer";
-import {
-  confirm,
-  isInteractiveConsole,
-  renderSkillFileResults,
-  resolveTargets,
-} from "./shared";
+import { confirm, isInteractiveConsole, renderSkillFileResults, resolveTargets } from "./shared";
 import { throwValidationError } from "./validation";
 
 export interface SkillsUninstallOptions extends RawOutputFlags {

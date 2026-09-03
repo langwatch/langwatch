@@ -80,13 +80,10 @@ export const TeamUserRoleField = ({
 }) => {
   const selectedRoleValue: TeamRoleValue =
     (value as TeamRoleValue | undefined) ??
-    (currentRole === TeamUserRole.CUSTOM && customRole
-      ? `custom:${customRole.id}`
-      : currentRole);
+    (currentRole === TeamUserRole.CUSTOM && customRole ? `custom:${customRole.id}` : currentRole);
 
   const selectedRole: RoleOption =
-    selectedRoleValue === TeamUserRole.CUSTOM ||
-    selectedRoleValue === MISSING_CUSTOM_ROLE_VALUE
+    selectedRoleValue === TeamUserRole.CUSTOM || selectedRoleValue === MISSING_CUSTOM_ROLE_VALUE
       ? {
           label: "Missing Custom Role",
           value: MISSING_CUSTOM_ROLE_VALUE,
@@ -97,8 +94,7 @@ export const TeamUserRoleField = ({
             label: customRole?.name ?? "Custom Role",
             value: selectedRoleValue,
             description:
-              customRole?.description ??
-              `${customRole?.permissions.length ?? 0} permissions`,
+              customRole?.description ?? `${customRole?.permissions.length ?? 0} permissions`,
             isCustom: true,
             customRoleId: selectedRoleValue.replace("custom:", ""),
           }

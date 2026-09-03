@@ -9,19 +9,11 @@ import {
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BetterAuthSsoAdapter } from "../../adapters/better-auth.better-auth.adapter";
-import {
-  SsoGateLogger,
-  SsoGateService,
-  SsoProviderMountInspector,
-} from "../sso-gate.service";
+import { SsoGateLogger, SsoGateService, SsoProviderMountInspector } from "../sso-gate.service";
 
 class FakeLicensingService extends LicensingService {
   readonly inspectPlatformAccess =
-    vi.fn<
-      (input: {
-        instanceLicenseKey?: string | undefined;
-      }) => Promise<PlatformLicenseAccess>
-    >();
+    vi.fn<(input: { instanceLicenseKey?: string | undefined }) => Promise<PlatformLicenseAccess>>();
 
   getActivePlan(): Promise<PlanInfo> {
     return Promise.reject(new Error("unused"));
@@ -109,9 +101,7 @@ describe("SsoGateService", () => {
     });
 
   it("allows SaaS without asking the licensing service", async () => {
-    expect(await create({ ...baseConfiguration(), isSaas: true }).platformAllowed()).toBe(
-      true,
-    );
+    expect(await create({ ...baseConfiguration(), isSaas: true }).platformAllowed()).toBe(true);
     expect(licensing.inspectPlatformAccess).not.toHaveBeenCalled();
   });
 

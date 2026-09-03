@@ -58,9 +58,7 @@ describe("given a hosted deployment", () => {
       // The card is beside the panel, never inside it: the component that
       // authenticates somebody carries none of the pitch.
       expect(panel.contains(card)).toBe(false);
-      expect(screen.getByTestId("front-door-card-column").contains(card)).toBe(
-        true,
-      );
+      expect(screen.getByTestId("front-door-card-column").contains(card)).toBe(true);
       expect(screen.getByTestId("front-door-ambient")).toBeTruthy();
     });
 
@@ -71,9 +69,7 @@ describe("given a hosted deployment", () => {
       expect(screen.getByTestId("front-door-headline")).toHaveTextContent(
         "See what your agents are actually doing.",
       );
-      expect(
-        screen.getByTestId("front-door-headline-accent"),
-      ).toHaveTextContent("actually");
+      expect(screen.getByTestId("front-door-headline-accent")).toHaveTextContent("actually");
       expect(screen.getByTestId("front-door-tagline")).toBeTruthy();
     });
 

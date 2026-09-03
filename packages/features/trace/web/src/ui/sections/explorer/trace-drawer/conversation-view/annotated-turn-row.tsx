@@ -130,7 +130,5 @@ export const AnnotatedTurnRow = memo(function AnnotatedTurnRow({
  * whole conversation jump width the moment the rail opened.
  */
 function messageColumnWidth(layout: TurnLayout): string {
-  return layout === "thread"
-    ? `minmax(0, ${THREAD_COLUMN_MAX_WIDTH_PX}px)`
-    : "minmax(0, 1fr)";
+  return layout === "thread" ? `minmax(0, ${THREAD_COLUMN_MAX_WIDTH_PX}px)` : "minmax(0, 1fr)";
 }

@@ -6,9 +6,7 @@ import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 // default regardless of what launched vitest.
 let savedAgentEnv: Record<string, string | undefined> = {};
 beforeEach(() => {
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
 });
 afterEach(() => {
@@ -81,10 +79,7 @@ describe("sessionEventsCommand()", () => {
   it("walks the cursor until the limit and prints one line per event", async () => {
     fetchMock
       .mockResolvedValueOnce(
-        page(
-          [modelCall(1720000000000, "r1"), modelCall(1720000001000, "r2")],
-          "cursor-1",
-        ),
+        page([modelCall(1720000000000, "r1"), modelCall(1720000001000, "r2")], "cursor-1"),
       )
       .mockResolvedValueOnce(
         page(
@@ -127,9 +122,7 @@ describe("sessionEventsCommand()", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0]![0])).toContain(
-      "kinds=model_call%2Ccompaction",
-    );
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("kinds=model_call%2Ccompaction");
   });
 
   it("exits with an error for a non-numeric --limit", async () => {
@@ -140,9 +133,9 @@ describe("sessionEventsCommand()", () => {
   });
 
   it("exits with an error for an unparsable --from instead of sending NaN", async () => {
-    await expect(
-      sessionEventsCommand("session-abc", { from: "last tuesday" }),
-    ).rejects.toThrow(ProcessExitError);
+    await expect(sessionEventsCommand("session-abc", { from: "last tuesday" })).rejects.toThrow(
+      ProcessExitError,
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

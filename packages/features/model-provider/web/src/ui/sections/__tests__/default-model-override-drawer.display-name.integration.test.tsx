@@ -151,9 +151,7 @@ const PROVIDER_ROW = {
   name: "Custom",
   provider: PROVIDER,
   enabled: true,
-  customModels: [
-    { modelId: MODEL_ID, displayName: DISPLAY_NAME, mode: "chat" as const },
-  ],
+  customModels: [{ modelId: MODEL_ID, displayName: DISPLAY_NAME, mode: "chat" as const }],
   customEmbeddingsModels: [],
 };
 
@@ -217,33 +215,25 @@ describe("<DefaultModelOverrideDrawer/>", () => {
       it("renders the Default role's dropdown item as the display name", () => {
         renderDrawer();
 
-        expect(
-          within(listboxFor("default")).getByText(DISPLAY_NAME),
-        ).toBeInTheDocument();
+        expect(within(listboxFor("default")).getByText(DISPLAY_NAME)).toBeInTheDocument();
       });
 
       it("does not render the raw model id as the Default role's dropdown item", () => {
         renderDrawer();
 
-        expect(
-          within(listboxFor("default")).queryByText(MODEL_ID),
-        ).not.toBeInTheDocument();
+        expect(within(listboxFor("default")).queryByText(MODEL_ID)).not.toBeInTheDocument();
       });
 
       it("renders the Default role's collapsed trigger as the display name", () => {
         renderDrawer();
 
-        expect(
-          within(triggerFor("default")).getByText(DISPLAY_NAME),
-        ).toBeInTheDocument();
+        expect(within(triggerFor("default")).getByText(DISPLAY_NAME)).toBeInTheDocument();
       });
 
       it("does not render the raw model id as the Default role's trigger value", () => {
         renderDrawer();
 
-        expect(
-          within(triggerFor("default")).queryByText(MODEL_ID),
-        ).not.toBeInTheDocument();
+        expect(within(triggerFor("default")).queryByText(MODEL_ID)).not.toBeInTheDocument();
       });
     });
   });

@@ -26,11 +26,7 @@ import {
   parseBase64DataUri,
   visitContentPart,
 } from "../../../model/shared/content-parts/visit-content-part";
-import {
-  isMediaPartRole,
-  type MediaPartRole,
-  type TraceMediaRef,
-} from "@langwatch/trace-contract";
+import { isMediaPartRole, type MediaPartRole, type TraceMediaRef } from "@langwatch/trace-contract";
 
 /**
  * A single renderable media content part, as produced after content
@@ -362,10 +358,7 @@ export function collectMediaParts(value: unknown, depth = 0): MediaPartData[] {
  * on the plain list, and consumers that must tell the caller's media from the
  * agent's reply (the trace summary strips) read the role.
  */
-export function collectAnnotatedMediaParts(
-  value: unknown,
-  depth = 0,
-): CollectedMediaPart[] {
+export function collectAnnotatedMediaParts(value: unknown, depth = 0): CollectedMediaPart[] {
   const out: CollectedMediaPart[] = [];
   collectInto({ value, depth, out });
   return out;
@@ -445,7 +438,6 @@ function collectInto({
 export function collectAudioParts(value: unknown, depth = 0): MediaPartData[] {
   return collectMediaParts(value, depth).filter(
     (m) =>
-      m.type === "audio" ||
-      (m.type === "binary" && m.mimeType.toLowerCase().startsWith("audio/")),
+      m.type === "audio" || (m.type === "binary" && m.mimeType.toLowerCase().startsWith("audio/")),
   );
 }

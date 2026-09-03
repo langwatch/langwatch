@@ -24,8 +24,7 @@ export function useDejaViewState(url: string) {
   const [hasSearched, setHasSearched] = useState(
     Boolean(initialState.query || deepLinkedAggregate),
   );
-  const [selectedAggregate, setSelectedAggregate] =
-    useState<AggregateSelection>(initialAggregate);
+  const [selectedAggregate, setSelectedAggregate] = useState<AggregateSelection>(initialAggregate);
   const [eventCursor, setEventCursor] = useState(initialState.event ?? 0);
   const [selectedProjection, setSelectedProjection] = useState<string | null>(
     initialState.proj ?? null,
@@ -78,10 +77,7 @@ export function useDejaViewState(url: string) {
     setSelectedProjection(null);
     setShowEventDetail(false);
   }, []);
-  const toggleEventDetail = useCallback(
-    () => setShowEventDetail((current) => !current),
-    [],
-  );
+  const toggleEventDetail = useCallback(() => setShowEventDetail((current) => !current), []);
 
   return {
     searchQuery,

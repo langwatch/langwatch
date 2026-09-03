@@ -27,8 +27,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock("../../../behavior/use-feature-flag", () => ({
   useFeatureFlag: (flag: string) => ({
-    enabled:
-      flag === "release_ui_agent_testing_v2_enabled" ? state.flagEnabled : false,
+    enabled: flag === "release_ui_agent_testing_v2_enabled" ? state.flagEnabled : false,
     isLoading: state.flagLoading,
   }),
 }));
@@ -112,10 +111,7 @@ describe("the simulations address", () => {
 
     describe("and the previous-screens preference is recorded", () => {
       beforeEach(() => {
-        localStorage.setItem(
-          "langwatch:prefer-legacy-simulations:v1:project-1",
-          "1",
-        );
+        localStorage.setItem("langwatch:prefer-legacy-simulations:v1:project-1", "1");
       });
 
       afterEach(() => {

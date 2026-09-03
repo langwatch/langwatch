@@ -270,13 +270,7 @@ export class TraceEditOverlayService {
     return this.upsert({ projectId, traceId, patch: next, userId });
   }
 
-  async delete({
-    projectId,
-    traceId,
-  }: {
-    projectId: string;
-    traceId: string;
-  }): Promise<void> {
+  async delete({ projectId, traceId }: { projectId: string; traceId: string }): Promise<void> {
     await this.repository.delete({ projectId, traceId });
   }
 

@@ -95,9 +95,7 @@ export const PRINCIPAL_KINDS = {
   anyone: { stored: "ANYONE", identified: false },
 } as const;
 
-export const PRINCIPAL_KIND_NAMES = Object.keys(
-  PRINCIPAL_KINDS,
-) as readonly PrincipalKind[];
+export const PRINCIPAL_KIND_NAMES = Object.keys(PRINCIPAL_KINDS) as readonly PrincipalKind[];
 export const principalKindSchema = z.enum(
   Object.keys(PRINCIPAL_KINDS) as [
     keyof typeof PRINCIPAL_KINDS,

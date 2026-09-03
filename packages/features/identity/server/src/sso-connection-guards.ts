@@ -78,10 +78,7 @@ import type {
 
 /** Which states each verb may be commanded from. The one place the diagram
  *  in `specs/identity/sso-connection-lifecycle.feature` is executable. */
-const ALLOWED_FROM: Record<
-  SsoConnectionCommandType,
-  readonly SsoConnectionLifecycleState[]
-> = {
+const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifecycleState[]> = {
   [REGISTER_CONNECTION_COMMAND_TYPE]: [],
   [GRANDFATHER_CONNECTION_COMMAND_TYPE]: [],
   [CLAIM_DOMAIN_COMMAND_TYPE]: ["DRAFT", "REJECTED", "VERIFIED", "ACTIVE"],
@@ -121,9 +118,7 @@ export class SsoConnectionGuards {
     this.platformOperators = deps.platformOperators;
   }
 
-  async registerConnection(
-    data: RegisterConnectionCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async registerConnection(data: RegisterConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     const existing = await this.connections.findConnection({
       connectionId: data.connectionId,
     });
@@ -216,9 +211,7 @@ export class SsoConnectionGuards {
     ];
   }
 
-  async claimDomain(
-    data: ClaimDomainCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async claimDomain(data: ClaimDomainCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, CLAIM_DOMAIN_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
     if (
@@ -249,9 +242,7 @@ export class SsoConnectionGuards {
    * make the queue a formality. Checked here rather than only on the surface,
    * so the rule holds for every caller the aggregate will ever have.
    */
-  async approveDomainClaim(
-    data: ApproveDomainClaimCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async approveDomainClaim(data: ApproveDomainClaimCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, APPROVE_DOMAIN_CLAIM_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
     if (state.approvedDomains.includes(domain)) return [];
@@ -275,9 +266,7 @@ export class SsoConnectionGuards {
 
   /** The same decision with the opposite answer, so the same operator gate:
    *  a claim is decided by LangWatch or it is not decided. */
-  async rejectDomainClaim(
-    data: RejectDomainClaimCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async rejectDomainClaim(data: RejectDomainClaimCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, REJECT_DOMAIN_CLAIM_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
     await this.requirePlatformOperator({
@@ -299,9 +288,7 @@ export class SsoConnectionGuards {
     ];
   }
 
-  async discardConnection(
-    data: DiscardConnectionCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async discardConnection(data: DiscardConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     await this.require(data, DISCARD_CONNECTION_COMMAND_TYPE);
     return [
       {
@@ -370,9 +357,7 @@ export class SsoConnectionGuards {
    *   which is immediate, reversible, and taken by a human at the moment it
    *   matters.
    */
-  async attestDomain(
-    data: AttestDomainCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async attestDomain(data: AttestDomainCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, ATTEST_DOMAIN_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
     if (state.verifiedDomains.includes(domain)) return [];
@@ -407,9 +392,7 @@ export class SsoConnectionGuards {
    * instantaneous, and another organization's connection may have gone
    * ACTIVE on the same domain while this one was waiting for DNS.
    */
-  async verifyDomain(
-    data: VerifyDomainCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async verifyDomain(data: VerifyDomainCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, VERIFY_DOMAIN_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
     if (state.verifiedDomains.includes(domain)) return [];
@@ -444,9 +427,7 @@ export class SsoConnectionGuards {
    * organization out of its own instance — if the IdP is misconfigured,
    * somebody must still be able to get in and turn it off.
    */
-  async activateConnection(
-    data: ActivateConnectionCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async activateConnection(data: ActivateConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, ACTIVATE_CONNECTION_COMMAND_TYPE);
     if (state.verifiedDomains.length === 0) {
       throw new SsoConnectionActivationBlockedError(
@@ -486,9 +467,7 @@ export class SsoConnectionGuards {
   /** Always available: suspension is the lever an operator reaches for when
    *  a connection is actively hurting people, so it has no preconditions
    *  beyond being ACTIVE. */
-  async suspendConnection(
-    data: SuspendConnectionCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async suspendConnection(data: SuspendConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     await this.require(data, SUSPEND_CONNECTION_COMMAND_TYPE);
     return [
       {
@@ -503,9 +482,7 @@ export class SsoConnectionGuards {
     ];
   }
 
-  async resumeConnection(
-    data: ResumeConnectionCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async resumeConnection(data: ResumeConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     await this.require(data, RESUME_CONNECTION_COMMAND_TYPE);
     return [
       {
@@ -526,9 +503,7 @@ export class SsoConnectionGuards {
    * account loss. The refusal names how many, and heals itself the moment
    * those people hold another verified method.
    */
-  async requestTeardown(
-    data: RequestTeardownCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async requestTeardown(data: RequestTeardownCommandData): Promise<SsoConnectionFactInput[]> {
     await this.require(data, REQUEST_TEARDOWN_COMMAND_TYPE);
     const stranded = await this.stranding.findStrandedUserIds({
       connectionId: data.connectionId,
@@ -558,9 +533,7 @@ export class SsoConnectionGuards {
    * the wake: a lagged wake, a replayed job or a hand-run command must not
    * be able to complete a teardown early.
    */
-  async completeTeardown(
-    data: CompleteTeardownCommandData,
-  ): Promise<SsoConnectionFactInput[]> {
+  async completeTeardown(data: CompleteTeardownCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, COMPLETE_TEARDOWN_COMMAND_TYPE);
     const deadline = state.tearDownAfterMs;
     if (deadline !== null && data.occurredAtMs < deadline) {
@@ -632,13 +605,7 @@ export class SsoConnectionGuards {
     );
   }
 
-  private requireClaimed({
-    state,
-    domain,
-  }: {
-    state: SsoConnectionState;
-    domain: string;
-  }): void {
+  private requireClaimed({ state, domain }: { state: SsoConnectionState; domain: string }): void {
     if (state.claimedDomains.includes(domain)) return;
     throw new SsoConnectionInvalidTransitionError(
       `connection ${state.connectionId}: ${domain} has no claim awaiting a decision`,

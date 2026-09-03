@@ -42,9 +42,7 @@ function matchKey(method: string, urlPath: string): string | undefined {
         (keyPath ?? "")
           .split("/")
           .map((segment) =>
-            segment.startsWith(":")
-              ? "[^/]+"
-              : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            segment.startsWith(":") ? "[^/]+" : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
           )
           .join("/") +
         "$",
@@ -180,10 +178,7 @@ describe("CLI error propagation across commands", () => {
         },
       });
 
-      const result = await runCli(
-        ["agent", "create", "my-agent", "--type", "http"],
-        testDir,
-      );
+      const result = await runCli(["agent", "create", "my-agent", "--type", "http"], testDir);
 
       expect(result.exitCode).toBe(1);
       expect(result.combined.toLowerCase()).toContain("already exists");
@@ -264,10 +259,7 @@ describe("CLI error propagation across commands", () => {
         },
       });
 
-      const result = await runCli(
-        ["workflow", "run", "wf_abc", "--input", '{"x":1}'],
-        testDir,
-      );
+      const result = await runCli(["workflow", "run", "wf_abc", "--input", '{"x":1}'], testDir);
 
       expect(result.exitCode).toBe(1);
       expect(result.combined.toLowerCase()).toContain("missing required input");

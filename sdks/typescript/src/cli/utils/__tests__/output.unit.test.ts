@@ -16,9 +16,7 @@ const DATA = [
 let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
@@ -70,10 +68,7 @@ describe("printResult", () => {
 
   describe("given -o yaml", () => {
     it("prints YAML", async () => {
-      await printResult(
-        { name: "alpha", tags: ["a", "b"] },
-        { output: "yaml", table: vi.fn() },
-      );
+      await printResult({ name: "alpha", tags: ["a", "b"] }, { output: "yaml", table: vi.fn() });
 
       expect(console.log).toHaveBeenCalledWith("name: alpha\ntags:\n  - a\n  - b");
     });
@@ -134,9 +129,9 @@ describe("printResult", () => {
     });
 
     it("throws when iterating a non-array", async () => {
-      await expect(
-        printResult({ items: 42 }, { jq: ".items[]", table: vi.fn() }),
-      ).rejects.toThrow(/non-array/);
+      await expect(printResult({ items: 42 }, { jq: ".items[]", table: vi.fn() })).rejects.toThrow(
+        /non-array/,
+      );
     });
   });
 });

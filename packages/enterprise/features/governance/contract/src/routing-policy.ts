@@ -91,9 +91,7 @@ export const setDefaultRoutingPolicyInputSchema = z
     actorUserId: z.string().min(1),
   })
   .strict();
-export type SetDefaultRoutingPolicyInput = z.infer<
-  typeof setDefaultRoutingPolicyInputSchema
->;
+export type SetDefaultRoutingPolicyInput = z.infer<typeof setDefaultRoutingPolicyInputSchema>;
 
 export const deleteRoutingPolicyInputSchema = z
   .object({
@@ -113,9 +111,7 @@ export type ResolveDefaultRoutingPolicyInput = z.infer<
   typeof resolveDefaultRoutingPolicyInputSchema
 >;
 
-export function toRoutingPolicyScopeType(
-  scope: RoutingPolicyWireScope,
-): RoutingPolicyScopeType {
+export function toRoutingPolicyScopeType(scope: RoutingPolicyWireScope): RoutingPolicyScopeType {
   return routingPolicyScopeTypeSchema.parse(scope.toUpperCase());
 }
 

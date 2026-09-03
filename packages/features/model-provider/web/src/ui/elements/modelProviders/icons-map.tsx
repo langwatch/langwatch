@@ -66,13 +66,7 @@ export function ProviderIconGlyph({
 }) {
   const icon = modelProviderIcons[provider];
   if (!icon) return null;
-  return (
-    <IconGlyph
-      icon={icon}
-      monochrome={MONOCHROME_PROVIDER_ICONS.has(provider)}
-      size={size}
-    />
-  );
+  return <IconGlyph icon={icon} monochrome={MONOCHROME_PROVIDER_ICONS.has(provider)} size={size} />;
 }
 
 type ProviderKey = keyof typeof modelProviderIcons;
@@ -116,11 +110,7 @@ export function inferProvider(model: string): ProviderKey | null {
     return "openai";
   }
   if (lower.startsWith("claude-") || lower.startsWith("claude/")) return "anthropic";
-  if (
-    lower.startsWith("gemini-") ||
-    lower.startsWith("gemma-") ||
-    lower.startsWith("text-bison")
-  ) {
+  if (lower.startsWith("gemini-") || lower.startsWith("gemma-") || lower.startsWith("text-bison")) {
     return "gemini";
   }
   if (lower.startsWith("deepseek-")) return "deepseek";
@@ -138,13 +128,7 @@ export function inferProvider(model: string): ProviderKey | null {
  * dropdown row: a preview row is dense, so the mark complements the mono label
  * instead of dominating it.
  */
-export function ProviderIcon({
-  model,
-  size,
-}: {
-  model: string;
-  size: "compact" | "comfortable";
-}) {
+export function ProviderIcon({ model, size }: { model: string; size: "compact" | "comfortable" }) {
   const provider = inferProvider(model);
   if (!provider) return null;
   return <ProviderIconGlyph provider={provider} size={size === "comfortable" ? "14px" : "12px"} />;

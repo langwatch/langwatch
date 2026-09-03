@@ -1,8 +1,5 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** A registrable Eventing definition, as the worker's one runtime accepts it. */

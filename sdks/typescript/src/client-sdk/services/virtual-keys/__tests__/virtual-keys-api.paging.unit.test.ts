@@ -141,13 +141,9 @@ describe("VirtualKeysApiService cursor paging", () => {
 
     it("raises rather than truncating when the cursor chain never ends", async () => {
       // A fresh Response per call: a body can only be read once.
-      mockFetch.mockImplementation(() =>
-        Promise.resolve(jsonResponse(page(["a"], "stuck"))),
-      );
+      mockFetch.mockImplementation(() => Promise.resolve(jsonResponse(page(["a"], "stuck"))));
 
-      await expect(new VirtualKeysApiService().list()).rejects.toBeInstanceOf(
-        VirtualKeysApiError,
-      );
+      await expect(new VirtualKeysApiService().list()).rejects.toBeInstanceOf(VirtualKeysApiError);
     });
   });
 
@@ -205,9 +201,7 @@ describe("VirtualKeysApiService cursor paging", () => {
 
     it("raises rather than looping forever when the cursor chain never ends", async () => {
       // A fresh Response per call: a body can only be read once.
-      mockFetch.mockImplementation(() =>
-        Promise.resolve(jsonResponse(page(["a"], "stuck"))),
-      );
+      mockFetch.mockImplementation(() => Promise.resolve(jsonResponse(page(["a"], "stuck"))));
 
       // The guard fires on the second page, long before this drains.
       await expect(drain(new VirtualKeysApiService().iterate())).rejects.toBeInstanceOf(
@@ -242,9 +236,9 @@ describe("VirtualKeysApiService cursor paging", () => {
         ),
       );
 
-      await expect(
-        new VirtualKeysApiService().listPage({ cursor: "made-up" }),
-      ).rejects.toThrow(/cursor/i);
+      await expect(new VirtualKeysApiService().listPage({ cursor: "made-up" })).rejects.toThrow(
+        /cursor/i,
+      );
     });
   });
   describe("filtering by your own identifier", () => {

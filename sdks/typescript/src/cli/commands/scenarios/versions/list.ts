@@ -21,9 +21,7 @@ export const listScenarioVersionsCommand = async (
   await resolveCredentials();
 
   const service = createCliScenariosService();
-  const spinner = createSpinner(
-    `Fetching versions of scenario "${scenarioId}"...`,
-  ).start();
+  const spinner = createSpinner(`Fetching versions of scenario "${scenarioId}"...`).start();
 
   try {
     const limit = options?.limit ? parseInt(options.limit, 10) : undefined;

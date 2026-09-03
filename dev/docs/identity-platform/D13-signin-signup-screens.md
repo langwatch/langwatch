@@ -48,7 +48,7 @@ authenticated identity surfaces (later deliverables — listed for orientation)
 
 - Today's screens are thin because Auth0's Universal Login carried the weight; there is no first-party UI for method choice, verification states, or recovery guidance.
 - Sign-up today always lands in workspace creation — the direct source of the orphaned-organization problem (users create a solo org, later get invited to the real one, the solo org lingers forever).
-- Spec impacts: `specs/auth/auth-signin-flows.feature` ports to router + screens (with D03); `signup-does-not-strand-an-account.feature` anchors survive; `sign-in-failure-messages.feature` is an anchor — the new screens keep saying *why* a sign-in failed (wrong password, rate-limit wait, origin mismatch); new `.feature` files for the full screen set.
+- Spec impacts: `specs/auth/auth-signin-flows.feature` ports to router + screens (with D03); `signup-does-not-strand-an-account.feature` anchors survive; `sign-in-failure-messages.feature` is an anchor — the new screens keep saying _why_ a sign-in failed (wrong password, rate-limit wait, origin mismatch); new `.feature` files for the full screen set.
 
 # Technical Plan
 

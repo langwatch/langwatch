@@ -10,9 +10,7 @@ export abstract class DataPrivacyPolicyRepository {
     organizationId: string;
     scopes: Array<Pick<DataPrivacyRow, "scopeType" | "scopeId" | "personalOnly">>;
   }): Promise<DataPrivacyRow[]>;
-  abstract findAllInOrganization(input: {
-    organizationId: string;
-  }): Promise<DataPrivacyPolicy[]>;
+  abstract findAllInOrganization(input: { organizationId: string }): Promise<DataPrivacyPolicy[]>;
   abstract upsertForScope(input: {
     organizationId: string;
     scope: DataPrivacyScope;

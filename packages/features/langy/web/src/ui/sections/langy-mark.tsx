@@ -132,9 +132,7 @@ export function LangyMeshLayer({
       backgroundSize="220% 220%"
       backgroundPosition="0% 50%"
       animation={
-        reduceMotion
-          ? undefined
-          : `langy-mesh-drift ${active ? "14s" : "26s"} ease-in-out infinite`
+        reduceMotion ? undefined : `langy-mesh-drift ${active ? "14s" : "26s"} ease-in-out infinite`
       }
     />
   );

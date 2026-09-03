@@ -31,11 +31,9 @@ export function useEvalInputs({
   const { project } = useOrganizationTeamProject();
   const isReadOnly = useIsReadOnlyTrace();
 
-  const listInputs =
-    eval_.inputs && Object.keys(eval_.inputs).length > 0 ? eval_.inputs : null;
+  const listInputs = eval_.inputs && Object.keys(eval_.inputs).length > 0 ? eval_.inputs : null;
 
-  const needLazy =
-    enabled && !listInputs && !!eval_.evaluationId && !!project?.id && !isReadOnly;
+  const needLazy = enabled && !listInputs && !!eval_.evaluationId && !!project?.id && !isReadOnly;
 
   const query = api.traces.getEvaluationInputs.useQuery(
     {

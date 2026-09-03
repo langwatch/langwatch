@@ -18,10 +18,7 @@ import {
 } from "../ingestion-pull-worker.service";
 import { createWorkerService } from "../../__tests__/support/puller-test-ports";
 
-import type {
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
+import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();

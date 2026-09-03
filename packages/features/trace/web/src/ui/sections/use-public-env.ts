@@ -86,9 +86,7 @@ type PublicEnvReading = {
  * a caller that asks for capabilities still gets them off the same cache entry
  * the application's own `api.publicEnv` query uses.
  */
-export function usePublicEnv(
-  options: { includeCapabilities?: boolean } = {},
-): PublicEnvReading {
+export function usePublicEnv(options: { includeCapabilities?: boolean } = {}): PublicEnvReading {
   const includeCapabilities = options.includeCapabilities ?? false;
   const capabilities = api.publicEnv.useQuery(
     {},
@@ -110,6 +108,12 @@ export function usePublicEnv(
         : staticValues,
       isLoading: includeCapabilities ? capabilities.isLoading : false,
     }),
-    [includeCapabilities, capabilities.data, capabilities.isLoading, staticValues.BASE_HOST, staticValues.DEMO_PROJECT_SLUG],
+    [
+      includeCapabilities,
+      capabilities.data,
+      capabilities.isLoading,
+      staticValues.BASE_HOST,
+      staticValues.DEMO_PROJECT_SLUG,
+    ],
   );
 }

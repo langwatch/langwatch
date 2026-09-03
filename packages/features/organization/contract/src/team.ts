@@ -64,9 +64,7 @@ export const createOrganizationTeamInputSchema = z
     name: z.string().min(1).max(255),
   })
   .strict();
-export type CreateOrganizationTeamInput = z.infer<
-  typeof createOrganizationTeamInputSchema
->;
+export type CreateOrganizationTeamInput = z.infer<typeof createOrganizationTeamInputSchema>;
 
 export const updateOrganizationTeamInputSchema = z
   .object({
@@ -75,9 +73,7 @@ export const updateOrganizationTeamInputSchema = z
     name: z.string().min(1).max(255).optional(),
   })
   .strict();
-export type UpdateOrganizationTeamInput = z.infer<
-  typeof updateOrganizationTeamInputSchema
->;
+export type UpdateOrganizationTeamInput = z.infer<typeof updateOrganizationTeamInputSchema>;
 
 export const changeOrganizationTeamMemberInputSchema = z
   .object({
@@ -88,33 +84,22 @@ export const changeOrganizationTeamMemberInputSchema = z
   })
   .strict();
 
-export const addOrganizationTeamMemberInputSchema =
-  changeOrganizationTeamMemberInputSchema.extend({
-    role: organizationTeamRoleSchema,
-  });
-export type AddOrganizationTeamMemberInput = z.infer<
-  typeof addOrganizationTeamMemberInputSchema
->;
+export const addOrganizationTeamMemberInputSchema = changeOrganizationTeamMemberInputSchema.extend({
+  role: organizationTeamRoleSchema,
+});
+export type AddOrganizationTeamMemberInput = z.infer<typeof addOrganizationTeamMemberInputSchema>;
 
 export type RemoveOrganizationTeamMemberInput = z.infer<
   typeof changeOrganizationTeamMemberInputSchema
 >;
 
-export const organizationTeamMemberRoleSchema = z.enum([
-  "ADMIN",
-  "MEMBER",
-  "VIEWER",
-  "CUSTOM",
-]);
+export const organizationTeamMemberRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type OrganizationTeamMemberRole = z.infer<typeof organizationTeamMemberRoleSchema>;
 
 export const organizationTeamMemberInputSchema = z
   .object({
     userId: z.string().min(1),
-    role: z.union([
-      organizationTeamRoleSchema,
-      z.string().regex(/^custom:[a-zA-Z0-9_-]+$/),
-    ]),
+    role: z.union([organizationTeamRoleSchema, z.string().regex(/^custom:[a-zA-Z0-9_-]+$/)]),
     customRoleId: z.string().min(1).optional(),
   })
   .strict()
@@ -135,9 +120,7 @@ export const organizationTeamMemberInputSchema = z
       });
     }
   });
-export type OrganizationTeamMemberInput = z.infer<
-  typeof organizationTeamMemberInputSchema
->;
+export type OrganizationTeamMemberInput = z.infer<typeof organizationTeamMemberInputSchema>;
 
 export const organizationTeamMemberUserSchema = z
   .object({
@@ -160,9 +143,7 @@ export const organizationTeamAssignedRoleSchema = z
     updatedAt: z.date(),
   })
   .passthrough();
-export type OrganizationTeamAssignedRole = z.infer<
-  typeof organizationTeamAssignedRoleSchema
->;
+export type OrganizationTeamAssignedRole = z.infer<typeof organizationTeamAssignedRoleSchema>;
 
 export const organizationTeamMemberSchema = z
   .object({
@@ -181,16 +162,10 @@ export type OrganizationTeamMember = z.infer<typeof organizationTeamMemberSchema
 export const organizationTeamWithMembersSchema = organizationTeamSchema.extend({
   members: z.array(organizationTeamMemberSchema),
 });
-export type OrganizationTeamWithMembers = z.infer<
-  typeof organizationTeamWithMembersSchema
->;
+export type OrganizationTeamWithMembers = z.infer<typeof organizationTeamWithMembersSchema>;
 
-export const getOrganizationTeamByIdInputSchema = z
-  .object({ teamId: z.string().min(1) })
-  .strict();
-export type GetOrganizationTeamByIdInput = z.infer<
-  typeof getOrganizationTeamByIdInputSchema
->;
+export const getOrganizationTeamByIdInputSchema = z.object({ teamId: z.string().min(1) }).strict();
+export type GetOrganizationTeamByIdInput = z.infer<typeof getOrganizationTeamByIdInputSchema>;
 
 export const getOrganizationTeamBySlugInputSchema = z
   .object({
@@ -198,9 +173,7 @@ export const getOrganizationTeamBySlugInputSchema = z
     slug: z.string().min(1),
   })
   .strict();
-export type GetOrganizationTeamBySlugInput = z.infer<
-  typeof getOrganizationTeamBySlugInputSchema
->;
+export type GetOrganizationTeamBySlugInput = z.infer<typeof getOrganizationTeamBySlugInputSchema>;
 
 export const getOrganizationTeamBySlugForMemberInputSchema =
   getOrganizationTeamBySlugInputSchema.extend({ userId: z.string().min(1) });
@@ -259,9 +232,7 @@ export const organizationTeamAccessProjectSchema = z
     teamId: z.string().min(1),
   })
   .strict();
-export type OrganizationTeamAccessProject = z.infer<
-  typeof organizationTeamAccessProjectSchema
->;
+export type OrganizationTeamAccessProject = z.infer<typeof organizationTeamAccessProjectSchema>;
 
 export const listOrganizationTeamAccessInputSchema = z
   .object({
@@ -269,9 +240,7 @@ export const listOrganizationTeamAccessInputSchema = z
     projects: z.array(organizationTeamAccessProjectSchema),
   })
   .strict();
-export type ListOrganizationTeamAccessInput = z.infer<
-  typeof listOrganizationTeamAccessInputSchema
->;
+export type ListOrganizationTeamAccessInput = z.infer<typeof listOrganizationTeamAccessInputSchema>;
 
 export const organizationTeamAccessMemberSchema = z
   .object({
@@ -288,9 +257,7 @@ export const organizationTeamAccessMemberSchema = z
     customRoleName: z.string().nullable(),
   })
   .strict();
-export type OrganizationTeamAccessMember = z.infer<
-  typeof organizationTeamAccessMemberSchema
->;
+export type OrganizationTeamAccessMember = z.infer<typeof organizationTeamAccessMemberSchema>;
 
 export const organizationProjectOnlyAccessSchema = z
   .object({
@@ -306,9 +273,7 @@ export const organizationProjectOnlyAccessSchema = z
     projectName: z.string(),
   })
   .strict();
-export type OrganizationProjectOnlyAccess = z.infer<
-  typeof organizationProjectOnlyAccessSchema
->;
+export type OrganizationProjectOnlyAccess = z.infer<typeof organizationProjectOnlyAccessSchema>;
 
 export const organizationProjectAccessMemberSchema = organizationTeamAccessMemberSchema
   .omit({ viaGroupId: true })
@@ -316,9 +281,7 @@ export const organizationProjectAccessMemberSchema = organizationTeamAccessMembe
     source: z.enum(["team", "direct", "override"]),
     teamRole: organizationTeamMemberRoleSchema.optional(),
   });
-export type OrganizationProjectAccessMember = z.infer<
-  typeof organizationProjectAccessMemberSchema
->;
+export type OrganizationProjectAccessMember = z.infer<typeof organizationProjectAccessMemberSchema>;
 
 export const organizationTeamAccessSchema = z
   .object({

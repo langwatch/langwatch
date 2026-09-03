@@ -13,10 +13,7 @@ import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import { AnthropicAdminPuller } from "../anthropic-admin-puller.adapter";
-import {
-  GovernanceHttpPort,
-  type GovernanceHttpResponse,
-} from "../../ports/governance-http.port";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service";
 
@@ -34,8 +31,7 @@ class TestHttpPort extends GovernanceHttpPort {
 class TestRatePort {
   rate(input: PulledUsageRateInput) {
     return {
-      costNanoUsd:
-        input.quantities.tokensInput + input.quantities.tokensOutput > 0 ? 1 : 0,
+      costNanoUsd: input.quantities.tokensInput + input.quantities.tokensOutput > 0 ? 1 : 0,
       rateVersion: "test",
     };
   }
@@ -205,9 +201,7 @@ describe("the Anthropic Admin puller", () => {
       // Long-context usage is priced differently, so the two rows must not
       // collapse onto one identity (source_event_id is the OCSF dedup key).
       expect(result.events).toHaveLength(2);
-      expect(result.events[0]!.source_event_id).not.toBe(
-        result.events[1]!.source_event_id,
-      );
+      expect(result.events[0]!.source_event_id).not.toBe(result.events[1]!.source_event_id);
     });
 
     it("keys rows differing only by service tier apart", async () => {
@@ -234,9 +228,7 @@ describe("the Anthropic Admin puller", () => {
       // Batch usage is priced differently from standard, so service tier must
       // participate in identity the same way context window does.
       expect(result.events).toHaveLength(2);
-      expect(result.events[0]!.source_event_id).not.toBe(
-        result.events[1]!.source_event_id,
-      );
+      expect(result.events[0]!.source_event_id).not.toBe(result.events[1]!.source_event_id);
     });
 
     it("falls back to the legacy flat cache-creation field when the nested object is absent", async () => {
@@ -549,9 +541,7 @@ describe("the Anthropic Admin puller", () => {
         bucketWidth: "1d",
       });
       if (!run.cursor?.includes("page_2")) {
-        throw new Error(
-          `expected a mid-window cursor holding page_2, got ${String(run.cursor)}`,
-        );
+        throw new Error(`expected a mid-window cursor holding page_2, got ${String(run.cursor)}`);
       }
       fetchMock.mockClear();
       fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
@@ -673,9 +663,7 @@ describe("the Anthropic Admin puller", () => {
 
       const url = String(fetchMock.mock.calls[0]?.[0]);
       expect(url).not.toContain("page=");
-      expect(url).toContain(
-        `starting_at=${encodeURIComponent("2026-07-01T00:00:00.000Z")}`,
-      );
+      expect(url).toContain(`starting_at=${encodeURIComponent("2026-07-01T00:00:00.000Z")}`);
     });
 
     it("never rewinds a cost source FORWARD: a backlogged watermark older than the configured start survives", async () => {
@@ -722,9 +710,7 @@ describe("the Anthropic Admin puller", () => {
       );
 
       const url = String(fetchMock.mock.calls[0]?.[0]);
-      expect(url).toContain(
-        `starting_at=${encodeURIComponent("2026-07-01T00:00:00.000Z")}`,
-      );
+      expect(url).toContain(`starting_at=${encodeURIComponent("2026-07-01T00:00:00.000Z")}`);
       // The re-pulled bucket keeps its stable identity, so the corrected
       // figure supersedes the 100x row instead of sitting beside it.
       const record = buildPulledUsageRecord({
@@ -769,9 +755,7 @@ describe("the Anthropic Admin puller", () => {
       );
 
       const url = String(fetchMock.mock.calls[0]?.[0]);
-      expect(url).toContain(
-        `starting_at=${encodeURIComponent("2026-01-01T00:00:00.000Z")}`,
-      );
+      expect(url).toContain(`starting_at=${encodeURIComponent("2026-01-01T00:00:00.000Z")}`);
     });
 
     it("keeps replaying a cost page token while the config is unchanged", async () => {
@@ -807,9 +791,7 @@ describe("the Anthropic Admin puller", () => {
 
   describe("when a page claims more pages but names none", () => {
     it("refuses, rather than advancing the watermark past what it never read", async () => {
-      fetchMock.mockResolvedValue(
-        jsonResponse({ ...USAGE_PAGE, has_more: true, next_page: null }),
-      );
+      fetchMock.mockResolvedValue(jsonResponse({ ...USAGE_PAGE, has_more: true, next_page: null }));
 
       // Treating this as drained would move `startingAt` to the last bucket
       // read and the unread pages would never be fetched again — a window of
@@ -849,21 +831,15 @@ describe("the Anthropic Admin puller", () => {
       // two rows join to the byte-identical string when nothing is encoded:
       // "…:a:b:c" either way. Both fields keep the same total colon count,
       // which is what makes this a true collision rather than a near miss.
-      fetchMock.mockResolvedValue(
-        jsonResponse({ ...COST_PAGE, data: [bucket("a:b", "c")] }),
-      );
+      fetchMock.mockResolvedValue(jsonResponse({ ...COST_PAGE, data: [bucket("a:b", "c")] }));
       const first = await puller.runOnce(RUN_OPTIONS, config);
-      fetchMock.mockResolvedValue(
-        jsonResponse({ ...COST_PAGE, data: [bucket("a", "b:c")] }),
-      );
+      fetchMock.mockResolvedValue(jsonResponse({ ...COST_PAGE, data: [bucket("a", "b:c")] }));
       const second = await puller.runOnce(RUN_OPTIONS, config);
 
       // `description` is free text Anthropic writes and can hold the ":" the
       // identity is joined on. Unencoded, these two distinct provider rows
       // produce one source_event_id — and that is the OCSF sink's dedup key.
-      expect(second.events[0]!.source_event_id).not.toBe(
-        first.events[0]!.source_event_id,
-      );
+      expect(second.events[0]!.source_event_id).not.toBe(first.events[0]!.source_event_id);
     });
   });
 

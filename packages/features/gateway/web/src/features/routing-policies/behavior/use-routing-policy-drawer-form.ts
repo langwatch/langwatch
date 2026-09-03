@@ -138,9 +138,7 @@ function useProviderOptions({
           id: provider.id!,
           modelProviderName: provider.name ?? provider.provider,
           slot: "primary",
-          disabledAt: provider.disabledAt
-            ? new Date(provider.disabledAt).toISOString()
-            : null,
+          disabledAt: provider.disabledAt ? new Date(provider.disabledAt).toISOString() : null,
           healthStatus: provider.healthStatus ?? "UNKNOWN",
         })),
     [providers],
@@ -154,13 +152,9 @@ function useProviderOptions({
   const boundProviderTypes = useMemo(() => {
     const all = (providers ?? []).map((provider) => provider.provider);
     if (selectedIds.length === 0) return [...new Set(all)];
-    const byId = new Map(
-      (providers ?? []).map((provider) => [provider.id, provider.provider]),
-    );
+    const byId = new Map((providers ?? []).map((provider) => [provider.id, provider.provider]));
     return [
-      ...new Set(
-        selectedIds.map((id) => byId.get(id)).filter((type): type is string => !!type),
-      ),
+      ...new Set(selectedIds.map((id) => byId.get(id)).filter((type): type is string => !!type)),
     ];
   }, [selectedIds, providers]);
 

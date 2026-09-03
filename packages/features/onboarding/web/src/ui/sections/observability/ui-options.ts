@@ -4,7 +4,11 @@ import {
   derivePlatformsForCategory,
   type IntegrationCategory,
 } from "./codegen/registry";
-import type { Option as BaseOption, FrameworkKey, PlatformKey } from "../../../model/observability/types";
+import type {
+  Option as BaseOption,
+  FrameworkKey,
+  PlatformKey,
+} from "../../../model/observability/types";
 
 type PlatformOption = BaseOption<PlatformKey> & { iconUrl?: string };
 

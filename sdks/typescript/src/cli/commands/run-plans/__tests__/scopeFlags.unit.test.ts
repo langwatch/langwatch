@@ -24,8 +24,7 @@ const noop = () => {
 };
 
 /** Everything the reader wrote on stderr while refusing. */
-const reported = (): string =>
-  vi.mocked(console.error).mock.calls.flat().join("\n");
+const reported = (): string => vi.mocked(console.error).mock.calls.flat().join("\n");
 
 describe("parseTargets()", () => {
   beforeEach(() => {
@@ -100,10 +99,7 @@ describe("parseTargets()", () => {
     /** @scenario "A target carries its own parameters after a question mark" */
     it("gives the same agent named twice its own values each time", () => {
       expect(
-        parseTargets([
-          "http:agent_abc?model=gpt-5",
-          "http:agent_abc?model=gpt-5-mini",
-        ]),
+        parseTargets(["http:agent_abc?model=gpt-5", "http:agent_abc?model=gpt-5-mini"]),
       ).toEqual([
         {
           type: "http",
@@ -119,9 +115,7 @@ describe("parseTargets()", () => {
     });
 
     it("reads every pair the ampersands separate", () => {
-      expect(
-        parseTargets(["http:agent_abc?model=gpt-5&region=eu&seats=12"]),
-      ).toEqual([
+      expect(parseTargets(["http:agent_abc?model=gpt-5&region=eu&seats=12"])).toEqual([
         {
           type: "http",
           referenceId: "agent_abc",
@@ -132,9 +126,7 @@ describe("parseTargets()", () => {
 
     /** @scenario "A target carries its own parameters after a question mark" */
     it("reads a value as the type it looks like, the rule --param uses", () => {
-      expect(
-        parseTargets(["http:agent_abc?seats=12&beta=true&account=007"]),
-      ).toEqual([
+      expect(parseTargets(["http:agent_abc?seats=12&beta=true&account=007"])).toEqual([
         {
           type: "http",
           referenceId: "agent_abc",
@@ -156,9 +148,7 @@ describe("parseTargets()", () => {
 
     /** @scenario "A target carries its own parameters after a question mark" */
     it("percent-decodes both halves", () => {
-      expect(
-        parseTargets(["http:agent_abc?system%20prompt=be%20brief%20%26%20kind"]),
-      ).toEqual([
+      expect(parseTargets(["http:agent_abc?system%20prompt=be%20brief%20%26%20kind"])).toEqual([
         {
           type: "http",
           referenceId: "agent_abc",
@@ -168,15 +158,13 @@ describe("parseTargets()", () => {
     });
 
     it("keeps the last value when one name is repeated", () => {
-      expect(parseTargets(["http:agent_abc?model=gpt-5&model=gpt-5-mini"])).toEqual(
-        [
-          {
-            type: "http",
-            referenceId: "agent_abc",
-            runParameters: { model: "gpt-5-mini" },
-          },
-        ],
-      );
+      expect(parseTargets(["http:agent_abc?model=gpt-5&model=gpt-5-mini"])).toEqual([
+        {
+          type: "http",
+          referenceId: "agent_abc",
+          runParameters: { model: "gpt-5-mini" },
+        },
+      ]);
     });
 
     it("keeps an equals sign inside a value", () => {
@@ -190,9 +178,7 @@ describe("parseTargets()", () => {
     });
 
     it("puts the values on their own target and leaves the others alone", () => {
-      expect(
-        parseTargets(["http:agent_abc?model=gpt-5", "prompt:prompt_xyz"]),
-      ).toEqual([
+      expect(parseTargets(["http:agent_abc?model=gpt-5", "prompt:prompt_xyz"])).toEqual([
         {
           type: "http",
           referenceId: "agent_abc",
@@ -212,32 +198,24 @@ describe("parseTargets()", () => {
 
     /** @scenario "Run with a target parameter that is not a pair" */
     it("refuses a parameter that is not a pair", () => {
-      expect(() => parseTargets(["http:agent_abc?model"])).toThrow(
-        ProcessExitError,
-      );
+      expect(() => parseTargets(["http:agent_abc?model"])).toThrow(ProcessExitError);
       expect(reported()).toContain("key=value");
     });
 
     /** @scenario "Run with a target parameter that is not a pair" */
     it("refuses a pair with no name", () => {
-      expect(() => parseTargets(["http:agent_abc?=gpt-5"])).toThrow(
-        ProcessExitError,
-      );
+      expect(() => parseTargets(["http:agent_abc?=gpt-5"])).toThrow(ProcessExitError);
       expect(reported()).toContain("key=value");
     });
 
     /** @scenario "Run with a target holding a second question mark" */
     it("refuses a second question mark and names the encoding", () => {
-      expect(() => parseTargets(["http:agent_abc?ask=what?"])).toThrow(
-        ProcessExitError,
-      );
+      expect(() => parseTargets(["http:agent_abc?ask=what?"])).toThrow(ProcessExitError);
       expect(reported()).toContain("%3F");
     });
 
     it("refuses a half that is not valid percent-encoding", () => {
-      expect(() => parseTargets(["http:agent_abc?model=%zz"])).toThrow(
-        ProcessExitError,
-      );
+      expect(() => parseTargets(["http:agent_abc?model=%zz"])).toThrow(ProcessExitError);
       expect(reported()).toContain("percent-encoded");
     });
   });
@@ -250,9 +228,7 @@ describe("parseTargets()", () => {
     });
 
     it("refuses a type the platform does not run", () => {
-      expect(() => parseTargets(["agent:agent_abc?model=gpt-5"])).toThrow(
-        ProcessExitError,
-      );
+      expect(() => parseTargets(["agent:agent_abc?model=gpt-5"])).toThrow(ProcessExitError);
       expect(reported()).toContain("prompt, http, code, workflow");
     });
 

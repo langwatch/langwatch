@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTracingProxy } from "../create-tracing-proxy";
-import {
-  getLangWatchTracerFromProvider,
-  type LangWatchTracer,
-} from "../../../observability-sdk";
+import { getLangWatchTracerFromProvider, type LangWatchTracer } from "../../../observability-sdk";
 import {
   type MockTracer,
   MockTracerProvider,
@@ -20,11 +17,7 @@ describe("createTracingProxy", () => {
   beforeEach(() => {
     testEnv = setupTestEnvironment();
     mockProvider = new MockTracerProvider();
-    langwatchTracer = getLangWatchTracerFromProvider(
-      mockProvider,
-      "test-tracer",
-      "1.0.0",
-    );
+    langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "test-tracer", "1.0.0");
     mockTracer = mockProvider.getTracerByName("test-tracer", "1.0.0")!;
   });
 
@@ -325,11 +318,7 @@ describe("createTracingProxy", () => {
       }
 
       const testInstance = new TestClass();
-      const proxy = createTracingProxy(
-        testInstance,
-        langwatchTracer,
-        AsyncErrorDecorator,
-      );
+      const proxy = createTracingProxy(testInstance, langwatchTracer, AsyncErrorDecorator);
 
       // Test successful async method
       const result = await proxy.publicAsyncMethod();
@@ -680,11 +669,7 @@ describe("createTracingProxy", () => {
 
     it("handles decorator errors", () => {
       const testInstance = new TestClass();
-      const proxy = createTracingProxy(
-        testInstance,
-        langwatchTracer,
-        ErrorDecorator as any,
-      );
+      const proxy = createTracingProxy(testInstance, langwatchTracer, ErrorDecorator as any);
 
       expect(() => {
         proxy.publicMethod();

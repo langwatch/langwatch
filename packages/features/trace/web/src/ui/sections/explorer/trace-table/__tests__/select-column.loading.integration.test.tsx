@@ -26,13 +26,7 @@ const realRows = (): TraceListItem[] =>
     traceId: `trace-${index}`,
   }));
 
-const SelectHeader = ({
-  data,
-  isLoading,
-}: {
-  data: TraceListItem[];
-  isLoading: boolean;
-}) => {
+const SelectHeader = ({ data, isLoading }: { data: TraceListItem[]; isLoading: boolean }) => {
   const table = useReactTable({
     data,
     columns: [traceSelectColumnDef],
@@ -51,8 +45,7 @@ const renderHeader = (props: { data: TraceListItem[]; isLoading: boolean }) =>
     </ChakraProvider>,
   );
 
-const selectAllButton = () =>
-  screen.queryByRole("button", { name: "Select all on this page" });
+const selectAllButton = () => screen.queryByRole("button", { name: "Select all on this page" });
 
 const selection = () => Array.from(useSelectionStore.getState().traceIds);
 

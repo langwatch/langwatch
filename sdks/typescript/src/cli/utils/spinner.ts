@@ -24,9 +24,7 @@ import { getOutputFormat } from "./errorOutput";
  */
 export function createSpinner(textOrOptions?: string | Options): Ora {
   const options: Options =
-    typeof textOrOptions === "string"
-      ? { text: textOrOptions }
-      : { ...(textOrOptions ?? {}) };
+    typeof textOrOptions === "string" ? { text: textOrOptions } : { ...(textOrOptions ?? {}) };
 
   return ora({
     ...options,

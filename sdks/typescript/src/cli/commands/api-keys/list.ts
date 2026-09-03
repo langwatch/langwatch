@@ -50,9 +50,7 @@ export const listApiKeysCommand = async (): Promise<CommandResult | void> => {
             Name: k.name,
             Status: status,
             Bindings: String(k.roleBindings.length),
-            Expires: k.expiresAt
-              ? new Date(k.expiresAt).toLocaleDateString()
-              : chalk.gray("never"),
+            Expires: k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : chalk.gray("never"),
             "Last used": k.lastUsedAt
               ? new Date(k.lastUsedAt).toLocaleDateString()
               : chalk.gray("—"),
@@ -62,15 +60,7 @@ export const listApiKeysCommand = async (): Promise<CommandResult | void> => {
 
         formatTable({
           data: tableData,
-          headers: [
-            "ID",
-            "Name",
-            "Status",
-            "Bindings",
-            "Expires",
-            "Last used",
-            "Created",
-          ],
+          headers: ["ID", "Name", "Status", "Bindings", "Expires", "Last used", "Created"],
           colorMap: {
             Name: chalk.cyan,
             ID: chalk.gray,

@@ -34,11 +34,7 @@ function draftState() {
 function renderEditor() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SpanNameTypeEditor
-        spanId="span-1"
-        capturedName={CAPTURED_NAME}
-        capturedType="llm"
-      />
+      <SpanNameTypeEditor spanId="span-1" capturedName={CAPTURED_NAME} capturedType="llm" />
     </ChakraProvider>,
   );
 }
@@ -53,9 +49,7 @@ afterEach(cleanup);
 
 describe("given a trace that was already corrected once", () => {
   beforeEach(() => {
-    useTraceEditStore
-      .getState()
-      .startEditing({ traceId: "trace-1", basePatch: storedCorrection });
+    useTraceEditStore.getState().startEditing({ traceId: "trace-1", basePatch: storedCorrection });
   });
 
   describe("when the reviewer opens that span", () => {

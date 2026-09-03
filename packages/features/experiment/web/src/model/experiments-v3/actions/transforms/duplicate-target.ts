@@ -1,8 +1,5 @@
 import type { EvaluatorConfig, FieldMapping, TargetConfig } from "../../types";
-import {
-  type DuplicateTargetPayload,
-  duplicateTargetPayloadSchema,
-} from "../schemas";
+import { type DuplicateTargetPayload, duplicateTargetPayloadSchema } from "../schemas";
 import { attachTarget, newTargetId } from "./add-target";
 import { requireTarget } from "./helpers";
 import type { Transform } from "./types";
@@ -22,9 +19,7 @@ const repointToCopy = ({
   sourceTargetId: string;
   copyTargetId: string;
 }): FieldMapping =>
-  mapping.type === "source" &&
-  mapping.source === "target" &&
-  mapping.sourceId === sourceTargetId
+  mapping.type === "source" && mapping.source === "target" && mapping.sourceId === sourceTargetId
     ? { ...mapping, sourceId: copyTargetId }
     : { ...mapping };
 
@@ -79,9 +74,7 @@ export const duplicateTarget: Transform<
   // workflow targets take their displayed name from the entity they reference.
   const renameable = source.type === "evaluator";
   const localEvaluatorConfig =
-    name && renameable
-      ? { ...source.localEvaluatorConfig, name }
-      : source.localEvaluatorConfig;
+    name && renameable ? { ...source.localEvaluatorConfig, name } : source.localEvaluatorConfig;
 
   const copy: TargetConfig = {
     ...source,

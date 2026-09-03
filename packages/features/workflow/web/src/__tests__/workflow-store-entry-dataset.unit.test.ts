@@ -64,11 +64,7 @@ describe("workflowStoreCore - entry dataset attach", () => {
       ]);
 
       const entry = store.getState().nodes[0]!.data as Entry;
-      expect(entry.outputs?.map((f) => f.identifier)).toEqual([
-        "feature_flag",
-        "query",
-        "context",
-      ]);
+      expect(entry.outputs?.map((f) => f.identifier)).toEqual(["feature_flag", "query", "context"]);
       expect(entry.dataset).toEqual(sampleDataset);
     });
 
@@ -91,11 +87,7 @@ describe("workflowStoreCore - entry dataset attach", () => {
       ]);
 
       const entry = store.getState().nodes[0]!.data as Entry;
-      expect(entry.outputs?.map((f) => f.identifier)).toEqual([
-        "query",
-        "feature_flag",
-        "context",
-      ]);
+      expect(entry.outputs?.map((f) => f.identifier)).toEqual(["query", "feature_flag", "context"]);
     });
 
     it("replacing the dataset keeps previously merged and user fields", () => {

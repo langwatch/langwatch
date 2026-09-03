@@ -24,21 +24,21 @@ The process connects only with an API key. The SDK reads `LANGWATCH_API_KEY` fro
 
 ### Options
 
-| Option | Type | Default | Effect |
-|---|---|---|---|
-| `name` | `str` | required | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
-| `environment` | `str \| None` | resolved, see below | The environment row this process registers under. |
-| `description` | `str \| None` | `None` | One line about the agent, shown on the agents page. |
-| `parameters` | `dict \| None` | read from the signature | An explicit declaration that replaces signature reflection. |
-| `enabled` | `bool \| None` | `True`, `False` when `CI` is set | Whether this process connects. |
-| `instance_label` | `str \| None` | `None` | A name for this instance in the instances table. |
-| `timeout` | `float` | `120` | Seconds one call may take. The ceiling is `300`. |
-| `concurrency` | `int \| None` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
-| `sticky` | `bool` | `False` | Keep every turn of one conversation on one instance. |
-| `api_key` | `str \| None` | `LANGWATCH_API_KEY` | The key the connection authenticates with. |
-| `endpoint` | `str \| None` | `LANGWATCH_ENDPOINT` | The LangWatch instance to connect to. |
-| `project_id` | `str \| None` | `None` | The project, for a key that covers more than one. |
-| `transport` | `str \| None` | `websocket` | `websocket` or `http`. See [Transport](#transport). |
+| Option           | Type           | Default                             | Effect                                                                             |
+| ---------------- | -------------- | ----------------------------------- | ---------------------------------------------------------------------------------- |
+| `name`           | `str`          | required                            | The agent's name, and the first half of a `connected:<name>@<environment>` target. |
+| `environment`    | `str \| None`  | resolved, see below                 | The environment row this process registers under.                                  |
+| `description`    | `str \| None`  | `None`                              | One line about the agent, shown on the agents page.                                |
+| `parameters`     | `dict \| None` | read from the signature             | An explicit declaration that replaces signature reflection.                        |
+| `enabled`        | `bool \| None` | `True`, `False` when `CI` is set    | Whether this process connects.                                                     |
+| `instance_label` | `str \| None`  | `None`                              | A name for this instance in the instances table.                                   |
+| `timeout`        | `float`        | `120`                               | Seconds one call may take. The ceiling is `300`.                                   |
+| `concurrency`    | `int \| None`  | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time.                                        |
+| `sticky`         | `bool`         | `False`                             | Keep every turn of one conversation on one instance.                               |
+| `api_key`        | `str \| None`  | `LANGWATCH_API_KEY`                 | The key the connection authenticates with.                                         |
+| `endpoint`       | `str \| None`  | `LANGWATCH_ENDPOINT`                | The LangWatch instance to connect to.                                              |
+| `project_id`     | `str \| None`  | `None`                              | The project, for a key that covers more than one.                                  |
+| `transport`      | `str \| None`  | `websocket`                         | `websocket` or `http`. See [Transport](#transport).                                |
 
 ### Environment resolution
 
@@ -50,13 +50,13 @@ The process connects only with an API key. The SDK reads `LANGWATCH_API_KEY` fro
 
 The platform sends the same fields on every call. The SDK reads the signature once, at decoration, and passes exactly the names the function declares. A function that declares `**kwargs` receives all of them.
 
-| Name | Type | Value |
-|---|---|---|
-| `messages` | `list[dict]` | The whole conversation so far, as OpenAI-style messages |
-| `new_messages` | `list[dict]` | The messages added since the previous turn |
-| `thread_id` | `str` | The platform's conversation id, the same on every turn of one run |
-| `session` | `Any \| None` | What the function returned as `session` on the previous turn |
-| `trace_id` | `str` | The id of the turn's trace |
+| Name           | Type          | Value                                                             |
+| -------------- | ------------- | ----------------------------------------------------------------- |
+| `messages`     | `list[dict]`  | The whole conversation so far, as OpenAI-style messages           |
+| `new_messages` | `list[dict]`  | The messages added since the previous turn                        |
+| `thread_id`    | `str`         | The platform's conversation id, the same on every turn of one run |
+| `session`      | `Any \| None` | What the function returned as `session` on the previous turn      |
+| `trace_id`     | `str`         | The id of the turn's trace                                        |
 
 These names are never run parameters.
 
@@ -70,21 +70,21 @@ async def support_agent(call: langwatch.AgentCall) -> str:
     return await run_my_agent(call.messages, tenant=call.parameters["tenant"])
 ```
 
-| Attribute | Value |
-|---|---|
-| `messages`, `new_messages`, `thread_id`, `session`, `trace_id` | The turn fields above |
-| `parameters` | A `dict` of the run's values for the declared parameters |
+| Attribute                                                      | Value                                                    |
+| -------------------------------------------------------------- | -------------------------------------------------------- |
+| `messages`, `new_messages`, `thread_id`, `session`, `trace_id` | The turn fields above                                    |
+| `parameters`                                                   | A `dict` of the run's values for the declared parameters |
 
 ### Run parameters
 
 Every parameter that is not a turn field is a run parameter. A parameter with a default is optional, and the run dialog prefills that default. A parameter with no default is required, and the run must supply a value for it.
 
-| Read from | Gives |
-|---|---|
-| `str`, `int`, `float`, `bool` | The parameter's type |
-| `Literal[...]`, an `Enum` class | A closed list of options |
-| `Optional[T]` | The type, and a value that may be empty |
-| The default value | The default the run dialog prefills |
+| Read from                            | Gives                                     |
+| ------------------------------------ | ----------------------------------------- |
+| `str`, `int`, `float`, `bool`        | The parameter's type                      |
+| `Literal[...]`, an `Enum` class      | A closed list of options                  |
+| `Optional[T]`                        | The type, and a value that may be empty   |
+| The default value                    | The default the run dialog prefills       |
 | `Annotated[T, langwatch.Param(...)]` | A description, an options list, or a type |
 
 An annotation the SDK does not map falls back to that type's JSON schema and is offered as text.
@@ -95,11 +95,11 @@ Values arrive validated against the declaration. A value the declaration refuses
 
 Annotates one run parameter.
 
-| Argument | Type | Effect |
-|---|---|---|
-| `description` | `str` | Shown beside the field in the run dialog |
-| `options` | `list` | A closed list of allowed values, up to 50 |
-| `type` | `str` | Overrides the type read from the annotation |
+| Argument      | Type   | Effect                                      |
+| ------------- | ------ | ------------------------------------------- |
+| `description` | `str`  | Shown beside the field in the run dialog    |
+| `options`     | `list` | A closed list of allowed values, up to 50   |
+| `type`        | `str`  | Overrides the type read from the annotation |
 
 ```python
 from typing import Annotated
@@ -109,21 +109,21 @@ tenant: Annotated[str, langwatch.Param(description="Which tenant to answer for")
 
 ### Return values
 
-| Return | Meaning |
-|---|---|
-| `str` | The reply text |
-| `dict` | One message |
-| `list[dict]` | Several messages |
+| Return                                      | Meaning                                          |
+| ------------------------------------------- | ------------------------------------------------ |
+| `str`                                       | The reply text                                   |
+| `dict`                                      | One message                                      |
+| `list[dict]`                                | Several messages                                 |
 | `langwatch.AgentReply(output, session=...)` | A reply plus the session value for the next turn |
 
 A generator is refused with a message saying that streaming is not supported.
 
 ### `langwatch.AgentReply`
 
-| Field | Type | Value |
-|---|---|---|
-| `output` | `str \| dict \| list[dict]` | The reply |
-| `session` | `Any \| None` | An opaque JSON value the platform echoes on the next turn of the same conversation, up to 64 kilobytes |
+| Field     | Type                        | Value                                                                                                  |
+| --------- | --------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `output`  | `str \| dict \| list[dict]` | The reply                                                                                              |
+| `session` | `Any \| None`               | An opaque JSON value the platform echoes on the next turn of the same conversation, up to 64 kilobytes |
 
 ### `langwatch.agent.serve()`
 
@@ -139,15 +139,15 @@ The connection is an outbound WebSocket by default. On a network that blocks Web
 
 ### Environment variables
 
-| Variable | Effect |
-|---|---|
-| `LANGWATCH_API_KEY` | The project key. Without it, the process does not connect. |
-| `LANGWATCH_ENDPOINT` | The LangWatch instance, for a self-hosted deployment. |
-| `LANGWATCH_PROJECT_ID` | The project, for a key that covers more than one. |
-| `LANGWATCH_AGENT_ENVIRONMENT` | The environment to register under. |
-| `LANGWATCH_AGENT_CONNECT` | `0` or `false` stops this process from connecting. |
-| `LANGWATCH_AGENT_INSTANCE_LABEL` | The instance name shown in the instances table. |
-| `LANGWATCH_AGENT_TRANSPORT` | `http` uses HTTP long polling instead of the WebSocket. |
+| Variable                         | Effect                                                     |
+| -------------------------------- | ---------------------------------------------------------- |
+| `LANGWATCH_API_KEY`              | The project key. Without it, the process does not connect. |
+| `LANGWATCH_ENDPOINT`             | The LangWatch instance, for a self-hosted deployment.      |
+| `LANGWATCH_PROJECT_ID`           | The project, for a key that covers more than one.          |
+| `LANGWATCH_AGENT_ENVIRONMENT`    | The environment to register under.                         |
+| `LANGWATCH_AGENT_CONNECT`        | `0` or `false` stops this process from connecting.         |
+| `LANGWATCH_AGENT_INSTANCE_LABEL` | The instance name shown in the instances table.            |
+| `LANGWATCH_AGENT_TRANSPORT`      | `http` uses HTTP long polling instead of the WebSocket.    |
 
 ### Errors
 

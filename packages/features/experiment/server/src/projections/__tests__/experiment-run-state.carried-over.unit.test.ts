@@ -107,9 +107,7 @@ const verdict = ({
 });
 
 /** The run's state after the fold has seen these events, in this order. */
-const fold = (
-  events: ExperimentRunProcessingEvent[],
-): ExperimentRunStateData => {
+const fold = (events: ExperimentRunProcessingEvent[]): ExperimentRunStateData => {
   const projection = new ExperimentRunStateFoldProjection({
     store: {
       store: async () => undefined,
@@ -152,9 +150,7 @@ describe("given a run that carried a cell in from the board", () => {
 
     /** @scenario "A carried-over failure does not move the run's failed count" */
     it("keeps the failed count where it was for a carried failure", () => {
-      const state = fold([
-        targetResult({ error: "lw.unnamed_failure", carriedOver: true }),
-      ]);
+      const state = fold([targetResult({ error: "lw.unnamed_failure", carriedOver: true })]);
 
       expect(state.FailedCount).toBe(0);
       expect(state.Progress).toBe(0);
@@ -162,9 +158,7 @@ describe("given a run that carried a cell in from the board", () => {
 
     /** @scenario "A carried-over verdict adds nothing to the run's cost" */
     it("leaves the carried verdict's money out of the total cost", () => {
-      const state = fold([
-        verdict({ passed: true, cost: 0.5, carriedOver: true }),
-      ]);
+      const state = fold([verdict({ passed: true, cost: 0.5, carriedOver: true })]);
 
       expect(state.TotalCost).toBeNull();
     });
@@ -183,9 +177,7 @@ describe("given a run that carried a cell in from the board", () => {
 
     /** @scenario "A carried-over verdict counts toward the run's average score" */
     it("counts the carried verdict toward the average score", () => {
-      const state = fold([
-        verdict({ score: 0.8, passed: true, carriedOver: true }),
-      ]);
+      const state = fold([verdict({ score: 0.8, passed: true, carriedOver: true })]);
 
       expect(state.ScoreCount).toBe(1);
       expect(state.AvgScoreBps).toBe(8000);

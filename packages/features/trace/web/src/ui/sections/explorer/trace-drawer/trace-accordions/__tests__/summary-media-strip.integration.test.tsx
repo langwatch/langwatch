@@ -12,10 +12,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import {
-  filterReservedMediaRefAttributes,
-  SummaryMediaStrip,
-} from "../trace-summary-accordions";
+import { filterReservedMediaRefAttributes, SummaryMediaStrip } from "../trace-summary-accordions";
 
 vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_test" } }),
@@ -55,24 +52,17 @@ describe("SummaryMediaStrip", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByTestId("media-part-audio")).toHaveAttribute(
-        "src",
-        "/api/files/p1/a1",
-      );
-      expect(screen.getByTestId("media-part-image")).toHaveAttribute(
-        "src",
-        "/api/files/p1/i1",
-      );
+      expect(screen.getByTestId("media-part-audio")).toHaveAttribute("src", "/api/files/p1/a1");
+      expect(screen.getByTestId("media-part-image")).toHaveAttribute("src", "/api/files/p1/i1");
       expect(screen.getByTestId("media-part-binary")).toHaveTextContent("report.pdf");
     });
   });
 
   describe("given no refs attribute or unparseable JSON", () => {
     it("renders nothing", () => {
-      const { container: empty } = render(
-        <SummaryMediaStrip refsJson={undefined} side="input" />,
-        { wrapper: Wrapper },
-      );
+      const { container: empty } = render(<SummaryMediaStrip refsJson={undefined} side="input" />, {
+        wrapper: Wrapper,
+      });
       expect(empty).toBeEmptyDOMElement();
 
       const { container: garbage } = render(
@@ -89,10 +79,9 @@ describe("SummaryMediaStrip", () => {
         { kind: "image", url: "https://attacker.example/beacon.png" },
         { kind: "file", url: "javascript:alert(1)", filename: "invoice.pdf" },
       ]);
-      const { container } = render(
-        <SummaryMediaStrip refsJson={refsJson} side="input" />,
-        { wrapper: Wrapper },
-      );
+      const { container } = render(<SummaryMediaStrip refsJson={refsJson} side="input" />, {
+        wrapper: Wrapper,
+      });
       expect(container).toBeEmptyDOMElement();
     });
   });
@@ -135,14 +124,10 @@ describe("SummaryMediaStrip", () => {
     /** @scenario "Media refs recorded without a role render on both summary strips" */
     it("renders the recording on both strips, exactly as before", () => {
       for (const side of ["input", "output"] as const) {
-        const { unmount } = render(
-          <SummaryMediaStrip refsJson={refsJson} side={side} />,
-          { wrapper: Wrapper },
-        );
-        expect(screen.getByTestId("media-part-audio")).toHaveAttribute(
-          "src",
-          "/api/files/p1/a1",
-        );
+        const { unmount } = render(<SummaryMediaStrip refsJson={refsJson} side={side} />, {
+          wrapper: Wrapper,
+        });
+        expect(screen.getByTestId("media-part-audio")).toHaveAttribute("src", "/api/files/p1/a1");
         unmount();
       }
     });

@@ -44,10 +44,7 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-export async function instrumentCommand(
-  tool: string,
-  options: InstrumentOptions,
-): Promise<void> {
+export async function instrumentCommand(tool: string, options: InstrumentOptions): Promise<void> {
   const sourceType = SOURCE_TYPE_BY_TOOL[tool];
   if (!sourceType) {
     fail(

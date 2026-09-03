@@ -73,10 +73,7 @@ export class ConcurrencyLimiter {
     abort: (error: Error) => void;
   }[] = [];
 
-  constructor({
-    maxConcurrent,
-    maxQueued = DEFAULT_MAX_QUEUED,
-  }: ConcurrencyLimiterOptions) {
+  constructor({ maxConcurrent, maxQueued = DEFAULT_MAX_QUEUED }: ConcurrencyLimiterOptions) {
     if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) {
       throw new RangeError("maxConcurrent must be a positive integer");
     }

@@ -24,7 +24,10 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTraceExplorerTourPreference } from "../hooks/use-trace-explorer-tour-preference";
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store";
-import type { Spotlight, SpotlightContext } from "../../../../../model/explorer/onboarding/spotlights/spotlights";
+import type {
+  Spotlight,
+  SpotlightContext,
+} from "../../../../../model/explorer/onboarding/spotlights/spotlights";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../model/explorer/onboarding/spotlights/spotlights";
 
 // ---------------------------------------------------------------------------
@@ -152,9 +155,7 @@ function resolveSpotlight({
   id: string | null;
   ctx: SpotlightContext;
 }): Spotlight | null {
-  const list = TRACE_EXPLORER_SPOTLIGHTS.filter(
-    (s) => !s.isApplicable || s.isApplicable(ctx),
-  );
+  const list = TRACE_EXPLORER_SPOTLIGHTS.filter((s) => !s.isApplicable || s.isApplicable(ctx));
   if (list.length === 0) return null;
   if (id === null) return list[0] ?? null;
   return list.find((s) => s.id === id) ?? list[0] ?? null;
@@ -167,9 +168,7 @@ function nextSpotlight({
   currentId: string | null;
   ctx: SpotlightContext;
 }): Spotlight | null {
-  const list = TRACE_EXPLORER_SPOTLIGHTS.filter(
-    (s) => !s.isApplicable || s.isApplicable(ctx),
-  );
+  const list = TRACE_EXPLORER_SPOTLIGHTS.filter((s) => !s.isApplicable || s.isApplicable(ctx));
   if (list.length === 0) return null;
   const idx = list.findIndex((s) => s.id === currentId);
   return list[idx + 1] ?? null;
@@ -182,25 +181,18 @@ function prevSpotlight({
   currentId: string | null;
   ctx: SpotlightContext;
 }): Spotlight | null {
-  const list = TRACE_EXPLORER_SPOTLIGHTS.filter(
-    (s) => !s.isApplicable || s.isApplicable(ctx),
-  );
+  const list = TRACE_EXPLORER_SPOTLIGHTS.filter((s) => !s.isApplicable || s.isApplicable(ctx));
   if (list.length === 0) return null;
   const idx = list.findIndex((s) => s.id === currentId);
   if (idx <= 0) return null;
   return list[idx - 1] ?? null;
 }
 
-function spotlightIndex({
-  currentId,
-  ctx,
-}: {
-  currentId: string | null;
-  ctx: SpotlightContext;
-}): { index: number; total: number } {
-  const list = TRACE_EXPLORER_SPOTLIGHTS.filter(
-    (s) => !s.isApplicable || s.isApplicable(ctx),
-  );
+function spotlightIndex({ currentId, ctx }: { currentId: string | null; ctx: SpotlightContext }): {
+  index: number;
+  total: number;
+} {
+  const list = TRACE_EXPLORER_SPOTLIGHTS.filter((s) => !s.isApplicable || s.isApplicable(ctx));
   const idx = list.findIndex((s) => s.id === currentId);
   return { index: idx >= 0 ? idx : 0, total: list.length };
 }
@@ -380,12 +372,7 @@ export function SpotlightPopover({
         </Button>
         <Flex align="center" gap={2}>
           {hasPrev && (
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={onBack}
-              aria-label="Previous spotlight"
-            >
+            <Button size="xs" variant="ghost" onClick={onBack} aria-label="Previous spotlight">
               Back
             </Button>
           )}
@@ -421,11 +408,7 @@ export function SpotlightPopover({
 // can see which element the spotlight is talking about.
 // ---------------------------------------------------------------------------
 
-export function HighlightRing({
-  anchorRect,
-}: {
-  anchorRect: AnchorRect;
-}): React.ReactElement {
+export function HighlightRing({ anchorRect }: { anchorRect: AnchorRect }): React.ReactElement {
   // Soft orange focus, not a blue aurora.
   //
   // Design rule: BLUE is reserved on this screen for "you need to act"
@@ -503,9 +486,7 @@ export function SpotlightOverlay(): React.ReactElement | null {
   // read the discover response.
   const ctx: SpotlightContext = { hasEvaluators: true, hasFlameViz: true };
 
-  const resolved = spotlightsActive
-    ? resolveSpotlight({ id: currentSpotlightId, ctx })
-    : null;
+  const resolved = spotlightsActive ? resolveSpotlight({ id: currentSpotlightId, ctx }) : null;
 
   // Measure the anchor on every spotlight change (and on scroll/resize
   // so the popover tracks if the page reflows).
@@ -578,9 +559,7 @@ export function SpotlightOverlay(): React.ReactElement | null {
       const target = e.target;
       if (
         target instanceof HTMLElement &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
       ) {
         return;
       }

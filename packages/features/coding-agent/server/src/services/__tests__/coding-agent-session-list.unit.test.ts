@@ -489,9 +489,21 @@ describe("Coding Agent sessions list", () => {
       // Two sessions sharing a repository and branches ask once for each, and
       // the third repository joins the same call.
       expect(github.branchLookupInputs[0]?.keys).toEqual([
-        { repositoryHost: "github.com", repositoryFullName: "acme/widgets", headBranch: "feat/one" },
-        { repositoryHost: "github.com", repositoryFullName: "acme/widgets", headBranch: "feat/two" },
-        { repositoryHost: "github.com", repositoryFullName: "acme/gadgets", headBranch: "fix/crash" },
+        {
+          repositoryHost: "github.com",
+          repositoryFullName: "acme/widgets",
+          headBranch: "feat/one",
+        },
+        {
+          repositoryHost: "github.com",
+          repositoryFullName: "acme/widgets",
+          headBranch: "feat/two",
+        },
+        {
+          repositoryHost: "github.com",
+          repositoryFullName: "acme/gadgets",
+          headBranch: "fix/crash",
+        },
       ]);
     });
 
@@ -553,7 +565,11 @@ describe("Coding Agent sessions list", () => {
       const [row] = await service.listForProject({ projectId: PROJECT });
 
       expect(github.branchLookupInputs[0]?.keys).toEqual([
-        { repositoryHost: "github.com", repositoryFullName: "acme/widgets", headBranch: "feat/one" },
+        {
+          repositoryHost: "github.com",
+          repositoryFullName: "acme/widgets",
+          headBranch: "feat/one",
+        },
       ]);
       expect(row?.pullRequests.map((pull) => pull.number)).toEqual([11]);
       // The row answers with the one branch it does know about, so the page

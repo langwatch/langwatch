@@ -22,12 +22,12 @@ step is the surface's to supply and never the member's. There is no third move.
 
 Four commits, each defensible alone.
 
-| commit | what it did |
-| --- | --- |
-| `40bca7acac` | built `LangWatchQLGranularityPicker` and wired it into the workbench |
-| `df4f775bd2` | shipped the granularity contract end to end, spec scenarios included |
+| commit       | what it did                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------- |
+| `40bca7acac` | built `LangWatchQLGranularityPicker` and wired it into the workbench                         |
+| `df4f775bd2` | shipped the granularity contract end to end, spec scenarios included                         |
 | `94b95128a0` | moved the workbench into `packages/features/analytics/web` — as a **new file**, not a rename |
-| `cbcaf76802` | deleted 27 modules nothing imported, the now-orphaned picker among them |
+| `cbcaf76802` | deleted 27 modules nothing imported, the now-orphaned picker among them                      |
 
 The move re-authored the workbench (957 lines to 408) and did not carry the
 picker. That left the picker imported by nothing, so the dead-code sweep was

@@ -57,11 +57,7 @@ export class PrismaIngestionPullRunProjectionRepository implements StateProjecti
   ): Promise<void> {
     const sourceId = projection.state.SourceId;
     const projectId = String(context.tenantId);
-    const {
-      SourceId: _sourceId,
-      LastEventOccurredAt: _checkpoint,
-      ...state
-    } = projection.state;
+    const { SourceId: _sourceId, LastEventOccurredAt: _checkpoint, ...state } = projection.state;
     const data = {
       ...state,
       CreatedAt: projection.createdAt,

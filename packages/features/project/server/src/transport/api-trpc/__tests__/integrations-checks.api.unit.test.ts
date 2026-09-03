@@ -27,10 +27,7 @@ type CheckStatus = { workflows: number; integrated: boolean };
 function harness({
   getCheckStatus = async () => ({ workflows: 0, integrated: false }),
 }: {
-  getCheckStatus?: (
-    ctx: object,
-    input: Readonly<{ projectId: string }>,
-  ) => Promise<CheckStatus>;
+  getCheckStatus?: (ctx: object, input: Readonly<{ projectId: string }>) => Promise<CheckStatus>;
 } = {}) {
   const trpc = initTRPC.context<TestContext>().create();
   // Mirrors the process's authenticated procedure: it narrows the context, so
@@ -124,9 +121,9 @@ describe("IntegrationsChecksTrpcApi", () => {
     it("refuses on the process's authenticated procedure", async () => {
       const { anonymousCaller, port } = harness();
 
-      await expect(anonymousCaller.getCheckStatus({ projectId: "project-1" })).rejects.toMatchObject(
-        { code: "UNAUTHORIZED" },
-      );
+      await expect(
+        anonymousCaller.getCheckStatus({ projectId: "project-1" }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
       expect(port).not.toHaveBeenCalled();
     });
   });

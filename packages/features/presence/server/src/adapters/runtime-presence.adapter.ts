@@ -1,10 +1,7 @@
 import type { PresenceService as PresenceServiceContract } from "@langwatch/presence-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type {
-  PresenceBroadcastPort,
-  PresenceDiagnosticsPort,
-} from "../ports/presence.port";
+import type { PresenceBroadcastPort, PresenceDiagnosticsPort } from "../ports/presence.port";
 import { MemoryPresenceRepository } from "../repositories/memory/memory.presence.repository";
 import { RedisPresenceRepository } from "../repositories/redis/redis.presence.repository";
 import { PresenceService } from "../services/presence.service";

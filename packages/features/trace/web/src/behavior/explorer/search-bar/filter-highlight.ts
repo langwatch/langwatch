@@ -9,11 +9,7 @@ import type {
   TagToken,
   UnaryOperatorToken,
 } from "liqe";
-import {
-  parse as cachedParse,
-  SCENARIO_FIELDS,
-  SEARCH_FIELDS,
-} from "@langwatch/trace-contract";
+import { parse as cachedParse, SCENARIO_FIELDS, SEARCH_FIELDS } from "@langwatch/trace-contract";
 
 /**
  * The grammar's actual operator vocabulary — anything else uppercase-shaped
@@ -142,13 +138,7 @@ function isKnownField(fieldName: string): boolean {
   return false;
 }
 
-function tagClassName({
-  fieldName,
-  negated,
-}: {
-  fieldName: string;
-  negated: boolean;
-}): string {
+function tagClassName({ fieldName, negated }: { fieldName: string; negated: boolean }): string {
   // Unknown field — the query parses, but no part of the platform knows
   // how to filter on it. Yellow/dashed treatment makes the typo obvious
   // before the user submits and gets zero rows.
@@ -172,11 +162,7 @@ function tagClassName({
  * of `name:OK` (where `OK` is legitimate free text inside a quoted/literal
  * value) or the inside of an `[N TO M]` range.
  */
-function flagOperatorShapedTypos(
-  text: string,
-  baseOffset: number,
-  plan: DecorationPlan,
-): void {
+function flagOperatorShapedTypos(text: string, baseOffset: number, plan: DecorationPlan): void {
   OPERATOR_SHAPED_WORD_REGEX.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = OPERATOR_SHAPED_WORD_REGEX.exec(text)) !== null) {
@@ -204,11 +190,7 @@ function flagOperatorShapedTypos(
   }
 }
 
-function isPositionCoveredBySlot(
-  slots: DecorationSlot[],
-  from: number,
-  to: number,
-): boolean {
+function isPositionCoveredBySlot(slots: DecorationSlot[], from: number, to: number): boolean {
   for (const slot of slots) {
     if (from >= slot.from && to <= slot.to) return true;
   }
@@ -521,8 +503,7 @@ function computeDecorations(doc: ProseMirrorNode): DecorationSet {
       // the text-node base position. Two conventions because the AST path
       // wants positions that round-trip through `removeNodeAtLocation`,
       // whereas the fallback path slices directly out of the editor text.
-      const widgetPos =
-        token.kind === "ast" ? pos + plan.leadingWs + token.end : pos + token.end;
+      const widgetPos = token.kind === "ast" ? pos + plan.leadingWs + token.end : pos + token.end;
       decorations.push(
         Decoration.widget(widgetPos, () => createDeleteWidget(token), {
           side: 1,

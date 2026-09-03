@@ -161,11 +161,9 @@ export class ReportChannelUnsupportedError extends HandledError {
   declare readonly code: "report_channel_unsupported";
 
   constructor() {
-    super(
-      "report_channel_unsupported",
-      "Reports can only send Email or Slack notifications.",
-      { httpStatus: 400 },
-    );
+    super("report_channel_unsupported", "Reports can only send Email or Slack notifications.", {
+      httpStatus: 400,
+    });
     this.name = "ReportChannelUnsupportedError";
   }
 }
@@ -309,10 +307,7 @@ export class AutomationApp {
    * is" at the other. A door still chooses how to refuse; what "there" means is
    * decided here.
    */
-  async tryGetLiveById(input: {
-    triggerId: string;
-    projectId: string;
-  }): Promise<Trigger | null> {
+  async tryGetLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
     const trigger = await this.dependencies.automation.tryGetById(input);
     return !trigger || trigger.deleted ? null : trigger;
   }
@@ -515,14 +510,12 @@ export class AutomationApp {
    * The picker is flag-gated client-side and both writing doors gate it too,
    * so the flag cannot be bypassed by calling the API directly.
    */
-  async assertWebhookChannelEnabled(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<void> {
-    const allowed = await this.dependencies.featureFlags.isEnabled(
-      "release_webhook_automations",
-      { kind: "project", userId: input.userId, projectId: input.projectId },
-    );
+  async assertWebhookChannelEnabled(input: { projectId: string; userId: string }): Promise<void> {
+    const allowed = await this.dependencies.featureFlags.isEnabled("release_webhook_automations", {
+      kind: "project",
+      userId: input.userId,
+      projectId: input.projectId,
+    });
     if (!allowed) throw new AutomationWebhookNotEnabledError(input.projectId);
   }
 

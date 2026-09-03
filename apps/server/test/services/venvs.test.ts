@@ -6,11 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const execCalls: Array<{ bin: string; args: string[] }> = [];
 
 vi.mock("../../src/services/_pipe-to-bus.ts", () => ({
-  execAndPipe: vi.fn(
-    async (_bus: unknown, _name: string, bin: string, args: string[]) => {
-      execCalls.push({ bin, args });
-    },
-  ),
+  execAndPipe: vi.fn(async (_bus: unknown, _name: string, bin: string, args: string[]) => {
+    execCalls.push({ bin, args });
+  }),
 }));
 
 vi.mock("../../src/services/app-dir.ts", () => ({
@@ -87,15 +85,7 @@ describe("evaluator environment", () => {
       // Exact set rather than a containment check: this pins the whole extras
       // list, so an extra nobody asked for cannot slip in unnoticed.
       expect([...extras].sort()).toEqual(
-        [
-          "azure",
-          "langevals",
-          "lingua",
-          "openai",
-          "presidio",
-          "ragas",
-          "topic_clustering",
-        ].sort(),
+        ["azure", "langevals", "lingua", "openai", "presidio", "ragas", "topic_clustering"].sort(),
       );
     });
   });

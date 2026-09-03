@@ -1,10 +1,6 @@
 import type { Redis } from "ioredis";
 
-import {
-  defineGroupQueue,
-  GroupQueueConsumer,
-  GroupQueueProducer,
-} from "@langwatch/group-queue";
+import { defineGroupQueue, GroupQueueConsumer, GroupQueueProducer } from "@langwatch/group-queue";
 import {
   BLOB_SWEEP_INTERVAL_MS,
   CachedLuaScript,

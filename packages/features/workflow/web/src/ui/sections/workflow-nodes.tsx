@@ -15,12 +15,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useWorkflowStore } from "../../behavior/use-workflow-store";
-import type {
-  Component,
-  ComponentType,
-  Field,
-  LLMConfig,
-} from "@langwatch/workflow-contract";
+import type { Component, ComponentType, Field, LLMConfig } from "@langwatch/workflow-contract";
 import { GATE_FIELD, showsTemporaryGate } from "../../model/control-flow";
 import { hasUnsavedChanges } from "../../model/unsaved-changes";
 import { useWorkflowNodeHost } from "../elements/workflow-node.host";
@@ -273,10 +268,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
   };
 
   const isNotDroppable = useMemo(
-    () =>
-      isDragging &&
-      item?.node?.type === "prompting_technique" &&
-      props.type !== "signature",
+    () => isDragging && item?.node?.type === "prompting_technique" && props.type !== "signature",
     [isDragging, item, props.type],
   );
 
@@ -305,9 +297,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       border="1px solid"
       borderColor="border"
       outline={!!props.selected || isHovered ? "1.5px solid" : "none"}
-      outlineColor={
-        props.selected ? selectionColor : isHovered ? "gray.emphasized" : "none"
-      }
+      outlineColor={props.selected ? selectionColor : isHovered ? "gray.emphasized" : "none"}
       onMouseEnter={() => setHoveredNodeId(props.id)}
       onMouseLeave={() => setHoveredNodeId(void 0)}
       onDoubleClick={() => {
@@ -398,10 +388,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
           <React.Fragment key={llmParam.identifier}>
             <NodeSectionTitle>LLM</NodeSectionTitle>
             <HStack width="full">
-              <LLMModelDisplay
-                model={(llmParam.value as LLMConfig).model}
-                fontSize="11px"
-              />
+              <LLMModelDisplay model={(llmParam.value as LLMConfig).model} fontSize="11px" />
             </HStack>
           </React.Fragment>
         ))}

@@ -9,11 +9,7 @@ import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redi
 import Redis from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
-import {
-  LangyUiActionService,
-  type UiActionRedis,
-  uiActionKeys,
-} from "../langy-ui-action.service";
+import { LangyUiActionService, type UiActionRedis, uiActionKeys } from "../langy-ui-action.service";
 import {
   LangyUiActionCatalogPort,
   type LangyUiActionDefinition,

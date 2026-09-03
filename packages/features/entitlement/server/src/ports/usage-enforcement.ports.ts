@@ -32,9 +32,7 @@ export abstract class UsageVolumeCounterPort {
  * rather than its repository.
  */
 export abstract class UsageOrganizationPort {
-  abstract tryGetOrganizationIdByTeamId(input: {
-    teamId: string;
-  }): Promise<string | null>;
+  abstract tryGetOrganizationIdByTeamId(input: { teamId: string }): Promise<string | null>;
 
   abstract getProjectIds(organizationId: string): Promise<string[]>;
 

@@ -15,13 +15,7 @@
  * Spec: specs/members/member-role-team-restrictions.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../behavior/organization-api", () => ({
@@ -70,10 +64,9 @@ const removeTheAssignedTeam = () => {
 };
 
 const enterEmail = (email: string) => {
-  fireEvent.change(
-    screen.getByPlaceholderText("alice@example.com, bob@example.com"),
-    { target: { value: email } },
-  );
+  fireEvent.change(screen.getByPlaceholderText("alice@example.com, bob@example.com"), {
+    target: { value: email },
+  });
 };
 
 const sendInvites = () => {

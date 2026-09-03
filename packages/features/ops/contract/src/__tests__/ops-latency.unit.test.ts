@@ -16,8 +16,7 @@ describe("latencyBucketField", () => {
       expect(latencyBucketField(5)).toBe("6");
       expect(latencyBucketField(6)).toBe("6");
       expect(latencyBucketField(327)).toBe("384");
-      const largest =
-        LATENCY_HISTOGRAM_BOUNDS_MS[LATENCY_HISTOGRAM_BOUNDS_MS.length - 1]!;
+      const largest = LATENCY_HISTOGRAM_BOUNDS_MS[LATENCY_HISTOGRAM_BOUNDS_MS.length - 1]!;
       expect(latencyBucketField(largest)).toBe(String(largest));
       expect(latencyBucketField(largest + 1)).toBe(LATENCY_HISTOGRAM_OVERFLOW_FIELD);
     });
@@ -25,9 +24,7 @@ describe("latencyBucketField", () => {
 
   it("keeps the bounds strictly increasing so the walk terminates correctly", () => {
     for (let i = 1; i < LATENCY_HISTOGRAM_BOUNDS_MS.length; i++) {
-      expect(LATENCY_HISTOGRAM_BOUNDS_MS[i]!).toBeGreaterThan(
-        LATENCY_HISTOGRAM_BOUNDS_MS[i - 1]!,
-      );
+      expect(LATENCY_HISTOGRAM_BOUNDS_MS[i]!).toBeGreaterThan(LATENCY_HISTOGRAM_BOUNDS_MS[i - 1]!);
     }
   });
 });

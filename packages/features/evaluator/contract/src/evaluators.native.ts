@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-export const API_KEYS_AND_SECRETS_DETECTION =
-  "langwatch/api_keys_and_secrets_detection" as const;
+export const API_KEYS_AND_SECRETS_DETECTION = "langwatch/api_keys_and_secrets_detection" as const;
 export const nativeEvaluatorsSchemaShape = {
   [API_KEYS_AND_SECRETS_DETECTION]: z.object({ settings: z.object({}) }),
 };

@@ -4,11 +4,7 @@ import {
   proposeLinkCommandDataSchema,
 } from "@langwatch/identity-contract";
 import type { IdentityGuards } from "../guards";
-import {
-  type Command,
-  type CommandHandler,
-  defineCommandSchema,
-} from "@langwatch/eventing";
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { identityEventsFor } from "../projections/identity-state.projection";
 import type { IdentityEvent } from "../projections/identity-state.projection";
 
@@ -17,9 +13,10 @@ import type { IdentityEvent } from "../projections/identity-state.projection";
  * path ran, the same envelope. A retried callback carries the same commandId,
  * so the re-run costs no second event.
  */
-export class ProposeLinkCommand
-  implements CommandHandler<Command<ProposeLinkCommandData>, IdentityEvent>
-{
+export class ProposeLinkCommand implements CommandHandler<
+  Command<ProposeLinkCommandData>,
+  IdentityEvent
+> {
   static readonly schema = defineCommandSchema(
     PROPOSE_LINK_COMMAND_TYPE,
     proposeLinkCommandDataSchema,
@@ -32,9 +29,7 @@ export class ProposeLinkCommand
 
   constructor(private readonly guards: IdentityGuards) {}
 
-  async handle(
-    command: Command<ProposeLinkCommandData>,
-  ): Promise<IdentityEvent[]> {
+  async handle(command: Command<ProposeLinkCommandData>): Promise<IdentityEvent[]> {
     const facts = await this.guards.proposeLink(command.data);
     return identityEventsFor({
       command: { type: PROPOSE_LINK_COMMAND_TYPE, data: command.data },

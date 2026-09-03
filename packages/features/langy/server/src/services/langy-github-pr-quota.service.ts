@@ -84,9 +84,7 @@ export async function getLangyGithubPrUsage({
   const key = `langy:gh:prs:${userId}:${bucket}`;
   let count = 0;
   try {
-    const raw = await (connection as { get: (k: string) => Promise<string | null> }).get(
-      key,
-    );
+    const raw = await (connection as { get: (k: string) => Promise<string | null> }).get(key);
     count = raw ? Number.parseInt(raw, 10) : 0;
   } catch {
     return {
@@ -273,9 +271,10 @@ export async function reserveLangyGithubPrPermit({
       // TTL — operator-visible via redis monitoring of `langy:gh:prs:*`
       // keys older than 2 days. Documented residual; cap still works.
       try {
-        await (
-          connection as { expire: (k: string, s: number) => Promise<number> }
-        ).expire(key, 60 * 60 * 24 * 2);
+        await (connection as { expire: (k: string, s: number) => Promise<number> }).expire(
+          key,
+          60 * 60 * 24 * 2,
+        );
       } catch {
         /* TTL-less key; cap enforcement unaffected this bucket */
       }
@@ -354,9 +353,9 @@ export async function releaseLangyGithubPrPermit({
     // read-before-decrement. Not atomic, but the decrement is best-effort
     // anyway (a race here yields a slightly under-counted cap, not an
     // underflow to negative that would grant unlimited permits).
-    const raw = await (
-      connection as unknown as { get: (k: string) => Promise<string | null> }
-    ).get(key);
+    const raw = await (connection as unknown as { get: (k: string) => Promise<string | null> }).get(
+      key,
+    );
     const n = parseInt(raw ?? "0", 10);
     if (n > 0) {
       await conn.decr(key);

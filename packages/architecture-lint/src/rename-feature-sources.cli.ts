@@ -29,9 +29,7 @@ try {
     `${plan.mappings.length} filename mapping${plan.mappings.length === 1 ? "" : "s"}\n`,
   );
   for (const mapping of plan.mappings) {
-    process.stdout.write(
-      `${relative(root, mapping.from)} -> ${relative(root, mapping.to)}\n`,
-    );
+    process.stdout.write(`${relative(root, mapping.from)} -> ${relative(root, mapping.to)}\n`);
   }
   process.stdout.write(
     `${plan.edits.size} reference file${plan.edits.size === 1 ? "" : "s"} would change\n`,
@@ -47,11 +45,7 @@ try {
       `Remaining documentation references:\n${plan.remainingTextualReferences.join("\n")}\n`,
     );
   }
-  if (
-    plan.collisions.length ||
-    plan.unresolved.length ||
-    plan.remainingTextualReferences.length
-  ) {
+  if (plan.collisions.length || plan.unresolved.length || plan.remainingTextualReferences.length) {
     process.exitCode = 1;
   } else if (write) {
     applyFilenameMigration(plan);

@@ -82,12 +82,7 @@ export function detectCodingAgent({
  * is present, so the first hit wins and no agent is disadvantaged.
  */
 export function resolveConversationKey(attrs: Record<string, unknown>): string | null {
-  const candidates = [
-    "session.id",
-    "conversation.id",
-    "gen_ai.conversation.id",
-    "thread.id",
-  ];
+  const candidates = ["session.id", "conversation.id", "gen_ai.conversation.id", "thread.id"];
   for (const key of candidates) {
     const value = attrs[key];
     if (typeof value === "string" && value.length > 0) return value;
@@ -119,9 +114,7 @@ export function resolveSpanConversationKey({
   attrs: Record<string, unknown>;
 }): string | null {
   const definition = CODING_AGENT_REGISTRY.find((candidate) => candidate.id === agent);
-  return (
-    definition?.sessionKeyFromSpan?.({ name, attrs }) ?? resolveConversationKey(attrs)
-  );
+  return definition?.sessionKeyFromSpan?.({ name, attrs }) ?? resolveConversationKey(attrs);
 }
 
 /**

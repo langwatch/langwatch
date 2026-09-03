@@ -3,16 +3,7 @@
 // governance's. Two seams are substituted: the deployment shape comes from the
 // host port rather than `usePublicEnv`, and the docs base comes from
 // `@langwatch/config/docs-url`, which every family now shares.
-import {
-  Box,
-  Button,
-  Code,
-  Heading,
-  HStack,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Code, Heading, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Check, Copy, ExternalLink, Terminal } from "lucide-react";
 import { useState } from "react";
 
@@ -64,9 +55,7 @@ export function InstallCliCard({
   // LangWatch, so no env / flag needed there.
   const installCommand = "npm install -g langwatch";
 
-  const loginCommand = isSaas
-    ? "langwatch login"
-    : `langwatch login --endpoint ${baseHost}`;
+  const loginCommand = isSaas ? "langwatch login" : `langwatch login --endpoint ${baseHost}`;
 
   return (
     <Box
@@ -92,26 +81,17 @@ export function InstallCliCard({
         </Text>
 
         <Text fontSize="xs" color="fg.muted">
-          Requires Node.js 18 or newer (the <Code fontSize="xs">npm</Code> command ships
-          with it). Get it at <Code fontSize="xs">nodejs.org</Code>.
+          Requires Node.js 18 or newer (the <Code fontSize="xs">npm</Code> command ships with it).
+          Get it at <Code fontSize="xs">nodejs.org</Code>.
         </Text>
 
-        <CommandRow
-          label="1. Install"
-          command={installCommand}
-          ariaLabel="Copy install command"
-        />
-        <CommandRow
-          label="2. Authenticate"
-          command={loginCommand}
-          ariaLabel="Copy login command"
-        />
+        <CommandRow label="1. Install" command={installCommand} ariaLabel="Copy install command" />
+        <CommandRow label="2. Authenticate" command={loginCommand} ariaLabel="Copy login command" />
 
         {!isSaas && (
           <Text fontSize="xs" color="fg.muted">
-            Self-hosted detected. The login flag targets{" "}
-            <Code fontSize="xs">{baseHost}</Code>; the endpoint is persisted after that
-            first login, so subsequent commands don&apos;t need it.
+            Self-hosted detected. The login flag targets <Code fontSize="xs">{baseHost}</Code>; the
+            endpoint is persisted after that first login, so subsequent commands don&apos;t need it.
           </Text>
         )}
 

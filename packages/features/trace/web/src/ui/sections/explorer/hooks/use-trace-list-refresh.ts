@@ -67,9 +67,7 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
         const head = JSON.stringify(key[0]);
         return (
           head.includes('"tracesV2"') &&
-          (head.includes('"list"') ||
-            head.includes('"discover"') ||
-            head.includes('"newCount"'))
+          (head.includes('"list"') || head.includes('"discover"') || head.includes('"newCount"'))
         );
       } catch {
         return false;

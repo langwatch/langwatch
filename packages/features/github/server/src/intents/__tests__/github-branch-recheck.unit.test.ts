@@ -13,10 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TestGithubService } from "./fixtures/github-service.fixture";
 
 import { EventingGithubMaintenanceAdapter } from "../../adapters/eventing.github-maintenance.adapter";
-import {
-  runGithubBranchRecheck,
-  runGithubRetentionPrune,
-} from "../github-branch-recheck.intent";
+import { runGithubBranchRecheck, runGithubRetentionPrune } from "../github-branch-recheck.intent";
 import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,

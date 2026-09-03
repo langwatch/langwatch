@@ -70,8 +70,7 @@ const MAX_IN_FLIGHT_IDS = 1000;
 const GONE_CHECK_SLACK_MS = 5_000;
 
 /** The delivered marker outlives the longest call and its slack. */
-const DELIVERED_TTL_SECONDS =
-  Math.ceil(MAX_CALL_TIMEOUT_MS / 1000) + CALL_KEY_SLACK_SECONDS;
+const DELIVERED_TTL_SECONDS = Math.ceil(MAX_CALL_TIMEOUT_MS / 1000) + CALL_KEY_SLACK_SECONDS;
 
 /** What the store keeps for one HTTP session, under its token. */
 const storedSessionSchema = z.object({
@@ -130,8 +129,7 @@ export class LongPollTransport {
   constructor(options: LongPollTransportOptions) {
     this.core = new AgentSessionCore(options);
     this.pollWaitMs = options.pollWaitMs ?? POLL_WAIT_MS;
-    this.watchTtlMs =
-      options.watchTtlMs ?? PRESENCE_TTL_SECONDS * 1000 + GONE_CHECK_SLACK_MS;
+    this.watchTtlMs = options.watchTtlMs ?? PRESENCE_TTL_SECONDS * 1000 + GONE_CHECK_SLACK_MS;
   }
 
   /** How many instances this pod watches. */
@@ -357,10 +355,7 @@ export class LongPollTransport {
   }
 
   /** A poll is a heartbeat: the session and the presence both live on. */
-  private async touch(
-    stored: StoredSession,
-    session: SessionInfo,
-  ): Promise<void> {
+  private async touch(stored: StoredSession, session: SessionInfo): Promise<void> {
     await this.saveSession(stored);
     await this.core.refreshPresence(session);
   }
@@ -378,17 +373,10 @@ export class LongPollTransport {
   }): Promise<(CallFrame | CancelFrame)[]> {
     const store = this.core.runtime.store;
     const frames: (CallFrame | CancelFrame)[] = [];
-    const pending = await store.zrangebyscore(
-      pendingKey(session.instanceId),
-      this.core.now(),
-    );
+    const pending = await store.zrangebyscore(pendingKey(session.instanceId), this.core.now());
     for (const callId of pending) {
       if (inFlight.has(callId)) continue;
-      const claimed = await store.setIfAbsent(
-        callDeliveredKey(callId),
-        "1",
-        DELIVERED_TTL_SECONDS,
-      );
+      const claimed = await store.setIfAbsent(callDeliveredKey(callId), "1", DELIVERED_TTL_SECONDS);
       if (!claimed) continue;
       const call = await this.core.readCallForSession(session, callId);
       if (call) frames.push(this.core.callFrame(call));
@@ -402,13 +390,7 @@ export class LongPollTransport {
   }
 
   /** A poll answers as soon as it holds a frame, or when its request or this pod is going away. */
-  private settled({
-    frames,
-    signal,
-  }: {
-    frames: unknown[];
-    signal?: AbortSignal;
-  }): boolean {
+  private settled({ frames, signal }: { frames: unknown[]; signal?: AbortSignal }): boolean {
     return frames.length > 0 || signal?.aborted === true || this.closed;
   }
 
@@ -448,10 +430,7 @@ export class LongPollTransport {
       session,
       unsubscribe: async () => undefined,
       waiters: new Set(),
-      expiry: setTimeout(
-        () => void this.expireWatch(session.instanceId),
-        this.watchTtlMs,
-      ),
+      expiry: setTimeout(() => void this.expireWatch(session.instanceId), this.watchTtlMs),
     };
     watch.expiry.unref();
     this.watches.set(session.instanceId, watch);
@@ -480,22 +459,14 @@ export class LongPollTransport {
     if (!watch) return;
     this.watches.delete(instanceId);
     await watch.unsubscribe();
-    const live = await this.core.runtime.store.hgetall(
-      instanceMetaKey(instanceId),
-    );
+    const live = await this.core.runtime.store.hgetall(instanceMetaKey(instanceId));
     if (live) return;
-    const pending = await this.core.runtime.store.zrangebyscore(
-      pendingKey(instanceId),
-      0,
-    );
+    const pending = await this.core.runtime.store.zrangebyscore(pendingKey(instanceId), 0);
     logger.info({ instanceId }, "instance stopped polling, retiring it");
     await this.core.retire(watch.session, pending);
   }
 
-  private async deregister(
-    stored: StoredSession,
-    session: SessionInfo,
-  ): Promise<void> {
+  private async deregister(stored: StoredSession, session: SessionInfo): Promise<void> {
     const store = this.core.runtime.store;
     await store.del(httpSessionKey(stored.token));
     const watch = this.watches.get(session.instanceId);
@@ -505,10 +476,7 @@ export class LongPollTransport {
       for (const waiter of watch.waiters) waiter({ cancel: "" });
       await watch.unsubscribe();
     }
-    const pending = await store.zrangebyscore(
-      pendingKey(session.instanceId),
-      0,
-    );
+    const pending = await store.zrangebyscore(pendingKey(session.instanceId), 0);
     await this.core.retire(session, pending);
   }
 }

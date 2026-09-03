@@ -104,9 +104,7 @@ export class ClickHouseCodingAgentProcessingAdapter {
     return new ClickHouseCodingAgentProcessingAdapter(options);
   }
 
-  private constructor(
-    private readonly options: ClickHouseCodingAgentProcessingAdapterOptions,
-  ) {}
+  private constructor(private readonly options: ClickHouseCodingAgentProcessingAdapterOptions) {}
 
   buildProcessing(): CodingAgentProcessingPipeline {
     const options = this.options;

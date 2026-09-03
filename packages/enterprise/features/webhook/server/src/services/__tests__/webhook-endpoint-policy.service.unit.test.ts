@@ -22,21 +22,17 @@ describe("webhook delivery control bounds", () => {
       `between ${WEBHOOK_MAX_BATCH_SIZE_BOUNDS.min} and ${WEBHOOK_MAX_BATCH_SIZE_BOUNDS.max}`,
     );
 
-    expect(() =>
-      policy.assertValidDeliveryControls({ maxBatchDelayMs: -1 }),
-    ).toThrow(
+    expect(() => policy.assertValidDeliveryControls({ maxBatchDelayMs: -1 })).toThrow(
       `between ${WEBHOOK_BATCH_DELAY_BOUNDS_MS.min} and ${WEBHOOK_BATCH_DELAY_BOUNDS_MS.max}`,
     );
     expect(() =>
       policy.assertValidDeliveryControls({
         maxInFlight: WEBHOOK_IN_FLIGHT_BOUNDS.max + 1,
       }),
-    ).toThrow(
-      `between ${WEBHOOK_IN_FLIGHT_BOUNDS.min} and ${WEBHOOK_IN_FLIGHT_BOUNDS.max}`,
+    ).toThrow(`between ${WEBHOOK_IN_FLIGHT_BOUNDS.min} and ${WEBHOOK_IN_FLIGHT_BOUNDS.max}`);
+    expect(() => policy.assertValidDeliveryControls({ maxBatchSize: 2.5 })).toThrow(
+      WebhookEndpointValidationError,
     );
-    expect(() =>
-      policy.assertValidDeliveryControls({ maxBatchSize: 2.5 }),
-    ).toThrow(WebhookEndpointValidationError);
   });
 
   it("accepts every value on the bounds themselves", () => {

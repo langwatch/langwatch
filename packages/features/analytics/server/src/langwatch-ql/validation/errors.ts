@@ -27,9 +27,7 @@ import type { LangWatchQLViolation } from "./violations";
  * that tells it *which* of five joins to change. Nothing else goes in here; the
  * SQL, the resolved policy and the trace ids belong in the log line.
  */
-function violationMeta(
-  violations: readonly LangWatchQLViolation[],
-): Record<string, unknown> {
+function violationMeta(violations: readonly LangWatchQLViolation[]): Record<string, unknown> {
   return { violations };
 }
 
@@ -85,9 +83,7 @@ export class LangWatchQLNotPermittedError extends HandledError {
  * in the wrong place.
  */
 export function lwqlValidationError(rejection: RejectedLangWatchQL): HandledError {
-  const unparseable = rejection.violations.every(
-    (violation) => violation.code === "PARSE_FAILED",
-  );
+  const unparseable = rejection.violations.every((violation) => violation.code === "PARSE_FAILED");
   return unparseable
     ? new LangWatchQLUnparseableError(rejection.violations)
     : new LangWatchQLNotPermittedError(rejection.violations);

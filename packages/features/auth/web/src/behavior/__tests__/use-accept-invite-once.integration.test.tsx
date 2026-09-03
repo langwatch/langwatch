@@ -20,8 +20,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "../../model/invite-messages";
 
-const { mutateSpy, toasterCreate, hardRedirectSpy, captureExceptionSpy, mockState } =
-  vi.hoisted(() => {
+const { mutateSpy, toasterCreate, hardRedirectSpy, captureExceptionSpy, mockState } = vi.hoisted(
+  () => {
     return {
       mutateSpy: vi.fn(),
       toasterCreate: vi.fn(),
@@ -30,10 +30,7 @@ const { mutateSpy, toasterCreate, hardRedirectSpy, captureExceptionSpy, mockStat
       mockState: {
         handlers: {} as {
           onSuccess?: (data: unknown, variables: { inviteCode: string }) => void;
-          onError?: (
-            error: { message: string },
-            variables: { inviteCode: string },
-          ) => void;
+          onError?: (error: { message: string }, variables: { inviteCode: string }) => void;
         },
         mutation: {
           isLoading: false,
@@ -43,7 +40,8 @@ const { mutateSpy, toasterCreate, hardRedirectSpy, captureExceptionSpy, mockStat
         },
       },
     };
-  });
+  },
+);
 
 vi.mock("../auth-api", () => ({
   authApi: {
@@ -74,10 +72,7 @@ vi.mock("../error-capture", () => ({
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
-import {
-  _resetSubmittedInviteCodesForTests,
-  useAcceptInviteOnce,
-} from "../use-accept-invite-once";
+import { _resetSubmittedInviteCodesForTests, useAcceptInviteOnce } from "../use-accept-invite-once";
 
 function resetMutationState() {
   mockState.mutation = {
@@ -224,10 +219,9 @@ describe("useAcceptInviteOnce()", () => {
           mockState.mutation.error = { message: "The invite has expired" };
           // Pass a real Error to match the TRPCClientError runtime type (which extends Error),
           // so toError() preserves the instance rather than stringifying to "[object Object]".
-          mockState.handlers.onError?.(
-            new Error("The invite has expired") as { message: string },
-            { inviteCode: "invite-abc" },
-          );
+          mockState.handlers.onError?.(new Error("The invite has expired") as { message: string }, {
+            inviteCode: "invite-abc",
+          });
         });
         rerender();
 
@@ -263,10 +257,9 @@ describe("useAcceptInviteOnce()", () => {
         act(() => {
           mockState.mutation.isError = true;
           mockState.mutation.error = { message: "The invite has expired" };
-          mockState.handlers.onError?.(
-            new Error("The invite has expired") as { message: string },
-            { inviteCode: "invite-abc" },
-          );
+          mockState.handlers.onError?.(new Error("The invite has expired") as { message: string }, {
+            inviteCode: "invite-abc",
+          });
         });
 
         first.unmount();
@@ -313,10 +306,9 @@ describe("useAcceptInviteOnce()", () => {
         expect(second.result.current.status).toBe("loading");
 
         act(() => {
-          firstHandlers.onError?.(
-            new Error("The invite has expired") as { message: string },
-            { inviteCode: "invite-abc" },
-          );
+          firstHandlers.onError?.(new Error("The invite has expired") as { message: string }, {
+            inviteCode: "invite-abc",
+          });
         });
 
         expect(second.result.current.status).toBe("error");
@@ -350,9 +342,7 @@ describe("useAcceptInviteOnce()", () => {
         rerender();
 
         expect(hardRedirectSpy).toHaveBeenCalledWith("/acme-prod");
-        expect(toasterCreate).toHaveBeenCalledWith(
-          expect.objectContaining({ type: "success" }),
-        );
+        expect(toasterCreate).toHaveBeenCalledWith(expect.objectContaining({ type: "success" }));
         expect(result.current.status).toBe("success");
       });
     });

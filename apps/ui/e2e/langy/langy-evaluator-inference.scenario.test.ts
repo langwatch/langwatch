@@ -222,9 +222,7 @@ describe("Langy prompt optimization: choosing the evaluator from the data", () =
         hasGoldenAnswer?: boolean;
       }>;
       const goldenFree = comparisons.find(
-        (comparison) =>
-          comparison.variants.length >= 2 &&
-          comparison.hasGoldenAnswer === false,
+        (comparison) => comparison.variants.length >= 2 && comparison.hasGoldenAnswer === false,
       );
       expect(
         goldenFree,

@@ -50,8 +50,7 @@ const DIRECTION_LABEL: Record<GatewayGuardrailDirection, string> = {
 const DIRECTION_HELP: Record<GatewayGuardrailDirection, string> = {
   PRE: "Runs on the inbound request body before any provider call. Block returns 403 guardrail_blocked.",
   POST: "Runs on the assistant response before the client sees it. Block returns 403 + zero-cost debit.",
-  STREAM_CHUNK:
-    "Runs per visible SSE delta. Always fail-open per contract (50ms budget).",
+  STREAM_CHUNK: "Runs per visible SSE delta. Always fail-open per contract (50ms budget).",
 };
 
 const FAILURE_LABEL: Record<GatewayGuardrailFailureMode, string> = {
@@ -156,8 +155,8 @@ function GuardrailsPage() {
               </EmptyState.Indicator>
               <EmptyState.Title>Pick a project first</EmptyState.Title>
               <EmptyState.Description>
-                Guardrails are scoped per project. Use the project switcher in the
-                top-left to pick a project before creating one.
+                Guardrails are scoped per project. Use the project switcher in the top-left to pick
+                a project before creating one.
               </EmptyState.Description>
             </EmptyState.Content>
           </EmptyState.Root>
@@ -186,9 +185,9 @@ function GuardrailsPage() {
       <Box paddingX={6} paddingY={4} width="full">
         <VStack align="stretch" gap={4}>
           <Text fontSize="sm" color="fg.muted">
-            Project-scoped LangWatch evaluators that run on every gateway request bound to
-            this project. Pick a direction (pre / post / stream_chunk) and a failure mode
-            (default fail closed). The VK opt-in lives in the virtual-key drawer.
+            Project-scoped LangWatch evaluators that run on every gateway request bound to this
+            project. Pick a direction (pre / post / stream_chunk) and a failure mode (default fail
+            closed). The VK opt-in lives in the virtual-key drawer.
           </Text>
 
           {listQuery.isLoading ? (
@@ -205,10 +204,9 @@ function GuardrailsPage() {
                     <EmptyState.Description>
                       {guardrailEvaluators.length === 0 ? (
                         <>
-                          No project evaluators are marked as guardrails. Open
-                          Evaluations, edit an evaluator, and switch{" "}
-                          <strong>executionMode</strong> to <code>AS_GUARDRAIL</code>{" "}
-                          before binding it here.
+                          No project evaluators are marked as guardrails. Open Evaluations, edit an
+                          evaluator, and switch <strong>executionMode</strong> to{" "}
+                          <code>AS_GUARDRAIL</code> before binding it here.
                         </>
                       ) : (
                         <>
@@ -269,23 +267,15 @@ function GuardrailsPage() {
                       <Table.Cell>
                         <Badge
                           variant="surface"
-                          colorPalette={
-                            row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"
-                          }
+                          colorPalette={row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"}
                         >
-                          {row.failureMode === "FAIL_CLOSED"
-                            ? "fail closed"
-                            : "fail open"}
+                          {row.failureMode === "FAIL_CLOSED" ? "fail closed" : "fail open"}
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>
                         <HStack justify="end" gap={1}>
                           {canManage && (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              onClick={() => setEditing(row)}
-                            >
+                            <Button size="xs" variant="ghost" onClick={() => setEditing(row)}>
                               <Pencil size={12} /> Edit
                             </Button>
                           )}
@@ -358,8 +348,7 @@ function GuardrailDrawer({
   const [description, setDescription] = useState("");
   const [evaluatorId, setEvaluatorId] = useState("");
   const [direction, setDirection] = useState<GatewayGuardrailDirection>("PRE");
-  const [failureMode, setFailureMode] =
-    useState<GatewayGuardrailFailureMode>("FAIL_CLOSED");
+  const [failureMode, setFailureMode] = useState<GatewayGuardrailFailureMode>("FAIL_CLOSED");
 
   useEffect(() => {
     if (!open) return;
@@ -439,9 +428,7 @@ function GuardrailDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Drawer.Title>
-            {mode === "create" ? "New guardrail" : "Edit guardrail"}
-          </Drawer.Title>
+          <Drawer.Title>{mode === "create" ? "New guardrail" : "Edit guardrail"}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -482,8 +469,8 @@ function GuardrailDrawer({
                 </NativeSelect.Field>
               </NativeSelect.Root>
               <Field.HelperText>
-                Only evaluators with executionMode AS_GUARDRAIL are listed. Flip an
-                evaluator in Evaluations to expose it here.
+                Only evaluators with executionMode AS_GUARDRAIL are listed. Flip an evaluator in
+                Evaluations to expose it here.
               </Field.HelperText>
             </Field.Root>
 
@@ -492,9 +479,7 @@ function GuardrailDrawer({
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={direction}
-                  onChange={(e) =>
-                    setDirection(e.target.value as GatewayGuardrailDirection)
-                  }
+                  onChange={(e) => setDirection(e.target.value as GatewayGuardrailDirection)}
                 >
                   {(["PRE", "POST", "STREAM_CHUNK"] as const).map((d) => (
                     <option key={d} value={d}>
@@ -511,9 +496,7 @@ function GuardrailDrawer({
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={failureMode}
-                  onChange={(e) =>
-                    setFailureMode(e.target.value as GatewayGuardrailFailureMode)
-                  }
+                  onChange={(e) => setFailureMode(e.target.value as GatewayGuardrailFailureMode)}
                 >
                   <option value="FAIL_CLOSED">{FAILURE_LABEL.FAIL_CLOSED}</option>
                   <option value="FAIL_OPEN">{FAILURE_LABEL.FAIL_OPEN}</option>

@@ -89,8 +89,7 @@ export function toggleSupportChat(): void {
 function isCrispContainer(node: Node): boolean {
   if (!(node instanceof Element)) return false;
   return (
-    node.matches(CRISP_CONTAINER_SELECTOR) ||
-    node.querySelector(CRISP_CONTAINER_SELECTOR) !== null
+    node.matches(CRISP_CONTAINER_SELECTOR) || node.querySelector(CRISP_CONTAINER_SELECTOR) !== null
   );
 }
 

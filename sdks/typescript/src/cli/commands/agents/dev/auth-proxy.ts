@@ -37,10 +37,7 @@ const UPSTREAM_TIMEOUT_MS = 120_000;
  * local agent, so its check must not leak a prefix through timing. The length
  * check comes first because `timingSafeEqual` throws on a length mismatch.
  */
-function secretMatches(
-  presented: string | string[] | undefined,
-  secret: string,
-): boolean {
+function secretMatches(presented: string | string[] | undefined, secret: string): boolean {
   if (typeof presented !== "string") return false;
   const presentedBuffer = Buffer.from(presented);
   const secretBuffer = Buffer.from(secret);
@@ -166,18 +163,14 @@ function forwardToUpstream({
     },
   );
   upstream.on("timeout", () => {
-    upstream.destroy(
-      new Error(`it did not answer within ${upstreamTimeoutMs / 1000} seconds`),
-    );
+    upstream.destroy(new Error(`it did not answer within ${upstreamTimeoutMs / 1000} seconds`));
   });
   upstream.on("error", (error) => {
     // The detail goes to the terminal, where the developer who owns the URL
     // is watching. It must not go in the response: that body travels back
     // through the public tunnel to the caller, and the local URL can carry
     // basic-auth credentials (http://user:password@127.0.0.1:3000).
-    console.error(
-      chalk.red(`Could not reach the local agent at ${targetUrl}: ${error.message}`),
-    );
+    console.error(chalk.red(`Could not reach the local agent at ${targetUrl}: ${error.message}`));
     if (res.headersSent) {
       // The upstream died mid-response. Appending an error body here would
       // corrupt a response the client is already parsing; ending the socket

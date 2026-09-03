@@ -20,11 +20,7 @@ describe("langyTranscriptRuns", () => {
         text("They are all timeouts."),
       ]);
 
-      expect(runs.map((run) => run.kind)).toEqual([
-        "answer",
-        "activity",
-        "answer",
-      ]);
+      expect(runs.map((run) => run.kind)).toEqual(["answer", "activity", "answer"]);
       expect(langyRunText(runs[0]!.parts)).toBe("Looking at the failures.");
       expect(langyRunText(runs[2]!.parts)).toBe("They are all timeouts.");
     });
@@ -32,12 +28,7 @@ describe("langyTranscriptRuns", () => {
 
   describe("given consecutive parts of the same kind", () => {
     it("keeps them in one run", () => {
-      const runs = langyTranscriptRuns([
-        tool("t1"),
-        tool("t2"),
-        text("first"),
-        text("second"),
-      ]);
+      const runs = langyTranscriptRuns([tool("t1"), tool("t2"), text("first"), text("second")]);
 
       expect(runs).toHaveLength(2);
       expect(runs[0]!.parts).toHaveLength(2);

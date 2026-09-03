@@ -150,9 +150,7 @@ describe("Autosave evaluation state", () => {
 
     // Make a change to the store
     act(() => {
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "test value");
+      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "test value");
     });
 
     // Force re-render to pick up store changes
@@ -176,9 +174,7 @@ describe("Autosave evaluation state", () => {
 
     // Make a change
     act(() => {
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "trigger save");
+      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "trigger save");
     });
 
     // Advance past debounce - should trigger save and go to "saving" then "saved"
@@ -187,18 +183,14 @@ describe("Autosave evaluation state", () => {
     });
 
     // After mutation completes, should be at "saved"
-    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe(
-      "saved",
-    );
+    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("saved");
 
     // Advance past the 2s delay in markSaved to go back to idle
     await act(async () => {
       vi.advanceTimersByTime(2100);
     });
 
-    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe(
-      "idle",
-    );
+    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("idle");
   });
 
   it("sets autosave status to error when save fails", async () => {
@@ -214,9 +206,7 @@ describe("Autosave evaluation state", () => {
 
     // Make a change - this should trigger the rejected mock
     act(() => {
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", "will fail");
+      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "will fail");
     });
 
     // Advance past debounce to trigger save
@@ -225,9 +215,7 @@ describe("Autosave evaluation state", () => {
     });
 
     // Should show error status
-    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe(
-      "error",
-    );
+    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("error");
   });
 
   // Dataset records, prompt text and run results are customer content. The
@@ -244,9 +232,7 @@ describe("Autosave evaluation state", () => {
     mockMutateAsync.mockRejectedValueOnce(new Error("Network error"));
 
     act(() => {
-      useEvaluationsV3Store
-        .getState()
-        .setCellValue("test-data", 0, "input", customerContent);
+      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", customerContent);
     });
 
     await act(async () => {
@@ -370,22 +356,16 @@ describe("Autosave evaluation state", () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
       });
 
-      expect(mockMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({ expectedVersion: 4 }),
-      );
+      expect(mockMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 4 }));
       expect(useEvaluationsV3Store.getState().staleWorkbench).toEqual({
         serverVersion: 9,
       });
-      expect(
-        useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
-      ).toBe("error");
+      expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("error");
 
       // Standing down: further edits do not save while stale.
       mockMutateAsync.mockClear();
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setCellValue("test-data", 0, "input", "another edit");
+        useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "another edit");
       });
       await act(async () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
@@ -472,13 +452,9 @@ describe("Autosave evaluation state", () => {
 
       // Sent again at the version the run created, not at the one this page
       // was holding.
-      expect(mockMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({ expectedVersion: 9 }),
-      );
+      expect(mockMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 9 }));
       expect(useEvaluationsV3Store.getState().staleWorkbench).toBeUndefined();
-      expect(
-        useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
-      ).not.toBe("error");
+      expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).not.toBe("error");
     });
 
     /** @scenario "A page still stands down for a version somebody else wrote" */
@@ -517,9 +493,7 @@ describe("Autosave evaluation state", () => {
       expect(useEvaluationsV3Store.getState().staleWorkbench).toMatchObject({
         serverVersion: 9,
       });
-      expect(
-        useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
-      ).toBe("error");
+      expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("error");
     });
   });
 
@@ -557,9 +531,7 @@ describe("Autosave evaluation state", () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
       });
 
-      expect(mockMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({ expectedVersion: 3 }),
-      );
+      expect(mockMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 3 }));
     });
   });
 });

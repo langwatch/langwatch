@@ -60,15 +60,13 @@ describe("authFailureMessage", () => {
       });
 
       expect(message).toContain(registryCopy("identity_engine_unavailable"));
-      expect(message).not.toBe(
-        "Something went wrong on our side. Try again in a moment.",
-      );
+      expect(message).not.toBe("Something went wrong on our side. Try again in a moment.");
     });
 
     it("reads an upper-cased code the same way, because the wire shape varies", () => {
-      expect(
-        authFailureMessage({ code: "IDENTITY_EMAIL_IN_USE", status: 409 }),
-      ).toContain(registryCopy("identity_email_in_use"));
+      expect(authFailureMessage({ code: "IDENTITY_EMAIL_IN_USE", status: 409 })).toContain(
+        registryCopy("identity_email_in_use"),
+      );
     });
   });
 
@@ -77,9 +75,9 @@ describe("authFailureMessage", () => {
       expect(authFailureMessage({ code: "INVALID_ORIGIN", status: 403 })).toBe(
         "LangWatch is set up for a different web address than the one you are using. Check the address and try again.",
       );
-      expect(
-        authFailureMessage({ code: "INVALID_EMAIL_OR_PASSWORD", status: 401 }),
-      ).toBe("Invalid email or password.");
+      expect(authFailureMessage({ code: "INVALID_EMAIL_OR_PASSWORD", status: 401 })).toBe(
+        "Invalid email or password.",
+      );
     });
   });
 

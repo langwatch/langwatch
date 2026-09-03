@@ -68,9 +68,7 @@ describe("buildAuthHeaders", () => {
         apiKey: "pat-lw-abc_secret",
         projectId: "project_123",
       });
-      const expected = Buffer.from("project_123:pat-lw-abc_secret", "utf-8").toString(
-        "base64",
-      );
+      const expected = Buffer.from("project_123:pat-lw-abc_secret", "utf-8").toString("base64");
       expect(headers).toEqual({ authorization: `Basic ${expected}` });
     });
   });
@@ -93,9 +91,7 @@ describe("buildAuthHeaders", () => {
     it("falls back to LANGWATCH_PROJECT_ID", () => {
       process.env.LANGWATCH_PROJECT_ID = "env_project";
       const headers = buildAuthHeaders({ apiKey: "pat-lw-envtok_secret" });
-      const expected = Buffer.from("env_project:pat-lw-envtok_secret", "utf-8").toString(
-        "base64",
-      );
+      const expected = Buffer.from("env_project:pat-lw-envtok_secret", "utf-8").toString("base64");
       expect(headers).toEqual({ authorization: `Basic ${expected}` });
     });
   });

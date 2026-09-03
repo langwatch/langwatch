@@ -11,18 +11,12 @@ const tips: Record<string, readonly string[]> = {
   langy_conversation_id_unadoptable: [
     "Retry with a different conversation id, or omit `conversationId` to let the server generate one",
   ],
-  langy_model_not_configured: [
-    "Pick a model in the project's model settings, then retry",
-  ],
-  langy_model_not_allowed: [
-    "Choose one of the models configured for this project and retry",
-  ],
+  langy_model_not_configured: ["Pick a model in the project's model settings, then retry"],
+  langy_model_not_allowed: ["Choose one of the models configured for this project and retry"],
   langy_egress_misconfigured: [
     "Ask a workspace admin to review the project's outbound network policy — Langy refuses to run rather than leak",
   ],
-  langy_insufficient_scope: [
-    "Ask a workspace admin to grant Langy permissions in this project",
-  ],
+  langy_insufficient_scope: ["Ask a workspace admin to grant Langy permissions in this project"],
   langy_turn_in_progress: [
     "Wait for the current response to finish before sending another message",
   ],

@@ -77,12 +77,8 @@ const analyticsEvents = [
  * This projection is a pure map: it never reads a prior row or projection.
  */
 export class LangyAnalyticsEventMapProjection
-  extends AbstractMapProjection<
-    LangyAnalyticsEventProjectionRecord,
-    typeof analyticsEvents
-  >
-  implements
-    MapEventHandlers<typeof analyticsEvents, LangyAnalyticsEventProjectionRecord>
+  extends AbstractMapProjection<LangyAnalyticsEventProjectionRecord, typeof analyticsEvents>
+  implements MapEventHandlers<typeof analyticsEvents, LangyAnalyticsEventProjectionRecord>
 {
   readonly name = "langyAnalyticsEvent";
   readonly store: AppendStore<LangyAnalyticsEventProjectionRecord>;
@@ -141,33 +137,23 @@ export class LangyAnalyticsEventMapProjection
     return this.record(event);
   }
 
-  mapLangyConversationConversationMetadataUpdated(
-    event: LangyConversationMetadataUpdatedEvent,
-  ) {
+  mapLangyConversationConversationMetadataUpdated(event: LangyConversationMetadataUpdatedEvent) {
     return this.record(event);
   }
 
-  mapLangyConversationConversationHandoffPending(
-    event: LangyConversationHandoffPendingEvent,
-  ) {
+  mapLangyConversationConversationHandoffPending(event: LangyConversationHandoffPendingEvent) {
     return this.record(event);
   }
 
-  mapLangyConversationConversationHandoffConsumed(
-    event: LangyConversationHandoffConsumedEvent,
-  ) {
+  mapLangyConversationConversationHandoffConsumed(event: LangyConversationHandoffConsumedEvent) {
     return this.record(event);
   }
 
-  mapLangyConversationConversationTitleGenerated(
-    event: LangyConversationTitleGeneratedEvent,
-  ) {
+  mapLangyConversationConversationTitleGenerated(event: LangyConversationTitleGeneratedEvent) {
     return this.record(event);
   }
 
-  private record(
-    event: LangyConversationProcessingEvent,
-  ): LangyAnalyticsEventProjectionRecord {
+  private record(event: LangyConversationProcessingEvent): LangyAnalyticsEventProjectionRecord {
     const data = event.data;
     return {
       eventId: event.id,
@@ -185,9 +171,7 @@ export class LangyAnalyticsEventMapProjection
             ? "failed"
             : null,
       model:
-        event.type === LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED
-          ? event.data.model
-          : null,
+        event.type === LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED ? event.data.model : null,
       durationMs: "durationMs" in data ? (data.durationMs ?? null) : null,
       occurredAtMs: event.occurredAt,
       acceptedAtMs: event.createdAt,

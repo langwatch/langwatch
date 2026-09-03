@@ -22,9 +22,7 @@ export class GovernanceSignalService {
     return new GovernanceSignalService(port, diagnostics);
   }
 
-  async emitVirtualKeyLifecycle(
-    signal: GovernanceVirtualKeyLifecycleSignal,
-  ): Promise<void> {
+  async emitVirtualKeyLifecycle(signal: GovernanceVirtualKeyLifecycleSignal): Promise<void> {
     if (!this.port.available()) return;
     try {
       const tenantId = await this.port.tryResolveLifecycleTenant({
@@ -43,20 +41,15 @@ export class GovernanceSignalService {
         occurred_at: this.port.now().getTime(),
       });
     } catch (error) {
-      this.diagnostics.warn(
-        "failed to append vk lifecycle governance event (best effort)",
-        {
-          virtualKeyId: signal.virtualKey.id,
-          action: signal.action,
-          error,
-        },
-      );
+      this.diagnostics.warn("failed to append vk lifecycle governance event (best effort)", {
+        virtualKeyId: signal.virtualKey.id,
+        action: signal.action,
+        error,
+      });
     }
   }
 
-  async detectBudgetCrossings(
-    candidates: GatewayBudgetCrossingCandidate[],
-  ): Promise<void> {
+  async detectBudgetCrossings(candidates: GatewayBudgetCrossingCandidate[]): Promise<void> {
     if (candidates.length === 0 || !this.port.available()) return;
     try {
       const now = this.port.now();

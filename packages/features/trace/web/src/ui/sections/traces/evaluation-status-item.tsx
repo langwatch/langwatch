@@ -1,13 +1,4 @@
-import {
-  Box,
-  Circle,
-  HStack,
-  IconButton,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Circle, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { MoreVertical, Pencil } from "lucide-react";
 import numeral from "numeral";
@@ -118,9 +109,7 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
 
   const customPrompt = useMemo(() => {
     if (isEvaluatorTable && evaluatorQuery.data) {
-      const config = evaluatorQuery.data.config as
-        | { settings?: { prompt?: string } }
-        | undefined;
+      const config = evaluatorQuery.data.config as { settings?: { prompt?: string } } | undefined;
       return config?.settings?.prompt;
     }
     if (!isEvaluatorTable && monitorQuery.data) {
@@ -196,21 +185,19 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
           {check.status === "processed" && (
             <>
               {/* Score badge */}
-              {!evaluator?.isGuardrail &&
-                check.score !== undefined &&
-                check.score !== null && (
-                  <Box
-                    bg="bg.muted"
-                    paddingX={2}
-                    paddingY={0.5}
-                    borderRadius="md"
-                    fontSize="sm"
-                    fontWeight="semibold"
-                    fontFamily="mono"
-                  >
-                    {formatEvaluationScore(check.score)}
-                  </Box>
-                )}
+              {!evaluator?.isGuardrail && check.score !== undefined && check.score !== null && (
+                <Box
+                  bg="bg.muted"
+                  paddingX={2}
+                  paddingY={0.5}
+                  borderRadius="md"
+                  fontSize="sm"
+                  fontWeight="semibold"
+                  fontFamily="mono"
+                >
+                  {formatEvaluationScore(check.score)}
+                </Box>
+              )}
 
               {/* Pass/Fail badge */}
               {passed !== undefined && (
@@ -304,12 +291,7 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
         {projectSlug && check.evaluator_id && hasEvaluatorData && (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <IconButton
-                variant="ghost"
-                size="xs"
-                aria-label="Evaluation options"
-                flexShrink={0}
-              >
+              <IconButton variant="ghost" size="xs" aria-label="Evaluation options" flexShrink={0}>
                 <MoreVertical size={14} />
               </IconButton>
             </Menu.Trigger>

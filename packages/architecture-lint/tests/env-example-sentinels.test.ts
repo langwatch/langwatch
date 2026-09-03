@@ -30,10 +30,7 @@ function getSentinelValue(key: string): string | null {
   const line = envExampleLines.find((l) => l.startsWith(prefix));
   if (line === undefined) return null;
   const raw = line.slice(prefix.length).trim();
-  if (
-    (raw.startsWith('"') && raw.endsWith('"')) ||
-    (raw.startsWith("'") && raw.endsWith("'"))
-  ) {
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
     return raw.slice(1, -1).trim();
   }
   return raw;
@@ -58,19 +55,13 @@ describe(".env.example", () => {
     it("declares a non-empty sentinel value for LW_VIRTUAL_KEY_PEPPER", () => {
       const value = getSentinelValue("LW_VIRTUAL_KEY_PEPPER");
       expect(value, "LW_VIRTUAL_KEY_PEPPER must have a sentinel value").not.toBeNull();
-      expect(
-        value!.length,
-        "LW_VIRTUAL_KEY_PEPPER sentinel must be non-empty",
-      ).toBeGreaterThan(0);
+      expect(value!.length, "LW_VIRTUAL_KEY_PEPPER sentinel must be non-empty").toBeGreaterThan(0);
     });
 
     /** @scenario .env.example ships a sentinel placeholder for LW_GATEWAY_INTERNAL_SECRET */
     it("declares a non-empty sentinel value for LW_GATEWAY_INTERNAL_SECRET", () => {
       const value = getSentinelValue("LW_GATEWAY_INTERNAL_SECRET");
-      expect(
-        value,
-        "LW_GATEWAY_INTERNAL_SECRET must have a sentinel value",
-      ).not.toBeNull();
+      expect(value, "LW_GATEWAY_INTERNAL_SECRET must have a sentinel value").not.toBeNull();
       expect(
         value!.length,
         "LW_GATEWAY_INTERNAL_SECRET sentinel must be non-empty",
@@ -81,10 +72,7 @@ describe(".env.example", () => {
     it("declares a non-empty sentinel value for LW_GATEWAY_JWT_SECRET", () => {
       const value = getSentinelValue("LW_GATEWAY_JWT_SECRET");
       expect(value, "LW_GATEWAY_JWT_SECRET must have a sentinel value").not.toBeNull();
-      expect(
-        value!.length,
-        "LW_GATEWAY_JWT_SECRET sentinel must be non-empty",
-      ).toBeGreaterThan(0);
+      expect(value!.length, "LW_GATEWAY_JWT_SECRET sentinel must be non-empty").toBeGreaterThan(0);
     });
 
     it("preceding comment for LW_VIRTUAL_KEY_PEPPER mentions openssl rand -hex 32", () => {

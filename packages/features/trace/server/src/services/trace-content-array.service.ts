@@ -83,8 +83,7 @@ function pythonReprToJsonish(input: string): string {
   // literal originally delimited by ' / ".
   let state: "none" | "single" | "double" = "none";
 
-  const isWordChar = (c: string | undefined): boolean =>
-    c !== undefined && /[A-Za-z0-9_]/.test(c);
+  const isWordChar = (c: string | undefined): boolean => c !== undefined && /[A-Za-z0-9_]/.test(c);
 
   const matchIdentifier = (word: string): boolean =>
     input.startsWith(word, i) && !isWordChar(input[i + word.length]);

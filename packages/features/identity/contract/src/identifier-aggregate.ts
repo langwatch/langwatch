@@ -83,15 +83,10 @@ export function identityStreamsFor({
         // Null on a first promotion. Equal to the promoted id only in a fact
         // no command states (`primaryChangeFacts` excludes the identifier
         // being promoted), so the dedupe below is for a malformed one.
-        ...(fact.data.previousIdentifierId === null
-          ? []
-          : [fact.data.previousIdentifierId]),
+        ...(fact.data.previousIdentifierId === null ? [] : [fact.data.previousIdentifierId]),
       ]);
     case USER_ERASED_EVENT_TYPE:
-      return [
-        { kind: "person", userId },
-        ...identifierStreams(fact.data.erasedIdentifierIds),
-      ];
+      return [{ kind: "person", userId }, ...identifierStreams(fact.data.erasedIdentifierIds)];
     case LINK_PROPOSED_EVENT_TYPE:
       return [{ kind: "person", userId }];
   }

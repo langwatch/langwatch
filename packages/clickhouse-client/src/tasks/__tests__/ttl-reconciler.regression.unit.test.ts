@@ -47,8 +47,7 @@ describe("reconcileTTL()", () => {
     if (envBackup.CLICKHOUSE_COLD_STORAGE_ENABLED === undefined) {
       delete process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
     } else {
-      process.env.CLICKHOUSE_COLD_STORAGE_ENABLED =
-        envBackup.CLICKHOUSE_COLD_STORAGE_ENABLED;
+      process.env.CLICKHOUSE_COLD_STORAGE_ENABLED = envBackup.CLICKHOUSE_COLD_STORAGE_ENABLED;
     }
   });
 
@@ -58,9 +57,7 @@ describe("reconcileTTL()", () => {
       await reconcileTTL({ connectionUrl: "http://localhost:8123/default" });
 
       expect(clickhouseMocks.client.command).toHaveBeenCalledWith({
-        query: expect.stringContaining(
-          "toDateTime(EndTime) + INTERVAL 49 DAY TO VOLUME 'cold'",
-        ),
+        query: expect.stringContaining("toDateTime(EndTime) + INTERVAL 49 DAY TO VOLUME 'cold'"),
       });
       expect(clickhouseMocks.client.command).toHaveBeenCalledWith({
         query: expect.stringContaining("_retention_days"),
@@ -106,9 +103,7 @@ describe("reconcileTTL()", () => {
       }
 
       const calls = clickhouseMocks.client.command.mock.calls;
-      const modifyTtlCall = calls.find((c) =>
-        /MODIFY TTL/.test((c[0] as { query: string }).query),
-      );
+      const modifyTtlCall = calls.find((c) => /MODIFY TTL/.test((c[0] as { query: string }).query));
       expect(modifyTtlCall).toBeDefined();
       const query = (modifyTtlCall![0] as { query: string }).query;
 

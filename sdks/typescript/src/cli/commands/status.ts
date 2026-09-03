@@ -216,10 +216,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     // used to RANK candidates, never to filter them out.
     const recent = list.experiments
       .filter((experiment) => experiment.lastRunAt !== null)
-      .sort(
-        (a, b) =>
-          new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime(),
-      );
+      .sort((a, b) => new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime());
     const candidates = recent.slice(0, RUNNING_EXPERIMENT_CANDIDATES);
 
     const checks = await Promise.allSettled(
@@ -275,9 +272,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       );
     }
     if (failedChecks > 0) {
-      gaps.push(
-        `${failedChecks} experiment${failedChecks === 1 ? "" : "s"} could not be checked`,
-      );
+      gaps.push(`${failedChecks} experiment${failedChecks === 1 ? "" : "s"} could not be checked`);
     }
     if (gaps.length > 0) {
       attention.errors.runningExperiments = `incomplete scan: ${gaps.join("; ")}`;
@@ -356,8 +351,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
             // breached state, not a 0%-utilized one. Scoring it 0 and dropping
             // it below the threshold is how a `block` budget that rejects every
             // single request turns into a green tick.
-            utilizationPct:
-              effectiveLimit <= 0 ? 100 : Math.round((spent / effectiveLimit) * 100),
+            utilizationPct: effectiveLimit <= 0 ? 100 : Math.round((spent / effectiveLimit) * 100),
             spentUsd: budget.spent_usd,
             limitUsd: budget.limit_usd,
             onBreach: budget.on_breach,
@@ -367,9 +361,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
 
     const gaps: string[] = [];
     if (!spend_available) {
-      gaps.push(
-        "spend could not be totalled server-side, so utilization is not real spend",
-      );
+      gaps.push("spend could not be totalled server-side, so utilization is not real spend");
     }
     if (unreadable.length > 0) {
       gaps.push(
@@ -479,8 +471,10 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       try {
         // The three section fetchers return number | RunningExperiment[] |
         // BudgetAtRisk[]; the AttentionReport field types line up by key.
-        (attention as unknown as Record<AttentionSectionKey, unknown>)[key] =
-          await withTimeout(fn, SECTION_CALL_TIMEOUT_MS);
+        (attention as unknown as Record<AttentionSectionKey, unknown>)[key] = await withTimeout(
+          fn,
+          SECTION_CALL_TIMEOUT_MS,
+        );
       } catch (err) {
         // Soft-fail: the section reads null and the reason lives in `errors`
         // (rendered dimly in human mode, verbatim in machine output). A timeout
@@ -520,15 +514,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         console.log(chalk.red("  ✗ Could not fetch any project resources."));
         console.log(chalk.gray(`    Reason: ${sampleError}`));
         console.log();
-        if (
-          allUnauthorized &&
-          isPersonalAccessToken(apiKey) &&
-          !process.env.LANGWATCH_PROJECT_ID
-        ) {
+        if (allUnauthorized && isPersonalAccessToken(apiKey) && !process.env.LANGWATCH_PROJECT_ID) {
           console.log(
-            chalk.gray(
-              `    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`,
-            ),
+            chalk.gray(`    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`),
           );
           console.log(
             chalk.gray(
@@ -590,8 +578,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         // A per-person template carries a headcount instead of a total, so it
         // reports the headcount and the cap each person carries.
         const overCap = budget.endUsersOver;
-        const breached =
-          overCap !== undefined ? overCap > 0 : budget.utilizationPct >= 100;
+        const breached = overCap !== undefined ? overCap > 0 : budget.utilizationPct >= 100;
         const standing =
           overCap !== undefined
             ? `${overCap} of ${budget.endUsersSeen} over cap, $${budget.limitUsd}/person`
@@ -620,9 +607,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         budgetsAtRisk: "gateway budgets",
       };
       for (const [key, message] of Object.entries(attention.errors)) {
-        console.log(
-          chalk.gray(`    (could not check ${sectionLabels[key] ?? key}: ${message})`),
-        );
+        console.log(chalk.gray(`    (could not check ${sectionLabels[key] ?? key}: ${message})`));
       }
       // Advisories read differently on purpose: "note" is a standing limit of
       // the API, not a check that failed this run, and it does not gate the ✓.
@@ -637,9 +622,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         const r = results[key];
         if (!r) continue;
         const countStr = r.error ? chalk.red(r.error) : chalk.cyan(String(r.count));
-        console.log(
-          `    ${chalk.gray(key + ":")} ${" ".repeat(14 - key.length)}${countStr}`,
-        );
+        console.log(`    ${chalk.gray(key + ":")} ${" ".repeat(14 - key.length)}${countStr}`);
       }
 
       console.log();
@@ -652,9 +635,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       }
       console.log();
       console.log(
-        chalk.gray(
-          "  Run `langwatch commands` for the full catalog (args, flags, hints).",
-        ),
+        chalk.gray("  Run `langwatch commands` for the full catalog (args, flags, hints)."),
       );
       console.log();
     },

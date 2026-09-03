@@ -449,9 +449,7 @@ describe("DatabricksWarehouseCostService.costReadFloor", () => {
 
   /** @scenario "A source that prices nothing does not widen its window" */
   it("reads only what is new when the source prices nothing", () => {
-    expect(warehouseCosts.costReadFloor({ sinceMs, nowMs, costEnabled: false })).toBe(
-      sinceMs,
-    );
+    expect(warehouseCosts.costReadFloor({ sinceMs, nowMs, costEnabled: false })).toBe(sinceMs);
   });
 
   it("never reads less than the watermark already guarantees", () => {

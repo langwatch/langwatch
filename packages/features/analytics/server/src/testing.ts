@@ -1,4 +1,3 @@
-
 /**
  * The recording LangWatchQL executor: a statement is captured rather than
  * issued, so a suite can assert what a surface would have run without a

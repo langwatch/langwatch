@@ -22,15 +22,9 @@ import { SESSION_CONTEXT_GUIDANCE } from "@/cli/utils/governance/session-guidanc
  * JSON on stdout means nothing to them. Claude Code publishes these markers
  * into everything it spawns, hooks included.
  */
-const CLAUDE_MARKERS = [
-  "CLAUDECODE",
-  "CLAUDE_CODE_SESSION_ID",
-  "CLAUDE_PROJECT_DIR",
-] as const;
+const CLAUDE_MARKERS = ["CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_PROJECT_DIR"] as const;
 
-const isInsideClaude = CLAUDE_MARKERS.some(
-  (marker) => (process.env[marker]?.trim() ?? "") !== "",
-);
+const isInsideClaude = CLAUDE_MARKERS.some((marker) => (process.env[marker]?.trim() ?? "") !== "");
 
 if (isInsideClaude) {
   process.stdout.write(

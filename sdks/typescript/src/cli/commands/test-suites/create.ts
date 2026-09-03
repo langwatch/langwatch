@@ -11,9 +11,7 @@ import { createCliTestSuitesService } from "./cli-test-suites-service";
  *
  * @see specs/features/test-suite-cli.feature
  */
-export const createTestSuiteCommand = async (
-  name: string,
-): Promise<CommandResult | void> => {
+export const createTestSuiteCommand = async (name: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = createCliTestSuitesService();

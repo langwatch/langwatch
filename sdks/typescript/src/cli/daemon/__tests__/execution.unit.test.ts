@@ -25,13 +25,9 @@ const collectingSink = (): {
   return {
     sink: (stream, data) => chunks.push({ stream, data }),
     stdout: () =>
-      Buffer.concat(
-        chunks.filter((c) => c.stream === "stdout").map((c) => c.data),
-      ).toString(),
+      Buffer.concat(chunks.filter((c) => c.stream === "stdout").map((c) => c.data)).toString(),
     stderr: () =>
-      Buffer.concat(
-        chunks.filter((c) => c.stream === "stderr").map((c) => c.data),
-      ).toString(),
+      Buffer.concat(chunks.filter((c) => c.stream === "stderr").map((c) => c.data)).toString(),
   };
 };
 
@@ -280,11 +276,7 @@ describe("given a write made outside any request", () => {
 
       process.stdout.write("daemon's own log line\n");
 
-      expect(underlying).toHaveBeenCalledWith(
-        "daemon's own log line\n",
-        undefined,
-        undefined,
-      );
+      expect(underlying).toHaveBeenCalledWith("daemon's own log line\n", undefined, undefined);
 
       uninstall();
       underlying.mockRestore();

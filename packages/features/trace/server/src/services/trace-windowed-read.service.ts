@@ -115,10 +115,7 @@ function windowFragment(fromMs: number, toMs: number): WindowFragment {
  * the same `windowMs` clock-skew headroom as the hinted path, so a client clock
  * running slightly fast can't push a just-written row past the ceiling.
  */
-function fallbackFragment(
-  fallback: WindowFallback,
-  windowMs: number,
-): WindowFragment | null {
+function fallbackFragment(fallback: WindowFallback, windowMs: number): WindowFragment | null {
   if (typeof fallback === "object") {
     const now = Date.now();
     return windowFragment(now - fallback.lookbackMs, now + windowMs);
@@ -180,10 +177,7 @@ export async function queryWindowed<T>(opts: QueryWindowedOptions<T>): Promise<T
     const widened = await run(fallbackFragment(fallback, windowMs));
     const isWidenedEmpty = isEmpty(widened);
     if (fallback === "unbounded") {
-      incrementWindowedReadCount(
-        table,
-        isWidenedEmpty ? "unbounded_empty" : "unbounded_hit",
-      );
+      incrementWindowedReadCount(table, isWidenedEmpty ? "unbounded_empty" : "unbounded_hit");
     } else {
       incrementWindowedReadCount(table, isWidenedEmpty ? "widened_empty" : "widened_hit");
     }

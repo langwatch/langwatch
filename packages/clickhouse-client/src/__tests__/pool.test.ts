@@ -109,9 +109,7 @@ describe("deriveFleetPoolCeiling", () => {
         const fixedDefault = 64;
         const ceiling = deriveFleetPoolCeiling({ replicas: 10 })!;
 
-        expect(fixedDefault * 10 * 2).toBeGreaterThan(
-          DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,
-        );
+        expect(fixedDefault * 10 * 2).toBeGreaterThan(DEFAULT_SERVER_MAX_CONCURRENT_QUERIES);
         expect(ceiling).toBeLessThan(fixedDefault);
       });
     });
@@ -228,9 +226,7 @@ describe("poolSizingFromEnv", () => {
       });
 
       it("treats an empty string as unset", () => {
-        expect(
-          poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "" }).replicas,
-        ).toBeUndefined();
+        expect(poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "" }).replicas).toBeUndefined();
       });
     });
   });
@@ -269,9 +265,7 @@ describe("poolSizingFromEnv", () => {
   describe("given the environment describes the production fleet", () => {
     describe("when the size is resolved", () => {
       it("resolves a size that fits the server's budget", () => {
-        const decision = resolvePoolSize(
-          poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "10" }),
-        );
+        const decision = resolvePoolSize(poolSizingFromEnv({ CLICKHOUSE_CLIENT_REPLICAS: "10" }));
 
         expect(decision.size * 10 * DEFAULT_CLIENTS_PER_PROCESS).toBeLessThanOrEqual(
           DEFAULT_SERVER_MAX_CONCURRENT_QUERIES,

@@ -37,13 +37,7 @@ export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
   async acquire({ name, ttlMs }: { name: string; ttlMs: number }): Promise<boolean> {
     if (!this.redis) return false;
     try {
-      const result = await this.redis.set(
-        `${KEY_PREFIX}${name}`,
-        this.token,
-        "PX",
-        ttlMs,
-        "NX",
-      );
+      const result = await this.redis.set(`${KEY_PREFIX}${name}`, this.token, "PX", ttlMs, "NX");
       return result === "OK";
     } catch (error) {
       // Standing down is right, but silence is not: the runner counts a
@@ -73,10 +67,7 @@ export class RedisMigrationLeaseRepository implements MigrationLeaseRepository {
     } catch (error) {
       // A lost renewal stops the pass mid-flight, so the reason it was lost
       // is worth having.
-      logger.warn(
-        { error, name },
-        "could not renew the migration lease; treating it as lost",
-      );
+      logger.warn({ error, name }, "could not renew the migration lease; treating it as lost");
       return false;
     }
   }

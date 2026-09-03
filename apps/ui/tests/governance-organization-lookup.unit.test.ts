@@ -27,7 +27,10 @@ describe("given the reader's organizations", () => {
   describe("when the page is scoped to an organization the reader can reach", () => {
     it("answers with that organization and its teams, not the first one", () => {
       expect(
-        resolveGovernanceOrganization({ organizationId: "org_other", organizations: [ACME, OTHER] }),
+        resolveGovernanceOrganization({
+          organizationId: "org_other",
+          organizations: [ACME, OTHER],
+        }),
       ).toBe(OTHER);
       expect(
         resolveGovernanceOrganization({ organizationId: "org_acme", organizations: [ACME, OTHER] })
@@ -47,7 +50,10 @@ describe("given the reader's organizations", () => {
   describe("when the scope names an organization the reader is not in", () => {
     it("answers with nothing rather than a mismatched row", () => {
       expect(
-        resolveGovernanceOrganization({ organizationId: "org_unknown", organizations: [ACME, OTHER] }),
+        resolveGovernanceOrganization({
+          organizationId: "org_unknown",
+          organizations: [ACME, OTHER],
+        }),
       ).toBeUndefined();
     });
   });

@@ -9,10 +9,7 @@ import type {
   BTLeaderboardEntry,
   ScoreDifferenceCI,
 } from "./batch-evaluation-results.bt-leaderboard";
-import {
-  type Comparability,
-  isIncomparable,
-} from "./batch-evaluation-results.comparability";
+import { type Comparability, isIncomparable } from "./batch-evaluation-results.comparability";
 
 /** Two intervals overlap unless one ends strictly before the other starts. */
 const intervalsOverlap = (a: [number, number], b: [number, number]): boolean =>

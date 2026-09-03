@@ -8,12 +8,7 @@ export const DISPOSITIONS = ["capture", "restrict", "drop"] as const;
 export type Disposition = (typeof DISPOSITIONS)[number];
 export const PII_LEVELS = ["disabled", "essential", "strict", "custom"] as const;
 export type PiiLevel = (typeof PII_LEVELS)[number];
-export const DATA_PRIVACY_SCOPE_TYPES = [
-  "ORGANIZATION",
-  "DEPARTMENT",
-  "TEAM",
-  "PROJECT",
-] as const;
+export const DATA_PRIVACY_SCOPE_TYPES = ["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"] as const;
 export type DataPrivacyScopeType = (typeof DATA_PRIVACY_SCOPE_TYPES)[number];
 
 const VALID_PII_ENTITIES = new Set(

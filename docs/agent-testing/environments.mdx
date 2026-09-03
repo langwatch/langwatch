@@ -28,11 +28,11 @@ Environment names use lower-case letters, digits, dashes and underscores, up to 
 
 `development` makes an agent **personal**, because a developer machine is one person's and not the team's.
 
-| The process authenticates with | The agent belongs to | Who can run it |
-|---|---|---|
-| A personal API key | The key's owner | The owner only |
-| A project API key | The machine that registered it | Everyone on the project |
-| Any key, environment other than `development` | The project | Everyone on the project |
+| The process authenticates with                | The agent belongs to           | Who can run it          |
+| --------------------------------------------- | ------------------------------ | ----------------------- |
+| A personal API key                            | The key's owner                | The owner only          |
+| A project API key                             | The machine that registered it | Everyone on the project |
+| Any key, environment other than `development` | The project                    | Everyone on the project |
 
 The platform refuses a run against a teammate's personal agent with `agent_owner_only`, and the message includes the owner's name. The rule applies at every door: the run dialog, the CLI, the REST API and the MCP server.
 
@@ -56,7 +56,9 @@ The process on your machine reaches out to LangWatch, so there is no tunnel, no 
 The row stays after the process stops. It keeps the agent identity, the declared parameters and the run history, so the next process that connects under the same name and environment continues the same row.
 
 <Note>
-  An HTTP agent that runs on your machine is a different case: the platform calls it, so it needs a reachable URL. `langwatch agent dev` covers that, see [Other ways to connect](/agent-testing/other-ways-to-connect).
+  An HTTP agent that runs on your machine is a different case: the platform calls it, so it needs a
+  reachable URL. `langwatch agent dev` covers that, see [Other ways to
+  connect](/agent-testing/other-ways-to-connect).
 </Note>
 
 ## Compare production against your machine
@@ -113,6 +115,7 @@ LANGWATCH_AGENT_CONNECT=0
     async def support_agent(messages: list[dict]) -> str:
         return await run_my_agent(messages)
     ```
+
   </Tab>
   <Tab title="TypeScript">
     ```typescript
@@ -126,6 +129,7 @@ LANGWATCH_AGENT_CONNECT=0
       async ({ messages }) => await runMyAgent(messages),
     );
     ```
+
   </Tab>
 </Tabs>
 

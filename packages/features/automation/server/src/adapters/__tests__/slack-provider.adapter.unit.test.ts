@@ -48,9 +48,7 @@ describe("SlackProviderAdapter", () => {
         const persisted = SlackProviderAdapter.create(crypto).persist({ incoming: BOT });
 
         expect(crypto.encrypted).toEqual(["xoxb-plaintext"]);
-        expect(persisted.slackBotToken).toBe(
-          Buffer.from("xoxb-plaintext", "utf8").toString("hex"),
-        );
+        expect(persisted.slackBotToken).toBe(Buffer.from("xoxb-plaintext", "utf8").toString("hex"));
         expect(JSON.stringify(persisted)).not.toContain("xoxb-plaintext");
       });
     });

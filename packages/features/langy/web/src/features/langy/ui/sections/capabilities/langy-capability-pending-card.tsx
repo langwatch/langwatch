@@ -103,11 +103,7 @@ export function LangyCapabilityPendingCard({
           {preview.rows.map((row) => (
             <Box
               key={row.id}
-              css={
-                reduceMotion
-                  ? undefined
-                  : { animation: `${rowAppear} 0.3s ease-out both` }
-              }
+              css={reduceMotion ? undefined : { animation: `${rowAppear} 0.3s ease-out both` }}
             >
               <CapabilityRow primary={row.primary ?? row.id} secondary={row.secondary} />
             </Box>
@@ -176,14 +172,7 @@ function PendingProgress({
   reduceMotion: boolean;
 }) {
   if (!sample) {
-    return (
-      <Box
-        className="langy-pending-bar"
-        aria-hidden
-        role="presentation"
-        marginTop={0.5}
-      />
-    );
+    return <Box className="langy-pending-bar" aria-hidden role="presentation" marginTop={0.5} />;
   }
   return (
     <VStack align="stretch" gap={1.5} marginTop={0.5}>
@@ -193,18 +182,11 @@ function PendingProgress({
           width={`${percent}%`}
           borderRadius="full"
           background="langy.barFill"
-          transition={
-            reduceMotion ? "none" : "width 180ms cubic-bezier(0.32, 0.72, 0, 1)"
-          }
+          transition={reduceMotion ? "none" : "width 180ms cubic-bezier(0.32, 0.72, 0, 1)"}
         />
       </Box>
       <HStack justify="space-between" gap={2}>
-        <Text
-          textStyle="2xs"
-          color="fg.muted"
-          fontFamily="mono"
-          fontVariantNumeric="tabular-nums"
-        >
+        <Text textStyle="2xs" color="fg.muted" fontFamily="mono" fontVariantNumeric="tabular-nums">
           {formatLangyProgressCount(sample)}
         </Text>
         <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">

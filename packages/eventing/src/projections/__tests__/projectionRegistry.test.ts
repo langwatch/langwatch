@@ -64,9 +64,7 @@ describe("ProjectionRegistry", () => {
         const fold2 = createMockFoldProjectionDefinition("sameName");
 
         registry.registerFoldProjection(fold1);
-        expect(() => registry.registerFoldProjection(fold2)).toThrow(
-          /already registered/,
-        );
+        expect(() => registry.registerFoldProjection(fold2)).toThrow(/already registered/);
       });
     });
   });
@@ -127,11 +125,7 @@ describe("ProjectionRegistry", () => {
       it("logs warning and drops events", async () => {
         const registry = new ProjectionRegistry();
         const events = [
-          createTestEvent(
-            TEST_CONSTANTS.AGGREGATE_ID,
-            TEST_CONSTANTS.AGGREGATE_TYPE,
-            tenantId,
-          ),
+          createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
         ];
 
         // Does not throw, just warns
@@ -150,11 +144,7 @@ describe("ProjectionRegistry", () => {
         registry.initialize(globalQueue, globalJobRegistry);
 
         const events = [
-          createTestEvent(
-            TEST_CONSTANTS.AGGREGATE_ID,
-            TEST_CONSTANTS.AGGREGATE_TYPE,
-            tenantId,
-          ),
+          createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
         ];
 
         await registry.dispatch(events, { tenantId });

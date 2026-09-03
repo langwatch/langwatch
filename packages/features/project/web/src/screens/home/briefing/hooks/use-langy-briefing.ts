@@ -102,9 +102,7 @@ export function readSummaryMetric({
   aggregation: string;
 }): number | undefined {
   if (!buckets) return undefined;
-  const index = series.findIndex(
-    (s) => s.metric === metric && s.aggregation === aggregation,
-  );
+  const index = series.findIndex((s) => s.metric === metric && s.aggregation === aggregation);
   if (index < 0) return undefined;
   const key = buildSeriesName(series[index]!, index);
   let sum = 0;
@@ -306,9 +304,7 @@ export function useLangyBriefing(): LangyBriefingResult {
     {
       projectId: project?.id ?? "",
       timeRange: {
-        from:
-          analyticsWindow.startDate -
-          (analyticsWindow.endDate - analyticsWindow.startDate),
+        from: analyticsWindow.startDate - (analyticsWindow.endDate - analyticsWindow.startDate),
         to: analyticsWindow.startDate,
       },
       facetKey: "errorMessage",
@@ -412,9 +408,7 @@ export function useLangyBriefing(): LangyBriefingResult {
         aggregation,
       });
     const previousP50Latency = readPrevMetric("performance.completion_time", "median");
-    const previousCost = canViewCost
-      ? readPrevMetric("performance.total_cost", "sum")
-      : undefined;
+    const previousCost = canViewCost ? readPrevMetric("performance.total_cost", "sum") : undefined;
     const previousTraces = readPrevMetric("metadata.trace_id", "cardinality");
     const previousUsers = readPrevMetric("metadata.user_id", "cardinality");
     const previousTokens = readPrevMetric("performance.total_tokens", "sum");
@@ -425,14 +419,11 @@ export function useLangyBriefing(): LangyBriefingResult {
       current: number | undefined,
       previous: number | undefined,
     ): string | undefined => {
-      if (current === undefined || previous === undefined || previous <= 0)
-        return undefined;
+      if (current === undefined || previous === undefined || previous <= 0) return undefined;
       const pct = ((current - previous) / previous) * 100;
       if (!Number.isFinite(pct) || Math.abs(pct) < 0.5) return undefined;
       const magnitude =
-        Math.abs(pct) >= 10
-          ? Math.round(Math.abs(pct))
-          : Math.round(Math.abs(pct) * 10) / 10;
+        Math.abs(pct) >= 10 ? Math.round(Math.abs(pct)) : Math.round(Math.abs(pct) * 10) / 10;
       return `${pct > 0 ? "+" : "−"}${magnitude}%`;
     };
     /** For metrics where creeping UP is the problem (latency, cost). */
@@ -460,10 +451,7 @@ export function useLangyBriefing(): LangyBriefingResult {
       metric: "metadata.trace_id",
       aggregation: "cardinality",
     });
-    const errorTraces = sharedTraceNames?.reduce(
-      (total, signal) => total + signal.count,
-      0,
-    );
+    const errorTraces = sharedTraceNames?.reduce((total, signal) => total + signal.count, 0);
 
     const receipts = buildBriefingReceipts({
       slug,
@@ -502,8 +490,7 @@ export function useLangyBriefing(): LangyBriefingResult {
     } else {
       // The sheet renders QuietHeadline for this state (typed invitation);
       // the string is the reduced fallback and what tests/mocks assert on.
-      headline =
-        "Your project is quiet. Send a trace and I'll start watching for what changes.";
+      headline = "Your project is quiet. Send a trace and I'll start watching for what changes.";
       quiet = true;
     }
 
@@ -554,8 +541,7 @@ export function useLangyBriefing(): LangyBriefingResult {
     // figure. Order mirrors the design target (p50 → cost → traces·threads).
     const analyticsCells: StatusCell[] = [];
     if (p50Latency !== undefined && p50Latency > 0) {
-      const delta =
-        pctDelta(p50Latency, previousP50Latency) ?? devMockDelta("p50 latency");
+      const delta = pctDelta(p50Latency, previousP50Latency) ?? devMockDelta("p50 latency");
       analyticsCells.push({
         label: "p50 latency",
         value: formatMilliseconds(p50Latency),
@@ -608,11 +594,7 @@ export function useLangyBriefing(): LangyBriefingResult {
     const statusCells: StatusCell[] = [...scenarioCells, ...analyticsCells];
 
     const data: BriefingData = {
-      since: hasScenarios
-        ? "since yesterday"
-        : hasTraces
-          ? "last 30 days"
-          : "last 24 hours",
+      since: hasScenarios ? "since yesterday" : hasTraces ? "last 30 days" : "last 24 hours",
       headline,
       quiet,
       receiptsLabel: receipts.length > 0 ? "Anomalies" : undefined,

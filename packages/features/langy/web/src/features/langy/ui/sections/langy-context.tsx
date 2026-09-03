@@ -10,10 +10,7 @@ import {
   useState,
 } from "react";
 import type { ProposalHandlers } from "./message-content";
-import {
-  type LangyContextChip,
-  type LangyUiActionHandlers,
-} from "../../../../index";
+import { type LangyContextChip, type LangyUiActionHandlers } from "../../../../index";
 
 /**
  * Per-page registration surface for Langy (proposal handlers + precise page
@@ -29,10 +26,7 @@ interface LangyContextValue {
   // -> setState -> re-render -> new handlers object -> register -> ...
   proposalHandlersRef: RefObject<ProposalHandlers>;
   experimentSlug: string | undefined;
-  registerHandlers: (
-    handlers: ProposalHandlers,
-    opts?: { experimentSlug?: string },
-  ) => void;
+  registerHandlers: (handlers: ProposalHandlers, opts?: { experimentSlug?: string }) => void;
   clearHandlers: () => void;
   /**
    * Precise page-context chips a page has declared (see

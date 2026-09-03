@@ -129,9 +129,7 @@ export function scopeChipTooltip(entry: {
 }): string {
   const style = CHIP_STYLES[entry.scopeType] ?? CHIP_STYLES.PROJECT;
   const label = entry.name ?? style.fallbackLabel;
-  return entry.detail
-    ? `${style.kind}: ${label} · ${entry.detail}`
-    : `${style.kind}: ${label}`;
+  return entry.detail ? `${style.kind}: ${label} · ${entry.detail}` : `${style.kind}: ${label}`;
 }
 
 /**
@@ -219,11 +217,7 @@ export function ProviderScopeChips({
         return (
           <Tooltip key={`${entry.scopeType}:${entry.scopeId}`} content={tooltip}>
             {entry.href ? (
-              <Link
-                href={entry.href}
-                variant="plain"
-                _hover={{ textDecoration: "underline" }}
-              >
+              <Link href={entry.href} variant="plain" _hover={{ textDecoration: "underline" }}>
                 {chip}
               </Link>
             ) : (

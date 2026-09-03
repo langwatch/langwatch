@@ -12,21 +12,11 @@ import {
 
 const USER = "user_sam";
 
-function stateWithStatus(
-  status: TenantMigrationStatus | null,
-): SystemMigrationStateRepository {
+function stateWithStatus(status: TenantMigrationStatus | null): SystemMigrationStateRepository {
   return {
     findRecord: vi.fn(
-      async ({
-        migrationName,
-        tenantId,
-      }: {
-        migrationName: string;
-        tenantId: string;
-      }) =>
-        status === null
-          ? null
-          : { migrationName, tenantId, status, report: null },
+      async ({ migrationName, tenantId }: { migrationName: string; tenantId: string }) =>
+        status === null ? null : { migrationName, tenantId, status, report: null },
     ),
     upsertRecord: vi.fn(async () => undefined),
     upsertRecordUnlessRolledBack: vi.fn(async () => true),
@@ -46,22 +36,16 @@ describe("identifier write gate", () => {
     /** @scenario "The gate costs nothing before anyone is enrolled" */
     it("answers closed without reading the user's own row at all", async () => {
       const state = stateWithStatus("finalized");
-      (state.hasFinalizedTenant as ReturnType<typeof vi.fn>).mockResolvedValue(
-        false,
-      );
+      (state.hasFinalizedTenant as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
-      await expect(
-        isUserOnIdentityWrites({ userId: USER, state }),
-      ).resolves.toBe(false);
+      await expect(isUserOnIdentityWrites({ userId: USER, state })).resolves.toBe(false);
       // The whole point of the short-circuit: no per-user read is issued.
       expect(state.findRecord).not.toHaveBeenCalled();
     });
 
     it("reads once per pod, not once per user", async () => {
       const state = stateWithStatus("finalized");
-      (state.hasFinalizedTenant as ReturnType<typeof vi.fn>).mockResolvedValue(
-        false,
-      );
+      (state.hasFinalizedTenant as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
       await isUserOnIdentityWrites({ userId: "user_a", state });
       await isUserOnIdentityWrites({ userId: "user_b", state });
@@ -74,9 +58,7 @@ describe("identifier write gate", () => {
   describe("when no backfill row exists for the user", () => {
     it("answers closed — the gate ships closed for everyone", async () => {
       const state = stateWithStatus(null);
-      await expect(
-        isUserOnIdentityWrites({ userId: USER, state }),
-      ).resolves.toBe(false);
+      await expect(isUserOnIdentityWrites({ userId: USER, state })).resolves.toBe(false);
       expect(state.findRecord).toHaveBeenCalledWith({
         migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
         tenantId: USER,
@@ -134,9 +116,7 @@ describe("identifier write gate", () => {
         // question answers no first.
         hasFinalizedTenant: vi.fn(async () => true),
       };
-      await expect(
-        isUserOnIdentityWrites({ userId: USER, state }),
-      ).resolves.toBe(false);
+      await expect(isUserOnIdentityWrites({ userId: USER, state })).resolves.toBe(false);
     });
   });
 

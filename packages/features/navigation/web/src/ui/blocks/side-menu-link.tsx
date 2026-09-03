@@ -57,20 +57,14 @@ export const SideMenuItem = ({
   const betaPill = beta ? (
     <BetaPill
       label={betaLabel}
-      message={
-        <Text fontSize="sm">
-          {typeof beta === "string" ? beta : DEFAULT_BETA_MESSAGE}
-        </Text>
-      }
+      message={<Text fontSize="sm">{typeof beta === "string" ? beta : DEFAULT_BETA_MESSAGE}</Text>}
     />
   ) : null;
   const legacyPill = legacy ? (
     <LegacyPill
       label={legacyLabel}
       message={
-        <Text fontSize="sm">
-          {typeof legacy === "string" ? legacy : DEFAULT_LEGACY_MESSAGE}
-        </Text>
+        <Text fontSize="sm">{typeof legacy === "string" ? legacy : DEFAULT_LEGACY_MESSAGE}</Text>
       }
     />
   ) : null;
@@ -94,8 +88,7 @@ export const SideMenuItem = ({
   }>;
   // Use CSS variable for icon color to support dark mode
   const iconNode =
-    typeof IconElem === "function" ||
-    (IconElem as unknown as { render?: unknown }).render ? (
+    typeof IconElem === "function" || (IconElem as unknown as { render?: unknown }).render ? (
       <IconElem size={density.iconSize} color="var(--chakra-colors-nav-fg-muted)" />
     ) : (
       (icon as React.ReactNode)

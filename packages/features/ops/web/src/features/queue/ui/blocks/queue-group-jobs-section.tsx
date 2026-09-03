@@ -65,9 +65,7 @@ function JobsList({
   }
   return (
     <Text textStyle="xs" color="fg.muted">
-      {total > 0 && filter.trim()
-        ? "No jobs on this page match the filter."
-        : "No jobs in queue."}
+      {total > 0 && filter.trim() ? "No jobs on this page match the filter." : "No jobs in queue."}
     </Text>
   );
 }

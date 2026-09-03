@@ -107,8 +107,7 @@ describe("CLI E2E", () => {
         // Verify prompt file content. Tracks the CLI default template; the
         // template intentionally omits modelParameters.temperature because
         // the gpt-5 family rejects a custom temperature.
-        expect(localPromptFileManagement.getPromptFileContent(promptHandle))
-          .toMatchInlineSnapshot(`
+        expect(localPromptFileManagement.getPromptFileContent(promptHandle)).toMatchInlineSnapshot(`
           "model: openai/gpt-5.5
           messages:
             - role: system
@@ -157,8 +156,7 @@ describe("CLI E2E", () => {
             { role: "user", content: "You are an updated user message." },
           ],
         });
-        expect(localPromptFileManagement.getPromptFileContent(promptHandle))
-          .toMatchInlineSnapshot(`
+        expect(localPromptFileManagement.getPromptFileContent(promptHandle)).toMatchInlineSnapshot(`
         "model: gpt-4-turbo
         messages:
           - role: system
@@ -358,9 +356,7 @@ describe("CLI E2E", () => {
 
       // Skipped due to chronic CI flake — see langwatch/langwatch#3240.
       it.skip("should not be in the prompts directory", () => {
-        expect(() =>
-          localPromptFileManagement.getPromptFileContent(promptHandle),
-        ).toThrow();
+        expect(() => localPromptFileManagement.getPromptFileContent(promptHandle)).toThrow();
       });
 
       describe("when remote is updated", () => {

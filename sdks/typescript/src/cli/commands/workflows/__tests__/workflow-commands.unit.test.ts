@@ -1,17 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { WorkflowsApiError } from "@/client-sdk/services/workflows/workflows-api.service";
 
-vi.mock(
-  "@/client-sdk/services/workflows/workflows-api.service",
-  async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    const actual = (await importOriginal()) as Record<string, unknown>;
-    return {
-      ...actual,
-      WorkflowsApiService: vi.fn(),
-    };
-  },
-);
+vi.mock("@/client-sdk/services/workflows/workflows-api.service", async (importOriginal) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    WorkflowsApiService: vi.fn(),
+  };
+});
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -118,9 +115,7 @@ describe("listWorkflowsCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      mockGetAll.mockRejectedValue(
-        new WorkflowsApiError("Network error", "list workflows"),
-      );
+      mockGetAll.mockRejectedValue(new WorkflowsApiError("Network error", "list workflows"));
 
       await expect(listWorkflowsCommand()).rejects.toThrow(ProcessExitError);
     });
@@ -200,9 +195,7 @@ describe("deleteWorkflowCommand()", () => {
     it("exits with code 1 without calling delete", async () => {
       mockGet.mockRejectedValue(new WorkflowsApiError("Not found", "get workflow"));
 
-      await expect(deleteWorkflowCommand("nonexistent")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(deleteWorkflowCommand("nonexistent")).rejects.toThrow(ProcessExitError);
       expect(mockDelete).not.toHaveBeenCalled();
     });
   });
@@ -243,9 +236,7 @@ describe("updateWorkflowCommand()", () => {
 
   describe("when no fields are provided", () => {
     it("exits with code 1", async () => {
-      await expect(updateWorkflowCommand("workflow_abc123", {})).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(updateWorkflowCommand("workflow_abc123", {})).rejects.toThrow(ProcessExitError);
     });
   });
 

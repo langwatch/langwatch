@@ -1,8 +1,5 @@
 import type { IdentifierFact } from "@langwatch/identity-contract";
-import {
-  isLiveIdentifierState,
-  LIVE_IDENTIFIER_STATES,
-} from "@langwatch/identity-contract";
+import { isLiveIdentifierState, LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
 import type { IdentityReservationRepository } from "../../identity-reservations.repository";
 import { issuerForProviderId } from "../../better-auth/account-queries";
 import { createLogger } from "@langwatch/observability";
@@ -63,9 +60,7 @@ function linkedIdentifiers(state: IdentityFoldState): LinkedIdentifier[] {
  * linkage columns and reconciles existence: a live identifier projects to a
  * row, a tombstoned one projects to none.
  */
-export class PrismaIdentityProjectionRepository
-  implements StateProjectionStore<IdentityFoldState>
-{
+export class PrismaIdentityProjectionRepository implements StateProjectionStore<IdentityFoldState> {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly reservations: IdentityReservationRepository,
@@ -272,9 +267,7 @@ export class PrismaIdentityProjectionRepository
     state: IdentityFoldState;
   }): Promise<void> {
     const holding = Object.values(state.identifiers)
-      .filter(
-        (fact) => isLiveIdentifierState(fact.state) && fact.value !== null,
-      )
+      .filter((fact) => isLiveIdentifierState(fact.state) && fact.value !== null)
       .map((fact) => fact.identifierId);
     await this.reservations.release({
       userId,
@@ -338,9 +331,7 @@ export class PrismaIdentityProjectionRepository
   /** A tombstoned identifier projects to no row. `deleteMany`, not `delete`:
    *  the unlink that stated the detach has usually removed the row already,
    *  and that is the expected case rather than an error. */
-  private async removeTombstonedAccounts(
-    linked: readonly LinkedIdentifier[],
-  ): Promise<void> {
+  private async removeTombstonedAccounts(linked: readonly LinkedIdentifier[]): Promise<void> {
     const tombstoned = linked
       .filter((fact) => !isLiveIdentifierState(fact.state))
       .map((fact) => fact.accountId);
@@ -388,8 +379,7 @@ export class PrismaIdentityProjectionRepository
         // itself. Only reachable for a fact stated before the issuer was
         // carried; a fact that names one always wins, because a real OIDC
         // issuer is never what this derivation would produce.
-        issuer:
-          fact.issuer ?? issuerForProviderId(fact.providerId ?? fact.provider),
+        issuer: fact.issuer ?? issuerForProviderId(fact.providerId ?? fact.provider),
       },
       update: columns,
     });

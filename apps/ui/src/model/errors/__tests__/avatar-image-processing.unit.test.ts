@@ -2,7 +2,10 @@ import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 // Imported from the module rather than the `~/features/errors` barrel: the
 // barrel pulls in `showErrorToast`, and with it the toaster and Chakra.
-import { explainHandledError, UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
+import {
+  explainHandledError,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "@langwatch/handled-error/presentation";
 import { UserAvatarRateLimitedError, UserAvatarTooLargeError } from "@langwatch/user-contract";
 import {
   AVATAR_MAX_SOURCE_BYTES,

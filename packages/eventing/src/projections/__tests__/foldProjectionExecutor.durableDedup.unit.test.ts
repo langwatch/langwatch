@@ -74,9 +74,7 @@ describe("FoldProjectionExecutor durable dedup", () => {
     }));
   }
 
-  const contextWith = (
-    over: Partial<ProjectionStoreContext>,
-  ): ProjectionStoreContext => ({
+  const contextWith = (over: Partial<ProjectionStoreContext>): ProjectionStoreContext => ({
     aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
     tenantId,
     ...over,

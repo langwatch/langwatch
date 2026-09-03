@@ -76,14 +76,7 @@ export function IOViewerBody({
   const { colorMode } = useColorMode();
 
   if (format === "json" && canJson) {
-    return (
-      <ShikiCodeBlock
-        code={prettyJsonContent}
-        language="json"
-        colorMode={colorMode}
-        flush
-      />
-    );
+    return <ShikiCodeBlock code={prettyJsonContent} language="json" colorMode={colorMode} flush />;
   }
   if (format === "markdown") {
     return markdownSubmode === "rendered" ? (
@@ -94,12 +87,7 @@ export function IOViewerBody({
     ) : (
       // Source — raw markdown with markdown syntax highlighting.
       // Plain text, copyable, lightning fast even on huge content.
-      <ShikiCodeBlock
-        code={markdownBody}
-        language="markdown"
-        colorMode={colorMode}
-        flush
-      />
+      <ShikiCodeBlock code={markdownBody} language="markdown" colorMode={colorMode} flush />
     );
   }
   if (format === "pretty" && isChat) {
@@ -118,22 +106,11 @@ export function IOViewerBody({
     // thinking/tool_use/tool_result get the same visual hierarchy as
     // structured chat — left accent bar, role chip, blocks stacked.
     return (
-      <AssistantTurnCard
-        blocks={inlineBlocks}
-        toolCalls={[]}
-        collapseTools={mode === "output"}
-      />
+      <AssistantTurnCard blocks={inlineBlocks} toolCalls={[]} collapseTools={mode === "output"} />
     );
   }
   if (format === "pretty" && canJson) {
-    return (
-      <ShikiCodeBlock
-        code={prettyJsonContent}
-        language="json"
-        colorMode={colorMode}
-        flush
-      />
-    );
+    return <ShikiCodeBlock code={prettyJsonContent} language="json" colorMode={colorMode} flush />;
   }
   // Plain text in Pretty mode: if it reads as Markdown, render it richly so
   // Pretty is no longer a no-op vs the raw Text view. The "text" format

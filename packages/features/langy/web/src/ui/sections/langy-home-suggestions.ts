@@ -1,8 +1,4 @@
-import {
-  type LangySuggestion,
-  SETUP_SUGGESTIONS,
-  SUGGESTIONS,
-} from "./langy-empty-state";
+import { type LangySuggestion, SETUP_SUGGESTIONS, SUGGESTIONS } from "./langy-empty-state";
 
 /**
  * What the project has reached, as far as choosing an ask is concerned.
@@ -98,8 +94,7 @@ export function selectLangySuggestions({
   // than the row holds, so the setup list tops the row up rather than leaving
   // a gap — but only with the setup asks the project still needs.
   const topUp = SETUP_SUGGESTIONS.filter(
-    (setup) =>
-      stillNeeded(setup) && !ordered.some((chosen) => chosen.label === setup.label),
+    (setup) => stillNeeded(setup) && !ordered.some((chosen) => chosen.label === setup.label),
   );
   return [...ordered, ...topUp].slice(0, count);
 }

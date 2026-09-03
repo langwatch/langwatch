@@ -54,8 +54,7 @@ export function useTraceTableVirtualizer({
   const items = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
   const paddingTop = items.length > 0 ? (items[0]?.start ?? 0) : 0;
-  const paddingBottom =
-    items.length > 0 ? totalSize - (items[items.length - 1]?.end ?? 0) : 0;
+  const paddingBottom = items.length > 0 ? totalSize - (items[items.length - 1]?.end ?? 0) : 0;
 
   return { virtualizer, paddingTop, paddingBottom };
 }

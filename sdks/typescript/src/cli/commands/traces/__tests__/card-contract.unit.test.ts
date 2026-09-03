@@ -131,9 +131,7 @@ describe("the CLI's json output against the shared card contract", () => {
       it("still prints the document — an empty list is an answer, prose is corruption", async () => {
         vi.mocked(TracesApiService).mockImplementation(function () {
           return {
-            search: vi
-              .fn()
-              .mockResolvedValue({ traces: [], pagination: { totalHits: 0 } }),
+            search: vi.fn().mockResolvedValue({ traces: [], pagination: { totalHits: 0 } }),
             get: vi.fn(),
           } as unknown as TracesApiService;
         });

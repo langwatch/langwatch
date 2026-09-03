@@ -37,8 +37,7 @@ export function WorkbenchStaleBanner({
       flexShrink={0}
     >
       <Text fontSize="sm" color="fg">
-        {who}. Reloading shows the latest version and discards your unsaved
-        edits.
+        {who}. Reloading shows the latest version and discards your unsaved edits.
       </Text>
       <Button
         size="xs"

@@ -55,8 +55,7 @@ export const WaterfallView = memo(function WaterfallView({
   const [treePct, setTreePct] = useState(DEFAULT_TREE_PCT);
   const [showOnlyLangwatch, setShowOnlyLangwatch] = useState(false);
 
-  const { isEditing, deletedSpanIds, draftNames, toggleSpanDeleted } =
-    useWaterfallEditing(spans);
+  const { isEditing, deletedSpanIds, draftNames, toggleSpanDeleted } = useWaterfallEditing(spans);
   const { correctedSpanIds, deletedByCorrectionSpanIds } = useCorrectionMarks(spans);
 
   const { signalsBySpanId, isFetched: signalsFetched } = useSpanLangwatchSignals();
@@ -148,10 +147,7 @@ export const WaterfallView = memo(function WaterfallView({
     }
     prevSpanIdsRef.current = currentIds;
   }, [spans, currentRootSpanId]);
-  const { rootStart, rootDuration } = useMemo(
-    () => getTraceRange(filteredSpans),
-    [filteredSpans],
-  );
+  const { rootStart, rootDuration } = useMemo(() => getTraceRange(filteredSpans), [filteredSpans]);
   const timeMarkers = useMemo(() => getTimeMarkers(rootDuration), [rootDuration]);
 
   // Drop interior markers when the timeline panel is narrow enough
@@ -584,18 +580,14 @@ export const WaterfallView = memo(function WaterfallView({
                     hiddenDescendantCount={
                       collapsedIds.has(node.span.spanId) ? countDescendants(node) : 0
                     }
-                    isDimmed={
-                      selectedSpanId !== null && node.span.spanId !== selectedSpanId
-                    }
+                    isDimmed={selectedSpanId !== null && node.span.spanId !== selectedSpanId}
                     signals={signalsBySpanId.get(node.span.spanId) ?? EMPTY_SIGNALS}
                     traceId={rowTraceId}
                     comments={commentsFor(node.span.spanId)}
                     isEditing={isEditing}
                     isDraftDeleted={deletedSpanIds.has(node.span.spanId)}
                     isCorrected={correctedSpanIds.has(node.span.spanId)}
-                    isDeletedByCorrection={deletedByCorrectionSpanIds.has(
-                      node.span.spanId,
-                    )}
+                    isDeletedByCorrection={deletedByCorrectionSpanIds.has(node.span.spanId)}
                     draftName={draftNames.get(node.span.spanId)}
                     onToggleDelete={toggleSpanDeleted}
                     onToggleCollapse={handleToggleCollapse}
@@ -697,12 +689,7 @@ export const WaterfallView = memo(function WaterfallView({
             on this container so the row's hover / selection background
             still extends edge-to-edge while only the bars + time
             labels stay clear of the pane edge. */}
-            <Box
-              flex={1}
-              overflow="hidden"
-              position="relative"
-              onWheel={handleTimelineWheel}
-            >
+            <Box flex={1} overflow="hidden" position="relative" onWheel={handleTimelineWheel}>
               <Box
                 ref={timelineContentRef}
                 position="relative"
@@ -777,9 +764,7 @@ export const WaterfallView = memo(function WaterfallView({
                         rootDuration={rootDuration}
                         rowHeight={virtualRow.size}
                         isSelected={node.span.spanId === selectedSpanId}
-                        isDimmed={
-                          selectedSpanId !== null && node.span.spanId !== selectedSpanId
-                        }
+                        isDimmed={selectedSpanId !== null && node.span.spanId !== selectedSpanId}
                         onSelect={handleSelectSpan}
                       />
                     </Box>

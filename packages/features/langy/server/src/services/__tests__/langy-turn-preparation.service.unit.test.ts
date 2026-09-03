@@ -105,9 +105,7 @@ describe("LangyTurnService.startConversationTurn", () => {
     it("skips the projection and handoff reads for a new conversation", async () => {
       const fixture = makeFixture();
 
-      const result = await LangyTurnService.create(fixture.deps).startConversationTurn(
-        input,
-      );
+      const result = await LangyTurnService.create(fixture.deps).startConversationTurn(input);
 
       expect(result).toEqual({ conversationId: "conversation-1", turnId: "turn-1" });
       // Both reads are lag-tolerant: asked about a conversation whose
@@ -195,9 +193,7 @@ describe("LangyTurnPreparationService golden path", () => {
   it("commits one atomic message + acceptance command and fast-dispatches it", async () => {
     const fixture = makeFixture();
 
-    const result = await LangyTurnService.create(fixture.deps).startConversationTurn(
-      input,
-    );
+    const result = await LangyTurnService.create(fixture.deps).startConversationTurn(input);
 
     expect(result).toEqual({ conversationId: "conversation-1", turnId: "turn-1" });
     expect(fixture.acceptTurn).toHaveBeenCalledWith(
@@ -265,9 +261,7 @@ describe("LangyTurnPreparationService golden path", () => {
     await LangyTurnService.create(fixture.deps).startConversationTurn(input);
 
     expect(mint).not.toHaveBeenCalled();
-    expect(dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ intent: "continue" }),
-    );
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ intent: "continue" }));
   });
 
   it("finalizes the GitHub permit before probing the worker signature", async () => {
@@ -292,7 +286,11 @@ describe("LangyTurnPreparationService golden path", () => {
         resolveMirrorTier: vi.fn(async () => "content" as const),
         tryGetModelsAllowed: vi.fn(async () => null),
       },
-      permits: { reserve, release: vi.fn(async () => undefined), check: vi.fn(async () => ({ allowed: true })) },
+      permits: {
+        reserve,
+        release: vi.fn(async () => undefined),
+        check: vi.fn(async () => ({ allowed: true })),
+      },
       worker: {
         probe,
         dispatch,
@@ -353,7 +351,11 @@ describe("LangyTurnPreparationService golden path", () => {
         resolveMirrorTier: vi.fn(async () => "content" as const),
         tryGetModelsAllowed: vi.fn(async () => ["openai/gpt-5-mini"]),
       },
-      permits: { reserve, release: vi.fn(async () => undefined), check: vi.fn(async () => ({ allowed: true })) },
+      permits: {
+        reserve,
+        release: vi.fn(async () => undefined),
+        check: vi.fn(async () => ({ allowed: true })),
+      },
       admission: {
         claim: vi.fn(async () => ({
           kind: "claimed" as const,
@@ -425,7 +427,11 @@ describe("LangyTurnPreparationService golden path", () => {
         mint: vi.fn(async () => ({ token: "session-key", apiKeyId: "key-1" })),
         revoke,
       },
-      permits: { reserve: vi.fn(async () => ({ reserved: true, allowed: true, resetAt: 0 })), release, check: vi.fn(async () => ({ allowed: true })) },
+      permits: {
+        reserve: vi.fn(async () => ({ reserved: true, allowed: true, resetAt: 0 })),
+        release,
+        check: vi.fn(async () => ({ allowed: true })),
+      },
       admission: {
         claim: vi.fn(async () => ({
           kind: "claimed" as const,

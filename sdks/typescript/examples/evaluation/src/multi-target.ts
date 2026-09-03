@@ -20,9 +20,7 @@ import { setupObservability } from "langwatch/observability/node";
 
 // Check for required environment variables
 if (!process.env.LANGWATCH_API_KEY) {
-  console.error(
-    "❌ LANGWATCH_API_KEY is required. Create a .env file with your API key.",
-  );
+  console.error("❌ LANGWATCH_API_KEY is required. Create a .env file with your API key.");
   console.error("   Get your API key from https://app.langwatch.ai");
   process.exit(1);
 }
@@ -102,26 +100,18 @@ const main = async () => {
         }),
 
         // GPT-3.5 target
-        evaluation.withTarget(
-          "gpt-3.5-turbo",
-          { model: "openai/gpt-3.5-turbo" },
-          async () => {
-            const response = await simulateGPT35(item.question);
-            evaluation.log("response_quality", { score: 0.75 });
-            return response;
-          },
-        ),
+        evaluation.withTarget("gpt-3.5-turbo", { model: "openai/gpt-3.5-turbo" }, async () => {
+          const response = await simulateGPT35(item.question);
+          evaluation.log("response_quality", { score: 0.75 });
+          return response;
+        }),
 
         // Claude target
-        evaluation.withTarget(
-          "claude-3",
-          { model: "anthropic/claude-3-sonnet" },
-          async () => {
-            const response = await simulateClaude(item.question);
-            evaluation.log("response_quality", { score: 0.85 });
-            return response;
-          },
-        ),
+        evaluation.withTarget("claude-3", { model: "anthropic/claude-3-sonnet" }, async () => {
+          const response = await simulateClaude(item.question);
+          evaluation.log("response_quality", { score: 0.85 });
+          return response;
+        }),
       ]);
 
       // Log summary
@@ -132,9 +122,7 @@ const main = async () => {
     { concurrency: 2 }, // Process 2 dataset items at a time
   );
 
-  console.log(
-    "\n✅ Comparison complete! Check LangWatch to see charts comparing the models.",
-  );
+  console.log("\n✅ Comparison complete! Check LangWatch to see charts comparing the models.");
   console.log("   - Each target has its own unique trace (clickable in UI)");
   console.log("   - Latency is automatically captured per target");
 };

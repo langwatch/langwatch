@@ -113,14 +113,7 @@ export const useTemplateLogicMenu = ({
       setValueImmediate(newValue);
       closeMenu();
     },
-    [
-      localValue,
-      setValueImmediate,
-      triggerStart,
-      buttonMenuMode,
-      closeMenu,
-      containerRef,
-    ],
+    [localValue, setValueImmediate, triggerStart, buttonMenuMode, closeMenu, containerRef],
   );
 
   // Select the currently highlighted option
@@ -148,9 +141,7 @@ export const useTemplateLogicMenu = ({
       setMenuPosition({ top: rect.bottom + 4, left: rect.left });
 
       const cursorPos =
-        lastUserCursorPosRef.current >= 0
-          ? lastUserCursorPosRef.current
-          : localValue.length;
+        lastUserCursorPosRef.current >= 0 ? lastUserCursorPosRef.current : localValue.length;
       setTriggerStart(cursorPos);
 
       setMenuQuery("");

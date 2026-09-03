@@ -20,7 +20,10 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ClickHouseTraceService } from "../trace-legacy-read.repository";
-import { createTestClickHouseClient, testClickHouseUrl } from "./support/clickhouse-endpoint.support";
+import {
+  createTestClickHouseClient,
+  testClickHouseUrl,
+} from "./support/clickhouse-endpoint.support";
 
 const clickHouseUrl = testClickHouseUrl();
 const integration = describe.skipIf(clickHouseUrl === null);
@@ -66,7 +69,10 @@ function makeTraceSummaryRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function insertTraceSummary(ch: ClickHouseClient, row: ReturnType<typeof makeTraceSummaryRow>) {
+async function insertTraceSummary(
+  ch: ClickHouseClient,
+  row: ReturnType<typeof makeTraceSummaryRow>,
+) {
   await ch.insert({
     table: "trace_summaries",
     values: [row],
@@ -189,7 +195,10 @@ integration("ClickHouseTraceService.resolveTraceIdByPrefix (integration)", () =>
 
     beforeAll(async () => {
       // Insert under a DIFFERENT tenant — MUST NOT leak across projects.
-      await insertTraceSummary(ch, makeTraceSummaryRow({ TraceId: otherTraceId, TenantId: otherTenantId }));
+      await insertTraceSummary(
+        ch,
+        makeTraceSummaryRow({ TraceId: otherTraceId, TenantId: otherTenantId }),
+      );
     });
 
     /** @scenario Prefix match is scoped to the current project */

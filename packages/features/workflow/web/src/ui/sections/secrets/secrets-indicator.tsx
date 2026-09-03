@@ -1,14 +1,4 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Code,
-  HStack,
-  Link,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, Code, HStack, Link, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuExternalLink, LuKeyRound, LuSettings } from "react-icons/lu";
 import { Popover } from "@langwatch/design-system/popover";
@@ -58,12 +48,7 @@ export function SecretsIndicator({ projectId, onInsertSecret }: SecretsIndicator
           <Text>Secrets</Text>
         </HStack>
       </Popover.Trigger>
-      <Popover.Content
-        background="bg.panel"
-        borderRadius="lg"
-        portalled={false}
-        color="fg"
-      >
+      <Popover.Content background="bg.panel" borderRadius="lg" portalled={false} color="fg">
         <Popover.Body padding={0}>
           <VStack align="stretch" gap={0}>
             {/* Header */}

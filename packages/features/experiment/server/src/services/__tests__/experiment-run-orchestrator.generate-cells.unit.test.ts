@@ -154,9 +154,7 @@ describe("generateCells with evaluator-all-rows scope", () => {
 });
 
 describe("generateComparisonCells given a comparison the user has not finished configuring", () => {
-  const columnTarget = (
-    comparison: Record<string, unknown>,
-  ): EvaluationsV3State["targets"][0] =>
+  const columnTarget = (comparison: Record<string, unknown>): EvaluationsV3State["targets"][0] =>
     ({
       id: "comparison-column",
       type: "evaluator",
@@ -200,9 +198,7 @@ describe("generateComparisonCells given a comparison the user has not finished c
       expect(skipReasons.map((r) => r.rowIndex)).toEqual([0, 1]);
       expect(skipReasons[0]?.kind).toBe("too-few-variants");
       expect(skipReasons[0]?.targetId).toBe("comparison-column");
-      expect(comparisonSkipMessage(skipReasons[0]!).errorType).toBe(
-        "TooFewComparisonVariants",
-      );
+      expect(comparisonSkipMessage(skipReasons[0]!).errorType).toBe("TooFewComparisonVariants");
     });
   });
 
@@ -242,9 +238,7 @@ describe("generateComparisonCells given a comparison the user has not finished c
       expect(cells).toHaveLength(0);
       expect(skipReasons).toHaveLength(2);
       expect(skipReasons[0]?.kind).toBe("variant-not-found");
-      expect(comparisonSkipMessage(skipReasons[0]!).errorType).toBe(
-        "ComparisonVariantNotFound",
-      );
+      expect(comparisonSkipMessage(skipReasons[0]!).errorType).toBe("ComparisonVariantNotFound");
     });
   });
 

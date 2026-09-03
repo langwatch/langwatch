@@ -6,11 +6,11 @@ Reference example: [`dataset.md`](./dataset.md).
 
 ## 1. What is there now
 
-| Package | Non-test files | Lines |
-|---|---|---|
-| `server/src` | 143 | 24,097 |
-| `contract/src` | 34 | 3,062 |
-| `web/src` | 17 | 2,757 |
+| Package        | Non-test files | Lines  |
+| -------------- | -------------- | ------ |
+| `server/src`   | 143            | 24,097 |
+| `contract/src` | 34             | 3,062  |
+| `web/src`      | 17             | 2,757  |
 
 **99 operations, declared 5 to 7 times each.** The contract's
 `GovernanceService` (`contract/src/governance.service.ts`, 99 abstract
@@ -80,20 +80,20 @@ readonly activitySummary: GovernanceService["activitySummary"] = (...args) =>
 
 Below it, the same 99 again, split four ways:
 
-| File | Delegations | Lines |
-|---|---|---|
-| `services/governance-rules-operations.service.ts:32-140` | 34 | 141 |
-| `services/governance-ingestion-operations.service.ts:44-144` | 32 | 145 |
-| `services/governance-activity-operations.service.ts:28-70` | 13 | 71 |
-| `services/governance-lifecycle-operations.service.ts:48-115` | 20 | 116 |
+| File                                                         | Delegations | Lines |
+| ------------------------------------------------------------ | ----------- | ----- |
+| `services/governance-rules-operations.service.ts:32-140`     | 34          | 141   |
+| `services/governance-ingestion-operations.service.ts:44-144` | 32          | 145   |
+| `services/governance-activity-operations.service.ts:28-70`   | 13          | 71    |
+| `services/governance-lifecycle-operations.service.ts:48-115` | 20          | 116   |
 
 Then a third tier, three more classes that forward once more:
 
-| File | Delegations | Lines |
-|---|---|---|
-| `services/governance-ai-tools.service.ts:30-108` → `DefaultGovernanceAiToolCatalogService` | 17 | 109 |
-| `services/governance-activity.service.ts:27-78` → `ActivityMonitorService` | 9 | 79 |
-| `services/governance-department.service.ts:17-70` → `DepartmentService` | 9 | 71 |
+| File                                                                                       | Delegations | Lines |
+| ------------------------------------------------------------------------------------------ | ----------- | ----- |
+| `services/governance-ai-tools.service.ts:30-108` → `DefaultGovernanceAiToolCatalogService` | 17          | 109   |
+| `services/governance-activity.service.ts:27-78` → `ActivityMonitorService`                 | 9           | 79    |
+| `services/governance-department.service.ts:17-70` → `DepartmentService`                    | 9           | 71    |
 
 And a fourth, `services/ingestion-source-activity.service.ts:25-76`, whose nine
 methods are each `return this.repository.<sameName>(input)`.
@@ -233,18 +233,18 @@ ports/ingestion-pull-worker.port.ts
 
 The first four are waived precisely because their only export is a `*Repository`.
 
-Separately, `ports/department.port.ts:7-12` gives the repository the *service*
+Separately, `ports/department.port.ts:7-12` gives the repository the _service_
 verbs — `getAll`, `tryGetById`, `getAssignments` — against the convention that
 repositories use `findAll` / `findById`. Seven other port files already use
 `find*` correctly.
 
 ### P6 — Three ports with no implementation at all (breaks R4)
 
-| Port | Implementations | Evidence |
-|---|---|---|
-| `IngestionKeyCapability` | **0**, and zero references | `ports/ingestion-source-key.port.ts:49` is the only line in the repo naming it |
-| `GovernanceTraceIngestionPort` | **0** in production | `ports/ingestion-pull-worker.port.ts:10`; see P2 |
-| `CliBudgetOverviewPort` | **0** direct | `ports/cli-bootstrap.port.ts:10`; its one subclass `GovernanceBudgetOverviewPort` (`ports/governance-budget-overview.port.ts:8`) `override`s its only method with a different signature, so the base contributes nothing |
+| Port                           | Implementations            | Evidence                                                                                                                                                                                                                 |
+| ------------------------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `IngestionKeyCapability`       | **0**, and zero references | `ports/ingestion-source-key.port.ts:49` is the only line in the repo naming it                                                                                                                                           |
+| `GovernanceTraceIngestionPort` | **0** in production        | `ports/ingestion-pull-worker.port.ts:10`; see P2                                                                                                                                                                         |
+| `CliBudgetOverviewPort`        | **0** direct               | `ports/cli-bootstrap.port.ts:10`; its one subclass `GovernanceBudgetOverviewPort` (`ports/governance-budget-overview.port.ts:8`) `override`s its only method with a different signature, so the base contributes nothing |
 
 Every **other** port in the feature earns its place — see the Keep list.
 
@@ -297,19 +297,19 @@ the code: "Validated against a live workspace at 13.3% of warehouse compute",
 a two-hour settling window. That is an ADR. The package already has
 `adrs/` with two files in it.
 
-| File | Comment / code |
-|---|---|
-| `adapters/databricks-genie-puller.adapter.ts` | 1,177 / 2,072 |
-| `services/puller-databricks-warehouse-cost.service.ts` | 373 / 380 |
-| `adapters/copilot-studio-dataverse-puller.adapter.ts` | 321 / 526 |
-| `adapters/copilot-studio-trace-mapper.adapter.ts` | 310 / 772 |
-| `adapters/openai-admin-puller.adapter.ts` | 288 / 588 |
-| `adapters/anthropic-admin-puller.adapter.ts` | 277 / 526 |
-| `adapters/conversation-trace-assembly.adapter.ts` | 117 / 117 |
+| File                                                   | Comment / code |
+| ------------------------------------------------------ | -------------- |
+| `adapters/databricks-genie-puller.adapter.ts`          | 1,177 / 2,072  |
+| `services/puller-databricks-warehouse-cost.service.ts` | 373 / 380      |
+| `adapters/copilot-studio-dataverse-puller.adapter.ts`  | 321 / 526      |
+| `adapters/copilot-studio-trace-mapper.adapter.ts`      | 310 / 772      |
+| `adapters/openai-admin-puller.adapter.ts`              | 288 / 588      |
+| `adapters/anthropic-admin-puller.adapter.ts`           | 277 / 526      |
+| `adapters/conversation-trace-assembly.adapter.ts`      | 117 / 117      |
 
 Much of this is genuinely good — a vendor's billing model is exactly the kind of
-surprise R7 says to keep. The split is: the *invariant* stays beside the code,
-the *investigation that established it* moves to `adrs/`.
+surprise R7 says to keep. The split is: the _invariant_ stays beside the code,
+the _investigation that established it_ moves to `adrs/`.
 
 Two rotted path references:
 `adapters/__tests__/poller-cursor.unit.test.ts:16` cites
@@ -386,7 +386,7 @@ instead of seven.**
 The contract abstract has to stay for now: nine modules outside the feature
 hold `GovernanceService` directly (`platform/app/src/server/routes/auth-cli.ts`
 alone calls eleven of its methods). So one class must satisfy 99 signatures.
-It should be the *only* one.
+It should be the _only_ one.
 
 ```ts
 export class DefaultGovernanceService extends GovernanceService {
@@ -487,7 +487,7 @@ Each new code needs an entry in
   files" headline: nearly every port here is a genuine cross-package inversion,
   implemented in `packages/enterprise/composition/api/src/governance/` so the
   feature never reaches the app. Nineteen of the feature's 31 production
-  consumers *are* that adapter package. `GovernanceHttpPort` has 11
+  consumers _are_ that adapter package. `GovernanceHttpPort` has 11
   implementations, `GovernanceDiagnosticsPort` 10, `GovernanceEncryptionPort` 6,
   `TraceAlertTriggerPort` 4 (two of them in `platform/app`). None of these is a
   seam to nowhere.

@@ -21,10 +21,7 @@ export abstract class AiToolCatalogRepository {
     organizationId: string;
     departmentIds: string[];
   }): Promise<boolean>;
-  abstract create(input: {
-    values: CreateAiToolEntryInput;
-    slug: string;
-  }): Promise<AiToolEntry>;
+  abstract create(input: { values: CreateAiToolEntryInput; slug: string }): Promise<AiToolEntry>;
   abstract update(input: UpdateAiToolEntryInput): Promise<AiToolEntry>;
   abstract remove(id: string): Promise<AiToolEntry>;
   abstract ensureDefaultCatalog(input: {
@@ -36,9 +33,7 @@ export abstract class AiToolCatalogRepository {
     tiles: readonly AiToolStarterTile[];
   }): Promise<{ created: number; updated: number; skipped: number }>;
   abstract listConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]>;
-  abstract listConfiguredProvidersForOrganization(
-    organizationId: string,
-  ): Promise<string[]>;
+  abstract listConfiguredProvidersForOrganization(organizationId: string): Promise<string[]>;
   abstract listRoutingPolicyOptions(
     organizationId: string,
   ): Promise<Array<{ id: string; name: string }>>;

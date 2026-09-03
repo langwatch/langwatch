@@ -299,7 +299,6 @@ export class TraceIngestionService {
   }
 }
 
-
 /**
  * The span-collection half of ingestion: dedup, optional payload preparation,
  * and the one command handoff.
@@ -366,7 +365,9 @@ export class TraceSpanCollectionService {
         piiRedactionLevel: input.piiRedactionLevel,
         occurredAt: Date.now(),
       };
-      const prepared = this.options.payloads ? await this.options.payloads.prepare(commandData) : commandData;
+      const prepared = this.options.payloads
+        ? await this.options.payloads.prepare(commandData)
+        : commandData;
 
       await this.options.commands.recordSpan(prepared);
       await this.options.dedup.confirmProcessed({

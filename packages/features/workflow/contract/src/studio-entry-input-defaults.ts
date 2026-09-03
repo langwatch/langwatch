@@ -9,10 +9,7 @@ export function entryInlineWithDefaults(inline: Inline, outputs: Field[]): Inlin
   );
   if (defaults.length === 0) return inline;
 
-  const rowCount = Math.max(
-    1,
-    ...Object.values(inline.records).map((column) => column.length),
-  );
+  const rowCount = Math.max(1, ...Object.values(inline.records).map((column) => column.length));
   const records = { ...inline.records };
   const columnTypes = [...inline.columnTypes];
 

@@ -37,8 +37,9 @@ export const SortableSection: React.FC<SortableSectionProps> = ({
   children,
   isAnyDragging = false,
 }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
 
   // Stabilise the drag-handle props reference: @dnd-kit returns fresh
   // `attributes`/`listeners` objects on every render. Memoising by

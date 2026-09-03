@@ -1,13 +1,4 @@
-import {
-  Box,
-  Field,
-  Grid,
-  GridItem,
-  HStack,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Field, Grid, GridItem, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
@@ -62,9 +53,7 @@ export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<string, DatasetInferredMa
 };
 
 /** The source half of an inferred mapping, which is all the workflow edges match on. */
-const inferredMappingSource = (
-  inferred: DatasetInferredMapping,
-): keyof typeof TRACE_MAPPINGS =>
+const inferredMappingSource = (inferred: DatasetInferredMapping): keyof typeof TRACE_MAPPINGS =>
   typeof inferred === "string" ? inferred : inferred.source;
 
 /** How a column of this name is filled before anyone touches the mapping. */
@@ -166,9 +155,7 @@ const expansionsAfterMapping = ({
   availableExpansions: Set<keyof typeof TRACE_EXPANSIONS>;
 }): Set<keyof typeof TRACE_EXPANSIONS> => {
   const expandableBy =
-    targetMapping && "expandable_by" in targetMapping
-      ? targetMapping.expandable_by
-      : undefined;
+    targetMapping && "expandable_by" in targetMapping ? targetMapping.expandable_by : undefined;
   if (!expandableBy || availableExpansions.has(expandableBy)) return expansions;
   if (!TRACE_EXPANSIONS[expandableBy].enabledByDefault) return expansions;
   return new Set([...expansions, expandableBy]);
@@ -254,9 +241,7 @@ export const TracesMapping = ({
 
   // Get all unique thread_ids from the current traces
   const threadIds = useMemo(() => {
-    const ids = traces
-      .map((trace) => trace.metadata?.thread_id)
-      .filter((id): id is string => !!id);
+    const ids = traces.map((trace) => trace.metadata?.thread_id).filter((id): id is string => !!id);
     return Array.from(new Set(ids));
   }, [traces]);
 
@@ -331,8 +316,7 @@ export const TracesMapping = ({
   // any other place that renders this component) doesn't trigger the heavier
   // ClickHouse scan when none of those sources is in play.
   const needsProjectFieldNames = useMemo(
-    () =>
-      Object.values(mapping).some((m) => PROJECT_FIELD_NAME_SOURCES.includes(m.source)),
+    () => Object.values(mapping).some((m) => PROJECT_FIELD_NAME_SOURCES.includes(m.source)),
     [mapping],
   );
   const {
@@ -428,11 +412,7 @@ export const TracesMapping = ({
   }, [mapping]);
   const expansions = useMemo(
     () =>
-      new Set(
-        Array.from(traceMappingState.expansions).filter((x) =>
-          availableExpansions.has(x),
-        ),
-      ),
+      new Set(Array.from(traceMappingState.expansions).filter((x) => availableExpansions.has(x))),
     [traceMappingState.expansions, availableExpansions],
   );
 
@@ -482,12 +462,7 @@ export const TracesMapping = ({
       other: traceMappingStateWithDefaults.expansions,
     });
 
-    if (
-      !isInitializedRef.current ||
-      fieldsChanged ||
-      mappingChanged ||
-      expansionsChanged
-    ) {
+    if (!isInitializedRef.current || fieldsChanged || mappingChanged || expansionsChanged) {
       const nextState = traceMappingStateWithDefaults as LocalTraceMappingState;
       traceMappingStateRef.current = nextState;
       setTraceMappingState_(nextState);
@@ -506,9 +481,7 @@ export const TracesMapping = ({
     );
     const targetEdgesWithDefaults = [
       ...dsl.targetEdges.filter((edge) =>
-        dsl.sourceOptions[edge.source]?.fields.includes(
-          edge.sourceHandle?.split(".")[1] ?? "",
-        ),
+        dsl.sourceOptions[edge.source]?.fields.includes(edge.sourceHandle?.split(".")[1] ?? ""),
       ),
       ...(targetFields
         .map((targetField) => {
@@ -563,9 +536,7 @@ export const TracesMapping = ({
 
     // Identify columns mapped to server-only sources
     const serverOnlyColumns = Object.entries(mapping)
-      .filter(([, m]) =>
-        (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(m.source),
-      )
+      .filter(([, m]) => (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(m.source))
       .map(([col, m]) => ({ col, source: m.source }));
 
     for (const trace of traces_) {
@@ -621,11 +592,7 @@ export const TracesMapping = ({
       gap={2}
     >
       {titles?.map((title, idx) => (
-        <GridItem
-          key={title}
-          colSpan={idx == titles.length - 1 ? 1 : 2}
-          paddingBottom={2}
-        >
+        <GridItem key={title} colSpan={idx == titles.length - 1 ? 1 : 2} paddingBottom={2}>
           <Text fontWeight="semibold">{title}</Text>
         </GridItem>
       ))}
@@ -660,19 +627,13 @@ export const TracesMapping = ({
               ? // Spans always expose the same subfields. Offer them for any
                 // span name — including project-wide names that aren't on the
                 // loaded trace, where subkey discovery would otherwise be empty.
-                dedupeKeyOptions([
-                  ...defaultSpanSubkeys,
-                  ...(key ? computeSubkeys(key) : []),
-                ])
+                dedupeKeyOptions([...defaultSpanSubkeys, ...(key ? computeSubkeys(key) : [])])
               : source === "evaluations" && key
                 ? // Evaluations always expose the same result subfields. Offer
                   // them for any selected evaluator — including project-wide
                   // ones not on the loaded trace, where subkey discovery would
                   // otherwise be empty.
-                  dedupeKeyOptions([
-                    ...DEFAULT_EVALUATION_SUBKEYS,
-                    ...computeSubkeys(key),
-                  ])
+                  dedupeKeyOptions([...DEFAULT_EVALUATION_SUBKEYS, ...computeSubkeys(key)])
                 : computeSubkeys(key!)
             : undefined;
 
@@ -695,8 +656,7 @@ export const TracesMapping = ({
                 { key: "", label: FIELD_NAME_ANY_LABEL[source] ?? "* (any)" },
                 ...mergeProjectKeyOptions(source, traceMappingDefinition.keys(traces_)),
               ];
-        const selectedKeyOption =
-          keyOptions.find((option) => option.key === (key ?? "")) ?? null;
+        const selectedKeyOption = keyOptions.find((option) => option.key === (key ?? "")) ?? null;
 
         const targetHandle = `inputs.${targetField}`;
         const currentSourceMapping = dsl?.targetEdges
@@ -712,8 +672,7 @@ export const TracesMapping = ({
                     <NativeSelect.Field
                       value={currentSourceMapping ?? ""}
                       onChange={(e) => {
-                        const [source, sourceGroup, sourceField] =
-                          e.target.value.split(".");
+                        const [source, sourceGroup, sourceField] = e.target.value.split(".");
 
                         dsl.setTargetEdges?.([
                           ...(dsl.targetEdges?.filter(
@@ -731,29 +690,27 @@ export const TracesMapping = ({
                       }}
                     >
                       <option value=""></option>
-                      {Object.entries(dsl.sourceOptions).map(
-                        ([key, { label, fields }]) => {
-                          const options = fields.map((field) => (
-                            <option key={field} value={`${key}.outputs.${field}`}>
-                              {field}
-                            </option>
-                          ));
+                      {Object.entries(dsl.sourceOptions).map(([key, { label, fields }]) => {
+                        const options = fields.map((field) => (
+                          <option key={field} value={`${key}.outputs.${field}`}>
+                            {field}
+                          </option>
+                        ));
 
-                          if (options.length === 0) {
-                            return null;
-                          }
+                        if (options.length === 0) {
+                          return null;
+                        }
 
-                          if (Object.keys(dsl.sourceOptions).length === 1) {
-                            return options;
-                          }
+                        if (Object.keys(dsl.sourceOptions).length === 1) {
+                          return options;
+                        }
 
-                          return (
-                            <optgroup key={key} label={label}>
-                              {options}
-                            </optgroup>
-                          );
-                        },
-                      )}
+                        return (
+                          <optgroup key={key} label={label}>
+                            {options}
+                          </optgroup>
+                        );
+                      })}
                     </NativeSelect.Field>
                     <NativeSelect.Indicator />
                   </NativeSelect.Root>
@@ -772,9 +729,7 @@ export const TracesMapping = ({
                         onChange={(e) => {
                           setTraceMappingState((prev) => {
                             const targetMapping = e.target.value
-                              ? TRACE_MAPPINGS[
-                                  e.target.value as keyof typeof TRACE_MAPPINGS
-                                ]
+                              ? TRACE_MAPPINGS[e.target.value as keyof typeof TRACE_MAPPINGS]
                               : undefined;
 
                             const newExpansions = expansionsAfterMapping({
@@ -817,13 +772,11 @@ export const TracesMapping = ({
                           ))}
                         </optgroup>
                         <optgroup label="Current Thread">
-                          {["thread_id", "threads_until_current", "threads"].map(
-                            (key) => (
-                              <option key={key} value={key}>
-                                {TRACE_MAPPING_LABELS[key] ?? key}
-                              </option>
-                            ),
-                          )}
+                          {["thread_id", "threads_until_current", "threads"].map((key) => (
+                            <option key={key} value={key}>
+                              {TRACE_MAPPING_LABELS[key] ?? key}
+                            </option>
+                          ))}
                         </optgroup>
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
@@ -922,17 +875,13 @@ export const TracesMapping = ({
                           >
                             {/* "* (full object)" option - returns complete object for the selected key */}
                             <option value="">
-                              {source === "spans"
-                                ? "* (full span object)"
-                                : "* (full object)"}
+                              {source === "spans" ? "* (full span object)" : "* (full object)"}
                             </option>
-                            {subkeys.map(
-                              ({ key, label }: { key: string; label: string }) => (
-                                <option key={key} value={key}>
-                                  {label}
-                                </option>
-                              ),
-                            )}
+                            {subkeys.map(({ key, label }: { key: string; label: string }) => (
+                              <option key={key} value={key}>
+                                {label}
+                              </option>
+                            ))}
                           </NativeSelect.Field>
                           <NativeSelect.Indicator />
                         </NativeSelect.Root>
@@ -954,12 +903,10 @@ export const TracesMapping = ({
                         <MultiSelect
                           isMulti
                           options={THREAD_SUB_FIELD_OPTIONS}
-                          value={(mapping[targetField]?.selectedFields ?? []).map(
-                            (field) => ({
-                              label: `thread.traces.${field}`,
-                              value: field,
-                            }),
-                          )}
+                          value={(mapping[targetField]?.selectedFields ?? []).map((field) => ({
+                            label: `thread.traces.${field}`,
+                            value: field,
+                          }))}
                           onChange={(newValue) => {
                             setTraceMappingState((prev) => ({
                               ...prev,
@@ -1011,14 +958,9 @@ export const TracesMapping = ({
             <Field.Root width="full">
               <VStack align="start">
                 <Field.Label margin={0}>Expansions</Field.Label>
-                <Field.HelperText
-                  margin={0}
-                  fontSize="13px"
-                  marginBottom={2}
-                  maxWidth="600px"
-                >
-                  Normalize the dataset to duplicate the rows and have one entry per line
-                  instead of an array for the following mappings:
+                <Field.HelperText margin={0} fontSize="13px" marginBottom={2} maxWidth="600px">
+                  Normalize the dataset to duplicate the rows and have one entry per line instead of
+                  an array for the following mappings:
                 </Field.HelperText>
               </VStack>
             </Field.Root>
@@ -1035,9 +977,7 @@ export const TracesMapping = ({
                     setTraceMappingState((prev) => {
                       const newExpansions: Set<keyof typeof TRACE_EXPANSIONS> = isChecked
                         ? new Set([...prev.expansions, expansion])
-                        : new Set(
-                            Array.from(prev.expansions).filter((x) => x !== expansion),
-                          );
+                        : new Set(Array.from(prev.expansions).filter((x) => x !== expansion));
 
                       return {
                         ...prev,

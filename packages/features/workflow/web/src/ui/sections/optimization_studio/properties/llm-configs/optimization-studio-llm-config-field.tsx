@@ -38,11 +38,7 @@ export function OptimizationStudioLLMConfigField({
   showStructuredOutputs = false,
 }: OptimizationStudioLLMConfigFieldProps) {
   const model = llmConfig?.model ?? "";
-  const { modelOption, isEmpty } = useModelSelectionOptions(
-    allModelOptions,
-    model,
-    "chat",
-  );
+  const { modelOption, isEmpty } = useModelSelectionOptions(allModelOptions, model, "chat");
 
   const { hasCodeNodes } = useWorkflowStore((state) => ({
     hasCodeNodes: state.nodes.some((node) => node.type === "code"),

@@ -266,10 +266,7 @@ describe("Prompt Retrieval", () => {
 
         const result = await facade.get(`${testHandle}:production`);
 
-        expect(promptsApiService.get).toHaveBeenCalledWith(
-          `${testHandle}:production`,
-          undefined,
-        );
+        expect(promptsApiService.get).toHaveBeenCalledWith(`${testHandle}:production`, undefined);
         expect(result).toEqual(new Prompt(productionPrompt));
       });
     });

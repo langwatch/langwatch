@@ -71,9 +71,7 @@ export const AiErrorDetails: React.FC<{ error: AiActionError }> = ({ error }) =>
     {error.details?.httpStatus !== undefined && (
       <DetailRow label="Status" value={String(error.details.httpStatus)} />
     )}
-    {error.details?.provider && (
-      <DetailRow label="Provider" value={error.details.provider} />
-    )}
+    {error.details?.provider && <DetailRow label="Provider" value={error.details.provider} />}
     {error.details?.model && <DetailRow label="Model" value={error.details.model} />}
     {error.details?.reason && (
       <DetailRow label="Reason" value={safeProse(error.details.reason)} multiline />

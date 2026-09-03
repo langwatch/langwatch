@@ -25,8 +25,7 @@ import type { BatchComparisonColumn } from "@langwatch/experiment-web";
 import { WinRateChart } from "../win-rate-chart";
 
 vi.mock("recharts", () => {
-  const MockComponent = ({ children }: { children?: React.ReactNode }) =>
-    children ?? null;
+  const MockComponent = ({ children }: { children?: React.ReactNode }) => children ?? null;
   return {
     ResponsiveContainer: MockComponent,
     // Surfaces the chart's computed data (one entry per bar, in render
@@ -53,9 +52,7 @@ afterEach(() => {
   cleanup();
 });
 
-const createColumn = (
-  overrides: Partial<BatchComparisonColumn> = {},
-): BatchComparisonColumn => ({
+const createColumn = (overrides: Partial<BatchComparisonColumn> = {}): BatchComparisonColumn => ({
   evaluatorId: "comparison-1",
   name: "Comparison",
   variants: [
@@ -76,9 +73,7 @@ describe("WinRateChart", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByTestId("bar-chart-data").textContent).toBe(
-        "gpt-5-mini, gpt-4o, Tie",
-      );
+      expect(screen.getByTestId("bar-chart-data").textContent).toBe("gpt-5-mini, gpt-4o, Tie");
     });
   });
 

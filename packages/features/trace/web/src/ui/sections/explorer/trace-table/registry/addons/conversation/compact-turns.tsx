@@ -31,7 +31,10 @@ import { cellPropsFor } from "../../../trace-table-shell";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder";
 import { SELECT_COLUMN_ID } from "../../cells/select-cells";
 import { ConversationSummaryDetail } from "./conversation-summary";
-import { EXPANDED_BG, EXPANDED_BG_CSS } from "../../../../../../../model/explorer/trace-table/registry/addons/conversation/expanded-turn-styles";
+import {
+  EXPANDED_BG,
+  EXPANDED_BG_CSS,
+} from "../../../../../../../model/explorer/trace-table/registry/addons/conversation/expanded-turn-styles";
 import {
   formatGapSeconds,
   TURN_GAP_PAUSE_SECONDS,
@@ -60,9 +63,7 @@ export const CompactTurns: React.FC<CompactTurnsProps> = ({
   density,
   cells,
 }) => {
-  const { head, tail, hiddenCount, showMore, showAll, canShowMore } = useTurnsWindow(
-    group.traces,
-  );
+  const { head, tail, hiddenCount, showMore, showAll, canShowMore } = useTurnsWindow(group.traces);
 
   return (
     <>
@@ -139,8 +140,7 @@ const ConversationTurnRow: React.FC<ConversationTurnRowProps> = ({
   const { currentDrawer } = useDrawer();
   const params = useDrawerParams();
   const openTraceDrawer = useOpenTraceDrawer();
-  const selectedTraceId =
-    currentDrawer === "traceV2Details" ? (params.traceId ?? null) : null;
+  const selectedTraceId = currentDrawer === "traceV2Details" ? (params.traceId ?? null) : null;
   const isSelected = selectedTraceId === trace.traceId;
   const variant = rowVariantFor({ isSelected, status: trace.status });
   const rowStyle = ROW_STYLES[variant];
@@ -266,11 +266,7 @@ const StartedCell: React.FC<{ timestamp: number }> = ({ timestamp }) => {
   const format = useTimeFormatStore((s) => s.format);
   return (
     <MonoCell color="fg.subtle">
-      {format === "iso" ? (
-        formatISOTimestamp(timestamp)
-      ) : (
-        <RelativeTime timestamp={timestamp} />
-      )}
+      {format === "iso" ? formatISOTimestamp(timestamp) : <RelativeTime timestamp={timestamp} />}
     </MonoCell>
   );
 };

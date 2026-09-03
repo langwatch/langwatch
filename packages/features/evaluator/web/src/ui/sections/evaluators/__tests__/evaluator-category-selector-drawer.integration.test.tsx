@@ -27,10 +27,7 @@ vi.mock("../../../elements/evaluators/evaluator-type-selector-content", () => ({
   }) => (
     <div data-testid="mock-type-selector-content">
       type-content-for-{category}
-      <button
-        data-testid="mock-type-pick"
-        onClick={() => onSelect?.("langevals/exact_match")}
-      >
+      <button data-testid="mock-type-pick" onClick={() => onSelect?.("langevals/exact_match")}>
         pick
       </button>
     </div>
@@ -104,9 +101,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Choose Evaluator Category"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Choose Evaluator Category")).toBeInTheDocument();
       });
     });
 
@@ -146,8 +141,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       const workflowOption = screen.getByText("Custom (from Workflow)");
       // The code option must come first in document order.
       expect(
-        codeOption.compareDocumentPosition(workflowOption) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        codeOption.compareDocumentPosition(workflowOption) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 
@@ -156,9 +150,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Write a custom Python evaluator"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Write a custom Python evaluator")).toBeInTheDocument();
       });
       // Copy must not reference the workflow option a first-time user has no
       // context for. See dev/docs/best_practices/copywriting.md.
@@ -176,21 +168,16 @@ describe("EvaluatorCategorySelectorDrawer", () => {
         expect(screen.getByText("Expected Answer")).toBeInTheDocument();
       });
 
-      await user.click(
-        screen.getByTestId("evaluator-category-expected_answer"),
-      );
+      await user.click(screen.getByTestId("evaluator-category-expected_answer"));
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("mock-type-selector-content"),
-        ).toHaveTextContent("type-content-for-expected_answer");
+        expect(screen.getByTestId("mock-type-selector-content")).toHaveTextContent(
+          "type-content-for-expected_answer",
+        );
       });
       // Old behavior delegated to a second drawer via openDrawer — the unified
       // flow swaps views inline instead.
-      expect(mockOpenDrawer).not.toHaveBeenCalledWith(
-        "evaluatorTypeSelector",
-        expect.anything(),
-      );
+      expect(mockOpenDrawer).not.toHaveBeenCalledWith("evaluatorTypeSelector", expect.anything());
     });
 
     it("calls onSelectCategory when selecting a category", async () => {
@@ -216,9 +203,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       await user.click(backButton);
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Choose Evaluator Category"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Choose Evaluator Category")).toBeInTheDocument();
       });
     });
   });
@@ -243,9 +228,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       const user = userEvent.setup();
       renderDrawer();
 
-      await user.click(
-        screen.getByTestId("evaluator-category-expected_answer"),
-      );
+      await user.click(screen.getByTestId("evaluator-category-expected_answer"));
       await user.click(await screen.findByTestId("mock-type-pick"));
 
       await waitFor(() => {
@@ -254,10 +237,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
         expect(screen.getByTestId("mock-editor-heading")).toBeInTheDocument();
       });
       // Editor step must be hosted inline — no separate drawer opened.
-      expect(mockOpenDrawer).not.toHaveBeenCalledWith(
-        "evaluatorEditor",
-        expect.anything(),
-      );
+      expect(mockOpenDrawer).not.toHaveBeenCalledWith("evaluatorEditor", expect.anything());
     });
   });
 
@@ -276,9 +256,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       // Drill into the type step
       await user.click(screen.getByTestId("evaluator-category-safety"));
       await waitFor(() => {
-        expect(
-          screen.getByTestId("mock-type-selector-content"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("mock-type-selector-content")).toBeInTheDocument();
       });
 
       // Close the drawer
@@ -301,9 +279,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       );
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Choose Evaluator Category"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Choose Evaluator Category")).toBeInTheDocument();
       });
     });
   });

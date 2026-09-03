@@ -115,11 +115,7 @@ export class ApiKeysApiService {
     };
   }
 
-  private async request<T>(
-    operation: string,
-    path: string,
-    init?: RequestInit,
-  ): Promise<T> {
+  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
       headers: { ...this.headers(), ...(init?.headers ?? {}) },
@@ -148,10 +144,7 @@ export class ApiKeysApiService {
   }
 
   async list(): Promise<ApiKeyInfo[]> {
-    const { data } = await this.request<{ data: ApiKeyInfo[] }>(
-      "list API keys",
-      "/api/api-keys",
-    );
+    const { data } = await this.request<{ data: ApiKeyInfo[] }>("list API keys", "/api/api-keys");
     return data;
   }
 
@@ -169,13 +162,7 @@ export class ApiKeysApiService {
     });
   }
 
-  async update({
-    id,
-    input,
-  }: {
-    id: string;
-    input: UpdateApiKeyInput;
-  }): Promise<ApiKeyDetail> {
+  async update({ id, input }: { id: string; input: UpdateApiKeyInput }): Promise<ApiKeyDetail> {
     return this.request<ApiKeyDetail>(
       `update API key "${id}"`,
       `/api/api-keys/${encodeURIComponent(id)}`,

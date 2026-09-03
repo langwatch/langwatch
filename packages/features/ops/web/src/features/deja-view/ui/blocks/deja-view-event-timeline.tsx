@@ -24,10 +24,7 @@ export function EventTimeline({
       const containerRect = container.getBoundingClientRect();
       const elementRect = element.getBoundingClientRect();
 
-      if (
-        elementRect.left < containerRect.left ||
-        elementRect.right > containerRect.right
-      ) {
+      if (elementRect.left < containerRect.left || elementRect.right > containerRect.right) {
         element.scrollIntoView({
           behavior: "smooth",
           block: "nearest",
@@ -39,13 +36,7 @@ export function EventTimeline({
 
   return (
     <Box borderTop="1px solid" borderTopColor="border" bg="bg.subtle" flexShrink={0}>
-      <HStack
-        paddingX={3}
-        paddingY={1}
-        gap={2}
-        borderBottom="1px solid"
-        borderBottomColor="border"
-      >
+      <HStack paddingX={3} paddingY={1} gap={2} borderBottom="1px solid" borderBottomColor="border">
         <Text textStyle="xs" color="fg.muted" fontWeight="medium" flexShrink={0}>
           Timeline
         </Text>

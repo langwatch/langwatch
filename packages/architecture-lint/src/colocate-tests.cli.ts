@@ -51,7 +51,9 @@ if (!write) {
 
 for (const move of plan.moves) {
   mkdirSync(dirname(move.to), { recursive: true });
-  execFileSync("git", ["-C", root, "mv", move.from, move.to], { stdio: ["ignore", "ignore", "pipe"] });
+  execFileSync("git", ["-C", root, "mv", move.from, move.to], {
+    stdio: ["ignore", "ignore", "pipe"],
+  });
   const edited = plan.edits.get(move.from);
   if (edited !== undefined) writeFileSync(move.to, edited);
 }

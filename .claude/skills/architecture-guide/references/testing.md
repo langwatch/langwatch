@@ -28,7 +28,9 @@ from the user's side, never config values (`job fails without retry`, not
 describe("given a stored secret", () => {
   describe("when the caller reads it", () => {
     /** @scenario "Secret values never leave the boundary" */
-    it("returns metadata without the value", async () => { /* … */ });
+    it("returns metadata without the value", async () => {
+      /* … */
+    });
   });
 });
 ```
@@ -75,19 +77,19 @@ take a machine-wide slot; from an agent shell prefer the scoped forms.
 
 ## Guards by name
 
-| Rule                                          | Source                                                    | Catches                                                   |
-| --------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------- |
-| `feature-source-layout`, `-filename`, `-subject` | `architecture-lint/src/feature-layout.ts`             | wrong folder, wrong dot/hyphen, another feature's subject |
-| `prisma-containment`                          | `prisma-boundaries.ts`                                    | Prisma outside `repositories/prisma` / postgres adapter   |
-| `typed-prisma-seam`                           | `typed-prisma-seam.ts`                                    | `as PrismaClient`, `database: object`                     |
-| `private-runtime-export`                      | `feature-layout.ts`                                       | index re-exporting repositories/stores/projections        |
-| `strict-port-module`                          | `port-modules.ts`                                         | a port that is not an abstract `*Port` class              |
-| `api-transport-*`                             | `api-transport-boundaries.ts`                             | service locator, self-constructed services, imports       |
-| `ui-web-public-entry`, `ui-screen-closure`, `ui-dependency-direction`, `ui-root-catch-all` | `frontend-ui-boundaries.ts` | web layer and entry violations                  |
-| `cross-feature`, `package-cycle`, `enterprise-*` | `application-boundaries.ts`, `cycles.ts`               | wrong direction, cycles, enterprise leaks                 |
-| frontend-boundary test                        | `architecture-lint/tests/frontend-boundary.unit.test.ts`  | a server value-import reaching a browser package          |
-| `check-feature-parity`                        | `architecture-lint/src/check-feature-parity.ts`           | unbound or inert scenarios, unknown annotations           |
-| `overengineering-audit` (skill)               | `.claude/skills/overengineering-audit`                    | one-implementation ports, pass-through layers             |
+| Rule                                                                                       | Source                                                   | Catches                                                   |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------- | --------------------------------------------------------- |
+| `feature-source-layout`, `-filename`, `-subject`                                           | `architecture-lint/src/feature-layout.ts`                | wrong folder, wrong dot/hyphen, another feature's subject |
+| `prisma-containment`                                                                       | `prisma-boundaries.ts`                                   | Prisma outside `repositories/prisma` / postgres adapter   |
+| `typed-prisma-seam`                                                                        | `typed-prisma-seam.ts`                                   | `as PrismaClient`, `database: object`                     |
+| `private-runtime-export`                                                                   | `feature-layout.ts`                                      | index re-exporting repositories/stores/projections        |
+| `strict-port-module`                                                                       | `port-modules.ts`                                        | a port that is not an abstract `*Port` class              |
+| `api-transport-*`                                                                          | `api-transport-boundaries.ts`                            | service locator, self-constructed services, imports       |
+| `ui-web-public-entry`, `ui-screen-closure`, `ui-dependency-direction`, `ui-root-catch-all` | `frontend-ui-boundaries.ts`                              | web layer and entry violations                            |
+| `cross-feature`, `package-cycle`, `enterprise-*`                                           | `application-boundaries.ts`, `cycles.ts`                 | wrong direction, cycles, enterprise leaks                 |
+| frontend-boundary test                                                                     | `architecture-lint/tests/frontend-boundary.unit.test.ts` | a server value-import reaching a browser package          |
+| `check-feature-parity`                                                                     | `architecture-lint/src/check-feature-parity.ts`          | unbound or inert scenarios, unknown annotations           |
+| `overengineering-audit` (skill)                                                            | `.claude/skills/overengineering-audit`                   | one-implementation ports, pass-through layers             |
 
 Baselines (`*-baseline.json` in `packages/architecture-lint/src`) record pre-existing
 violations and may only shrink. A new violation in a file you touched is yours to fix,

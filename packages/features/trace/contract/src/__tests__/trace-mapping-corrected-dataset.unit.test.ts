@@ -6,10 +6,7 @@
  * expected output. The captured trace is untouched and still identifies the row.
  */
 import { describe, expect, it } from "vitest";
-import {
-  extractTracesFields,
-  mapTraceToDatasetEntry,
-} from "../trace-mapping";
+import { extractTracesFields, mapTraceToDatasetEntry } from "../trace-mapping";
 import type { Trace } from "../trace-format.schemas";
 import { applyOverlayToTrace } from "../trace-edit-overlay-apply";
 import type { TraceEditOverlayPatch } from "../trace-edit-overlay.contract";

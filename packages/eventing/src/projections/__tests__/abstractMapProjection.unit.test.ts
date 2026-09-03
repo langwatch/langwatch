@@ -75,10 +75,7 @@ describe("AbstractMapProjection", () => {
   describe("eventTypes", () => {
     it("derives event types from schemas", () => {
       const projection = new TestMapProjection(mockStore);
-      expect(projection.eventTypes).toEqual([
-        "lw.test.foo_happened",
-        "lw.test.bar_happened",
-      ]);
+      expect(projection.eventTypes).toEqual(["lw.test.foo_happened", "lw.test.bar_happened"]);
     });
   });
 
@@ -91,9 +88,7 @@ describe("AbstractMapProjection", () => {
 
     it("dispatches to bar handler", () => {
       const projection = new TestMapProjection(mockStore);
-      const result = projection.map(
-        makeEvent("lw.test.bar_happened", { label: "hello" }),
-      );
+      const result = projection.map(makeEvent("lw.test.bar_happened", { label: "hello" }));
       expect(result).toEqual({ id: "bar-hello", payload: "lbl:hello" });
     });
 

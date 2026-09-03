@@ -44,13 +44,9 @@ export class GovernanceEventDeliveryProcess {
     };
   }
 
-  static budgetCrossingEnvelope(
-    data: GovernanceBudgetCrossingData,
-  ): GovernanceWebhookEnvelope {
+  static budgetCrossingEnvelope(data: GovernanceBudgetCrossingData): GovernanceWebhookEnvelope {
     const type =
-      data.kind === "breached"
-        ? "gateway.budget.breached"
-        : "gateway.budget.threshold_crossed";
+      data.kind === "breached" ? "gateway.budget.breached" : "gateway.budget.threshold_crossed";
     const id = `${data.budget_id}:${data.bucket_scope_id}:${data.kind}:${data.period_started_at_ms}`;
     return {
       id,

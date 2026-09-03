@@ -43,9 +43,9 @@ curl -X PATCH https://app.langwatch.ai/api/projects/<project_id> \
 ```
 
 <Warning>
-  Moving a project changes its access boundary. Members who had access through the source
-  team will lose inherited access, while members of the destination team will gain it.
-  Project-level access overrides are preserved.
+  Moving a project changes its access boundary. Members who had access through the source team will
+  lose inherited access, while members of the destination team will gain it. Project-level access
+  overrides are preserved.
 </Warning>
 
 ## Typical Flow
@@ -61,6 +61,6 @@ LANGWATCH_PROJECT_ID=<project id>
 ```
 
 <Info>
-  The `serviceApiKey` is shown only once in the create response. Store it securely — you
-  cannot retrieve it later.
+  The `serviceApiKey` is shown only once in the create response. Store it securely — you cannot
+  retrieve it later.
 </Info>

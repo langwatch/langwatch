@@ -80,19 +80,14 @@ describe("normalizeParameterSchema", () => {
     /** @scenario "More than twenty parameters are refused" */
     it("refuses with agent_parameter_invalid", () => {
       const properties = Object.fromEntries(
-        Array.from({ length: 21 }, (_, index) => [
-          `param_${index}`,
-          { type: "string" },
-        ]),
+        Array.from({ length: 21 }, (_, index) => [`param_${index}`, { type: "string" }]),
       );
       expect(() => normalizeParameterSchema({ properties })).toThrow(
         expect.objectContaining({ code: "agent_parameter_invalid" }),
       );
       expect(
         normalizeParameterSchema({
-          properties: Object.fromEntries(
-            Object.entries(properties).slice(0, 20),
-          ),
+          properties: Object.fromEntries(Object.entries(properties).slice(0, 20)),
         }).parameters,
       ).toHaveLength(20);
     });
@@ -110,9 +105,7 @@ describe("normalizeParameterSchema", () => {
         },
       });
       expect(parameters[0]?.options).toHaveLength(50);
-      expect(notes).toEqual([
-        '"voice": the option list was cut to the first 50 of 60 values',
-      ]);
+      expect(notes).toEqual(['"voice": the option list was cut to the first 50 of 60 values']);
     });
   });
 

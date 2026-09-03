@@ -47,8 +47,8 @@ export function ParkedTenantsSection({
           )}
         </HStack>
         <Text textStyle="xs" color="fg.muted" marginTop={1}>
-          These tenants are at their in-flight capacity limit. Their work is waiting its
-          turn so other tenants keep moving — nothing has failed.
+          These tenants are at their in-flight capacity limit. Their work is waiting its turn so
+          other tenants keep moving — nothing has failed.
         </Text>
       </Box>
       <Table.ScrollArea>
@@ -112,9 +112,7 @@ function ParkedTenantRow({
               to the drill-down behind a mouse. */}
           <IconButton
             aria-label={
-              open
-                ? `Hide parked groups for ${tenantId}`
-                : `Show parked groups for ${tenantId}`
+              open ? `Hide parked groups for ${tenantId}` : `Show parked groups for ${tenantId}`
             }
             aria-expanded={open}
             aria-controls={panelId}

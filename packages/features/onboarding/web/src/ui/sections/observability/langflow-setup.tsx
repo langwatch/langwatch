@@ -103,14 +103,10 @@ langwatch.get_current_trace().update(
         <Text textStyle="sm" color="fg.muted">
           Restart Langflow using:
         </Text>
-        <CodePreview
-          code="langflow run --env-file .env"
-          filename="terminal"
-          codeLanguage="bash"
-        />
+        <CodePreview code="langflow run --env-file .env" filename="terminal" codeLanguage="bash" />
         <Text textStyle="sm" color="fg.muted">
-          Run a message through your Langflow project and check the LangWatch dashboard
-          for monitoring and observability.
+          Run a message through your Langflow project and check the LangWatch dashboard for
+          monitoring and observability.
         </Text>
       </VStack>
 
@@ -142,11 +138,7 @@ langwatch.get_current_trace().update(
                   <Text fontSize="sm" color="fg.muted">
                     {item.description}
                   </Text>
-                  <CodePreview
-                    code={item.code}
-                    filename={item.filename}
-                    codeLanguage="python"
-                  />
+                  <CodePreview code={item.code} filename={item.filename} codeLanguage="python" />
                   {item.instructions && (
                     <VStack align="stretch" gap={1}>
                       <Text fontSize="sm" fontWeight="medium">

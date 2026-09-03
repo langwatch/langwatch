@@ -34,9 +34,7 @@ describe("resolveCurrentComparisonPlan()", () => {
     });
 
     it('returns "free" when free flag is true regardless of type', () => {
-      expect(resolveCurrentComparisonPlan({ type: "SOMETHING", free: true })).toBe(
-        "free",
-      );
+      expect(resolveCurrentComparisonPlan({ type: "SOMETHING", free: true })).toBe("free");
     });
   });
 
@@ -50,27 +48,19 @@ describe("resolveCurrentComparisonPlan()", () => {
     });
 
     it('returns "growth" for GROWTH_SEAT_EUR_MONTHLY variant', () => {
-      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_EUR_MONTHLY" })).toBe(
-        "growth",
-      );
+      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_EUR_MONTHLY" })).toBe("growth");
     });
 
     it('returns "growth" for GROWTH_SEAT_EUR_ANNUAL variant', () => {
-      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_EUR_ANNUAL" })).toBe(
-        "growth",
-      );
+      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_EUR_ANNUAL" })).toBe("growth");
     });
 
     it('returns "growth" for GROWTH_SEAT_USD_MONTHLY variant', () => {
-      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_USD_MONTHLY" })).toBe(
-        "growth",
-      );
+      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_USD_MONTHLY" })).toBe("growth");
     });
 
     it('returns "growth" for GROWTH_SEAT_USD_ANNUAL variant', () => {
-      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_USD_ANNUAL" })).toBe(
-        "growth",
-      );
+      expect(resolveCurrentComparisonPlan({ type: "GROWTH_SEAT_USD_ANNUAL" })).toBe("growth");
     });
   });
 
@@ -91,15 +81,11 @@ describe("resolveCurrentComparisonPlan()", () => {
       // The open-source baseline is flagged `free` but is not the Cloud Free
       // tier and is not capped like one. Marking that column current would
       // present its two-seat, fifty-thousand-event numbers as the deployment's.
-      expect(
-        resolveCurrentComparisonPlan({ type: "OPEN_SOURCE", free: true }),
-      ).toBeNull();
+      expect(resolveCurrentComparisonPlan({ type: "OPEN_SOURCE", free: true })).toBeNull();
     });
 
     it("is not fooled by casing", () => {
-      expect(
-        resolveCurrentComparisonPlan({ type: "open_source", free: true }),
-      ).toBeNull();
+      expect(resolveCurrentComparisonPlan({ type: "open_source", free: true })).toBeNull();
     });
   });
 

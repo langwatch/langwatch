@@ -19,8 +19,7 @@ export class QuarantineFillEvaluatorService {
     private readonly traceActivity: QuarantineTraceActivityPort | undefined,
     private readonly diagnostics: GovernanceDiagnosticsPort,
     private readonly now: () => number,
-  ) {
-  }
+  ) {}
 
   static create(options: {
     tenant: QuarantineTenantPort;

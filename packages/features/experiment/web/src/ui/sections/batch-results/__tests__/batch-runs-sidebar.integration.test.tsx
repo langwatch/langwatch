@@ -14,10 +14,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  type BatchRunSummary,
-  BatchRunsSidebar,
-} from "../batch-runs-sidebar";
+import { type BatchRunSummary, BatchRunsSidebar } from "../batch-runs-sidebar";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -33,9 +30,7 @@ const createRun = ({
   commitMessage?: string;
 }): BatchRunSummary => ({
   runId,
-  workflowVersion: commitMessage
-    ? { id: `wv-${runId}`, version: "1", commitMessage }
-    : null,
+  workflowVersion: commitMessage ? { id: `wv-${runId}`, version: "1", commitMessage } : null,
   timestamps: {
     createdAt,
     finishedAt: createdAt + 10_000,
@@ -149,9 +144,7 @@ describe("BatchRunsSidebar", () => {
   });
 
   describe("when a run has no commit message", () => {
-    const runs = [
-      createRun({ runId: "snobbish-otter-1f2a3b9c4d", createdAt: 1_000_000 }),
-    ];
+    const runs = [createRun({ runId: "snobbish-otter-1f2a3b9c4d", createdAt: 1_000_000 })];
 
     /** @scenario A run without a commit message shows index then a middle-dot separator */
     it("renders 'Run #N · runId' with a middle-dot separator and no parentheses", () => {

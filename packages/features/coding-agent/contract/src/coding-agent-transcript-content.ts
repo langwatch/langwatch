@@ -1,8 +1,5 @@
 import { isReplyTextPart } from "@langwatch/trace-contract";
-import {
-  isInjectedContextOnly,
-  systemReminderText,
-} from "./coding-agent-transcript-context";
+import { isInjectedContextOnly, systemReminderText } from "./coding-agent-transcript-context";
 
 const RECOVERED_REPLY_MATCH_CHARS = 200;
 
@@ -41,8 +38,7 @@ export function extractedSystemText(input: string | null | undefined): string | 
 
   for (const message of messages) {
     const candidate = message as { role?: unknown; content?: unknown } | null;
-    if (typeof candidate?.content !== "string" || candidate.content.length === 0)
-      continue;
+    if (typeof candidate?.content !== "string" || candidate.content.length === 0) continue;
 
     if (candidate.role === "system") {
       parts.push(candidate.content);
@@ -82,10 +78,7 @@ export function parsedChatMessages(input: string | null | undefined): unknown[] 
   return wrapper.value;
 }
 
-export function isSameRecoveredReply(
-  candidate: string,
-  previous: string | null,
-): boolean {
+export function isSameRecoveredReply(candidate: string, previous: string | null): boolean {
   if (previous === null) return false;
   if (candidate === previous) return true;
 

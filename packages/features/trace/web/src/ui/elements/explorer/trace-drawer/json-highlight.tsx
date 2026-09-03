@@ -72,10 +72,7 @@ export function safePrettyJson(content: string): string {
  * marked when its own key matches a pinned path *or* any of its object
  * ancestors does — pinning a parent visually hits the whole subtree.
  */
-function computeHighlightLines(
-  lines: string[],
-  pinnedKeys: ReadonlySet<string>,
-): number[] {
+function computeHighlightLines(lines: string[], pinnedKeys: ReadonlySet<string>): number[] {
   const path: string[] = [];
   const out: number[] = [];
   for (let i = 0; i < lines.length; i++) {

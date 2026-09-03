@@ -13,11 +13,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { ScimSyncGuards } from "../scim-sync-guards";
 import type { ZodTypeAny, z } from "zod";
-import {
-  type Command,
-  type CommandHandler,
-  defineCommandSchema,
-} from "@langwatch/eventing";
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { scimSyncEventsFor } from "../projections/scim-sync-state.projection";
 import type { ScimSyncEvent } from "../projections/scim-sync-state.projection";
 
@@ -32,9 +28,7 @@ import type { ScimSyncEvent } from "../projections/scim-sync-state.projection";
  */
 
 type GuardVerb = {
-  [K in keyof ScimSyncGuards]: ScimSyncGuards[K] extends (
-    data: never,
-  ) => Promise<unknown>
+  [K in keyof ScimSyncGuards]: ScimSyncGuards[K] extends (data: never) => Promise<unknown>
     ? K
     : never;
 }[keyof ScimSyncGuards];
@@ -51,9 +45,7 @@ function scimSyncCommand<Schema extends ZodTypeAny>({
   verb: GuardVerb;
 }) {
   type Data = z.infer<Schema>;
-  return class ScimSyncCommandHandler
-    implements CommandHandler<Command<Data>, ScimSyncEvent>
-  {
+  return class ScimSyncCommandHandler implements CommandHandler<Command<Data>, ScimSyncEvent> {
     static readonly schema = defineCommandSchema(type, schema, description);
 
     /** The SYNC is the aggregate — never the organization. One connection's
@@ -67,9 +59,7 @@ function scimSyncCommand<Schema extends ZodTypeAny>({
 
     async handle(command: Command<Data>): Promise<ScimSyncEvent[]> {
       const data = command.data as never;
-      const facts = await (
-        this.guards[verb] as (input: never) => Promise<never[]>
-      )(data);
+      const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
       return scimSyncEventsFor({
         command: { type, data } as ScimSyncCommand,
         facts,
@@ -102,8 +92,7 @@ export const RecordScimGroupMappingCommand = scimSyncCommand({
 export const RecordScimApplyFailureCommand = scimSyncCommand({
   type: RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
   schema: recordScimApplyFailureCommandDataSchema,
-  description:
-    "Record a directory apply that failed, and retire it if it never can succeed",
+  description: "Record a directory apply that failed, and retire it if it never can succeed",
   verb: "recordScimApplyFailure",
 });
 

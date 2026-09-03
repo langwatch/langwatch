@@ -93,10 +93,9 @@ const HEAVY_FIXTURE: ComparisonRunData[] = [
 ];
 
 const renderHeavyComparison = () => {
-  const result = render(
-    <ComparisonCharts comparisonData={HEAVY_FIXTURE} isVisible={true} />,
-    { wrapper: Wrapper },
-  );
+  const result = render(<ComparisonCharts comparisonData={HEAVY_FIXTURE} isVisible={true} />, {
+    wrapper: Wrapper,
+  });
   const chartsRoot = result.container.firstElementChild;
   if (!chartsRoot) {
     throw new Error("ComparisonCharts rendered nothing");

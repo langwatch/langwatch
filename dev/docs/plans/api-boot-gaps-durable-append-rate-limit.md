@@ -68,11 +68,11 @@ precisely the outcome `CLAUDE.md` calls a bug in the feature.
 `apps/api/src/platform/infrastructure/api-eventing.infrastructure.ts:90-102`
 makes three decisions in one object literal:
 
-| Decision | Line | What it governs |
-| --- | --- | --- |
-| `eventStore: EventStoreProducerOnly.create(...)` | `:93` | whether this process can **append** |
-| `processManagerMode: "producer-only"` | `:94` | whether it **runs** inboxes, outboxes and wakes |
-| `consumersEnabled: false` | `:99` | whether it **claims** `event-sourcing/jobs` |
+| Decision                                         | Line  | What it governs                                 |
+| ------------------------------------------------ | ----- | ----------------------------------------------- |
+| `eventStore: EventStoreProducerOnly.create(...)` | `:93` | whether this process can **append**             |
+| `processManagerMode: "producer-only"`            | `:94` | whether it **runs** inboxes, outboxes and wakes |
+| `consumersEnabled: false`                        | `:99` | whether it **claims** `event-sourcing/jobs`     |
 
 They read as one property, and the docblock (`:35-67`) states it three times
 over. They are independent: `processManagerMode` is read only at
@@ -83,7 +83,7 @@ be a pure producer.
 Missing on `apps/api`, precisely:
 
 1. **A `retention` config leaf.** `grep -i retention
-   apps/api/src/platform/config/api.config.ts` returns zero hits.
+apps/api/src/platform/config/api.config.ts` returns zero hits.
    `EventingClickHouseEventStore.create` requires an
    `EventingRetentionConfiguration`
    (`packages/eventing/src/server/adapters/clickhouse/event-store.clickhouse.ts:36-39`).
@@ -102,7 +102,7 @@ durable event log is **ClickHouse**, not Postgres — `event_log`, written by
 ClickHouse resolver (`api-clickhouse.infrastructure.ts:206-207`) that
 structurally satisfies `EventingClickHouseClientResolver`, and already declares
 `@langwatch/eventing` (`apps/api/package.json:93`) whose `./server` subpath is
-unconditional. A lease and a process store belong to process-manager *running*,
+unconditional. A lease and a process store belong to process-manager _running_,
 which producer-only correctly keeps off this process.
 
 ### Does the worker own the durable half? Yes
@@ -125,8 +125,8 @@ correctly. It is one ledger that never received a correction the others did.
 
 ### The actual defect: an unmigrated ledger, not a missing collaborator
 
-ADR-101 pinned the original order — *"durable append to ClickHouse first
-(waited), the command staged onto the per-user GroupQueue second"*
+ADR-101 pinned the original order — _"durable append to ClickHouse first
+(waited), the command staged onto the per-user GroupQueue second"_
 (`dev/docs/adr/101-identity-pipeline-and-identifiers.md:105`).
 
 ADR-110 corrected it, and ADR-116 records the correction
@@ -182,8 +182,8 @@ sole appender, exactly as it already is for identity and grants.
 
 The four tRPC verbs sit behind the `join_requests` feature flag, whose
 `defaultValue` is `false`
-(`packages/features/feature-flag/contract/src/feature-flag.ts:384-388`): *"no
-join command is ever dispatched. This is the whole of the rollback."* No
+(`packages/features/feature-flag/contract/src/feature-flag.ts:384-388`): _"no
+join command is ever dispatched. This is the whole of the rollback."_ No
 `JOIN_REQUESTS` appears anywhere in `charts/`. The two invitation side-effects
 (`resolveByInvitation`, `withdrawOnInvitationAccepted`) both short-circuit on
 `if (!open) return;`
@@ -219,8 +219,8 @@ The one test covering this path,
 asserts "Leg one: the durable append" and passes — because its `producerEventing()`
 helper composes `EventStoreMemory.createForTesting()` (`:793`), not
 `EventStoreProducerOnly`. That is precisely the substitution
-`eventStoreProducerOnly.ts:29-31` warns about: *"a memory store in the same seat
-would ACCEPT that append, hold the event in one process's heap, and lose it"*.
+`eventStoreProducerOnly.ts:29-31` warns about: _"a memory store in the same seat
+would ACCEPT that append, hold the event in one process's heap, and lose it"_.
 The helper is named for the production shape and does not have it.
 
 There is **no** unit test for `JoinRequestLedgerWriter` anywhere.
@@ -229,12 +229,12 @@ There is **no** unit test for `JoinRequestLedgerWriter` anywhere.
 
 Finish ADR-110 for join requests. Make the queued run the sole appender.
 
-| File | Change | Size |
-| --- | --- | --- |
-| `packages/features/identity/server/src/adapters/join-request-ledger.adapter.ts` | Delete the `eventStore` dep, its resolver and the `storeEvents` call; `commit` becomes `stage` then `awaitFold`. `events` is still computed locally by `joinRequestEventsFor`, so the return contract is unchanged | ~25 lines removed |
-| `apps/api/src/app/api-identity-pipelines.composition.ts` | Delete `withoutDurableAppend` and its logger leg; the absence no longer exists | ~15 lines removed |
-| `apps/api/src/app/__tests__/api-trpc-collaborators.identity.composition.integration.test.ts` | Re-point "leg one" at the staged command; compose `EventStoreProducerOnly` rather than the memory store, so the test has the production shape | ~20 lines |
-| new: `packages/features/identity/server/src/adapters/__tests__/join-request-ledger.adapter.unit.test.ts` | The ledger has no unit test; the stage-only contract deserves one | ~80 lines |
+| File                                                                                                     | Change                                                                                                                                                                                                             | Size              |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- |
+| `packages/features/identity/server/src/adapters/join-request-ledger.adapter.ts`                          | Delete the `eventStore` dep, its resolver and the `storeEvents` call; `commit` becomes `stage` then `awaitFold`. `events` is still computed locally by `joinRequestEventsFor`, so the return contract is unchanged | ~25 lines removed |
+| `apps/api/src/app/api-identity-pipelines.composition.ts`                                                 | Delete `withoutDurableAppend` and its logger leg; the absence no longer exists                                                                                                                                     | ~15 lines removed |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.identity.composition.integration.test.ts`             | Re-point "leg one" at the staged command; compose `EventStoreProducerOnly` rather than the memory store, so the test has the production shape                                                                      | ~20 lines         |
+| new: `packages/features/identity/server/src/adapters/__tests__/join-request-ledger.adapter.unit.test.ts` | The ledger has no unit test; the stage-only contract deserves one                                                                                                                                                  | ~80 lines         |
 
 Roughly **half a day**, one package and one application, no config leaf, no new
 collaborator, no doctrine change. It also deletes a double-append that would
@@ -253,7 +253,7 @@ run the sole appender applies a decision that is already made, in an accepted
 ADR, and already applied to the two sibling ledgers.
 
 The ledger's own suggested closure — compose `EventingClickHouseEventStore` on
-`apps/api` — *is* a product decision, and it is the wrong one: it contradicts the
+`apps/api` — _is_ a product decision, and it is the wrong one: it contradicts the
 producer-only property stated three times in `api-eventing.infrastructure.ts`,
 needs a config leaf and a thunked resolver, and reintroduces the double-append
 ADR-110 removed. Recommend against.
@@ -308,19 +308,19 @@ faithful port of the platform's `server/rateLimit.ts` — same
 (`:102-121`), same 1000-entry memory GC, with the Redis connection injected
 rather than pulled from a global. One instance is built at
 `api-production.composition.ts:619` over the queue's Redis, deliberately:
-*"two limiter instances would give a caller two budgets for one rule."* It is
+_"two limiter instances would give a caller two budgets for one rule."_ It is
 fanned out to roughly fifteen call sites.
 
 The product is not unprotected. Verified limits in force today:
 
-| Surface | Limits | Cite |
-| --- | --- | --- |
-| Sign-in, sign-up, password reset, passkey register | 100/min default; 30 per 15 min on `/sign-in/email`; 50/hr sign-up; 5/hr reset; 50/hr passkey — Redis-backed when available | `packages/features/auth/server/src/transport/better-auth/better-auth.api.ts:423-450`, `:772-775` |
-| RUM ingest | 6000/min global, then 120/min per caller — global bucket checked **first** so a flood cannot mint a Redis key per request | `apps/api/src/features/rum/rum-ingest.service.ts:264-289` |
-| Hosted-MCP OAuth | 30/min register, 30/min token, 20/min auth-fail, per IP | `packages/features/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts:245-253` |
-| Stored-object / files REST | per-caller fixed window | `apps/api/src/app-rest/app-rest.packaged-families.ts:474`, `:660` |
-| Invite send, join-request ask | per-invitation and per-person windows | `api-organization-invites.composition.ts:205`; `api-trpc-collaborators.identity.composition.ts:1005`, `:1135` |
-| Governance ingest | 60/min per IP, key `lwingest:rate:` kept from the platform | `apps/api/src/features/enterprise/governance-ingest-rest.mount.ts:82` |
+| Surface                                            | Limits                                                                                                                     | Cite                                                                                                          |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Sign-in, sign-up, password reset, passkey register | 100/min default; 30 per 15 min on `/sign-in/email`; 50/hr sign-up; 5/hr reset; 50/hr passkey — Redis-backed when available | `packages/features/auth/server/src/transport/better-auth/better-auth.api.ts:423-450`, `:772-775`              |
+| RUM ingest                                         | 6000/min global, then 120/min per caller — global bucket checked **first** so a flood cannot mint a Redis key per request  | `apps/api/src/features/rum/rum-ingest.service.ts:264-289`                                                     |
+| Hosted-MCP OAuth                                   | 30/min register, 30/min token, 20/min auth-fail, per IP                                                                    | `packages/features/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts:245-253`                         |
+| Stored-object / files REST                         | per-caller fixed window                                                                                                    | `apps/api/src/app-rest/app-rest.packaged-families.ts:474`, `:660`                                             |
+| Invite send, join-request ask                      | per-invitation and per-person windows                                                                                      | `api-organization-invites.composition.ts:205`; `api-trpc-collaborators.identity.composition.ts:1005`, `:1135` |
+| Governance ingest                                  | 60/min per IP, key `lwingest:rate:` kept from the platform                                                                 | `apps/api/src/features/enterprise/governance-ingest-rest.mount.ts:82`                                         |
 
 The RUM one is the best-reasoned limiter in the tree and is the model for
 anything closed here.
@@ -345,8 +345,8 @@ enforces both and raises `ShareReadRateLimitedError`, a real `HandledError` with
 code `share_read_rate_limited` registered at
 `packages/handled-error/src/app-codes.ts:392` and customer copy at
 `presentation.ts:2244` ("This shared trace is busy right now"). The endpoint's
-own docblock says the numbers are *"tight enough that the endpoint is not a
-cheap way to drive repeated ClickHouse fan-out from outside."*
+own docblock says the numbers are _"tight enough that the endpoint is not a
+cheap way to drive repeated ClickHouse fan-out from outside."_
 
 That refusal can never fire, and it is a clean regression. The platform composed
 the real counter in the same ports object —
@@ -507,11 +507,11 @@ Two changes, in this order, and only the first is a lane's work.
 
 **1. Wire the share-link counter.** This is the whole of it:
 
-| File | Change | Size |
-| --- | --- | --- |
-| `apps/api/src/app/api-trpc-collaborators.trace-group.composition.ts` | Take a `rateLimit` option; replace the always-allow stub with it | ~6 lines |
-| `apps/api/src/app/api-production.composition.ts` | Pass `rateLimit: (input) => this.rateLimiter.consume(input)` into `composeApiTraceGroupCollaborators` at `:2771`, exactly as `composeUnsubscribe` already does at `:2125` | ~3 lines |
-| new: a test over `enforceShareReadLimit` | There is none anywhere; the limit has zero coverage, which is how a stub passed CI | ~60 lines |
+| File                                                                 | Change                                                                                                                                                                    | Size      |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `apps/api/src/app/api-trpc-collaborators.trace-group.composition.ts` | Take a `rateLimit` option; replace the always-allow stub with it                                                                                                          | ~6 lines  |
+| `apps/api/src/app/api-production.composition.ts`                     | Pass `rateLimit: (input) => this.rateLimiter.consume(input)` into `composeApiTraceGroupCollaborators` at `:2771`, exactly as `composeUnsubscribe` already does at `:2125` | ~3 lines  |
+| new: a test over `enforceShareReadLimit`                             | There is none anywhere; the limit has zero coverage, which is how a stub passed CI                                                                                        | ~60 lines |
 
 An hour or two. No new package, no config, no decision — the counter is three
 files away and the per-token and per-IP keys are already chosen.
@@ -556,14 +556,13 @@ and that should be checked before treating the share-link path as fully exposed.
 
 ## What changed against the ledger
 
-| Row | Ledger said | This audit says |
-| --- | --- | --- |
+| Row                    | Ledger said                                                                         | This audit says                                                                                                                                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `withoutDurableAppend` | REAL GAP; blocker is a missing `retention` leaf; close by composing a durable store | REAL GAP, but the repair is the opposite direction: the ledger is one ADR-110 correction behind, and composing a store would double-append. Latent behind `join_requests` (default off), not live |
-| `withoutRateLimit` | REAL GAP; substrate exists, shapes differ | Accurate and low-severity. The shape delta is ~12 lines; the real blocker is that no budget can be expressed. Two undeclared and larger holes sit beside it |
+| `withoutRateLimit`     | REAL GAP; substrate exists, shapes differ                                           | Accurate and low-severity. The shape delta is ~12 lines; the real blocker is that no budget can be expressed. Two undeclared and larger holes sit beside it                                       |
 
 Neither item appears in `core-application-exit-decisions-for-review.md`. Both
 belong there.
-
 
 ---
 
@@ -609,13 +608,13 @@ AFTER
   under budget ─► the share payload
 ```
 
-| File | What changed |
-| --- | --- |
-| `apps/api/src/app/api-trpc-collaborators.trace-group.composition.ts` | `rateLimit` is now a **required** option on `ApiTraceGroupCollaboratorsOptions` and is what `ports.sharedTrace.rateLimit` is. Required rather than optional on purpose: an optional leaf is how the always-allow stand-in got in |
-| `apps/api/src/app/api-production.composition.ts` | Passes `rateLimit: (input) => this.rateLimiter.consume(input)` — the same one-line shape `composeUnsubscribe` uses, so one token gets one budget |
-| `apps/api/src/api.application.ts` | `withServices` takes the `Request` and fills `ctx.req` with its headers instead of pinning `undefined`. `createCaller` still gets `undefined`, which is honest — it has no request |
-| `apps/api/src/app/__tests__/api-trpc-collaborators.trace-group.integration.test.ts` | New suite, four tests, over the REAL composed port and a real `ApiRateLimitInfrastructure`, driven through the real `/api/trpc` handler |
-| `specs/server/api-process-anonymous-share-read.feature` | New; two `@integration` scenarios, both bound |
+| File                                                                                | What changed                                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/app/api-trpc-collaborators.trace-group.composition.ts`                | `rateLimit` is now a **required** option on `ApiTraceGroupCollaboratorsOptions` and is what `ports.sharedTrace.rateLimit` is. Required rather than optional on purpose: an optional leaf is how the always-allow stand-in got in |
+| `apps/api/src/app/api-production.composition.ts`                                    | Passes `rateLimit: (input) => this.rateLimiter.consume(input)` — the same one-line shape `composeUnsubscribe` uses, so one token gets one budget                                                                                 |
+| `apps/api/src/api.application.ts`                                                   | `withServices` takes the `Request` and fills `ctx.req` with its headers instead of pinning `undefined`. `createCaller` still gets `undefined`, which is honest — it has no request                                               |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.trace-group.integration.test.ts` | New suite, four tests, over the REAL composed port and a real `ApiRateLimitInfrastructure`, driven through the real `/api/trpc` handler                                                                                          |
+| `specs/server/api-process-anonymous-share-read.feature`                             | New; two `@integration` scenarios, both bound                                                                                                                                                                                    |
 
 **The second half nobody had named.** Wiring the counter alone would have closed
 only the per-token ceiling. `ApiApplication.withServices` pinned `req: undefined`
@@ -657,15 +656,15 @@ BEFORE                                    AFTER
     └─ 3. awaitFold(...)   ── never ran
 ```
 
-| File | What changed |
-| --- | --- |
-| `packages/features/identity/server/src/adapters/join-request-ledger.adapter.ts` | The append, its resolver and the `eventStore` dep are gone; `commit` is `stage` then `awaitFold`. `stagedSender` is now **async**, which fixed a second defect: the old `stagedSenderVia` always returned a non-null wrapper whose `send` resolved to `undefined` for an unregistered pipeline, so the "no sender" refusal was dead code and the command was dropped **silently** |
-| `packages/features/identity/server/src/ports/identity-eventing.port.ts` | `tryEventStore` deleted. After both ledgers were corrected nothing called it, and leaving the seam is how a ledger walks back into appending on a producer |
-| `apps/api/src/app/api-identity-eventing.adapter.ts` | Its `tryEventStore` and the `eventSourcing` constructor arg go with it |
-| `apps/api/src/app/api-identity-pipelines.composition.ts` | `withoutDurableAppend` deleted — abstract method, call site and logger leg. It had no other subject. The backwards warn text (it claimed the command was staged and only the facts lost; the append ran FIRST, so nothing was staged) is gone with it |
-| `apps/api/src/app/__tests__/api-trpc-collaborators.identity.composition.integration.test.ts` | `producerEventing()` now seats the real `EventStoreProducerOnly`, not `EventStoreMemory`. That substitution is why "leg one: the durable append" passed CI against an append that could never succeed. "Leg one" is now the staged command, and the suite asserts the store still refuses |
-| new: `.../adapters/__tests__/join-request-ledger.adapter.unit.test.ts` | Six tests; the writer had none at all |
-| `specs/server/api-process-eventing.feature` | The join-request scenario said "the request's facts are appended before the call returns". It now says staged, and that this process appends nothing |
+| File                                                                                         | What changed                                                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/features/identity/server/src/adapters/join-request-ledger.adapter.ts`              | The append, its resolver and the `eventStore` dep are gone; `commit` is `stage` then `awaitFold`. `stagedSender` is now **async**, which fixed a second defect: the old `stagedSenderVia` always returned a non-null wrapper whose `send` resolved to `undefined` for an unregistered pipeline, so the "no sender" refusal was dead code and the command was dropped **silently** |
+| `packages/features/identity/server/src/ports/identity-eventing.port.ts`                      | `tryEventStore` deleted. After both ledgers were corrected nothing called it, and leaving the seam is how a ledger walks back into appending on a producer                                                                                                                                                                                                                        |
+| `apps/api/src/app/api-identity-eventing.adapter.ts`                                          | Its `tryEventStore` and the `eventSourcing` constructor arg go with it                                                                                                                                                                                                                                                                                                            |
+| `apps/api/src/app/api-identity-pipelines.composition.ts`                                     | `withoutDurableAppend` deleted — abstract method, call site and logger leg. It had no other subject. The backwards warn text (it claimed the command was staged and only the facts lost; the append ran FIRST, so nothing was staged) is gone with it                                                                                                                             |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.identity.composition.integration.test.ts` | `producerEventing()` now seats the real `EventStoreProducerOnly`, not `EventStoreMemory`. That substitution is why "leg one: the durable append" passed CI against an append that could never succeed. "Leg one" is now the staged command, and the suite asserts the store still refuses                                                                                         |
+| new: `.../adapters/__tests__/join-request-ledger.adapter.unit.test.ts`                       | Six tests; the writer had none at all                                                                                                                                                                                                                                                                                                                                             |
+| `specs/server/api-process-eventing.feature`                                                  | The join-request scenario said "the request's facts are appended before the call returns". It now says staged, and that this process appends nothing                                                                                                                                                                                                                              |
 
 ### 3. SCIM directory-sync history: the writer is corrected, and so is the registration
 
@@ -681,23 +680,23 @@ through — the package's rule that a push must never fail for its bookkeeping i
 unchanged. That fourth registration has since landed; the closure is recorded
 below, together with the one thing it turned out not to reach.
 
-| File | What changed |
-| --- | --- |
+| File                                                                                  | What changed                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/features/identity/server/src/adapters/eventing.scim-sync-ledger.adapter.ts` | The append and its `eventStore()` helper are gone; `commit` stages. The absent-sender path moved from `warn` "appended but not staged" (which was false in both halves) to `error`, naming the pipeline, the sender and what is lost until it exists |
-| `apps/api/src/app/api-scim.composition.ts` | Its docblock explained the loss as a missing durable append. It now names the missing registration, and says the worker's consumer side is already there |
-| new: `.../adapters/__tests__/eventing.scim-sync-ledger.adapter.unit.test.ts` | Five tests: it stages on the registered sender, it resolves the sender by the verb, it lets the push through when there is none, and it logs the loss at `error` with the pipeline and sender named |
+| `apps/api/src/app/api-scim.composition.ts`                                            | Its docblock explained the loss as a missing durable append. It now names the missing registration, and says the worker's consumer side is already there                                                                                             |
+| new: `.../adapters/__tests__/eventing.scim-sync-ledger.adapter.unit.test.ts`          | Five tests: it stages on the registered sender, it resolves the sender by the verb, it lets the push through when there is none, and it logs the loss at `error` with the pipeline and sender named                                                  |
 
 **The remaining registration landed — 2026-09-03.** All four steps, exactly as
 scoped above:
 
-| File | What changed |
-| --- | --- |
-| `packages/identity-eventing/src/adapters/producer.identity-pipelines.adapter.ts` | `createScimSyncProducerPipeline({ processName })`, the fourth sibling: `createScimSyncPipeline` over a `ProducerOnlyStateProjectionStore<ScimSyncFoldState>` and `ScimSyncGuards` over `producerOnlyReads<ScimSyncReadRepository>`. No process manager to decline — `scim-sync` declares none, because a push is the DIRECTORY's to retry |
-| `packages/identity-eventing/src/index.ts` | exported beside the other three |
-| `apps/api/src/app/api-identity-pipelines.composition.ts` | the fourth `senders.set(SCIM_SYNC_PIPELINE_NAME, …)` over the five verbs, listed as `SCIM_SYNC_COMMAND_NAMES` so a definition that dropped one fails this process's boot rather than one provider's nightly run |
-| `packages/identity-eventing/src/adapters/__tests__/producer.identity-pipelines.adapter.unit.test.ts` | the fourth case, twice over: the five command names equal the Postgres composition's, and the directory-sync head refuses by name |
-| `apps/api/src/features/enterprise/__tests__/scim-rest.integration.test.ts` | four new tests over the REAL composed graph — `EventStoreProducerOnly` + `composeApiIdentityPipelines` + `ApiEventingIdentityAdapter` + `composeApiScimRest` — driven with the mounted Hono app beside them |
-| `specs/server/api-process-eventing.feature` | two `@integration` scenarios, both bound (`8/8 · ✓ all bound`) |
+| File                                                                                                 | What changed                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/identity-eventing/src/adapters/producer.identity-pipelines.adapter.ts`                     | `createScimSyncProducerPipeline({ processName })`, the fourth sibling: `createScimSyncPipeline` over a `ProducerOnlyStateProjectionStore<ScimSyncFoldState>` and `ScimSyncGuards` over `producerOnlyReads<ScimSyncReadRepository>`. No process manager to decline — `scim-sync` declares none, because a push is the DIRECTORY's to retry |
+| `packages/identity-eventing/src/index.ts`                                                            | exported beside the other three                                                                                                                                                                                                                                                                                                           |
+| `apps/api/src/app/api-identity-pipelines.composition.ts`                                             | the fourth `senders.set(SCIM_SYNC_PIPELINE_NAME, …)` over the five verbs, listed as `SCIM_SYNC_COMMAND_NAMES` so a definition that dropped one fails this process's boot rather than one provider's nightly run                                                                                                                           |
+| `packages/identity-eventing/src/adapters/__tests__/producer.identity-pipelines.adapter.unit.test.ts` | the fourth case, twice over: the five command names equal the Postgres composition's, and the directory-sync head refuses by name                                                                                                                                                                                                         |
+| `apps/api/src/features/enterprise/__tests__/scim-rest.integration.test.ts`                           | four new tests over the REAL composed graph — `EventStoreProducerOnly` + `composeApiIdentityPipelines` + `ApiEventingIdentityAdapter` + `composeApiScimRest` — driven with the mounted Hono app beside them                                                                                                                               |
+| `specs/server/api-process-eventing.feature`                                                          | two `@integration` scenarios, both bound (`8/8 · ✓ all bound`)                                                                                                                                                                                                                                                                            |
 
 Sabotage-checked: deleting the fourth `senders.set` fails the staging test and
 the per-verb sender test, and leaves the eleven that were green before green.
@@ -743,10 +742,10 @@ as a missing durable append.
 
 ### What this leaves in the two rows above
 
-| Row | Now |
-| --- | --- |
+| Row                    | Now                                                                                                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `withoutDurableAppend` | **CLOSED and deleted.** Not by composing a store — by finishing ADR-110 for the fourth ledger. The absence no longer exists, so nothing is logged at boot |
-| `withoutRateLimit` | **UNCHANGED, still declared.** The larger hole beside it — the anonymous share read — is closed. The budget decision it waits on is still Alex's |
+| `withoutRateLimit`     | **UNCHANGED, still declared.** The larger hole beside it — the anonymous share read — is closed. The budget decision it waits on is still Alex's          |
 
 `core-application-feature-extraction-plan.md` still carries the old
 `withoutDurableAppend` rows (lines 7943, 8015, 12942, 13825); that file belongs

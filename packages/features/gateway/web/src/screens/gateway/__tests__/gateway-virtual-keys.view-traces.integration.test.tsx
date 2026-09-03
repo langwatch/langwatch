@@ -94,9 +94,7 @@ const host = fakeGatewayHost({
       {
         id: TEAM_ID,
         name: "platform",
-        projects: [
-          { id: PROJECT_ID, name: "web-app", slug: PROJECT_SLUG, teamId: TEAM_ID },
-        ],
+        projects: [{ id: PROJECT_ID, name: "web-app", slug: PROJECT_SLUG, teamId: TEAM_ID }],
       },
     ],
   },

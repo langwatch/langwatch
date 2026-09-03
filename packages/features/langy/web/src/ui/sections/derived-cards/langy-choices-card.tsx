@@ -45,10 +45,7 @@ export function LangyChoicesCard({
   /** Still streaming — never answerable while forming. */
   forming?: boolean;
   /** Absent = read-only (time travel, shared views). */
-  onSelect?: (a: {
-    selection: LangyChoiceSelection;
-    card: LangyDerivedChoicesCard;
-  }) => void;
+  onSelect?: (a: { selection: LangyChoiceSelection; card: LangyDerivedChoicesCard }) => void;
   /** Fixture seam (gallery/tests): pre-resolved rows instead of fetching. */
   refRows?: ReadonlyMap<string, ChoicesRefRow>;
 }) {
@@ -113,12 +110,10 @@ export function LangyChoicesCard({
           const isPicked = picked.has(option.id);
           const selectable = open && !dead;
 
-          const primary =
-            refRow.state === "live" && refRow.primary ? refRow.primary : option.label;
+          const primary = refRow.state === "live" && refRow.primary ? refRow.primary : option.label;
           const secondary = dead
             ? "No longer exists"
-            : ((refRow.state === "live" ? refRow.secondary : undefined) ??
-              option.description);
+            : ((refRow.state === "live" ? refRow.secondary : undefined) ?? option.description);
 
           return (
             <chakra.button
@@ -146,9 +141,7 @@ export function LangyChoicesCard({
             >
               <Box
                 flexShrink={0}
-                color={
-                  isChosen || isPicked ? "purple.fg" : dead ? "fg.subtle" : "fg.muted"
-                }
+                color={isChosen || isPicked ? "purple.fg" : dead ? "fg.subtle" : "fg.muted"}
                 display="flex"
               >
                 {dead ? (

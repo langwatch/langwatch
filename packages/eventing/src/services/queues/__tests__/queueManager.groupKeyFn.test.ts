@@ -134,26 +134,18 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
       manager.initializeProjectionQueues(projections, vi.fn());
 
       // Both entries registered
-      expect(globalJobRegistry.has("test-pipeline:projection:customProjection")).toBe(
-        true,
-      );
-      expect(globalJobRegistry.has("test-pipeline:projection:defaultProjection")).toBe(
-        true,
-      );
+      expect(globalJobRegistry.has("test-pipeline:projection:customProjection")).toBe(true);
+      expect(globalJobRegistry.has("test-pipeline:projection:defaultProjection")).toBe(true);
 
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
       // Custom projection uses its custom groupKeyFn
-      const customEntry = globalJobRegistry.get(
-        "test-pipeline:projection:customProjection",
-      );
+      const customEntry = globalJobRegistry.get("test-pipeline:projection:customProjection");
       const customGroupKey = customEntry?.groupKeyFn(event);
       expect(customGroupKey).toBe(`${tenantId}/fold/customProjection/custom:${event.id}`);
 
       // Default projection uses aggregate-based groupKey
-      const defaultEntry = globalJobRegistry.get(
-        "test-pipeline:projection:defaultProjection",
-      );
+      const defaultEntry = globalJobRegistry.get("test-pipeline:projection:defaultProjection");
       const defaultGroupKey = defaultEntry?.groupKeyFn(event);
       expect(defaultGroupKey).toBe(
         `${tenantId}/fold/defaultProjection/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,

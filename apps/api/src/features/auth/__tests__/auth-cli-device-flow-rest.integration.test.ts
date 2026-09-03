@@ -116,9 +116,9 @@ describe("given a CLI starting a device login", () => {
       const world = deviceFlowWorld();
       const api = mount(world);
 
-      const grant = (await (
-        await api.post("/api/auth/cli/device-code", {})
-      ).json()) as { device_code: string };
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        device_code: string;
+      };
 
       const first = await api.post("/api/auth/cli/exchange", {
         device_code: grant.device_code,
@@ -138,9 +138,10 @@ describe("given a CLI starting a device login", () => {
       const world = deviceFlowWorld();
       const api = mount(world);
 
-      const grant = (await (
-        await api.post("/api/auth/cli/device-code", {})
-      ).json()) as { device_code: string; user_code: string };
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        device_code: string;
+        user_code: string;
+      };
       await api.post("/api/auth/cli/approve", {
         user_code: grant.user_code,
         organization_id: ORGANIZATION_ID,
@@ -215,8 +216,7 @@ function deviceFlowWorld() {
 
   const database = {
     user: {
-      findUnique: () =>
-        Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" }),
+      findUnique: () => Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" }),
     },
     organization: {
       findUnique: () =>
@@ -247,10 +247,8 @@ function deviceFlowWorld() {
             scope: { kind: "organization" as const, projectIds: [] },
           });
         },
-        validateCliSelection: (input: { selection: unknown }) =>
-          Promise.resolve(input.selection),
-        tryResolveDefaultCliSelection: () =>
-          Promise.resolve({ bindings: [], permissions: [] }),
+        validateCliSelection: (input: { selection: unknown }) => Promise.resolve(input.selection),
+        tryResolveDefaultCliSelection: () => Promise.resolve({ bindings: [], permissions: [] }),
         revokeCliLoginKeyForLogout: () => Promise.resolve(),
       }) as never,
     ensurePersonalWorkspace: () =>

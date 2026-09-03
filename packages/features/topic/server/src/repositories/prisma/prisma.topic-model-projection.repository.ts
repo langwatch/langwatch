@@ -11,10 +11,7 @@ export type TopicModelProjectionDatabase = Pick<
   PrismaClient,
   "$transaction" | "topic" | "topicModelProjection"
 >;
-import type {
-  ProjectedTopic,
-  TopicModelData,
-} from "../../projections/topic-model.projection";
+import type { ProjectedTopic, TopicModelData } from "../../projections/topic-model.projection";
 
 /** KSUID resource for topic-model projection cursor rows (the app's KSUID_RESOURCES.TOPIC_MODEL_PROJECTION). */
 const TOPIC_MODEL_PROJECTION_KSUID_RESOURCE = "topicmodel";
@@ -27,9 +24,7 @@ const TOPIC_MODEL_PROJECTION_KSUID_RESOURCE = "topicmodel";
  * transactionally, so a replayed or redelivered event converges instead of
  * duplicating.
  */
-export class PrismaTopicModelProjectionRepository
-  implements StateProjectionStore<TopicModelData>
-{
+export class PrismaTopicModelProjectionRepository implements StateProjectionStore<TopicModelData> {
   private constructor(private readonly prisma: TopicModelProjectionDatabase) {}
 
   static create(options: {

@@ -9,13 +9,7 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -235,12 +229,7 @@ describe("the version chip in the scenario editor", () => {
 
   const renderEditor = () =>
     render(
-      <ScenarioFormDrawer
-        open
-        scenarioId="case_1"
-        variant="agent-testing"
-        onClose={vi.fn()}
-      />,
+      <ScenarioFormDrawer open scenarioId="case_1" variant="agent-testing" onClose={vi.fn()} />,
       { wrapper: Wrapper },
     );
 
@@ -274,12 +263,7 @@ describe("the version chip in the scenario editor", () => {
     });
     view.rerender(
       <ChakraProvider value={defaultSystem}>
-        <ScenarioFormDrawer
-          open
-          scenarioId="case_1"
-          variant="agent-testing"
-          onClose={vi.fn()}
-        />
+        <ScenarioFormDrawer open scenarioId="case_1" variant="agent-testing" onClose={vi.fn()} />
       </ChakraProvider>,
     );
 
@@ -304,9 +288,7 @@ describe("the version chip in the scenario editor", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     const notice = await screen.findByTestId("scenario-stale-version");
-    expect(notice).toHaveTextContent(
-      "This scenario changed since it was opened",
-    );
+    expect(notice).toHaveTextContent("This scenario changed since it was opened");
     expect(notice).toHaveTextContent("version 6");
     // The reload replaces the form, so the offer has to say the edits go.
     expect(notice).toHaveTextContent("Reloading replaces them");
@@ -326,10 +308,9 @@ describe("the version chip in the scenario editor", () => {
 
     await user.click(await screen.findByTestId("editor-history"));
 
-    expect(mocks.mockOpenDrawer).toHaveBeenCalledWith(
-      "scenarioVersionHistory",
-      { urlParams: { scenarioId: "case_1" } },
-    );
+    expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("scenarioVersionHistory", {
+      urlParams: { scenarioId: "case_1" },
+    });
   });
 });
 
@@ -380,8 +361,7 @@ describe("the History drawer", () => {
 
   afterEach(cleanup);
 
-  const renderHistory = () =>
-    render(<ScenarioVersionHistoryDrawer open />, { wrapper: Wrapper });
+  const renderHistory = () => render(<ScenarioVersionHistoryDrawer open />, { wrapper: Wrapper });
 
   /** @scenario "History opens a popover listing the versions newest first" */
   it("lists the versions newest first", () => {
@@ -403,9 +383,7 @@ describe("the History drawer", () => {
     const row = screen.getByTestId("version-row-3");
     expect(within(row).getByText(/Lena Fischer/)).toBeInTheDocument();
     // One line: the changed fields, then the date of the save.
-    expect(
-      within(row).getByText(/changed situation, criteria · .+/),
-    ).toBeInTheDocument();
+    expect(within(row).getByText(/changed situation, criteria · .+/)).toBeInTheDocument();
   });
 
   /** @scenario "The version a restore wrote says that it is a restore" */
@@ -437,19 +415,13 @@ describe("the History drawer", () => {
     const user = userEvent.setup();
     renderHistory();
 
-    await user.click(
-      within(screen.getByTestId("version-row-2")).getByText("v2"),
-    );
+    await user.click(within(screen.getByTestId("version-row-2")).getByText("v2"));
 
     const content = await screen.findByTestId("version-content-2");
-    expect(
-      within(content).getByText("A calmer, older situation"),
-    ).toBeInTheDocument();
+    expect(within(content).getByText("A calmer, older situation")).toBeInTheDocument();
     // No field to edit: the content is read-only text.
     expect(within(content).queryByRole("textbox")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("version-row-3")).getByText("Current"),
-    ).toBeInTheDocument();
+    expect(within(screen.getByTestId("version-row-3")).getByText("Current")).toBeInTheDocument();
   });
 
   /** @scenario "A scenario that never had a save shows one Created entry" */

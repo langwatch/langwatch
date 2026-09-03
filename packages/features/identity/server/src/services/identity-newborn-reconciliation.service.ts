@@ -65,8 +65,7 @@ export class IdentityNewbornReconciliationService {
 
   constructor(private readonly deps: IdentityNewbornReconciliationDeps) {
     this.now = deps.now ?? Date.now;
-    this.abandonedAfterMs =
-      deps.abandonedAfterMs ?? IDENTITY_NEWBORN_ABANDONED_AFTER_MS;
+    this.abandonedAfterMs = deps.abandonedAfterMs ?? IDENTITY_NEWBORN_ABANDONED_AFTER_MS;
   }
 
   async runPass(): Promise<IdentityNewbornSweepSummary> {

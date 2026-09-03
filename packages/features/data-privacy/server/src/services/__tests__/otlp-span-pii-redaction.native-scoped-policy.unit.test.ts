@@ -455,7 +455,10 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       // even though langevals is configured. That is a deliberate opt-out, not an
       // outage, so the incomplete marker must NOT show.
       const featureFlags = new FlagSwitches() as unknown as FeatureFlagService;
-      (featureFlags as unknown as FlagSwitches).setFlag("ops_pii_strict_presidio_redaction_disabled", true);
+      (featureFlags as unknown as FlagSwitches).setFlag(
+        "ops_pii_strict_presidio_redaction_disabled",
+        true,
+      );
       const batchSpy = vi.fn<BatchClearPIIFunction>(async (texts) => texts.map(() => "[REDACTED]"));
       const service = OtlpSpanPiiRedactionService.create({
         isLangevalsConfigured: true,

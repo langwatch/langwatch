@@ -119,10 +119,7 @@ export const evaluatorsSchema = z.object({
   }),
   "ragas/factual_correctness": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation.")
-        .default("openai/gpt-5-mini"),
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
       max_tokens: z
         .number()
         .describe(
@@ -145,10 +142,7 @@ export const evaluatorsSchema = z.object({
   }),
   "ragas/faithfulness": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation.")
-        .default("openai/gpt-5-mini"),
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
       max_tokens: z
         .number()
         .describe(
@@ -165,10 +159,7 @@ export const evaluatorsSchema = z.object({
   }),
   "ragas/response_context_precision": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation.")
-        .default("openai/gpt-5-mini"),
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
       max_tokens: z
         .number()
         .describe(
@@ -179,10 +170,7 @@ export const evaluatorsSchema = z.object({
   }),
   "ragas/response_context_recall": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation.")
-        .default("openai/gpt-5-mini"),
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
       max_tokens: z
         .number()
         .describe(
@@ -193,10 +181,7 @@ export const evaluatorsSchema = z.object({
   }),
   "ragas/response_relevancy": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation.")
-        .default("openai/gpt-5-mini"),
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
       max_tokens: z
         .number()
         .describe(
@@ -223,10 +208,7 @@ export const evaluatorsSchema = z.object({
   }),
   "ragas/rubrics_based_scoring": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation.")
-        .default("openai/gpt-5-mini"),
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
       max_tokens: z
         .number()
         .describe(
@@ -256,10 +238,7 @@ export const evaluatorsSchema = z.object({
   }),
   "ragas/sql_query_equivalence": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation.")
-        .default("openai/gpt-5-mini"),
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
       max_tokens: z
         .number()
         .describe(
@@ -270,10 +249,7 @@ export const evaluatorsSchema = z.object({
   }),
   "ragas/summarization_score": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation.")
-        .default("openai/gpt-5-mini"),
+      model: z.string().describe("The model to use for evaluation.").default("openai/gpt-5-mini"),
       max_tokens: z
         .number()
         .describe(
@@ -342,9 +318,7 @@ export const evaluatorsSchema = z.object({
         }),
       min_threshold: z
         .number()
-        .describe(
-          "The minimum confidence required for failing the evaluation on a PII match.",
-        )
+        .describe("The minimum confidence required for failing the evaluation on a PII match.")
         .default(0.5),
     }),
   }),
@@ -360,9 +334,7 @@ export const evaluatorsSchema = z.object({
           z.literal(6),
           z.literal(7),
         ])
-        .describe(
-          "The minimum severity level to consider content as unsafe, from 1 to 7.",
-        )
+        .describe("The minimum severity level to consider content as unsafe, from 1 to 7.")
         .default(1),
       categories: z
         .object({
@@ -520,14 +492,8 @@ export const evaluatorsSchema = z.object({
   }),
   "langevals/competitor_llm": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+      model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
+      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
       name: z.string().describe("The name of your company").default("LangWatch"),
       description: z
         .string()
@@ -537,14 +503,8 @@ export const evaluatorsSchema = z.object({
   }),
   "langevals/competitor_llm_function_call": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+      model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
+      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
       name: z.string().describe("The name of your company").default("LangWatch"),
       description: z
         .string()
@@ -574,14 +534,8 @@ export const evaluatorsSchema = z.object({
   }),
   "langevals/llm_answer_match": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+      model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
+      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
       prompt: z
         .string()
         .describe("Prompt for the comparison")
@@ -592,14 +546,8 @@ export const evaluatorsSchema = z.object({
   }),
   "langevals/llm_boolean": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+      model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
+      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
       prompt: z
         .string()
         .describe("The system prompt to use for the LLM to run the evaluation")
@@ -610,14 +558,8 @@ export const evaluatorsSchema = z.object({
   }),
   "langevals/llm_category": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+      model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
+      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
       prompt: z
         .string()
         .describe("The system prompt to use for the LLM to run the evaluation")
@@ -638,14 +580,8 @@ export const evaluatorsSchema = z.object({
   }),
   "langevals/llm_score": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+      model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
+      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
       prompt: z
         .string()
         .describe("The system prompt to use for the LLM to run the evaluation")
@@ -656,14 +592,8 @@ export const evaluatorsSchema = z.object({
   }),
   "langevals/off_topic": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+      model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
+      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
       allowed_topics: z
         .array(z.object({ topic: z.string(), description: z.string() }))
         .describe(
@@ -680,14 +610,8 @@ export const evaluatorsSchema = z.object({
   }),
   "langevals/pairwise_compare": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+      model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
+      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
       prompt: z
         .string()
         .describe("Judge prompt template (golden-aware by default)")
@@ -718,26 +642,14 @@ export const evaluatorsSchema = z.object({
   }),
   "langevals/query_resolution": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+      model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
+      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
     }),
   }),
   "langevals/select_best_compare": z.object({
     settings: z.object({
-      model: z
-        .string()
-        .describe("The model to use for evaluation")
-        .default("openai/gpt-5-mini"),
-      max_tokens: z
-        .number()
-        .describe("Max tokens allowed for evaluation")
-        .default(128000),
+      model: z.string().describe("The model to use for evaluation").default("openai/gpt-5-mini"),
+      max_tokens: z.number().describe("Max tokens allowed for evaluation").default(128000),
       prompt: z
         .string()
         .describe(
@@ -814,12 +726,7 @@ export const evaluatorsSchema = z.object({
   "langevals/valid_format": z.object({
     settings: z.object({
       format: z
-        .union([
-          z.literal("json"),
-          z.literal("markdown"),
-          z.literal("python"),
-          z.literal("sql"),
-        ])
+        .union([z.literal("json"), z.literal("markdown"), z.literal("python"), z.literal("sql")])
         .default("json"),
       json_schema: z
         .string()
@@ -1053,8 +960,7 @@ Computes with an LLM how factually similar the generated answer is to the expect
 This evaluator assesses the extent to which the generated answer is consistent with the provided context. Higher scores indicate better faithfulness to the context, useful for detecting hallucinations.
 `,
     category: "rag",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/",
+    docsUrl: "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/",
     isGuardrail: false,
     requiredFields: ["output", "contexts"],
     optionalFields: ["input"],
@@ -1077,8 +983,7 @@ This evaluator assesses the extent to which the generated answer is consistent w
     envVars: [],
     result: {
       score: {
-        description:
-          "A score between 0.0 and 1.0 indicating the faithfulness of the answer.",
+        description: "A score between 0.0 and 1.0 indicating the faithfulness of the answer.",
       },
     },
   },
@@ -1137,8 +1042,7 @@ Uses an LLM to measure how many of relevant documents attributable the claims in
     envVars: [],
     result: {
       score: {
-        description:
-          "A score between 0.0 and 1.0 indicating the recall of the retrieved context.",
+        description: "A score between 0.0 and 1.0 indicating the recall of the retrieved context.",
       },
     },
   },
@@ -1148,8 +1052,7 @@ Uses an LLM to measure how many of relevant documents attributable the claims in
 Evaluates how pertinent the generated answer is to the given prompt. Higher scores indicate better relevancy.
 `,
     category: "quality",
-    docsUrl:
-      "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/answer_relevance/",
+    docsUrl: "https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/answer_relevance/",
     isGuardrail: false,
     requiredFields: ["input", "output"],
     optionalFields: [],
@@ -1171,8 +1074,7 @@ Evaluates how pertinent the generated answer is to the given prompt. Higher scor
     envVars: [],
     result: {
       score: {
-        description:
-          "A score between 0.0 and 1.0 indicating the relevance of the answer.",
+        description: "A score between 0.0 and 1.0 indicating the relevance of the answer.",
       },
     },
   },
@@ -1358,8 +1260,7 @@ social security numbers. It allows customization of the detection threshold and 
         },
       },
       min_threshold: {
-        description:
-          "The minimum confidence required for failing the evaluation on a PII match.",
+        description: "The minimum confidence required for failing the evaluation on a PII match.",
         default: 0.5,
       },
     },
@@ -1382,15 +1283,13 @@ self-harm, sexual content, and violence. It allows customization of the severity
 threshold and the specific categories to check.
 `,
     category: "safety",
-    docsUrl:
-      "https://learn.microsoft.com/en-us/azure/ai-services/content-safety/quickstart-text",
+    docsUrl: "https://learn.microsoft.com/en-us/azure/ai-services/content-safety/quickstart-text",
     isGuardrail: true,
     requiredFields: [],
     optionalFields: ["input", "output"],
     settings: {
       severity_threshold: {
-        description:
-          "The minimum severity level to consider content as unsafe, from 1 to 7.",
+        description: "The minimum severity level to consider content as unsafe, from 1 to 7.",
         default: 1,
       },
       categories: {
@@ -1660,8 +1559,7 @@ A simple evaluator that checks if the output matches the expected_output exactly
     envVars: [],
     result: {
       passed: {
-        description:
-          "True if the output matched the expected_output exactly, False otherwise",
+        description: "True if the output matched the expected_output exactly, False otherwise",
       },
     },
   },
@@ -1849,8 +1747,7 @@ This evaluator checks if the user message is concerning one of the allowed topic
         description: "Is the message concerning allowed topic",
       },
       label: {
-        description:
-          "The detected intent or 'other' if the intent is not in the allowed topics",
+        description: "The detected intent or 'other' if the intent is not in the allowed topics",
       },
     },
   },
@@ -1993,8 +1890,7 @@ for that row when the two checks disagree, rather than guessing.
         default: [],
       },
       temperature: {
-        description:
-          "Sampling temperature for the judge call. Lower is more deterministic.",
+        description: "Sampling temperature for the judge call. Lower is more deterministic.",
         default: 0.0,
       },
       swap_and_reconcile: {
@@ -2032,13 +1928,11 @@ to 1.0 (very positive) and a corresponding label.
         default: "openai/text-embedding-3-small",
       },
       positive_reference: {
-        description:
-          "Reference phrase representing the positive end of the sentiment scale",
+        description: "Reference phrase representing the positive end of the sentiment scale",
         default: "Comment of a very happy and satisfied user",
       },
       negative_reference: {
-        description:
-          "Reference phrase representing the negative end of the sentiment scale",
+        description: "Reference phrase representing the negative end of the sentiment scale",
         default: "Comment of a user who is extremely dissatisfied",
       },
       normalization_factor: {
@@ -2098,8 +1992,7 @@ match on the exact text.
           "How similar the input and output semantically, from 0.0 to 1.0, with 1.0 meaning the sentences are identical",
       },
       passed: {
-        description:
-          "Passes if the cosine similarity crosses the threshold for the defined rule",
+        description: "Passes if the cosine similarity crosses the threshold for the defined rule",
       },
     },
   },

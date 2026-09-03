@@ -61,9 +61,7 @@ export const TerminalOutput = memo(function TerminalOutput({
       visibleText: shown,
       isCollapsible: collapsible,
       foldLabel:
-        hiddenLineCount > 0
-          ? `+${hiddenLineCount} lines`
-          : `+${formatCharCount(hiddenCharCount)}`,
+        hiddenLineCount > 0 ? `+${hiddenLineCount} lines` : `+${formatCharCount(hiddenCharCount)}`,
       isDisplayCapped: expanded && text.length > RENDER_CEILING_CHARS,
     };
   }, [text, expanded]);

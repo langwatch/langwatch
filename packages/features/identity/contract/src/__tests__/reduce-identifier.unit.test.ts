@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { IdentityFact } from "../facts";
-import {
-  reduceIdentifier,
-  userErasureFacts,
-} from "../identifier-aggregate";
+import { reduceIdentifier, userErasureFacts } from "../identifier-aggregate";
 import {
   ACTOR,
   T0,
@@ -88,12 +85,7 @@ describe("reduceIdentifier", () => {
             fact: deadEnded({ identifierId: "idf_work" }),
           })?.state,
         ).toBe("DEAD_END");
-        for (const state of [
-          "VERIFIED",
-          "PRIMARY",
-          "DETACHED",
-          "DEAD_END",
-        ] as const) {
+        for (const state of ["VERIFIED", "PRIMARY", "DETACHED", "DEAD_END"] as const) {
           const head = headIn(state);
           expect(
             reduceIdentifier({
@@ -133,9 +125,7 @@ describe("reduceIdentifier", () => {
           detached({ identifierId: "idf_personal" }),
         ];
         for (const fact of foreign) {
-          expect(reduceIdentifier({ identifierId: "idf_work", head, fact })).toBe(
-            head,
-          );
+          expect(reduceIdentifier({ identifierId: "idf_work", head, fact })).toBe(head);
         }
       });
 
@@ -154,9 +144,7 @@ describe("reduceIdentifier", () => {
       /** @scenario "A proposal moves no head, on whichever stream it is folded" */
       it("returns the head exactly as it was", () => {
         const head = headIn("VERIFIED");
-        expect(
-          reduceIdentifier({ identifierId: "idf_work", head, fact: proposed() }),
-        ).toBe(head);
+        expect(reduceIdentifier({ identifierId: "idf_work", head, fact: proposed() })).toBe(head);
         expect(
           reduceIdentifier({
             identifierId: "idf_work",
@@ -283,9 +271,10 @@ describe("reduceIdentifier", () => {
             value: "sam@b.dev",
             occurredAt: T0 + 1,
           }),
-          ...userErasureFacts({ heads, userId: USER, actor: ACTOR }).map(
-            (fact): IdentityFact => ({ ...fact, occurredAt: T0 + 4 }),
-          ),
+          ...userErasureFacts({ heads, userId: USER, actor: ACTOR }).map((fact): IdentityFact => ({
+            ...fact,
+            occurredAt: T0 + 4,
+          })),
         ];
         const perUser = foldUser(history);
         for (const identifierId of ["idf_google", "idf_email"]) {

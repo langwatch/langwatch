@@ -6,35 +6,32 @@ sidebarTitle: MCP server
 
 <Info>
   **Pairs with:** [Governance REST API](/ai-governance/api) and [Governance
-  CLI](/ai-governance/cli): all three surfaces dispatch through the same service-layer
-  functions, with audit emission tagged `metadata.surface = "trpc" | "hono" | "cli" |
-  "mcp"` for incident response. Distinct from LangWatch's general MCP server, this is a
-  governance-namespaced toolset specifically for setting up and querying governance state.
+  CLI](/ai-governance/cli): all three surfaces dispatch through the same service-layer functions,
+  with audit emission tagged `metadata.surface = "trpc" | "hono" | "cli" | "mcp"` for incident
+  response. Distinct from LangWatch's general MCP server, this is a governance-namespaced toolset
+  specifically for setting up and querying governance state.
 </Info>
 
 <Note>
-  **Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP
-  tools register on every MCP session the hosted endpoint opens, through the session
-  tool registrar bound in `apps/api/src/features/mcp/hosted-mcp.mount.ts`, via
-  `registerGovernanceMcpTools(server, ctx)`, and call the governance services
-  (`IngestionTemplateService`, `IngestionKeyService`, etc.) directly with `surface:
-  "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason: it avoids the
-  project-API-key vs PAT auth mismatch and matches Sergey's explicit
+  **Architecture: in-process service calls (not HTTP-shell over REST).** Governance MCP tools
+  register on every MCP session the hosted endpoint opens, through the session tool registrar bound
+  in `apps/api/src/features/mcp/hosted-mcp.mount.ts`, via `registerGovernanceMcpTools(server, ctx)`,
+  and call the governance services (`IngestionTemplateService`, `IngestionKeyService`, etc.)
+  directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason:
+  it avoids the project-API-key vs PAT auth mismatch and matches Sergey's explicit
   `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes.
-  Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the
-  service layer is the single source of truth, and `metadata.surface` distinguishes the
-  entrypoint.
+  Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer
+  is the single source of truth, and `metadata.surface` distinguishes the entrypoint.
 </Note>
 
 <Note>
   **RBAC enforced at the tool layer.** Per
-  `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, write tools and
-  admin reads resolve the caller's user session to its RBAC scopes and reject with
-  `FORBIDDEN` (or `AUTH_REQUIRED` when no user is bound) if the required permission is
-  missing; the plain `list`/`get` read tools are available to a project API key without a
-  user. No tool can bypass the service-layer or the multitenancy middleware, the same
-  defense-in-depth that protects the REST API protects the MCP surface, even though MCP
-  doesn't go through the REST surface.
+  `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, write tools and admin reads
+  resolve the caller's user session to its RBAC scopes and reject with `FORBIDDEN` (or
+  `AUTH_REQUIRED` when no user is bound) if the required permission is missing; the plain
+  `list`/`get` read tools are available to a project API key without a user. No tool can bypass the
+  service-layer or the multitenancy middleware, the same defense-in-depth that protects the REST API
+  protects the MCP surface, even though MCP doesn't go through the REST surface.
 </Note>
 
 ## Why an MCP server for governance
@@ -99,15 +96,14 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
 The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `packages/enterprise/features/governance/server/src/transport/api-mcp/governance-tools.api.ts`. The registrar is installed once, as the session-tool port that `apps/api/src/features/mcp/hosted-mcp.mount.ts` binds, and it runs for every session the endpoint opens, so the tools are available regardless of which MCP transport the client chose.
 
 <Note>
-  **Dev-environment port routing**: in production, LangWatch listens on a single port and
-  the `/mcp` + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on
-  the same host. In dev (Vite), external MCP clients (e.g. Claude Code) hit
-  `FRONTEND_PORT` (default `5560`) which proxies the seven MCP route prefixes through to
-  the API port. Local Claude Code runbook: `claude mcp add langwatch
-  http://localhost:5560/mcp` (or the OAuth flow at
-  `http://localhost:5560/api/mcp/authorize` for write tools). All 9 tools register over
-  that proxy, read tools return the catalog with a project apiKey Bearer, and write tools
-  return `AUTH_REQUIRED:` until the OAuth flow completes.
+  **Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp`
+  + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev
+  (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies
+  the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add
+  langwatch http://localhost:5560/mcp` (or the OAuth flow at
+  `http://localhost:5560/api/mcp/authorize` for write tools). All 9 tools register over that proxy,
+  read tools return the catalog with a project apiKey Bearer, and write tools return
+  `AUTH_REQUIRED:` until the OAuth flow completes.
 </Note>
 
 ## RBAC enforcement

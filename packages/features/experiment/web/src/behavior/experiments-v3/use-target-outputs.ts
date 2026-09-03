@@ -43,8 +43,7 @@ export const useTargetOutputs = (
       t.prompts.getByIdOrHandle(
         { idOrHandle: target?.promptId ?? "", projectId },
         {
-          enabled:
-            target?.type === "prompt" && !!target.promptId && !!projectId,
+          enabled: target?.type === "prompt" && !!target.promptId && !!projectId,
           staleTime: 60_000,
         },
       ),
@@ -54,9 +53,7 @@ export const useTargetOutputs = (
   return targets.map((target, index) => {
     if (!target) return undefined;
 
-    const draft = target.localPromptConfig?.outputs as
-      | TargetOutputs
-      | undefined;
+    const draft = target.localPromptConfig?.outputs as TargetOutputs | undefined;
     const draftNeedsSchema = (draft ?? []).some(
       (field) => field.type === "json_schema" && !field.json_schema,
     );
@@ -78,9 +75,8 @@ export const useTargetOutputs = (
     // persist exactly that. Callers render an unresolved picker instead.
     if (promptQueries[index]?.isLoading) return undefined;
 
-    const promptOutputs = (
-      promptQueries[index]?.data as { outputs?: TargetOutputs } | undefined
-    )?.outputs;
+    const promptOutputs = (promptQueries[index]?.data as { outputs?: TargetOutputs } | undefined)
+      ?.outputs;
 
     // needsSchema means `own` is the known-invalid schema-less copy — if the
     // prompt lookup came back empty (deleted prompt, fetch error), returning

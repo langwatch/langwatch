@@ -6,11 +6,7 @@
     "module": "preserve",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "lib": [
-      "es2022",
-      "dom",
-      "dom.iterable"
-    ],
+    "lib": ["es2022", "dom", "dom.iterable"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
@@ -18,10 +14,5 @@
     "verbatimModuleSyntax": true,
     "noEmit": true
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.d.ts",
-    "vitest.setup.ts"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vitest.setup.ts"]
 }

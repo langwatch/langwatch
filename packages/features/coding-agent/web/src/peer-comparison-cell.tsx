@@ -29,9 +29,7 @@ function ComparisonBar({
   hasStats: boolean;
 }) {
   if (!hasStats || value <= 0) {
-    return (
-      <Box width={BAR_WIDTH} height={BAR_HEIGHT} bg="border.subtle" borderRadius="full" />
-    );
+    return <Box width={BAR_WIDTH} height={BAR_HEIGHT} bg="border.subtle" borderRadius="full" />;
   }
   const ratio = value / p95;
   const isOverP95 = ratio >= 1;

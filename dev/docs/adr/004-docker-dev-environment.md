@@ -272,11 +272,11 @@ always runs, so there is nothing left to select.
 
 ### What runs a local stack
 
-| Entry point | What it starts |
-| --- | --- |
-| `pnpm dev` | `dev/scripts/dev-stack.sh`: the three Node lanes under `concurrently`, plus aigateway and nlpgo when their toolchain is present and their ports are free |
-| `make haven up` | the same three lanes as supervised children (`ui`, `api`, `workers`), each `pnpm --filter <package> dev` from the workspace root, plus the routed Go services |
-| `make quickstart <preset>` | `dev/compose.dev.yml`'s `ui`, `api` and `workers` services |
+| Entry point                | What it starts                                                                                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                 | `dev/scripts/dev-stack.sh`: the three Node lanes under `concurrently`, plus aigateway and nlpgo when their toolchain is present and their ports are free      |
+| `make haven up`            | the same three lanes as supervised children (`ui`, `api`, `workers`), each `pnpm --filter <package> dev` from the workspace root, plus the routed Go services |
+| `make quickstart <preset>` | `dev/compose.dev.yml`'s `ui`, `api` and `workers` services                                                                                                    |
 
 The port layout is unchanged and still derived from `PORT` (default 5560): ui on
 `PORT`, api on `PORT + 1000`, worker metrics on `PORT - 2561`, gateway on

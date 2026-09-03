@@ -59,13 +59,7 @@ vi.mock("../save-and-run-menu", () => ({
 // Auto-confirm the run-model dialog so the gate flow reaches the run; the
 // dialog UI is covered in ScenarioRunModelDialog.integration.test.tsx.
 vi.mock("../scenario-run-model-dialog", () => ({
-  ScenarioRunModelDialog: ({
-    open,
-    onConfirm,
-  }: {
-    open?: boolean;
-    onConfirm?: () => void;
-  }) => {
+  ScenarioRunModelDialog: ({ open, onConfirm }: { open?: boolean; onConfirm?: () => void }) => {
     React.useEffect(() => {
       if (open) onConfirm?.();
     }, [open]);
@@ -282,10 +276,9 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       await user.click(screen.getByTestId("save-and-run-button"));
 
       await waitFor(() => {
-        expect(mocks.mockOpenDrawer).toHaveBeenCalledWith(
-          "agentWorkflowEditor",
-          { urlParams: { agentId: "workflow-agent-1" } },
-        );
+        expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentWorkflowEditor", {
+          urlParams: { agentId: "workflow-agent-1" },
+        });
       });
 
       expect(mocks.mockRunScenario).not.toHaveBeenCalled();
@@ -382,10 +375,9 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       await user.click(screen.getByTestId("save-and-run-button"));
 
       await waitFor(() => {
-        expect(mocks.mockOpenDrawer).toHaveBeenCalledWith(
-          "agentWorkflowEditor",
-          { urlParams: { agentId: "workflow-agent-2" } },
-        );
+        expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentWorkflowEditor", {
+          urlParams: { agentId: "workflow-agent-2" },
+        });
       });
 
       expect(mocks.mockRunScenario).not.toHaveBeenCalled();

@@ -26,10 +26,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const testsDir = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-);
+const testsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const skillsDir = path.resolve(testsDir, "..");
 
 /**
@@ -83,8 +80,7 @@ if (scenarioFiles.length === 0) {
 // An id supplied by the caller joins an open batch, which is what a rerun of
 // one file needs to land in the Run the rest of the suite already opened.
 const batchRunId =
-  process.env.SCENARIO_BATCH_RUN_ID ??
-  `scenariobatch_${randomBytes(6).toString("hex")}`;
+  process.env.SCENARIO_BATCH_RUN_ID ?? `scenariobatch_${randomBytes(6).toString("hex")}`;
 
 console.log(`Batch run id: ${batchRunId}`);
 console.log(`Files: ${scenarioFiles.length}, workers: ${args.workers}`);
@@ -98,13 +94,7 @@ console.log(
 
 const child = spawn(
   "pnpm",
-  [
-    "vitest",
-    "run",
-    `--maxWorkers=${args.workers}`,
-    ...scenarioFiles,
-    ...args.passthrough,
-  ],
+  ["vitest", "run", `--maxWorkers=${args.workers}`, ...scenarioFiles, ...args.passthrough],
   {
     cwd: skillsDir,
     env: { ...process.env, SCENARIO_BATCH_RUN_ID: batchRunId },

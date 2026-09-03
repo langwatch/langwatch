@@ -150,8 +150,7 @@ export class SuitesApiService {
       note?: string;
     } = {
       idempotencyKey:
-        options.idempotencyKey ??
-        `cli-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        options.idempotencyKey ?? `cli-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     };
     if (options.parameters !== undefined) body.parameters = options.parameters;
     // A note of only spaces is no note: sending "" would store an empty string

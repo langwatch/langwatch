@@ -10,8 +10,7 @@ const BLINK_MS = 900;
  * rather than a panel of its own. Mixed rather than swapped for another token,
  * so it follows the theme into dark mode.
  */
-const TINT_RESTING =
-  "color-mix(in srgb, var(--chakra-colors-blue-subtle) 50%, transparent)";
+const TINT_RESTING = "color-mix(in srgb, var(--chakra-colors-blue-subtle) 50%, transparent)";
 
 /** What the blink rises to: the same blue at full strength, so it registers. */
 const TINT_BLINK_PEAK = "var(--chakra-colors-blue-subtle)";
@@ -98,9 +97,7 @@ export function FocusedTurnFrame({
       borderRadius="lg"
       padding={`${TINT_BLEED_PX}px`}
       margin={`-${TINT_BLEED_PX}px`}
-      animation={
-        isBlinking ? `tracesV2FocusedTurnBlink ${BLINK_MS}ms ease-in-out` : undefined
-      }
+      animation={isBlinking ? `tracesV2FocusedTurnBlink ${BLINK_MS}ms ease-in-out` : undefined}
     >
       <style>{BLINK_KEYFRAMES}</style>
       {children}

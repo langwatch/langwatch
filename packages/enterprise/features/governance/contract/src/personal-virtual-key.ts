@@ -59,9 +59,7 @@ export const issuePersonalVirtualKeyInputSchema = z
     routingPolicyId: z.string().nullable().optional(),
   })
   .strict();
-export type IssuePersonalVirtualKeyInput = z.infer<
-  typeof issuePersonalVirtualKeyInputSchema
->;
+export type IssuePersonalVirtualKeyInput = z.infer<typeof issuePersonalVirtualKeyInputSchema>;
 
 export const listPersonalVirtualKeysInputSchema = z
   .object({
@@ -69,9 +67,7 @@ export const listPersonalVirtualKeysInputSchema = z
     userId: z.string().min(1).optional(),
   })
   .strict();
-export type ListPersonalVirtualKeysInput = z.infer<
-  typeof listPersonalVirtualKeysInputSchema
->;
+export type ListPersonalVirtualKeysInput = z.infer<typeof listPersonalVirtualKeysInputSchema>;
 
 export const revokePersonalVirtualKeyInputSchema = z
   .object({
@@ -80,9 +76,7 @@ export const revokePersonalVirtualKeyInputSchema = z
     virtualKeyId: z.string().min(1),
   })
   .strict();
-export type RevokePersonalVirtualKeyInput = z.infer<
-  typeof revokePersonalVirtualKeyInputSchema
->;
+export type RevokePersonalVirtualKeyInput = z.infer<typeof revokePersonalVirtualKeyInputSchema>;
 
 export const revokeAllPersonalVirtualKeysInputSchema = z
   .object({

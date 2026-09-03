@@ -12,10 +12,7 @@ export type ResultMetricsInlineProps = {
   totalCost?: number | null;
 };
 
-export function ResultMetricsInline({
-  durationInMs,
-  totalCost,
-}: ResultMetricsInlineProps) {
+export function ResultMetricsInline({ durationInMs, totalCost }: ResultMetricsInlineProps) {
   const parts: string[] = [];
   if (typeof durationInMs === "number") {
     parts.push(formatLatency(durationInMs));

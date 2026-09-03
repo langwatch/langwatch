@@ -7,11 +7,21 @@ type RoutingPolicyReader = {
   tryFindById(input: {
     id: string;
     organizationId: string;
-  }): Promise<{ id: string; name: string; organizationId: string; modelProviderIds: string[] } | null>;
+  }): Promise<{
+    id: string;
+    name: string;
+    organizationId: string;
+    modelProviderIds: string[];
+  } | null>;
   tryResolveDefaultForUser(input: {
     organizationId: string;
     personalTeamId: string;
-  }): Promise<{ id: string; name: string; organizationId: string; modelProviderIds: string[] } | null>;
+  }): Promise<{
+    id: string;
+    name: string;
+    organizationId: string;
+    modelProviderIds: string[];
+  } | null>;
 };
 
 export class PostgresPersonalVirtualKeyAdapter {

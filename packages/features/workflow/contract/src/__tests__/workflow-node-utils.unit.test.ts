@@ -26,11 +26,7 @@ interface BuildWorkflowOptions {
   edges?: StudioEdge[];
 }
 
-function buildWorkflow({
-  entryOutputs,
-  endInputs = [],
-  edges = [],
-}: BuildWorkflowOptions): {
+function buildWorkflow({ entryOutputs, endInputs = [], edges = [] }: BuildWorkflowOptions): {
   nodes: StudioNode[];
   edges: StudioEdge[];
 } {
@@ -70,11 +66,7 @@ function buildWorkflow({
   return { nodes, edges };
 }
 
-function makeEdge(
-  identifier: string,
-  targetNodeId: string,
-  edgeIndex: number,
-): StudioEdge {
+function makeEdge(identifier: string, targetNodeId: string, edgeIndex: number): StudioEdge {
   return {
     id: `edge-${edgeIndex}`,
     source: "entry",

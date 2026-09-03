@@ -66,9 +66,7 @@ describe("useProductFlow", () => {
         ProductScreenIndex.SELECTION,
         ProductScreenIndex.VIA_PLATFORM,
       ]);
-      expect(rendered.result.current.currentScreenIndex).toBe(
-        ProductScreenIndex.VIA_PLATFORM,
-      );
+      expect(rendered.result.current.currentScreenIndex).toBe(ProductScreenIndex.VIA_PLATFORM);
     });
 
     it("goes back from the platform screen to the selection screen", () => {
@@ -81,9 +79,7 @@ describe("useProductFlow", () => {
         rendered.result.current.navigation.prevScreen();
       });
 
-      expect(rendered.result.current.currentScreenIndex).toBe(
-        ProductScreenIndex.SELECTION,
-      );
+      expect(rendered.result.current.currentScreenIndex).toBe(ProductScreenIndex.SELECTION);
     });
   });
 
@@ -93,9 +89,7 @@ describe("useProductFlow", () => {
 
       const rendered = renderHook(() => useProductFlow());
 
-      expect(rendered.result.current.currentScreenIndex).toBe(
-        ProductScreenIndex.VIA_PLATFORM,
-      );
+      expect(rendered.result.current.currentScreenIndex).toBe(ProductScreenIndex.VIA_PLATFORM);
       expect(rendered.result.current.flow.visibleScreens).not.toContain(
         ProductScreenIndex.MODEL_PROVIDER,
       );

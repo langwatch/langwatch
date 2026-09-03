@@ -32,10 +32,7 @@ import { AuthCard } from "../auth-card";
 import { FrontDoorShell } from "../../sections/front-door-shell";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const castleSnakeSource = readFileSync(
-  join(here, "..", "castle-snake.tsx"),
-  "utf8",
-);
+const castleSnakeSource = readFileSync(join(here, "..", "castle-snake.tsx"), "utf8");
 
 const renderDoor = () =>
   render(
@@ -71,9 +68,7 @@ describe("given a hosted deployment with the front door enabled", () => {
       fireEvent.dblClick(castle());
 
       expect(game()).toBeTruthy();
-      expect(screen.getByTestId("castle-snake-hud")).toHaveTextContent(
-        /0 tokens/i,
-      );
+      expect(screen.getByTestId("castle-snake-hud")).toHaveTextContent(/0 tokens/i);
     });
 
     /** @scenario The castle opens on a double-tap and on nothing else */
@@ -110,9 +105,7 @@ describe("given a hosted deployment with the front door enabled", () => {
         position: "fixed",
         pointerEvents: "none",
       });
-      expect(screen.getByTestId("front-door-card-column").contains(card)).toBe(
-        true,
-      );
+      expect(screen.getByTestId("front-door-card-column").contains(card)).toBe(true);
       expect(screen.getByLabelText("Email")).toBeTruthy();
     });
 

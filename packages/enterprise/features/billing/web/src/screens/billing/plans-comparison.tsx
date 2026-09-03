@@ -92,9 +92,7 @@ function getPlanPrice(
   if (planId === "growth") {
     const p = getGrowthSeatPriceCents();
     const cents =
-      billingPeriod === "annual"
-        ? Math.round(p[currency].annual / 12)
-        : p[currency].monthly;
+      billingPeriod === "annual" ? Math.round(p[currency].annual / 12) : p[currency].monthly;
     return `${formatPrice({ cents, currency })} per seat/month`;
   }
   return "Custom pricing";
@@ -222,17 +220,13 @@ function PlanCard({
   );
 }
 
-export function PlansComparisonPage({
-  activePlan,
-  pricingModel,
-}: PlansComparisonPageProps) {
+export function PlansComparisonPage({ activePlan, pricingModel }: PlansComparisonPageProps) {
   const currentPlan = resolveCurrentComparisonPlan(activePlan);
   const showTieredNotice = pricingModel === "TIERED" && !activePlan?.free;
 
   const detectedCurrency = billingApi.currency.detectCurrency.useQuery({});
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
-  const currency =
-    selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
+  const currency = selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
   const [billingPeriod, setBillingPeriod] = useState<BillingInterval>("monthly");
 
   if (detectedCurrency.isLoading) {
@@ -330,11 +324,7 @@ export function PlansComparisonPage({
               )
             }
           >
-            {currency === PrismaCurrency.EUR ? (
-              <Euro size={14} />
-            ) : (
-              <DollarSign size={14} />
-            )}
+            {currency === PrismaCurrency.EUR ? <Euro size={14} /> : <DollarSign size={14} />}
             {currency}
           </Button>
         </Box>

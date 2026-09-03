@@ -73,9 +73,7 @@ void (async () => {
         const heading = page.locator('text="Trace Ingest"').first();
         await heading.waitFor({ state: "visible", timeout: 10_000 });
         await heading.scrollIntoViewIfNeeded();
-        const section = heading.locator(
-          'xpath=ancestor::*[contains(@class, "css-")][1]/..',
-        );
+        const section = heading.locator('xpath=ancestor::*[contains(@class, "css-")][1]/..');
         await section.first().screenshot({
           path: path.join(OUTPUT_DIR, "me-trace-ingest-tile-grid.png"),
         });

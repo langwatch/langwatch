@@ -105,9 +105,7 @@ describe("scenario child process wiring", () => {
       expect(source).toContain("ScenarioRunner.judgeAgent({");
       // Remote fetching arrives through the run configuration alone.
       expect(source).toContain("...buildRemoteTraceRunConfig({");
-      expect(source).toContain(
-        "traceWaitTimeoutMs: jobData.traceWaitTimeoutMs",
-      );
+      expect(source).toContain("traceWaitTimeoutMs: jobData.traceWaitTimeoutMs");
     });
   });
 });

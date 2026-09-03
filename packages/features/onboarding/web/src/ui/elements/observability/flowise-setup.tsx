@@ -53,8 +53,8 @@ export function FlowiseSetup(): React.ReactElement {
         <VStack align="stretch" gap={2}>
           <Text fontWeight="semibold">2. Go to the Analyse Chatflow tab</Text>
           <Text fontSize="sm" color="fg.muted">
-            Navigate to the <strong>Analyse Chatflow</strong> tab to find the LangWatch
-            integration option
+            Navigate to the <strong>Analyse Chatflow</strong> tab to find the LangWatch integration
+            option
           </Text>
           <Card.Root
             overflow="hidden"
@@ -82,9 +82,7 @@ export function FlowiseSetup(): React.ReactElement {
         <Separator />
 
         <VStack align="stretch" gap={2}>
-          <Text fontWeight="semibold">
-            3. Create a new credential and enable LangWatch
-          </Text>
+          <Text fontWeight="semibold">3. Create a new credential and enable LangWatch</Text>
           <Text fontSize="sm" color="fg.muted">
             Add your API key to create the LangWatch credential and enable the integration
           </Text>
@@ -116,8 +114,7 @@ export function FlowiseSetup(): React.ReactElement {
         <VStack align="stretch" gap={2}>
           <Text fontWeight="semibold">4. Test the integration</Text>
           <Text fontSize="sm" color="fg.muted">
-            Send a message to your agent or chatflow to see it on LangWatch and start
-            monitoring
+            Send a message to your agent or chatflow to see it on LangWatch and start monitoring
           </Text>
         </VStack>
       </VStack>

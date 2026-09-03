@@ -28,11 +28,7 @@ const noop = () => {};
 
 const renderEditor = (value: string, availableVariables: string[]) =>
   render(
-    <LiquidConditionEditor
-      value={value}
-      onChange={noop}
-      availableVariables={availableVariables}
-    />,
+    <LiquidConditionEditor value={value} onChange={noop} availableVariables={availableVariables} />,
     { wrapper: Wrapper },
   );
 

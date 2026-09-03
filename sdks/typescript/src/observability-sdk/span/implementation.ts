@@ -16,10 +16,7 @@ import {
   type SpanType,
 } from "./types";
 import { type Prompt } from "@/client-sdk/services/prompts";
-import {
-  type ChatMessage,
-  type SpanInputOutput,
-} from "../../internal/generated/types/tracer";
+import { type ChatMessage, type SpanInputOutput } from "../../internal/generated/types/tracer";
 import * as intSemconv from "../semconv/attributes";
 import { processSpanInputOutput } from "./input-output";
 import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";
@@ -118,10 +115,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
   }
 
   setRAGContexts(ragContexts: LangWatchSpanRAGContext[]): this {
-    return this.setAttribute(
-      intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
-      JSON.stringify(ragContexts),
-    );
+    return this.setAttribute(intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS, JSON.stringify(ragContexts));
   }
 
   setRAGContext(ragContext: LangWatchSpanRAGContext): this {
@@ -157,10 +151,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
   setOutput(output: any): this;
   setOutput(typeOrOutput: any, output?: any): this {
     const spanOutput = processSpanInputOutput(typeOrOutput, output);
-    return this.setAttribute(
-      intSemconv.ATTR_LANGWATCH_OUTPUT,
-      JSON.stringify(spanOutput),
-    );
+    return this.setAttribute(intSemconv.ATTR_LANGWATCH_OUTPUT, JSON.stringify(spanOutput));
   }
 }
 

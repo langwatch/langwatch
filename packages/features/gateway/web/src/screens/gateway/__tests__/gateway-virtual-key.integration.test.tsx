@@ -149,9 +149,7 @@ const host = fakeGatewayHost({
       {
         id: TEAM_ID,
         name: "platform",
-        projects: [
-          { id: PROJECT_ID, name: "web-app", slug: "web-app", teamId: TEAM_ID },
-        ],
+        projects: [{ id: PROJECT_ID, name: "web-app", slug: "web-app", teamId: TEAM_ID }],
       },
     ],
   },
@@ -186,10 +184,7 @@ function baseKey(overrides: Record<string, unknown> = {}) {
 }
 
 function renderPage() {
-  return renderWithGatewayHost(
-    <VirtualKeyDetailPage />,
-    { host },
-  );
+  return renderWithGatewayHost(<VirtualKeyDetailPage />, { host });
 }
 
 describe("virtual key detail page", () => {
@@ -234,9 +229,7 @@ describe("virtual key detail page", () => {
     it("badges a key past its date as expired", async () => {
       detail.current = baseKey({ expiresAt: "2020-01-01T00:00:00.000Z" });
       renderPage();
-      expect((await screen.findByTestId("vk-detail-status")).textContent).toContain(
-        "expired",
-      );
+      expect((await screen.findByTestId("vk-detail-status")).textContent).toContain("expired");
     });
 
     /** @scenario "An expired key can still be edited so the date can be extended" */
@@ -244,9 +237,7 @@ describe("virtual key detail page", () => {
       detail.current = baseKey({ expiresAt: "2020-01-01T00:00:00.000Z" });
       renderPage();
 
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: /Edit/ })).toBeVisible(),
-      );
+      await waitFor(() => expect(screen.getByRole("button", { name: /Edit/ })).toBeVisible());
       expect(screen.getByRole("button", { name: /Rotate/ })).toBeVisible();
       expect(screen.getByRole("button", { name: /Disable/ })).toBeVisible();
       expect(screen.getByRole("button", { name: /Revoke/ })).toBeVisible();
@@ -259,9 +250,7 @@ describe("virtual key detail page", () => {
       renderPage();
 
       const header = await screen.findByTestId("vk-header-view-traces");
-      expect(header.closest("a")?.getAttribute("href")).toContain(
-        "/web-app/traces#all-traces?",
-      );
+      expect(header.closest("a")?.getAttribute("href")).toContain("/web-app/traces#all-traces?");
       expect(
         screen.getByTestId("vk-usage-view-traces").closest("a")?.getAttribute("href"),
       ).toContain("/web-app/traces#all-traces?");
@@ -283,9 +272,7 @@ describe("virtual key detail page", () => {
     it("asks the server for that model only, and carries it into the traces link", async () => {
       renderPage();
 
-      await userEvent.click(
-        await screen.findByTestId("vk-usage-model-claude-sonnet-4-5"),
-      );
+      await userEvent.click(await screen.findByTestId("vk-usage-model-claude-sonnet-4-5"));
 
       await waitFor(() => expect(usageInputs.at(-1)?.model).toBe("claude-sonnet-4-5"));
       expect(
@@ -335,9 +322,7 @@ describe("virtual key detail page", () => {
       policy.current = { data: undefined, isError: true };
       renderPage();
 
-      expect((await screen.findByTestId("vk-routing-policy-id")).textContent).toBe(
-        "rp-eu",
-      );
+      expect((await screen.findByTestId("vk-routing-policy-id")).textContent).toBe("rp-eu");
       expect(screen.queryByTestId("vk-routing-policy-link")).not.toBeInTheDocument();
     });
 
@@ -354,13 +339,9 @@ describe("virtual key detail page", () => {
       renderPage();
 
       await waitFor(() =>
-        expect(
-          screen.getByTestId("vk-provider-outside-policy-mp-anthropic"),
-        ).toBeVisible(),
+        expect(screen.getByTestId("vk-provider-outside-policy-mp-anthropic")).toBeVisible(),
       );
-      expect(
-        screen.queryByTestId("vk-provider-outside-policy-mp-openai"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("vk-provider-outside-policy-mp-openai")).not.toBeInTheDocument();
     });
   });
 
@@ -372,9 +353,7 @@ describe("virtual key detail page", () => {
       });
       renderPage();
 
-      await waitFor(() =>
-        expect(screen.getByText("Allowed model providers")).toBeVisible(),
-      );
+      await waitFor(() => expect(screen.getByText("Allowed model providers")).toBeVisible());
       expect(screen.getByText("Anthropic")).toBeVisible();
       expect(screen.queryByText("OpenAI")).not.toBeInTheDocument();
       expect(screen.getByText(/can route to 1 provider/)).toBeInTheDocument();

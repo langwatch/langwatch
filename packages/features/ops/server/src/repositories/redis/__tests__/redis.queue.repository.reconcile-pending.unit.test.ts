@@ -79,11 +79,7 @@ class FakeRedis {
     isHeldByCaller: boolean;
   }[] = [];
 
-  async set(
-    key: string,
-    value: string,
-    ...options: (string | number)[]
-  ): Promise<string | null> {
+  async set(key: string, value: string, ...options: (string | number)[]): Promise<string | null> {
     if (options.includes("NX") && this.strings.has(key)) return null;
     this.strings.set(key, value);
     const pxIndex = options.indexOf("PX");
@@ -264,10 +260,7 @@ class FakeRedis {
     index: string;
     indexType: "zset" | "set";
   }): void {
-    const jobs = Array.from(
-      { length: params.jobCount },
-      (_, i) => `${params.groupId}-job-${i}`,
-    );
+    const jobs = Array.from({ length: params.jobCount }, (_, i) => `${params.groupId}-job-${i}`);
     this.zsets.set(`${PREFIX}group:${params.groupId}:jobs`, jobs);
     const container =
       params.indexType === "zset"
@@ -329,10 +322,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
         // left to adopt the sweep is not due, and a pass touches only the
         // indexes. The keyspace walk is reserved for adopting groups the index
         // does not know about yet.
-        redis.strings.set(
-          `${PREFIX}stats:pending-recon-sweep-due`,
-          String(Date.now() + 60_000),
-        );
+        redis.strings.set(`${PREFIX}stats:pending-recon-sweep-due`, String(Date.now() + 60_000));
 
         await repo.tryReconcileTotalPending(QUEUE_NAME);
 
@@ -394,9 +384,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
           .filter((event) => event === "lease-refresh").length;
         expect(refreshesAfterFirstBatch).toBe(batches);
 
-        const leaseRefreshes = redis.evalshaCalls.filter(
-          (call) => call.ttlMs === LEASE_MS,
-        );
+        const leaseRefreshes = redis.evalshaCalls.filter((call) => call.ttlMs === LEASE_MS);
         expect(leaseRefreshes.every((call) => call.key === MARKER_KEY)).toBe(true);
       });
 
@@ -644,13 +632,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
       // pending index nowhere, and in no lifecycle index at the moment each of
       // those is read — unblocked into an already-scanned `ready` before
       // `blocked` was reached.
-      redis.zsets.set(`${PREFIX}group:tenant-a/mover:jobs`, [
-        "j1",
-        "j2",
-        "j3",
-        "j4",
-        "j5",
-      ]);
+      redis.zsets.set(`${PREFIX}group:tenant-a/mover:jobs`, ["j1", "j2", "j3", "j4", "j5"]);
       redis.strings.set(COUNTER_KEY, "0");
     });
 

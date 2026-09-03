@@ -27,14 +27,7 @@ export async function startLangevals(
     spec: {
       name: "langevals",
       command: uvBin,
-      args: [
-        "run",
-        "--project",
-        projectDir,
-        "--no-sync",
-        "python",
-        join("langevals", "server.py"),
-      ],
+      args: ["run", "--project", projectDir, "--no-sync", "python", join("langevals", "server.py")],
       env: {
         ...process.env,
         ...envFromFile,

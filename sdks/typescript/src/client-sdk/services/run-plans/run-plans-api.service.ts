@@ -1,8 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
@@ -71,11 +68,7 @@ export class RunPlansApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(
-    operation: string,
-    error: unknown,
-    response?: Response,
-  ): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const status = response?.status ?? extractStatusFromResponse(error);
     const message = formatApiErrorForOperation({
       operation,
@@ -88,23 +81,17 @@ export class RunPlansApiService {
 
   /** The project's run plans. Archived plans are left out unless asked for. */
   async list(options?: { includeArchived?: boolean }): Promise<RunPlan[]> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/run-plans",
-      {
-        ...(options?.includeArchived
-          ? { params: { query: { includeArchived: "true" } } }
-          : {}),
-      },
-    );
+    const { data, error, response } = await this.apiClient.GET("/api/v1/run-plans", {
+      ...(options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {}),
+    });
     if (error) this.handleApiError("list run plans", error, response);
     return data as unknown as RunPlan[];
   }
 
   async get(id: string): Promise<RunPlan> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/run-plans/{id}",
-      { params: { path: { id } } },
-    );
+    const { data, error, response } = await this.apiClient.GET("/api/v1/run-plans/{id}", {
+      params: { path: { id } },
+    });
     if (error) this.handleApiError(`get run plan "${id}"`, error, response);
     return data as unknown as RunPlan;
   }
@@ -116,32 +103,27 @@ export class RunPlansApiService {
    * value every reader then has to filter out.
    */
   async run(body: RunPlanRunBody): Promise<RunPlanRunResult> {
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/run-plans/run",
-      { body: withTrimmedNote(body) },
-    );
+    const { data, error, response } = await this.apiClient.POST("/api/v1/run-plans/run", {
+      body: withTrimmedNote(body),
+    });
     if (error) this.handleApiError("run a run plan", error, response);
     return data as unknown as RunPlanRunResult;
   }
 
   /** Runs a plan again with the configuration it already holds. */
-  async rerun(
-    id: string,
-    body: RunPlanRerunBody = {},
-  ): Promise<RunPlanRunResult> {
-    const { data, error, response} = await this.apiClient.POST(
-      "/api/v1/run-plans/{id}/run",
-      { params: { path: { id } }, body: withTrimmedNote(body) },
-    );
+  async rerun(id: string, body: RunPlanRerunBody = {}): Promise<RunPlanRunResult> {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/run-plans/{id}/run", {
+      params: { path: { id } },
+      body: withTrimmedNote(body),
+    });
     if (error) this.handleApiError(`rerun run plan "${id}"`, error, response);
     return data as unknown as RunPlanRunResult;
   }
 
   async archive(id: string): Promise<{ id: string; archived: true }> {
-    const { data, error, response } = await this.apiClient.DELETE(
-      "/api/v1/run-plans/{id}",
-      { params: { path: { id } } },
-    );
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/run-plans/{id}", {
+      params: { path: { id } },
+    });
     if (error) this.handleApiError(`archive run plan "${id}"`, error, response);
     return data as unknown as { id: string; archived: true };
   }

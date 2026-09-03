@@ -5,10 +5,7 @@ import type {
 } from "@langwatch/agent-contract";
 
 export interface AgentsWorkflowPort {
-  fields(input: {
-    projectId: string;
-    workflowIds: string[];
-  }): Promise<Record<string, AgentFields>>;
+  fields(input: { projectId: string; workflowIds: string[] }): Promise<Record<string, AgentFields>>;
   related(input: {
     projectId: string;
     workflowId: string;

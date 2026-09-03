@@ -38,10 +38,7 @@ export function shortenChipId(id: string): string {
 }
 
 /** The stable chip a trace becomes, wherever it was picked up from. */
-export function traceContextChip(
-  traceId: string,
-  displayName?: string | null,
-): LangyContextChip {
+export function traceContextChip(traceId: string, displayName?: string | null): LangyContextChip {
   const name = displayName?.trim();
   return {
     id: `trace:${traceId}`,

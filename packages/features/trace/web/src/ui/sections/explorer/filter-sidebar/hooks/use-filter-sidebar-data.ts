@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
-import {
-  analyzeOrGroups,
-  buildFacetStateLookup,
-  getFacetValues,
-} from "@langwatch/trace-contract";
+import { analyzeOrGroups, buildFacetStateLookup, getFacetValues } from "@langwatch/trace-contract";
 import { useTraceFacets } from "../../hooks/use-trace-facets";
 import type { NumericMode } from "../../../../../index";
 import {
@@ -116,9 +112,7 @@ export function useFilterSidebarData() {
   const hideFacet = useFacetVisibilityStore((s) => s.hideFacet);
   const resetAllVisibility = useFacetVisibilityStore((s) => s.resetAll);
   const visibilityHydrate = useFacetVisibilityStore((s) => s.hydrateFromStorage);
-  const visibilityPrefs = useFacetVisibilityStore((s) =>
-    selectVisibilityFor(s, projectId),
-  );
+  const visibilityPrefs = useFacetVisibilityStore((s) => selectVisibilityFor(s, projectId));
   useEffect(() => {
     if (projectId) visibilityHydrate(projectId);
   }, [projectId, visibilityHydrate]);
@@ -127,9 +121,7 @@ export function useFilterSidebarData() {
   // Owned outside the sidebar (per-project, like visibility) — read the
   // overrides here and resolve the effective mode against the registry
   // default further down (`numericModeByKey`).
-  const numericModes = useNumericModeStore((s) =>
-    selectNumericModesFor({ state: s, projectId }),
-  );
+  const numericModes = useNumericModeStore((s) => selectNumericModesFor({ state: s, projectId }));
   const setNumericModeRaw = useNumericModeStore((s) => s.setMode);
   const numericModeHydrate = useNumericModeStore((s) => s.hydrateFromStorage);
   useEffect(() => {
@@ -611,10 +603,7 @@ function synthesizeDefaultDescriptors(): Descriptors {
  * becomes a tickable row (value === label === the number), so the existing
  * categorical FacetSection renders the "Discrete" presentation unchanged.
  */
-function buildDiscreteFacetItems(
-  range: RangeSectionData,
-  synthetic: boolean,
-): FacetItem[] {
+function buildDiscreteFacetItems(range: RangeSectionData, synthetic: boolean): FacetItem[] {
   const dimmed = !VIBRANT_FIELDS.has(range.key);
   return (range.discrete?.values ?? []).map((dv) => ({
     value: String(dv.value),
@@ -636,9 +625,7 @@ function buildFacetItems(cat: CategoricalSection, synthetic: boolean): FacetItem
   // the sidebar drilldown for `evaluator:<id>` can show pass/fail /
   // score-range without a second round-trip.
   const aggregates = new Map(
-    cat.topValues
-      .filter((v) => v.aggregates !== undefined)
-      .map((v) => [v.value, v.aggregates!]),
+    cat.topValues.filter((v) => v.aggregates !== undefined).map((v) => [v.value, v.aggregates!]),
   );
   const orderedValues = orderValues({
     defaults: FACET_DEFAULTS[cat.key],

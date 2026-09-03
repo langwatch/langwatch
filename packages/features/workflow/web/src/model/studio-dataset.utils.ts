@@ -87,9 +87,8 @@ const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {
   image: "image",
 };
 
-export const datasetColumnTypeToFieldType = (
-  columnType: DatasetColumnType,
-): Field["type"] => columnTypeToFieldTypeMap[columnType];
+export const datasetColumnTypeToFieldType = (columnType: DatasetColumnType): Field["type"] =>
+  columnTypeToFieldTypeMap[columnType];
 
 export function fieldsToDatasetColumns(fields: Field[]): DatasetColumns {
   return fields.map((field) => ({
@@ -105,9 +104,7 @@ export function datasetColumnsToFields(columns: DatasetColumns): Field[] {
   }));
 }
 
-export function inMemoryDatasetToNodeDataset(
-  dataset: StudioInMemoryDataset,
-): NodeDataset {
+export function inMemoryDatasetToNodeDataset(dataset: StudioInMemoryDataset): NodeDataset {
   return dataset.datasetId
     ? {
         id: dataset.datasetId,

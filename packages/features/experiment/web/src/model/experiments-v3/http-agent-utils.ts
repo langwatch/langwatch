@@ -24,9 +24,7 @@ import type { HttpConfig, TargetConfig } from "./types";
  * extractVariablesFromBodyTemplate('{"thread_id": "{{thread_id}}", "messages": {{messages}}}')
  * // Returns: ["thread_id", "messages"]
  */
-export const extractVariablesFromBodyTemplate = (
-  bodyTemplate: string | undefined,
-): string[] => {
+export const extractVariablesFromBodyTemplate = (bodyTemplate: string | undefined): string[] => {
   if (!bodyTemplate) return [];
 
   const pattern = /\{\{(\w+)\}\}/g;
@@ -70,9 +68,7 @@ export const convertHttpComponentConfig = (config: HttpComponentConfig): HttpCon
  * @param bodyTemplate - The body template with mustache variables
  * @returns Array of Field objects for the inputs
  */
-export const buildInputsFromBodyTemplate = (
-  bodyTemplate: string | undefined,
-): Field[] => {
+export const buildInputsFromBodyTemplate = (bodyTemplate: string | undefined): Field[] => {
   const variables = extractVariablesFromBodyTemplate(bodyTemplate);
   return variables.map((name) => ({
     identifier: name,

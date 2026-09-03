@@ -23,14 +23,11 @@ import { LOCAL_METHOD_SET } from "../services/signin-method-policy.service";
  * port's answer and no guard, command or test has to change to start
  * enforcing them.
  */
-export class LocalDoorBreakGlassBinding
-  implements SsoBreakGlassBindingRepository
-{
+export class LocalDoorBreakGlassBinding implements SsoBreakGlassBindingRepository {
   constructor(
     /** The instance's local method set. Injected so a test can express an
      *  instance with no local door without reaching for env. */
-    private readonly localMethods: () => readonly unknown[] = () =>
-      LOCAL_METHOD_SET,
+    private readonly localMethods: () => readonly unknown[] = () => LOCAL_METHOD_SET,
   ) {}
 
   async hasLiveBinding(_args: { organizationId: string }): Promise<boolean> {

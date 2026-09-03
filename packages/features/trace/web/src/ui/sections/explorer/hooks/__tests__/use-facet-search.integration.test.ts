@@ -52,9 +52,7 @@ afterEach(() => vi.clearAllMocks());
 describe("useFacetSearch", () => {
   describe("when enabled with a project and a facetKey", () => {
     it("forwards the typed prefix to facetValues", () => {
-      renderHook(() =>
-        useFacetSearch({ facetKey: "service", prefix: "fin", enabled: true }),
-      );
+      renderHook(() => useFacetSearch({ facetKey: "service", prefix: "fin", enabled: true }));
 
       expect(lastInput()?.facetKey).toBe("service");
       expect(lastInput()?.prefix).toBe("fin");
@@ -62,9 +60,7 @@ describe("useFacetSearch", () => {
     });
 
     it("omits an all-whitespace prefix (sends undefined, not a blank string)", () => {
-      renderHook(() =>
-        useFacetSearch({ facetKey: "service", prefix: "   ", enabled: true }),
-      );
+      renderHook(() => useFacetSearch({ facetKey: "service", prefix: "   ", enabled: true }));
 
       expect(lastInput()?.prefix).toBeUndefined();
     });
@@ -73,9 +69,7 @@ describe("useFacetSearch", () => {
   describe("when there is no project", () => {
     it("disables the query", () => {
       harness.projectId.value = undefined;
-      renderHook(() =>
-        useFacetSearch({ facetKey: "service", prefix: "fin", enabled: true }),
-      );
+      renderHook(() => useFacetSearch({ facetKey: "service", prefix: "fin", enabled: true }));
 
       expect(lastOpts()?.enabled).toBe(false);
     });

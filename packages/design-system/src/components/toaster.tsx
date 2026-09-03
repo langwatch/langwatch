@@ -83,16 +83,11 @@ export function Toaster({
         {(toast) => {
           const status = statusOf(toast.type);
           return (
-            <Toast.Root
-              width={{ md: "sm" }}
-              role={status === "error" ? "alert" : undefined}
-            >
+            <Toast.Root width={{ md: "sm" }} role={status === "error" ? "alert" : undefined}>
               <StatusIcon status={status} />
               <Stack gap="0.5" flex="1" maxWidth="100%">
                 {toast.title && <Toast.Title>{toast.title}</Toast.Title>}
-                {toast.description && (
-                  <Toast.Description>{toast.description}</Toast.Description>
-                )}
+                {toast.description && <Toast.Description>{toast.description}</Toast.Description>}
                 {renderMeta?.(toast.meta)}
                 {toast.action && (
                   <Toast.ActionTrigger

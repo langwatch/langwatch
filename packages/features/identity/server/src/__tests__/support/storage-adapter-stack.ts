@@ -14,33 +14,18 @@ import {
   IdentityEngineUnavailableError,
   runWithIdentityBirth,
 } from "../../better-auth/identity-birth";
-import {
-  bridgeAccountCeremonies,
-  IdentityCeremonies,
-} from "../../better-auth/identity-ceremonies";
+import { bridgeAccountCeremonies, IdentityCeremonies } from "../../better-auth/identity-ceremonies";
 import { createIdentityStorageAdapter } from "../../better-auth/identity-storage-adapter";
-import type {
-  IdentityAccountsPort,
-  IdentityResolutionPort,
-} from "../../better-auth/storage-ports";
+import type { IdentityAccountsPort, IdentityResolutionPort } from "../../better-auth/storage-ports";
 import { IdentityGuards } from "../../guards";
-import {
-  adoptUserEmailCommandId,
-  newIdentityCommandId,
-} from "../../identity-command-id";
+import { adoptUserEmailCommandId, newIdentityCommandId } from "../../identity-command-id";
 import type { IdentityLedger } from "../../identity-ledger";
 import type { IdentityUsersRepository } from "../../identity-users.repository";
 import { IdentityService } from "../../identity.service";
-import {
-  InMemoryIdentityEventStore,
-  inMemoryIdentityLedger,
-} from "./in-memory-event-store";
+import { InMemoryIdentityEventStore, inMemoryIdentityLedger } from "./in-memory-event-store";
 import { InMemoryHeads, T0 } from "./in-memory-heads";
 import { InMemoryReservations } from "./in-memory-reservations";
-import {
-  inertIdentityPorts,
-  InMemoryIdentityStorage,
-} from "./in-memory-identity-storage";
+import { inertIdentityPorts, InMemoryIdentityStorage } from "./in-memory-identity-storage";
 
 export const PASSWORD = "correct-horse-battery";
 export const NEW_PASSWORD = "staple-battery-horse";
@@ -135,8 +120,7 @@ export function identityStack({
   const migrationState = new Map<string, "migrated" | "finalized">();
   const engine = { available: true };
   const finalized = {
-    is: (userId: string) =>
-      migrationState.get(userId) === "finalized" || gate.open(userId),
+    is: (userId: string) => migrationState.get(userId) === "finalized" || gate.open(userId),
   };
 
   /** The event store the ledger appends through — carrying the real store's
@@ -182,19 +166,14 @@ export function identityStack({
     (userId) => finalized.is(userId),
     db.account ?? [],
   );
-  const isUserOnIdentityWrites = async ({ userId }: { userId: string }) =>
-    gate.open(userId);
+  const isUserOnIdentityWrites = async ({ userId }: { userId: string }) => gate.open(userId);
   /** The fleet-level short-circuit, answered from the same two sources the
    *  per-user fork reads rather than a third one kept in step by hand. */
   const isAnyoneOnIdentityWrites = async () =>
-    (db.user ?? []).some(
-      (row) => typeof row.id === "string" && gate.open(row.id),
-    ) || [...migrationState.values()].includes("finalized");
+    (db.user ?? []).some((row) => typeof row.id === "string" && gate.open(row.id)) ||
+    [...migrationState.values()].includes("finalized");
 
-  const identity = new IdentityService(
-    new IdentityGuards(heads, users, reservations),
-    ledger,
-  );
+  const identity = new IdentityService(new IdentityGuards(heads, users, reservations), ledger);
 
   const ceremonies = new IdentityCeremonies(
     heads,
@@ -249,12 +228,8 @@ export function identityStack({
     },
   };
 
-  const accounts: IdentityAccountsPort = inert
-    ? inertIdentityPorts.accounts
-    : storage;
-  const resolution: IdentityResolutionPort = inert
-    ? inertIdentityPorts.resolution
-    : storage;
+  const accounts: IdentityAccountsPort = inert ? inertIdentityPorts.accounts : storage;
+  const resolution: IdentityResolutionPort = inert ? inertIdentityPorts.resolution : storage;
 
   const bridge = bridgeAccountCeremonies({
     ceremonies,
@@ -296,10 +271,7 @@ export function identityStack({
   };
 }
 
-export async function signUp(
-  auth: AuthUnderTest,
-  email: string,
-): Promise<string> {
+export async function signUp(auth: AuthUnderTest, email: string): Promise<string> {
   const response = await auth.api.signUpEmail({
     body: { email, password: PASSWORD, name: "Sam" },
     asResponse: true,
@@ -312,10 +284,7 @@ export async function signUp(
  * route boundary does once the backend feature-flag check passes (ADR-116
  * §3). Nothing below the marker re-decides the flag.
  */
-export function flaggedSignUp(
-  auth: AuthUnderTest,
-  email: string,
-): Promise<string> {
+export function flaggedSignUp(auth: AuthUnderTest, email: string): Promise<string> {
   return runWithIdentityBirth(() => signUp(auth, email));
 }
 
@@ -325,10 +294,7 @@ export function flaggedSignUp(
  * status code, which is the wrong lens for asserting that a refusal kept its
  * handled code all the way out.
  */
-export function flaggedSignUpOrThrow(
-  auth: AuthUnderTest,
-  email: string,
-): Promise<unknown> {
+export function flaggedSignUpOrThrow(auth: AuthUnderTest, email: string): Promise<unknown> {
   return runWithIdentityBirth(() =>
     auth.api.signUpEmail({
       body: { email, password: PASSWORD, name: "Sam" },

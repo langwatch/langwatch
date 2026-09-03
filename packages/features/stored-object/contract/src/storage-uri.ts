@@ -17,9 +17,7 @@ export function mintStoredObjectUri({
     case "s3":
       return `s3://${destination.bucket}/${objectPath}`;
     case "file": {
-      const root = destination.root.startsWith("/")
-        ? destination.root
-        : `/${destination.root}`;
+      const root = destination.root.startsWith("/") ? destination.root : `/${destination.root}`;
       return `file://${root}/${objectPath}`;
     }
     case "azure":
@@ -147,7 +145,5 @@ export function redactStoredObjectAuthorizationMaterial(text: string): string {
 }
 
 export function redactStoredObjectStorageErrorText(text: string): string {
-  return redactStoredObjectAuthorizationMaterial(
-    redactStoredObjectStorageUrisInText(text),
-  );
+  return redactStoredObjectAuthorizationMaterial(redactStoredObjectStorageUrisInText(text));
 }

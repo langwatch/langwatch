@@ -3,12 +3,8 @@ import { createLangyFeatureMap, parseCliToolName } from "../../../index";
 
 const featureMap = createLangyFeatureMap(rawFeatureMap);
 
-export const {
-  FEATURES,
-  featureForCliCommand,
-  featureForCliToolName,
-  featuresConsuming,
-} = featureMap;
+export const { FEATURES, featureForCliCommand, featureForCliToolName, featuresConsuming } =
+  featureMap;
 
 export { parseCliToolName };
 export type {

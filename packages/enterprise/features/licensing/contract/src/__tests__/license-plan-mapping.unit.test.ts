@@ -4,9 +4,7 @@ import { mapToPlanInfo } from "../index";
 import type { LicenseData } from "../index";
 
 describe("mapToPlanInfo", () => {
-  const createLicenseData = (
-    planOverrides: Partial<LicenseData["plan"]> = {},
-  ): LicenseData => ({
+  const createLicenseData = (planOverrides: Partial<LicenseData["plan"]> = {}): LicenseData => ({
     licenseId: "lic-test-001",
     version: 1,
     organizationName: "Test Org",
@@ -180,9 +178,7 @@ describe("mapToPlanInfo", () => {
     const withFlag = mapToPlanInfo(createLicenseData({ webhookEndpointsEnabled: true }));
     expect(withFlag.webhookEndpointsEnabled).toBe(true);
 
-    const explicitlyOff = mapToPlanInfo(
-      createLicenseData({ webhookEndpointsEnabled: false }),
-    );
+    const explicitlyOff = mapToPlanInfo(createLicenseData({ webhookEndpointsEnabled: false }));
     expect(explicitlyOff.webhookEndpointsEnabled).toBe(false);
 
     // Omitted stays omitted through the mapping. The plan's tier answers it at

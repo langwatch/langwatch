@@ -32,10 +32,7 @@ describe("checkTenantScope", () => {
           "a predicate inside parentheses",
           "SELECT 1 FROM t WHERE (TenantId = {tenantId:String}) AND x = 1",
         ],
-        [
-          "an unusually named parameter",
-          "SELECT 1 FROM t WHERE TenantId = {scope_id:String}",
-        ],
+        ["an unusually named parameter", "SELECT 1 FROM t WHERE TenantId = {scope_id:String}"],
       ])("accepts %s", (_label, sql) => {
         const param = /\{\s*(\w+)\s*:/.exec(sql)?.[1] as string;
 
@@ -117,9 +114,9 @@ describe("checkTenantScope", () => {
         ["a line comment", "SELECT 1 FROM t -- WHERE TenantId = {t:String}"],
         ["a block comment", "/* TenantId = {t:String} */ SELECT 1 FROM t"],
       ])("refuses %s, which is the case the guard exists for", (_label, sql) => {
-        expect(
-          checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT }),
-        ).toEqual({ kind: "missing-predicate" });
+        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toEqual({
+          kind: "missing-predicate",
+        });
       });
     });
   });
@@ -141,9 +138,9 @@ describe("checkTenantScope", () => {
           "SELECT * FROM (SELECT Id FROM t WHERE TenantId = {t:String}) WHERE a = 1 OR b = 2",
         ],
       ])("refuses %s", (_label, sql) => {
-        expect(
-          checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT }),
-        ).toEqual({ kind: "weakening-disjunction" });
+        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toEqual({
+          kind: "weakening-disjunction",
+        });
       });
     });
 
@@ -162,9 +159,7 @@ describe("checkTenantScope", () => {
           "SELECT 1 FROM t WHERE TenantId = {t:String} ORDER BY OccurredAt",
         ],
       ])("accepts %s, because it cannot weaken the scoping", (_label, sql) => {
-        expect(
-          checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT }),
-        ).toBeNull();
+        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toBeNull();
       });
     });
   });
@@ -188,9 +183,7 @@ describe("checkTenantScope", () => {
           "SELECT * FROM (SELECT Id FROM t WHERE TenantId = {t:String}) UNION ALL SELECT Id FROM t",
         ],
       ])("still accepts %s", (_label, sql) => {
-        expect(
-          checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT }),
-        ).toBeNull();
+        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toBeNull();
       });
     });
   });
@@ -275,9 +268,9 @@ describe("TenantGuard", () => {
       it("explains how to fix it", async () => {
         const execute = guardedBy(passthrough);
 
-        await expect(
-          execute(request({ sql: "SELECT 1 FROM t", params: {} })),
-        ).rejects.toThrow(/TenantId = \{param:String\}/);
+        await expect(execute(request({ sql: "SELECT 1 FROM t", params: {} }))).rejects.toThrow(
+          /TenantId = \{param:String\}/,
+        );
       });
     });
   });

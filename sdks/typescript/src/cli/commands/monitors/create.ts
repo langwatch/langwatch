@@ -42,9 +42,7 @@ export const createMonitorCommand = async (
   const validModes = ["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"];
   if (options.executionMode && !validModes.includes(options.executionMode)) {
     reportCommandError({
-      error: commandValidationError(
-        `--execution-mode must be one of: ${validModes.join(", ")}`,
-      ),
+      error: commandValidationError(`--execution-mode must be one of: ${validModes.join(", ")}`),
     });
     process.exit(1);
   }

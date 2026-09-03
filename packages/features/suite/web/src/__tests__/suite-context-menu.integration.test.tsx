@@ -71,14 +71,9 @@ describe("<SuiteContextMenu/>", () => {
       const onDuplicate = vi.fn();
       const onClose = vi.fn();
 
-      render(
-        <SuiteContextMenu
-          {...defaultProps}
-          onDuplicate={onDuplicate}
-          onClose={onClose}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteContextMenu {...defaultProps} onDuplicate={onDuplicate} onClose={onClose} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Duplicate"));
       expect(onDuplicate).toHaveBeenCalledOnce();
@@ -92,10 +87,9 @@ describe("<SuiteContextMenu/>", () => {
       const onArchive = vi.fn();
       const onClose = vi.fn();
 
-      render(
-        <SuiteContextMenu {...defaultProps} onArchive={onArchive} onClose={onClose} />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteContextMenu {...defaultProps} onArchive={onArchive} onClose={onClose} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Archive"));
       expect(onArchive).toHaveBeenCalledOnce();

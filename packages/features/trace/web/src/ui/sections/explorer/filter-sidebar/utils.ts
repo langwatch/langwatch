@@ -28,19 +28,11 @@ export function facetLabel(value: string, field: string): string {
   return value;
 }
 
-export function getFacetIcon({
-  key,
-  group,
-}: {
-  key: string;
-  group?: SectionGroup;
-}): LucideIcon {
+export function getFacetIcon({ key, group }: { key: string; group?: SectionGroup }): LucideIcon {
   return FACET_ICONS[key] ?? (group && GROUP_ICONS[group]) ?? HelpCircle;
 }
 
-export function sortBySectionOrder<T extends { key: string; label: string }>(
-  items: T[],
-): T[] {
+export function sortBySectionOrder<T extends { key: string; label: string }>(items: T[]): T[] {
   return [...items].sort((a, b) => {
     const ai = SECTION_ORDER.indexOf(a.key);
     const bi = SECTION_ORDER.indexOf(b.key);

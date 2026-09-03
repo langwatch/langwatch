@@ -40,10 +40,7 @@ import { TtftCell } from "./ttft-cell";
  * Cell renderers keyed by column id. Every TraceColumnId must have a cell;
  * the helper type below enforces this at compile time.
  */
-type RequiredTraceCells = Record<
-  TraceColumnId | typeof SELECT_COLUMN_ID,
-  CellDef<TraceListItem>
->;
+type RequiredTraceCells = Record<TraceColumnId | typeof SELECT_COLUMN_ID, CellDef<TraceListItem>>;
 
 export const traceCells = {
   [TraceSelectCell.id]: TraceSelectCell,

@@ -24,9 +24,9 @@ import {
 type Unsubscribable = { unsubscribe: () => void };
 
 const mutation = vi.fn();
-const subscription = vi.fn<
-  (path: string, input: unknown, opts: unknown) => Unsubscribable
->(() => ({ unsubscribe: vi.fn() }));
+const subscription = vi.fn<(path: string, input: unknown, opts: unknown) => Unsubscribable>(() => ({
+  unsubscribe: vi.fn(),
+}));
 
 // The mock mirrors the v11 PROXY client the transport now calls: procedures
 // are addressed as `trpcClient.langy.<proc>.mutate/subscribe`. The spies keep
@@ -73,9 +73,7 @@ const options = (over: Record<string, unknown> = {}) =>
   ({
     messages: [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
     ...over,
-  }) as unknown as Parameters<
-    ReturnType<typeof createLangyChatTransport>["sendMessages"]
-  >[0];
+  }) as unknown as Parameters<ReturnType<typeof createLangyChatTransport>["sendMessages"]>[0];
 
 describe("createLangyChatTransport", () => {
   beforeEach(() => {
@@ -289,9 +287,7 @@ describe("createLangyChatTransport", () => {
         items: [{ content: "Find the slow traces", status: "in_progress" }],
       });
       // …and the first output cleared the cold-start status exactly once.
-      const cleared = onSignal.mock.calls.filter(
-        ([s]) => s.type === "status" && s.status === "",
-      );
+      const cleared = onSignal.mock.calls.filter(([s]) => s.type === "status" && s.status === "");
       expect(cleared).toHaveLength(1);
     });
 
@@ -417,10 +413,7 @@ describe("createLangyChatTransport", () => {
     it("forwards it to onNavigate as a bare passthrough, not a message chunk", async () => {
       const onNavigate = vi.fn();
       const onSignal = vi.fn();
-      const { transport } = makeTransport(
-        { conversationId: null },
-        { onNavigate, onSignal },
-      );
+      const { transport } = makeTransport({ conversationId: null }, { onNavigate, onSignal });
       await transport.sendMessages(options());
       const { onData } = streamHandlers();
 
@@ -460,10 +453,7 @@ describe("createLangyChatTransport", () => {
     it("forwards it to onUiAction as a bare passthrough, not a message chunk", async () => {
       const onUiAction = vi.fn();
       const onSignal = vi.fn();
-      const { transport } = makeTransport(
-        { conversationId: null },
-        { onUiAction, onSignal },
-      );
+      const { transport } = makeTransport({ conversationId: null }, { onUiAction, onSignal });
       await transport.sendMessages(options());
       const { onData } = streamHandlers();
 
@@ -484,9 +474,7 @@ describe("createLangyChatTransport", () => {
       await transport.sendMessages(options());
       const { onData } = streamHandlers();
 
-      expect(() =>
-        onData({ type: "ui", actionId: "a1", kind: "x", payload: {} }),
-      ).not.toThrow();
+      expect(() => onData({ type: "ui", actionId: "a1", kind: "x", payload: {} })).not.toThrow();
     });
   });
 
@@ -522,9 +510,10 @@ describe("createLangyChatTransport", () => {
     /** @scenario "A tool card sits between the paragraphs it ran between" */
     it("closes the paragraph a call interrupts and opens a new one after it", async () => {
       const { transport } = makeTransport({ conversationId: null });
-      const stream = (await transport.sendMessages(
-        options(),
-      )) as unknown as ReadableStream<{ type: string; id?: string }>;
+      const stream = (await transport.sendMessages(options())) as unknown as ReadableStream<{
+        type: string;
+        id?: string;
+      }>;
       const { chunks, done } = collect(stream);
       const { onData } = streamHandlers();
 
@@ -559,9 +548,7 @@ describe("createLangyChatTransport", () => {
         "text-end",
         "finish",
       ]);
-      const runs = chunks
-        .filter((chunk) => chunk.type === "text-start")
-        .map((chunk) => chunk.id);
+      const runs = chunks.filter((chunk) => chunk.type === "text-start").map((chunk) => chunk.id);
       expect(new Set(runs).size).toBe(2);
     });
 
@@ -572,9 +559,10 @@ describe("createLangyChatTransport", () => {
      */
     it("leaves the open paragraph alone when a call reports its output", async () => {
       const { transport } = makeTransport({ conversationId: null });
-      const stream = (await transport.sendMessages(
-        options(),
-      )) as unknown as ReadableStream<{ type: string; id?: string }>;
+      const stream = (await transport.sendMessages(options())) as unknown as ReadableStream<{
+        type: string;
+        id?: string;
+      }>;
       const { chunks, done } = collect(stream);
       const { onData } = streamHandlers();
 
@@ -611,9 +599,10 @@ describe("createLangyChatTransport", () => {
 
     it("opens no paragraph at all for a turn that only ran tools", async () => {
       const { transport } = makeTransport({ conversationId: null });
-      const stream = (await transport.sendMessages(
-        options(),
-      )) as unknown as ReadableStream<{ type: string; id?: string }>;
+      const stream = (await transport.sendMessages(options())) as unknown as ReadableStream<{
+        type: string;
+        id?: string;
+      }>;
       const { chunks, done } = collect(stream);
       const { onData } = streamHandlers();
 
@@ -627,9 +616,7 @@ describe("createLangyChatTransport", () => {
       onData({ type: "end" });
       await done;
 
-      expect(chunks.some((chunk) => chunk.type.startsWith("text-"))).toBe(
-        false,
-      );
+      expect(chunks.some((chunk) => chunk.type.startsWith("text-"))).toBe(false);
     });
   });
 

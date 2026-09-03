@@ -102,9 +102,7 @@ function reportUntrustedSocket(socketPath: string): boolean {
 function requireSupport(): void {
   if (isDaemonSupported()) return;
   console.error(
-    chalk.red(
-      "The langwatch daemon is not available on this platform. Commands run in-process.",
-    ),
+    chalk.red("The langwatch daemon is not available on this platform. Commands run in-process."),
   );
   process.exit(1);
 }
@@ -132,9 +130,7 @@ export async function daemonStartCommand(options: {
     const existing = await requestStatus(identity.socketPath);
     if (existing) {
       console.log(
-        chalk.gray(
-          `Daemon already running (pid ${existing.pid}) at ${existing.socketPath}`,
-        ),
+        chalk.gray(`Daemon already running (pid ${existing.pid}) at ${existing.socketPath}`),
       );
       return;
     }

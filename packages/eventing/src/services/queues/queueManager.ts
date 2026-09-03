@@ -48,9 +48,7 @@ const logger = createLogger("langwatch:event-sourcing:queue-manager");
  */
 function occurredAtScore(payload: { occurredAt?: unknown }): number {
   const occurredAt = payload.occurredAt;
-  return occurredAt === undefined || occurredAt === null
-    ? Date.now()
-    : (occurredAt as number);
+  return occurredAt === undefined || occurredAt === null ? Date.now() : (occurredAt as number);
 }
 
 /**
@@ -232,9 +230,7 @@ export class QueueManager<EventType extends Event = Event> {
     };
 
     // Namespace dedup IDs to avoid cross-pipeline/cross-type collisions
-    const namespaceDedup = (
-      dedup: DeduplicationConfig<any>,
-    ): DeduplicationConfig<any> => ({
+    const namespaceDedup = (dedup: DeduplicationConfig<any>): DeduplicationConfig<any> => ({
       ...dedup,
       makeId: (payload: any) =>
         `${pipelineName}/${jobType}/${jobName}/${dedup.makeId(stripInternal(payload))}`,
@@ -450,8 +446,7 @@ export class QueueManager<EventType extends Event = Event> {
       const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
       const entry: JobRegistryEntry = {
         groupKeyFn,
-        scoreFn:
-          projectionDef.scoreFn ?? ((event: any) => event.occurredAt ?? event.createdAt),
+        scoreFn: projectionDef.scoreFn ?? ((event: any) => event.occurredAt ?? event.createdAt),
         process: async (event: any, delivery?: JobDelivery) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,
@@ -509,10 +504,7 @@ export class QueueManager<EventType extends Event = Event> {
       handlerInstance?: CommandHandler<any, EventType>;
       options?: CommandHandlerOptions<Payload>;
     }>,
-    storeEvents: (
-      events: EventType[],
-      context: EventStoreReadContext<EventType>,
-    ) => Promise<void>,
+    storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
     pipelineName: string,
   ): void {
     if (!this.globalQueue) {
@@ -540,8 +532,7 @@ export class QueueManager<EventType extends Event = Event> {
       const handlerInstance = registration.handlerInstance ?? new handlerClass();
 
       const getAggregateId =
-        registration.options?.getAggregateId ??
-        handlerClass.getAggregateId.bind(handlerClass);
+        registration.options?.getAggregateId ?? handlerClass.getAggregateId.bind(handlerClass);
 
       const getGroupKey =
         registration.options?.getGroupKey ?? handlerClass.getGroupKey?.bind(handlerClass);
@@ -662,11 +653,7 @@ export class QueueManager<EventType extends Event = Event> {
         spanAttributes: cmdEntry.spanAttributes,
       };
 
-      const baseFacade = this.createFacade<Record<string, unknown>>(
-        "command",
-        cmdName,
-        jobEntry,
-      );
+      const baseFacade = this.createFacade<Record<string, unknown>>("command", cmdName, jobEntry);
 
       // Wrap with pre-send validation
       const validatingFacade: EventSourcedQueueProcessor<any> = {
@@ -748,8 +735,7 @@ export class QueueManager<EventType extends Event = Event> {
         getTenantId: (payload: any) => String(payload.event.tenantId),
         domainKeyFn: customGroupKeyFn
           ? (payload: any) => customGroupKeyFn(payload)
-          : (payload: any) =>
-              `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
+          : (payload: any) => `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
       });
       const entry: JobRegistryEntry = {
         groupKeyFn: subscriberGroupKeyFn,
@@ -804,25 +790,19 @@ export class QueueManager<EventType extends Event = Event> {
     return this.projectionSubscriberCount > 0;
   }
 
-  getHandlerQueue(
-    handlerName: string,
-  ): EventSourcedQueueProcessor<EventType> | undefined {
+  getHandlerQueue(handlerName: string): EventSourcedQueueProcessor<EventType> | undefined {
     return this.queues.get(this.key("handler", handlerName)) as
       | EventSourcedQueueProcessor<EventType>
       | undefined;
   }
 
-  getSubscriberQueue(
-    subscriberName: string,
-  ): EventSourcedQueueProcessor<EventType> | undefined {
+  getSubscriberQueue(subscriberName: string): EventSourcedQueueProcessor<EventType> | undefined {
     return this.queues.get(this.key("subscriber", subscriberName)) as
       | EventSourcedQueueProcessor<EventType>
       | undefined;
   }
 
-  getProjectionQueue(
-    projectionName: string,
-  ): EventSourcedQueueProcessor<EventType> | undefined {
+  getProjectionQueue(projectionName: string): EventSourcedQueueProcessor<EventType> | undefined {
     return this.queues.get(this.key("projection", projectionName)) as
       | EventSourcedQueueProcessor<EventType>
       | undefined;

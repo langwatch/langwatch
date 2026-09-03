@@ -46,7 +46,12 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       tryGetModelsAllowed: vi.fn(async () => null),
     },
     models: { resolve: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })) },
-    worker: { probe, dispatch, cancel: vi.fn(async () => undefined), warm: vi.fn(async () => undefined) },
+    worker: {
+      probe,
+      dispatch,
+      cancel: vi.fn(async () => undefined),
+      warm: vi.fn(async () => undefined),
+    },
     tokenBuffer: null,
     permits: {
       reserve: vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 })),
@@ -54,7 +59,10 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       check: vi.fn(async () => ({ allowed: true })),
     },
     perDayPrCap: 5,
-    sessionKeys: { mint: vi.fn(async () => ({ token: "sk", apiKeyId: "key-1" })), revoke: vi.fn(async () => undefined) },
+    sessionKeys: {
+      mint: vi.fn(async () => ({ token: "sk", apiKeyId: "key-1" })),
+      revoke: vi.fn(async () => undefined),
+    },
     context: { render: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
     metrics: { count: vi.fn() },
@@ -78,9 +86,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   return { deps, mocks: { dispatch, stash, findAllByConversation, probe } };
 }
 
-const input = (
-  over: Partial<StartConversationTurnInput> = {},
-): StartConversationTurnInput => ({
+const input = (over: Partial<StartConversationTurnInput> = {}): StartConversationTurnInput => ({
   projectId: "p1",
   idempotencyKey: "00000000-0000-4000-8000-000000000001",
   session: { user: { id: "user-1" } },
@@ -210,7 +216,9 @@ describe("LangyTurnService.startConversationTurn conversation memory", () => {
     expect(prompt).toBe("what is my name?");
     // The stash carries the same seed: an outbox or liveness re-dispatch to a
     // fresh worker continues the conversation too.
-    const stashed = (mocks.stash.mock.calls[0] as unknown as [{ system: string; historySeed?: string }])[0];
+    const stashed = (
+      mocks.stash.mock.calls[0] as unknown as [{ system: string; historySeed?: string }]
+    )[0];
     expect(stashed.historySeed).toBe(historySeed);
     expect(stashed.system).toBe(system);
   });

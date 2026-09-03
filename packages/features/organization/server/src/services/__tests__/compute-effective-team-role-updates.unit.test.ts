@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  OrganizationUserRole,
-  TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
 import { computeEffectiveTeamRoleUpdates } from "../compute-effective-team-role-updates";
 
 describe("computeEffectiveTeamRoleUpdates()", () => {
@@ -23,9 +20,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
           newOrganizationRole: OrganizationUserRole.ADMIN,
         });
 
-        expect(result).toEqual(
-          requested.map((update) => ({ ...update, origin: "requested" })),
-        );
+        expect(result).toEqual(requested.map((update) => ({ ...update, origin: "requested" })));
       });
 
       it("returns requested updates for MEMBER org role", () => {
@@ -37,9 +32,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
           newOrganizationRole: OrganizationUserRole.MEMBER,
         });
 
-        expect(result).toEqual(
-          requested.map((update) => ({ ...update, origin: "requested" })),
-        );
+        expect(result).toEqual(requested.map((update) => ({ ...update, origin: "requested" })));
       });
     });
 
@@ -89,9 +82,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
           newOrganizationRole: OrganizationUserRole.EXTERNAL,
         });
 
-        expect(result).toEqual(
-          requested.map((update) => ({ ...update, origin: "requested" })),
-        );
+        expect(result).toEqual(requested.map((update) => ({ ...update, origin: "requested" })));
       });
     });
   });
@@ -220,9 +211,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
       /** @scenario A seat change that names team roles outright still keeps the guard */
       it("keeps a team the caller named outright attributed to the caller", () => {
         const result = computeEffectiveTeamRoleUpdates({
-          requestedTeamRoleUpdates: [
-            { teamId: "team-1", role: TeamUserRole.VIEWER },
-          ],
+          requestedTeamRoleUpdates: [{ teamId: "team-1", role: TeamUserRole.VIEWER }],
           currentMemberships: [{ teamId: "team-1", role: TeamUserRole.ADMIN }],
           newOrganizationRole: OrganizationUserRole.EXTERNAL,
         });

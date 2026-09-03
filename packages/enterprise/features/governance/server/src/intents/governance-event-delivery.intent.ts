@@ -44,10 +44,7 @@ export class GovernanceEventDeliveryIntent {
     return this.port.retryDelayMs(input);
   }
 
-  async deliver(
-    payload: DeliverGovernancePayload,
-    _context: IntentContext,
-  ): Promise<void> {
+  async deliver(payload: DeliverGovernancePayload, _context: IntentContext): Promise<void> {
     if (!(await this.port.webhooksEnabled(payload.organization_id))) return;
     const endpointIds = await this.port.activeEndpointIds({
       organizationId: payload.organization_id,

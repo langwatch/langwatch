@@ -14,10 +14,7 @@ import type {
   ScoreDifferenceCI,
 } from "../../model/batch-evaluation-results.bt-leaderboard";
 import type { Comparability } from "../../model/batch-evaluation-results.comparability";
-import {
-  MIN_PRICED_ROWS,
-  type VariantMetrics,
-} from "./batch-evaluation-results.variant-metrics";
+import { MIN_PRICED_ROWS, type VariantMetrics } from "./batch-evaluation-results.variant-metrics";
 import { areDistinguishable } from "../../model/batch-evaluation-results.score-separation";
 
 export type TradeoffDimension = "quality" | "cost" | "speed";
@@ -69,12 +66,8 @@ const compareQuality = ({
 };
 
 /** A metric is usable only when it is finite and averaged over enough rows. */
-const usableMean = (
-  stats: { avg: number; count: number } | null | undefined,
-): number | null =>
-  stats && Number.isFinite(stats.avg) && stats.count >= MIN_PRICED_ROWS
-    ? stats.avg
-    : null;
+const usableMean = (stats: { avg: number; count: number } | null | undefined): number | null =>
+  stats && Number.isFinite(stats.avg) && stats.count >= MIN_PRICED_ROWS ? stats.avg : null;
 
 /**
  * Cost and speed: the interval of the mean paired per-row difference.

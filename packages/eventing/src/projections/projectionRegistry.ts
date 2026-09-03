@@ -20,14 +20,8 @@ import { ProjectionRouter } from "./projectionRouter";
  */
 export class ProjectionRegistry<EventType extends Event = Event> {
   private readonly logger = createLogger("langwatch:event-sourcing:projection-registry");
-  private readonly foldProjections = new Map<
-    string,
-    FoldProjectionDefinition<any, EventType>
-  >();
-  private readonly mapProjections = new Map<
-    string,
-    MapProjectionDefinition<any, EventType>
-  >();
+  private readonly foldProjections = new Map<string, FoldProjectionDefinition<any, EventType>>();
+  private readonly mapProjections = new Map<string, MapProjectionDefinition<any, EventType>>();
   private readonly subscribers = new Map<
     string,
     { foldName: string; definition: SubscriberDispatchDefinition<EventType> }
@@ -61,10 +55,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     this.mapProjections.set(projection.name, projection);
   }
 
-  registerSubscriber(
-    foldName: string,
-    subscriber: SubscriberDispatchDefinition<EventType>,
-  ): void {
+  registerSubscriber(foldName: string, subscriber: SubscriberDispatchDefinition<EventType>): void {
     if (!this.foldProjections.has(foldName)) {
       throw new ConfigurationError(
         "ProjectionRegistry",
@@ -144,12 +135,9 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     });
 
     // Create router — all projections are incremental
-    this.router = new ProjectionRouter<EventType>(
-      aggregateType,
-      "global",
-      this.queueManager,
-      { executionTarget },
-    );
+    this.router = new ProjectionRouter<EventType>(aggregateType, "global", this.queueManager, {
+      executionTarget,
+    });
 
     for (const fold of this.foldProjections.values()) {
       this.router.registerFoldProjection(fold);

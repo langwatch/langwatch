@@ -7,7 +7,10 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { aiBrandPalette } from "../../../../model/explorer/ai/ai-brand-palette";
-import { DEFAULT_THINKING_VERBS, useCyclingVerb } from "../../../../behavior/explorer/ai/use-cycling-verb";
+import {
+  DEFAULT_THINKING_VERBS,
+  useCyclingVerb,
+} from "../../../../behavior/explorer/ai/use-cycling-verb";
 
 const ICON_GRADIENT_ID = "ai-icon-gradient";
 
@@ -45,10 +48,7 @@ const TYPING_MS = 70;
 const ERASING_MS = 40;
 const HOLD_MS = 2600;
 
-const useTypewriterPlaceholder = (
-  active: boolean,
-  examples: readonly string[],
-): string => {
+const useTypewriterPlaceholder = (active: boolean, examples: readonly string[]): string => {
   const reduceMotion = useReducedMotion();
   const [text, setText] = useState(examples[0] ?? "");
 
@@ -240,10 +240,7 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
           minWidth={0}
         />
       )}
-      <Tooltip
-        content={isPending ? "Cancel (Esc)" : "Exit AI mode (Esc)"}
-        openDelay={200}
-      >
+      <Tooltip content={isPending ? "Cancel (Esc)" : "Exit AI mode (Esc)"} openDelay={200}>
         <IconButton
           aria-label={isPending ? "Cancel AI request" : "Exit AI mode"}
           size="2xs"

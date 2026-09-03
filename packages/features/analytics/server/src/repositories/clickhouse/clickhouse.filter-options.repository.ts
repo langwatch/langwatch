@@ -8,10 +8,7 @@ import type {
   FilterOption,
   SupportedClickHouseFilterDefinition,
 } from "../../filters/clickhouse/types";
-import {
-  FilterOptionsPort,
-  type FindFilterOptionsInput,
-} from "../../ports/filter-options.port";
+import { FilterOptionsPort, type FindFilterOptionsInput } from "../../ports/filter-options.port";
 
 /** How this repository reaches the tenant's ClickHouse client. */
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;
@@ -42,9 +39,7 @@ export class FilterOptionsClickHouseRepository extends FilterOptionsPort {
     if (sql === null) return [];
 
     if (!sql.includes("TenantId = {tenantId:String}")) {
-      throw new Error(
-        `Security: Filter query for ${input.field} is missing TenantId isolation`,
-      );
+      throw new Error(`Security: Filter query for ${input.field} is missing TenantId isolation`);
     }
 
     const client = await this.resolveClient(input.tenantId);

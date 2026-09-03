@@ -45,10 +45,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
   readonly tags: {
-    assign(
-      id: string,
-      params: { tag: string; versionId: string },
-    ): Promise<AssignTagResult>;
+    assign(id: string, params: { tag: string; versionId: string }): Promise<AssignTagResult>;
     list(): Promise<TagDefinition[]>;
     create(params: { name: string }): Promise<CreatedTag>;
     delete(tagName: string): Promise<void>;
@@ -59,8 +56,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     this.promptsApiService = config.promptsApiService ?? new PromptsApiService(config);
     this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
     this.tags = {
-      assign: (id, { tag, versionId }) =>
-        this.promptsApiService.assignTag({ id, tag, versionId }),
+      assign: (id, { tag, versionId }) => this.promptsApiService.assignTag({ id, tag, versionId }),
       list: () => this.promptsApiService.listTags(),
       create: ({ name }) => this.promptsApiService.createTag({ name }),
       delete: (tagName) => this.promptsApiService.deleteTag(tagName),
@@ -122,10 +118,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     return new Prompt(serverPrompt);
   }
 
-  private async getAlwaysFetch(
-    handleOrId: string,
-    options?: GetPromptOptions,
-  ): Promise<Prompt> {
+  private async getAlwaysFetch(handleOrId: string, options?: GetPromptOptions): Promise<Prompt> {
     try {
       const serverPrompt = await this.promptsApiService.get(handleOrId, options);
       return new Prompt(serverPrompt);
@@ -151,10 +144,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     return `${handleOrId}::version:${options?.version ?? ""}${tagSegment}`;
   }
 
-  private async getCacheTtl(
-    handleOrId: string,
-    options?: GetPromptOptions,
-  ): Promise<Prompt> {
+  private async getCacheTtl(handleOrId: string, options?: GetPromptOptions): Promise<Prompt> {
     const cacheKey = this.buildCacheKey(handleOrId, options);
     const ttlMs = (options?.cacheTtlMinutes ?? 5) * 60 * 1000;
     const cached = this.cache.get(cacheKey);

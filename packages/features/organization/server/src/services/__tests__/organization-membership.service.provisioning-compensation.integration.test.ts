@@ -112,9 +112,7 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
         grantCache,
       });
 
-      await expect(failing.createForProvisioning({ name, slug })).rejects.toThrow(
-        SEEDING_FAILURE,
-      );
+      await expect(failing.createForProvisioning({ name, slug })).rejects.toThrow(SEEDING_FAILURE);
 
       // The failure has to have happened after the organization committed,
       // or the test would pass without exercising the compensation at all.

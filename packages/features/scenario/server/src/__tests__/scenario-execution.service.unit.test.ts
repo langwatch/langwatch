@@ -48,9 +48,7 @@ function prefetcher(): ScenarioExecutionPrefetcherService {
 }
 
 function failures(): ScenarioFailureHandlerService {
-  return Object.create(
-    ScenarioFailureHandlerService.prototype,
-  ) as ScenarioFailureHandlerService;
+  return Object.create(ScenarioFailureHandlerService.prototype) as ScenarioFailureHandlerService;
 }
 
 describe("ScenarioExecutionService", () => {
@@ -62,9 +60,7 @@ describe("ScenarioExecutionService", () => {
       failures: failures(),
     });
 
-    await expect(service.submit(job)).rejects.toThrow(
-      /No execution pool on this pod.*run-1/,
-    );
+    await expect(service.submit(job)).rejects.toThrow(/No execution pool on this pod.*run-1/);
   });
 
   it("submits through the process-owned pool", async () => {

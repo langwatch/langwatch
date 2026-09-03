@@ -64,9 +64,7 @@ export class WorkflowsApiService {
   private readonly experimentsApiService: ExperimentsApiService;
   private readonly endpoint: string;
 
-  constructor(
-    config?: Pick<InternalConfig, "langwatchApiClient"> & { endpoint?: string },
-  ) {
+  constructor(config?: Pick<InternalConfig, "langwatchApiClient"> & { endpoint?: string }) {
     // The run URLs this service rebases and the requests it issues have to
     // name the same host, so a caller that supplies only an endpoint gets a
     // client built on that endpoint rather than on the environment.

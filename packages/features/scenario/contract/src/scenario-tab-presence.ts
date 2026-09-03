@@ -28,11 +28,7 @@ export abstract class ScenarioTabRegistry {
 
   abstract unregister(input: ScenarioTabRegistration): Promise<void>;
 
-  abstract hasLiveTab(input: {
-    projectId: string;
-    tabKey: string;
-    now?: number;
-  }): Promise<boolean>;
+  abstract hasLiveTab(input: { projectId: string; tabKey: string; now?: number }): Promise<boolean>;
 
   abstract setPendingNavigate(input: {
     projectId: string;

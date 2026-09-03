@@ -15,8 +15,7 @@ const stubs = vi.hoisted(() => ({
 }));
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@langwatch/observability")>();
+  const actual = await importOriginal<typeof import("@langwatch/observability")>();
   return {
     ...actual,
     createLogger: () => {
@@ -214,9 +213,7 @@ describe("startSystemMigrations", () => {
         // progress, so nothing else could have.
         expect(passes).toBeGreaterThan(1);
         expect(passes).toBeLessThan(cycles);
-        expect(stubs.errors).toContainEqual(
-          expect.objectContaining({ passes }),
-        );
+        expect(stubs.errors).toContainEqual(expect.objectContaining({ passes }));
       });
     });
   });
@@ -267,9 +264,7 @@ describe("startSystemMigrations", () => {
         await stop();
 
         expect(stubs.runPass).toHaveBeenCalledTimes(1);
-        expect(stubs.errors).toContainEqual(
-          expect.objectContaining({ pass: 1 }),
-        );
+        expect(stubs.errors).toContainEqual(expect.objectContaining({ pass: 1 }));
       });
     });
   });

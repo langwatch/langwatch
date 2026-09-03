@@ -20,9 +20,7 @@ export interface ModelProviderEntry {
 
 /** Lists all model providers for the project, with masked API keys. */
 export async function listModelProviders(): Promise<Record<string, ModelProviderEntry>> {
-  return makeRequest("GET", "/api/model-providers") as Promise<
-    Record<string, ModelProviderEntry>
-  >;
+  return makeRequest("GET", "/api/model-providers") as Promise<Record<string, ModelProviderEntry>>;
 }
 
 /** Creates or updates a model provider. */

@@ -265,9 +265,8 @@ describe("given several spans of the trace carry comments", () => {
       spans: longTrace(),
       selectedSpanId: null,
     });
-    const widthBefore = (
-      uncommented.container.firstElementChild?.firstElementChild as HTMLElement
-    ).style.width;
+    const widthBefore = (uncommented.container.firstElementChild?.firstElementChild as HTMLElement)
+      .style.width;
     cleanup();
 
     mocks.comments = [
@@ -279,8 +278,7 @@ describe("given several spans of the trace carry comments", () => {
       selectedSpanId: null,
     });
 
-    const treePane = commented.container.firstElementChild
-      ?.firstElementChild as HTMLElement;
+    const treePane = commented.container.firstElementChild?.firstElementChild as HTMLElement;
     expect(treePane.style.width).toBe(widthBefore);
     expect(
       commented.container.querySelector('[data-testid^="turn-annotation-rail"]'),

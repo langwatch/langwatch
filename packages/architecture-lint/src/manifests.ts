@@ -31,10 +31,7 @@ function compatibleEnterpriseCompositionTarget(target: ClassifiedPackage): boole
   return Boolean(target.enterprise && target.feature && target.kind === "server");
 }
 
-function matchingEnterpriseComposition(
-  pkg: ClassifiedPackage,
-  target: ClassifiedPackage,
-): boolean {
+function matchingEnterpriseComposition(pkg: ClassifiedPackage, target: ClassifiedPackage): boolean {
   if (target.kind !== "enterprise-composition") return true;
   if (pkg.kind !== "application") return false;
   return pkg.applicationRole === target.enterpriseCompositionRole;
@@ -114,14 +111,10 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           file: pkg.manifestPath,
           specifier: dependency,
           message: `Application ${pkg.applicationRole} cannot depend on application ${target.applicationRole}.`,
-          allowed:
-            "Move reusable behaviour to its owning feature or infrastructure package.",
+          allowed: "Move reusable behaviour to its owning feature or infrastructure package.",
         });
       }
-      if (
-        target.kind === "enterprise-composition" &&
-        !matchingEnterpriseComposition(pkg, target)
-      ) {
+      if (target.kind === "enterprise-composition" && !matchingEnterpriseComposition(pkg, target)) {
         violations.push({
           policy: "enterprise-composition",
           file: pkg.manifestPath,
@@ -133,10 +126,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
               : "Only the matching application composition root may consume this package.",
         });
       }
-      if (
-        pkg.kind === "enterprise-composition" &&
-        target.kind === "enterprise-composition"
-      ) {
+      if (pkg.kind === "enterprise-composition" && target.kind === "enterprise-composition") {
         violations.push({
           policy: "enterprise-composition",
           file: pkg.manifestPath,
@@ -195,11 +185,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           allowed: `Depend on ${target.enterprise ? `@langwatch/enterprise-${target.feature}-contract` : `@langwatch/${target.feature}-contract`}.`,
         });
       }
-      if (
-        pkg.kind === "contract" &&
-        target.feature === pkg.feature &&
-        target.kind !== "contract"
-      ) {
+      if (pkg.kind === "contract" && target.feature === pkg.feature && target.kind !== "contract") {
         violations.push({
           policy: "package-role",
           file: pkg.manifestPath,

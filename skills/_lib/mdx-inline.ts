@@ -119,10 +119,7 @@ function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Roo
         continue;
       }
       if (isSharedPartial) opts.seenShared?.add(target);
-      const inlined = inlineTree(target, { ...opts, stripFrontmatter: true }, [
-        ...stack,
-        filePath,
-      ]);
+      const inlined = inlineTree(target, { ...opts, stripFrontmatter: true }, [...stack, filePath]);
       out.push(...inlined.children);
       continue;
     }
@@ -152,9 +149,7 @@ export function inlineMdx(sourceFile: string, opts: InlineOptions = {}): string 
       }
       dir = path.dirname(dir);
     }
-    const known = sharedDir
-      ? new Set(fs.readdirSync(sharedDir).map(basename))
-      : new Set<string>();
+    const known = sharedDir ? new Set(fs.readdirSync(sharedDir).map(basename)) : new Set<string>();
     for (const name of opts.excludeShared) {
       if (!known.has(name)) {
         throw new Error(

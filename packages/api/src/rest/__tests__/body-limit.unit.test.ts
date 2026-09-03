@@ -42,13 +42,7 @@ function request({
  * Drives the middleware over a stand-in for the Hono context, which is all of
  * it the middleware touches, and reports what the route would have seen.
  */
-async function capped({
-  maxSize,
-  incoming,
-}: {
-  maxSize: number;
-  incoming: Request;
-}): Promise<{
+async function capped({ maxSize, incoming }: { maxSize: number; incoming: Request }): Promise<{
   status: number;
   reachedRoute: boolean;
   handedOn: Request;

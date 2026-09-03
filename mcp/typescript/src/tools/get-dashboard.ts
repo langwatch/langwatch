@@ -7,9 +7,7 @@ export async function handleGetDashboard(params: { id: string }): Promise<string
   lines.push(`# ${dashboard.name}\n`);
   lines.push(`**ID**: ${dashboard.id}`);
   lines.push(`**Order**: ${dashboard.order}`);
-  lines.push(
-    `**Graphs**: ${Array.isArray(dashboard.graphs) ? dashboard.graphs.length : 0}`,
-  );
+  lines.push(`**Graphs**: ${Array.isArray(dashboard.graphs) ? dashboard.graphs.length : 0}`);
   lines.push(`**Created**: ${dashboard.createdAt}`);
   lines.push(`**Updated**: ${dashboard.updatedAt}`);
 

@@ -8,10 +8,7 @@ import {
   type ModelProviderCodexStatus,
   type ModelProviderCodexStatusInput,
 } from "@langwatch/model-provider-contract";
-import type {
-  CodexTokenRefresher,
-  ModelProviderRepository,
-} from "../ports/model-provider.port";
+import type { CodexTokenRefresher, ModelProviderRepository } from "../ports/model-provider.port";
 import type { ModelProviderQueryService } from "./model-provider-query.service";
 
 type ModelProviderCodexOptions = {
@@ -27,9 +24,7 @@ export class ModelProviderCodexService {
     return new ModelProviderCodexService(options);
   }
 
-  async getStatus(
-    input: ModelProviderCodexStatusInput,
-  ): Promise<ModelProviderCodexStatus> {
+  async getStatus(input: ModelProviderCodexStatusInput): Promise<ModelProviderCodexStatus> {
     const parsed = modelProviderCodexStatusInputSchema.parse(input);
     const provider = await this.options.query.tryGetProviderForProject({
       provider: "openai_codex",

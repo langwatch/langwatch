@@ -24,11 +24,7 @@ export type SetupCredentials = {
  * Written as env lines because that is how every LangWatch SDK reads
  * them, so the agent can put the block straight into a `.env`.
  */
-export function credentialsHeader({
-  apiKey,
-  projectId,
-  endpoint,
-}: SetupCredentials): string {
+export function credentialsHeader({ apiKey, projectId, endpoint }: SetupCredentials): string {
   const lines = [
     `LANGWATCH_API_KEY="${apiKey}"`,
     `LANGWATCH_PROJECT_ID="${projectId}"`,

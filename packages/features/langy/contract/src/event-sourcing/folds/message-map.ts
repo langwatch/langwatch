@@ -54,9 +54,7 @@ export const LANGY_MESSAGE_EVENT_TYPES = [
 ] as const;
 
 /** Map ONE message-bearing event onto its message row. Pure and total. */
-export function mapLangyMessageEvent(
-  event: LangyMessageEvent,
-): LangyMessageProjectionRecord {
+export function mapLangyMessageEvent(event: LangyMessageEvent): LangyMessageProjectionRecord {
   return {
     ConversationId: event.data.conversationId,
     MessageId: event.data.messageId,

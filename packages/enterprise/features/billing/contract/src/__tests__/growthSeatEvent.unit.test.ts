@@ -76,27 +76,19 @@ describe("growthSeatEvent", () => {
 
     describe("when given a pre-March 2026 growth events price ID", () => {
       it("returns true for EUR monthly pre-March 2026", () => {
-        expect(
-          isGrowthEventsPrice("price_events_eur_monthly_until_mar_2026", prices),
-        ).toBe(true);
+        expect(isGrowthEventsPrice("price_events_eur_monthly_until_mar_2026", prices)).toBe(true);
       });
 
       it("returns true for EUR annual pre-March 2026", () => {
-        expect(
-          isGrowthEventsPrice("price_events_eur_annual_until_mar_2026", prices),
-        ).toBe(true);
+        expect(isGrowthEventsPrice("price_events_eur_annual_until_mar_2026", prices)).toBe(true);
       });
 
       it("returns true for USD monthly pre-March 2026", () => {
-        expect(
-          isGrowthEventsPrice("price_events_usd_monthly_until_mar_2026", prices),
-        ).toBe(true);
+        expect(isGrowthEventsPrice("price_events_usd_monthly_until_mar_2026", prices)).toBe(true);
       });
 
       it("returns true for USD annual pre-March 2026", () => {
-        expect(
-          isGrowthEventsPrice("price_events_usd_annual_until_mar_2026", prices),
-        ).toBe(true);
+        expect(isGrowthEventsPrice("price_events_usd_annual_until_mar_2026", prices)).toBe(true);
       });
     });
 
@@ -114,29 +106,29 @@ describe("growthSeatEvent", () => {
   describe("resolveGrowthSeatPriceId()", () => {
     describe("when resolving EUR prices", () => {
       it("returns the monthly EUR seat price", () => {
-        expect(
-          resolveGrowthSeatPriceId({ currency: "EUR", interval: "monthly", prices }),
-        ).toBe("price_seat_eur_monthly");
+        expect(resolveGrowthSeatPriceId({ currency: "EUR", interval: "monthly", prices })).toBe(
+          "price_seat_eur_monthly",
+        );
       });
 
       it("returns the annual EUR seat price", () => {
-        expect(
-          resolveGrowthSeatPriceId({ currency: "EUR", interval: "annual", prices }),
-        ).toBe("price_seat_eur_annual");
+        expect(resolveGrowthSeatPriceId({ currency: "EUR", interval: "annual", prices })).toBe(
+          "price_seat_eur_annual",
+        );
       });
     });
 
     describe("when resolving USD prices", () => {
       it("returns the monthly USD seat price", () => {
-        expect(
-          resolveGrowthSeatPriceId({ currency: "USD", interval: "monthly", prices }),
-        ).toBe("price_seat_usd_monthly");
+        expect(resolveGrowthSeatPriceId({ currency: "USD", interval: "monthly", prices })).toBe(
+          "price_seat_usd_monthly",
+        );
       });
 
       it("returns the annual USD seat price", () => {
-        expect(
-          resolveGrowthSeatPriceId({ currency: "USD", interval: "annual", prices }),
-        ).toBe("price_seat_usd_annual");
+        expect(resolveGrowthSeatPriceId({ currency: "USD", interval: "annual", prices })).toBe(
+          "price_seat_usd_annual",
+        );
       });
     });
   });
@@ -144,29 +136,29 @@ describe("growthSeatEvent", () => {
   describe("resolveGrowthEventsPriceId()", () => {
     describe("when resolving EUR prices", () => {
       it("returns the monthly EUR events price", () => {
-        expect(
-          resolveGrowthEventsPriceId({ currency: "EUR", interval: "monthly", prices }),
-        ).toBe("price_events_eur_monthly");
+        expect(resolveGrowthEventsPriceId({ currency: "EUR", interval: "monthly", prices })).toBe(
+          "price_events_eur_monthly",
+        );
       });
 
       it("returns the annual EUR events price", () => {
-        expect(
-          resolveGrowthEventsPriceId({ currency: "EUR", interval: "annual", prices }),
-        ).toBe("price_events_eur_annual");
+        expect(resolveGrowthEventsPriceId({ currency: "EUR", interval: "annual", prices })).toBe(
+          "price_events_eur_annual",
+        );
       });
     });
 
     describe("when resolving USD prices", () => {
       it("returns the monthly USD events price", () => {
-        expect(
-          resolveGrowthEventsPriceId({ currency: "USD", interval: "monthly", prices }),
-        ).toBe("price_events_usd_monthly");
+        expect(resolveGrowthEventsPriceId({ currency: "USD", interval: "monthly", prices })).toBe(
+          "price_events_usd_monthly",
+        );
       });
 
       it("returns the annual USD events price", () => {
-        expect(
-          resolveGrowthEventsPriceId({ currency: "USD", interval: "annual", prices }),
-        ).toBe("price_events_usd_annual");
+        expect(resolveGrowthEventsPriceId({ currency: "USD", interval: "annual", prices })).toBe(
+          "price_events_usd_annual",
+        );
       });
     });
   });

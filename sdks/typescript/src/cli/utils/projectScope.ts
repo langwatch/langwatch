@@ -62,9 +62,7 @@ const statusOf = (error: unknown): number | undefined => {
  * listing is filtered server-side by what the credential holds `project:view`
  * on, so "not in here" and "not yours" are the same fact.
  */
-const listAccessibleProjects = async (
-  service: ProjectsApiService,
-): Promise<Project[]> => {
+const listAccessibleProjects = async (service: ProjectsApiService): Promise<Project[]> => {
   const collected: Project[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     const result = await service.list({ page, limit: PAGE_SIZE });

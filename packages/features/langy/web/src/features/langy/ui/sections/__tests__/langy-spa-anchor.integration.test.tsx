@@ -47,10 +47,7 @@ describe("LangySpaAnchor", () => {
     beforeEach(() => renderAnchor("/acme/simulations/scenarios"));
 
     it("stays a real link, so copying and previewing the address still work", () => {
-      expect(screen.getByRole("link")).toHaveAttribute(
-        "href",
-        "/acme/simulations/scenarios",
-      );
+      expect(screen.getByRole("link")).toHaveAttribute("href", "/acme/simulations/scenarios");
     });
 
     it("routes in-app instead of reloading", () => {

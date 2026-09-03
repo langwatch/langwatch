@@ -39,9 +39,7 @@ class StubProjects extends StoredObjectProjectS3ConfigPort {
 }
 
 class StubAzureDestination extends StoredObjectAzureDestinationPort {
-  constructor(
-    private readonly value: Readonly<{ accountName: string; container: string }>,
-  ) {
+  constructor(private readonly value: Readonly<{ accountName: string; container: string }>) {
     super();
   }
   resolve() {
@@ -49,10 +47,7 @@ class StubAzureDestination extends StoredObjectAzureDestinationPort {
   }
 }
 
-async function mintFor(
-  policy: StoredObjectDestinationPolicy,
-  projectId: string,
-): Promise<string> {
+async function mintFor(policy: StoredObjectDestinationPolicy, projectId: string): Promise<string> {
   const destination = await policy.resolve(projectId);
   return mintStoredObjectUri({
     destination,
@@ -121,9 +116,7 @@ describe("StoredObjectDestinationPolicy", () => {
       const putUri = await mintFor(policy, PROJECT_ID);
 
       const expectedSha256 = sha256(TEST_BYTES);
-      expect(putUri).toBe(
-        `azure-blob://lwacct/lw-container/${PROJECT_ID}/${expectedSha256}`,
-      );
+      expect(putUri).toBe(`azure-blob://lwacct/lw-container/${PROJECT_ID}/${expectedSha256}`);
     });
   });
 
@@ -240,12 +233,8 @@ describe("StoredObjectDestinationPolicy composed with resolveAzureCredentials (B
         projects: new StubProjects(null),
       });
 
-      await expect(policy.resolve("proj_1")).rejects.toBeInstanceOf(
-        AzureBackendMisconfiguredError,
-      );
-      await expect(policy.resolve("proj_1")).rejects.toThrow(
-        new RegExp(missingVariable),
-      );
+      await expect(policy.resolve("proj_1")).rejects.toBeInstanceOf(AzureBackendMisconfiguredError);
+      await expect(policy.resolve("proj_1")).rejects.toThrow(new RegExp(missingVariable));
     });
   });
 

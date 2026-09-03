@@ -136,15 +136,11 @@ const acceptAgentTurnDataSchema = langyAgentTurnAcceptedEventDataSchema.extend({
   conversationStart: langyConversationStartedEventDataSchema
     .omit({ conversationId: true })
     .optional(),
-  userMessage: langyMessageRecordedEventDataSchema
-    .omit({ conversationId: true })
-    .optional(),
+  userMessage: langyMessageRecordedEventDataSchema.omit({ conversationId: true }).optional(),
   consumeHandoffTurnId: z.string().optional(),
 });
 const acceptAgentTurnCommandSchema = withCommandEnvelope(acceptAgentTurnDataSchema);
-export type LangyAcceptAgentTurnCommandData = z.infer<
-  typeof acceptAgentTurnCommandSchema
->;
+export type LangyAcceptAgentTurnCommandData = z.infer<typeof acceptAgentTurnCommandSchema>;
 
 export class AcceptAgentTurnCommand implements CommandHandler<
   Command<LangyAcceptAgentTurnCommandData>,
@@ -166,12 +162,9 @@ export class AcceptAgentTurnCommand implements CommandHandler<
     };
   }
 
-  handle(
-    command: Command<LangyAcceptAgentTurnCommandData>,
-  ): LangyConversationProcessingEvent[] {
+  handle(command: Command<LangyAcceptAgentTurnCommandData>): LangyConversationProcessingEvent[] {
     const data = stripEnvelope(command.data);
-    const { conversationStart, userMessage, consumeHandoffTurnId, ...acceptedData } =
-      data;
+    const { conversationStart, userMessage, consumeHandoffTurnId, ...acceptedData } = data;
     const events: LangyConversationProcessingEvent[] = [];
 
     if (conversationStart) {
@@ -314,8 +307,7 @@ export const UpdatePlanCommand = defineCommand({
   aggregateType: "langy_conversation",
   schema: langyPlanUpdatedEventDataSchema,
   aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:plan:${d.turnId}:${d.occurredAt}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:plan:${d.turnId}:${d.occurredAt}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.turn.id": d.turnId,
@@ -398,8 +390,7 @@ export const GenerateConversationTitleCommand = defineCommand({
   aggregateId: (d) => d.conversationId,
   // The process-outbox effect supplies turnId. occurredAt is retained only for
   // trusted command callers that do not originate from an agent response.
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:title:${d.turnId ?? d.occurredAt}`,
+  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:title:${d.turnId ?? d.occurredAt}`,
   spanAttributes: (d) => ({
     "payload.conversation.id": d.conversationId,
     "payload.title.source": d.source,

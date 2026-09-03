@@ -11,17 +11,13 @@ import type { TargetConfig } from "../../model/experiments-v3/types";
  * "target_1778838627724.l3".
  */
 export function useResolveTargetName(): (
-  target: Pick<
-    TargetConfig,
-    "id" | "promptId" | "dbAgentId" | "targetEvaluatorId"
-  >,
+  target: Pick<TargetConfig, "id" | "promptId" | "dbAgentId" | "targetEvaluatorId">,
 ) => string {
   const nameMap = useTargetNameMap();
 
   return useCallback(
     (target) => {
-      const entityId =
-        target.promptId ?? target.dbAgentId ?? target.targetEvaluatorId;
+      const entityId = target.promptId ?? target.dbAgentId ?? target.targetEvaluatorId;
       return (entityId && nameMap.get(entityId)) || target.id;
     },
     [nameMap],

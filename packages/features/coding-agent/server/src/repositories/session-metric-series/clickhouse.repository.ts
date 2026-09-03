@@ -6,9 +6,7 @@ import { SessionMetricSeriesRepository as MetricSeriesRepository } from "../sess
 
 const TABLE_NAME = "session_metric_series" as const;
 
-const logger = createLogger(
-  "langwatch:app-layer:coding-agent:session-metric-series-repository",
-);
+const logger = createLogger("langwatch:app-layer:coding-agent:session-metric-series-repository");
 
 /**
  * Persistence for a session's converged metric units (ADR-056 §5, migration
@@ -18,10 +16,7 @@ const logger = createLogger(
  * never an increment on insert.
  */
 export interface SessionMetricSeriesRepository {
-  ensure(
-    records: CodingAgentSessionMetricSeriesRecord[],
-    retentionDays?: number,
-  ): Promise<void>;
+  ensure(records: CodingAgentSessionMetricSeriesRecord[], retentionDays?: number): Promise<void>;
 
   /**
    * Converged totals per (session, metric, bucket) across the deduplicated
@@ -85,10 +80,7 @@ export class SessionMetricSeriesClickHouseRepository implements MetricSeriesRepo
     if (!first) return;
 
     const tenantId = first.tenantId;
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SessionMetricSeriesClickHouseRepository.ensure",
-    );
+    EventUtils.validateTenantId({ tenantId }, "SessionMetricSeriesClickHouseRepository.ensure");
     // A batch insert resolves ONE client, so a row from another tenant would
     // be written into this tenant's ClickHouse. Refuse rather than cross the
     // line.

@@ -24,32 +24,24 @@ The **Ops Console** (`/ops`) is a platform-wide operations interface built for t
 
 <CardGroup cols={2}>
   <Card title="Dashboard" icon="gauge" href="/self-hosting/ops/dashboard">
-    Real-time throughput, latency, error rates, and pipeline health at a glance. Powered
-    by Server-Sent Events with automatic polling fallback.
+    Real-time throughput, latency, error rates, and pipeline health at a glance. Powered by
+    Server-Sent Events with automatic polling fallback.
   </Card>
-  <Card
-    title="Queue Management"
-    icon="layer-group"
-    href="/self-hosting/ops/queue-management"
-  >
-    Error groups, blocked queues, dead letter queue redriving, draining, and pipeline
-    pause/unpause controls.
+  <Card title="Queue Management" icon="layer-group" href="/self-hosting/ops/queue-management">
+    Error groups, blocked queues, dead letter queue redriving, draining, and pipeline pause/unpause
+    controls.
   </Card>
-  <Card
-    title="Projection Replay"
-    icon="rotate"
-    href="/self-hosting/ops/projection-replay"
-  >
-    Rebuild projection state by replaying events from ClickHouse. Supports bulk replay
-    across tenants, single-aggregate debugging, and dry runs.
+  <Card title="Projection Replay" icon="rotate" href="/self-hosting/ops/projection-replay">
+    Rebuild projection state by replaying events from ClickHouse. Supports bulk replay across
+    tenants, single-aggregate debugging, and dry runs.
   </Card>
   <Card title="Deja View" icon="clock-rotate-left" href="/self-hosting/ops/dejaview">
-    Time-travel debugger for event-sourced aggregates. Inspect the full event history and
-    compute any projection's state at any point in time.
+    Time-travel debugger for event-sourced aggregates. Inspect the full event history and compute
+    any projection's state at any point in time.
   </Card>
   <Card title="The Foundry" icon="hammer" href="/self-hosting/ops/foundry">
-    Interactive trace playground for building, visualizing, and sending synthetic traces
-    to any project. Useful for testing ingestion pipelines and reproducing issues.
+    Interactive trace playground for building, visualizing, and sending synthetic traces to any
+    project. Useful for testing ingestion pipelines and reproducing issues.
   </Card>
 </CardGroup>
 

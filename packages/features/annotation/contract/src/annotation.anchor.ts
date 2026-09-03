@@ -51,9 +51,7 @@ export const annotationAnchorScopes = ANNOTATION_ANCHOR_SCOPES;
 export const annotationAnchorScopeSchema = z.enum(annotationAnchorScopes);
 export type AnnotationAnchorScope = z.infer<typeof annotationAnchorScopeSchema>;
 
-export function readableAnnotationAnchor(
-  row: AnnotationAnchorStorage,
-): ReadableAnnotationAnchor {
+export function readableAnnotationAnchor(row: AnnotationAnchorStorage): ReadableAnnotationAnchor {
   const kind = annotationAnchorKindSchema.safeParse(row.anchorKind);
   if (!kind.success || !row.anchorId) {
     return { anchorKind: null, anchorId: null, anchorPath: null };
@@ -125,9 +123,7 @@ export function annotationSuggestedOutput({
   if (!anchor.anchorKind) return annotation.expectedOutput ?? null;
 
   const isTraceOutput =
-    anchor.anchorKind === "field" &&
-    anchor.anchorId === traceId &&
-    anchor.anchorPath === "output";
+    anchor.anchorKind === "field" && anchor.anchorId === traceId && anchor.anchorPath === "output";
 
   return isTraceOutput ? (annotation.expectedOutput ?? null) : null;
 }
@@ -198,9 +194,7 @@ function describeAnchorOwner({
     return withIds ? `${selfLabel} (${shortId(traceId)})` : selfLabel;
   }
   if (!withIds) return `Span ${spanName ?? anchorId}`;
-  return spanName
-    ? `${spanName} span (${shortId(anchorId)})`
-    : `span (${shortId(anchorId)})`;
+  return spanName ? `${spanName} span (${shortId(anchorId)})` : `span (${shortId(anchorId)})`;
 }
 
 function describeFieldPath(anchorPath: string | null): string | null {

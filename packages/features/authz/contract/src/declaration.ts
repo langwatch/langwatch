@@ -35,10 +35,7 @@ type TiersOf<P extends AuthzPermission> = P extends `${infer R}:${string}`
 
 /** The input-addressable tiers permission P can be granted at. Platform-only
  *  permissions resolve to `never` and are refused by every surface. */
-export type PermissionGrantTiers<P extends AuthzPermission> = Extract<
-  TiersOf<P>,
-  BindingScopeTier
->;
+export type PermissionGrantTiers<P extends AuthzPermission> = Extract<TiersOf<P>, BindingScopeTier>;
 
 /** Permissions grantable only at the platform tier (`ops:*`). */
 export type PlatformTierPermission = {
@@ -50,9 +47,7 @@ type FieldsIn<I> = Extract<keyof I, ScopeTierField>;
 
 /** The tiers I is guaranteed to carry an id for — required, not optional. */
 type RequiredTiersIn<I> = {
-  [K in FieldsIn<I>]: I extends Record<K, string>
-    ? (typeof SCOPE_TIER_BY_FIELD)[K]
-    : never;
+  [K in FieldsIn<I>]: I extends Record<K, string> ? (typeof SCOPE_TIER_BY_FIELD)[K] : never;
 }[FieldsIn<I>];
 
 /**
@@ -67,9 +62,7 @@ export type DeclarationError<Reason extends string> = {
  *  stays deferred and no `extends` constraint can apply to it, so the
  *  conditional does the narrowing and the result still interpolates into the
  *  template-literal diagnostics below. */
-type FieldsForTiers<T> = T extends BindingScopeTier
-  ? (typeof SCOPE_TIER_FIELDS)[T]
-  : never;
+type FieldsForTiers<T> = T extends BindingScopeTier ? (typeof SCOPE_TIER_FIELDS)[T] : never;
 
 /**
  * One input shape (never a union — the caller distributes) against one
@@ -106,9 +99,7 @@ export type ValidatePermissionForInput<P extends AuthzPermission, I> = [I] exten
  * ordered most specific first, and a narrower id always resolves its
  * ancestors.
  */
-export type ViaFieldFor<P extends AuthzPermission, I> = [P] extends [
-  PlatformTierPermission,
-]
+export type ViaFieldFor<P extends AuthzPermission, I> = [P] extends [PlatformTierPermission]
   ? never
   : I extends unknown
     ? {
@@ -222,8 +213,7 @@ export type DeclaredScopeResolution =
   | { resolved: true; scope: DeclaredScopeId }
   | { resolved: false; unresolved: UnresolvedDeclaredScope };
 
-const usableId = (value: unknown): value is string =>
-  typeof value === "string" && value.length > 0;
+const usableId = (value: unknown): value is string => typeof value === "string" && value.length > 0;
 
 /**
  * Whether the input asked the caller for this field at all. Guarded rather

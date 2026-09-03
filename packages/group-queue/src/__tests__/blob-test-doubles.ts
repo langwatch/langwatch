@@ -22,13 +22,7 @@ export class InMemoryJobBlobStore implements JobBlobStore {
     this.putTtls.push(ttlSeconds);
     this.store.set(id, data);
   }
-  async get({
-    id,
-    ttlSeconds,
-  }: {
-    id: string;
-    ttlSeconds?: number;
-  }): Promise<Buffer | null> {
+  async get({ id, ttlSeconds }: { id: string; ttlSeconds?: number }): Promise<Buffer | null> {
     this.getTtls.push(ttlSeconds);
     return this.store.get(id) ?? null;
   }

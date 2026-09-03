@@ -25,9 +25,7 @@ const readStdin = async (): Promise<string> => {
   return Buffer.concat(chunks).toString("utf8");
 };
 
-const readState = async (
-  file: string,
-): Promise<ExperimentWorkbenchState> => {
+const readState = async (file: string): Promise<ExperimentWorkbenchState> => {
   const raw = file === "-" ? await readStdin() : await readFile(file, "utf8");
   let parsed: unknown;
   try {

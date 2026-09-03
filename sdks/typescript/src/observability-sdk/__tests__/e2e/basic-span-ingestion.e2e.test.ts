@@ -69,18 +69,8 @@ describe("Basic Span Ingestion E2E", () => {
       expect((span as any).type).toBe("llm");
 
       // Use the new helper that checks both span params and trace metadata
-      expectSpanAttributeWithTrace(
-        trace,
-        span,
-        semconv.ATTR_LANGWATCH_CUSTOMER_ID,
-        testIds.userId,
-      );
-      expectSpanAttributeWithTrace(
-        trace,
-        span,
-        semconv.ATTR_LANGWATCH_THREAD_ID,
-        testIds.threadId,
-      );
+      expectSpanAttributeWithTrace(trace, span, semconv.ATTR_LANGWATCH_CUSTOMER_ID, testIds.userId);
+      expectSpanAttributeWithTrace(trace, span, semconv.ATTR_LANGWATCH_THREAD_ID, testIds.threadId);
       expectSpanAttribute(span, "test.scenario", "simple-span");
 
       // Verify input/output exist

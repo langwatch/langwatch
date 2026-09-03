@@ -8,12 +8,7 @@ import {
 } from "./lens-capabilities";
 import type { RowKind } from "../model/trace-row-kind";
 
-export type GroupingMode =
-  | "flat"
-  | "by-conversation"
-  | "by-service"
-  | "by-user"
-  | "by-model";
+export type GroupingMode = "flat" | "by-conversation" | "by-service" | "by-user" | "by-model";
 
 export interface SortConfig {
   columnId: string;
@@ -40,8 +35,7 @@ export function getEffectiveLens(state: {
   grouping: GroupingMode;
   columnOrder: string[];
 }): LensConfig | null {
-  const lens =
-    state.allLenses.find((l) => l.id === state.activeLensId) ?? state.allLenses[0];
+  const lens = state.allLenses.find((l) => l.id === state.activeLensId) ?? state.allLenses[0];
   if (!lens) return null;
   // Reconcile addons against the LIVE grouping's capability — not the
   // saved lens's. The saved lens stores whatever addons matched its
@@ -69,9 +63,7 @@ export function rowKindForGrouping(grouping: GroupingMode): RowKind {
   return "group";
 }
 
-export function groupByForGrouping(
-  grouping: GroupingMode,
-): "service" | "model" | "user" | null {
+export function groupByForGrouping(grouping: GroupingMode): "service" | "model" | "user" | null {
   if (grouping === "by-service") return "service";
   if (grouping === "by-model") return "model";
   if (grouping === "by-user") return "user";
@@ -138,9 +130,7 @@ interface ViewState {
  * refetch + error reporting.
  */
 export interface LensSyncBridge {
-  create: (
-    lens: LensConfig & { /** Optional client-suggested id. */ id: string },
-  ) => void;
+  create: (lens: LensConfig & { /** Optional client-suggested id. */ id: string }) => void;
   rename: (lensId: string, name: string) => void;
   delete: (lensId: string) => void;
 }
@@ -219,9 +209,7 @@ function migrateGrouping(value: unknown): GroupingMode | undefined {
 function isSortConfig(value: unknown): value is SortConfig {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  return (
-    typeof v.columnId === "string" && (v.direction === "asc" || v.direction === "desc")
-  );
+  return typeof v.columnId === "string" && (v.direction === "asc" || v.direction === "desc");
 }
 
 function loadDrafts(): Map<string, DraftLensState> {
@@ -359,16 +347,7 @@ const builtInLenses: LensConfig[] = [
     id: "errors",
     name: "Errors",
     isBuiltIn: true,
-    columns: [
-      "time",
-      "trace",
-      "service",
-      "duration",
-      "cost",
-      "model",
-      "evaluations",
-      "events",
-    ],
+    columns: ["time", "trace", "service", "duration", "cost", "model", "evaluations", "events"],
     addons: ["error-detail", "expanded-peek"],
     grouping: "flat",
     sort: DEFAULT_SORT,
@@ -578,8 +557,7 @@ const persistedActiveLensId = getPersistedActiveLensId();
 const initialActiveLensId =
   // Restore the persisted lens when it's already known (a built-in, present
   // at init). Custom lenses hydrate later and are restored in setUserLenses.
-  (persistedActiveLensId &&
-    initialLenses.find((l) => l.id === persistedActiveLensId)?.id) ||
+  (persistedActiveLensId && initialLenses.find((l) => l.id === persistedActiveLensId)?.id) ||
   initialLenses.find((l) => l.id === "all-traces")?.id ||
   initialLenses[0]?.id ||
   "all-traces";
@@ -592,8 +570,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
   allLenses: initialLenses,
   sort: initialActiveDraft?.sort ?? initialActiveLens?.sort ?? DEFAULT_SORT,
   grouping: initialActiveDraft?.grouping ?? initialActiveLens?.grouping ?? "flat",
-  columnOrder:
-    initialActiveDraft?.columns ?? initialActiveLens?.columns ?? defaultColumnOrder,
+  columnOrder: initialActiveDraft?.columns ?? initialActiveLens?.columns ?? defaultColumnOrder,
   draftState: initialDrafts,
 
   selectLens: (id, opts) => {

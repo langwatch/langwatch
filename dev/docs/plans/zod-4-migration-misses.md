@@ -2,7 +2,7 @@
 
 `main` is on `zod@^3.25`; this branch is on `zod@^4.4`. Most of that upgrade is
 covered by the type checker. The cases below are not: they are places where a
-zod 3 API still *type-checks* — because it is reached through `unknown`, a
+zod 3 API still _type-checks_ — because it is reached through `unknown`, a
 structural cast, or a runtime `typeof` guard — and fails or silently answers
 wrong at run time.
 
@@ -81,9 +81,9 @@ internals:
 
 `pnpm` resolves two zods in this workspace:
 
-| what | zod |
-| --- | --- |
-| `platform/app`, and 113 other package manifests | 4.4.3 |
+| what                                                         | zod     |
+| ------------------------------------------------------------ | ------- |
+| `platform/app`, and 113 other package manifests              | 4.4.3   |
 | `@langwatch/identity-contract`, `@langwatch/identity-server` | 3.25.76 |
 
 Ten files in the identity packages import zod, so identity really does produce
@@ -136,8 +136,8 @@ Thirty-seven of those, across `identity/commands/`, `join-requests/commands/`,
 
 So the two identity packages being on zod 3 is not a private choice. Any
 package on zod 4 that consumes a schema they export cannot compile against it.
-The `isZodLikeError` structural check keeps *errors* crossing the boundary
-safely; nothing does the same for *schemas*, and nothing can — a schema is
+The `isZodLikeError` structural check keeps _errors_ crossing the boundary
+safely; nothing does the same for _schemas_, and nothing can — a schema is
 handed to a library that reads its internals.
 
 The fix is one zod. Until then, expect this wherever a zod-4 package imports a

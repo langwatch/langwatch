@@ -118,7 +118,7 @@ That is also why the failure stayed invisible for so long. The startup guard
 this ADR describes — "a catalogue that cannot be fetched fails here, the server
 does not start with a silently empty tool list" — was protecting an invariant
 that was **already violated**: the catalogue was always empty, but it was empty
-*successfully*, so the guard never fired. A fail-closed check only helps when
+_successfully_, so the guard never fired. A fail-closed check only helps when
 the thing it distrusts is the thing that goes wrong.
 
 When the RPC registration style was removed from `@langwatch/api`, the endpoint

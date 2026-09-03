@@ -129,14 +129,7 @@ function buildViewQuery({
   startDate?: string;
   endDate?: string;
 }): Record<string, unknown> {
-  const KEEP = new Set([
-    "project",
-    "view",
-    "group_by",
-    "startDate",
-    "endDate",
-    "negateFilters",
-  ]);
+  const KEEP = new Set(["project", "view", "group_by", "startDate", "endDate", "negateFilters"]);
 
   const out: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(routerQuery)) {
@@ -217,10 +210,7 @@ function useSavedViewsInternal() {
     return cached ?? undefined;
   }, [projectId]);
 
-  const savedViewsQuery = api.savedViews.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
+  const savedViewsQuery = api.savedViews.getAll.useQuery({ projectId }, { enabled: !!projectId });
 
   const rawViews = savedViewsQuery.data;
   const isInitialized = savedViewsQuery.isFetched || cachedViews !== undefined;
@@ -330,9 +320,7 @@ function useSavedViewsInternal() {
     // be populated even when the URL itself is clean.
     const urlQueryString = router.asPath.split("?")[1] ?? "";
     const urlParams = new URLSearchParams(urlQueryString);
-    const hasUrlFilters = Object.values(availableFilters).some((f) =>
-      urlParams.has(f.urlKey),
-    );
+    const hasUrlFilters = Object.values(availableFilters).some((f) => urlParams.has(f.urlKey));
     const hasUrlDates = urlParams.has("startDate") || urlParams.has("endDate");
     const hasUrlQuery = urlParams.has("query");
     if (hasUrlFilters || hasUrlDates || hasUrlQuery) return;
@@ -553,9 +541,7 @@ function useSavedViewsInternal() {
   }, [matchedViewId, isInitialized, selectedViewId, projectId]);
 
   return {
-    defaultViews: [
-      { id: "all-traces", name: "All Traces", origin: null },
-    ] as DefaultView[],
+    defaultViews: [{ id: "all-traces", name: "All Traces", origin: null }] as DefaultView[],
     customViews,
     selectedViewId,
     isInitialized,
@@ -574,9 +560,7 @@ const SavedViewsContext = createContext<SavedViewsContextValue | null>(null);
 
 export function SavedViewsProvider({ children }: { children: React.ReactNode }) {
   const value = useSavedViewsInternal();
-  return (
-    <SavedViewsContext.Provider value={value}>{children}</SavedViewsContext.Provider>
-  );
+  return <SavedViewsContext.Provider value={value}>{children}</SavedViewsContext.Provider>;
 }
 
 export function useSavedViews(): SavedViewsContextValue {

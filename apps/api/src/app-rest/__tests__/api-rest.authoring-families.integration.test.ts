@@ -26,11 +26,9 @@ import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed
 describe("given the Studio's run dispatch door", () => {
   describe("when a permitted person posts a runnable event", () => {
     it("prepares the event through the workflow application and streams the engine's events", async () => {
-      const postEvent = vi.fn(
-        async (input: { onEvent: (event: { type: string }) => void }) => {
-          input.onEvent({ type: "done" } as never);
-        },
-      );
+      const postEvent = vi.fn(async (input: { onEvent: (event: { type: string }) => void }) => {
+        input.onEvent({ type: "done" } as never);
+      });
       const prepareStudioEvent = vi.fn(async (input: { event: unknown }) => input.event);
       const api = mount({ workflowStudio: { postEvent, prepareStudioEvent } });
 

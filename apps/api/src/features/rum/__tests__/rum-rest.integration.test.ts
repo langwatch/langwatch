@@ -84,17 +84,17 @@ describe("given a caller to be named for the rate-limit bucket", () => {
   describe("when the browser sends a session header", () => {
     it("names the session, capped at 64 characters", () => {
       const long = "s".repeat(200);
-      expect(
-        rateLimitKey(contextWith({ [RUM_SESSION_HEADER]: long })),
-      ).toBe(`session:${"s".repeat(64)}`);
+      expect(rateLimitKey(contextWith({ [RUM_SESSION_HEADER]: long }))).toBe(
+        `session:${"s".repeat(64)}`,
+      );
     });
   });
 
   describe("when it does not", () => {
     it("names the hop NEAREST us, not the client-supplied first one", () => {
-      expect(
-        rateLimitKey(contextWith({ "x-forwarded-for": "1.2.3.4, 9.9.9.9, 10.0.0.1" })),
-      ).toBe("ip:10.0.0.1");
+      expect(rateLimitKey(contextWith({ "x-forwarded-for": "1.2.3.4, 9.9.9.9, 10.0.0.1" }))).toBe(
+        "ip:10.0.0.1",
+      );
       expect(rateLimitKey(contextWith({}))).toBe("ip:unknown");
     });
   });

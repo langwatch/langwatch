@@ -6,7 +6,6 @@
 // add copy there, not inline.
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
-
 export class TraceNotFoundError extends NotFoundError {
   declare readonly code: "trace_not_found";
 

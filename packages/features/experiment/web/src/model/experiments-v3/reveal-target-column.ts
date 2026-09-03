@@ -39,9 +39,7 @@ const targetColumnSelector = (targetId: string): string =>
  */
 export function targetColumnLabel(targetId: string): string | null {
   if (typeof document === "undefined") return null;
-  const header = document.querySelector(
-    `${targetColumnSelector(targetId)} [data-target-name]`,
-  );
+  const header = document.querySelector(`${targetColumnSelector(targetId)} [data-target-name]`);
   return header?.getAttribute("data-target-name") || null;
 }
 

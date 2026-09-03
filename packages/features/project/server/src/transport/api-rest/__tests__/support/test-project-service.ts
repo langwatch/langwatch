@@ -25,8 +25,7 @@ export class TestProjectService extends ProjectService {
   listIdsByOrganization = unsupported<ProjectService["listIdsByOrganization"]>();
   listActiveByScopes = unsupported<ProjectService["listActiveByScopes"]>();
   updateMetadata = unsupported<ProjectService["updateMetadata"]>();
-  touchCodingAgentSessionSeen =
-    unsupported<ProjectService["touchCodingAgentSessionSeen"]>();
+  touchCodingAgentSessionSeen = unsupported<ProjectService["touchCodingAgentSessionSeen"]>();
   touchCodingAgentPullRequestSeen =
     unsupported<ProjectService["touchCodingAgentPullRequestSeen"]>();
   searchByQuery = unsupported<ProjectService["searchByQuery"]>();

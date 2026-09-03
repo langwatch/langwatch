@@ -15,11 +15,7 @@
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 /**
@@ -75,22 +71,22 @@ export class PersonalSessionsTrpcApi {
        * with every other governance page. The actual reach is the caller's
        * userId, from `ctx.actor()`, never from input.
        */
-      list: policy("organization:view")(
-        procedure.input(organizationScopeSchema),
-      ).query(async ({ ctx }) => {
-        const sessions = await ctx.app.governance.cliSessionListForUser({
-          userId: ctx.actor().id,
-        });
-        return sessions.map((session) => ({
-          sessionStartedAtMs: session.sessionStartedAtMs,
-          deviceLabel: session.deviceLabel,
-          hostname: session.hostname,
-          uname: session.uname,
-          platform: session.platform,
-          lastSeenMs: session.lastSeenMs,
-          expiresAtMs: session.expiresAtMs,
-        }));
-      }),
+      list: policy("organization:view")(procedure.input(organizationScopeSchema)).query(
+        async ({ ctx }) => {
+          const sessions = await ctx.app.governance.cliSessionListForUser({
+            userId: ctx.actor().id,
+          });
+          return sessions.map((session) => ({
+            sessionStartedAtMs: session.sessionStartedAtMs,
+            deviceLabel: session.deviceLabel,
+            hostname: session.hostname,
+            uname: session.uname,
+            platform: session.platform,
+            lastSeenMs: session.lastSeenMs,
+            expiresAtMs: session.expiresAtMs,
+          }));
+        },
+      ),
 
       /** Revoke one of the caller's own sessions. Idempotent. */
       revoke: policy("organization:view")(procedure.input(revokeSchema)).mutation(
@@ -108,14 +104,14 @@ export class PersonalSessionsTrpcApi {
        * the user-wide token revoke so the per-user token index clears in one
        * shot.
        */
-      revokeAll: policy("organization:view")(
-        procedure.input(organizationScopeSchema),
-      ).mutation(async ({ ctx }) => {
-        const result = await ctx.app.governance.cliTokenRevokeForUser({
-          userId: ctx.actor().id,
-        });
-        return { ok: true, revokedTokens: result.revokedCount };
-      }),
+      revokeAll: policy("organization:view")(procedure.input(organizationScopeSchema)).mutation(
+        async ({ ctx }) => {
+          const result = await ctx.app.governance.cliTokenRevokeForUser({
+            userId: ctx.actor().id,
+          });
+          return { ok: true, revokedTokens: result.revokedCount };
+        },
+      ),
     });
   }
 }

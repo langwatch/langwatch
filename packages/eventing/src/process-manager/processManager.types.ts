@@ -104,11 +104,7 @@ export interface ProcessDefinition<State> {
    */
   transient?: boolean;
   /** Pure: no I/O, no clocks, no projection reads. */
-  evolve(params: {
-    previousState: State;
-    input: ProcessInput;
-    ref: ProcessRef;
-  }): Evolution<State>;
+  evolve(params: { previousState: State; input: ProcessInput; ref: ProcessRef }): Evolution<State>;
   /**
    * Optional pure external-signal evolution. Persistence and retry semantics
    * remain in ProcessManagerService; this function only decides the next

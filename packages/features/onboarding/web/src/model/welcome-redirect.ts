@@ -11,7 +11,10 @@
 
 interface WelcomeOrg {
   primaryIntent: string | null;
-  teams: readonly { readonly isPersonal: boolean; readonly projects: readonly { readonly slug: string }[] }[];
+  teams: readonly {
+    readonly isPersonal: boolean;
+    readonly projects: readonly { readonly slug: string }[];
+  }[];
 }
 
 export type WelcomeRedirectDecision =
@@ -29,8 +32,7 @@ export function resolveWelcomeRedirect({
   const sharedTeams = (org: WelcomeOrg) => org.teams.filter((t) => !t.isPersonal);
 
   const hasAnyProject =
-    organizations?.some((org) => sharedTeams(org).some((t) => t.projects.length > 0)) ??
-    false;
+    organizations?.some((org) => sharedTeams(org).some((t) => t.projects.length > 0)) ?? false;
 
   // Membership is the test, not `primaryIntent`. That field is null for every
   // organization created before ADR-038 and for every one created outside

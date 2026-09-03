@@ -174,17 +174,17 @@ export class CodingAgentTrpcApi {
        * window — cost, tokens, active time and session count, plus what the
        * sessions produced. Metric-only sessions are included.
        */
-      usageTotals: policy(CODING_AGENT_PERMISSION)(
-        procedure.input(usageTotalsInputSchema),
-      ).query(async ({ ctx, input }) => {
-        const toMs = input.toMs ?? Date.now();
-        const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
-        return ctx.app.codingAgentApp.getUsageTotals({
-          projectId: input.projectId,
-          fromMs,
-          toMs,
-        });
-      }),
+      usageTotals: policy(CODING_AGENT_PERMISSION)(procedure.input(usageTotalsInputSchema)).query(
+        async ({ ctx, input }) => {
+          const toMs = input.toMs ?? Date.now();
+          const fromMs = input.fromMs ?? toMs - DEFAULT_WINDOW_MS;
+          return ctx.app.codingAgentApp.getUsageTotals({
+            projectId: input.projectId,
+            fromMs,
+            toMs,
+          });
+        },
+      ),
 
       /**
        * The project's recent coding-agent sessions in a window, newest first —
@@ -218,23 +218,23 @@ export class CodingAgentTrpcApi {
        * the project's content visibility; the cost follows `cost:view`, like every
        * other spend on the platform.
        */
-      sessionsList: policy(CODING_AGENT_PERMISSION)(
-        procedure.input(projectScopeSchema),
-      ).query(async ({ ctx, input }) => {
-        const visibility = await ports.readViewerVisibility(ctx, {
-          projectId: input.projectId,
-        });
-        const rows = await ctx.app.codingAgentApp.listForProject({
-          projectId: input.projectId,
-        });
-        return gateSessionListCost({
-          rows: gateSessionListTitles({
-            rows,
-            canReadCapturedContent: visibility.canReadCapturedContent,
-          }),
-          canSeeCosts: visibility.canSeeCosts,
-        });
-      }),
+      sessionsList: policy(CODING_AGENT_PERMISSION)(procedure.input(projectScopeSchema)).query(
+        async ({ ctx, input }) => {
+          const visibility = await ports.readViewerVisibility(ctx, {
+            projectId: input.projectId,
+          });
+          const rows = await ctx.app.codingAgentApp.listForProject({
+            projectId: input.projectId,
+          });
+          return gateSessionListCost({
+            rows: gateSessionListTitles({
+              rows,
+              canReadCapturedContent: visibility.canReadCapturedContent,
+            }),
+            canSeeCosts: visibility.canSeeCosts,
+          });
+        },
+      ),
 
       /**
        * What each of the project's pull requests cost, plus the branches whose
@@ -246,13 +246,12 @@ export class CodingAgentTrpcApi {
        * project the caller may read, so a shared pull request reports its whole
        * price rather than one person's share of it.
        */
-      pullRequestUsage: policy(CODING_AGENT_PERMISSION)(
-        procedure.input(projectScopeSchema),
-      ).query(async ({ ctx, input }) =>
-        ctx.app.codingAgentApp.getPersonalProjectPullRequestUsage(
-          { projectId: input.projectId },
-          ctx.actor(),
-        ),
+      pullRequestUsage: policy(CODING_AGENT_PERMISSION)(procedure.input(projectScopeSchema)).query(
+        async ({ ctx, input }) =>
+          ctx.app.codingAgentApp.getPersonalProjectPullRequestUsage(
+            { projectId: input.projectId },
+            ctx.actor(),
+          ),
       ),
 
       /**

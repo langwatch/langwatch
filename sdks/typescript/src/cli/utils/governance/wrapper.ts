@@ -24,10 +24,7 @@ import { getCliBootstrap } from "./cli-api";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import type { GovernanceConfig } from "./config";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
-import {
-  copilotGatewayModelPreflight,
-  copilotPrespawnWarnings,
-} from "./copilot-prespawn";
+import { copilotGatewayModelPreflight, copilotPrespawnWarnings } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
 import { maybeOfferIngestionShellRcPersist, SHELL_FUNCTION_TOOLS } from "./shell-rc";
@@ -38,10 +35,7 @@ import {
   parseToolModeFlag,
   resolveWrapperPath,
 } from "./wrapper-path-choice";
-import {
-  classifyIngestionSetupError,
-  recoverExpiredSession,
-} from "./wrapper-session-recovery";
+import { classifyIngestionSetupError, recoverExpiredSession } from "./wrapper-session-recovery";
 
 /**
  * How often the wrapper polls codex's append-only rollout while the session
@@ -232,8 +226,7 @@ export async function preflightWrapper(
   // own VK" surface). Prefer the credential-derived families; fall back to the
   // tile list only on legacy servers that don't send `gatewayProviders`.
   const need = TOOL_PROVIDER_FAMILIES[tool];
-  const configured =
-    bootstrap?.gatewayProviders ?? bootstrap?.providers?.map((p) => p.name);
+  const configured = bootstrap?.gatewayProviders ?? bootstrap?.providers?.map((p) => p.name);
   if (need && need.length > 0 && Array.isArray(configured)) {
     const have = new Set(configured.map((n) => n.toLowerCase()));
     const matches = need.filter((n) => have.has(n));
@@ -297,9 +290,7 @@ export function buildShellReapply(args: {
     parts.push(`unset -f ${args.tool} 2>/dev/null`);
   }
   parts.push(...args.clears.map((k) => `unset ${k}`));
-  parts.push(
-    ...Object.entries(args.vars).map(([k, v]) => `export ${k}=${shellQuote(v)}`),
-  );
+  parts.push(...Object.entries(args.vars).map(([k, v]) => `export ${k}=${shellQuote(v)}`));
   return parts.join("; ");
 }
 
@@ -350,9 +341,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     try {
       cfg = await runDeviceFlowLogin({ cfg });
     } catch (err) {
-      process.stderr.write(
-        `login failed: ${(err as Error).message ?? "unknown error"}\n`,
-      );
+      process.stderr.write(`login failed: ${(err as Error).message ?? "unknown error"}\n`);
       process.exit(1);
     }
     if (!isLoggedIn(cfg)) {
@@ -384,9 +373,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
         tool,
         project: scopeFlags.project,
       });
-      process.stderr.write(
-        `${lwTag()} pinned ${tool} telemetry to project ${pinned.label}.\n`,
-      );
+      process.stderr.write(`${lwTag()} pinned ${tool} telemetry to project ${pinned.label}.\n`);
     } catch (err) {
       process.stderr.write(
         `${lwTag()} could not pin ${tool} to project ${scopeFlags.project}: ` +
@@ -405,8 +392,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // an explicit direct-OTLP override: no gateway-vs-subscription prompt,
   // no tool_mode persistence. A literal --tool-mode flag still wins.
   const pathOverride =
-    parsedMode.override ??
-    (cfg.tool_project_keys?.[tool]?.secret ? "ingestion" : undefined);
+    parsedMode.override ?? (cfg.tool_project_keys?.[tool]?.secret ? "ingestion" : undefined);
 
   // Decide Path A (gateway) vs Path B (ingestion) for this run. Prompts
   // (and remembers the answer) only when the org policy allows BOTH paths,
@@ -440,8 +426,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   try {
     modeResult = await withTelemetrySetupSpinner({
       tool,
-      run: () =>
-        resolveWrapperMode(cfg, tool, gatewayVars, gatewayClears, pathChoice.mode),
+      run: () => resolveWrapperMode(cfg, tool, gatewayVars, gatewayClears, pathChoice.mode),
     });
   } catch (err) {
     // Direct-OTLP setup can fail at mint time: an expired device session,
@@ -450,10 +435,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     // that path bills model usage to the org and the user has to opt into
     // it. An expired session is the one recoverable case, so offer the
     // login inline and retry the same path.
-    if (
-      pathChoice.mode === "ingestion" &&
-      classifyIngestionSetupError(err) === "expired_session"
-    ) {
+    if (pathChoice.mode === "ingestion" && classifyIngestionSetupError(err) === "expired_session") {
       const recovery = await recoverExpiredSession({ cfg, tool });
       if (recovery.status === "abort") {
         process.stderr.write(recovery.message);
@@ -485,8 +467,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       }
     } else {
       process.stderr.write(
-        `${lwTag()} could not set up telemetry for ${tool}: ` +
-          `${(err as Error).message}\n`,
+        `${lwTag()} could not set up telemetry for ${tool}: ` + `${(err as Error).message}\n`,
       );
       process.exit(2);
     }
@@ -602,9 +583,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       );
     }
     if (modeResult.codexProfilePath) {
-      process.stderr.write(
-        `${lwTag()} wrote profile body to ${modeResult.codexProfilePath}.\n`,
-      );
+      process.stderr.write(`${lwTag()} wrote profile body to ${modeResult.codexProfilePath}.\n`);
     }
   } else {
     // ingestion mode side-effect feedback so the user sees what
@@ -648,8 +627,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     // explanation reads as the wrapper having hung.
     onCheckStart: () =>
       process.stderr.write(
-        `${lwTag()} checking whether the LangWatch plugin for Claude Code ` +
-          `is up to date.\n`,
+        `${lwTag()} checking whether the LangWatch plugin for Claude Code ` + `is up to date.\n`,
       ),
   });
   if (pluginUpdate.action === "updated") {

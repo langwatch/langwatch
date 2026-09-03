@@ -58,9 +58,7 @@ describe("RedisStatTile", () => {
 
       it("shows the engine-processor percent", () => {
         renderTile({ redisEngineCpuPercent: 12.3 });
-        expect(screen.getByTestId("redis-engine-cpu-stat").textContent).toContain(
-          "12.3%",
-        );
+        expect(screen.getByTestId("redis-engine-cpu-stat").textContent).toContain("12.3%");
       });
 
       it("shows the connection count", () => {

@@ -42,9 +42,9 @@ export type DotSnakeToPascal<S extends string> = S extends `${infer H}.${infer T
 // Utility types
 // ---------------------------------------------------------------------------
 
-export type UnionToIntersection<U> = (
-  U extends unknown ? (k: U) => void : never
-) extends (k: infer I) => void
+export type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (
+  k: infer I,
+) => void
   ? I
   : never;
 

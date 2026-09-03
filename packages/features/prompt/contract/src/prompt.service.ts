@@ -76,9 +76,7 @@ export abstract class PromptService {
     organizationId?: string;
   }): Promise<PromptTagAssignment>;
   abstract listCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]>;
-  abstract tryGetCopySource(input: {
-    promptId: string;
-  }): Promise<PromptCopySource | null>;
+  abstract tryGetCopySource(input: { promptId: string }): Promise<PromptCopySource | null>;
   abstract getNamesByIds(input: {
     ids: string[];
     projectId: string;
@@ -101,10 +99,7 @@ export abstract class PromptService {
     oldName: string;
     newName: string;
   }): Promise<PromptTag>;
-  abstract tryDeleteTag(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<PromptTag | null>;
+  abstract tryDeleteTag(input: { id: string; organizationId: string }): Promise<PromptTag | null>;
   abstract tryDeleteTagByName(input: {
     organizationId: string;
     name: string;

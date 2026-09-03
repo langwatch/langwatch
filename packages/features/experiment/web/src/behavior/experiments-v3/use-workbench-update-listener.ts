@@ -141,9 +141,7 @@ const pullThenApplyMissed = async ({
  * have, so the page takes the version instead of reading it as a stranger's.
  */
 const isOwnRunVersion = (runId: string | undefined): boolean =>
-  Boolean(
-    runId && useEvaluationsV3Store.getState().runsStartedHere?.includes(runId),
-  );
+  Boolean(runId && useEvaluationsV3Store.getState().runsStartedHere?.includes(runId));
 
 /**
  * Takes a version this page's own run wrote, and carries on saving.
@@ -285,9 +283,7 @@ const useApplyServerVersion = ({
  * and a frame this page does not understand is not a failure worth reporting:
  * the next signal, or the next time the tab becomes visible, tries again.
  */
-const parseUpdateSignal = (
-  event: unknown,
-): ExperimentUpdateSignal | undefined => {
+const parseUpdateSignal = (event: unknown): ExperimentUpdateSignal | undefined => {
   if (!event) return undefined;
   try {
     const raw = typeof event === "string" ? JSON.parse(event) : event;
@@ -310,10 +306,7 @@ const useExperimentUpdateSignal = ({
   experimentSlug: string | undefined;
   applyServerVersion: ApplyServerVersion;
 }) => {
-  useSSESubscription<
-    { event?: unknown; timestamp?: number },
-    { projectId: string }
-  >(
+  useSSESubscription<{ event?: unknown; timestamp?: number }, { projectId: string }>(
     // @ts-expect-error - tRPC subscription type isn't inferred for the hook's generic
     api.experiments.onExperimentUpdate,
     { projectId },
@@ -397,14 +390,13 @@ export function useWorkbenchUpdateListener({
   reloadFromServer: () => Promise<void>;
   enabled?: boolean;
 }) {
-  const { workbenchVersion, staleWorkbench, setStaleWorkbench } =
-    useEvaluationsV3Store(
-      useShallow((state) => ({
-        workbenchVersion: state.workbenchVersion,
-        staleWorkbench: state.staleWorkbench,
-        setStaleWorkbench: state.setStaleWorkbench,
-      })),
-    );
+  const { workbenchVersion, staleWorkbench, setStaleWorkbench } = useEvaluationsV3Store(
+    useShallow((state) => ({
+      workbenchVersion: state.workbenchVersion,
+      staleWorkbench: state.staleWorkbench,
+      setStaleWorkbench: state.setStaleWorkbench,
+    })),
+  );
 
   const { applyServerVersion, reload } = useApplyServerVersion({
     isDirty,

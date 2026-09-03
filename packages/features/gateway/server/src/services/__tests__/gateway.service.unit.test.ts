@@ -348,9 +348,7 @@ describe("GatewayService configuration bundle", () => {
         const bundle = await service.loadConfigurationPersistence({
           organizationId: "org_1",
           traceProjectId: null,
-          guardrailAttachments: [
-            { direction: "input", guardrailIds: ["guardrail_present"] },
-          ],
+          guardrailAttachments: [{ direction: "input", guardrailIds: ["guardrail_present"] }],
         });
 
         expect(bundle.cacheRules).toEqual([{ id: "rule_enabled" }]);

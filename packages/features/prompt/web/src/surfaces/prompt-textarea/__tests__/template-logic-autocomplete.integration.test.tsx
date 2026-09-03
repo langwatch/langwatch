@@ -28,14 +28,9 @@ vi.mock("rich-textarea", () => ({
       onBlur?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
       "data-role"?: string;
     }
-  >(
-    (
-      { children, autoHeight, onSelectionChange, "data-role": dataRole, ...props },
-      ref,
-    ) => {
-      return <textarea ref={ref} data-role={dataRole} {...props} />;
-    },
-  ),
+  >(({ children, autoHeight, onSelectionChange, "data-role": dataRole, ...props }, ref) => {
+    return <textarea ref={ref} data-role={dataRole} {...props} />;
+  }),
 }));
 
 const mockSources: AvailableSource[] = [

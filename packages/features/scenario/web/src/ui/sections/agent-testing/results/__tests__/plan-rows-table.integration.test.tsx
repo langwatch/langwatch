@@ -53,9 +53,7 @@ function makeSuite(overrides: Partial<RunPlanSuite> = {}): RunPlanSuite {
   };
 }
 
-function makeExternalSet(
-  overrides: Partial<ExternalSetSummary> = {},
-): ExternalSetSummary {
+function makeExternalSet(overrides: Partial<ExternalSetSummary> = {}): ExternalSetSummary {
   return {
     scenarioSetId: "nightly-ci",
     passedCount: 2,
@@ -134,9 +132,7 @@ function plansOf({
 }): RunPlan[] {
   return buildRunPlans({
     plans,
-    suiteNames: new Map(
-      [...plans, ...testSuites].map((suite) => [suite.id, suite.name]),
-    ),
+    suiteNames: new Map([...plans, ...testSuites].map((suite) => [suite.id, suite.name])),
     suiteSummaries,
     externalSets,
   });
@@ -162,16 +158,12 @@ function oneSuiteRow(
 
 async function openPlanMenu(planName: string) {
   const user = userEvent.setup();
-  await user.click(
-    screen.getByRole("button", { name: `Actions for ${planName}` }),
-  );
+  await user.click(screen.getByRole("button", { name: `Actions for ${planName}` }));
   return user;
 }
 
 async function menuItemTexts(): Promise<(string | null)[]> {
-  return (await screen.findAllByRole("menuitem")).map(
-    (item) => item.textContent,
-  );
+  return (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
 }
 
 describe("the Test Runs list", () => {
@@ -211,14 +203,7 @@ describe("the Test Runs list", () => {
   it("heads the table with the seven columns in order", () => {
     renderRows([]);
 
-    const headings = [
-      "Run plan",
-      "Last run",
-      "Scope",
-      "Targets",
-      "Pass",
-      "Trend",
-    ];
+    const headings = ["Run plan", "Last run", "Scope", "Targets", "Pass", "Trend"];
     for (const heading of headings) {
       expect(screen.getByText(heading)).toBeInTheDocument();
     }
@@ -257,9 +242,7 @@ describe("the Test Runs list", () => {
     renderRows([{ plan: checkout, group: makeGroup() }]);
 
     const row = screen.getByTestId("run-plan-row-checkout");
-    expect(
-      within(row).getByText("2h ago · 3 scenarios · 2 runs"),
-    ).toBeInTheDocument();
+    expect(within(row).getByText("2h ago · 3 scenarios · 2 runs")).toBeInTheDocument();
   });
 
   /** @scenario "The Last run column reads the age, the scenarios and the runs" */
@@ -294,9 +277,7 @@ describe("the Test Runs list", () => {
     const row = screen.getByTestId("run-plan-row-checkout");
     expect(within(row).getByText("nothing in 30 days")).toBeInTheDocument();
     // A plan with no run has no history to draw, so no bars either.
-    expect(
-      within(row).queryByTestId("trend-sparkline"),
-    ).not.toBeInTheDocument();
+    expect(within(row).queryByTestId("trend-sparkline")).not.toBeInTheDocument();
   });
 
   /** @scenario "The Scope column says what the plan covers" */
@@ -320,17 +301,13 @@ describe("the Test Runs list", () => {
     renderRows(planRowsOf(plans));
 
     expect(
-      within(screen.getByTestId("run-plan-row-checkout")).getByText(
-        "All scenarios",
-      ),
+      within(screen.getByTestId("run-plan-row-checkout")).getByText("All scenarios"),
     ).toBeInTheDocument();
     // A scope over test suites names them rather than counting them, and a
     // test suite is no row of its own, so the name comes from the read that
     // carries every suite of the project.
     expect(
-      within(screen.getByTestId("run-plan-row-nightly")).getByText(
-        "Checkout, Refunds",
-      ),
+      within(screen.getByTestId("run-plan-row-nightly")).getByText("Checkout, Refunds"),
     ).toBeInTheDocument();
   });
 
@@ -366,9 +343,7 @@ describe("the Test Runs list", () => {
     // The mark says which rule the scope is, so the four rules cannot be told
     // apart by the words alone.
     const marks = ["checkout", "nightly", "labelled", "picked"].map((slug) => {
-      const cell = within(
-        screen.getByTestId(`run-plan-row-${slug}`),
-      ).getByTestId("plan-scope");
+      const cell = within(screen.getByTestId(`run-plan-row-${slug}`)).getByTestId("plan-scope");
       return cell.querySelector("svg")?.innerHTML ?? "";
     });
 
@@ -410,9 +385,7 @@ describe("the Test Runs list", () => {
     expect(within(row).getByTestId("pass-rate-text")).toHaveTextContent("90%");
     // The boxed metrics pill is gone: it carried a cost and a duration that
     // most rows never had.
-    expect(
-      within(row).queryByTestId("run-metrics-summary"),
-    ).not.toBeInTheDocument();
+    expect(within(row).queryByTestId("run-metrics-summary")).not.toBeInTheDocument();
   });
 
   // The rates run from best to worst, so a list drawn newest first would put
@@ -442,11 +415,7 @@ describe("the Test Runs list", () => {
     const row = screen.getByTestId("run-plan-row-checkout");
     const bars = within(row).getAllByTestId("trend-sparkline-bar");
     expect(bars).toHaveLength(3);
-    expect(bars.map((bar) => bar.getAttribute("title"))).toEqual([
-      "100%",
-      "50%",
-      "0%",
-    ]);
+    expect(bars.map((bar) => bar.getAttribute("title"))).toEqual(["100%", "50%", "0%"]);
   });
 
   /** @scenario "The trend bars are softer than the text beside them" */
@@ -500,9 +469,7 @@ describe("the Test Runs list", () => {
 
     const row = screen.getByTestId("run-plan-row-checkout");
     expect(within(row).getByTestId("pass-rate-text")).toHaveTextContent("100%");
-    expect(within(row).getByTestId("plan-last-run")).toHaveTextContent(
-      "3 scenarios",
-    );
+    expect(within(row).getByTestId("plan-last-run")).toHaveTextContent("3 scenarios");
   });
 
   /** @scenario "A run plan row opens on a click and carries no chevron" */
@@ -535,11 +502,7 @@ describe("the Test Runs list", () => {
     renderRows([oneSuiteRow()]);
     await openPlanMenu("Checkout");
 
-    expect(await menuItemTexts()).toEqual([
-      "Open last run",
-      "Edit run plan",
-      "Archive run plan",
-    ]);
+    expect(await menuItemTexts()).toEqual(["Open last run", "Edit run plan", "Archive run plan"]);
 
     // Archiving is the one action of the menu that takes something away, so
     // it reads apart from the two that do not.
@@ -555,24 +518,18 @@ describe("the Test Runs list", () => {
     const { props, view } = renderRows([row]);
     const user = await openPlanMenu("Checkout");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Archive run plan" }),
-    );
+    await user.click(await screen.findByRole("menuitem", { name: "Archive run plan" }));
 
     expect(await screen.findByText(PLAN_ARCHIVE_TITLE)).toBeInTheDocument();
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("Checkout")).toBeInTheDocument();
-    expect(
-      within(dialog).getByText(PLAN_ARCHIVE_DESCRIPTION),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText(PLAN_ARCHIVE_DESCRIPTION)).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("button", { name: "Archive" }));
     expect(props.onArchivePlan).toHaveBeenCalledWith(row.plan);
 
     view.rerender(<PlanRowsTable {...props} rows={[]} />);
-    expect(
-      screen.queryByTestId("run-plan-row-checkout"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-plan-row-checkout")).not.toBeInTheDocument();
   });
 
   /** @scenario "Leaving the archive dialog keeps the run plan" */
@@ -580,9 +537,7 @@ describe("the Test Runs list", () => {
     const { props } = renderRows([oneSuiteRow()]);
     const user = await openPlanMenu("Checkout");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Archive run plan" }),
-    );
+    await user.click(await screen.findByRole("menuitem", { name: "Archive run plan" }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
@@ -611,10 +566,7 @@ describe("the Test Runs list", () => {
     renderRows([oneSuiteRow({}, null)]);
     await openPlanMenu("Checkout");
 
-    expect(await menuItemTexts()).toEqual([
-      "Edit run plan",
-      "Archive run plan",
-    ]);
+    expect(await menuItemTexts()).toEqual(["Edit run plan", "Archive run plan"]);
   });
 
   it("lists a set written by code as a run plan of its own", () => {
@@ -657,11 +609,7 @@ describe("the run plans of a project", () => {
 
     // The external sets sort by their own run time, and a run plan with no
     // run falls below them.
-    expect(plans.map((plan) => plan.name)).toEqual([
-      "ci-regression",
-      "smoke-tests",
-      "Checkout",
-    ]);
+    expect(plans.map((plan) => plan.name)).toEqual(["ci-regression", "smoke-tests", "Checkout"]);
   });
 
   it("keeps the command line's throwaway suites out of the list", () => {
@@ -696,9 +644,7 @@ describe("the run plans of a project", () => {
   /** @scenario "The Scope column says what the plan covers" */
   it("reads a label scope as the labels it names", () => {
     const plans = plansOf({
-      plans: [
-        makeSuite({ scope: { mode: "labels", labels: ["smoke", "critical"] } }),
-      ],
+      plans: [makeSuite({ scope: { mode: "labels", labels: ["smoke", "critical"] } })],
       suiteSummaries: {},
       externalSets: [],
     });

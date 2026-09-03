@@ -4,10 +4,7 @@
  * precedent — the feature declares its own narrow port and composition
  * adapts the real client; no Trace repositories are imported.
  */
-export type TopicClusteringClickHouseQueryParams = Record<
-  string,
-  string | number | string[]
->;
+export type TopicClusteringClickHouseQueryParams = Record<string, string | number | string[]>;
 
 export type TopicClusteringClickHouseQuery = {
   query: string;

@@ -40,10 +40,9 @@ describe("TerminalOutput", () => {
 
   describe("given a plain (non-ANSI) tool output", () => {
     it("renders it verbatim as monospace text, with no box chrome around it", () => {
-      const { container } = render(
-        <TerminalOutput text={"just plain lines\nsecond line"} />,
-        { wrapper },
-      );
+      const { container } = render(<TerminalOutput text={"just plain lines\nsecond line"} />, {
+        wrapper,
+      });
       expect(container.textContent).toContain("just plain lines");
       expect(container.textContent).toContain("second line");
       // No card — the header bar / copy button this used to render.

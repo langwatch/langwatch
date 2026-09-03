@@ -413,16 +413,8 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1_agg2], context);
 
       // Verify both events are stored (they're in different partitions)
-      const events_agg1 = await eventStore.getEvents(
-        aggregateId1,
-        context,
-        aggregateType,
-      );
-      const events_agg2 = await eventStore.getEvents(
-        aggregateId2,
-        context,
-        aggregateType,
-      );
+      const events_agg1 = await eventStore.getEvents(aggregateId1, context, aggregateType);
+      const events_agg2 = await eventStore.getEvents(aggregateId2, context, aggregateType);
       expect(events_agg1).toHaveLength(1);
       expect(events_agg2).toHaveLength(1);
       expect(events_agg1[0]?.id).toBe(event1_agg1.id);

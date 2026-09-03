@@ -26,10 +26,7 @@ export function ComponentExecutionButton({
 
   const openRunUntilHereDialog = useRunUntilHereDialogStore((state) => state.open);
 
-  const [isWaitingLong] = useDebounceValue(
-    node?.data.execution_state?.status === "waiting",
-    600,
-  );
+  const [isWaitingLong] = useDebounceValue(node?.data.execution_state?.status === "waiting", 600);
 
   const { propertiesExpanded, setPropertiesExpanded, setSelectedNode } = useWorkflowStore(
     ({ propertiesExpanded, setPropertiesExpanded, setSelectedNode }) => ({
@@ -84,8 +81,7 @@ export function ComponentExecutionButton({
           ) : node?.data.execution_state?.status === "success" ? (
             <Box
               color={
-                checkIsEvaluator(node) &&
-                node?.data.execution_state?.outputs?.status === "skipped"
+                checkIsEvaluator(node) && node?.data.execution_state?.outputs?.status === "skipped"
                   ? "yellow.500"
                   : "green.500"
               }
@@ -146,17 +142,11 @@ export function ComponentExecutionButton({
             </Button>
           </Menu.Trigger>
           <Menu.Content>
-            <Menu.Item
-              value="run-manual"
-              onClick={() => node && startComponentExecution({ node })}
-            >
+            <Menu.Item value="run-manual" onClick={() => node && startComponentExecution({ node })}>
               <Play size={14} />
               Run with manual input
             </Menu.Item>
-            <Menu.Item
-              value="run-workflow"
-              onClick={() => node && openRunUntilHereDialog(node.id)}
-            >
+            <Menu.Item value="run-workflow" onClick={() => node && openRunUntilHereDialog(node.id)}>
               <Play size={14} />
               Run workflow until here
             </Menu.Item>

@@ -116,11 +116,7 @@ vi.mock("../../traces/add-participants", () => ({
       <button type="button" onClick={() => queueDrawerOpen?.onOpen()}>
         Add new queue
       </button>
-      <button
-        type="button"
-        disabled={annotators.length === 0 || !!isLoading}
-        onClick={sendToQueue}
-      >
+      <button type="button" disabled={annotators.length === 0 || !!isLoading} onClick={sendToQueue}>
         Send
       </button>
     </div>
@@ -234,8 +230,7 @@ describe("AddToAnnotationQueueDialog", () => {
         pickAndSend();
 
         expect(mocks.toastCreate.mock.calls[0]?.[0]).toMatchObject({
-          description:
-            "2 traces sent for annotation. 1 skipped because its trace no longer exists",
+          description: "2 traces sent for annotation. 1 skipped because its trace no longer exists",
         });
       });
 

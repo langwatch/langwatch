@@ -7,13 +7,12 @@ sidebarTitle: Production runbook
 When the gateway is slow, stuck, or chewing memory, and the LangWatch trace for a specific bad request has already been checked, this runbook is the next stop. Every recipe here relies on the pprof admin listener, which is bound to `127.0.0.1:6060` by default and therefore never reachable from outside the pod.
 
 <Note>
-  **Don't expose the admin port without a token.** `GATEWAY_ADMIN_ADDR` binds to loopback
-  by default. If you genuinely need direct (non-port-forward) access, e.g. non-k8s
-  deploys, or from a corporate VPN, you MUST also set `GATEWAY_ADMIN_AUTH_TOKEN`. The
-  gateway refuses to start otherwise. See [Helm → Admin
-  listener](/ai-gateway/self-hosting/helm#admin-listener) for the three deployment
-  postures. `kubectl port-forward` remains the simplest option for k8s, it tunnels through
-  the API server and is auditable in Kubernetes audit logs.
+  **Don't expose the admin port without a token.** `GATEWAY_ADMIN_ADDR` binds to loopback by
+  default. If you genuinely need direct (non-port-forward) access, e.g. non-k8s deploys, or from a
+  corporate VPN, you MUST also set `GATEWAY_ADMIN_AUTH_TOKEN`. The gateway refuses to start
+  otherwise. See [Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener) for the three
+  deployment postures. `kubectl port-forward` remains the simplest option for k8s, it tunnels
+  through the API server and is auditable in Kubernetes audit logs.
 </Note>
 
 ## Prerequisites
@@ -171,9 +170,9 @@ gateway request -> spend command -> local spool -> drainer -> control-plane inge
 **Operator signal:** `gateway_budget_blocks_total{scope}` is the counter that tells you enforcement actually fired. A scope configured with `on_breach: block` whose ledger is past the limit but whose block counter is flat means the gateway has not received a refreshed bundle yet.
 
 <Note>
-  Because the precheck is local and permissive, a stale snapshot allows requests through
-  rather than rejecting them. Overspend during a workers outage is expected and reconciles
-  once the ledger catches up.
+  Because the precheck is local and permissive, a stale snapshot allows requests through rather than
+  rejecting them. Overspend during a workers outage is expected and reconciles once the ledger
+  catches up.
 </Note>
 
 ## Recipe 7: Stuck drain

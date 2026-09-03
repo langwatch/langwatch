@@ -111,10 +111,7 @@ export function expectEvaluatorWiring({
     evaluatorType: evaluator.evaluatorType,
     mappings: evaluator.mappings?.[datasetId]?.[targetId],
   }));
-  expect(
-    wired,
-    `${what}. Evaluators on the experiment: ${JSON.stringify(found)}`,
-  ).toBeDefined();
+  expect(wired, `${what}. Evaluators on the experiment: ${JSON.stringify(found)}`).toBeDefined();
 }
 
 function resolves({

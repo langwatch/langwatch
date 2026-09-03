@@ -26,13 +26,7 @@ const createEdge = ({
   type: "default",
 });
 
-const createField = ({
-  identifier,
-  value,
-}: {
-  identifier: string;
-  value?: unknown;
-}): Field => ({
+const createField = ({ identifier, value }: { identifier: string; value?: unknown }): Field => ({
   identifier,
   type: "str",
   ...(value !== undefined ? { value } : {}),
@@ -67,9 +61,7 @@ describe("edgeMappingUtils", () => {
     describe("when only field values exist", () => {
       it("returns value mappings from field.value", () => {
         const edges: Edge[] = [];
-        const inputs: Field[] = [
-          createField({ identifier: "query", value: "hello world" }),
-        ];
+        const inputs: Field[] = [createField({ identifier: "query", value: "hello world" })];
 
         const result = buildInputMappings({
           nodeId: "node_b",
@@ -93,9 +85,7 @@ describe("edgeMappingUtils", () => {
             targetField: "query",
           }),
         ];
-        const inputs: Field[] = [
-          createField({ identifier: "query", value: "stale value" }),
-        ];
+        const inputs: Field[] = [createField({ identifier: "query", value: "stale value" })];
 
         const result = buildInputMappings({
           nodeId: "node_b",
@@ -155,9 +145,7 @@ describe("edgeMappingUtils", () => {
     describe("when applying a source mapping", () => {
       it("creates a new edge and clears field.value", () => {
         const currentEdges: Edge[] = [];
-        const currentInputs: Field[] = [
-          createField({ identifier: "query", value: "old value" }),
-        ];
+        const currentInputs: Field[] = [createField({ identifier: "query", value: "old value" })];
 
         const result = applyMappingChange({
           nodeId: "node_b",
@@ -250,9 +238,7 @@ describe("edgeMappingUtils", () => {
             targetField: "query",
           }),
         ];
-        const currentInputs: Field[] = [
-          createField({ identifier: "query", value: "stale" }),
-        ];
+        const currentInputs: Field[] = [createField({ identifier: "query", value: "stale" })];
 
         const result = applyMappingChange({
           nodeId: "node_b",

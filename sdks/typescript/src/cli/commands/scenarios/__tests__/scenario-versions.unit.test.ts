@@ -36,10 +36,7 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import {
-  ScenariosApiError,
-  ScenariosApiService,
-} from "@/client-sdk/services/scenarios";
+import { ScenariosApiError, ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { listScenarioVersionsCommand } from "../versions/list";
 import { getScenarioVersionCommand } from "../versions/get";
 
@@ -162,9 +159,9 @@ describe("the scenario version commands", () => {
         ),
       );
 
-      await expect(
-        getScenarioVersionCommand("scenario_abc123", "9"),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(getScenarioVersionCommand("scenario_abc123", "9")).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

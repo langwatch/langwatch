@@ -53,9 +53,7 @@ export type RegistryModelProviderCatalogOptions = {
  * by LangWatch, and what the provider itself says about a key.
  */
 export class RegistryModelProviderCatalogAdapter extends ModelProviderCatalog {
-  static create(
-    options: RegistryModelProviderCatalogOptions,
-  ): RegistryModelProviderCatalogAdapter {
+  static create(options: RegistryModelProviderCatalogOptions): RegistryModelProviderCatalogAdapter {
     return new RegistryModelProviderCatalogAdapter(options);
   }
 

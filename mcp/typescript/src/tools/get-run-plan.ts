@@ -38,9 +38,7 @@ export async function handleGetRunPlan(params: {
     const overrides = Object.entries(target.runParameters ?? {})
       .map(([name, value]) => `${name}=${String(value)}`)
       .join(", ");
-    lines.push(
-      `- ${target.type}:${target.referenceId}${overrides ? ` (${overrides})` : ""}`,
-    );
+    lines.push(`- ${target.type}:${target.referenceId}${overrides ? ` (${overrides})` : ""}`);
   }
 
   if (plan.scenarioIds.length > 0) {

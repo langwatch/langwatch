@@ -50,9 +50,7 @@ export function normalizeAssetBase(raw: string | undefined): string {
     );
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error(
-      `LANGWATCH_ASSET_BASE must use http or https; got ${JSON.stringify(raw)}`,
-    );
+    throw new Error(`LANGWATCH_ASSET_BASE must use http or https; got ${JSON.stringify(raw)}`);
   }
   // The resolver concatenates the asset path onto this base, so a query or
   // fragment would swallow it — "…/build?rev=1" + "assets/x.js" resolves to
@@ -60,8 +58,7 @@ export function normalizeAssetBase(raw: string | undefined): string {
   // silent 404 the scheme check above exists to prevent.
   if (url.search || url.hash) {
     throw new Error(
-      `LANGWATCH_ASSET_BASE must not carry a query or fragment; ` +
-        `got ${JSON.stringify(raw)}`,
+      `LANGWATCH_ASSET_BASE must not carry a query or fragment; ` + `got ${JSON.stringify(raw)}`,
     );
   }
   return url.href.endsWith("/") ? url.href : `${url.href}/`;
@@ -116,13 +113,7 @@ export function assetBaseBootstrapBody(base: string): string {
  * a no-op when the base is same-origin; the resolver bootstrap is always
  * injected (the built bundle references `window.__lwAssetUrl` regardless of base).
  */
-export function injectAssetBaseIntoHtml({
-  html,
-  base,
-}: {
-  html: string;
-  base: string;
-}): string {
+export function injectAssetBaseIntoHtml({ html, base }: { html: string; base: string }): string {
   const withBootstrap = insertBootstrap({
     html,
     snippet: assetBaseBootstrapScript(base),

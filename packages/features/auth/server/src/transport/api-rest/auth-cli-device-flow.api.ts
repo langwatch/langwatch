@@ -87,9 +87,7 @@ export type CliPersonalWorkspace = Readonly<{
 /** Who is signed in, as this process resolves a browser session. */
 export type CliBrowserSessionPort = (
   request: Request,
-) => Promise<
-  Readonly<{ id: string; name?: string | null; email?: string | null }> | null
->;
+) => Promise<Readonly<{ id: string; name?: string | null; email?: string | null }> | null>;
 
 /** Everything the device grant reaches that it does not itself store. */
 export type AuthCliDeviceFlowRestPorts = Readonly<{
@@ -516,9 +514,7 @@ export function createAuthCliDeviceFlowRestApp(options: {
     // device login. Ensured here (idempotent) so a session approved through
     // the provider-less branch still resolves a key. Best-effort — a workspace
     // failure must not fail the login itself, and older CLIs ignore the field.
-    let personalProject:
-      | { id: string; slug: string; name: string; api_key: string }
-      | undefined;
+    let personalProject: { id: string; slug: string; name: string; api_key: string } | undefined;
     try {
       const workspace = await ports.ensurePersonalWorkspace({
         organizationId: organization.id,
@@ -936,11 +932,14 @@ export function createAuthCliDeviceFlowRestApp(options: {
     // writes a real project's key to `.env`.
     const governanceEnabled = await ports
       .featureFlags()
-      .isEnabled(GOVERNANCE_RELEASE_FLAG as never, {
-        kind: "organization",
-        userId: person.id,
-        organizationId: organization_id,
-      } as never)
+      .isEnabled(
+        GOVERNANCE_RELEASE_FLAG as never,
+        {
+          kind: "organization",
+          userId: person.id,
+          organizationId: organization_id,
+        } as never,
+      )
       .catch(() => true);
     if (!governanceEnabled) {
       return c.json(

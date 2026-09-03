@@ -75,24 +75,24 @@ describe("resolveAzureCredentials", () => {
       ["workloadIdentity" as const],
       ["managedIdentity" as const],
       ["azureCli" as const],
-    ])("resolves a distinct credential for %s without requiring an account key unless sharedKey", (mode) => {
-      const config =
-        mode === "sharedKey" ? sharedKeyConfig() : tokenModeConfig(mode);
-      const identity: AzureInjectedIdentity =
-        mode === "workloadIdentity" ? injectedWorkloadIdentity : {};
+    ])(
+      "resolves a distinct credential for %s without requiring an account key unless sharedKey",
+      (mode) => {
+        const config = mode === "sharedKey" ? sharedKeyConfig() : tokenModeConfig(mode);
+        const identity: AzureInjectedIdentity =
+          mode === "workloadIdentity" ? injectedWorkloadIdentity : {};
 
-      const credentials = resolveAzureCredentials({ config, identity });
+        const credentials = resolveAzureCredentials({ config, identity });
 
-      expect(credentials.mode).toBe(mode);
-      expect(credentials.accountName).toBe("lwacct");
-      if (mode === "sharedKey") {
-        expect((credentials as { accountKey: string }).accountKey).toBe(
-          "key-value",
-        );
-      } else {
-        expect("accountKey" in credentials).toBe(false);
-      }
-    });
+        expect(credentials.mode).toBe(mode);
+        expect(credentials.accountName).toBe("lwacct");
+        if (mode === "sharedKey") {
+          expect((credentials as { accountKey: string }).accountKey).toBe("key-value");
+        } else {
+          expect("accountKey" in credentials).toBe(false);
+        }
+      },
+    );
 
     /** @scenario "Adding an auth mode forces every Azure credential construction site to be revisited" */
     it("exhaustively handles every AZURE_BLOB_AUTH_MODE value — a switch, not a default fallthrough", () => {
@@ -104,16 +104,10 @@ describe("resolveAzureCredentials", () => {
       // supported mode is actually reachable and returns its own
       // discriminated credential shape, proving there is no silent
       // default-case swallow.
-      const modes = [
-        "sharedKey",
-        "workloadIdentity",
-        "managedIdentity",
-        "azureCli",
-      ] as const;
+      const modes = ["sharedKey", "workloadIdentity", "managedIdentity", "azureCli"] as const;
 
       for (const mode of modes) {
-        const config =
-          mode === "sharedKey" ? sharedKeyConfig() : tokenModeConfig(mode);
+        const config = mode === "sharedKey" ? sharedKeyConfig() : tokenModeConfig(mode);
         const identity: AzureInjectedIdentity =
           mode === "workloadIdentity" ? injectedWorkloadIdentity : {};
         expect(resolveAzureCredentials({ config, identity }).mode).toBe(mode);
@@ -128,12 +122,8 @@ describe("resolveAzureCredentials", () => {
         accountKey: "leftover-key",
       });
 
-      expect(() => resolveAzureCredentials({ config })).toThrow(
-        AzureBackendMisconfiguredError,
-      );
-      expect(() => resolveAzureCredentials({ config })).toThrow(
-        /AZURE_BLOB_ACCOUNT_KEY/,
-      );
+      expect(() => resolveAzureCredentials({ config })).toThrow(AzureBackendMisconfiguredError);
+      expect(() => resolveAzureCredentials({ config })).toThrow(/AZURE_BLOB_ACCOUNT_KEY/);
       expect(() => resolveAzureCredentials({ config })).toThrow(/remove/i);
     });
   });
@@ -143,12 +133,8 @@ describe("resolveAzureCredentials", () => {
     it("refuses, stating the setting has no effect without the azure backend", () => {
       const config = tokenModeConfig("workloadIdentity", { backend: "s3" });
 
-      expect(() => resolveAzureCredentials({ config })).toThrow(
-        AzureBackendMisconfiguredError,
-      );
-      expect(() => resolveAzureCredentials({ config })).toThrow(
-        /STORED_OBJECTS_BACKEND=azure/,
-      );
+      expect(() => resolveAzureCredentials({ config })).toThrow(AzureBackendMisconfiguredError);
+      expect(() => resolveAzureCredentials({ config })).toThrow(/STORED_OBJECTS_BACKEND=azure/);
     });
 
     /**
@@ -175,9 +161,9 @@ describe("resolveAzureCredentials", () => {
       expect(credentials.mode).toBe("workloadIdentity");
       expect(credentials.accountName).toBe("acct");
       // ...while the default (write) resolution still refuses the same config.
-      expect(() =>
-        resolveAzureCredentials({ config, identity: injectedWorkloadIdentity }),
-      ).toThrow(AzureBackendMisconfiguredError);
+      expect(() => resolveAzureCredentials({ config, identity: injectedWorkloadIdentity })).toThrow(
+        AzureBackendMisconfiguredError,
+      );
     });
   });
 
@@ -219,12 +205,8 @@ describe("resolveAzureCredentials", () => {
       };
       // AZURE_BLOB_ACCOUNT_KEY intentionally left unset.
 
-      expect(() => resolveAzureCredentials({ config })).toThrow(
-        AzureBackendMisconfiguredError,
-      );
-      expect(() => resolveAzureCredentials({ config })).toThrow(
-        /AZURE_BLOB_ACCOUNT_KEY/,
-      );
+      expect(() => resolveAzureCredentials({ config })).toThrow(AzureBackendMisconfiguredError);
+      expect(() => resolveAzureCredentials({ config })).toThrow(/AZURE_BLOB_ACCOUNT_KEY/);
       expect(() => resolveAzureCredentials({ config })).toThrow(/sharedKey/);
     });
   });
@@ -236,12 +218,8 @@ describe("resolveAzureCredentials", () => {
         endpoint: "http://storage.example.com/lwacct",
       });
 
-      expect(() => resolveAzureCredentials({ config })).toThrow(
-        AzureBackendMisconfiguredError,
-      );
-      expect(() => resolveAzureCredentials({ config })).toThrow(
-        /AZURE_BLOB_ENDPOINT/,
-      );
+      expect(() => resolveAzureCredentials({ config })).toThrow(AzureBackendMisconfiguredError);
+      expect(() => resolveAzureCredentials({ config })).toThrow(/AZURE_BLOB_ENDPOINT/);
       expect(() => resolveAzureCredentials({ config })).toThrow(/https/i);
     });
 
@@ -263,12 +241,8 @@ describe("resolveAzureCredentials", () => {
       });
       // AZURE_BLOB_AUTHORITY_HOST intentionally left unset.
 
-      expect(() => resolveAzureCredentials({ config })).toThrow(
-        AzureBackendMisconfiguredError,
-      );
-      expect(() => resolveAzureCredentials({ config })).toThrow(
-        /AZURE_BLOB_AUTHORITY_HOST/,
-      );
+      expect(() => resolveAzureCredentials({ config })).toThrow(AzureBackendMisconfiguredError);
+      expect(() => resolveAzureCredentials({ config })).toThrow(/AZURE_BLOB_AUTHORITY_HOST/);
     });
 
     it("does not silently fall back to the public-cloud authority", () => {

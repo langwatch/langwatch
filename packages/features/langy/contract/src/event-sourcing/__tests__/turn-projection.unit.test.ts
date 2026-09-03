@@ -159,10 +159,7 @@ describe("the local turn projection", () => {
         },
       };
 
-      const inRecordedOrder = applyLangyTurnEvents(initialLangyTurnProjection, [
-        earlier,
-        later,
-      ]);
+      const inRecordedOrder = applyLangyTurnEvents(initialLangyTurnProjection, [earlier, later]);
       const reversedArrival = applyLangyTurnEvents(
         applyLangyTurnEvents(initialLangyTurnProjection, [later]),
         [earlier],

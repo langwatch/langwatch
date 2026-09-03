@@ -27,9 +27,7 @@ export type ScenarioRunExportMode = z.infer<typeof scenarioRunExportModeSchema>;
  * filtered export matches the filtered list exactly.
  */
 export const scenarioRunExportStatusFilterSchema = z.enum(["pass", "fail", "stalled"]);
-export type ScenarioRunExportStatusFilter = z.infer<
-  typeof scenarioRunExportStatusFilterSchema
->;
+export type ScenarioRunExportStatusFilter = z.infer<typeof scenarioRunExportStatusFilterSchema>;
 
 export const scenarioRunExportRequestSchema = z.object({
   projectId: z.string(),

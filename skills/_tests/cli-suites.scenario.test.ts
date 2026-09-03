@@ -54,8 +54,7 @@ Then run these commands:
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "CLI test suite management",
-        description:
-          "Developer wants to manage test suites using the LangWatch CLI.",
+        description: "Developer wants to manage test suites using the LangWatch CLI.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -77,9 +76,7 @@ Then run these commands:
             toolCallFix(state);
 
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+test-suite/);
@@ -96,9 +93,7 @@ Then run these commands:
   it.skipIf(isCI)(
     "agent uses CLI to view simulation run results",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-sim-runs-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-sim-runs-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
@@ -141,9 +136,7 @@ If runs exist, get details: \`langwatch simulation-run get <runId>\`
             toolCallFix(state);
 
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+simulation-run/);
@@ -160,9 +153,7 @@ If runs exist, get details: \`langwatch simulation-run get <runId>\`
   it.skipIf(isCI)(
     "agent uses CLI to manage triggers",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-triggers-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-triggers-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
@@ -207,9 +198,7 @@ Then: \`langwatch trigger list --format json\`
             toolCallFix(state);
 
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+trigger/);

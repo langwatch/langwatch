@@ -18,10 +18,7 @@ import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PageRequest } from "../model/governance-events-pager";
-import {
-  type SourceEventRowData,
-  SourceEventsTable,
-} from "../ui/sections/source-events-table";
+import { type SourceEventRowData, SourceEventsTable } from "../ui/sections/source-events-table";
 import { useSourceEventsPager } from "../behavior/use-source-events-pager";
 
 afterEach(cleanup);
@@ -80,10 +77,7 @@ function Harness({
     fetchPage,
   });
   return (
-    <SourceEventsTable
-      pager={pager}
-      emptyState={<div>walkthrough: push your first event</div>}
-    />
+    <SourceEventsTable pager={pager} emptyState={<div>walkthrough: push your first event</div>} />
   );
 }
 
@@ -104,15 +98,7 @@ describe("given a source with ingested events", () => {
     renderTable({ fetchPage: fakeServer(events), pageSize: 10 });
 
     const table = await screen.findByRole("table");
-    for (const header of [
-      "Time",
-      "Type",
-      "Actor",
-      "Action",
-      "Target",
-      "Cost",
-      "Tokens",
-    ]) {
+    for (const header of ["Time", "Type", "Actor", "Action", "Target", "Cost", "Tokens"]) {
       expect(within(table).getByRole("columnheader", { name: header })).toBeTruthy();
     }
     const rows = within(table).getAllByTestId("source-event-row");

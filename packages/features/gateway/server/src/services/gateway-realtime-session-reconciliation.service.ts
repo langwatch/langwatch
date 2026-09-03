@@ -15,9 +15,7 @@ export const elevenLabsConversationReportSchema = z
   })
   .passthrough();
 
-export type ElevenLabsConversationReport = z.infer<
-  typeof elevenLabsConversationReportSchema
->;
+export type ElevenLabsConversationReport = z.infer<typeof elevenLabsConversationReportSchema>;
 
 export interface RealtimeSessionReconciliationLogger {
   warn(context: Record<string, unknown>, message: string): void;
@@ -195,8 +193,7 @@ export class GatewayRealtimeSessionReconciliationWorker {
       await this.repository.releaseMissingVendorConversation({
         sessionId: session.id,
         projectId: session.projectId,
-        reason:
-          "the vendor has no conversation for this session, so the credential was never used",
+        reason: "the vendor has no conversation for this session, so the credential was never used",
       });
       return false;
     }

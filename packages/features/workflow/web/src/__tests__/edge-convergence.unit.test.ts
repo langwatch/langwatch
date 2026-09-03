@@ -127,9 +127,9 @@ describe("computeNodeGuards", () => {
 describe("guardsAreMutuallyExclusive", () => {
   describe("when two guard sets disagree on a gate side", () => {
     it("reports them as mutually exclusive", () => {
-      expect(
-        guardsAreMutuallyExclusive(new Set(["gate:true"]), new Set(["gate:false"])),
-      ).toBe(true);
+      expect(guardsAreMutuallyExclusive(new Set(["gate:true"]), new Set(["gate:false"]))).toBe(
+        true,
+      );
     });
 
     it("detects the conflict on a shared nested gate", () => {
@@ -144,9 +144,9 @@ describe("guardsAreMutuallyExclusive", () => {
 
   describe("when the guard sets can both hold", () => {
     it("treats identical guards as not exclusive", () => {
-      expect(
-        guardsAreMutuallyExclusive(new Set(["gate:true"]), new Set(["gate:true"])),
-      ).toBe(false);
+      expect(guardsAreMutuallyExclusive(new Set(["gate:true"]), new Set(["gate:true"]))).toBe(
+        false,
+      );
     });
 
     it("treats two always-reachable nodes as not exclusive", () => {

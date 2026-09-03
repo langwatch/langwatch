@@ -301,10 +301,7 @@ export class VirtualKeysApiService {
       startCursor: options?.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
-        new VirtualKeysApiError(
-          `Failed to list virtual keys: ${reason}.`,
-          "list virtual keys",
-        ),
+        new VirtualKeysApiError(`Failed to list virtual keys: ${reason}.`, "list virtual keys"),
       fetchPage: (cursor) =>
         this.listPage({
           cursor,
@@ -332,10 +329,7 @@ export class VirtualKeysApiService {
       startCursor: options?.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
-        new VirtualKeysApiError(
-          `Failed to list virtual keys: ${reason}.`,
-          "list virtual keys",
-        ),
+        new VirtualKeysApiError(`Failed to list virtual keys: ${reason}.`, "list virtual keys"),
       fetchPage: (cursor) =>
         this.listPage({
           cursor,

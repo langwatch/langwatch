@@ -17,11 +17,7 @@ import type { BTLeaderboardEntry } from "../../../../model/batch-evaluation-resu
  * which edges ran over — so the fade cue cannot silently stop firing.
  */
 
-const entry = (
-  variantId: string,
-  score: number,
-  isDegenerate = false,
-): BTLeaderboardEntry => ({
+const entry = (variantId: string, score: number, isDegenerate = false): BTLeaderboardEntry => ({
   variantId,
   wins: 1,
   losses: 1,
@@ -84,11 +80,7 @@ describe("computeBandClipping", () => {
     // wider than that spread already overruns it. This is the common case on
     // small samples, not an edge case.
     it("detects the overrun a bootstrap on few comparisons produces", () => {
-      const scale = computeScoreBarScale([
-        entry("A", 100),
-        entry("B", 80),
-        entry("C", 60),
-      ]);
+      const scale = computeScoreBarScale([entry("A", 100), entry("B", 80), entry("C", 60)]);
       expect(scale).not.toBeNull();
 
       const wide = computeBandClipping({

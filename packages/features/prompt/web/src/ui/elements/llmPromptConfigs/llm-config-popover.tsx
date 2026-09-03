@@ -3,7 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { clampMaxTokens } from "@langwatch/model-provider-web/utils/clampMaxTokens";
-import { allModelOptions, ModelSelector } from "@langwatch/model-provider-web/components/ModelSelector";
+import {
+  allModelOptions,
+  ModelSelector,
+} from "@langwatch/model-provider-web/components/ModelSelector";
 import { type Output, OutputsSection, type OutputType } from "../outputs/outputs-section";
 import { Popover } from "@langwatch/design-system/popover";
 import {
@@ -118,11 +121,7 @@ export function LLMConfigPopover({
     } else {
       // Remove BOTH potential keys (snake_case and camelCase) to avoid duplicates
       // This ensures the new value replaces the old regardless of key format
-      const {
-        [paramName]: _snake,
-        [formKey]: _camel,
-        ...rest
-      } = values as Record<string, unknown>;
+      const { [paramName]: _snake, [formKey]: _camel, ...rest } = values as Record<string, unknown>;
       onChange({ ...rest, [formKey]: value } as LLMConfigValues);
     }
   };
@@ -130,9 +129,7 @@ export function LLMConfigPopover({
   // Structured outputs state
   const hasNonDefaultOutputs =
     outputs &&
-    (outputs.length !== 1 ||
-      outputs[0]?.identifier !== "output" ||
-      outputs[0]?.type !== "str");
+    (outputs.length !== 1 || outputs[0]?.identifier !== "output" || outputs[0]?.type !== "str");
 
   const [isStructuredOutputsEnabled, setIsStructuredOutputsEnabled] = useState(
     hasNonDefaultOutputs ?? false,
@@ -222,14 +219,12 @@ export function LLMConfigPopover({
             const value = getParamValue(values, paramName);
 
             // Get provider-level parameter constraints
-            const paramConstraints =
-              currentModelMetadata?.parameterConstraints?.[paramName];
+            const paramConstraints = currentModelMetadata?.parameterConstraints?.[paramName];
 
             // Determine effective max override:
             // - For max_tokens: use model's maxCompletionTokens
             // - For other params: use provider constraints if available
-            const maxOverride =
-              paramName === "max_tokens" ? maxTokenLimit : paramConstraints?.max;
+            const maxOverride = paramName === "max_tokens" ? maxTokenLimit : paramConstraints?.max;
 
             // Determine effective min override from provider constraints
             const minOverride = paramConstraints?.min;
@@ -330,11 +325,7 @@ export function LLMConfigPopover({
                 borderRadius="lg"
                 background="bg"
               >
-                <OutputsSection
-                  outputs={outputs}
-                  onChange={onOutputsChange}
-                  title="Outputs"
-                />
+                <OutputsSection outputs={outputs} onChange={onOutputsChange} title="Outputs" />
               </Box>
             )}
           </VStack>

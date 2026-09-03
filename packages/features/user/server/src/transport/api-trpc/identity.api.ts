@@ -30,11 +30,7 @@
  * Spec: specs/identity/identifier-model.feature.
  */
 import type { AuthzDeclaration } from "@langwatch/authz-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 /** The process supplies authentication; authorization arrives as `policy`. */

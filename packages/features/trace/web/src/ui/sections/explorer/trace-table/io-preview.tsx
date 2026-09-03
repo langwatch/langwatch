@@ -1,14 +1,5 @@
 import { chakra, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import {
-  ArrowDown,
-  ArrowUp,
-  AudioLines,
-  Bot,
-  Film,
-  Paperclip,
-  User,
-  Wrench,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, AudioLines, Bot, Film, Paperclip, User, Wrench } from "lucide-react";
 import type React from "react";
 import { Fragment, memo, type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import type { TraceMediaRef } from "@langwatch/trace-contract";
@@ -229,9 +220,11 @@ function useBreakMarkerClampGuard(text: string) {
  * `useBreakMarkerClampGuard`). Style props (`fontSize`, `color`,
  * `textStyle`, …) are forwarded so both density rows can share it.
  */
-const ClampedPreviewText: React.FC<
-  { text: string } & React.ComponentProps<typeof Text>
-> = ({ text, css, ...rest }) => {
+const ClampedPreviewText: React.FC<{ text: string } & React.ComponentProps<typeof Text>> = ({
+  text,
+  css,
+  ...rest
+}) => {
   const ref = useBreakMarkerClampGuard(text);
   return (
     <Text
@@ -412,9 +405,7 @@ function buildRow(
   // `whiteSpace="pre-line"`, and `renderWithBreakMarkers` decorates each
   // break with a non-selectable marker at render time.
   const formatted =
-    raw === null
-      ? { text: "" }
-      : formatPreview(raw, { maxChars: 200, newlines: "preserve" });
+    raw === null ? { text: "" } : formatPreview(raw, { maxChars: 200, newlines: "preserve" });
   return {
     text: formatted.text,
     isChat: parsed?.isChat ?? false,
@@ -423,9 +414,13 @@ function buildRow(
   };
 }
 
-const CompactIOPreview: React.FC<
-  IOPreviewProps & { placeholders: MissingPlaceholderSides }
-> = ({ input, output, inputMediaRefs, outputMediaRefs, placeholders }) => {
+const CompactIOPreview: React.FC<IOPreviewProps & { placeholders: MissingPlaceholderSides }> = ({
+  input,
+  output,
+  inputMediaRefs,
+  outputMediaRefs,
+  placeholders,
+}) => {
   const tokens = useDensityTokens();
   // Cache the parse work per row: without this a density flip (a store
   // subscription every visible cell holds) re-parses every row's IO.
@@ -439,18 +434,10 @@ const CompactIOPreview: React.FC<
   );
   return (
     <VStack align="start" gap={0.5} fontFamily="mono">
-      {inputRow && (
-        <CompactRow row={inputRow} fontSize={tokens.ioFontSize} direction="input" />
-      )}
-      {placeholders.input && (
-        <CompactMissingRow direction="input" fontSize={tokens.ioFontSize} />
-      )}
-      {outputRow && (
-        <CompactRow row={outputRow} fontSize={tokens.ioFontSize} direction="output" />
-      )}
-      {placeholders.output && (
-        <CompactMissingRow direction="output" fontSize={tokens.ioFontSize} />
-      )}
+      {inputRow && <CompactRow row={inputRow} fontSize={tokens.ioFontSize} direction="input" />}
+      {placeholders.input && <CompactMissingRow direction="input" fontSize={tokens.ioFontSize} />}
+      {outputRow && <CompactRow row={outputRow} fontSize={tokens.ioFontSize} direction="output" />}
+      {placeholders.output && <CompactMissingRow direction="output" fontSize={tokens.ioFontSize} />}
     </VStack>
   );
 };
@@ -606,9 +593,7 @@ const ComfortableIOPreview: React.FC<
   );
 };
 
-const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({
-  direction,
-}) => (
+const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({ direction }) => (
   <HStack align="flex-start" gap={2}>
     <Text
       textStyle="sm"

@@ -28,22 +28,22 @@ export class IdentityIdentifierNotFoundError extends IdentityCommandRefusedError
 
 export class IdentityIdentifierNotVerifiableError extends IdentityCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "identity_identifier_not_verifiable",
-      "identity_identifier_not_verifiable",
-      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("identity_identifier_not_verifiable", "identity_identifier_not_verifiable", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "IdentityIdentifierNotVerifiableError";
   }
 }
 
 export class IdentityPrimaryMustDemoteFirstError extends IdentityCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "identity_primary_must_demote_first",
-      "identity_primary_must_demote_first",
-      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("identity_primary_must_demote_first", "identity_primary_must_demote_first", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "IdentityPrimaryMustDemoteFirstError";
   }
 }
@@ -68,9 +68,7 @@ export class IdentityEmailInUseError extends IdentityCommandRefusedError {
       httpStatus: 409,
       fault: "customer",
       reasons: [new Error(detail)],
-      tips: [
-        "Sign in with the account that already holds this address, or use a different one.",
-      ],
+      tips: ["Sign in with the account that already holds this address, or use a different one."],
     });
     this.name = "IdentityEmailInUseError";
   }
@@ -78,11 +76,11 @@ export class IdentityEmailInUseError extends IdentityCommandRefusedError {
 
 export class IdentityPrimaryRequiresVerifiedError extends IdentityCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "identity_primary_requires_verified",
-      "identity_primary_requires_verified",
-      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("identity_primary_requires_verified", "identity_primary_requires_verified", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "IdentityPrimaryRequiresVerifiedError";
   }
 }
@@ -129,11 +127,11 @@ export abstract class SsoConnectionCommandRefusedError extends HandledError {}
 
 export class SsoConnectionInvalidTransitionError extends SsoConnectionCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "sso_connection_invalid_transition",
-      "sso_connection_invalid_transition",
-      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("sso_connection_invalid_transition", "sso_connection_invalid_transition", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "SsoConnectionInvalidTransitionError";
   }
 }
@@ -158,11 +156,11 @@ export class SsoConnectionDomainTakenError extends SsoConnectionCommandRefusedEr
  *  break-glass binding, or no recorded test login. */
 export class SsoConnectionActivationBlockedError extends SsoConnectionCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "sso_connection_activation_blocked",
-      "sso_connection_activation_blocked",
-      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("sso_connection_activation_blocked", "sso_connection_activation_blocked", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "SsoConnectionActivationBlockedError";
   }
 }
@@ -174,11 +172,11 @@ export class SsoConnectionActivationBlockedError extends SsoConnectionCommandRef
  */
 export class SsoConnectionTeardownStrandsUsersError extends SsoConnectionCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "sso_connection_teardown_strands_users",
-      "sso_connection_teardown_strands_users",
-      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("sso_connection_teardown_strands_users", "sso_connection_teardown_strands_users", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "SsoConnectionTeardownStrandsUsersError";
   }
 }
@@ -196,11 +194,11 @@ export class SsoConnectionTeardownStrandsUsersError extends SsoConnectionCommand
  */
 export class SsoConnectionOperatorActRequiredError extends SsoConnectionCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "sso_connection_operator_act_required",
-      "sso_connection_operator_act_required",
-      { httpStatus: 403, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("sso_connection_operator_act_required", "sso_connection_operator_act_required", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "SsoConnectionOperatorActRequiredError";
   }
 }
@@ -231,11 +229,11 @@ export class SsoSamlNotSelfServeError extends SsoConnectionCommandRefusedError {
  */
 export class SsoConnectionStringEditRetiredError extends SsoConnectionCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "sso_connection_string_edit_retired",
-      "sso_connection_string_edit_retired",
-      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("sso_connection_string_edit_retired", "sso_connection_string_edit_retired", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "SsoConnectionStringEditRetiredError";
   }
 }
@@ -409,11 +407,11 @@ export class IdentityMfaCodeInvalidError extends MfaCommandRefusedError {
  */
 export class IdentityMfaEnrollmentExpiredError extends MfaCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "identity_mfa_enrollment_expired",
-      "identity_mfa_enrollment_expired",
-      { httpStatus: 410, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("identity_mfa_enrollment_expired", "identity_mfa_enrollment_expired", {
+      httpStatus: 410,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "IdentityMfaEnrollmentExpiredError";
   }
 }
@@ -439,11 +437,11 @@ export class IdentityMfaLockedOutError extends MfaCommandRefusedError {
 /** Every backup code has been spent, and the authenticator is gone too. */
 export class IdentityMfaBackupCodesExhaustedError extends MfaCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "identity_mfa_backup_codes_exhausted",
-      "identity_mfa_backup_codes_exhausted",
-      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("identity_mfa_backup_codes_exhausted", "identity_mfa_backup_codes_exhausted", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "IdentityMfaBackupCodesExhaustedError";
   }
 }
@@ -456,11 +454,11 @@ export class IdentityMfaBackupCodesExhaustedError extends MfaCommandRefusedError
  */
 export class IdentityMfaRequiredByOrganizationError extends MfaCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "identity_mfa_required_by_organization",
-      "identity_mfa_required_by_organization",
-      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("identity_mfa_required_by_organization", "identity_mfa_required_by_organization", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "IdentityMfaRequiredByOrganizationError";
   }
 }
@@ -473,11 +471,11 @@ export class IdentityMfaRequiredByOrganizationError extends MfaCommandRefusedErr
  */
 export class IdentityMfaEnrollmentRequiredError extends MfaCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "identity_mfa_enrollment_required",
-      "identity_mfa_enrollment_required",
-      { httpStatus: 403, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("identity_mfa_enrollment_required", "identity_mfa_enrollment_required", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "IdentityMfaEnrollmentRequiredError";
   }
 }
@@ -497,11 +495,11 @@ export abstract class PasskeyCommandRefusedError extends HandledError {}
  */
 export class IdentityPasskeyCeremonyFailedError extends PasskeyCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "identity_passkey_ceremony_failed",
-      "identity_passkey_ceremony_failed",
-      { httpStatus: 400, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("identity_passkey_ceremony_failed", "identity_passkey_ceremony_failed", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "IdentityPasskeyCeremonyFailedError";
   }
 }
@@ -510,11 +508,11 @@ export class IdentityPasskeyCeremonyFailedError extends PasskeyCommandRefusedErr
  *  anybody. Deliberately the same answer either way. */
 export class IdentityPasskeyNotRecognizedError extends PasskeyCommandRefusedError {
   constructor(detail: string) {
-    super(
-      "identity_passkey_not_recognized",
-      "identity_passkey_not_recognized",
-      { httpStatus: 400, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("identity_passkey_not_recognized", "identity_passkey_not_recognized", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "IdentityPasskeyNotRecognizedError";
   }
 }
@@ -544,11 +542,11 @@ export class IdentityDetachStrandsUserError extends IdentityCommandRefusedError 
  */
 export class CannotImpersonateWithoutSecondFactorError extends HandledError {
   constructor(detail: string) {
-    super(
-      "cannot_impersonate_without_second_factor",
-      "cannot_impersonate_without_second_factor",
-      { httpStatus: 403, fault: "customer", reasons: [new Error(detail)] },
-    );
+    super("cannot_impersonate_without_second_factor", "cannot_impersonate_without_second_factor", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
     this.name = "CannotImpersonateWithoutSecondFactorError";
   }
 }

@@ -232,13 +232,7 @@ export function resolveField(path: string): ResolvedField | null {
   return null;
 }
 
-function resolveEventField({
-  path,
-  rest,
-}: {
-  path: string;
-  rest: string;
-}): ResolvedField | null {
+function resolveEventField({ path, rest }: { path: string; rest: string }): ResolvedField | null {
   if (rest === "type") {
     return field({
       path,

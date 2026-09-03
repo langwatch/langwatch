@@ -11,11 +11,7 @@ import {
   buildInputMappingsFromEdges,
 } from "../edge-mapping";
 
-function createNode(
-  id: string,
-  type: string,
-  data: Partial<Component> = {},
-): Node<Component> {
+function createNode(id: string, type: string, data: Partial<Component> = {}): Node<Component> {
   return {
     id,
     type,
@@ -92,9 +88,7 @@ describe("buildAvailableSources", () => {
         }),
         createNode("end", "end", {}),
       ];
-      const edges: Edge[] = [
-        createEdge("llm1", "llm2", "outputs.result", "inputs.context"),
-      ];
+      const edges: Edge[] = [createEdge("llm1", "llm2", "outputs.result", "inputs.context")];
 
       const result = buildAvailableSources({
         nodeId: "llm1",
@@ -206,9 +200,7 @@ describe("buildInputMappingsFromEdges", () => {
 
   describe("when no edges target the node", () => {
     it("returns an empty mapping", () => {
-      const edges: Edge[] = [
-        createEdge("entry", "other_node", "outputs.data", "inputs.input"),
-      ];
+      const edges: Edge[] = [createEdge("entry", "other_node", "outputs.data", "inputs.input")];
 
       const result = buildInputMappingsFromEdges({
         nodeId: "llm1",

@@ -12,10 +12,7 @@ type GuardParams = {
 const PROJECT_ID = "governance-project-1";
 const SOURCE_ID = "source-1";
 
-async function runGuard(
-  action: GuardParams["action"],
-  args: GuardParams["args"],
-): Promise<void> {
+async function runGuard(action: GuardParams["action"], args: GuardParams["args"]): Promise<void> {
   if (action !== "findUnique" && action !== "upsert") {
     throw new Error(`Unexpected projection action: ${action}`);
   }
@@ -87,9 +84,7 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
       },
     };
     const prisma = {
-      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) =>
-        callback(tx),
-      ),
+      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
     };
     const repository = PostgresIngestionPullRunProjectionAdapter.create(prisma).build();
 

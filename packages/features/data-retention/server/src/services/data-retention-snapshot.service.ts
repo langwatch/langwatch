@@ -158,10 +158,7 @@ export class DataRetentionSnapshotService {
       return projectUpdate.get(scopeId) === true;
     };
 
-    const scopeName = (
-      scopeType: RetentionScopeTarget["scopeType"],
-      scopeId: string,
-    ): string => {
+    const scopeName = (scopeType: RetentionScopeTarget["scopeType"], scopeId: string): string => {
       if (scopeType === "ORGANIZATION") return organizationName ?? scopeId;
       if (scopeType === "TEAM") return teamName.get(scopeId) ?? scopeId;
       return projectName.get(scopeId) ?? scopeId;

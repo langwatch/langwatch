@@ -40,10 +40,7 @@ export function postgresLayout(postgresBinPath: string): PostgresLayout {
 // rebuild the embeds tarball with --with-rpath '$ORIGIN/../lib' or run
 // patchelf post-extract — tracked as a follow-up against the embeds
 // repo, this is the surgical runtime fix.
-function pgEnv(
-  resolvedPath: string,
-  base: NodeJS.ProcessEnv = process.env,
-): NodeJS.ProcessEnv {
+function pgEnv(resolvedPath: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const libDir = join(dirname(dirname(resolvedPath)), "lib");
   if (!existsSync(libDir)) return base;
   const var_ = process.platform === "darwin" ? "DYLD_LIBRARY_PATH" : "LD_LIBRARY_PATH";
@@ -58,10 +55,7 @@ function pgEnv(
  * Idempotent. On first run: initdb, then start; subsequently: just start.
  * Database creation (langwatch_db) happens after the server is healthy.
  */
-export async function startPostgres(
-  ctx: RuntimeContext,
-  bus: EventBus,
-): Promise<SupervisedHandle> {
+export async function startPostgres(ctx: RuntimeContext, bus: EventBus): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "postgres" });
   const start = Date.now();
 
@@ -103,17 +97,7 @@ export async function startPostgres(
   const ready = await pollUntilHealthy({
     check: execCheck(
       layout.psql.replace(/psql$/, "pg_isready"),
-      [
-        "-h",
-        "127.0.0.1",
-        "-p",
-        String(ctx.ports.postgres),
-        "-U",
-        DB_USER,
-        "-d",
-        "postgres",
-        "-q",
-      ],
+      ["-h", "127.0.0.1", "-p", String(ctx.ports.postgres), "-U", DB_USER, "-d", "postgres", "-q"],
       { env },
     ),
     timeoutMs: 30_000,
@@ -185,9 +169,8 @@ async function ensureDatabase(
     { reject: false, env },
   );
   if (probe.stdout.trim() === "1") return;
-  await execa(
-    layout.createdb,
-    ["-h", "127.0.0.1", "-p", String(port), "-U", DB_USER, DB_NAME],
-    { stdio: "ignore", env },
-  );
+  await execa(layout.createdb, ["-h", "127.0.0.1", "-p", String(port), "-U", DB_USER, DB_NAME], {
+    stdio: "ignore",
+    env,
+  });
 }

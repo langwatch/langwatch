@@ -30,13 +30,12 @@ import {
   measureAnchor,
   SpotlightPopover,
 } from "./spotlight-overlay";
-import { DRAWER_SPOTLIGHTS, type Spotlight } from "../../../../../model/explorer/onboarding/spotlights/spotlights";
+import {
+  DRAWER_SPOTLIGHTS,
+  type Spotlight,
+} from "../../../../../model/explorer/onboarding/spotlights/spotlights";
 
-export function DrawerSpotlights({
-  traceId,
-}: {
-  traceId: string;
-}): React.ReactElement | null {
+export function DrawerSpotlights({ traceId }: { traceId: string }): React.ReactElement | null {
   const pageTourActive = useOnboardingStore((s) => s.spotlightsActive);
   const seenDrawerSpotlights = useOnboardingStore((s) => s.seenDrawerSpotlights);
   const markDrawerSpotlightSeen = useOnboardingStore((s) => s.markDrawerSpotlightSeen);

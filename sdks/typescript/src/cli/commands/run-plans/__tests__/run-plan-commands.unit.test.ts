@@ -109,16 +109,11 @@ const printedDocuments = (): string[] =>
   vi
     .mocked(console.log)
     .mock.calls.map((call) => call[0] as unknown)
-    .filter(
-      (line): line is string =>
-        typeof line === "string" && line.trimStart().startsWith("{"),
-    );
+    .filter((line): line is string => typeof line === "string" && line.trimStart().startsWith("{"));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   runSpy.mockResolvedValue(makeRunResult());
   listSpy.mockResolvedValue([]);
@@ -356,9 +351,7 @@ describe("runRunPlanCommand()", () => {
         name: "Nightly regression",
       });
 
-      expect(runSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "Nightly regression" }),
-      );
+      expect(runSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "Nightly regression" }));
     });
   });
 
@@ -480,9 +473,9 @@ describe("runRunPlanCommand()", () => {
   describe("when no scope flag is given", () => {
     /** @scenario "Run with no scope flag" */
     it("refuses rather than running the whole project by accident", async () => {
-      await expect(
-        runRunPlanCommand({ target: ["http:agent_abc"] }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runRunPlanCommand({ target: ["http:agent_abc"] })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(runSpy).not.toHaveBeenCalled();
     });
@@ -491,9 +484,7 @@ describe("runRunPlanCommand()", () => {
   describe("when no target is given", () => {
     /** @scenario "Run with no target" */
     it("refuses, because a run has nothing to go against", async () => {
-      await expect(runRunPlanCommand({ all: true })).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(runRunPlanCommand({ all: true })).rejects.toThrow(ProcessExitError);
 
       expect(runSpy).not.toHaveBeenCalled();
     });
@@ -502,9 +493,9 @@ describe("runRunPlanCommand()", () => {
   describe("when a target is malformed", () => {
     /** @scenario "Run with a malformed target" */
     it("refuses and names the shape it wanted", async () => {
-      await expect(
-        runRunPlanCommand({ all: true, target: ["agent_abc"] }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runRunPlanCommand({ all: true, target: ["agent_abc"] })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       const reported = vi.mocked(console.error).mock.calls.flat().join("\n");
       expect(reported).toContain("<type>:<referenceId>");
@@ -601,9 +592,7 @@ describe("runRunPlanCommand()", () => {
     /** @scenario "A dead status endpoint still emits the machine-readable document" */
     it("still prints the final document, naming the poll failure outcome", async () => {
       runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
-      vi.spyOn(globalThis, "fetch").mockRejectedValue(
-        new Error("endpoint down"),
-      );
+      vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("endpoint down"));
 
       await runWithFakeTimers({ advanceMs: 5 * 3000 });
 
@@ -632,9 +621,7 @@ describe("runRunPlanCommand()", () => {
       await runWithFakeTimers({ advanceMs: 3000, format: "table" });
 
       expect(printedDocuments()).toHaveLength(0);
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining("batch_123"),
-      );
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining("batch_123"));
       expect(process.exitCode).not.toBe(1);
     });
   });
@@ -725,13 +712,11 @@ describe("runRunPlanCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      runSpy.mockRejectedValue(
-        new RunPlansApiError("Not found", "run a run plan"),
-      );
+      runSpy.mockRejectedValue(new RunPlansApiError("Not found", "run a run plan"));
 
-      await expect(
-        runRunPlanCommand({ all: true, target: ["http:agent_abc"] }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runRunPlanCommand({ all: true, target: ["http:agent_abc"] })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -775,9 +760,7 @@ describe("listRunPlansCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      listSpy.mockRejectedValue(
-        new RunPlansApiError("Network error", "list run plans"),
-      );
+      listSpy.mockRejectedValue(new RunPlansApiError("Network error", "list run plans"));
 
       await expect(listRunPlansCommand({})).rejects.toThrow(ProcessExitError);
     });
@@ -801,13 +784,9 @@ describe("getRunPlanCommand()", () => {
   describe("when the plan is not found", () => {
     /** @scenario "Get a run plan that does not exist" */
     it("exits with code 1", async () => {
-      getSpy.mockRejectedValue(
-        new RunPlansApiError("Not found", 'get run plan "nonexistent-id"'),
-      );
+      getSpy.mockRejectedValue(new RunPlansApiError("Not found", 'get run plan "nonexistent-id"'));
 
-      await expect(getRunPlanCommand("nonexistent-id")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(getRunPlanCommand("nonexistent-id")).rejects.toThrow(ProcessExitError);
     });
   });
 });

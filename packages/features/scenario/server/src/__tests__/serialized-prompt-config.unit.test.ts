@@ -502,8 +502,7 @@ describe("SerializedPromptConfigAdapter", () => {
       const adapter = new SerializedPromptConfigAdapter({
         config: {
           ...defaultConfig,
-          systemPrompt:
-            "You serve a {{ params.account_tier }} customer in {{ params.region }}.",
+          systemPrompt: "You serve a {{ params.account_tier }} customer in {{ params.region }}.",
           messages: [{ role: "user", content: "Tier: {{ params.account_tier }}" }],
         },
         litellmParams: defaultLitellmParams,
@@ -518,9 +517,7 @@ describe("SerializedPromptConfigAdapter", () => {
         content: string;
       }>;
 
-      expect(promptMessages[0]?.content).toBe(
-        "You serve a platinum customer in eu-central.",
-      );
+      expect(promptMessages[0]?.content).toBe("You serve a platinum customer in eu-central.");
       expect(promptMessages[1]?.content).toBe("Tier: platinum");
     });
   });

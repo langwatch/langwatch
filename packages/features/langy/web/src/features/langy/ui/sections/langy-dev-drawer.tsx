@@ -230,15 +230,9 @@ export function LangyDevDrawer({
                 Switching tabs re-attempts. */}
             <IsolatedErrorBoundary scope="The inspector crashed" resetKeys={[tab]}>
               {tab === "log" ? <LogTab records={visibleRecords} live={live} /> : null}
-              {tab === "tokens" ? (
-                <TokensTab records={visibleRecords} live={live} />
-              ) : null}
-              {tab === "ephemeral" ? (
-                <EphemeralTab records={visibleRecords} live={live} />
-              ) : null}
-              {tab === "events" ? (
-                <EventsTab records={visibleRecords} live={live} />
-              ) : null}
+              {tab === "tokens" ? <TokensTab records={visibleRecords} live={live} /> : null}
+              {tab === "ephemeral" ? <EphemeralTab records={visibleRecords} live={live} /> : null}
+              {tab === "events" ? <EventsTab records={visibleRecords} live={live} /> : null}
               {tab === "store" ? <StoreTab /> : null}
             </IsolatedErrorBoundary>
           </Box>
@@ -451,8 +445,8 @@ function LogTab({ records, live }: { records: LangyDevLogRecord[]; live: boolean
     <Box padding={2}>
       {dropped > 0 ? (
         <Text textStyle="2xs" color="orange.fg" paddingX={1} paddingBottom={2}>
-          {dropped.toLocaleString()} earlier entries dropped — the tape keeps the most
-          recent {DEV_LOG_CAPACITY.toLocaleString()}.
+          {dropped.toLocaleString()} earlier entries dropped — the tape keeps the most recent{" "}
+          {DEV_LOG_CAPACITY.toLocaleString()}.
         </Text>
       ) : null}
       <VStack align="stretch" gap={0.5}>
@@ -490,22 +484,10 @@ function LogRow({ record }: { record: LangyDevLogRecord }) {
         <Text textStyle="2xs" color="fg.subtle" flexShrink={0} css={MONO} minWidth="34px">
           {record.seq}
         </Text>
-        <Text
-          textStyle="2xs"
-          color={lane.color}
-          flexShrink={0}
-          css={MONO}
-          minWidth="12px"
-        >
+        <Text textStyle="2xs" color={lane.color} flexShrink={0} css={MONO} minWidth="12px">
           {lane.glyph}
         </Text>
-        <Text
-          textStyle="2xs"
-          fontWeight="600"
-          color={lane.color}
-          flexShrink={0}
-          minWidth="62px"
-        >
+        <Text textStyle="2xs" fontWeight="600" color={lane.color} flexShrink={0} minWidth="62px">
           {recordKind(record)}
         </Text>
         <Text
@@ -576,8 +558,7 @@ function TapeEmpty() {
   return (
     <VStack align="stretch" gap={3} paddingX="12px" paddingY="10px">
       <Text textStyle="xs" color="fg.muted">
-        Armed. Send a message — everything that crosses the wire lands here in arrival
-        order.
+        Armed. Send a message — everything that crosses the wire lands here in arrival order.
       </Text>
       <VStack align="stretch" gap={1}>
         {LANE_LEGEND.map(({ lane, label, detail }) => (
@@ -615,8 +596,7 @@ function TapeEmpty() {
 }
 
 const MONO = {
-  fontFamily:
-    "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace",
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace",
 } as const;
 
 function TokensTab({ records, live }: { records: LangyDevLogRecord[]; live: boolean }) {
@@ -671,13 +651,7 @@ function TokensTab({ records, live }: { records: LangyDevLogRecord[]; live: bool
  * Together with Tokens (deltas) and Events (tool calls), this accounts for
  * every entry on the tape — no kind is invisible in the inspector.
  */
-function EphemeralTab({
-  records,
-  live,
-}: {
-  records: LangyDevLogRecord[];
-  live: boolean;
-}) {
+function EphemeralTab({ records, live }: { records: LangyDevLogRecord[]; live: boolean }) {
   const dropped = useLangyDevLog((s) => s.dropped);
   const signals = useMemo(
     () =>
@@ -696,8 +670,7 @@ function EphemeralTab({
   if (signals.length === 0) {
     return (
       <Empty>
-        No signals yet — status, progress, reasoning and plan frames land here as they
-        arrive.
+        No signals yet — status, progress, reasoning and plan frames land here as they arrive.
       </Empty>
     );
   }
@@ -714,8 +687,8 @@ function EphemeralTab({
         // Say so. A silently-truncated tape reads as a complete one, and that
         // is exactly how you end up debugging the wrong half of a turn.
         <Text textStyle="2xs" color="orange.fg" paddingX={1} paddingBottom={2}>
-          {dropped.toLocaleString()} earlier entries dropped — the tape keeps the most
-          recent {DEV_LOG_CAPACITY.toLocaleString()}.
+          {dropped.toLocaleString()} earlier entries dropped — the tape keeps the most recent{" "}
+          {DEV_LOG_CAPACITY.toLocaleString()}.
         </Text>
       ) : null}
       <VStack align="stretch" gap={0.5}>
@@ -728,11 +701,7 @@ function EphemeralTab({
   );
 }
 
-function SignalRow({
-  record,
-}: {
-  record: Extract<LangyDevLogRecord, { lane: "stream" }>;
-}) {
+function SignalRow({ record }: { record: Extract<LangyDevLogRecord, { lane: "stream" }> }) {
   const [open, setOpen] = useState(false);
   const { entry } = record;
   // One scannable line, so the list reads without expanding every row.
@@ -996,13 +965,7 @@ function StoreTab() {
           borderBottomWidth="1px"
           borderColor="border.muted"
         >
-          <Text
-            textStyle="2xs"
-            color="fg.muted"
-            flexShrink={0}
-            minWidth="150px"
-            css={MONO}
-          >
+          <Text textStyle="2xs" color="fg.muted" flexShrink={0} minWidth="150px" css={MONO}>
             {label}
           </Text>
           <Text

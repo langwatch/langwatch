@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  closestEvaluatorTypes,
-  evaluatorTypeCatalog,
-  isValidEvaluatorType,
-} from "../catalog";
+import { closestEvaluatorTypes, evaluatorTypeCatalog, isValidEvaluatorType } from "../catalog";
 
 describe("the CLI's evaluator-type catalog", () => {
   describe("when checking a slug against the catalog", () => {
@@ -22,9 +18,9 @@ describe("the CLI's evaluator-type catalog", () => {
       // regeneration that reintroduced the removed family would surface here
       // rather than as a 422 at the API boundary.
       expect(isValidEvaluatorType("legacy/ragas_answer_relevancy")).toBe(false);
-      expect(
-        evaluatorTypeCatalog().filter((entry) => entry.slug.startsWith("legacy/")),
-      ).toEqual([]);
+      expect(evaluatorTypeCatalog().filter((entry) => entry.slug.startsWith("legacy/"))).toEqual(
+        [],
+      );
     });
   });
 

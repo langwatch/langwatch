@@ -13,15 +13,8 @@
 
 import chalk from "chalk";
 import type { RunPlanRunResult } from "@/client-sdk/services/run-plans";
-import {
-  printResult,
-  resolveOutputOptions,
-  type RawOutputFlags,
-} from "../../utils/output";
-import {
-  waitForBatchRun,
-  type BatchRunOutcome,
-} from "../../utils/waitForBatchRun";
+import { printResult, resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
+import { waitForBatchRun, type BatchRunOutcome } from "../../utils/waitForBatchRun";
 
 /** How the run ended, in the final document a machine caller reads. */
 export type RunCommandOutcome = "scheduled" | BatchRunOutcome;
@@ -60,9 +53,7 @@ export function reportScheduledRun({
     console.log(`  ${chalk.gray("View:")}         ${chalk.underline(result.platformUrl)}`);
   }
   console.log();
-  console.log(
-    chalk.gray(`Or run it again with ${chalk.cyan("--wait")} to poll for completion.`),
-  );
+  console.log(chalk.gray(`Or run it again with ${chalk.cyan("--wait")} to poll for completion.`));
 }
 
 export interface EmitRunResultParams {
@@ -110,9 +101,7 @@ export async function emitRunResult({
         table: () => {
           if (nothingToWaitFor) {
             console.log();
-            console.log(
-              chalk.yellow("  No jobs were scheduled: nothing to wait for."),
-            );
+            console.log(chalk.yellow("  No jobs were scheduled: nothing to wait for."));
             return;
           }
           reportScheduledRun({ result, note });
@@ -135,9 +124,7 @@ export async function emitRunResult({
       ...options,
       table: () => {
         console.log();
-        console.log(
-          `  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`,
-        );
+        console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
         console.log();
       },
     },

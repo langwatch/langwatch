@@ -84,9 +84,7 @@ describe("given a deployment stages the bundle somewhere", () => {
   describe("when LANGWATCH_UI_DIST_DIR names it", () => {
     /** @scenario "The production API serves the built UI artifact" */
     it("resolves the configured directory", () => {
-      expect(resolveClientDistDir({ LANGWATCH_UI_DIST_DIR: clientDistDir })).toBe(
-        clientDistDir,
-      );
+      expect(resolveClientDistDir({ LANGWATCH_UI_DIST_DIR: clientDistDir })).toBe(clientDistDir);
     });
   });
 

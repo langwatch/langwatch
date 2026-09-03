@@ -11,13 +11,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -205,14 +199,9 @@ const caseSubject = (): RunDialogSubject => ({
 function renderDialog(subject: RunDialogSubject) {
   const onClose = vi.fn();
   const onRunStarted = vi.fn();
-  render(
-    <RunDialog
-      subject={subject}
-      onClose={onClose}
-      onRunStarted={onRunStarted}
-    />,
-    { wrapper: Wrapper },
-  );
+  render(<RunDialog subject={subject} onClose={onClose} onRunStarted={onRunStarted} />, {
+    wrapper: Wrapper,
+  });
   return { onClose, onRunStarted };
 }
 
@@ -243,9 +232,7 @@ function casesDeclaring(parameters: unknown) {
  * does not read the emitted sheet, so the rule is read from the sheet by hand.
  */
 function styleRuleOf(element: Element): string {
-  const className = [...element.classList].find((name) =>
-    name.startsWith("css-"),
-  );
+  const className = [...element.classList].find((name) => name.startsWith("css-"));
   const sheets = [...document.querySelectorAll("style")]
     .map((style) => style.textContent ?? "")
     .join("\n");
@@ -304,20 +291,13 @@ describe("<RunDialog/>", () => {
 
   /** @scenario "The dialog opens with the agent section and nothing else expanded" */
   it("opens with the agent section, the last target selected, and no field added", () => {
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     expect(screen.getByText("Agent to be tested")).toBeInTheDocument();
-    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("customize-run-chips")).toBeInTheDocument();
     expect(screen.queryByTestId("run-note-field")).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("run-dialog-parameters"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-parameters")).not.toBeInTheDocument();
   });
 
   /** @scenario "The agent section offers a way to the agent setup page" */
@@ -342,12 +322,10 @@ describe("<RunDialog/>", () => {
     const plain = screen.getByTestId("run-dialog-agent-agent_2");
     expect(within(tunnelled).getByText("prod-agent")).toBeInTheDocument();
     expect(within(plain).getByText("staging-agent")).toBeInTheDocument();
-    expect(
-      within(tunnelled).getByTestId("agent-dev-tunnel-agent_1"),
-    ).toHaveTextContent("Local tunnel");
-    expect(
-      within(plain).queryByTestId("agent-dev-tunnel-agent_2"),
-    ).not.toBeInTheDocument();
+    expect(within(tunnelled).getByTestId("agent-dev-tunnel-agent_1")).toHaveTextContent(
+      "Local tunnel",
+    );
+    expect(within(plain).queryByTestId("agent-dev-tunnel-agent_2")).not.toBeInTheDocument();
     // The block holds the name and the mark, nothing else: no file name, no
     // environment name.
     expect(tunnelled).toHaveTextContent(/^prod-agentLocal tunnel$/);
@@ -369,9 +347,7 @@ describe("<RunDialog/>", () => {
   /** @scenario "A run with no target selected is refused" */
   it("keeps the dialog open and says a target is needed when the run is refused", async () => {
     const user = userEvent.setup();
-    mockSuitesRunPlan.mockRejectedValue(
-      handledRejection("suite_targets_required"),
-    );
+    mockSuitesRunPlan.mockRejectedValue(handledRejection("suite_targets_required"));
     const { onClose } = renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("run-dialog-run"));
@@ -400,15 +376,10 @@ describe("<RunDialog/>", () => {
   /** @scenario "A field added by a chip can be removed again" */
   it("removes the note field, offers the chip again, and sends no note", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("customize-chip-note"));
-    await user.type(
-      screen.getByLabelText("Note for the run"),
-      "a note that will be removed",
-    );
+    await user.type(screen.getByLabelText("Note for the run"), "a note that will be removed");
     await user.click(screen.getByRole("button", { name: "Remove the note" }));
 
     expect(screen.queryByTestId("run-note-field")).not.toBeInTheDocument();
@@ -448,9 +419,7 @@ describe("<RunDialog/>", () => {
 
     const block = screen.getByTestId("run-dialog-parameters");
     // One value field; the checkbox is the secret parameters toggle.
-    expect(block.querySelectorAll('input:not([type="checkbox"])')).toHaveLength(
-      1,
-    );
+    expect(block.querySelectorAll('input:not([type="checkbox"])')).toHaveLength(1);
 
     const line = screen.getByTestId("run-dialog-parameter-line");
     expect(line).toHaveValue("model=gpt-5-mini, locale=de");
@@ -532,21 +501,17 @@ describe("<RunDialog/>", () => {
 
         await user.clear(line);
         await user.click(line);
-        const list = await screen.findByTestId(
-          "run-dialog-parameter-line-suggestions",
+        const list = await screen.findByTestId("run-dialog-parameter-line-suggestions");
+        expect(within(list).getByTestId("parameter-suggestion-key-locale")).toHaveTextContent(
+          "scenario",
         );
-        expect(
-          within(list).getByTestId("parameter-suggestion-key-locale"),
-        ).toHaveTextContent("scenario");
-        expect(
-          within(list).getByTestId("parameter-suggestion-key-model"),
-        ).toHaveTextContent("support-agent · production");
+        expect(within(list).getByTestId("parameter-suggestion-key-model")).toHaveTextContent(
+          "support-agent · production",
+        );
 
         await user.type(line, "model=");
         expect(
-          within(
-            await screen.findByTestId("run-dialog-parameter-line-suggestions"),
-          )
+          within(await screen.findByTestId("run-dialog-parameter-line-suggestions"))
             .getAllByRole("option")
             .map((option) => option.textContent),
         ).toEqual(["gpt-5-mini", "gpt-5"]);
@@ -587,9 +552,7 @@ describe("<RunDialog/>", () => {
           ...CONNECTED_AGENT,
           id: "agent_other",
           name: "other-agent",
-          parameters: [
-            { name: "model", type: "string" as const, options: ["claude-4"] },
-          ],
+          parameters: [{ name: "model", type: "string" as const, options: ["claude-4"] }],
         };
         mockAgentsGetAll.mockReturnValue({
           data: [CONNECTED_AGENT, otherAgent],
@@ -601,18 +564,12 @@ describe("<RunDialog/>", () => {
         );
 
         await user.click(screen.getByTestId("customize-chip-compare"));
-        expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue(
-          "agent_other",
-        );
+        expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue("agent_other");
 
         const second = screen.getByTestId("run-dialog-compare-parameters-1");
         await user.type(second, "model=");
         expect(
-          within(
-            await screen.findByTestId(
-              "run-dialog-compare-parameters-1-suggestions",
-            ),
-          )
+          within(await screen.findByTestId("run-dialog-compare-parameters-1-suggestions"))
             .getAllByRole("option")
             .map((option) => option.textContent),
         ).toEqual(["claude-4"]);
@@ -620,11 +577,7 @@ describe("<RunDialog/>", () => {
         const first = screen.getByTestId("run-dialog-compare-parameters-0");
         await user.type(first, "model=");
         expect(
-          within(
-            await screen.findByTestId(
-              "run-dialog-compare-parameters-0-suggestions",
-            ),
-          )
+          within(await screen.findByTestId("run-dialog-compare-parameters-0-suggestions"))
             .getAllByRole("option")
             .map((option) => option.textContent),
         ).toEqual(["gpt-5-mini", "gpt-5"]);
@@ -661,9 +614,7 @@ describe("<RunDialog/>", () => {
         await waitFor(() => expect(block).toHaveTextContent("gpt-5-mini"));
         expect(block).toHaveTextContent("model");
         expect(line).toHaveAttribute("aria-invalid", "true");
-        expect(
-          screen.queryByTestId("run-dialog-error"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("run-dialog-error")).not.toBeInTheDocument();
 
         // Editing the line takes the refusal away.
         await user.type(line, "x");
@@ -687,12 +638,8 @@ describe("<RunDialog/>", () => {
     const toggle = screen.getByTestId("run-dialog-secret-parameters");
     expect(toggle).not.toBeChecked();
     expect(screen.getByTestId("run-dialog-parameter-line")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("run-dialog-parameter-rows"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByLabelText("Remove the parameter overrides"),
-    ).toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-parameter-rows")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Remove the parameter overrides")).toBeInTheDocument();
   });
 
   /** @scenario "Turning the toggle on converts the line into key and value rows" */
@@ -710,50 +657,31 @@ describe("<RunDialog/>", () => {
     await user.click(screen.getByTestId("run-dialog-secret-parameters"));
 
     expect(screen.getByTestId("run-dialog-parameter-rows")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("run-dialog-parameter-line"),
-    ).not.toBeInTheDocument();
-    expect(screen.getByTestId("run-dialog-parameter-name-0")).toHaveValue(
-      "model",
-    );
-    expect(screen.getByTestId("run-dialog-parameter-value-0")).toHaveValue(
-      "gpt-5",
-    );
-    expect(screen.getByTestId("run-dialog-parameter-name-1")).toHaveValue(
-      "locale",
-    );
-    expect(screen.getByTestId("run-dialog-parameter-value-1")).toHaveValue(
-      "de",
-    );
+    expect(screen.queryByTestId("run-dialog-parameter-line")).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-parameter-name-0")).toHaveValue("model");
+    expect(screen.getByTestId("run-dialog-parameter-value-0")).toHaveValue("gpt-5");
+    expect(screen.getByTestId("run-dialog-parameter-name-1")).toHaveValue("locale");
+    expect(screen.getByTestId("run-dialog-parameter-value-1")).toHaveValue("de");
   });
 
   /** @scenario "Turning the toggle off writes the rows back onto the line" */
   it("writes the rows back onto the line when the toggle goes off again", async () => {
     const user = userEvent.setup();
-    mockScenariosGetAll.mockReturnValue(
-      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
-    );
+    mockScenariosGetAll.mockReturnValue(casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]));
     renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("customize-chip-params"));
     await user.click(screen.getByTestId("run-dialog-secret-parameters"));
-    await user.type(
-      screen.getByTestId("run-dialog-parameter-value-0"),
-      "-mini",
-    );
+    await user.type(screen.getByTestId("run-dialog-parameter-value-0"), "-mini");
     await user.click(screen.getByTestId("run-dialog-secret-parameters"));
 
-    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
-      "model=gpt-5-mini",
-    );
+    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue("model=gpt-5-mini");
   });
 
   /** @scenario "The quiet controls of the dialog are drawn flat" */
   it("draws the add, the remove and the lock of a row with no shadow", async () => {
     const user = userEvent.setup();
-    mockScenariosGetAll.mockReturnValue(
-      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
-    );
+    mockScenariosGetAll.mockReturnValue(casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]));
     renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("customize-chip-params"));
@@ -773,18 +701,13 @@ describe("<RunDialog/>", () => {
   /** @scenario "A row can be added and a row can be taken away" */
   it("adds a row, sends both values, and drops the value of a removed row", async () => {
     const user = userEvent.setup();
-    mockScenariosGetAll.mockReturnValue(
-      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
-    );
+    mockScenariosGetAll.mockReturnValue(casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]));
     renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("customize-chip-params"));
     await user.click(screen.getByTestId("run-dialog-secret-parameters"));
     await user.click(screen.getByTestId("run-dialog-parameter-add-row"));
-    await user.type(
-      screen.getByTestId("run-dialog-parameter-name-1"),
-      "locale",
-    );
+    await user.type(screen.getByTestId("run-dialog-parameter-name-1"), "locale");
     await user.type(screen.getByTestId("run-dialog-parameter-value-1"), "de");
 
     await user.click(screen.getByTestId("run-dialog-run"));
@@ -804,26 +727,22 @@ describe("<RunDialog/>", () => {
   /** @scenario "A row marked secret is masked and holds the block in rows mode" */
   it("masks a row marked secret and refuses to fold the block back to one line", async () => {
     const user = userEvent.setup();
-    mockScenariosGetAll.mockReturnValue(
-      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
-    );
+    mockScenariosGetAll.mockReturnValue(casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]));
     renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("customize-chip-params"));
     await user.click(screen.getByTestId("run-dialog-secret-parameters"));
     await user.click(screen.getByTestId("run-dialog-parameter-add-row"));
-    await user.type(
-      screen.getByTestId("run-dialog-parameter-name-1"),
-      "api_token",
-    );
+    await user.type(screen.getByTestId("run-dialog-parameter-name-1"), "api_token");
     await user.click(screen.getByTestId("run-dialog-parameter-lock-1"));
 
     const value = screen.getByTestId("run-dialog-parameter-value-1");
     expect(value).toHaveAttribute("type", "password");
     expect(screen.getByTestId("run-dialog-secret-parameters")).toBeDisabled();
-    expect(
-      screen.getByTestId("run-dialog-secret-parameters-toggle"),
-    ).toHaveAttribute("title", LOCKED_IN_ROWS_MESSAGE);
+    expect(screen.getByTestId("run-dialog-secret-parameters-toggle")).toHaveAttribute(
+      "title",
+      LOCKED_IN_ROWS_MESSAGE,
+    );
     // The run waits for the value the locked row now demands.
     expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
 
@@ -852,17 +771,11 @@ describe("<RunDialog/>", () => {
 
     // The block opens on its rows, and the standalone secret section is gone.
     expect(screen.getByTestId("run-dialog-parameter-rows")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("run-dialog-parameter-line"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("suite-run-parameters"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-parameter-line")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("suite-run-parameters")).not.toBeInTheDocument();
 
     // The plain parameter is a row of the same list.
-    expect(screen.getByTestId("run-dialog-parameter-name-0")).toHaveValue(
-      "model",
-    );
+    expect(screen.getByTestId("run-dialog-parameter-name-0")).toHaveValue("model");
 
     const toggle = screen.getByTestId("run-dialog-secret-parameters");
     expect(toggle).toBeChecked();
@@ -872,9 +785,7 @@ describe("<RunDialog/>", () => {
     expect(secret).toHaveAttribute("type", "password");
     expect(secret).toHaveValue("");
     expect(secret).toBeRequired();
-    expect(
-      screen.getByTestId("run-dialog-parameter-lock-api_token"),
-    ).toBeDisabled();
+    expect(screen.getByTestId("run-dialog-parameter-lock-api_token")).toBeDisabled();
     expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
 
     await user.type(secret, "sk-live-1");
@@ -929,9 +840,7 @@ describe("<RunDialog/>", () => {
     const picker = screen.getByTestId("run-dialog-prompts");
     // The test suite of the handle heads its prompts, like the prompt list.
     expect(within(picker).getByText("checkout")).toBeInTheDocument();
-    expect(
-      within(picker).getByText("checkout/refund-prompt"),
-    ).toBeInTheDocument();
+    expect(within(picker).getByText("checkout/refund-prompt")).toBeInTheDocument();
     expect(within(picker).getByText("plain-prompt")).toBeInTheDocument();
   });
 
@@ -941,22 +850,15 @@ describe("<RunDialog/>", () => {
     mockPromptsGetAll.mockReturnValue({
       data: [{ id: "prompt_1", handle: "checkout/refund-prompt", version: 3 }],
     });
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("customize-chip-prompt"));
     expect(screen.getByText("Prompt to be tested")).toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole("button", { name: "Remove the prompt picker" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Remove the prompt picker" }));
 
     expect(screen.getByText("Agent to be tested")).toBeInTheDocument();
-    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute("aria-pressed", "true");
   });
 
   // --- Starting the run ---
@@ -967,9 +869,7 @@ describe("<RunDialog/>", () => {
 
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     // Running is what writes the plan down, so there is nothing to save.
-    expect(
-      screen.queryByRole("button", { name: "Save" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
     const run = screen.getByTestId("run-dialog-run");
     expect(run).toHaveTextContent("Run 2 scenarios");
     expect(run).not.toHaveAttribute("aria-haspopup");
@@ -1012,26 +912,15 @@ describe("<RunDialog/>", () => {
     // The suite row carries nothing: the memory is the newest run plan of the
     // scope, which the dialog reads.
     mockRunConfigurations.mockReturnValue({
-      data: [
-        configurationEntry({ runParameters: { model: "gpt-5", locale: "nl" } }),
-      ],
+      data: [configurationEntry({ runParameters: { model: "gpt-5", locale: "nl" } })],
       isLoading: false,
     });
     renderDialog(suiteSubject());
 
-    expect(
-      await screen.findByTestId("run-dialog-parameters"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
-      "model=gpt-5, locale=nl",
-    );
-    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(
-      screen.queryByTestId("customize-chip-params"),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByTestId("run-dialog-parameters")).toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue("model=gpt-5, locale=nl");
+    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByTestId("customize-chip-params")).not.toBeInTheDocument();
   });
 
   /** @scenario "A suite remembers that it was run against a prompt" */
@@ -1116,10 +1005,7 @@ describe("<RunDialog/>", () => {
 
     await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
     await user.click(screen.getByTestId("customize-chip-params"));
-    await user.type(
-      screen.getByTestId("run-dialog-parameter-value-api_key"),
-      "sk-live-1",
-    );
+    await user.type(screen.getByTestId("run-dialog-parameter-value-api_key"), "sk-live-1");
     await user.click(screen.getByTestId("run-dialog-run"));
 
     await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
@@ -1141,24 +1027,16 @@ describe("<RunDialog/>", () => {
   /** @scenario "A secret row is remembered by its key alone" */
   it("remembers a secret row by its key and never its value", async () => {
     const user = userEvent.setup();
-    mockScenariosGetAll.mockReturnValue(
-      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
-    );
+    mockScenariosGetAll.mockReturnValue(casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]));
     renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
     await user.click(screen.getByTestId("customize-chip-params"));
     await user.click(screen.getByTestId("run-dialog-secret-parameters"));
     await user.click(screen.getByTestId("run-dialog-parameter-add-row"));
-    await user.type(
-      screen.getByTestId("run-dialog-parameter-name-1"),
-      "api_token",
-    );
+    await user.type(screen.getByTestId("run-dialog-parameter-name-1"), "api_token");
     await user.click(screen.getByTestId("run-dialog-parameter-lock-1"));
-    await user.type(
-      screen.getByTestId("run-dialog-parameter-value-1"),
-      "tok-1",
-    );
+    await user.type(screen.getByTestId("run-dialog-parameter-value-1"), "tok-1");
     await user.click(screen.getByTestId("run-dialog-run"));
 
     await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
@@ -1174,18 +1052,13 @@ describe("<RunDialog/>", () => {
         ],
       },
     });
-    expect(
-      JSON.stringify(mockSuitesRunPlan.mock.calls[0]![0]!.config),
-    ).not.toContain("tok-1");
+    expect(JSON.stringify(mockSuitesRunPlan.mock.calls[0]![0]!.config)).not.toContain("tok-1");
   });
 
   /** @scenario "A secret row is remembered by its key alone" */
   it("opens the remembered secret row empty, in rows mode, and waits for it", async () => {
     mockScenariosGetAll.mockReturnValue(
-      casesDeclaring([
-        { name: "model", defaultValue: "gpt-5" },
-        { name: "api_token" },
-      ]),
+      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }, { name: "api_token" }]),
     );
     mockRunConfigurations.mockReturnValue({
       data: [
@@ -1204,18 +1077,10 @@ describe("<RunDialog/>", () => {
     });
     renderDialog(suiteSubject());
 
-    expect(
-      await screen.findByTestId("run-dialog-parameter-rows"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("run-dialog-parameter-name-0")).toHaveValue(
-      "model",
-    );
-    expect(screen.getByTestId("run-dialog-parameter-value-0")).toHaveValue(
-      "gpt-5",
-    );
-    expect(screen.getByTestId("run-dialog-parameter-name-1")).toHaveValue(
-      "api_token",
-    );
+    expect(await screen.findByTestId("run-dialog-parameter-rows")).toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-parameter-name-0")).toHaveValue("model");
+    expect(screen.getByTestId("run-dialog-parameter-value-0")).toHaveValue("gpt-5");
+    expect(screen.getByTestId("run-dialog-parameter-name-1")).toHaveValue("api_token");
     const secret = screen.getByTestId("run-dialog-parameter-value-1");
     expect(secret).toHaveValue("");
     expect(secret).toHaveAttribute("type", "password");
@@ -1246,9 +1111,7 @@ describe("<RunDialog/>", () => {
   /** @scenario "A note typed in the run dialog is stored with the batch" */
   it("sends the typed note with the run", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("customize-chip-note"));
     await user.type(
@@ -1267,9 +1130,7 @@ describe("<RunDialog/>", () => {
   /** @scenario "The run dialog refuses a note over two hundred characters before the run starts" */
   it("says a long note is too long and does not start the run", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("customize-chip-note"));
     const field = screen.getByLabelText("Note for the run");
@@ -1334,9 +1195,7 @@ describe("<RunDialog/>", () => {
       renderDialog(rememberedOn("agent_1"));
 
       await waitFor(() =>
-        expect(
-          screen.queryByTestId("run-dialog-parameters"),
-        ).not.toBeInTheDocument(),
+        expect(screen.queryByTestId("run-dialog-parameters")).not.toBeInTheDocument(),
       );
       expect(screen.getByTestId("run-dialog-run")).not.toBeDisabled();
     });
@@ -1361,9 +1220,7 @@ describe("<RunDialog/>", () => {
       mockScenariosGetAll.mockReturnValue(
         casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
       );
-      renderDialog(
-        suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-      );
+      renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
       await user.click(screen.getByTestId("customize-chip-params"));
       const line = screen.getByTestId("run-dialog-parameter-line");
@@ -1391,16 +1248,12 @@ describe("<RunDialog/>", () => {
         targetLabel: "support-agent · production",
       }),
     );
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("run-dialog-run"));
 
     const error = await screen.findByTestId("run-dialog-error");
-    expect(error).toHaveTextContent(
-      "Nothing in this run declares a parameter by that name",
-    );
+    expect(error).toHaveTextContent("Nothing in this run declares a parameter by that name");
     expect(error).toHaveTextContent("modle");
     expect(error).toHaveTextContent("model");
     expect(error).toHaveTextContent("support-agent · production");
@@ -1409,9 +1262,7 @@ describe("<RunDialog/>", () => {
   /** @scenario "A run refused because every scenario is archived says so in the dialog" */
   it("says there is nothing left to run when every scenario is archived", async () => {
     const user = userEvent.setup();
-    mockSuitesRunPlan.mockRejectedValue(
-      handledRejection("suite_all_scenarios_archived"),
-    );
+    mockSuitesRunPlan.mockRejectedValue(handledRejection("suite_all_scenarios_archived"));
     const { onClose } = renderDialog(
       suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
     );
@@ -1419,9 +1270,7 @@ describe("<RunDialog/>", () => {
     await user.click(screen.getByTestId("run-dialog-run"));
 
     const error = await screen.findByTestId("run-dialog-error");
-    expect(error).toHaveTextContent(
-      "Every scenario in this run plan is archived",
-    );
+    expect(error).toHaveTextContent("Every scenario in this run plan is archived");
     expect(error).not.toHaveTextContent(/unknown error/i);
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -1490,18 +1339,15 @@ describe("run entries on the Scenarios tab", () => {
     });
     render(<TestCasesTab />, { wrapper: Wrapper });
 
-    await user.click(
-      screen.getByRole("button", { name: "Actions for Refunds" }),
-    );
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Run suite" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Actions for Refunds" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Run suite" }));
 
     const dialog = await screen.findByTestId("run-dialog");
     await waitFor(() =>
-      expect(
-        within(dialog).getByTestId("run-dialog-agent-agent_1"),
-      ).toHaveAttribute("aria-pressed", "true"),
+      expect(within(dialog).getByTestId("run-dialog-agent-agent_1")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
     );
   });
 
@@ -1522,12 +1368,8 @@ describe("run entries on the Scenarios tab", () => {
     const user = userEvent.setup();
     render(<TestCasesTab />, { wrapper: Wrapper });
 
-    await user.click(
-      screen.getByRole("button", { name: "Actions for Refunds" }),
-    );
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Run suite" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Actions for Refunds" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Run suite" }));
 
     const dialog = await screen.findByTestId("run-dialog");
     await user.click(within(dialog).getByTestId("run-dialog-agent-agent_1"));
@@ -1537,9 +1379,7 @@ describe("run entries on the Scenarios tab", () => {
     // No navigation: the placeholder is what announces the run. The runs rail
     // renders it from this same store value (see the run plan detail tests).
     expect(mockRouterPush).not.toHaveBeenCalled();
-    expect(useAgentTestingStore.getState().pendingRun?.batchRunId).toBe(
-      "batch_new",
-    );
+    expect(useAgentTestingStore.getState().pendingRun?.batchRunId).toBe("batch_new");
   });
 });
 
@@ -1628,9 +1468,7 @@ describe("the run name", () => {
 
   /** @scenario "The run name is the first field and holds the derived name" */
   it("reads first, holds the derived name, and explains nothing under it", () => {
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     const name = screen.getByTestId("run-dialog-name");
     expect(name).toHaveValue("Refunds prod-agent");
@@ -1638,51 +1476,38 @@ describe("the run name", () => {
     // The name comes before the agent section, not after it.
     const agentLabel = screen.getByText("Agent to be tested");
     expect(
-      name.compareDocumentPosition(agentLabel) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      name.compareDocumentPosition(agentLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
     // The block holds the label and the field, and explains nothing.
-    expect(screen.getByTestId("run-dialog-name-block")).toHaveTextContent(
-      /^Run name$/,
-    );
+    expect(screen.getByTestId("run-dialog-name-block")).toHaveTextContent(/^Run name$/);
   });
 
   /** @scenario "The derived name follows the agent until the person types" */
   it("follows the agent, and stops the moment a name is typed", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("run-dialog-agent-agent_2"));
-    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
-      "Refunds staging-agent",
-    );
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue("Refunds staging-agent");
 
     await user.clear(screen.getByTestId("run-dialog-name"));
     await user.type(screen.getByTestId("run-dialog-name"), "Nightly refunds");
     await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
 
-    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
-      "Nightly refunds",
-    );
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue("Nightly refunds");
   });
 
   /** @scenario "A comparison run derives both targets into the name" */
   it("reads both agents of a comparison, joined by vs, in the plan's order", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_2" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_2" } }));
 
     await user.click(screen.getByTestId("customize-chip-compare"));
 
     // The second row defaulted to the other agent, and the name reads the
     // targets the way the run plan sorts them rather than the row order.
-    expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue(
-      "agent_1",
-    );
+    expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue("agent_1");
     expect(screen.getByTestId("run-dialog-name")).toHaveValue(
       "Refunds prod-agent vs staging-agent",
     );
@@ -1712,9 +1537,9 @@ describe("the run name", () => {
 
     await user.click(screen.getByTestId("run-dialog-name-caret"));
 
-    const options = within(
-      await screen.findByTestId("run-dialog-name-options"),
-    ).getAllByRole("button");
+    const options = within(await screen.findByTestId("run-dialog-name-options")).getAllByRole(
+      "button",
+    );
     expect(options.map((option) => option.textContent)).toEqual([
       expect.stringContaining("Nightly refunds"),
       expect.stringContaining("Refunds prod-agent"),
@@ -1729,9 +1554,7 @@ describe("the run name", () => {
     renderDialog(suiteSubject());
 
     expect(screen.getByTestId("run-dialog-name")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("run-dialog-name-caret"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-name-caret")).not.toBeInTheDocument();
   });
 
   /** @scenario "The note text is never carried over" */
@@ -1776,9 +1599,7 @@ describe("the run name", () => {
 
     await user.click(screen.getByTestId("run-dialog-name-caret"));
     await user.click(
-      within(await screen.findByTestId("run-dialog-name-options")).getAllByRole(
-        "button",
-      )[0]!,
+      within(await screen.findByTestId("run-dialog-name-options")).getAllByRole("button")[0]!,
     );
 
     expect(screen.queryByTestId("run-note-field")).not.toBeInTheDocument();
@@ -1788,9 +1609,7 @@ describe("the run name", () => {
   /** @scenario "Picking a configuration refills the dialog and opens what it used" */
   it("refills the dialog, opens the blocks that entry used, and pins the name", async () => {
     const user = userEvent.setup();
-    mockScenariosGetAll.mockReturnValue(
-      casesDeclaring([{ name: "locale", defaultValue: "en" }]),
-    );
+    mockScenariosGetAll.mockReturnValue(casesDeclaring([{ name: "locale", defaultValue: "en" }]));
     mockRunConfigurations.mockReturnValue({
       data: [
         configurationEntry({
@@ -1809,35 +1628,20 @@ describe("the run name", () => {
 
     await user.click(screen.getByTestId("run-dialog-name-caret"));
     await user.click(
-      within(await screen.findByTestId("run-dialog-name-options")).getAllByRole(
-        "button",
-      )[0]!,
+      within(await screen.findByTestId("run-dialog-name-options")).getAllByRole("button")[0]!,
     );
 
-    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
-      "Nightly refunds",
-    );
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue("Nightly refunds");
     expect(screen.getByTestId("run-dialog-compare")).toBeInTheDocument();
     expect(screen.getByLabelText("Repeat count")).toHaveValue(3);
     // A configuration stored with its overrides at run level puts them on
     // every row, which is what that run did with them.
-    expect(screen.getByTestId("run-dialog-compare-parameters-0")).toHaveValue(
-      "locale=de",
-    );
-    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue(
-      "locale=de",
-    );
-    expect(
-      screen.queryByTestId("run-dialog-parameter-line"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-compare-parameters-0")).toHaveValue("locale=de");
+    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue("locale=de");
+    expect(screen.queryByTestId("run-dialog-parameter-line")).not.toBeInTheDocument();
     // The name was taken over, so it no longer follows the agent.
-    await user.selectOptions(
-      screen.getByTestId("run-dialog-compare-agent-0"),
-      "agent_2",
-    );
-    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
-      "Nightly refunds",
-    );
+    await user.selectOptions(screen.getByTestId("run-dialog-compare-agent-0"), "agent_2");
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue("Nightly refunds");
   });
 
   /** @scenario "Typing filters the list and opens it" */
@@ -1868,18 +1672,16 @@ describe("the run name", () => {
     await user.clear(field);
     await user.type(field, "Nightly");
 
-    const shown = within(
-      await screen.findByTestId("run-dialog-name-options"),
-    ).getAllByRole("button");
+    const shown = within(await screen.findByTestId("run-dialog-name-options")).getAllByRole(
+      "button",
+    );
     expect(shown).toHaveLength(1);
     expect(shown[0]).toHaveTextContent("Nightly refunds");
 
     await user.clear(field);
     await user.type(field, "Something else entirely");
     await waitFor(() =>
-      expect(
-        screen.queryByTestId("run-dialog-name-options"),
-      ).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("run-dialog-name-options")).not.toBeInTheDocument(),
     );
   });
 
@@ -1908,9 +1710,7 @@ describe("the run name", () => {
     await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
 
     // The second row, not the first: the arrows moved off the top of the list.
-    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
-      "Refunds prod-agent",
-    );
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue("Refunds prod-agent");
   });
 
   /** @scenario "Escape closes the list and leaves the dialog open" */
@@ -1925,16 +1725,12 @@ describe("the run name", () => {
     // Opened from the caret, which is where the key lands: the caret took the
     // focus off the field.
     await user.click(screen.getByTestId("run-dialog-name-caret"));
-    expect(
-      await screen.findByTestId("run-dialog-name-options"),
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("run-dialog-name-options")).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
 
     await waitFor(() =>
-      expect(
-        screen.queryByTestId("run-dialog-name-options"),
-      ).not.toBeInTheDocument(),
+      expect(screen.queryByTestId("run-dialog-name-options")).not.toBeInTheDocument(),
     );
     // The subject is what mounts the dialog, so its presence proves nothing:
     // the close the dialog would ask its caller for is what must not happen.
@@ -1948,9 +1744,7 @@ describe("the run name", () => {
   /** @scenario "A run with no name cannot start" */
   it("keeps Run off while the name is empty", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.clear(screen.getByTestId("run-dialog-name"));
 
@@ -1968,9 +1762,7 @@ describe("the run name", () => {
       }),
     );
 
-    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
-      "Refunds prod-agent",
-    );
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue("Refunds prod-agent");
   });
 
   /** @scenario "A stored run plan that took a note opens the note field ready" */
@@ -2067,9 +1859,7 @@ describe("what the run covers", () => {
 
   /** @scenario "An entry point that fixed the scope says nothing about it" */
   it("says nothing about the scope when the entry point already fixed it", () => {
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     expect(screen.queryByTestId("run-scope")).not.toBeInTheDocument();
     expect(screen.getByTestId("run-dialog")).not.toHaveTextContent("Runs as");
@@ -2083,9 +1873,7 @@ describe("what the run covers", () => {
     expect(screen.getByTestId("run-dialog")).toBeInTheDocument();
     const scope = screen.getByTestId("run-scope");
     expect(within(scope).getByTestId("run-scope-all")).toBeChecked();
-    expect(
-      within(scope).getByTestId("run-scope-test_suites"),
-    ).not.toBeChecked();
+    expect(within(scope).getByTestId("run-scope-test_suites")).not.toBeChecked();
     expect(within(scope).getByTestId("run-scope-labels")).not.toBeChecked();
     expect(within(scope).getByTestId("run-scope-scenarios")).not.toBeChecked();
     expect(scope).toHaveTextContent("2 scenarios will run.");
@@ -2097,14 +1885,10 @@ describe("what the run covers", () => {
     renderDialog(planSubject());
 
     await user.click(screen.getByTestId("run-scope-test_suites"));
-    expect(screen.getByTestId("run-scope")).toHaveTextContent(
-      "0 scenarios will run.",
-    );
+    expect(screen.getByTestId("run-scope")).toHaveTextContent("0 scenarios will run.");
 
     await user.click(screen.getByTestId("run-scope-test-suite-suite_refunds"));
-    expect(screen.getByTestId("run-scope")).toHaveTextContent(
-      "1 scenario will run.",
-    );
+    expect(screen.getByTestId("run-scope")).toHaveTextContent("1 scenario will run.");
   });
 
   /** @scenario "A run can be scoped to chosen labels" */
@@ -2114,17 +1898,11 @@ describe("what the run covers", () => {
 
     await user.click(screen.getByTestId("run-scope-labels"));
     const labels = screen.getByTestId("run-scope-labels-list");
-    expect(
-      within(labels).getByTestId("run-scope-label-billing"),
-    ).toBeInTheDocument();
-    expect(
-      within(labels).getByTestId("run-scope-label-invoices"),
-    ).toBeInTheDocument();
+    expect(within(labels).getByTestId("run-scope-label-billing")).toBeInTheDocument();
+    expect(within(labels).getByTestId("run-scope-label-invoices")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("run-scope-label-invoices"));
-    expect(screen.getByTestId("run-scope")).toHaveTextContent(
-      "1 scenario will run.",
-    );
+    expect(screen.getByTestId("run-scope")).toHaveTextContent("1 scenario will run.");
   });
 
   /** @scenario "A run can hold a hand-picked list of scenarios" */
@@ -2140,15 +1918,11 @@ describe("what the run covers", () => {
     expect(cases).toHaveTextContent("Billing");
 
     await user.click(screen.getByTestId("run-scope-case-case_2"));
-    expect(screen.getByTestId("run-scope")).toHaveTextContent(
-      "1 scenario will run.",
-    );
+    expect(screen.getByTestId("run-scope")).toHaveTextContent("1 scenario will run.");
 
     // One scenario out of each test suite, which is the plan that picker exists for.
     await user.click(screen.getByTestId("run-scope-case-case_1"));
-    expect(screen.getByTestId("run-scope")).toHaveTextContent(
-      "2 scenarios will run.",
-    );
+    expect(screen.getByTestId("run-scope")).toHaveTextContent("2 scenarios will run.");
 
     await user.click(screen.getByTestId("run-dialog-run"));
     await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
@@ -2156,10 +1930,7 @@ describe("what the run covers", () => {
       config: { scope: { mode: string }; scenarioIds?: string[] };
     };
     expect(sent.config.scope).toEqual({ mode: "scenarios" });
-    expect([...(sent.config.scenarioIds ?? [])].sort()).toEqual([
-      "case_1",
-      "case_2",
-    ]);
+    expect([...(sent.config.scenarioIds ?? [])].sort()).toEqual(["case_1", "case_2"]);
   });
 
   /** @scenario "Running a stored run plan again keeps the scope it holds" */
@@ -2184,10 +1955,7 @@ describe("what the run covers", () => {
       config: { scope: { mode: string }; scenarioIds?: string[] };
     };
     expect(sent.config.scope).toEqual({ mode: "scenarios" });
-    expect([...(sent.config.scenarioIds ?? [])].sort()).toEqual([
-      "case_1",
-      "case_2",
-    ]);
+    expect([...(sent.config.scenarioIds ?? [])].sort()).toEqual(["case_1", "case_2"]);
   });
 
   /** @scenario "A run of one scenario is named after that scenario" */
@@ -2215,16 +1983,12 @@ describe("what the run covers", () => {
     renderDialog(planSubject());
 
     await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
-    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
-      "All scenarios prod-agent",
-    );
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue("All scenarios prod-agent");
 
     await user.click(screen.getByTestId("run-scope-test_suites"));
     await user.click(screen.getByTestId("run-scope-test-suite-suite_billing"));
 
-    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
-      "Billing prod-agent",
-    );
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue("Billing prod-agent");
   });
 });
 
@@ -2268,15 +2032,11 @@ describe("the chips that add a run option", () => {
   /** @scenario "The compare chip turns the run into a comparison" */
   it("turns the agent section into rows, sends every row, and puts the first back on removal", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("customize-chip-compare"));
 
-    expect(
-      screen.queryByTestId("run-dialog-target-section"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-target-section")).not.toBeInTheDocument();
     expect(screen.getByTestId("run-dialog-compare-row-0")).toBeInTheDocument();
     expect(screen.getByTestId("run-dialog-compare-row-1")).toBeInTheDocument();
     await user.click(screen.getByTestId("run-dialog-run"));
@@ -2291,39 +2051,28 @@ describe("the chips that add a run option", () => {
       },
     });
 
-    await user.click(
-      screen.getByRole("button", { name: "Remove the comparison" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Remove the comparison" }));
     expect(screen.queryByTestId("run-dialog-compare")).not.toBeInTheDocument();
-    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute("aria-pressed", "true");
   });
 
   /** @scenario "The simulation models chip adds the user simulator and the judge" */
   it("adds the user simulator and the judge", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("customize-chip-models"));
 
     const models = screen.getByTestId("run-dialog-models");
     expect(models).toHaveTextContent("User simulator");
     expect(models).toHaveTextContent("Judge");
-    expect(
-      screen.queryByTestId("customize-chip-models"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("customize-chip-models")).not.toBeInTheDocument();
   });
 
   /** @scenario "The repeat chip adds the repeat count" */
   it("adds a repeat count and sends it with the run", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("customize-chip-repeat"));
     const count = screen.getByLabelText("Repeat count");
@@ -2346,9 +2095,7 @@ describe("the comparison", () => {
     useAgentTestingStore.setState({ lastRunTarget: null, pendingRun: null });
     mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT, OFFLINE_AGENT] });
     mockPromptsGetAll.mockReturnValue({ data: [] });
-    mockScenariosGetAll.mockReturnValue(
-      casesDeclaring([{ name: "locale", defaultValue: "en" }]),
-    );
+    mockScenariosGetAll.mockReturnValue(casesDeclaring([{ name: "locale", defaultValue: "en" }]));
     mockTestSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
     mockRunConfigurations.mockReturnValue({ data: [], isLoading: false });
@@ -2368,9 +2115,7 @@ describe("the comparison", () => {
    * prefills the line with the declared "locale=en".
    */
   async function openWithParameters(user: ReturnType<typeof userEvent.setup>) {
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
     await user.click(screen.getByTestId("customize-chip-params"));
   }
 
@@ -2392,15 +2137,9 @@ describe("the comparison", () => {
 
     await user.click(screen.getByTestId("customize-chip-compare"));
 
-    expect(
-      screen.queryByTestId("run-dialog-target-section"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("run-dialog-parameters"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("customize-chip-params"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-target-section")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-parameters")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("customize-chip-params")).not.toBeInTheDocument();
     const section = screen.getByTestId("run-dialog-compare");
     expect(within(section).getByText("Compare agents")).toBeInTheDocument();
     expect(screen.getAllByTestId(/^run-dialog-compare-row-/)).toHaveLength(2);
@@ -2422,24 +2161,15 @@ describe("the comparison", () => {
 
     await user.click(screen.getByTestId("customize-chip-compare"));
 
-    expect(screen.getByTestId("run-dialog-compare-agent-0")).toHaveValue(
-      "agent_1",
-    );
-    expect(screen.getByTestId("run-dialog-compare-parameters-0")).toHaveValue(
-      "locale=en",
-    );
-    expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue(
-      "agent_2",
-    );
-    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue(
-      "locale=en",
-    );
+    expect(screen.getByTestId("run-dialog-compare-agent-0")).toHaveValue("agent_1");
+    expect(screen.getByTestId("run-dialog-compare-parameters-0")).toHaveValue("locale=en");
+    expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue("agent_2");
+    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue("locale=en");
     // The list offers the same agents as the picker, tunnel mark included.
     expect(
-      within(screen.getByTestId("run-dialog-compare-agent-1")).getByRole(
-        "option",
-        { name: "prod-agent · Local tunnel" },
-      ),
+      within(screen.getByTestId("run-dialog-compare-agent-1")).getByRole("option", {
+        name: "prod-agent · Local tunnel",
+      }),
     ).toBeInTheDocument();
   });
 
@@ -2451,12 +2181,8 @@ describe("the comparison", () => {
 
     await user.click(screen.getByTestId("customize-chip-compare"));
 
-    expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue(
-      "agent_1",
-    );
-    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue(
-      "locale=en",
-    );
+    expect(screen.getByTestId("run-dialog-compare-agent-1")).toHaveValue("agent_1");
+    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue("locale=en");
   });
 
   /** @scenario "A row is added as a copy of the last row, up to four" */
@@ -2468,18 +2194,12 @@ describe("the comparison", () => {
 
     await user.click(screen.getByTestId("run-dialog-compare-add"));
 
-    expect(screen.getByTestId("run-dialog-compare-agent-2")).toHaveValue(
-      "agent_2",
-    );
-    expect(screen.getByTestId("run-dialog-compare-parameters-2")).toHaveValue(
-      "locale=de",
-    );
+    expect(screen.getByTestId("run-dialog-compare-agent-2")).toHaveValue("agent_2");
+    expect(screen.getByTestId("run-dialog-compare-parameters-2")).toHaveValue("locale=de");
 
     await user.click(screen.getByTestId("run-dialog-compare-add"));
     expect(screen.getAllByTestId(/^run-dialog-compare-row-/)).toHaveLength(4);
-    expect(
-      screen.queryByTestId("run-dialog-compare-add"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-compare-add")).not.toBeInTheDocument();
   });
 
   /** @scenario "The hint under the rows says the same agent twice works" */
@@ -2489,29 +2209,20 @@ describe("the comparison", () => {
 
     await user.click(screen.getByTestId("customize-chip-compare"));
 
-    expect(screen.getByTestId("run-dialog-compare-hint")).toHaveTextContent(
-      COMPARE_HINT,
-    );
+    expect(screen.getByTestId("run-dialog-compare-hint")).toHaveTextContent(COMPARE_HINT);
   });
 
   /** @scenario "Removing a row down to one leaves compare mode with that row as the agent" */
   it("leaves compare mode with the remaining row as the agent to be tested", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
     await user.click(screen.getByTestId("customize-chip-compare"));
 
     await user.click(screen.getByRole("button", { name: "Remove target 1" }));
 
     expect(screen.queryByTestId("run-dialog-compare")).not.toBeInTheDocument();
-    expect(screen.getByTestId("run-dialog-agent-agent_2")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByTestId("run-dialog-name")).toHaveValue(
-      "Refunds staging-agent",
-    );
+    expect(screen.getByTestId("run-dialog-agent-agent_2")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("run-dialog-name")).toHaveValue("Refunds staging-agent");
   });
 
   /** @scenario "Removing the section puts the first row back" */
@@ -2521,34 +2232,21 @@ describe("the comparison", () => {
     await user.click(screen.getByTestId("customize-chip-compare"));
     await writeRowParameters(user, 0, "locale=de");
 
-    await user.click(
-      screen.getByRole("button", { name: "Remove the comparison" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Remove the comparison" }));
 
-    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
-      "locale=de",
-    );
+    expect(screen.getByTestId("run-dialog-agent-agent_1")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue("locale=de");
   });
 
   /** @scenario "Removing the section puts the first row back" */
   it("folds the parameter section away when the first row had no line", async () => {
     const user = userEvent.setup();
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
     await user.click(screen.getByTestId("customize-chip-compare"));
 
-    await user.click(
-      screen.getByRole("button", { name: "Remove the comparison" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Remove the comparison" }));
 
-    expect(
-      screen.queryByTestId("run-dialog-parameters"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-parameters")).not.toBeInTheDocument();
     expect(screen.getByTestId("customize-chip-params")).toBeInTheDocument();
   });
 
@@ -2556,9 +2254,7 @@ describe("the comparison", () => {
   it("refuses two rows of the same agent with the same parameters and holds Run", async () => {
     const user = userEvent.setup();
     mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
     await user.click(screen.getByTestId("customize-chip-compare"));
     await writeRowParameters(user, 0, "model=gpt-5-mini");
     await writeRowParameters(user, 1, "model=gpt-5-mini");
@@ -2569,9 +2265,7 @@ describe("the comparison", () => {
     expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
 
     await writeRowParameters(user, 1, "model=gpt-5");
-    expect(
-      screen.queryByTestId("run-dialog-compare-error"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-compare-error")).not.toBeInTheDocument();
     expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
   });
 
@@ -2590,9 +2284,7 @@ describe("the comparison", () => {
     expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
 
     await writeRowParameters(user, 1, "locale=de");
-    expect(
-      screen.queryByTestId("run-dialog-compare-error"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-dialog-compare-error")).not.toBeInTheDocument();
     expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
   });
 
@@ -2626,17 +2318,13 @@ describe("the comparison", () => {
         { name: "api_token", secret: true },
       ]),
     );
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("customize-chip-compare"));
 
     const secrets = screen.getByTestId("run-dialog-compare-secrets");
     expect(within(secrets).getByText("Secret parameters")).toBeInTheDocument();
-    const value = within(secrets).getByTestId(
-      "run-dialog-parameter-value-api_token",
-    );
+    const value = within(secrets).getByTestId("run-dialog-parameter-value-api_token");
     expect(value).toHaveAttribute("type", "password");
     expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
 
@@ -2655,9 +2343,7 @@ describe("the comparison", () => {
   it("offers the add secret control while the block holds nothing", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue(casesDeclaring([]));
-    renderDialog(
-      suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }),
-    );
+    renderDialog(suiteSubject({ initialTarget: { type: "http", id: "agent_1" } }));
 
     await user.click(screen.getByTestId("customize-chip-compare"));
 
@@ -2697,9 +2383,7 @@ describe("the comparison", () => {
     // One layer of parameters: the rows carry them all, the run carries none.
     expect(input.parameters).toBeUndefined();
     // The name reads the value that differs and leaves the shared one out.
-    expect(input.name).toBe(
-      "Refunds prod-agent · model=gpt-5 vs prod-agent · model=gpt-5-mini",
-    );
+    expect(input.name).toBe("Refunds prod-agent · model=gpt-5 vs prod-agent · model=gpt-5-mini");
   });
 
   /** @scenario "A stored comparison comes back with every target and its parameters" */
@@ -2730,27 +2414,15 @@ describe("the comparison", () => {
 
     await user.click(screen.getByTestId("run-dialog-name-caret"));
     await user.click(
-      within(await screen.findByTestId("run-dialog-name-options")).getAllByRole(
-        "button",
-      )[0]!,
+      within(await screen.findByTestId("run-dialog-name-options")).getAllByRole("button")[0]!,
     );
 
     expect(screen.getAllByTestId(/^run-dialog-compare-row-/)).toHaveLength(3);
-    expect(screen.getByTestId("run-dialog-compare-agent-0")).toHaveValue(
-      "agent_1",
-    );
-    expect(screen.getByTestId("run-dialog-compare-parameters-0")).toHaveValue(
-      "model=gpt-5",
-    );
-    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue(
-      "model=gpt-5-mini",
-    );
-    expect(screen.getByTestId("run-dialog-compare-agent-2")).toHaveValue(
-      "agent_2",
-    );
-    expect(screen.getByTestId("run-dialog-compare-parameters-2")).toHaveValue(
-      "",
-    );
+    expect(screen.getByTestId("run-dialog-compare-agent-0")).toHaveValue("agent_1");
+    expect(screen.getByTestId("run-dialog-compare-parameters-0")).toHaveValue("model=gpt-5");
+    expect(screen.getByTestId("run-dialog-compare-parameters-1")).toHaveValue("model=gpt-5-mini");
+    expect(screen.getByTestId("run-dialog-compare-agent-2")).toHaveValue("agent_2");
+    expect(screen.getByTestId("run-dialog-compare-parameters-2")).toHaveValue("");
   });
 
   /** @scenario "The footer counts the targets" */
@@ -2762,14 +2434,10 @@ describe("the comparison", () => {
         scenarioIds: ["case_1", "case_2", "case_3"],
       }),
     );
-    expect(screen.getByTestId("run-dialog-run")).toHaveTextContent(
-      "Run 3 scenarios",
-    );
+    expect(screen.getByTestId("run-dialog-run")).toHaveTextContent("Run 3 scenarios");
 
     await user.click(screen.getByTestId("customize-chip-compare"));
 
-    expect(screen.getByTestId("run-dialog-run")).toHaveTextContent(
-      "Run 3 scenarios × 2 targets",
-    );
+    expect(screen.getByTestId("run-dialog-run")).toHaveTextContent("Run 3 scenarios × 2 targets");
   });
 });

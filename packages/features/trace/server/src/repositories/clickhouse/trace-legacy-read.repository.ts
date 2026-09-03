@@ -38,7 +38,10 @@ import {
   mapTraceSummaryToTrace,
 } from "../../services/trace-legacy-mapping.service";
 import { parseLLMSpanMessages } from "../../services/trace-llm-span-messages.service";
-import { type EventSpanRow, mapEventAttrsToEvent } from "../../services/trace-event-attribute-mapping.service";
+import {
+  type EventSpanRow,
+  mapEventAttrsToEvent,
+} from "../../services/trace-event-attribute-mapping.service";
 import type { ProjectableTrace, ProjectedAnnotation } from "../../services/trace-projection.types";
 import type { ResolvedTraceSpans } from "../../services/trace-offload-resolution.service";
 import type {

@@ -62,9 +62,7 @@ describe("evaluation skill boundaries", () => {
       .readdirSync(__dirname)
       .filter((file) => file.endsWith(".scenario.test.ts"));
 
-    expect(scenarioFiles.filter((file) => file.startsWith("experiments-"))).toHaveLength(
-      5,
-    );
+    expect(scenarioFiles.filter((file) => file.startsWith("experiments-"))).toHaveLength(5);
     expect(scenarioFiles).toContain("online-evaluations.scenario.test.ts");
   });
 

@@ -1,7 +1,4 @@
-import type {
-  ChildProcessJobData,
-  ScenarioExecutionResult,
-} from "@langwatch/scenario-contract";
+import type { ChildProcessJobData, ScenarioExecutionResult } from "@langwatch/scenario-contract";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service";
 
 export interface ScenarioChildEnvironment {

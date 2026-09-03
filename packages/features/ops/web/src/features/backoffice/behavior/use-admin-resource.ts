@@ -24,16 +24,12 @@ import {
 const rootKey = (resource: ResourceName) => ["backoffice", resource] as const;
 const listKey = (resource: ResourceName, params: ListParams) =>
   [...rootKey(resource), "list", params] as const;
-const oneKey = (resource: ResourceName, id: string) =>
-  [...rootKey(resource), "one", id] as const;
+const oneKey = (resource: ResourceName, id: string) => [...rootKey(resource), "one", id] as const;
 
 export function useAdminList<T>(
   resource: ResourceName,
   params: ListParams,
-  options?: Omit<
-    UseQueryOptions<ListResult<T>, Error, ListResult<T>>,
-    "queryKey" | "queryFn"
-  >,
+  options?: Omit<UseQueryOptions<ListResult<T>, Error, ListResult<T>>, "queryKey" | "queryFn">,
 ) {
   return useQuery<ListResult<T>, Error>({
     queryKey: listKey(resource, params),
@@ -61,23 +57,17 @@ export function useAdminOne<T>(
 
 export function useAdminUpdate<T>(
   resource: ResourceName,
-  options?: UseMutationOptions<
-    DataResult<T>,
-    Error,
-    { id: string; data: Record<string, unknown> }
-  >,
+  options?: UseMutationOptions<DataResult<T>, Error, { id: string; data: Record<string, unknown> }>,
 ) {
   const qc = useQueryClient();
-  return useMutation<DataResult<T>, Error, { id: string; data: Record<string, unknown> }>(
-    {
-      mutationFn: ({ id, data }) => adminClient.update<T>(resource, id, data),
-      ...options,
-      onSuccess: async (...args) => {
-        await qc.invalidateQueries({ queryKey: rootKey(resource) });
-        options?.onSuccess?.(...args);
-      },
+  return useMutation<DataResult<T>, Error, { id: string; data: Record<string, unknown> }>({
+    mutationFn: ({ id, data }) => adminClient.update<T>(resource, id, data),
+    ...options,
+    onSuccess: async (...args) => {
+      await qc.invalidateQueries({ queryKey: rootKey(resource) });
+      options?.onSuccess?.(...args);
     },
-  );
+  });
 }
 
 export function useAdminCreate<T>(

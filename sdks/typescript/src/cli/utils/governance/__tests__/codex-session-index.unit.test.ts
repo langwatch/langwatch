@@ -28,9 +28,7 @@ const indexLine = (id: string, name: string) =>
 
 describe("the codex session index", () => {
   it("lives beside the sessions tree, not inside it", () => {
-    expect(codexSessionIndexPath(join(home, "sessions"))).toBe(
-      join(home, "session_index.jsonl"),
-    );
+    expect(codexSessionIndexPath(join(home, "sessions"))).toBe(join(home, "session_index.jsonl"));
   });
 
   describe("given an index with renames and noise", () => {
@@ -47,9 +45,7 @@ describe("the codex session index", () => {
         ].join("\n"),
       );
 
-      const names = await readCodexThreadNames(
-        codexSessionIndexPath(join(home, "sessions")),
-      );
+      const names = await readCodexThreadNames(codexSessionIndexPath(join(home, "sessions")));
 
       expect(names.get("thread-a")).toBe("pr-reviewer");
       expect(names.get("thread-b")).toBe("pnpm btw not npm");
@@ -67,9 +63,7 @@ describe("the codex session index", () => {
         ].join("\n"),
       );
 
-      const names = await readCodexThreadNames(
-        codexSessionIndexPath(join(home, "sessions")),
-      );
+      const names = await readCodexThreadNames(codexSessionIndexPath(join(home, "sessions")));
 
       expect(names.has("thread-a")).toBe(false);
     });
@@ -77,9 +71,7 @@ describe("the codex session index", () => {
 
   describe("given no index at all", () => {
     it("answers an empty map", async () => {
-      const names = await readCodexThreadNames(
-        codexSessionIndexPath(join(home, "sessions")),
-      );
+      const names = await readCodexThreadNames(codexSessionIndexPath(join(home, "sessions")));
 
       expect(names.size).toBe(0);
     });

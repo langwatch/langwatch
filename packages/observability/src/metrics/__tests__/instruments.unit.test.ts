@@ -27,7 +27,9 @@ interface Recorded {
 /** Collects every value written through it, in order. */
 function createRecordingMeterProvider() {
   const recorded: Recorded[] = [];
-  const observableCallbacks: Array<(result: { observe: (v: number, a?: Attributes) => void }) => unknown> = [];
+  const observableCallbacks: Array<
+    (result: { observe: (v: number, a?: Attributes) => void }) => unknown
+  > = [];
 
   const write = (instrument: string) => ({
     add: (value: number, attributes?: Attributes) => {
@@ -44,13 +46,21 @@ function createRecordingMeterProvider() {
     createGauge: (name: string) => write(name),
     createUpDownCounter: (name: string) => write(name),
     createObservableGauge: (name: string) => ({
-      addCallback: (callback: (result: { observe: (v: number, a?: Attributes) => void }) => unknown) => {
+      addCallback: (
+        callback: (result: { observe: (v: number, a?: Attributes) => void }) => unknown,
+      ) => {
         observableCallbacks.push(async (result) => await callback(result));
       },
       removeCallback: () => void 0,
     }),
-    createObservableCounter: (name: string) => ({ addCallback: () => void 0, removeCallback: () => void 0 }),
-    createObservableUpDownCounter: (name: string) => ({ addCallback: () => void 0, removeCallback: () => void 0 }),
+    createObservableCounter: (name: string) => ({
+      addCallback: () => void 0,
+      removeCallback: () => void 0,
+    }),
+    createObservableUpDownCounter: (name: string) => ({
+      addCallback: () => void 0,
+      removeCallback: () => void 0,
+    }),
     addBatchObservableCallback: () => void 0,
     removeBatchObservableCallback: () => void 0,
   };
@@ -68,7 +78,9 @@ function createRecordingMeterProvider() {
     recorded,
     collect,
     observableCount: () => observableCallbacks.length,
-    provider: { getMeter: () => meter } as unknown as Parameters<typeof metrics.setGlobalMeterProvider>[0],
+    provider: { getMeter: () => meter } as unknown as Parameters<
+      typeof metrics.setGlobalMeterProvider
+    >[0],
   };
 }
 
@@ -188,10 +200,13 @@ describe("metric instruments", () => {
     });
 
     it("reports on collection, awaiting an async read", async () => {
-      observableGauge({ name: "pm_outbox_pending", description: "Pending outbox rows" }, async (observer) => {
-        await Promise.resolve();
-        observer.observe(11, { process_name: "billing" });
-      });
+      observableGauge(
+        { name: "pm_outbox_pending", description: "Pending outbox rows" },
+        async (observer) => {
+          await Promise.resolve();
+          observer.observe(11, { process_name: "billing" });
+        },
+      );
 
       metrics.setGlobalMeterProvider(harness.provider);
       activateMetrics();

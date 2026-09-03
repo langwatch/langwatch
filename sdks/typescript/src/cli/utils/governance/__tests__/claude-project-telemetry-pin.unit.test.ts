@@ -53,10 +53,7 @@ describe("ensureClaudeProjectTelemetryPin", () => {
           cwd: temp.cwd,
         });
 
-        const exclude = fs.readFileSync(
-          path.join(temp.cwd, ".git", "info", "exclude"),
-          "utf8",
-        );
+        const exclude = fs.readFileSync(path.join(temp.cwd, ".git", "info", "exclude"), "utf8");
         expect(exclude).toContain("**/.claude/settings.local.json");
       });
     });
@@ -87,9 +84,7 @@ describe("ensureClaudeProjectTelemetryPin", () => {
       expect(result.action).toBe("updated");
       const written = JSON.parse(fs.readFileSync(result.path, "utf8"));
       expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(CURRENT_ENDPOINT);
-      expect(written.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
-        `Authorization=Bearer ${CURRENT_TOKEN}`,
-      );
+      expect(written.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(`Authorization=Bearer ${CURRENT_TOKEN}`);
     });
   });
 

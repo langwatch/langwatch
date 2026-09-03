@@ -10,8 +10,8 @@ from the composition root.
 ```ts
 // apps/api/src/platform/config/api.config.ts (shape)
 const definition = RuntimeConfig.define({
-  port:     Config.value(portSchema.default(5560), { env: "API_PORT" }),
-  apiKey:   Config.secret({ optional: true, env: "LANGWATCH_API_KEY" }),
+  port: Config.value(portSchema.default(5560), { env: "API_PORT" }),
+  apiKey: Config.secret({ optional: true, env: "LANGWATCH_API_KEY" }),
   endpoint: Config.url({ optional: true, env: "LANGWATCH_ENDPOINT" }),
 });
 const config = RuntimeConfig.create({ name: "api", definition, source: process.env });
@@ -58,7 +58,7 @@ installers in `apps/worker/src/features/<area>/<feature>-worker-feature.installe
 ```ts
 export abstract class WorkerFeatureInstallerPort {
   abstract readonly name: string;
-  abstract install(): Promise<WorkerFeatureHandlePort>;   // handle.close() on shutdown
+  abstract install(): Promise<WorkerFeatureHandlePort>; // handle.close() on shutdown
 }
 ```
 

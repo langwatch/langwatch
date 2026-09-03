@@ -18,9 +18,7 @@ export class LangyUiPageOutOfDateError extends Error {
   readonly code = "langy_ui_page_out_of_date";
 
   constructor() {
-    super(
-      "The open page holds an older version of this evaluation, so it cannot save the change.",
-    );
+    super("The open page holds an older version of this evaluation, so it cannot save the change.");
     this.name = "LangyUiPageOutOfDateError";
   }
 }

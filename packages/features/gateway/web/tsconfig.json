@@ -21,7 +21,9 @@
       "@langwatch/authz-web/surfaces/scope-picker": [
         "../../authz/web/src/surfaces/scope-picker/index.ts"
       ],
-      "@langwatch/enterprise-billing-web": ["../../../enterprise/features/billing/web/src/index.ts"],
+      "@langwatch/enterprise-billing-web": [
+        "../../../enterprise/features/billing/web/src/index.ts"
+      ],
       "@langwatch/platform-api-client": ["../../../platform-api-client/src/index.ts"]
     }
   },

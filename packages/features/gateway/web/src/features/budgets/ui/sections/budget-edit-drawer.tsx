@@ -35,11 +35,7 @@ type BudgetEditDrawerProps = {
   onSaved: () => void;
 };
 
-export function BudgetEditDrawer({
-  budget,
-  onOpenChange,
-  onSaved,
-}: BudgetEditDrawerProps) {
+export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDrawerProps) {
   const toaster = useGatewayToaster();
   const showErrorToast = useShowErrorToast();
   const { organization } = useOrganizationTeamProject();
@@ -125,10 +121,7 @@ export function BudgetEditDrawer({
             </Field.Root>
             <Field.Root>
               <Field.Label>Description</Field.Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
             </Field.Root>
             <Field.Root>
               <Field.Label>Applies to</Field.Label>
@@ -137,8 +130,8 @@ export function BudgetEditDrawer({
                   ? "group"
                   : budget?.scopeType.toLowerCase().replace("_", " ")}
                 {budget?.scopeTarget?.name ? `, ${budget.scopeTarget.name}` : ""}
-                {budget?.providerLabel ? `, ${budget.providerLabel} only` : ""} (immutable
-                after create)
+                {budget?.providerLabel ? `, ${budget.providerLabel} only` : ""} (immutable after
+                create)
               </Text>
               {budget?.scopeType === "GROUP" && (
                 <Field.HelperText>
@@ -170,9 +163,8 @@ export function BudgetEditDrawer({
               />
               {limitError && <Field.ErrorText>{limitError}</Field.ErrorText>}
               <Field.HelperText>
-                Raising the limit does not reset the window. Lowering it may cause the
-                budget to enter breach immediately if current spend already exceeds the
-                new value.
+                Raising the limit does not reset the window. Lowering it may cause the budget to
+                enter breach immediately if current spend already exceeds the new value.
               </Field.HelperText>
             </Field.Root>
             <Field.Root required>
@@ -186,9 +178,7 @@ export function BudgetEditDrawer({
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={onBreach}
-                  onChange={(e) =>
-                    setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")
-                  }
+                  onChange={(e) => setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")}
                 >
                   <option value="BLOCK">Block: reject requests at limit</option>
                   <option value="WARN">Warn: tag responses, keep serving</option>

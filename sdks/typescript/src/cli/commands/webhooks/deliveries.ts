@@ -49,24 +49,11 @@ export const webhookDeliveriesCommand = async (
                 : d.outcome === "retryable"
                   ? chalk.yellow(d.outcome)
                   : chalk.red(d.outcome),
-            Status:
-              d.response_status !== null ? String(d.response_status) : chalk.gray("-"),
+            Status: d.response_status !== null ? String(d.response_status) : chalk.gray("-"),
             "Latency ms": d.latency_ms !== null ? String(d.latency_ms) : chalk.gray("-"),
-            Error: d.error
-              ? d.error.length > 40
-                ? `${d.error.slice(0, 37)}...`
-                : d.error
-              : "",
+            Error: d.error ? (d.error.length > 40 ? `${d.error.slice(0, 37)}...` : d.error) : "",
           })),
-          headers: [
-            "Fired at",
-            "Attempt",
-            "Events",
-            "Outcome",
-            "Status",
-            "Latency ms",
-            "Error",
-          ],
+          headers: ["Fired at", "Attempt", "Events", "Outcome", "Status", "Latency ms", "Error"],
         });
         if (page.next_cursor) {
           console.log();

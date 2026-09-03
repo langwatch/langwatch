@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Icon,
-  Progress,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Icon, Progress, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Check, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -22,12 +13,7 @@ interface ExportProgressProps {
 // legacy Traces page was removed, and the new-violation gate compares by path,
 // so a relocation reads as a brand-new file.
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: relocated, not rewritten
-export function ExportProgress({
-  exported,
-  total,
-  isExporting,
-  onCancel,
-}: ExportProgressProps) {
+export function ExportProgress({ exported, total, isExporting, onCancel }: ExportProgressProps) {
   // Animate mount/unmount with a slight delay
   const [visible, setVisible] = useState(false);
 
@@ -63,8 +49,7 @@ export function ExportProgress({
       css={{
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(20px)",
-        transition:
-          "opacity 0.3s ease-out, transform 0.3s ease-out, border-color 0.3s ease",
+        transition: "opacity 0.3s ease-out, transform 0.3s ease-out, border-color 0.3s ease",
       }}
     >
       <VStack align="stretch" gap={2}>
@@ -91,12 +76,7 @@ export function ExportProgress({
             </Text>
           )}
           {!isDone && onCancel && (
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={onCancel}
-              aria-label="Cancel export"
-            >
+            <Button variant="ghost" size="xs" onClick={onCancel} aria-label="Cancel export">
               <X size={14} />
               Cancel
             </Button>

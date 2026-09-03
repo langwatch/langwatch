@@ -40,12 +40,7 @@ describe("given the first page of events", () => {
   /** @scenario "The table pages through more events than fit at once" */
   it("shows pageSize rows and knows there is more when the sentinel came back", () => {
     const req = buildPageRequest({ pageSize: 3, displayedRows: [] });
-    const fetched = [
-      row("a", T + 40),
-      row("b", T + 30),
-      row("c", T + 20),
-      row("d", T + 10),
-    ];
+    const fetched = [row("a", T + 40), row("b", T + 30), row("c", T + 20), row("d", T + 10)];
     const result = absorbFetch({ pageSize: 3, request: req, fetched });
     expect(result.rows.map((r) => r.eventId)).toEqual(["a", "b", "c"]);
     expect(result.hasMore).toBe(true);

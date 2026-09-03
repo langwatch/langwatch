@@ -224,9 +224,7 @@ export function applyHandledErrorToForm({
 
 /** Renders whatever `applyHandledErrorToForm` put in the whole-form slot. */
 export function FormServerError({ form }: { form: MinimalForm }) {
-  const root = form.formState.errors.root as
-    | { serverError?: { message?: string } }
-    | undefined;
+  const root = form.formState.errors.root as { serverError?: { message?: string } } | undefined;
   const message = root?.serverError?.message;
   if (!message) return null;
   return (

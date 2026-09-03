@@ -56,10 +56,7 @@ export const adminListResultSchema = z.object({
 
 export const adminDataResultSchema = z.object({ data: z.unknown() });
 
-export const adminOperationResultSchema = z.union([
-  adminListResultSchema,
-  adminDataResultSchema,
-]);
+export const adminOperationResultSchema = z.union([adminListResultSchema, adminDataResultSchema]);
 
 export type AdminListResult = z.infer<typeof adminListResultSchema>;
 export type AdminDataResult = z.infer<typeof adminDataResultSchema>;

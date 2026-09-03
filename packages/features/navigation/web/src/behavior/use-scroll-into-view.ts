@@ -9,9 +9,7 @@ export function useScrollIntoView(
 ) {
   useEffect(() => {
     if (!resultsRef.current) return;
-    const selectedElement = resultsRef.current.querySelector(
-      `[data-index="${selectedIndex}"]`,
-    );
+    const selectedElement = resultsRef.current.querySelector(`[data-index="${selectedIndex}"]`);
     if (selectedElement) {
       selectedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }

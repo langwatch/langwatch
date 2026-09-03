@@ -23,10 +23,7 @@ export {
   type RetentionProjectLineage,
 } from "./ports/data-retention-directory.port";
 export { DataRetentionPermissionsPort } from "./ports/data-retention-permissions.port";
-export {
-  DataRetentionPlanPort,
-  type DataRetentionPlan,
-} from "./ports/data-retention-plan.port";
+export { DataRetentionPlanPort, type DataRetentionPlan } from "./ports/data-retention-plan.port";
 export { DataRetentionAdministratorPort } from "./ports/data-retention-administrator.port";
 export {
   PrismaDataRetentionDirectoryRepository,

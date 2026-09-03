@@ -192,4 +192,3 @@ function toObservabilitySetup(config: WorkerConfig): ProcessObservabilityOptions
     },
   };
 }
-

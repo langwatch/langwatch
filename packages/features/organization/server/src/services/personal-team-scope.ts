@@ -66,9 +66,7 @@ async function findPersonalTeamMatching({
 }): Promise<{ name: string } | null> {
   const idsOfType = (scopeType: RoleBindingScopeType) => [
     ...new Set(
-      scopes
-        .filter((scope) => scope.scopeType === scopeType)
-        .map((scope) => scope.scopeId),
+      scopes.filter((scope) => scope.scopeType === scopeType).map((scope) => scope.scopeId),
     ),
   ];
 
@@ -109,9 +107,7 @@ async function findPersonalTeamMatching({
  * NULL rows.
  */
 function foreignOwnerFilter(ownerUserId: string | null): Prisma.TeamWhereInput {
-  return ownerUserId
-    ? { OR: [{ ownerUserId: null }, { ownerUserId: { not: ownerUserId } }] }
-    : {};
+  return ownerUserId ? { OR: [{ ownerUserId: null }, { ownerUserId: { not: ownerUserId } }] } : {};
 }
 
 export async function scopesTouchPersonalTeam({

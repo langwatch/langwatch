@@ -66,7 +66,7 @@ function harness({ withPolicy = true } = {}) {
   const applied: string[] = [];
   const policy: SecretTrpcPolicy =
     (permission) =>
-    <TProcedure,>(procedure: TProcedure): TProcedure => {
+    <TProcedure>(procedure: TProcedure): TProcedure => {
       declared.push(permission);
       return (procedure as ChainableProcedure).use(({ next }: { next: () => unknown }) => {
         applied.push(permission);

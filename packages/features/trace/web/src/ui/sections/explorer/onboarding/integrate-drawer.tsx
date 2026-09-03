@@ -98,12 +98,7 @@ export function IntegrateDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={open}
-      onOpenChange={(e) => onOpenChange(e.open)}
-      size="xl"
-      placement="end"
-    >
+    <Drawer.Root open={open} onOpenChange={(e) => onOpenChange(e.open)} size="xl" placement="end">
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <VStack align="stretch" gap={1}>

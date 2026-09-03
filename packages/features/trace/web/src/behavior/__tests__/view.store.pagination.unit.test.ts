@@ -29,10 +29,7 @@ const pagination = () => {
 };
 
 /** Put both stores where a user lands after sorting, then clicking Next twice. */
-function seedThirdPageSortedBy(sort: {
-  columnId: string;
-  direction: "asc" | "desc";
-}): void {
+function seedThirdPageSortedBy(sort: { columnId: string; direction: "asc" | "desc" }): void {
   useViewStore.setState({
     activeLensId: "all-traces",
     grouping: "flat",
@@ -47,10 +44,7 @@ function seedThirdPageSortedBy(sort: {
 }
 
 /** The same, one batch earlier: the state a single click of Next leaves. */
-function seedSecondPageSortedBy(sort: {
-  columnId: string;
-  direction: "asc" | "desc";
-}): void {
+function seedSecondPageSortedBy(sort: { columnId: string; direction: "asc" | "desc" }): void {
   seedThirdPageSortedBy(sort);
   useFilterStore.setState({
     page: 2,

@@ -20,9 +20,7 @@ describe("rotatingColors", () => {
   describe("given the same name asked for twice", () => {
     it("returns the same token pair both times", () => {
       for (const name of NAMES) {
-        expect(getColorForString("colors", name)).toEqual(
-          getColorForString("colors", name),
-        );
+        expect(getColorForString("colors", name)).toEqual(getColorForString("colors", name));
       }
     });
 
@@ -38,18 +36,13 @@ describe("rotatingColors", () => {
 
     it("paints charts in the hue the badge for that name already uses", () => {
       const paletteHexes = new Map(
-        NAMES.map((name) => [
-          getColorPaletteForString(name),
-          getHexColorForString(name),
-        ]),
+        NAMES.map((name) => [getColorPaletteForString(name), getHexColorForString(name)]),
       );
 
       // One palette can never resolve to two different hexes, whichever name
       // hashed onto it.
       for (const name of NAMES) {
-        expect(getHexColorForString(name)).toBe(
-          paletteHexes.get(getColorPaletteForString(name)),
-        );
+        expect(getHexColorForString(name)).toBe(paletteHexes.get(getColorPaletteForString(name)));
       }
       expect(new Set(paletteHexes.values()).size).toBe(paletteHexes.size);
     });
@@ -58,9 +51,7 @@ describe("rotatingColors", () => {
   describe("given a spread of unrelated names", () => {
     it("spends the whole palette rather than crowding one hue", () => {
       const hues = new Set(
-        Array.from({ length: 200 }, (_, index) =>
-          getColorPaletteForString(`workspace-${index}`),
-        ),
+        Array.from({ length: 200 }, (_, index) => getColorPaletteForString(`workspace-${index}`)),
       );
 
       expect(hues.size).toBe(rotatingColors.colors.length);

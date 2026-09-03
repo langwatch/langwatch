@@ -24,9 +24,7 @@ export type BillingSubscriptionWithOrganization = BillingSubscriptionRecord & {
 };
 
 export abstract class BillingSubscriptionRepository {
-  abstract tryFindActive(
-    organizationId: string,
-  ): Promise<BillingSubscriptionRecord | null>;
+  abstract tryFindActive(organizationId: string): Promise<BillingSubscriptionRecord | null>;
   abstract tryFindLastNonCancelled(
     organizationId: string,
   ): Promise<BillingSubscriptionRecord | null>;
@@ -34,14 +32,8 @@ export abstract class BillingSubscriptionRepository {
     organizationId: string;
     plan: string;
   }): Promise<BillingSubscriptionRecord>;
-  abstract updateStatus(input: {
-    id: string;
-    status: string;
-  }): Promise<BillingSubscriptionRecord>;
-  abstract updatePlan(input: {
-    id: string;
-    plan: string;
-  }): Promise<BillingSubscriptionRecord>;
+  abstract updateStatus(input: { id: string; status: string }): Promise<BillingSubscriptionRecord>;
+  abstract updatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord>;
   abstract tryFindByStripeId(
     stripeSubscriptionId: string,
   ): Promise<BillingSubscriptionRecord | null>;
@@ -53,10 +45,7 @@ export abstract class BillingSubscriptionRepository {
     id: string;
     previousStatus: string;
   }): Promise<BillingSubscriptionWithOrganization>;
-  abstract recordPaymentFailure(input: {
-    id: string;
-    currentStatus: string;
-  }): Promise<void>;
+  abstract recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void>;
   abstract cancel(input: { id: string }): Promise<void>;
   abstract cancelTrialSubscriptions(organizationId: string): Promise<void>;
   abstract migrateToSeatEvent(input: {

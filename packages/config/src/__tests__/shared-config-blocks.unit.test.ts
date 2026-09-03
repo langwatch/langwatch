@@ -33,8 +33,11 @@ describe("shared configuration blocks", () => {
 
     expect(value).toEqual({ url: "postgresql://localhost/langwatch" });
     expect(
-      RuntimeConfig.create({ name: "postgres-block", definition: postgresConfigDefinition, source: {} })
-        .value.url,
+      RuntimeConfig.create({
+        name: "postgres-block",
+        definition: postgresConfigDefinition,
+        source: {},
+      }).value.url,
     ).toBeUndefined();
   });
 
@@ -204,7 +207,11 @@ describe("shared configuration blocks", () => {
         definition: runtimeIdentityConfigDefinition,
         source: { ENVIRONMENT: "eu-west", NODE_ENV: "production", SERVICE_VERSION: "build-42" },
       }).value,
-    ).toEqual({ environment: "eu-west", nodeEnvironment: "production", serviceVersion: "build-42" });
+    ).toEqual({
+      environment: "eu-west",
+      nodeEnvironment: "production",
+      serviceVersion: "build-42",
+    });
   });
 
   it("resolves the shared Enterprise licensing public key", () => {

@@ -13,8 +13,6 @@ export abstract class GovernanceEventingPort {
   abstract recordIngestionRunCompleted(
     input: RecordIngestionPullRunCompletedCommand,
   ): Promise<void>;
-  abstract recordIngestionRunFailed(
-    input: RecordIngestionPullRunFailedCommand,
-  ): Promise<void>;
+  abstract recordIngestionRunFailed(input: RecordIngestionPullRunFailedCommand): Promise<void>;
   abstract recordPulledUsage(input: RecordPulledUsageCommand): Promise<void>;
 }

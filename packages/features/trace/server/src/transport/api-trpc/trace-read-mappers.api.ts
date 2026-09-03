@@ -47,9 +47,7 @@ import {
   resolveNonBilledCost,
 } from "@langwatch/trace-contract";
 import type { CodingAgentService, LogContentCategory } from "@langwatch/coding-agent-contract";
-import {
-  TraceAttributeRedactor,
-} from "../../services/trace-attribute-redaction.service";
+import { TraceAttributeRedactor } from "../../services/trace-attribute-redaction.service";
 import type {
   CategoryVisibility,
   Protections,

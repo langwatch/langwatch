@@ -33,13 +33,10 @@ export async function handleListSimulationRuns(params: {
   for (const run of runs) {
     const statusIcon =
       run.status === "SUCCESS" ? "pass" : run.status === "FAILED" ? "FAIL" : run.status;
-    const duration =
-      run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
+    const duration = run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
     const verdict = run.results?.verdict ?? "";
 
-    lines.push(
-      `## ${run.name ?? run.scenarioId} — ${statusIcon}${verdict ? ` (${verdict})` : ""}`,
-    );
+    lines.push(`## ${run.name ?? run.scenarioId} — ${statusIcon}${verdict ? ` (${verdict})` : ""}`);
     lines.push(`**Run ID**: ${run.scenarioRunId}`);
     lines.push(`**Batch**: ${run.batchRunId}`);
     lines.push(`**Duration**: ${duration}`);

@@ -21,7 +21,8 @@ const recordingLogger = (): Logger & { lines: (level: string, pattern: RegExp) =
     info: log("info"),
     warn: log("warn"),
     error: log("error"),
-    lines: (level, pattern) => calls.filter(([l, m]) => l === level && pattern.test(m)).map(([, m]) => m),
+    lines: (level, pattern) =>
+      calls.filter(([l, m]) => l === level && pattern.test(m)).map(([, m]) => m),
   };
 };
 
@@ -103,7 +104,11 @@ describe("connectAgent()", () => {
       it("refuses a value the schema rejects before the handler runs", async () => {
         const handler = vi.fn(async () => "ok");
         const agent = connectAgent(
-          { name: "zod-int", enabled: false, parameters: z.object({ maxTools: z.number().int().default(5) }) },
+          {
+            name: "zod-int",
+            enabled: false,
+            parameters: z.object({ maxTools: z.number().int().default(5) }),
+          },
           handler,
         );
 
@@ -118,7 +123,11 @@ describe("connectAgent()", () => {
       it("fills the defaults and passes undeclared values through", async () => {
         const seen: unknown[] = [];
         const agent = connectAgent(
-          { name: "zod-defaults", enabled: false, parameters: z.object({ plan: z.string().default("free") }) },
+          {
+            name: "zod-defaults",
+            enabled: false,
+            parameters: z.object({ plan: z.string().default("free") }),
+          },
           async ({ params }) => {
             seen.push(params);
             return "ok";
@@ -139,7 +148,10 @@ describe("connectAgent()", () => {
           {
             name: "json",
             enabled: false,
-            parameters: { type: "object", properties: { model: { type: "string", default: "gpt-5-mini" } } },
+            parameters: {
+              type: "object",
+              properties: { model: { type: "string", default: "gpt-5-mini" } },
+            },
           },
           async () => "ok",
         );
@@ -172,16 +184,25 @@ describe("connectAgent()", () => {
     it("refuses a bad parameter value before the handler runs", async () => {
       const handler = vi.fn(async () => "never");
       const agent = connectAgent(
-        { name: "direct-bad", enabled: false, parameters: { model: { options: ["a", "b"], default: "a" } } },
+        {
+          name: "direct-bad",
+          enabled: false,
+          parameters: { model: { options: ["a", "b"], default: "a" } },
+        },
         handler,
       );
 
-      await expect(agent({ messages: [], params: { model: "c" as "a" } })).rejects.toThrow(/"model" must be one of a, b/);
+      await expect(agent({ messages: [], params: { model: "c" as "a" } })).rejects.toThrow(
+        /"model" must be one of a, b/,
+      );
       expect(handler).not.toHaveBeenCalled();
     });
 
     it("exposes the name, the environment and disconnect", async () => {
-      const agent = connectAgent({ name: "meta", environment: "Prod EU", enabled: false }, async () => "ok");
+      const agent = connectAgent(
+        { name: "meta", environment: "Prod EU", enabled: false },
+        async () => "ok",
+      );
       expect(agent.name).toBe("meta");
       expect(agent.environment).toBe("prod-eu");
       await expect(agent.disconnect()).resolves.toBeUndefined();
@@ -225,7 +246,9 @@ describe("connectAgent()", () => {
 
   describe("when the name is missing", () => {
     it("refuses the definition", () => {
-      expect(() => connectAgent({ name: " ", enabled: false }, async () => "ok")).toThrow(/needs a name/);
+      expect(() => connectAgent({ name: " ", enabled: false }, async () => "ok")).toThrow(
+        /needs a name/,
+      );
     });
   });
 });
@@ -245,20 +268,28 @@ describe("normalizeReply()", () => {
 
   /** @scenario "A list of messages is the output" */
   it("wraps a list of messages", () => {
-    const messages = [{ role: "assistant", content: "a" }, { role: "assistant", content: "b" }];
+    const messages = [
+      { role: "assistant", content: "a" },
+      { role: "assistant", content: "b" },
+    ];
     expect(normalizeReply(messages)).toEqual({ output: messages });
   });
 
   /** @scenario "A reply with a session echoes the session" */
   it("keeps output and session apart", () => {
-    expect(normalizeReply({ output: "hi", session: { cursor: 3 } })).toEqual({ output: "hi", session: { cursor: 3 } });
+    expect(normalizeReply({ output: "hi", session: { cursor: 3 } })).toEqual({
+      output: "hi",
+      session: { cursor: 3 },
+    });
     expect(normalizeReply({ output: [{ role: "assistant", content: "x" }] })).toEqual({
       output: [{ role: "assistant", content: "x" }],
     });
   });
 
   it("refuses anything else", () => {
-    expect(() => normalizeReply(42)).toThrow(/must return a string, a message, a list of messages, or/);
+    expect(() => normalizeReply(42)).toThrow(
+      /must return a string, a message, a list of messages, or/,
+    );
     expect(() => normalizeReply({ text: "no" })).toThrow();
   });
 });

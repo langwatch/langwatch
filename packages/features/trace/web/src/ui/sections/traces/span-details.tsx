@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useMemo } from "react";
 import { ChevronDown, Clock, Play, Settings } from "react-feather";
@@ -63,9 +54,7 @@ export function SpanDetails({
   /** Extract prompt reference from span params, searching siblings and ancestors */
   const promptRef = useMemo(() => {
     // Check the span's own params first
-    const ownAttrs = flattenParamsToPromptAttributes(
-      span.params as Record<string, unknown> | null,
-    );
+    const ownAttrs = flattenParamsToPromptAttributes(span.params as Record<string, unknown> | null);
     const promptId = ownAttrs["langwatch.prompt.id"];
     if (typeof promptId === "string" && promptId.includes(":")) {
       return promptId;
@@ -77,9 +66,7 @@ export function SpanDetails({
         spanId: s.span_id,
         parentSpanId: s.parent_id ?? null,
         startTime: s.timestamps.started_at,
-        attributes: flattenParamsToPromptAttributes(
-          s.params as Record<string, unknown> | null,
-        ),
+        attributes: flattenParamsToPromptAttributes(s.params as Record<string, unknown> | null),
       }));
 
       const ref = findPromptReferenceInAncestors({
@@ -113,11 +100,7 @@ export function SpanDetails({
             <b>Span ID:</b> <Text as="code">{span.span_id}</Text>
           </Text>
           {canOpenSpanInPromptStudio && promptRef ? (
-            <OpenInPromptsMenu
-              spanId={span.span_id}
-              promptRef={promptRef}
-              buildUrl={buildUrl}
-            />
+            <OpenInPromptsMenu spanId={span.span_id} promptRef={promptRef} buildUrl={buildUrl} />
           ) : canOpenSpanInPromptStudio ? (
             <Link href={buildUrl(span.span_id)?.toString() ?? ""} isExternal>
               <Button size="sm" colorPalette="orange">
@@ -197,12 +180,7 @@ export function SpanDetails({
       </VStack>
       {span.params && (
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
-          <Box
-            fontSize="13px"
-            color="fg.subtle"
-            textTransform="uppercase"
-            fontWeight="bold"
-          >
+          <Box fontSize="13px" color="fg.subtle" textTransform="uppercase" fontWeight="bold">
             Params
           </Box>
           <Box
@@ -217,13 +195,10 @@ export function SpanDetails({
           >
             <RenderInputOutput
               value={JSON.stringify(
-                Object.fromEntries(
-                  Object.entries(span.params).filter(([key]) => key !== "_keys"),
-                ),
+                Object.fromEntries(Object.entries(span.params).filter(([key]) => key !== "_keys")),
               )}
               collapsed={
-                (!!span.input || !!span.output) &&
-                JSON.stringify(span.params).length > 100
+                (!!span.input || !!span.output) && JSON.stringify(span.params).length > 100
               }
               showTools
             />
@@ -232,12 +207,7 @@ export function SpanDetails({
       )}
       {span.input && (
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
-          <Box
-            fontSize="13px"
-            color="fg.subtle"
-            textTransform="uppercase"
-            fontWeight="bold"
-          >
+          <Box fontSize="13px" color="fg.subtle" textTransform="uppercase" fontWeight="bold">
             Input
           </Box>
           <Box
@@ -257,12 +227,7 @@ export function SpanDetails({
       )}
       {"contexts" in span && span.contexts && (
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
-          <Box
-            fontSize="13px"
-            color="fg.subtle"
-            textTransform="uppercase"
-            fontWeight="bold"
-          >
+          <Box fontSize="13px" color="fg.subtle" textTransform="uppercase" fontWeight="bold">
             Contexts
           </Box>
           <Box
@@ -330,12 +295,7 @@ export function SpanDetails({
         span.output !== undefined &&
         span.output !== null && (
           <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
-            <Box
-              fontSize="13px"
-              color="fg.subtle"
-              textTransform="uppercase"
-              fontWeight="bold"
-            >
+            <Box fontSize="13px" color="fg.subtle" textTransform="uppercase" fontWeight="bold">
               {span.type === "llm" ? "Generated" : "Output"}
             </Box>
             {!span.output && <Text>{"<empty>"}</Text>}

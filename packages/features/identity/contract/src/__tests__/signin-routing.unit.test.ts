@@ -23,9 +23,7 @@ const okta: SignInMethod = {
   connectionId: "conn_acme",
 };
 
-function connection(
-  overrides: Partial<RoutableConnection> = {},
-): RoutableConnection {
+function connection(overrides: Partial<RoutableConnection> = {}): RoutableConnection {
   return {
     connectionId: "conn_acme",
     method: okta,
@@ -36,9 +34,7 @@ function connection(
   };
 }
 
-function policy(
-  overrides: Partial<SignInMethodPolicy> = {},
-): SignInMethodPolicy {
+function policy(overrides: Partial<SignInMethodPolicy> = {}): SignInMethodPolicy {
   return {
     defaultMethods: [PASSWORD],
     localMethods: [PASSWORD],
@@ -91,9 +87,7 @@ describe("the identifier-first sign-in router", () => {
     it("normalizes the submitted value exactly as an attach does", () => {
       const identifier = routingIdentifierOf("Sam.J+news@Acme.com");
 
-      expect(identifier.normalized).toBe(
-        normalizeIdentifierValue("Sam.J+news@Acme.com"),
-      );
+      expect(identifier.normalized).toBe(normalizeIdentifierValue("Sam.J+news@Acme.com"));
       // The tag survives the fold, and the DOMAIN is still what routes: a
       // tagged address reaches its organization's connection exactly as the
       // bare one does.
@@ -125,11 +119,7 @@ describe("the identifier-first sign-in router", () => {
       const unknown = route({ raw: "nobody-has-ever-signed-up@home.net" });
 
       expect(known).toEqual(unknown);
-      expect(Object.keys(known).sort()).toEqual([
-        "methodSet",
-        "outcome",
-        "reasonCode",
-      ]);
+      expect(Object.keys(known).sort()).toEqual(["methodSet", "outcome", "reasonCode"]);
       expect(JSON.stringify(known)).not.toContain("sam");
     });
   });
@@ -163,10 +153,7 @@ describe("the identifier-first sign-in router", () => {
 
     it("asks for an address instead when a second connection exists", () => {
       const decision = route({
-        activeConnections: [
-          connection(),
-          connection({ connectionId: "conn_other" }),
-        ],
+        activeConnections: [connection(), connection({ connectionId: "conn_other" })],
       });
 
       expect(decision.outcome).toBe("method_picker");
@@ -230,9 +217,7 @@ describe("the identifier-first sign-in router", () => {
       for (const decision of [withoutEmail, withEmail]) {
         expect(decision.outcome).toBe("method_picker");
         expect(decision.methodSet).toEqual([PASSWORD]);
-        expect(
-          decision.methodSet.some((method) => method.kind === "federated"),
-        ).toBe(false);
+        expect(decision.methodSet.some((method) => method.kind === "federated")).toBe(false);
       }
       expect(withEmail.reasonCode).toBe("method_not_licensed");
     });
@@ -301,9 +286,7 @@ describe("the identifier-first sign-in router", () => {
         domainConnection: connection(),
       });
 
-      expect(
-        compareToLegacy({ decision, legacyProvider: "okta" }),
-      ).toEqual({
+      expect(compareToLegacy({ decision, legacyProvider: "okta" })).toEqual({
         matches: true,
         routerProvider: "okta",
         legacyProvider: "okta",
@@ -314,9 +297,7 @@ describe("the identifier-first sign-in router", () => {
     it("carries both answers and the reason code when they disagree", () => {
       const decision = route({ raw: "sam@home.net" });
 
-      expect(
-        compareToLegacy({ decision, legacyProvider: "okta" }),
-      ).toEqual({
+      expect(compareToLegacy({ decision, legacyProvider: "okta" })).toEqual({
         matches: false,
         routerProvider: "email",
         legacyProvider: "okta",

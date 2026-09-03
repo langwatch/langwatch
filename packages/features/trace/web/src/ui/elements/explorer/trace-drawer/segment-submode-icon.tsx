@@ -51,9 +51,7 @@ export function SegmentSubmodeIcon({
         color={active ? "blue.fg" : "blue.fg/55"}
         cursor="pointer"
         transition="background 0.12s ease, color 0.12s ease"
-        _hover={
-          active ? { bg: "blue.solid/22" } : { color: "blue.fg", bg: "blue.solid/8" }
-        }
+        _hover={active ? { bg: "blue.solid/22" } : { color: "blue.fg", bg: "blue.solid/8" }}
       >
         <Icon as={icon} boxSize={3} />
       </Box>

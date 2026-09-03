@@ -36,10 +36,7 @@ export type SlugValidationResult = {
  * @param datasetId - Current dataset ID (for edit mode, fetches slug from DB)
  * @returns Validation state and computed display values
  */
-export function useDatasetSlugValidation({
-  name,
-  datasetId,
-}: UseDatasetSlugValidationProps) {
+export function useDatasetSlugValidation({ name, datasetId }: UseDatasetSlugValidationProps) {
   const [slugInfo, setSlugInfo] = useState<SlugValidationResult>(null);
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
@@ -113,8 +110,7 @@ export function useDatasetSlugValidation({
       : slugInfo?.slug
     : slugInfo?.slug;
 
-  const slugWillChange =
-    !!datasetId && !!dbSlug && !!slugInfo?.slug && dbSlug !== slugInfo.slug;
+  const slugWillChange = !!datasetId && !!dbSlug && !!slugInfo?.slug && dbSlug !== slugInfo.slug;
 
   return {
     /**

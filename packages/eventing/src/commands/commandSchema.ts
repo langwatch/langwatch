@@ -44,11 +44,7 @@ export interface CommandSchema<Payload, Type extends CommandType> {
 export function defineCommandSchema<
   Schema extends ZodSchema,
   Type extends CommandType = CommandType,
->(
-  type: Type,
-  schema: Schema,
-  description?: string,
-): CommandSchema<z.infer<Schema>, Type> {
+>(type: Type, schema: Schema, description?: string): CommandSchema<z.infer<Schema>, Type> {
   return {
     type,
     validate: (payload: unknown): z.ZodSafeParseResult<z.output<Schema>> => {

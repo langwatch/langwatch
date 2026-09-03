@@ -126,26 +126,19 @@ export function AgentPropertiesPanel({ node }: { node: Node<AgentComponent> }) {
 // DB-backed Agent Panel
 // ---------------------------------------------------------------------------
 
-function DbAgentPanel({
-  node,
-  agentRef,
-}: {
-  node: Node<AgentComponent>;
-  agentRef: string;
-}) {
+function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef: string }) {
   const { project } = useOrganizationTeamProject();
   const updateNodeInternals = useUpdateNodeInternals();
-  const { nodes, edges, setNode, setEdges, getWorkflow, deselectAllNodes } =
-    useWorkflowStore(
-      useShallow(({ setNode, setEdges, getWorkflow, deselectAllNodes }) => ({
-        nodes: getWorkflow().nodes,
-        edges: getWorkflow().edges,
-        setNode,
-        setEdges,
-        getWorkflow,
-        deselectAllNodes,
-      })),
-    );
+  const { nodes, edges, setNode, setEdges, getWorkflow, deselectAllNodes } = useWorkflowStore(
+    useShallow(({ setNode, setEdges, getWorkflow, deselectAllNodes }) => ({
+      nodes: getWorkflow().nodes,
+      edges: getWorkflow().edges,
+      setNode,
+      setEdges,
+      getWorkflow,
+      deselectAllNodes,
+    })),
+  );
 
   const agentId = extractAgentId(agentRef);
 
@@ -175,18 +168,14 @@ function DbAgentPanel({
 
   // ---- HTTP state ----
   const httpSnapshot = readHttpSnapshot(node.data);
-  const httpConfig =
-    agentType === "http" && dbConfig ? getHttpConfig(dbConfig) : undefined;
+  const httpConfig = agentType === "http" && dbConfig ? getHttpConfig(dbConfig) : undefined;
   const localSettings = localConfig?.settings as Record<string, unknown> | undefined;
 
   const [url, setUrl] = useState(
     (localSettings?.url as string) ?? httpSnapshot?.url ?? httpConfig?.url ?? "",
   );
   const [method, setMethod] = useState<HttpMethod>(
-    (localSettings?.method as HttpMethod) ??
-      httpSnapshot?.method ??
-      httpConfig?.method ??
-      "POST",
+    (localSettings?.method as HttpMethod) ?? httpSnapshot?.method ?? httpConfig?.method ?? "POST",
   );
   const [bodyTemplate, setBodyTemplate] = useState(
     (localSettings?.bodyTemplate as string) ??
@@ -201,15 +190,10 @@ function DbAgentPanel({
       "",
   );
   const [headers, setHeaders] = useState<HttpHeader[]>(
-    (localSettings?.headers as HttpHeader[]) ??
-      httpSnapshot?.headers ??
-      httpConfig?.headers ??
-      [],
+    (localSettings?.headers as HttpHeader[]) ?? httpSnapshot?.headers ?? httpConfig?.headers ?? [],
   );
   const [auth, setAuth] = useState<HttpAuth | undefined>(
-    (localSettings?.auth as HttpAuth) ??
-      httpSnapshot?.auth ??
-      httpConfig?.auth ?? { type: "none" },
+    (localSettings?.auth as HttpAuth) ?? httpSnapshot?.auth ?? httpConfig?.auth ?? { type: "none" },
   );
   // ---- Code state ----
   const codeSnapshot = readCodeSnapshot(node.data);
@@ -320,26 +304,11 @@ function DbAgentPanel({
   }, [form, debouncedSetLocalConfig]);
 
   const handleUrlChange = useCallback((newUrl: string) => setUrl(newUrl), []);
-  const handleMethodChange = useCallback(
-    (newMethod: HttpMethod) => setMethod(newMethod),
-    [],
-  );
-  const handleBodyTemplateChange = useCallback(
-    (newBody: string) => setBodyTemplate(newBody),
-    [],
-  );
-  const handleOutputPathChange = useCallback(
-    (newPath: string) => setOutputPath(newPath),
-    [],
-  );
-  const handleAuthChange = useCallback(
-    (newAuth: HttpAuth | undefined) => setAuth(newAuth),
-    [],
-  );
-  const handleHeadersChange = useCallback(
-    (newHeaders: HttpHeader[]) => setHeaders(newHeaders),
-    [],
-  );
+  const handleMethodChange = useCallback((newMethod: HttpMethod) => setMethod(newMethod), []);
+  const handleBodyTemplateChange = useCallback((newBody: string) => setBodyTemplate(newBody), []);
+  const handleOutputPathChange = useCallback((newPath: string) => setOutputPath(newPath), []);
+  const handleAuthChange = useCallback((newAuth: HttpAuth | undefined) => setAuth(newAuth), []);
+  const handleHeadersChange = useCallback((newHeaders: HttpHeader[]) => setHeaders(newHeaders), []);
 
   // Track HTTP changes for localConfig persistence. Baseline = the
   // node's DSL snapshot (what is saved in this workflow), falling back
@@ -347,8 +316,7 @@ function DbAgentPanel({
   useEffect(() => {
     if (agentType !== "http") return;
     const baseline =
-      readHttpSnapshot(node.data) ??
-      (agentData ? getHttpConfig(agentData.config) : undefined);
+      readHttpSnapshot(node.data) ?? (agentData ? getHttpConfig(agentData.config) : undefined);
     if (!baseline) return;
     const changed =
       url !== (baseline.url ?? "") ||
@@ -386,8 +354,7 @@ function DbAgentPanel({
   useEffect(() => {
     if (agentType !== "code") return;
     const baseline =
-      readCodeSnapshot(node.data) ??
-      (agentData ? getCodeFromConfig(agentData.config) : undefined);
+      readCodeSnapshot(node.data) ?? (agentData ? getCodeFromConfig(agentData.config) : undefined);
     if (baseline === undefined) return;
     if (code !== baseline) {
       persistLocalSettings({ code });
@@ -414,8 +381,7 @@ function DbAgentPanel({
   const handleInputMappingChange = useCallback(
     (identifier: string, mapping: FieldMapping | undefined) => {
       const workflow = getWorkflow();
-      const currentInputs =
-        workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+      const currentInputs = workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
       const result = applyMappingChange({
         nodeId: node.id,
         identifier,
@@ -706,8 +672,7 @@ function DbAgentPanel({
           <Field.Root>
             <Field.Label fontSize="sm">Python Code</Field.Label>
             <Text fontSize="xs" color="fg.muted" marginBottom={1}>
-              Define a Python class with a `__call__` method that takes inputs and returns
-              outputs.
+              Define a Python class with a `__call__` method that takes inputs and returns outputs.
             </Text>
             <CodeBlockEditor
               code={code}
@@ -723,8 +688,7 @@ function DbAgentPanel({
       {agentType === "workflow" && (
         <Box paddingX={4}>
           <Text fontSize="sm" color="fg.muted">
-            This agent is backed by a workflow. Edit the workflow in Studio to modify its
-            behavior.
+            This agent is backed by a workflow. Edit the workflow in Studio to modify its behavior.
           </Text>
         </Box>
       )}

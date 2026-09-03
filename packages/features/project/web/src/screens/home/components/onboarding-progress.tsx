@@ -15,11 +15,7 @@ import {
 } from "react-icons/lu";
 import { homeApi } from "../../../behavior/home-api";
 import { HomeCard } from "./home-card";
-import {
-  HOME_SECTION_GAP,
-  HOME_SECTION_PADDING,
-  HomeSectionHeader,
-} from "./home-section-header";
+import { HOME_SECTION_GAP, HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header";
 import { useProjectHomeHost } from "../../../model/project-home-host";
 
 export type OnboardingStepKey =
@@ -319,11 +315,7 @@ export function OnboardingProgress() {
         {columns.map((column, colIndex) => (
           <VStack key={colIndex} align="stretch" gap={0}>
             {column.map((step) => (
-              <StepItem
-                key={step.key}
-                step={step}
-                onClick={() => handleStepClick(step)}
-              />
+              <StepItem key={step.key} step={step} onClick={() => handleStepClick(step)} />
             ))}
           </VStack>
         ))}

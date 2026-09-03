@@ -42,7 +42,6 @@ const connection = databaseUrl
   : null;
 const prisma = connection?.client as PrismaClient;
 
-
 const projectId = "test-project-id";
 const traceId = `test-trace-annotation-projection-${nanoid()}`;
 

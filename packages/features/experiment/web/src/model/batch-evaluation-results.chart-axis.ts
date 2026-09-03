@@ -107,10 +107,7 @@ export const commonLabelPrefix = (names: string[]): string => {
  * truncation and need no disambiguation suffixes. The full name stays on the
  * tooltip.
  */
-export const buildAxisLabels = (
-  names: string[],
-  maxLength = MAX_LABEL_LENGTH,
-): string[] => {
+export const buildAxisLabels = (names: string[], maxLength = MAX_LABEL_LENGTH): string[] => {
   // Only worth dropping when something would otherwise be cut off. Two bars
   // both called `gpt-5-mini` share a prefix, but they already fit — stripping
   // it would turn honest labels into `…mini (1)` / `…mini (2)` and reveal

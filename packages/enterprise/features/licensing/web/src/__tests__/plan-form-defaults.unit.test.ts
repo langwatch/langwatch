@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  ENTERPRISE_TEMPLATE,
-  PRO_TEMPLATE,
-} from "@langwatch/enterprise-licensing-contract";
+import { ENTERPRISE_TEMPLATE, PRO_TEMPLATE } from "@langwatch/enterprise-licensing-contract";
 import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../plan-form-defaults";
 
 /**
@@ -76,9 +73,7 @@ describe("planFormDefaults", () => {
 
       expect(enterpriseDefaults.maxMembers).toBe(ENTERPRISE_TEMPLATE.maxMembers);
       expect(enterpriseDefaults.maxMembersLite).toBe(ENTERPRISE_TEMPLATE.maxMembersLite);
-      expect(enterpriseDefaults.maxMessagesPerMonth).toBe(
-        ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-      );
+      expect(enterpriseDefaults.maxMessagesPerMonth).toBe(ENTERPRISE_TEMPLATE.maxMessagesPerMonth);
     });
 
     describe("when the operator picks a plan for the webhook entitlement", () => {

@@ -247,11 +247,15 @@ const Card = styled.div`padding: 1rem; &:hover { background: #f3f4f6; }`
 ### `asChild` for Next.js Link and Image
 
 ```tsx
-import NextLink from "next/link"
-<ChakraLink asChild><NextLink href="/about">About</NextLink></ChakraLink>
+import NextLink from "next/link";
+<ChakraLink asChild>
+  <NextLink href="/about">About</NextLink>
+</ChakraLink>;
 
-import NextImage from "next/image"
-<ChakraImage asChild><NextImage src="/hero.png" alt="Hero" width={800} height={400} /></ChakraImage>
+import NextImage from "next/image";
+<ChakraImage asChild>
+  <NextImage src="/hero.png" alt="Hero" width={800} height={400} />
+</ChakraImage>;
 ```
 
 ### Refactor output format

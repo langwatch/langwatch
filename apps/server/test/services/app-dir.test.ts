@@ -17,13 +17,9 @@ describe("shell script bits after relocation", () => {
     mkdirSync(join(root, "platform", "app", "scripts"), { recursive: true });
     mkdirSync(join(root, "node_modules", "dep"), { recursive: true });
     // pnpm pack normalizes modes: scripts arrive 0644.
-    writeFileSync(
-      join(root, "platform", "app", "scripts", "build-mcp-server.sh"),
-      "#!/bin/sh\n",
-      {
-        mode: 0o644,
-      },
-    );
+    writeFileSync(join(root, "platform", "app", "scripts", "build-mcp-server.sh"), "#!/bin/sh\n", {
+      mode: 0o644,
+    });
     writeFileSync(join(root, "platform", "app", "scripts", "helper.ts"), "export {};\n", {
       mode: 0o644,
     });
@@ -40,18 +36,14 @@ describe("shell script bits after relocation", () => {
       const root = await makeTree();
       const restored = restoreShellScriptBits(root);
       expect(restored).toBe(1);
-      const mode = statSync(
-        join(root, "platform", "app", "scripts", "build-mcp-server.sh"),
-      ).mode;
+      const mode = statSync(join(root, "platform", "app", "scripts", "build-mcp-server.sh")).mode;
       expect(mode & 0o111).not.toBe(0);
     });
 
     it("leaves non-scripts and node_modules alone", async () => {
       const root = await makeTree();
       restoreShellScriptBits(root);
-      expect(
-        statSync(join(root, "platform", "app", "scripts", "helper.ts")).mode & 0o111,
-      ).toBe(0);
+      expect(statSync(join(root, "platform", "app", "scripts", "helper.ts")).mode & 0o111).toBe(0);
       expect(statSync(join(root, "node_modules", "dep", "hook.sh")).mode & 0o111).toBe(0);
     });
   });

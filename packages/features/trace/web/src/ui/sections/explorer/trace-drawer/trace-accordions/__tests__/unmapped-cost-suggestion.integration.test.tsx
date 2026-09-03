@@ -142,9 +142,7 @@ describe("Feature: Unmapped model cost suggestion in span details", () => {
       // above the attribute table and its filter input.
       expect(suggestion.closest('[data-section="attributes"]')).not.toBeNull();
       expect(suggestion.closest('[data-section="io"]')).toBeNull();
-      expect(
-        screen.getByRole("button", { name: /add cost mapping/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /add cost mapping/i })).toBeInTheDocument();
     });
 
     /** @scenario Suggestion opens the model costs page prefilled in a new window */
@@ -159,9 +157,7 @@ describe("Feature: Unmapped model cost suggestion in span details", () => {
       const parsed = new URL(`http://localhost${url as string}`);
       expect(parsed.pathname).toBe("/settings/model-costs");
       expect(parsed.searchParams.get("drawer.open")).toBe("llmModelCost");
-      expect(parsed.searchParams.get("drawer.prefillModel")).toBe(
-        "vertex_ai/gemini-3-pro-preview",
-      );
+      expect(parsed.searchParams.get("drawer.prefillModel")).toBe("vertex_ai/gemini-3-pro-preview");
       expect(parsed.searchParams.get("drawer.prefillRegex")).toBe(
         "^vertex_ai\\/gemini-3-pro-preview$",
       );

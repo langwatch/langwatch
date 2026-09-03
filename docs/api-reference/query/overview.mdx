@@ -9,10 +9,10 @@ The Query API runs read-only LangWatchQL `SELECT` statements over your project's
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/v1/query` | Run one LangWatchQL statement. |
-| `GET` | `/api/v1/query/schema` | List queryable datasets, columns, and permission gates. |
+| Method | Path                   | Description                                             |
+| ------ | ---------------------- | ------------------------------------------------------- |
+| `POST` | `/api/v1/query`        | Run one LangWatchQL statement.                          |
+| `GET`  | `/api/v1/query/schema` | List queryable datasets, columns, and permission gates. |
 
 ## Authentication
 
@@ -22,9 +22,9 @@ Pass your LangWatch API key in the `X-Auth-Token` header.
 
 Both endpoints answer with the standard LangWatch error envelope and a real HTTP status. No wrapper sits around it. See [Error Envelope](/ai-gateway/api/errors).
 
-| Status | `type` | When |
-|--------|--------|------|
-| `400` | `bad_request` | The request body failed validation. |
-| `401` | `unauthenticated` | The API key is missing, invalid, or revoked. |
-| `403` | `permission_denied` | The key lacks the `analytics:view` permission. |
-| `422` | `unprocessable_entity` | The statement is valid but would scan more data than the key allows. |
+| Status | `type`                 | When                                                                 |
+| ------ | ---------------------- | -------------------------------------------------------------------- |
+| `400`  | `bad_request`          | The request body failed validation.                                  |
+| `401`  | `unauthenticated`      | The API key is missing, invalid, or revoked.                         |
+| `403`  | `permission_denied`    | The key lacks the `analytics:view` permission.                       |
+| `422`  | `unprocessable_entity` | The statement is valid but would scan more data than the key allows. |

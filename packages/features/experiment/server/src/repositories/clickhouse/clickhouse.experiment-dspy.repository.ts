@@ -128,18 +128,10 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return;
       const existing = await this.tryGetWithClient(client, input);
-      const examples = mergeByHash<ExperimentDspyExample>(
-        existing?.examples ?? [],
-        input.examples,
-      );
-      const llmCalls = mergeByHash<ExperimentDspyLlmCall>(
-        existing?.llmCalls ?? [],
-        input.llmCalls,
-      );
+      const examples = mergeByHash<ExperimentDspyExample>(existing?.examples ?? [], input.examples);
+      const llmCalls = mergeByHash<ExperimentDspyLlmCall>(existing?.llmCalls ?? [], input.llmCalls);
       const summary = llmSummary(llmCalls);
-      const retentionDays = await this.options.retention.getTraceRetentionDays(
-        input.tenantId,
-      );
+      const retentionDays = await this.options.retention.getTraceRetentionDays(input.tenantId);
 
       await client.insert({
         table: TABLE_NAME,

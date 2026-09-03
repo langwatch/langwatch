@@ -91,7 +91,7 @@ export type Transform<Payload, Result = undefined> = (args: {
  * every `P`. The executor parses the payload with the kind's schema before it
  * calls through, which is where the real type is checked.
  */
-export type AnyTransform = (args: {
+export type AnyTransform = (args: { state: WorkbenchState; payload: never }) => {
   state: WorkbenchState;
-  payload: never;
-}) => { state: WorkbenchState; result?: unknown };
+  result?: unknown;
+};

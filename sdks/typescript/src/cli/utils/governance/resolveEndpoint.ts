@@ -39,9 +39,7 @@ export interface ResolvedEndpoint {
  * Returns both the resolved URL and the source that won, so
  * `langwatch config list` can show the user where each value came from.
  */
-export function resolveControlPlaneEndpoint(
-  opts: ResolveEndpointOptions = {},
-): ResolvedEndpoint {
+export function resolveControlPlaneEndpoint(opts: ResolveEndpointOptions = {}): ResolvedEndpoint {
   // Each source is judged on what it normalizes to, not on truthiness: both a
   // whitespace-only value and a slash-only one reduce to the empty string, and
   // returning that as the resolved URL is worse than falling through to the

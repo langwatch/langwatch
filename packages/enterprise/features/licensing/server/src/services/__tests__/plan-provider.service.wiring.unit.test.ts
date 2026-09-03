@@ -52,8 +52,7 @@ describe("PlanProvider wiring patterns", () => {
       };
       // This mirrors the adapter in presets.ts for self-hosted mode
       const planProvider = PlanProviderService.create({
-        getActivePlan: ({ organizationId }) =>
-          mockLicenseHandler.getActivePlan(organizationId),
+        getActivePlan: ({ organizationId }) => mockLicenseHandler.getActivePlan(organizationId),
       });
 
       const result = await planProvider.getActivePlan({
@@ -95,9 +94,7 @@ describe("PlanProvider wiring patterns", () => {
         },
       });
 
-      await expect(planProvider.getActivePlan({ organizationId: "org_1" })).rejects.toBe(
-        error,
-      );
+      await expect(planProvider.getActivePlan({ organizationId: "org_1" })).rejects.toBe(error);
     });
 
     it("propagates errors from license adapter unchanged", async () => {
@@ -108,9 +105,7 @@ describe("PlanProvider wiring patterns", () => {
         },
       });
 
-      await expect(planProvider.getActivePlan({ organizationId: "org_1" })).rejects.toBe(
-        error,
-      );
+      await expect(planProvider.getActivePlan({ organizationId: "org_1" })).rejects.toBe(error);
     });
   });
 });

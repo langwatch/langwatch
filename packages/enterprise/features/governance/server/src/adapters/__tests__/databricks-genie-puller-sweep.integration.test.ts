@@ -298,9 +298,7 @@ async function startFixtureServer(params: {
       return;
     }
 
-    const conversations = /^\/api\/2\.0\/genie\/spaces\/([^/]+)\/conversations$/.exec(
-      url.pathname,
-    );
+    const conversations = /^\/api\/2\.0\/genie\/spaces\/([^/]+)\/conversations$/.exec(url.pathname);
     if (conversations) {
       const spaceId = conversations[1]!;
       params.onBeforeSpace?.(spaceId);
@@ -411,7 +409,10 @@ async function sweep(params: {
   outcome: PullResult;
   fixture: Awaited<ReturnType<typeof startFixtureServer>>;
 }> {
-  const fixture = await startFixtureServer({ workspace: params.workspace, ...params.fixtureOptions });
+  const fixture = await startFixtureServer({
+    workspace: params.workspace,
+    ...params.fixtureOptions,
+  });
   closers.push(fixture.close);
   const adapter = DatabricksGeniePuller.create(new FetchHttpPort());
   const config = genieConfig({
@@ -419,7 +420,10 @@ async function sweep(params: {
     spaceIds: params.spaceIds,
     startingAt: params.startingAt ?? "2020-01-01T00:00:00.000Z",
   });
-  const outcome = await adapter.runOnce({ cursor: null, credentials: { token: "fixture-token" } }, config);
+  const outcome = await adapter.runOnce(
+    { cursor: null, credentials: { token: "fixture-token" } },
+    config,
+  );
   return { outcome, fixture };
 }
 
@@ -625,7 +629,8 @@ describe("given messages by an author the directory no longer has", () => {
     const workspace = createFixtureWorkspace();
     const { outcome, fixture } = await sweep({ workspace, spaceIds: ["space-orphan"] });
 
-    const lookups = fixture.requestCounts.get(`/api/2.0/preview/scim/v2/Users/${DELETED_USER_ID}`) ?? 0;
+    const lookups =
+      fixture.requestCounts.get(`/api/2.0/preview/scim/v2/Users/${DELETED_USER_ID}`) ?? 0;
     expect(lookups).toBe(1);
 
     expect(outcome.events).toHaveLength(3);
@@ -711,9 +716,7 @@ describe("given a sweep too large for one run's budget", () => {
     const second = await adapter.runOnce({ cursor: first.cursor, credentials }, config);
     const secondCursor = decodeCursor(second.cursor);
 
-    const emitted = new Set(
-      [...first.events, ...second.events].map((e) => e.source_event_id),
-    );
+    const emitted = new Set([...first.events, ...second.events].map((e) => e.source_event_id));
     for (const id of ["msg-alpha-1", "msg-alpha-2", "msg-alpha-3", "msg-beta-1"]) {
       expect(emitted).toContain(id);
     }

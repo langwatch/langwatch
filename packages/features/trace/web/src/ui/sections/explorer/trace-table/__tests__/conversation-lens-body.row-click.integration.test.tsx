@@ -37,9 +37,7 @@ vi.mock("../../hooks/use-conversation-turns", () => ({
 
 const LAST_ACTIVITY_MS = 1_700_003_600_000;
 
-function conversationRow(
-  overrides: Partial<SessionGroupPayloadItem> = {},
-): ConversationGroup {
+function conversationRow(overrides: Partial<SessionGroupPayloadItem> = {}): ConversationGroup {
   return mapSessionGroupToConversationGroup({
     conversationId: "conv-1",
     traceCount: 4,
@@ -91,8 +89,7 @@ function firstRow(): HTMLElement {
   return row as HTMLElement;
 }
 
-const expandToggle = () =>
-  screen.getByRole("button", { name: /Expand turns|Collapse turns/ });
+const expandToggle = () => screen.getByRole("button", { name: /Expand turns|Collapse turns/ });
 
 beforeEach(() => {
   openDrawerMock.mockClear();

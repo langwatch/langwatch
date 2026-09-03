@@ -30,11 +30,7 @@ export function InlineCopyButton({
   }
 
   return (
-    <Tooltip
-      content={copied ? "Copied!" : `Copy ${label.toLowerCase()}`}
-      openDelay={0}
-      showArrow
-    >
+    <Tooltip content={copied ? "Copied!" : `Copy ${label.toLowerCase()}`} openDelay={0} showArrow>
       <Button
         size="xs"
         variant="ghost"

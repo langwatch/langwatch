@@ -158,20 +158,14 @@ function stackPids(): number[] {
  * any other run posted.
  */
 function sentinelPids(): number[] {
-  return markedPids(
-    (l) => l.includes("dev-supervisor.mjs") && l.includes(SENTINEL_FLAG),
-  );
+  return markedPids((l) => l.includes("dev-supervisor.mjs") && l.includes(SENTINEL_FLAG));
 }
 
 /** Every live pid, with its parent, as `ps` reports them. */
 function processTree(): { pid: number; ppid: number; command: string }[] {
-  const out = spawnSync(
-    "ps",
-    ["-Ao", "pid=", "-o", "ppid=", "-o", "command="],
-    {
-      encoding: "utf8",
-    },
-  ).stdout;
+  const out = spawnSync("ps", ["-Ao", "pid=", "-o", "ppid=", "-o", "command="], {
+    encoding: "utf8",
+  }).stdout;
   const rows: { pid: number; ppid: number; command: string }[] = [];
   for (const line of out.split("\n")) {
     const match = /^(\d+)\s+(\d+)\s+(.*)$/.exec(line.trim());
@@ -199,10 +193,7 @@ function pidAlive(pid: number): boolean {
   }
 }
 
-async function waitUntil(
-  predicate: () => boolean,
-  { timeoutMs = 6000 } = {},
-): Promise<boolean> {
+async function waitUntil(predicate: () => boolean, { timeoutMs = 6000 } = {}): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return true;
@@ -217,9 +208,7 @@ async function waitUntil(
  * and the tty already sends SIGHUP to the whole job. `spawnSync` cannot do this
  * (it has no `detached`), so this has to be the async spawn.
  */
-function runAsGroupLeader(
-  args: string[],
-): Promise<{ stdout: string; status: number | null }> {
+function runAsGroupLeader(args: string[]): Promise<{ stdout: string; status: number | null }> {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [SUPERVISOR, ...args], {
       detached: true,
@@ -296,9 +285,7 @@ describe("dev stack supervisor", () => {
       /** @scenario "Every lane goes down, not just the direct child" */
       it("takes down every lane, however deep", async () => {
         const stack = writeStack(DEEP_STACK);
-        const launcher = launchFrom(
-          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
-        );
+        const launcher = launchFrom(`node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`);
 
         expect(await stackIsUp()).toBe(true);
         const before = stackPids().length;
@@ -312,9 +299,7 @@ describe("dev stack supervisor", () => {
       /** @scenario "A stack that restarts its own lanes is still taken down" */
       it("takes down lanes that are restarted while it is stopping them", async () => {
         const stack = writeStack(RESTARTING_STACK);
-        const launcher = launchFrom(
-          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
-        );
+        const launcher = launchFrom(`node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`);
 
         expect(await stackIsUp()).toBe(true);
         process.kill(launcher, "SIGKILL");
@@ -327,9 +312,7 @@ describe("dev stack supervisor", () => {
       /** @scenario "A command that outlives its supervisor is still supervised" */
       it("kills outright what ignores the first signal", async () => {
         const stack = writeStack(`trap '' TERM\nsleep 120 &\necho up\nwait`);
-        const launcher = launchFrom(
-          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
-        );
+        const launcher = launchFrom(`node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`);
 
         expect(await stackIsUp()).toBe(true);
         process.kill(launcher, "SIGKILL");
@@ -398,9 +381,7 @@ describe("dev stack supervisor", () => {
       /** @scenario "The stack goes down even when the supervisor is killed outright" */
       it("still takes the whole stack down, sentinel included", async () => {
         const stack = writeStack(DEEP_STACK);
-        const launcher = launchFrom(
-          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
-        );
+        const launcher = launchFrom(`node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`);
         expect(await stackIsUp()).toBe(true);
         await waitUntil(() => supervisorPid() !== null);
         const supervisor = supervisorPid();
@@ -421,9 +402,7 @@ describe("dev stack supervisor", () => {
       /** @scenario "A killed supervisor alone does not take a living launcher's stack" */
       it("keeps the stack for the launcher, and takes it down when the launcher dies", async () => {
         const stack = writeStack(DEEP_STACK);
-        const launcher = launchFrom(
-          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
-        );
+        const launcher = launchFrom(`node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`);
         expect(await stackIsUp()).toBe(true);
         await waitUntil(() => supervisorPid() !== null);
         const supervisor = supervisorPid();
@@ -470,12 +449,8 @@ describe("dev stack supervisor", () => {
         // observed alive first: a run that never posted one would otherwise
         // pass this test by having nothing to leave behind.
         const stopFile = path.join(scratch, "stop");
-        const stack = writeStack(
-          `while [ ! -f ${asBashWord(stopFile)} ]; do sleep 0.1; done`,
-        );
-        const launcher = launchFrom(
-          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
-        );
+        const stack = writeStack(`while [ ! -f ${asBashWord(stopFile)} ]; do sleep 0.1; done`);
+        const launcher = launchFrom(`node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`);
         expect(await stackIsUp()).toBe(true);
         expect(await waitUntil(() => sentinelPids().length > 0)).toBe(true);
 
@@ -517,11 +492,7 @@ describe("dev stack supervisor", () => {
 
       /** @scenario "A command still runs when it cannot be supervised" */
       it("still runs the command when there is no launcher to watch", async () => {
-        const result = await runAsGroupLeader([
-          "sh",
-          "-c",
-          `echo ${marker}-unsupervised`,
-        ]);
+        const result = await runAsGroupLeader(["sh", "-c", `echo ${marker}-unsupervised`]);
 
         expect(result.status).toBe(0);
         expect(result.stdout).toBe(`${marker}-unsupervised\n`);

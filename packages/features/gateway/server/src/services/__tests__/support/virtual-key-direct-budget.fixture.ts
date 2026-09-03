@@ -52,9 +52,7 @@ export const BUDGET_NEIGHBOUR_UNUSED_ID = `bdg-vkb-neigh-unused-${suffix}`;
  */
 export const NOW = (() => {
   const d = new Date();
-  return new Date(
-    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0),
-  );
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
 })();
 export const YESTERDAY = new Date(NOW.getTime() - 24 * 60 * 60 * 1000);
 
@@ -107,9 +105,7 @@ async function createBudget(
       onBreach: "BLOCK",
       createdById: USER_ID,
       resetsAt: new Date(NOW.getTime() + 24 * 60 * 60 * 1000),
-      ...(args.managedByVirtualKeyId
-        ? { managedByVirtualKeyId: args.managedByVirtualKeyId }
-        : {}),
+      ...(args.managedByVirtualKeyId ? { managedByVirtualKeyId: args.managedByVirtualKeyId } : {}),
     },
   });
 }
@@ -309,10 +305,7 @@ async function seedSpend(chRepo: GatewayBudgetClickHouseRepository) {
   });
 }
 
-export async function seedFixture(
-  prisma: PrismaClient,
-  chRepo: GatewayBudgetClickHouseRepository,
-) {
+export async function seedFixture(prisma: PrismaClient, chRepo: GatewayBudgetClickHouseRepository) {
   await seedTenant(prisma);
   await seedKeysAndBudgets(prisma);
   await seedSpend(chRepo);
@@ -320,23 +313,14 @@ export async function seedFixture(
 
 /** Just the slice of the ClickHouse client the teardown needs. */
 type CommandRunner = {
-  command: (args: {
-    query: string;
-    query_params?: Record<string, unknown>;
-  }) => Promise<unknown>;
+  command: (args: { query: string; query_params?: Record<string, unknown> }) => Promise<unknown>;
 };
 
-export async function teardownFixture(
-  prisma: PrismaClient,
-  clickhouse: CommandRunner | null,
-) {
+export async function teardownFixture(prisma: PrismaClient, clickhouse: CommandRunner | null) {
   if (clickhouse) {
     // The rollup is a materialized-view target, so the source delete does
     // not cascade; both tables need the sweep.
-    for (const table of [
-      "gateway_budget_ledger_events",
-      "gateway_budget_scope_totals",
-    ]) {
+    for (const table of ["gateway_budget_ledger_events", "gateway_budget_scope_totals"]) {
       await clickhouse.command({
         query: `DELETE FROM ${table} WHERE TenantId = {tenantId:String}`,
         query_params: { tenantId: PROJECT_ID },

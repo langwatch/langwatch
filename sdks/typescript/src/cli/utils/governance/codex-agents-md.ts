@@ -61,10 +61,7 @@ function escapeRe(text: string): string {
 
 /** Our region: the markers and everything between them, plus one trailing newline. */
 function guidanceRegionRe(): RegExp {
-  return new RegExp(
-    `${escapeRe(GUIDANCE_BEGIN)}[\\s\\S]*?${escapeRe(GUIDANCE_END)}\\n?`,
-    "m",
-  );
+  return new RegExp(`${escapeRe(GUIDANCE_BEGIN)}[\\s\\S]*?${escapeRe(GUIDANCE_END)}\\n?`, "m");
 }
 
 /**
@@ -73,10 +70,7 @@ function guidanceRegionRe(): RegExp {
  * non-empty file byte for byte.
  */
 function guidanceRemovalRe(): RegExp {
-  return new RegExp(
-    `\\n?${escapeRe(GUIDANCE_BEGIN)}[\\s\\S]*?${escapeRe(GUIDANCE_END)}\\n?`,
-    "m",
-  );
+  return new RegExp(`\\n?${escapeRe(GUIDANCE_BEGIN)}[\\s\\S]*?${escapeRe(GUIDANCE_END)}\\n?`, "m");
 }
 
 /**
@@ -84,9 +78,7 @@ function guidanceRemovalRe(): RegExp {
  * marker is not one: removal accepts only a complete region, so anything
  * looser would report a target that cannot be removed.
  */
-export function hasCodexAgentGuidance(
-  filePath = defaultCodexAgentsMdPath(),
-): boolean {
+export function hasCodexAgentGuidance(filePath = defaultCodexAgentsMdPath()): boolean {
   try {
     return guidanceRegionRe().test(fs.readFileSync(filePath, "utf8"));
   } catch {
@@ -99,9 +91,9 @@ export function hasCodexAgentGuidance(
  * touched: a present block is replaced in place, an absent one is appended
  * after whatever the file holds. Reports whether anything changed.
  */
-export function installCodexAgentGuidance(
-  filePath = defaultCodexAgentsMdPath(),
-): { changed: boolean } {
+export function installCodexAgentGuidance(filePath = defaultCodexAgentsMdPath()): {
+  changed: boolean;
+} {
   const block = buildCodexAgentGuidanceBlock();
   let content = "";
   try {
@@ -116,10 +108,7 @@ export function installCodexAgentGuidance(
   let next: string;
   const region = guidanceRegionRe().exec(content);
   if (region) {
-    next =
-      content.slice(0, region.index) +
-      block +
-      content.slice(region.index + region[0].length);
+    next = content.slice(0, region.index) + block + content.slice(region.index + region[0].length);
   } else if (content === "") {
     next = block;
   } else {
@@ -141,9 +130,7 @@ export function installCodexAgentGuidance(
  * block does not linger empty; a file with the user's own content keeps it
  * byte for byte. Reports whether anything was removed.
  */
-export function removeCodexAgentGuidance(
-  filePath = defaultCodexAgentsMdPath(),
-): boolean {
+export function removeCodexAgentGuidance(filePath = defaultCodexAgentsMdPath()): boolean {
   let content: string;
   try {
     content = fs.readFileSync(filePath, "utf8");
@@ -153,9 +140,7 @@ export function removeCodexAgentGuidance(
   const region = guidanceRemovalRe().exec(content);
   if (!region) return false;
 
-  const remainder =
-    content.slice(0, region.index) +
-    content.slice(region.index + region[0].length);
+  const remainder = content.slice(0, region.index) + content.slice(region.index + region[0].length);
   if (remainder.trim() === "") {
     fs.unlinkSync(filePath);
     return true;

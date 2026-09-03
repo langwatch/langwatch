@@ -97,16 +97,13 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/{id}": UNDOCUMENTED_INGESTION_TEMPLATES,
-  "/api/governance/ingestion-templates/{id}/ottl-rules":
-    UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/{id}/ottl-rules": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/me/project": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
-  "/api/v1/projects/{projectId}/analytics/charts":
-    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
-  "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
-    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
+  "/api/v1/projects/{projectId}/analytics/charts": UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
+  "/api/v1/projects/{projectId}/analytics/charts/{chartId}": UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
 };
@@ -292,8 +289,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     name: "Analytics",
     dirName: "analytics",
     pathPrefixes: ["/api/analytics"],
-    overviewDescription:
-      "Query analytics timeseries data with metrics, aggregations, and filters.",
+    overviewDescription: "Query analytics timeseries data with metrics, aggregations, and filters.",
   },
   {
     name: "Query",
@@ -489,11 +485,7 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function generateTitle(
-  method: string,
-  apiPath: string,
-  op: OpenAPIOperation,
-): string {
+function generateTitle(method: string, apiPath: string, op: OpenAPIOperation): string {
   if (op.summary) return op.summary;
 
   const desc = op.description ?? "";
@@ -516,9 +508,7 @@ function generateTitle(
 function getResourceName(apiPath: string): string {
   const parts = apiPath
     .split("/")
-    .filter(
-      (p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3",
-    )
+    .filter((p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3")
     .filter(Boolean);
   const last = parts[parts.length - 1] ?? "resource";
   return last
@@ -527,11 +517,7 @@ function getResourceName(apiPath: string): string {
     .join(" ");
 }
 
-function generateFileName(
-  method: string,
-  apiPath: string,
-  op: OpenAPIOperation,
-): string {
+function generateFileName(method: string, apiPath: string, op: OpenAPIOperation): string {
   if (op.summary) {
     const s = slugify(op.summary);
     return s.length > 40 ? s.substring(0, 40).replace(/-$/, "") : s;
@@ -653,16 +639,16 @@ function main() {
     ...ENDPOINT_GROUPS.flatMap((group) => group.extraPages ?? []),
   ];
   const missingExtras = declaredExtras.filter(
-    (page) => !fs.existsSync(path.join(DOCS_DIR, `${page}.mdx`))
+    (page) => !fs.existsSync(path.join(DOCS_DIR, `${page}.mdx`)),
   );
   if (missingExtras.length > 0) {
     const noun = missingExtras.length === 1 ? "page" : "pages";
     console.error(
-      `ERROR: ${missingExtras.length} hand-written nav ${noun} named in this generator has no .mdx file:`
+      `ERROR: ${missingExtras.length} hand-written nav ${noun} named in this generator has no .mdx file:`,
     );
     for (const page of missingExtras.sort()) console.error(`  ${page}`);
     console.error(
-      "\nCreate the file, or drop it from INTRO_GROUP / the group's extraPages in docs/scripts/generate-api-reference-pages.ts."
+      "\nCreate the file, or drop it from INTRO_GROUP / the group's extraPages in docs/scripts/generate-api-reference-pages.ts.",
     );
     process.exit(1);
   }
@@ -724,28 +710,21 @@ function main() {
       }
       const owner = operationOwner.get(key);
       misownedOrder.push(
-        `${group.name}: ${key} (${
-          owner ? `owned by ${owner.name}` : "excluded by SKIP_PATHS"
-        })`,
+        `${group.name}: ${key} (${owner ? `owned by ${owner.name}` : "excluded by SKIP_PATHS"})`,
       );
     }
   }
 
   if (unknownOrder.length > 0) {
     const noun = unknownOrder.length === 1 ? "key matches" : "keys match";
-    console.error(
-      `ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`,
-    );
+    console.error(`ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`);
     for (const entry of unknownOrder.sort()) console.error(`  ${entry}`);
     console.error(
       "\nSpell the METHOD and path exactly as the spec does, path parameter names and casing included, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts.",
     );
   }
   if (misownedOrder.length > 0) {
-    const noun =
-      misownedOrder.length === 1
-        ? "key names an operation"
-        : "keys name operations";
+    const noun = misownedOrder.length === 1 ? "key names an operation" : "keys name operations";
     console.error(
       `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts no entries:`,
     );
@@ -786,13 +765,7 @@ function main() {
     // A declared order wins; everything it does not name keeps the CRUD sort
     // and follows behind, so adding a route never silently reshuffles the rest.
     const declaredOrder = group.endpointOrder ?? [];
-    const declaredIndex = ({
-      method,
-      apiPath,
-    }: {
-      method: string;
-      apiPath: string;
-    }): number => {
+    const declaredIndex = ({ method, apiPath }: { method: string; apiPath: string }): number => {
       const at = declaredOrder.indexOf(`${method.toUpperCase()} ${apiPath}`);
       return at === -1 ? Number.MAX_SAFE_INTEGER : at;
     };
@@ -848,10 +821,7 @@ function main() {
       const mdxPath = path.join(dirPath, `${fileName}.mdx`);
 
       if (!fs.existsSync(mdxPath)) {
-        fs.writeFileSync(
-          mdxPath,
-          `---\ntitle: "${title}"\nopenapi: "${openapiRef}"\n---\n`,
-        );
+        fs.writeFileSync(mdxPath, `---\ntitle: "${title}"\nopenapi: "${openapiRef}"\n---\n`);
         totalCreated++;
       } else {
         totalExisting++;
@@ -933,18 +903,11 @@ const BUILTIN_EVALUATOR_CATEGORIES: Record<string, string[]> = {
   ],
 };
 
-function buildBuiltInEvaluatorNav(): (
-  | string
-  | { group: string; pages: string[] }
-)[] {
+function buildBuiltInEvaluatorNav(): (string | { group: string; pages: string[] })[] {
   const p = (name: string) => `api-reference/evaluators/${name}`;
-  const pages: (string | { group: string; pages: string[] })[] = [
-    p("overview"),
-  ];
+  const pages: (string | { group: string; pages: string[] })[] = [p("overview")];
 
-  for (const [category, evaluators] of Object.entries(
-    BUILTIN_EVALUATOR_CATEGORIES,
-  )) {
+  for (const [category, evaluators] of Object.entries(BUILTIN_EVALUATOR_CATEGORIES)) {
     pages.push({
       group: category,
       pages: evaluators.map(p),

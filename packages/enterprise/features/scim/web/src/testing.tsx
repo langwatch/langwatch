@@ -50,10 +50,7 @@ export class FakeScimHost extends ScimHostPort {
 }
 
 /** Renders the screen inside the Design System's provider and a host. */
-export function renderWithScimHost(
-  element: ReactElement,
-  host: FakeScimHost = new FakeScimHost(),
-) {
+export function renderWithScimHost(element: ReactElement, host: FakeScimHost = new FakeScimHost()) {
   return {
     host,
     ...render(

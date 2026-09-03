@@ -26,12 +26,7 @@ export const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentPro
           }}
         >
           <OverlayDepthContext.Provider value={depth}>
-            <ChakraPopover.Content
-              ref={ref}
-              borderRadius="lg"
-              background="bg.panel"
-              {...rest}
-            />
+            <ChakraPopover.Content ref={ref} borderRadius="lg" background="bg.panel" {...rest} />
           </OverlayDepthContext.Provider>
         </ChakraPopover.Positioner>
       </Portal>

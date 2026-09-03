@@ -31,18 +31,12 @@ export abstract class BaseMemoryProjectionStore<
    */
   protected abstract getKey(tenantId: string, aggregateId: string): string;
 
-  async getProjection(
-    aggregateId: string,
-    context: ProjectionStoreReadContext,
-  ): Promise<T | null> {
+  async getProjection(aggregateId: string, context: ProjectionStoreReadContext): Promise<T | null> {
     const key = this.getKey(context.tenantId, aggregateId);
     return this.store.get(key) ?? null;
   }
 
-  async storeProjection(
-    projection: T,
-    context: ProjectionStoreWriteContext,
-  ): Promise<void> {
+  async storeProjection(projection: T, context: ProjectionStoreWriteContext): Promise<void> {
     const key = this.getKey(context.tenantId, projection.aggregateId);
     this.store.set(key, projection);
   }

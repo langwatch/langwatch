@@ -11,14 +11,12 @@ export function useTabSessionId(): string {
   const ref = useRef<string>("");
   if (typeof window === "undefined") return ref.current;
   if (!ref.current) {
-    const cached = (window as { __lw_presence_session_id?: string })
-      .__lw_presence_session_id;
+    const cached = (window as { __lw_presence_session_id?: string }).__lw_presence_session_id;
     if (cached) {
       ref.current = cached;
     } else {
       ref.current = crypto.randomUUID();
-      (window as { __lw_presence_session_id?: string }).__lw_presence_session_id =
-        ref.current;
+      (window as { __lw_presence_session_id?: string }).__lw_presence_session_id = ref.current;
     }
   }
   return ref.current;

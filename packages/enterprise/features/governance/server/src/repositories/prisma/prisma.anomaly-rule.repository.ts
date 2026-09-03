@@ -1,8 +1,5 @@
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import {
-  anomalyRuleSchema,
-  type AnomalyRule,
-} from "@langwatch/enterprise-governance-contract";
+import { anomalyRuleSchema, type AnomalyRule } from "@langwatch/enterprise-governance-contract";
 import {
   AnomalyRuleRepository,
   type AnomalyRuleChanges,

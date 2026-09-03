@@ -57,9 +57,7 @@ describe("summarizeLogEvent", () => {
 
   describe("given a rate limit", () => {
     it("names it specifically, not as a generic API error", () => {
-      const summary = summarizeLogEvent(
-        log({ "event.name": "api_error", status_code: "429" }),
-      );
+      const summary = summarizeLogEvent(log({ "event.name": "api_error", status_code: "429" }));
       expect(summary).toBe("Rate limited by the provider");
     });
 
@@ -68,9 +66,7 @@ describe("summarizeLogEvent", () => {
     // the distinction the data keeps.
     it("tells the agent's own report apart from the inferred 429", () => {
       const reported = summarizeLogEvent(log({ "event.name": "rate_limit" }));
-      const inferred = summarizeLogEvent(
-        log({ "event.name": "api_error", status_code: "429" }),
-      );
+      const inferred = summarizeLogEvent(log({ "event.name": "api_error", status_code: "429" }));
 
       expect(reported).toBe("Rate limit reported by the agent");
       expect(reported).not.toBe(inferred);
@@ -129,9 +125,7 @@ describe("logEventTone", () => {
   });
 
   it("leaves a successful tool result neutral", () => {
-    expect(logEventTone(log({ "event.name": "tool_result", tool_name: "Read" }))).toBe(
-      "neutral",
-    );
+    expect(logEventTone(log({ "event.name": "tool_result", tool_name: "Read" }))).toBe("neutral");
   });
 
   it("flags an api_error as danger", () => {

@@ -150,10 +150,7 @@ function createMockServer(): Server {
         res.end(JSON.stringify(CANNED_DATASET_DETAIL));
       }
       // GET /api/dataset/does-not-exist - not found
-      else if (
-        url.match(/^\/api\/dataset\/does-not-exist(\?|$)/) &&
-        req.method === "GET"
-      ) {
+      else if (url.match(/^\/api\/dataset\/does-not-exist(\?|$)/) && req.method === "GET") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Dataset not found" }));
       }
@@ -198,10 +195,7 @@ function createMockServer(): Server {
         res.end(JSON.stringify({ message: "Dataset not found" }));
       }
       // POST /api/dataset/my-dataset/records - create records
-      else if (
-        url.match(/^\/api\/dataset\/my-dataset\/records$/) &&
-        req.method === "POST"
-      ) {
+      else if (url.match(/^\/api\/dataset\/my-dataset\/records$/) && req.method === "POST") {
         res.writeHead(201);
         res.end(JSON.stringify(CANNED_RECORDS_CREATED));
       }
@@ -224,10 +218,7 @@ function createMockServer(): Server {
         res.end(JSON.stringify({ message: "Dataset not found" }));
       }
       // DELETE /api/dataset/my-dataset/records - delete records
-      else if (
-        url.match(/^\/api\/dataset\/my-dataset\/records$/) &&
-        req.method === "DELETE"
-      ) {
+      else if (url.match(/^\/api\/dataset\/my-dataset\/records$/) && req.method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_RECORDS_DELETED));
       }
@@ -351,9 +342,7 @@ describe("MCP dataset tools integration", () => {
       /** @scenario "Get dataset with non-existent slug returns an error" */
       it("propagates the 404 error", async () => {
         const { handleGetDataset } = await import("../tools/get-dataset.js");
-        await expect(handleGetDataset({ slugOrId: "does-not-exist" })).rejects.toThrow(
-          "404",
-        );
+        await expect(handleGetDataset({ slugOrId: "does-not-exist" })).rejects.toThrow("404");
       });
     });
   });
@@ -423,9 +412,9 @@ describe("MCP dataset tools integration", () => {
       /** @scenario "Update a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
         const { handleUpdateDataset } = await import("../tools/update-dataset.js");
-        await expect(
-          handleUpdateDataset({ slugOrId: "ghost", name: "Whatever" }),
-        ).rejects.toThrow("404");
+        await expect(handleUpdateDataset({ slugOrId: "ghost", name: "Whatever" })).rejects.toThrow(
+          "404",
+        );
       });
     });
   });
@@ -457,8 +446,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset exists", () => {
       /** @scenario "Add records to a dataset" */
       it("returns confirmation with the count of records created", async () => {
-        const { handleCreateDatasetRecords } =
-          await import("../tools/create-dataset-records.js");
+        const { handleCreateDatasetRecords } = await import("../tools/create-dataset-records.js");
         const result = await handleCreateDatasetRecords({
           slugOrId: "my-dataset",
           entries: [
@@ -474,8 +462,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario "Add records to a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
-        const { handleCreateDatasetRecords } =
-          await import("../tools/create-dataset-records.js");
+        const { handleCreateDatasetRecords } = await import("../tools/create-dataset-records.js");
         await expect(
           handleCreateDatasetRecords({
             slugOrId: "ghost",
@@ -492,8 +479,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the record exists", () => {
       /** @scenario "Update a single record entry" */
       it("returns confirmation that the record was updated", async () => {
-        const { handleUpdateDatasetRecord } =
-          await import("../tools/update-dataset-record.js");
+        const { handleUpdateDatasetRecord } = await import("../tools/update-dataset-record.js");
         const result = await handleUpdateDatasetRecord({
           slugOrId: "my-dataset",
           recordId: "rec-123",
@@ -506,8 +492,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario "Update a record in a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
-        const { handleUpdateDatasetRecord } =
-          await import("../tools/update-dataset-record.js");
+        const { handleUpdateDatasetRecord } = await import("../tools/update-dataset-record.js");
         await expect(
           handleUpdateDatasetRecord({
             slugOrId: "ghost",
@@ -525,8 +510,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset exists", () => {
       /** @scenario "Delete records by IDs" */
       it("returns confirmation with the count of records deleted", async () => {
-        const { handleDeleteDatasetRecords } =
-          await import("../tools/delete-dataset-records.js");
+        const { handleDeleteDatasetRecords } = await import("../tools/delete-dataset-records.js");
         const result = await handleDeleteDatasetRecords({
           slugOrId: "my-dataset",
           recordIds: ["rec-1", "rec-2"],
@@ -539,8 +523,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario "Delete records from a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
-        const { handleDeleteDatasetRecords } =
-          await import("../tools/delete-dataset-records.js");
+        const { handleDeleteDatasetRecords } = await import("../tools/delete-dataset-records.js");
         await expect(
           handleDeleteDatasetRecords({
             slugOrId: "ghost",

@@ -75,8 +75,7 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
         continue;
       }
       const rowDepartment = row.departments.length > 0 || row.scope === "department";
-      const existingDepartment =
-        existing.departments.length > 0 || existing.scope === "department";
+      const existingDepartment = existing.departments.length > 0 || existing.scope === "department";
       if (rowDepartment && !existingDepartment) bySlug.set(row.slug, row);
     }
     return Array.from(bySlug.values(), mapEntry);
@@ -114,10 +113,7 @@ export class PrismaAiToolCatalogRepository extends AiToolCatalogRepository {
     return count === ids.size;
   }
 
-  async create(input: {
-    values: CreateAiToolEntryInput;
-    slug: string;
-  }): Promise<AiToolEntry> {
+  async create(input: { values: CreateAiToolEntryInput; slug: string }): Promise<AiToolEntry> {
     const legacy = legacyScope(input.values.organizationId, input.values.departmentIds);
     const row = await this.database.$transaction(async (transaction) => {
       const created = await transaction.aiToolEntry.create({
@@ -239,8 +235,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
       },
       select: { id: true, type: true, displayName: true, iconAsset: true },
     });
-    const fingerprint = (type: string, name: string) =>
-      `${type}::${name.trim().toLowerCase()}`;
+    const fingerprint = (type: string, name: string) => `${type}::${name.trim().toLowerCase()}`;
     const byFingerprint = new Map(
       existing.map((row) => [fingerprint(row.type, row.displayName), row]),
     );
@@ -297,15 +292,11 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
       },
     });
     const teamIds = memberships.map(({ teamId }) => teamId);
-    const projectIds = memberships.flatMap(({ team }) =>
-      team.projects.map(({ id }) => id),
-    );
+    const projectIds = memberships.flatMap(({ team }) => team.projects.map(({ id }) => id));
     return this.configuredProviders(input.organizationId, teamIds, projectIds);
   }
 
-  async listConfiguredProvidersForOrganization(
-    organizationId: string,
-  ): Promise<string[]> {
+  async listConfiguredProvidersForOrganization(organizationId: string): Promise<string[]> {
     const teams = await this.database.team.findMany({
       where: { organizationId },
       select: { id: true, projects: { select: { id: true } } },
@@ -410,9 +401,7 @@ function mapEntry(row: EntryRow): AiToolEntry {
       ? row.scope
       : "organization";
   const type =
-    row.type === "coding_assistant" ||
-    row.type === "model_provider" ||
-    row.type === "external_tool"
+    row.type === "coding_assistant" || row.type === "model_provider" || row.type === "external_tool"
       ? row.type
       : "external_tool";
   return {

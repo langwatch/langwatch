@@ -28,10 +28,7 @@ export interface RedisClusterEndpoint {
 }
 
 /** TLS is off, on, or on-without-verification, decided by the URL. */
-export type RedisTlsSetting =
-  | undefined
-  | Record<string, never>
-  | { rejectUnauthorized: false };
+export type RedisTlsSetting = undefined | Record<string, never> | { rejectUnauthorized: false };
 
 export interface RedisStandaloneConfig {
   configured: true;
@@ -59,10 +56,7 @@ export interface RedisUnconfigured {
   warnings: string[];
 }
 
-export type RedisConfigResolution =
-  | RedisStandaloneConfig
-  | RedisClusterConfig
-  | RedisUnconfigured;
+export type RedisConfigResolution = RedisStandaloneConfig | RedisClusterConfig | RedisUnconfigured;
 
 const DEFAULT_REDIS_PORT = 6379;
 const VALID_DB_INDEX = /^(?:[0-9]|1[0-5])$/;

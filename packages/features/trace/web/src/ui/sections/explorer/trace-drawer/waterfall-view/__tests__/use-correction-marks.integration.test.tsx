@@ -21,8 +21,7 @@ vi.mock("../../../hooks/use-trace-edit-overlay", () => ({
 }));
 
 vi.mock("../../../../../../behavior/drawer.store", () => ({
-  useDrawerStore: (selector: (s: unknown) => unknown) =>
-    selector({ isEditing: harness.isEditing }),
+  useDrawerStore: (selector: (s: unknown) => unknown) => selector({ isEditing: harness.isEditing }),
 }));
 
 vi.mock("../../../../../../behavior/trace-edit.store", () => ({

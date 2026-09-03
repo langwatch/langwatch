@@ -22,9 +22,7 @@ describe("pruning to production dependencies", () => {
     it("leaves it alone", () => {
       // Pruning a working tree would strip the developer's own test and
       // build tooling out from under them.
-      expect(shouldPruneToProd("/home/u/Projects/langwatch/langwatch", paths)).toBe(
-        false,
-      );
+      expect(shouldPruneToProd("/home/u/Projects/langwatch/langwatch", paths)).toBe(false);
     });
 
     it("is not fooled by a sibling directory sharing the prefix", () => {
@@ -95,10 +93,7 @@ describe("external member peer links", () => {
     mkdirSync(join(appRoot, "apps", "api", "node_modules", "zod"), {
       recursive: true,
     });
-    writeFileSync(
-      join(appRoot, "apps", "api", "node_modules", "zod", "package.json"),
-      "{}",
-    );
+    writeFileSync(join(appRoot, "apps", "api", "node_modules", "zod", "package.json"), "{}");
     mkdirSync(join(appRoot, "packages", "langy-contract"), {
       recursive: true,
     });

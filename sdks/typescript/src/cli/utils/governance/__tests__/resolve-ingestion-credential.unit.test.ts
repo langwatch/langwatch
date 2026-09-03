@@ -8,10 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as cliApi from "../cli-api";
 import type { GovernanceConfig } from "../config";
-import {
-  resolveIngestionCredential,
-  resolveLiveIngestionKey,
-} from "../telemetry-refresh";
+import { resolveIngestionCredential, resolveLiveIngestionKey } from "../telemetry-refresh";
 
 vi.mock("../cli-api", async () => {
   const actual = await vi.importActual<typeof cliApi>("../cli-api");

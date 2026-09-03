@@ -37,10 +37,7 @@ import {
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
 } from "../ports/stored-object.port";
-import {
-  StoredObjectStore,
-  type StoredObjectRecord,
-} from "../stores/stored-object.store";
+import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store";
 
 export type StoredObjectServiceOptions = Readonly<{
   store: StoredObjectStore;
@@ -58,10 +55,7 @@ export type StoredObjectServiceOptions = Readonly<{
 /** The feature's only lifecycle/orchestration class. */
 export class StoredObjectService extends StoredObjectServiceContract {
   static create(options: StoredObjectServiceOptions): StoredObjectService {
-    if (
-      !Number.isSafeInteger(options.maximumUploadBytes) ||
-      options.maximumUploadBytes < 0
-    ) {
+    if (!Number.isSafeInteger(options.maximumUploadBytes) || options.maximumUploadBytes < 0) {
       throw new RangeError("maximumUploadBytes must be a non-negative safe integer");
     }
     if (!Number.isSafeInteger(options.uploadExpiryMs) || options.uploadExpiryMs <= 0) {
@@ -233,9 +227,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     };
   }
 
-  async confirmUpload(
-    input: ConfirmStoredObjectUploadInput,
-  ): Promise<StoredObjectReference> {
+  async confirmUpload(input: ConfirmStoredObjectUploadInput): Promise<StoredObjectReference> {
     const claims = await this.decodeUploadToken(input.uploadToken);
     if (claims.projectId !== input.projectId) {
       throw new UploadTokenInvalidError();
@@ -276,17 +268,11 @@ export class StoredObjectService extends StoredObjectServiceContract {
     return this.reference(available);
   }
 
-  async getMetadata(input: {
-    projectId: string;
-    id: string;
-  }): Promise<StoredObjectMetadata> {
+  async getMetadata(input: { projectId: string; id: string }): Promise<StoredObjectMetadata> {
     return this.metadata(await this.getAvailable(input));
   }
 
-  async getById(input: {
-    projectId: string;
-    id: string;
-  }): Promise<ReadStoredObjectResult> {
+  async getById(input: { projectId: string; id: string }): Promise<ReadStoredObjectResult> {
     const value = await this.getAvailable(input);
     const address = this.getStorage(value);
     const bytes = await this.storageCall(() =>
@@ -322,10 +308,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     method: "GET" | "HEAD";
   }): Promise<ReadStoredObjectResult> {
     const value = await this.getAvailable(input);
-    if (
-      value.generation !== input.generation ||
-      !value.audiences.includes(input.audience)
-    ) {
+    if (value.generation !== input.generation || !value.audiences.includes(input.audience)) {
       throw new StoredObjectNotFoundError();
     }
     return this.getById(input);
@@ -382,9 +365,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     return result;
   }
 
-  async deleteOwnedBy(input: {
-    projectId: string;
-  }): Promise<DeleteProjectStoredObjectsResult> {
+  async deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {
     let afterId: StoredObjectId | undefined;
     let deletedObjectCount = 0;
     let deletedByteLength = 0;
@@ -424,10 +405,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
   }
 
   /** Bounded retry for pending uploads that have expired. */
-  async cleanupExpiredUploads(input: {
-    projectId: string;
-    limit?: number;
-  }): Promise<number> {
+  async cleanupExpiredUploads(input: { projectId: string; limit?: number }): Promise<number> {
     const now = this.now();
     const page = await this.options.store.findPage({
       tenantId: input.projectId,
@@ -458,10 +436,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
   }
 
   /** Bounded retry for provider deletion after logical deletion won. */
-  async cleanupDeletedObjects(input: {
-    projectId: string;
-    limit?: number;
-  }): Promise<number> {
+  async cleanupDeletedObjects(input: { projectId: string; limit?: number }): Promise<number> {
     const now = this.now();
     const page = await this.options.store.findPage({
       tenantId: input.projectId,
@@ -568,9 +543,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     }
   }
 
-  private async readBounded(
-    source: StoreStoredObjectFromBytesInput["bytes"],
-  ): Promise<Uint8Array> {
+  private async readBounded(source: StoreStoredObjectFromBytesInput["bytes"]): Promise<Uint8Array> {
     const chunks: Uint8Array[] = [];
     let byteLength = 0;
     const values = source instanceof Uint8Array ? [source] : source;

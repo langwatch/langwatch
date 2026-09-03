@@ -33,9 +33,9 @@ export type LangyUiActionDefinition = Readonly<{
    * reads keeps the catalogue's own schema library the catalogue's business.
    */
   payloadSchema: {
-    safeParse(value: unknown):
-      | { success: true; data: unknown }
-      | { success: false; error: { issues: readonly unknown[] } };
+    safeParse(
+      value: unknown,
+    ): { success: true; data: unknown } | { success: false; error: { issues: readonly unknown[] } };
   };
   /** What the page is expected to answer with. Declared, not enforced here. */
   resultSchema?: unknown;

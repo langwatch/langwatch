@@ -9,13 +9,7 @@
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  renderHook,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, renderHook, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -173,9 +167,7 @@ function panelProps(
  */
 const TWO_HOURS_AGO = Date.now() - 2 * 60 * 60 * 1000 - 60_000;
 
-function makeSuiteRun(
-  overrides: Partial<ScenarioRunData> = {},
-): ScenarioRunData {
+function makeSuiteRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {
     scenarioId: "case_1",
     batchRunId: "batch_1",
@@ -248,10 +240,7 @@ const ONE_CASE_SET = "__internal__suite_double_charge__suite";
  * Hands the reads their answer: the runs, and which set each batch came from.
  * A batch with no entry falls back to the plan named after the suite.
  */
-function setRecentRuns(
-  runs: ScenarioRunData[],
-  scenarioSetIds: Record<string, string> = {},
-) {
+function setRecentRuns(runs: ScenarioRunData[], scenarioSetIds: Record<string, string> = {}) {
   const bySet: Record<string, string> = {};
   for (const run of runs) {
     bySet[run.batchRunId] = scenarioSetIds[run.batchRunId] ?? REFUNDS_SET;
@@ -269,9 +258,7 @@ async function openRecentRuns(user: ReturnType<typeof userEvent.setup>) {
 
 /** The pieces of text one row of the recent runs list is made of. */
 function readRow(row: HTMLElement): string[] {
-  return Array.from(row.querySelectorAll("p")).map(
-    (part) => part.textContent ?? "",
-  );
+  return Array.from(row.querySelectorAll("p")).map((part) => part.textContent ?? "");
 }
 
 /** True for a read that was actually asked for rather than held back. */
@@ -279,9 +266,7 @@ function isEnabledRead(call: unknown[]): boolean {
   return (call[1] as { enabled?: boolean } | undefined)?.enabled === true;
 }
 
-function renderPanel(
-  overrides: Partial<React.ComponentProps<typeof CasesPanel>> = {},
-) {
+function renderPanel(overrides: Partial<React.ComponentProps<typeof CasesPanel>> = {}) {
   const props = panelProps(overrides);
   const view = render(<CasesPanel {...props} />, { wrapper: Wrapper });
   return { props, view };
@@ -289,9 +274,7 @@ function renderPanel(
 
 async function openRowMenu(caseName: string) {
   const user = userEvent.setup();
-  await user.click(
-    screen.getByRole("button", { name: `Actions for ${caseName}` }),
-  );
+  await user.click(screen.getByRole("button", { name: `Actions for ${caseName}` }));
   return user;
 }
 
@@ -344,9 +327,7 @@ describe("the scenarios table", () => {
       });
 
       expect(result.current.selectedSuite).toEqual(REFUNDS);
-      expect(result.current.cases.map((entry) => entry.id)).toEqual([
-        "case_refunds",
-      ]);
+      expect(result.current.cases.map((entry) => entry.id)).toEqual(["case_refunds"]);
     });
 
     /** @scenario "An address that names no suite opens the first suite of the rail" */
@@ -358,9 +339,7 @@ describe("the scenarios table", () => {
       });
 
       expect(result.current.selectedSuite).toEqual(DEFAULT_SUITE);
-      expect(result.current.cases.map((entry) => entry.id)).toEqual([
-        "case_default",
-      ]);
+      expect(result.current.cases.map((entry) => entry.id)).toEqual(["case_default"]);
     });
 
     /** @scenario "An address naming a suite that does not exist opens the first suite" */
@@ -397,9 +376,7 @@ describe("the scenarios table", () => {
       rerender({ suites: [DEFAULT_SUITE] });
 
       expect(result.current.selectedSuite).toEqual(DEFAULT_SUITE);
-      expect(result.current.cases.map((entry) => entry.id)).toEqual([
-        "case_default",
-      ]);
+      expect(result.current.cases.map((entry) => entry.id)).toEqual(["case_default"]);
     });
 
     it("holds no suite at all while the project has none", () => {
@@ -424,9 +401,7 @@ describe("the scenarios table", () => {
     expect(within(row).getByText("Double charge")).toBeInTheDocument();
     expect(within(row).getByTestId("tag-pill-critical")).toBeInTheDocument();
     expect(within(row).getByTestId("tag-pill-billing")).toBeInTheDocument();
-    expect(
-      within(row).getByRole("button", { name: "Run Double charge" }),
-    ).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Run Double charge" })).toBeInTheDocument();
     expect(
       within(row).getByRole("button", { name: "Actions for Double charge" }),
     ).toBeInTheDocument();
@@ -460,9 +435,7 @@ describe("the scenarios table", () => {
   it("has no LAST RESULT column header and no per-row result cell", () => {
     renderPanel({
       cases: [makeCase()],
-      lastResults: new Map([
-        ["case_1", makeResult({ durationInMs: 6300, totalCost: 0.0042 })],
-      ]),
+      lastResults: new Map([["case_1", makeResult({ durationInMs: 6300, totalCost: 0.0042 })]]),
     });
 
     const table = screen.getByTestId("agent-testing-cases-table");
@@ -476,9 +449,7 @@ describe("the scenarios table", () => {
   it("draws no test suite row, because the rail is the only list of suites", () => {
     renderPanel({ cases: [makeCase()] });
 
-    expect(
-      document.querySelector('[data-testid^="test-suite-header-row-"]'),
-    ).toBeNull();
+    expect(document.querySelector('[data-testid^="test-suite-header-row-"]')).toBeNull();
   });
 
   // --- Row actions ---
@@ -500,16 +471,8 @@ describe("the scenarios table", () => {
     });
     await openRowMenu("Double charge");
 
-    const items = (await screen.findAllByRole("menuitem")).map(
-      (item) => item.textContent,
-    );
-    expect(items).toEqual([
-      "Edit",
-      "Duplicate",
-      "Open recent runs",
-      "Move to suite...",
-      "Archive",
-    ]);
+    const items = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
+    expect(items).toEqual(["Edit", "Duplicate", "Open recent runs", "Move to suite...", "Archive"]);
   });
 
   /** @scenario "Every action of the row menu carries its icon" */
@@ -521,9 +484,7 @@ describe("the scenarios table", () => {
     await openRowMenu("Double charge");
 
     const items = await screen.findAllByRole("menuitem");
-    const icons = items.map((item) =>
-      item.querySelector("svg")?.getAttribute("class"),
-    );
+    const icons = items.map((item) => item.querySelector("svg")?.getAttribute("class"));
 
     expect(icons).toEqual([
       expect.stringContaining("lucide-pencil"),
@@ -539,12 +500,8 @@ describe("the scenarios table", () => {
     renderPanel({ cases: [makeCase()], lastResults: new Map() });
     await openRowMenu("Double charge");
 
-    expect(
-      await screen.findByRole("menuitem", { name: "Edit" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: "Open recent runs" }),
-    ).not.toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Edit" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Open recent runs" })).not.toBeInTheDocument();
   });
 
   /** @scenario "Duplicate creates a copy in the same suite" */
@@ -554,9 +511,7 @@ describe("the scenarios table", () => {
     const { props, view } = renderPanel({ cases: [original] });
     const user = await openRowMenu("Double charge");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Duplicate" }),
-    );
+    await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
     expect(props.onDuplicate).toHaveBeenCalledWith(original);
 
     // The copy comes back from the server filed in the same suite.
@@ -568,9 +523,7 @@ describe("the scenarios table", () => {
     view.rerender(<CasesPanel {...props} cases={[original, copy]} />);
 
     const copyRow = screen.getByTestId("case-row-Double charge (copy)");
-    expect(
-      within(copyRow).getByTestId("tag-pill-critical"),
-    ).toBeInTheDocument();
+    expect(within(copyRow).getByTestId("tag-pill-critical")).toBeInTheDocument();
   });
 
   /** @scenario "Move to suite... on a row starts checkbox selection with that row pre-checked" */
@@ -578,16 +531,10 @@ describe("the scenarios table", () => {
     renderPanel({ cases: [makeCase()] });
     const user = await openRowMenu("Double charge");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Move to suite..." }),
-    );
+    await user.click(await screen.findByRole("menuitem", { name: "Move to suite..." }));
 
-    expect(screen.getByTestId("cases-selection-action-bar")).toHaveTextContent(
-      "1 selected",
-    );
-    expect(
-      screen.getByTestId("case-row-Double charge-checkbox"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("cases-selection-action-bar")).toHaveTextContent("1 selected");
+    expect(screen.getByTestId("case-row-Double charge-checkbox")).toBeInTheDocument();
   });
 
   /** @scenario "Move to suite... confirms a bulk move to another suite" */
@@ -596,9 +543,7 @@ describe("the scenarios table", () => {
     const { props } = renderPanel({ cases: [filed] });
     const user = await openRowMenu("Double charge");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Move to suite..." }),
-    );
+    await user.click(await screen.findByRole("menuitem", { name: "Move to suite..." }));
     await user.click(screen.getByTestId("cases-selection-move-to-suite"));
 
     const select = await screen.findByTestId("cases-move-to-suite-select");
@@ -613,9 +558,7 @@ describe("the scenarios table", () => {
     renderPanel({ cases: [makeCase()] });
     const user = await openRowMenu("Double charge");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Move to suite..." }),
-    );
+    await user.click(await screen.findByRole("menuitem", { name: "Move to suite..." }));
     await user.click(screen.getByTestId("cases-selection-move-to-suite"));
 
     const select = await screen.findByTestId("cases-move-to-suite-select");
@@ -693,9 +636,7 @@ describe("the scenarios table", () => {
     await user.click(within(filter).getByText("critical"));
     expect(props.onToggleLabel).toHaveBeenCalledWith("critical");
 
-    view.rerender(
-      <CasesPanel {...props} activeLabels={["critical"]} cases={[critical]} />,
-    );
+    view.rerender(<CasesPanel {...props} activeLabels={["critical"]} cases={[critical]} />);
 
     expect(screen.getByText("Double charge")).toBeInTheDocument();
     expect(screen.queryByText("Late refund")).not.toBeInTheDocument();
@@ -734,9 +675,7 @@ describe("the scenarios table", () => {
       renderPanel({ cases: [makeCase()] });
 
       expect(screen.queryByText("Edit suite")).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: "Edit suite" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Edit suite" })).not.toBeInTheDocument();
     });
 
     /** @scenario "A person with read-only access is offered no rename control" */
@@ -744,9 +683,7 @@ describe("the scenarios table", () => {
       renderPanel({ cases: [makeCase()], canManage: false });
 
       expect(screen.getByText("Refunds")).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: "Rename test suite" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Rename test suite" })).not.toBeInTheDocument();
     });
   });
 
@@ -757,13 +694,9 @@ describe("the scenarios table", () => {
     it("offers one Open recent run button and no last run line", () => {
       renderPanel({ cases: [makeCase()] });
 
-      expect(
-        screen.getByRole("button", { name: /Open recent run/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Open recent run/ })).toBeInTheDocument();
       expect(screen.queryByText(/Last run on/)).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("cases-last-run-line"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("cases-last-run-line")).not.toBeInTheDocument();
     });
 
     /** @scenario "One button above the table opens a recent run of the suite" */
@@ -830,9 +763,7 @@ describe("the scenarios table", () => {
 
       const list = await openRecentRuns(user);
 
-      expect(
-        within(list).queryByTestId("recent-run-batch_elsewhere"),
-      ).not.toBeInTheDocument();
+      expect(within(list).queryByTestId("recent-run-batch_elsewhere")).not.toBeInTheDocument();
       expect(within(list).getAllByRole("menuitem")).toHaveLength(3);
     });
 
@@ -853,9 +784,7 @@ describe("the scenarios table", () => {
 
       const list = await openRecentRuns(user);
 
-      expect(
-        within(list).queryByTestId("recent-run-batch_reserved"),
-      ).not.toBeInTheDocument();
+      expect(within(list).queryByTestId("recent-run-batch_reserved")).not.toBeInTheDocument();
       expect(list).not.toHaveTextContent("__internal__");
     });
 
@@ -885,9 +814,11 @@ describe("the scenarios table", () => {
 
       const list = await openRecentRuns(user);
 
-      expect(
-        readRow(within(list).getByTestId("recent-run-batch_live")),
-      ).toEqual(["Refunds", "2h ago", "running"]);
+      expect(readRow(within(list).getByTestId("recent-run-batch_live"))).toEqual([
+        "Refunds",
+        "2h ago",
+        "running",
+      ]);
     });
 
     /** @scenario "Choosing a run opens it on the Results tab" */
@@ -959,9 +890,7 @@ describe("the scenarios table", () => {
       });
       const user = await openRowMenu("Double charge");
 
-      await user.click(
-        await screen.findByRole("menuitem", { name: /Open recent runs/ }),
-      );
+      await user.click(await screen.findByRole("menuitem", { name: /Open recent runs/ }));
 
       const list = await screen.findByTestId("recent-runs-submenu-list");
       const rows = within(list).getAllByTestId(/^recent-run-/);
@@ -995,9 +924,7 @@ describe("the scenarios table", () => {
 
       expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(false);
 
-      await user.click(
-        screen.getByRole("menuitem", { name: /Open recent runs/ }),
-      );
+      await user.click(screen.getByRole("menuitem", { name: /Open recent runs/ }));
       await screen.findByTestId("recent-runs-submenu-list");
 
       expect(suiteRunDataQuery.mock.calls.some(isEnabledRead)).toBe(true);
@@ -1029,12 +956,8 @@ describe("the scenarios table", () => {
     renderPanel({ cases: [], projectHasNoCases: true });
 
     const empty = screen.getByTestId("agent-testing-first-case-empty");
-    expect(
-      within(empty).getByText("Write your first scenario"),
-    ).toBeInTheDocument();
-    expect(
-      within(empty).getByRole("button", { name: "New scenario" }),
-    ).toBeInTheDocument();
+    expect(within(empty).getByText("Write your first scenario")).toBeInTheDocument();
+    expect(within(empty).getByRole("button", { name: "New scenario" })).toBeInTheDocument();
   });
 
   // --- Day zero ---
@@ -1053,23 +976,15 @@ describe("the scenarios table", () => {
       });
 
       const empty = screen.getByTestId("agent-testing-first-suite-empty");
-      expect(
-        within(empty).getByText("Name your first test suite"),
-      ).toBeInTheDocument();
+      expect(within(empty).getByText("Name your first test suite")).toBeInTheDocument();
       // No suite is open, so no empty suite view is drawn beside it.
-      expect(
-        screen.queryByTestId("agent-testing-empty-suite"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("agent-testing-cases-table"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("agent-testing-empty-suite")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("agent-testing-cases-table")).not.toBeInTheDocument();
       expect(screen.queryByText("Run suite")).not.toBeInTheDocument();
       // Default is made for older projects by migration, never offered here.
       expect(screen.queryByText("Default")).not.toBeInTheDocument();
 
-      await user.click(
-        within(empty).getByRole("button", { name: "New test suite" }),
-      );
+      await user.click(within(empty).getByRole("button", { name: "New test suite" }));
       expect(props.onNewSuite).toHaveBeenCalled();
     });
 
@@ -1087,13 +1002,9 @@ describe("the scenarios table", () => {
 
       const empty = screen.getByTestId("agent-testing-connect-agent-empty");
       expect(empty).toHaveTextContent("Connect the agent you want to test");
-      expect(
-        screen.queryByTestId("agent-testing-first-suite-empty"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("agent-testing-first-suite-empty")).not.toBeInTheDocument();
 
-      await user.click(
-        within(empty).getByRole("button", { name: "Setup agent" }),
-      );
+      await user.click(within(empty).getByRole("button", { name: "Setup agent" }));
       expect(props.onConnectAgent).toHaveBeenCalled();
     });
 
@@ -1106,15 +1017,9 @@ describe("the scenarios table", () => {
         cases: [],
       });
 
-      expect(
-        screen.getByTestId("agent-testing-cases-skeleton"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("agent-testing-connect-agent-empty"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("agent-testing-first-suite-empty"),
-      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("agent-testing-cases-skeleton")).toBeInTheDocument();
+      expect(screen.queryByTestId("agent-testing-connect-agent-empty")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("agent-testing-first-suite-empty")).not.toBeInTheDocument();
     });
   });
 
@@ -1142,12 +1047,8 @@ describe("the scenarios table", () => {
     expect(screen.getByText("Refund flow")).toBeInTheDocument();
     expect(screen.getByText("Checkout flow")).toBeInTheDocument();
     expect(screen.getByText("Last run")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^Run / }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /Actions for/ }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Run / })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
     expect(screen.getByText("from code")).toBeInTheDocument();
   });
 

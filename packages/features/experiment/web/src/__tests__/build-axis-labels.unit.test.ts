@@ -19,9 +19,7 @@ describe("commonLabelPrefix", () => {
     // A raw longest-common-prefix here would be "support-warm", leaving the
     // first name with nothing at all.
     it("backs off so every name keeps a remainder", () => {
-      expect(commonLabelPrefix(["support-warm", "support-warm-premium"])).toBe(
-        "support-",
-      );
+      expect(commonLabelPrefix(["support-warm", "support-warm-premium"])).toBe("support-");
     });
   });
 
@@ -78,11 +76,7 @@ describe("buildAxisLabels", () => {
   describe("given names with no shared prefix", () => {
     /** @scenario "Names that already fit are shown in full" */
     it("leaves them alone", () => {
-      expect(buildAxisLabels(["warm", "formal", "blunt"], 16)).toEqual([
-        "warm",
-        "formal",
-        "blunt",
-      ]);
+      expect(buildAxisLabels(["warm", "formal", "blunt"], 16)).toEqual(["warm", "formal", "blunt"]);
     });
   });
 
@@ -110,9 +104,7 @@ describe("buildAxisLabels", () => {
 
   describe("given a single name", () => {
     it("returns it untouched", () => {
-      expect(buildAxisLabels(["support-assistant-warm"], 30)).toEqual([
-        "support-assistant-warm",
-      ]);
+      expect(buildAxisLabels(["support-assistant-warm"], 30)).toEqual(["support-assistant-warm"]);
     });
   });
 

@@ -12,8 +12,7 @@ export function DeadLetterAttemptHistory({
   if (attempts.length === 0) {
     return (
       <Text textStyle="xs" color="fg.muted">
-        No recorded attempts — this message was retired before failures were recorded per
-        attempt.
+        No recorded attempts — this message was retired before failures were recorded per attempt.
       </Text>
     );
   }
@@ -26,12 +25,7 @@ export function DeadLetterAttemptHistory({
         {attempts.map((row) => (
           // Keyed by row id, not attempt number: a redrive resets the count,
           // so one message can hold two entries numbered 1.
-          <HStack
-            key={row.id}
-            gap={2}
-            align="start"
-            data-testid={`dead-attempt-${row.attempt}`}
-          >
+          <HStack key={row.id} gap={2} align="start" data-testid={`dead-attempt-${row.attempt}`}>
             <Badge
               size="xs"
               colorPalette={row.outcome === "dead" ? "red" : "orange"}

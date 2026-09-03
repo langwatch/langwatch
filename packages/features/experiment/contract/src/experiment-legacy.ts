@@ -143,9 +143,7 @@ export const eSBatchEvaluationTargetTypeSchema = z.union([
   z.literal("custom"),
 ]);
 
-export type ESBatchEvaluationTargetType = z.infer<
-  typeof eSBatchEvaluationTargetTypeSchema
->;
+export type ESBatchEvaluationTargetType = z.infer<typeof eSBatchEvaluationTargetTypeSchema>;
 
 /**
  * Target metadata stored in batch evaluation for Evaluations V3.
@@ -252,9 +250,7 @@ export const eSBatchEvaluationTargetRESTSchema = eSBatchEvaluationTargetSchema
     }),
   );
 
-export type ESBatchEvaluationTargetREST = z.infer<
-  typeof eSBatchEvaluationTargetRESTSchema
->;
+export type ESBatchEvaluationTargetREST = z.infer<typeof eSBatchEvaluationTargetRESTSchema>;
 
 export const eSBatchEvaluationRESTParamsSchema = eSBatchEvaluationSchema
   .partial()
@@ -282,9 +278,7 @@ export const eSBatchEvaluationRESTParamsSchema = eSBatchEvaluationSchema
     }),
   );
 
-export type ESBatchEvaluationRESTParams = z.infer<
-  typeof eSBatchEvaluationRESTParamsSchema
->;
+export type ESBatchEvaluationRESTParams = z.infer<typeof eSBatchEvaluationRESTParamsSchema>;
 
 export const appliedOptimizationFieldSchema = z.object({
   identifier: z.string(),

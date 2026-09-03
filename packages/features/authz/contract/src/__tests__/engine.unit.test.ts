@@ -796,9 +796,7 @@ describe("authz engine explain()", () => {
      * active membership). These cases pin what the ENGINE then does with that
      * snapshot: deny everywhere a member could act, and say which gate closed.
      */
-    const disabled = (
-      overrides: Partial<CollectedGrants> = {},
-    ): CollectedGrants =>
+    const disabled = (overrides: Partial<CollectedGrants> = {}): CollectedGrants =>
       makeGrants({
         organizationRole: null,
         isOrgMember: false,
@@ -913,9 +911,7 @@ describe("authz engine explain()", () => {
           principal: { type: "apiKey", id: "key-1" },
           organizationRole: null,
           isOrgMember: false,
-          bindings: [
-            binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM }),
-          ],
+          bindings: [binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM })],
         }),
         ownerGrants: disabled(),
         permission: "traces:view",
@@ -932,9 +928,7 @@ describe("authz engine explain()", () => {
           principal: { type: "apiKey", id: "key-2" },
           organizationRole: null,
           isOrgMember: false,
-          bindings: [
-            binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM }),
-          ],
+          bindings: [binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM })],
         }),
         ownerGrants: null,
         permission: "traces:view",

@@ -143,13 +143,11 @@ export const SHAPE = {
  * stack, in the same weight and tracking, which reads as the same decision
  * rather than as a missing one.
  */
-export const HEADING_FONT =
-  '"Sentient", ui-serif, Georgia, "Times New Roman", serif';
+export const HEADING_FONT = '"Sentient", ui-serif, Georgia, "Times New Roman", serif';
 
 /**
  * The mono face the site uses for its small technical lines. The tagline used
  * to be set in it and no longer is — it read as a build log under a sentence
  * whose whole job is to invite — so this is now only the trust strip's label.
  */
-export const MONO_FONT =
-  'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace';
+export const MONO_FONT = 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace';

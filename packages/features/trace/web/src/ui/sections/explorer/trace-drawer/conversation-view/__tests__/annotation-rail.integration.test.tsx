@@ -237,14 +237,11 @@ function saveFromTheRail() {
   renderRow();
   fireEvent.click(rail());
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  const options = (mocks.create as Mock).mock.calls[0]?.[1] as
-    | MutationOptions
-    | undefined;
+  const options = (mocks.create as Mock).mock.calls[0]?.[1] as MutationOptions | undefined;
   options?.onSuccess?.();
 }
 
-const isCounted = () =>
-  isSessionMarked(useAnnotationQueueSessionStore.getState().marks, TRACE_ID);
+const isCounted = () => isSessionMarked(useAnnotationQueueSessionStore.getState().marks, TRACE_ID);
 
 describe("given a queue being walked", () => {
   describe("when the reviewer annotates one of the conversation's turns", () => {
@@ -287,9 +284,7 @@ describe("given the conversation has no rail", () => {
     renderRow({ isRailActive: false });
 
     expect(screen.getByTestId("chat-turn-row")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId(`turn-annotation-rail-${TRACE_ID}`),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`turn-annotation-rail-${TRACE_ID}`)).not.toBeInTheDocument();
   });
 });
 
@@ -382,9 +377,7 @@ describe("given a comment started from one of the turn's messages", () => {
       renderRow();
 
       expect(rail().contains(screen.getByLabelText("Annotation composer"))).toBe(true);
-      expect(screen.getByTestId("annotation-composer-anchor")).toHaveTextContent(
-        "Output",
-      );
+      expect(screen.getByTestId("annotation-composer-anchor")).toHaveTextContent("Output");
     });
   });
 });
@@ -438,8 +431,7 @@ describe("given a suggestion started on the turn's user message", () => {
 describe("given the rail open beside a turn in each message layout", () => {
   const columns = (layout: TurnLayout) => {
     renderRow({ layout });
-    const grid = screen.getByTestId("chat-turn-row").parentElement
-      ?.parentElement as HTMLElement;
+    const grid = screen.getByTestId("chat-turn-row").parentElement?.parentElement as HTMLElement;
     return getComputedStyle(grid).gridTemplateColumns;
   };
 
@@ -547,9 +539,7 @@ describe("given the reviewer has written an annotation in the rail composer", ()
       });
 
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      const options = (mocks.create as Mock).mock.calls[0]?.[1] as
-        | MutationOptions
-        | undefined;
+      const options = (mocks.create as Mock).mock.calls[0]?.[1] as MutationOptions | undefined;
       options?.onSuccess?.();
 
       expect(mocks.create).toHaveBeenCalledWith(
@@ -610,9 +600,7 @@ describe("given the turn carries an annotation the reviewer wrote", () => {
 
       fireEvent.click(screen.getByLabelText("Edit annotation"));
 
-      expect(
-        screen.getByRole("button", { name: "Delete annotation" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Delete annotation" })).toBeInTheDocument();
     });
   });
 });
@@ -658,18 +646,16 @@ describe("given a turn commented on as a whole and on two of its spans", () => {
   it("names the span each of them is about", () => {
     renderCommentedTurn();
 
-    expect(
-      screen.getAllByTestId("annotation-anchor").map((el) => el.textContent),
-    ).toEqual(["Span span-7", "Span span-9"]);
+    expect(screen.getAllByTestId("annotation-anchor").map((el) => el.textContent)).toEqual([
+      "Span span-7",
+      "Span span-9",
+    ]);
   });
 
   it("leaves the turn counting only what was said about the turn", () => {
     renderCommentedTurn();
 
-    expect(screen.getByTestId("chat-turn-row")).toHaveAttribute(
-      "data-annotation-count",
-      "1",
-    );
+    expect(screen.getByTestId("chat-turn-row")).toHaveAttribute("data-annotation-count", "1");
   });
 });
 

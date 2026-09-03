@@ -29,12 +29,7 @@
  */
 
 import { assertNames, type LangWatchQLNames, qualified } from "./provisioning";
-import {
-  assertIdentifier,
-  clickHouseLiteral,
-  postgresLiteral,
-  postgresQuoted,
-} from "./sql-text";
+import { assertIdentifier, clickHouseLiteral, postgresLiteral, postgresQuoted } from "./sql-text";
 
 /** Connection details of the named collection ClickHouse dials PostgreSQL with. */
 export interface PostgresNamedCollection {
@@ -196,15 +191,10 @@ export function postgresApprovedViewStatement({
   const quotedSchema = postgresQuoted(schema);
   const quotedView = postgresQuoted(view);
   if (columns.length === 0) {
-    throw new Error(
-      `lwql provisioning: approved view "${view}" needs at least one column`,
-    );
+    throw new Error(`lwql provisioning: approved view "${view}" needs at least one column`);
   }
   const projection = columns
-    .map(
-      (column) =>
-        `  ${postgresQuoted(column.source)} AS ${postgresQuoted(column.exposed)}`,
-    )
+    .map((column) => `  ${postgresQuoted(column.source)} AS ${postgresQuoted(column.exposed)}`)
     .join(",\n");
   return (
     `CREATE OR REPLACE VIEW ${quotedSchema}.${quotedView} AS\nSELECT\n${projection}\n` +
@@ -264,11 +254,7 @@ export const DEFAULT_POSTGRES_READER_LIMITS = {
  * terraform must match — keep it and its tests in sync, do not delete as dead
  * code.
  */
-export function postgresReaderRoleStatements({
-  reader,
-}: {
-  reader: PostgresReaderRole;
-}): string[] {
+export function postgresReaderRoleStatements({ reader }: { reader: PostgresReaderRole }): string[] {
   // Quoted, like every other PostgreSQL identifier this module emits — and the
   // existence probe compares `rolname` against the *unquoted* spelling on
   // purpose: `CREATE ROLE "ChReader"` stores `ChReader`, so an unquoted create

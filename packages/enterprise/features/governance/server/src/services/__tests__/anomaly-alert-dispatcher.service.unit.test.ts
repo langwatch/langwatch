@@ -124,9 +124,9 @@ describe("AnomalyAlertDispatcherService", () => {
       destinations: [{ type: "webhook", url: "https://hooks.test/alert" }],
     });
 
-    await expect(createDispatcher(transient).dispatchAlert(input)).resolves.toMatchObject(
-      { dispatchTag: "dispatched_webhook_1" },
-    );
+    await expect(createDispatcher(transient).dispatchAlert(input)).resolves.toMatchObject({
+      dispatchTag: "dispatched_webhook_1",
+    });
     const permanentResult = await createDispatcher(permanent).dispatchAlert(input);
 
     expect(transient.calls).toHaveLength(2);

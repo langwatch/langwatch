@@ -17,16 +17,7 @@
  * as a `ReactNode` off the port.
  */
 
-import {
-  Button,
-  Card,
-  Container,
-  Heading,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Card, Container, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { isAllowedRedirectScheme } from "../../model/redirect-schemes";
 import { useAuthorizeHost } from "../../model/authorize-host";
@@ -159,9 +150,7 @@ export default function McpAuthorize() {
         </Card.Header>
         <Card.Body>
           <VStack align="start" gap={6}>
-            <Text>
-              Allow this application to access your LangWatch project tools and data?
-            </Text>
+            <Text>Allow this application to access your LangWatch project tools and data?</Text>
             <Text fontSize="sm" color="fg.muted">
               Scopes: {scopeDisplay}
             </Text>

@@ -96,8 +96,7 @@ export const AnnotationScoreForm = ({
       setScoreTypeOptions(
         existingAnnotationScore.data.options
           .filter(
-            (o): o is { value: string } =>
-              o !== null && typeof o === "object" && "value" in o,
+            (o): o is { value: string } => o !== null && typeof o === "object" && "value" in o,
           )
           .map((o) => o.value),
       );
@@ -133,9 +132,7 @@ export const AnnotationScoreForm = ({
       return;
     }
 
-    const trimmedRadioCheckboxOptions = scoreTypeOptions.filter(
-      (opt) => opt.trim() !== "",
-    );
+    const trimmedRadioCheckboxOptions = scoreTypeOptions.filter((opt) => opt.trim() !== "");
 
     const normalizedOptions = trimmedRadioCheckboxOptions.map((opt) => opt.toLowerCase());
     if (normalizedOptions.length !== new Set(normalizedOptions).size) {
@@ -166,9 +163,7 @@ export const AnnotationScoreForm = ({
       {
         onSuccess: (data) => {
           host.succeeded({
-            title: annotationScoreId
-              ? "Annotation Score Updated"
-              : "Annotation Score Created",
+            title: annotationScoreId ? "Annotation Score Updated" : "Annotation Score Created",
             description: `Successfully ${annotationScoreId ? "updated" : "created"} ${data.name} annotation score`,
           });
 
@@ -215,9 +210,7 @@ export const AnnotationScoreForm = ({
           setScoreTypeOptions(nextOptions);
         }}
         onOptionRemove={(index) =>
-          setScoreTypeOptions(
-            scoreTypeOptions.filter((_, optionIndex) => optionIndex !== index),
-          )
+          setScoreTypeOptions(scoreTypeOptions.filter((_, optionIndex) => optionIndex !== index))
         }
         onOptionAdd={() => setScoreTypeOptions([...scoreTypeOptions, ""])}
         defaultRadioOption={defaultRadioOption}

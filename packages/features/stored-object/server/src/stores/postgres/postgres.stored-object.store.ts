@@ -138,9 +138,7 @@ export class PostgresStoredObjectStore extends StoredObjectStore {
       mediaType: this.string(row.mediaType, "mediaType"),
       mediaTypeVerified: row.mediaTypeVerified === true,
       storage:
-        provider && destinationId && relativeId
-          ? { provider, destinationId, relativeId }
-          : null,
+        provider && destinationId && relativeId ? { provider, destinationId, relativeId } : null,
       generation: Number(row.generation),
       audiences: this.stringArray(row.audiences) as StoredObjectDeliveryAudience[],
       expiresAt: this.tryDate(row.expiresAt),

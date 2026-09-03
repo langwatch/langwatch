@@ -58,25 +58,17 @@ export default function ExperimentsWorkbenchPage() {
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
 
-  const {
-    name,
-    setName,
-    datasets,
-    targets,
-    reset,
-    autosaveStatus,
-    addEvaluator,
-    removeEvaluator,
-  } = useEvaluationsV3Store((state) => ({
-    name: state.name,
-    setName: state.setName,
-    datasets: state.datasets,
-    targets: state.targets,
-    reset: state.reset,
-    autosaveStatus: state.ui.autosaveStatus,
-    addEvaluator: state.addEvaluator,
-    removeEvaluator: state.removeEvaluator,
-  }));
+  const { name, setName, datasets, targets, reset, autosaveStatus, addEvaluator, removeEvaluator } =
+    useEvaluationsV3Store((state) => ({
+      name: state.name,
+      setName: state.setName,
+      datasets: state.datasets,
+      targets: state.targets,
+      reset: state.reset,
+      autosaveStatus: state.ui.autosaveStatus,
+      addEvaluator: state.addEvaluator,
+      removeEvaluator: state.removeEvaluator,
+    }));
 
   // The columns as their own headers name them, which is also how a run's
   // errors name them. Resolved here, once, because the projection an agent
@@ -85,10 +77,7 @@ export default function ExperimentsWorkbenchPage() {
   const targetNames = useMemo(
     () =>
       Object.fromEntries(
-        targets.map((target, index) => [
-          target.id,
-          resolvedTargetNames[index] ?? "",
-        ]),
+        targets.map((target, index) => [target.id, resolvedTargetNames[index] ?? ""]),
       ),
     [targets, resolvedTargetNames],
   );
@@ -260,23 +249,20 @@ export default function ExperimentsWorkbenchPage() {
           data: { handle, messages, model, temperature, maxTokens },
         });
         await utils.prompts.getAllPromptsForProject.invalidate({ projectId });
-        return projectSlug
-          ? { href: `/${projectSlug}/prompts`, label: "Open prompt" }
-          : undefined;
+        return projectSlug ? { href: `/${projectSlug}/prompts`, label: "Open prompt" } : undefined;
       },
       "prompts.update": async (payload) => {
-        const { id, commitMessage, messages, model, temperature, maxTokens } =
-          payload as {
-            id: string;
-            commitMessage: string;
-            messages?: {
-              role: "system" | "user" | "assistant";
-              content: string;
-            }[];
-            model?: string;
-            temperature?: number;
-            maxTokens?: number;
-          };
+        const { id, commitMessage, messages, model, temperature, maxTokens } = payload as {
+          id: string;
+          commitMessage: string;
+          messages?: {
+            role: "system" | "user" | "assistant";
+            content: string;
+          }[];
+          model?: string;
+          temperature?: number;
+          maxTokens?: number;
+        };
         await updatePrompt.mutateAsync({
           projectId,
           id,
@@ -289,9 +275,7 @@ export default function ExperimentsWorkbenchPage() {
           },
         });
         await utils.prompts.getAllPromptsForProject.invalidate({ projectId });
-        return projectSlug
-          ? { href: `/${projectSlug}/prompts`, label: "Open prompt" }
-          : undefined;
+        return projectSlug ? { href: `/${projectSlug}/prompts`, label: "Open prompt" } : undefined;
       },
       "datasets.create": async (payload) => {
         const { name, columnTypes, initialRows } = payload as {
@@ -418,16 +402,13 @@ export default function ExperimentsWorkbenchPage() {
           setActionActivity(narrateWorkbenchAction(kind));
           try {
             assertPageIsCurrent();
-            const result = useEvaluationsV3Store
-              .getState()
-              .applyWorkbenchAction({ kind, payload });
+            const result = useEvaluationsV3Store.getState().applyWorkbenchAction({ kind, payload });
             await saveOrRefuse();
             // Every action that touches a column answers with its id. A new
             // column lands to the right of all the others, off the edge of a
             // wide workbench, so without this the reader watches a real change
             // happen out of sight and reads the step as nothing happening.
-            const touched = (result as { targetId?: unknown } | undefined)
-              ?.targetId;
+            const touched = (result as { targetId?: unknown } | undefined)?.targetId;
             if (typeof touched === "string") revealTargetColumn(touched);
             return result;
           } finally {
@@ -451,9 +432,7 @@ export default function ExperimentsWorkbenchPage() {
         // Remembered before the run starts, so the status line can name the
         // column the reader is watching fill rather than "the evaluation".
         const runningTarget = payload.targetIds?.[0] ?? null;
-        setRunTargetLabel(
-          runningTarget ? targetColumnLabel(runningTarget) : null,
-        );
+        setRunTargetLabel(runningTarget ? targetColumnLabel(runningTarget) : null);
         // Watch the column that is about to fill, not whichever one the
         // reader happened to be looking at.
         if (runningTarget) revealTargetColumn(runningTarget);

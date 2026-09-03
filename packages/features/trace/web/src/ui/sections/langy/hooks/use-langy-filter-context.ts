@@ -33,9 +33,7 @@ export function filterContextChip(queryText: string): LangyContextChip | null {
   if (!query) return null;
 
   const summary =
-    query.length > MAX_FILTER_SUMMARY
-      ? `${query.slice(0, MAX_FILTER_SUMMARY - 1)}…`
-      : query;
+    query.length > MAX_FILTER_SUMMARY ? `${query.slice(0, MAX_FILTER_SUMMARY - 1)}…` : query;
 
   return {
     id: `filter:${query}`,

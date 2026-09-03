@@ -1,7 +1,4 @@
-import type {
-  SsoConnectionCommand,
-  SsoConnectionFactInput,
-} from "@langwatch/identity-contract";
+import type { SsoConnectionCommand, SsoConnectionFactInput } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { SsoConnectionGuards } from "../sso-connection-guards";
 import type { SsoConnectionLedger } from "../sso-connection-ledger";

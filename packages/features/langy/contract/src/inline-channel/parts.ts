@@ -72,9 +72,7 @@ export function parseLangyCardFailedPart(part: unknown): LangyCardFailedPart | n
 }
 
 /** Parse an opaque message part as a choice selection, or null. */
-export function parseLangyChoiceSelectionPart(
-  part: unknown,
-): LangyChoiceSelectionPart | null {
+export function parseLangyChoiceSelectionPart(part: unknown): LangyChoiceSelectionPart | null {
   const parsed = langyChoiceSelectionPartSchema.safeParse(part);
   return parsed.success ? parsed.data : null;
 }

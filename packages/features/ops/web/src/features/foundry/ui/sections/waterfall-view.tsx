@@ -9,11 +9,7 @@ interface FlatSpan {
   absoluteEndMs: number;
 }
 
-function flattenSpans(
-  spans: SpanConfig[],
-  depth: number,
-  parentStartMs: number,
-): FlatSpan[] {
+function flattenSpans(spans: SpanConfig[], depth: number, parentStartMs: number): FlatSpan[] {
   const result: FlatSpan[] = [];
   for (const span of spans) {
     const absoluteStart = parentStartMs + span.offsetMs;
@@ -57,9 +53,7 @@ export function WaterfallView() {
   const maxTime = Math.max(...flat.map((f) => f.absoluteEndMs));
   const totalDuration = maxTime - minTime || 1;
 
-  const ticks = Array.from({ length: 6 }, (_, i) =>
-    Math.round(minTime + (totalDuration * i) / 5),
-  );
+  const ticks = Array.from({ length: 6 }, (_, i) => Math.round(minTime + (totalDuration * i) / 5));
 
   return (
     <Box p={4}>
@@ -88,9 +82,7 @@ export function WaterfallView() {
           const width = Math.max((item.span.durationMs / totalDuration) * 100, 0.5);
           const isSelected = selectedSpanId === item.span.id;
           const barColor =
-            item.span.status === "error"
-              ? "red.500"
-              : (TYPE_COLORS[item.span.type] ?? "gray.500");
+            item.span.status === "error" ? "red.500" : (TYPE_COLORS[item.span.type] ?? "gray.500");
 
           return (
             <Flex

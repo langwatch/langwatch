@@ -13,10 +13,7 @@ import { normalizeEndpoint } from "@/internal/endpoint";
  * who live in terminal. Same multi-tenant guard as the web UI
  * (org-scoped via the device-flow Bearer token).
  */
-export async function ingestListCommand(options: {
-  all?: boolean;
-  json?: boolean;
-}): Promise<void> {
+export async function ingestListCommand(options: { all?: boolean; json?: boolean }): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
     process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");

@@ -257,21 +257,9 @@
   pointer-events: none;
   opacity: 0.5;
   background-image:
-    radial-gradient(
-      ellipse 70% 55% at 100% 22%,
-      rgba(91, 141, 239, 0.22) 0%,
-      transparent 62%
-    ),
-    radial-gradient(
-      ellipse 60% 45% at 100% 62%,
-      rgba(201, 123, 58, 0.18) 0%,
-      transparent 60%
-    ),
-    radial-gradient(
-      ellipse 55% 40% at 92% 100%,
-      rgba(184, 82, 64, 0.14) 0%,
-      transparent 58%
-    );
+    radial-gradient(ellipse 70% 55% at 100% 22%, rgba(91, 141, 239, 0.22) 0%, transparent 62%),
+    radial-gradient(ellipse 60% 45% at 100% 62%, rgba(201, 123, 58, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 40% at 92% 100%, rgba(184, 82, 64, 0.14) 0%, transparent 58%);
   filter: blur(50px);
   -webkit-mask-image: linear-gradient(
     to left,
@@ -394,13 +382,7 @@
     #000 85%,
     transparent 100%
   );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    #000 15%,
-    #000 85%,
-    transparent 100%
-  );
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 15%, #000 85%, transparent 100%);
 }
 /* Fold sits behind the content. */
 .langy-wave--fold {
@@ -784,14 +766,12 @@
   );
 }
 .langy-accent-ring {
-  box-shadow: inset 0 0 0 1px
-    color-mix(in srgb, var(--chakra-colors-orange-solid) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-orange-solid) 22%, transparent);
 }
 /* The panel hero leans a touch warmer than a card (30% vs 22%) — its own ring
    so the card's calmer ring and the panel's stay independent. */
 .langy-panel-accent-ring {
-  box-shadow: inset 0 0 0 1px
-    color-mix(in srgb, var(--chakra-colors-orange-solid) 30%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-orange-solid) 30%, transparent);
 }
 
 /* ── HDR / Display-P3 accent (task #25) ─────────────────────────────────────

@@ -253,7 +253,9 @@ export function createWorkflowStudioRestApp<TSession extends WorkflowStudioRestS
               logger.error({ error }, "Error handling message");
               const errorMessage = error instanceof Error ? error.message : String(error);
               const nodeId =
-                "node_id" in message.payload ? (message.payload.node_id as string | undefined) : undefined;
+                "node_id" in message.payload
+                  ? (message.payload.node_id as string | undefined)
+                  : undefined;
 
               void stream.writeSSE({
                 data: JSON.stringify(

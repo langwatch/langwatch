@@ -112,9 +112,7 @@ class ApiComposedModelProviderHost extends ApiModelProviderHostPort {
         // invented an empty result would talk somebody out of a rule that
         // works.
         if (!isPreviewSpanReader(spans)) {
-          return Promise.reject(
-            new ApiCostPreviewUnavailableError(processName),
-          );
+          return Promise.reject(new ApiCostPreviewUnavailableError(processName));
         }
         return previewCostRuleMatchingSpans({ spans, input });
       },

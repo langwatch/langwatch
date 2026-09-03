@@ -15,9 +15,7 @@ import type { CommandResult } from "../../utils/output";
  * prints it in full. A rotate that withheld the new secret from a scripted
  * caller would break the very deployment it was rotating.
  */
-export const rotateVirtualKeyCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const rotateVirtualKeyCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new VirtualKeysApiService();

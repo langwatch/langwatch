@@ -216,12 +216,10 @@ export async function maybeExtractSpanMedia({
     // ride through inline (today's behavior) and the drop is logged and
     // counted so a sustained rate is alertable.
     if (budget.droppedByCap > 0 || budget.droppedByDeadline > 0 || budget.failedParts > 0) {
-      if (budget.droppedByCap > 0)
-        deps.telemetry?.failOpen("part_cap", budget.droppedByCap);
+      if (budget.droppedByCap > 0) deps.telemetry?.failOpen("part_cap", budget.droppedByCap);
       if (budget.droppedByDeadline > 0)
         deps.telemetry?.failOpen("deadline", budget.droppedByDeadline);
-      if (budget.failedParts > 0)
-        deps.telemetry?.failOpen("part_store", budget.failedParts);
+      if (budget.failedParts > 0) deps.telemetry?.failOpen("part_store", budget.failedParts);
       logger.warn(
         {
           projectId,

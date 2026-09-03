@@ -66,12 +66,7 @@ vi.mock("@langwatch/organization-web/screens/organization", () => ({
   DepartmentPicker: () => null,
 }));
 
-import {
-  anOrganization,
-  aProject,
-  FakeProjectHost,
-  renderWithProjectHost,
-} from "../../../testing";
+import { anOrganization, aProject, FakeProjectHost, renderWithProjectHost } from "../../../testing";
 import ProjectSettingsScreen from "../project-settings.screen";
 
 beforeEach(() => vi.clearAllMocks());
@@ -116,10 +111,7 @@ describe("given the project in scope is somebody's personal workspace", () => {
 
 describe("given a governance-intent organization with no project at all", () => {
   it("still serves its organization settings", () => {
-    renderWithProjectHost(
-      <ProjectSettingsScreen />,
-      new FakeProjectHost({ project: null }),
-    );
+    renderWithProjectHost(<ProjectSettingsScreen />, new FakeProjectHost({ project: null }));
 
     expect(screen.getByText("Organization Settings")).toBeTruthy();
     expect(screen.queryByText("Project-level Settings")).toBeNull();
@@ -155,10 +147,7 @@ describe("when the reader holds the lite membership seat", () => {
    * them.
    */
   it("takes the organization form's save away and leaves the project's", () => {
-    renderWithProjectHost(
-      <ProjectSettingsScreen />,
-      new FakeProjectHost({ isLiteMember: true }),
-    );
+    renderWithProjectHost(<ProjectSettingsScreen />, new FakeProjectHost({ isLiteMember: true }));
 
     expect(screen.getAllByRole("button", { name: "Save Changes" })).toHaveLength(1);
   });

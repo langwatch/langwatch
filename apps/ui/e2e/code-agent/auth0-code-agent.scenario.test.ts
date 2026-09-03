@@ -193,11 +193,7 @@ describe("Auth0-protected custom code agent as a scenario target", () => {
           ],
         }),
       ],
-      script: [
-        scenario.user("where is my order #1042?"),
-        scenario.agent(),
-        scenario.judge(),
-      ],
+      script: [scenario.user("where is my order #1042?"), scenario.agent(), scenario.judge()],
     });
 
     // Layer 2 FIRST — the deterministic wire-level assertions run before the

@@ -235,34 +235,30 @@ export function createApiMock() {
           })),
         },
         create: {
-          useMutation: vi.fn(
-            (options?: { onSuccess?: (evaluator: unknown) => void }) => ({
-              mutate: (data: unknown) => {
-                mockEvaluatorCreateMutate(data);
-                options?.onSuccess?.(mockEvaluators[0]);
-              },
-              mutateAsync: async (data: unknown) => {
-                mockEvaluatorCreateMutate(data);
-                return mockEvaluators[0];
-              },
-              isPending: false,
-            }),
-          ),
+          useMutation: vi.fn((options?: { onSuccess?: (evaluator: unknown) => void }) => ({
+            mutate: (data: unknown) => {
+              mockEvaluatorCreateMutate(data);
+              options?.onSuccess?.(mockEvaluators[0]);
+            },
+            mutateAsync: async (data: unknown) => {
+              mockEvaluatorCreateMutate(data);
+              return mockEvaluators[0];
+            },
+            isPending: false,
+          })),
         },
         update: {
-          useMutation: vi.fn(
-            (options?: { onSuccess?: (evaluator: unknown) => void }) => ({
-              mutate: (data: unknown) => {
-                mockEvaluatorUpdateMutate(data);
-                options?.onSuccess?.(mockEvaluators[0]);
-              },
-              mutateAsync: async (data: unknown) => {
-                mockEvaluatorUpdateMutate(data);
-                return mockEvaluators[0];
-              },
-              isPending: false,
-            }),
-          ),
+          useMutation: vi.fn((options?: { onSuccess?: (evaluator: unknown) => void }) => ({
+            mutate: (data: unknown) => {
+              mockEvaluatorUpdateMutate(data);
+              options?.onSuccess?.(mockEvaluators[0]);
+            },
+            mutateAsync: async (data: unknown) => {
+              mockEvaluatorUpdateMutate(data);
+              return mockEvaluators[0];
+            },
+            isPending: false,
+          })),
         },
         delete: {
           useMutation: vi.fn(() => ({
@@ -405,9 +401,7 @@ export function createOrgMock() {
 
 export function createUpgradeModalMock() {
   return {
-    useUpgradeModalStore: (
-      selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown,
-    ) => {
+    useUpgradeModalStore: (selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown) => {
       if (typeof selector === "function") {
         return selector({ open: mockOpenUpgradeModal });
       }
@@ -470,5 +464,4 @@ export const isOnlineEvalOpen = () =>
 /**
  * Helper to check if evaluator list drawer is open based on mock query state.
  */
-export const isEvaluatorListOpen = () =>
-  state.mockQuery["drawer.open"] === "evaluatorList";
+export const isEvaluatorListOpen = () => state.mockQuery["drawer.open"] === "evaluatorList";

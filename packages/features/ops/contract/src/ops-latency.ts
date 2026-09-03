@@ -115,9 +115,7 @@ export interface LatencyWindows {
   allTime: LatencyWindowPercentiles | null;
 }
 
-export function windowPercentiles(
-  counts: Map<string, number>,
-): LatencyWindowPercentiles | null {
+export function windowPercentiles(counts: Map<string, number>): LatencyWindowPercentiles | null {
   const p50Ms = percentileFromHistogram(counts, 0.5);
   const p99Ms = percentileFromHistogram(counts, 0.99);
   if (p50Ms === null || p99Ms === null) return null;

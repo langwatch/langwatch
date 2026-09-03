@@ -74,9 +74,7 @@ export const chatRichContentSchema = z.union([
     image_url: z
       .object({
         url: z.string(),
-        detail: z
-          .union([z.literal("auto"), z.literal("low"), z.literal("high")])
-          .optional(),
+        detail: z.union([z.literal("auto"), z.literal("low"), z.literal("high")]).optional(),
       })
       .optional(),
   }),
@@ -212,13 +210,7 @@ const typedValueRawSchema = z.object({
 type TypedValueRaw = z.infer<typeof typedValueRawSchema>;
 
 const jSONSerializableSchema = z
-  .union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.record(z.string(), z.any()),
-    z.array(z.any()),
-  ])
+  .union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.any()), z.array(z.any())])
   .nullable();
 
 export const typedValueJsonSchema = z.object({
@@ -343,9 +335,7 @@ export const reservedSpanParamsSchema = z.object({
 
 export type ReservedSpanParams = z.infer<typeof reservedSpanParamsSchema>;
 
-export const spanParamsSchema = reservedSpanParamsSchema.and(
-  z.record(z.string(), z.any()),
-);
+export const spanParamsSchema = reservedSpanParamsSchema.and(z.record(z.string(), z.any()));
 
 export type SpanParams = z.infer<typeof spanParamsSchema>;
 
@@ -498,9 +488,7 @@ export const reservedTraceMetadataMappingSchema = z.record(
   reservedTraceMetadataSchema.keyof(),
 );
 
-export type ReservedTraceMetadataMapping = z.infer<
-  typeof reservedTraceMetadataMappingSchema
->;
+export type ReservedTraceMetadataMapping = z.infer<typeof reservedTraceMetadataMappingSchema>;
 
 export const customMetadataSchema = z.record(
   z.string(),
@@ -680,26 +668,21 @@ export const traceSchema = z.object({
 
 export type Trace = z.infer<typeof traceSchema>;
 
-export const lLMModeTraceSchema = traceSchema
-  .omit({ timestamps: true, indexing_md5s: true })
-  .and(
-    z.object({
-      timestamps: z.object({
-        started_at: z.string(),
-        inserted_at: z.string(),
-        updated_at: z.string(),
-      }),
-      ascii_tree: z.string(),
+export const lLMModeTraceSchema = traceSchema.omit({ timestamps: true, indexing_md5s: true }).and(
+  z.object({
+    timestamps: z.object({
+      started_at: z.string(),
+      inserted_at: z.string(),
+      updated_at: z.string(),
     }),
-  );
+    ascii_tree: z.string(),
+  }),
+);
 
 export type LLMModeTrace = z.infer<typeof lLMModeTraceSchema>;
 
 // Dead ElasticSearch shape kept as a structural type only (no schema needed).
-export type ElasticSearchTrace = Omit<
-  Trace,
-  "metadata" | "timestamps" | "events" | "privacy"
-> & {
+export type ElasticSearchTrace = Omit<Trace, "metadata" | "timestamps" | "events" | "privacy"> & {
   metadata: ReservedTraceMetadata & {
     custom?: CustomMetadata;
     all_keys?: string[];
@@ -742,9 +725,7 @@ export const collectorRESTParamsValidatorSchema = collectorRESTParamsSchema.omit
   spans: true,
 });
 
-export type CollectorRESTParamsValidator = z.infer<
-  typeof collectorRESTParamsValidatorSchema
->;
+export type CollectorRESTParamsValidator = z.infer<typeof collectorRESTParamsValidatorSchema>;
 
 export const trackEventRESTParamsValidatorSchema = langWatchEventSchema
   .omit({
@@ -761,25 +742,23 @@ export const trackEventRESTParamsValidatorSchema = langWatchEventSchema
     }),
   );
 
-export type TrackEventRESTParamsValidator = z.infer<
-  typeof trackEventRESTParamsValidatorSchema
->;
+export type TrackEventRESTParamsValidator = z.infer<typeof trackEventRESTParamsValidatorSchema>;
 
 // Dataset Schemas
 
 export type DatasetSpan =
-  | (Omit<
-      BaseSpan,
-      "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
-    > & { params: Record<string, any>; model?: string | null })
-  | (Omit<
-      LLMSpan,
-      "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
-    > & { params: Record<string, any>; model?: string | null })
-  | (Omit<
-      RAGSpan,
-      "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"
-    > & { params: Record<string, any>; model?: string | null });
+  | (Omit<BaseSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"> & {
+      params: Record<string, any>;
+      model?: string | null;
+    })
+  | (Omit<LLMSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"> & {
+      params: Record<string, any>;
+      model?: string | null;
+    })
+  | (Omit<RAGSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"> & {
+      params: Record<string, any>;
+      model?: string | null;
+    });
 
 const datasetSpanShape = {
   params: z.record(z.string(), z.any()),

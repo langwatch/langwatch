@@ -197,12 +197,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
                   >
                     {i + 1}
                   </Box>
-                  <Text
-                    fontSize="sm"
-                    color="fg"
-                    fontWeight="medium"
-                    letterSpacing="-0.01em"
-                  >
+                  <Text fontSize="sm" color="fg" fontWeight="medium" letterSpacing="-0.01em">
                     {step}
                   </Text>
                 </HStack>

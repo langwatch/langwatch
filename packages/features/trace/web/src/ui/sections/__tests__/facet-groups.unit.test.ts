@@ -62,13 +62,7 @@ describe("FACET_GROUPS configuration", () => {
   });
 
   it("splits the cost / latency / volume families into their own groups", () => {
-    for (const key of [
-      "cost",
-      "tokens",
-      "promptTokens",
-      "completionTokens",
-      "tokensEstimated",
-    ]) {
+    for (const key of ["cost", "tokens", "promptTokens", "completionTokens", "tokensEstimated"]) {
       expect(getFacetGroupId(key)).toBe("cost");
     }
     for (const key of ["duration", "ttft", "ttlt", "tokensPerSecond"]) {

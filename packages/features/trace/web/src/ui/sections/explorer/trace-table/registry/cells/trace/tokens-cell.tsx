@@ -25,13 +25,7 @@ function isEstimated(row: TraceListItem): boolean {
   return Boolean(row.tokensEstimated) && !hasAuthoritative;
 }
 
-function TokenBreakdownTooltip({
-  row,
-  children,
-}: {
-  row: TraceListItem;
-  children: ReactElement;
-}) {
+function TokenBreakdownTooltip({ row, children }: { row: TraceListItem; children: ReactElement }) {
   return (
     <Tooltip
       content={

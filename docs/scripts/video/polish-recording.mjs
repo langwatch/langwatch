@@ -50,8 +50,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (x) => x * x * (3 - 2 * x);
 
 /** Slow at both ends, quick through the middle. The default for everything. */
-const easeInOutCubic = (x) =>
-  x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const easeInOutCubic = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
 /** Quick start, long settle. Used for the click dip and the ripple. */
 const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
@@ -87,10 +86,14 @@ function run(cmd, args) {
 
 async function probe(file) {
   const raw = await run("ffprobe", [
-    "-v", "error",
-    "-select_streams", "v:0",
-    "-show_entries", "stream=width,height,r_frame_rate:format=duration",
-    "-of", "json",
+    "-v",
+    "error",
+    "-select_streams",
+    "v:0",
+    "-show_entries",
+    "stream=width,height,r_frame_rate:format=duration",
+    "-of",
+    "json",
     file,
   ]);
   const j = JSON.parse(raw.toString());
@@ -107,12 +110,18 @@ async function probe(file) {
 /** Decodes any still image ffmpeg can read into an RGBA buffer of exactly w x h. */
 async function loadImageCover(file, w, h) {
   const data = await run("ffmpeg", [
-    "-v", "error",
-    "-i", file,
-    "-vf", `scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h}`,
-    "-frames:v", "1",
-    "-f", "rawvideo",
-    "-pix_fmt", "rgba",
+    "-v",
+    "error",
+    "-i",
+    file,
+    "-vf",
+    `scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h}`,
+    "-frames:v",
+    "1",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgba",
     "-",
   ]);
   if (data.length !== w * h * 4) {
@@ -136,7 +145,15 @@ async function rasterize(svgPath, height) {
   await run("rsvg-convert", ["-h", String(Math.round(height)), svgPath, "-o", tmp]);
   const meta = await probe(tmp);
   const rgba = await run("ffmpeg", [
-    "-v", "error", "-i", tmp, "-f", "rawvideo", "-pix_fmt", "rgba", "-",
+    "-v",
+    "error",
+    "-i",
+    tmp,
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgba",
+    "-",
   ]);
   fs.rmSync(dir, { recursive: true, force: true });
   return { width: meta.width, height: meta.height, data: rgba };
@@ -184,8 +201,7 @@ function blurAlpha(src, w, h, radius) {
 function buildSprite(bitmap, hotspot, shadow) {
   const { width: cw, height: ch, data } = bitmap;
   const pad =
-    Math.ceil(shadow.blur * 2) +
-    Math.ceil(Math.abs(shadow.offsetX) + Math.abs(shadow.offsetY)) + 2;
+    Math.ceil(shadow.blur * 2) + Math.ceil(Math.abs(shadow.offsetX) + Math.abs(shadow.offsetY)) + 2;
   const w = cw + pad * 2;
   const h = ch + pad * 2;
 
@@ -585,8 +601,7 @@ function buildCameraTrack(beats, cfg, duration, midX, midY) {
  * dip, the click ripples and its visibility.
  */
 /** Seconds the source is held before this beat's click, 0 for most beats. */
-const pauseBefore = (b) =>
-  typeof b.pause === "number" ? b.pause : (b.pause?.before ?? 0);
+const pauseBefore = (b) => (typeof b.pause === "number" ? b.pause : (b.pause?.before ?? 0));
 
 function buildCursorTrack(beats, cfg) {
   const moves = [];
@@ -611,9 +626,7 @@ function buildCursorTrack(beats, cfg) {
     // across the whole video instead of racing over a long move.
     const dist = Math.hypot(b.x - at.x, b.y - at.y);
     const travel =
-      b.travel != null
-        ? b.travel
-        : clamp(dist / cfg.speed, cfg.minTravel, cfg.maxTravel);
+      b.travel != null ? b.travel : clamp(dist / cfg.speed, cfg.minTravel, cfg.maxTravel);
     // A beat that asks for a `pause` before its click is asking the viewer to
     // look at the target, so the cursor has to be on it for the whole pause.
     // Every other beat arrives `settle` early and no earlier: waiting on a
@@ -1011,9 +1024,7 @@ async function main() {
     const list = pacing.freezes
       .map((f) => `${f.c.toFixed(2)}${f.d > 0 ? "+" : ""}${f.d.toFixed(2)}`)
       .join(" ");
-    console.log(
-      `  pacing: ${srcDuration.toFixed(2)}s -> ${duration.toFixed(2)}s  [${list}]`,
-    );
+    console.log(`  pacing: ${srcDuration.toFixed(2)}s -> ${duration.toFixed(2)}s  [${list}]`);
   }
 
   const cameraAt = buildCameraTrack(beats, cfg.zoom, duration, srcW / 2, srcH / 2);
@@ -1046,13 +1057,20 @@ async function main() {
   const dec = spawn(
     "ffmpeg",
     [
-      "-v", "error",
-      "-i", input,
-      "-filter_complex", graph,
-      "-map", "[out]",
-      "-r", String(fps),
-      "-f", "rawvideo",
-      "-pix_fmt", "rgba",
+      "-v",
+      "error",
+      "-i",
+      input,
+      "-filter_complex",
+      graph,
+      "-map",
+      "[out]",
+      "-r",
+      String(fps),
+      "-f",
+      "rawvideo",
+      "-pix_fmt",
+      "rgba",
       "-",
     ],
     { stdio: ["ignore", "pipe", "pipe"] },
@@ -1067,20 +1085,33 @@ async function main() {
   const enc = spawn(
     "ffmpeg",
     [
-      "-v", "error",
-      "-f", "rawvideo",
-      "-pix_fmt", "rgba",
-      "-s", `${outW}x${outH}`,
-      "-r", String(fps),
-      "-i", "-",
+      "-v",
+      "error",
+      "-f",
+      "rawvideo",
+      "-pix_fmt",
+      "rgba",
+      "-s",
+      `${outW}x${outH}`,
+      "-r",
+      String(fps),
+      "-i",
+      "-",
       "-an",
-      "-c:v", "libvpx-vp9",
-      "-b:v", "0",
-      "-crf", String(args.crf ?? cfg.quality.crf),
-      "-deadline", "good",
-      "-cpu-used", String(cfg.quality.cpuUsed),
-      "-row-mt", "1",
-      "-pix_fmt", "yuv420p",
+      "-c:v",
+      "libvpx-vp9",
+      "-b:v",
+      "0",
+      "-crf",
+      String(args.crf ?? cfg.quality.crf),
+      "-deadline",
+      "good",
+      "-cpu-used",
+      String(cfg.quality.cpuUsed),
+      "-row-mt",
+      "1",
+      "-pix_fmt",
+      "yuv420p",
       "-y",
       output,
     ],
@@ -1150,19 +1181,30 @@ async function main() {
 
     for (const r of cursor.ripples(t, cfg.click)) {
       drawRipple(
-        dst, outW, outH,
-        left + r.x * scale, top + r.y * scale,
-        r.radius, r.fill, r.stroke, cfg.click.strokeWidth, cfg.click.color,
+        dst,
+        outW,
+        outH,
+        left + r.x * scale,
+        top + r.y * scale,
+        r.radius,
+        r.fill,
+        r.stroke,
+        cfg.click.strokeWidth,
+        cfg.click.color,
       );
     }
 
     const c = cursor.at(t);
     if (c.alpha > 0.002) {
       drawSprite(
-        dst, outW, outH,
+        dst,
+        outW,
+        outH,
         c.hand ? pointer : arrow,
-        left + c.x * scale, top + c.y * scale,
-        c.scale, c.alpha,
+        left + c.x * scale,
+        top + c.y * scale,
+        c.scale,
+        c.alpha,
       );
     }
 
@@ -1170,9 +1212,7 @@ async function main() {
     n++;
     if (n % 60 === 0) {
       const rate = n / ((Date.now() - started) / 1000);
-      process.stderr.write(
-        `\r  frame ${n}  ${rate.toFixed(1)} fps  ${(n / fps).toFixed(1)}s`,
-      );
+      process.stderr.write(`\r  frame ${n}  ${rate.toFixed(1)} fps  ${(n / fps).toFixed(1)}s`);
     }
   }
 

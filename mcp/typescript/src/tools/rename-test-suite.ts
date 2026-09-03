@@ -3,10 +3,7 @@ import { renameTestSuite as apiRenameTestSuite } from "../langwatch-api-test-sui
 /**
  * Handles the platform_rename_test_suite MCP tool invocation.
  */
-export async function handleRenameTestSuite(params: {
-  id: string;
-  name: string;
-}): Promise<string> {
+export async function handleRenameTestSuite(params: { id: string; name: string }): Promise<string> {
   const suite = await apiRenameTestSuite(params);
 
   return [

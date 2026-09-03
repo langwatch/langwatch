@@ -108,10 +108,7 @@ interface TraceEditState {
   clearPendingExit: () => void;
   setDiffOpen: (open: boolean) => void;
 
-  startEditing: (params: {
-    traceId: string;
-    basePatch?: TraceEditOverlayPatch | null;
-  }) => void;
+  startEditing: (params: { traceId: string; basePatch?: TraceEditOverlayPatch | null }) => void;
   /**
    * Records the stored correction once the read for it lands. Editing can
    * start before that read resolves (a link straight into edit mode), and this
@@ -125,10 +122,7 @@ interface TraceEditState {
    * the session had already got. Used immediately before a save so a correction
    * stored while this one was being written is built on rather than replaced.
    */
-  rebaseBasePatch: (params: {
-    traceId: string;
-    basePatch: TraceEditOverlayPatch;
-  }) => void;
+  rebaseBasePatch: (params: { traceId: string; basePatch: TraceEditOverlayPatch }) => void;
   stopEditing: () => void;
   /** Drops every uncommitted change and leaves edit mode. */
   discard: () => void;
@@ -145,11 +139,7 @@ interface TraceEditState {
    * than storing a correction that changes nothing.
    */
   setSpanName: (params: { spanId: string; name: string; baselineName: string }) => void;
-  setSpanType: (params: {
-    spanId: string;
-    type: SpanTypes;
-    baselineType: string | null;
-  }) => void;
+  setSpanType: (params: { spanId: string; type: SpanTypes; baselineType: string | null }) => void;
   setSpanIO: (params: {
     spanId: string;
     field: "input" | "output";
@@ -403,13 +393,7 @@ const sessionActions = (set: SetTraceEditState) => ({
       overlayView: "edited" as const,
     }),
 
-  adoptBasePatch: ({
-    traceId,
-    basePatch,
-  }: {
-    traceId: string;
-    basePatch: TraceEditOverlayPatch;
-  }) =>
+  adoptBasePatch: ({ traceId, basePatch }: { traceId: string; basePatch: TraceEditOverlayPatch }) =>
     set((s) =>
       s.editingTraceId === traceId && s.basePatch === null
         ? { basePatch, spanDrafts: rebasedParams(s.spanDrafts, basePatch) }
@@ -435,9 +419,7 @@ const sessionActions = (set: SetTraceEditState) => ({
   discard: () => set(CLEARED_SESSION),
 
   dropSessionForOtherTrace: (traceId: string) =>
-    set((s) =>
-      s.editingTraceId !== null && s.editingTraceId !== traceId ? CLEARED_SESSION : {},
-    ),
+    set((s) => (s.editingTraceId !== null && s.editingTraceId !== traceId ? CLEARED_SESSION : {})),
 });
 
 /**
@@ -500,9 +482,7 @@ const spanFieldActions = (set: SetTraceEditState) => ({
 
   resetSpanField: ({ spanId, field }: { spanId: string; field: SpanDraftField }) =>
     set((s) => ({
-      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
-        withoutField(draft, field),
-      ),
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => withoutField(draft, field)),
     })),
 });
 
@@ -533,9 +513,7 @@ const spanParamActions = (set: SetTraceEditState) => ({
 
   resetSpanParam: ({ spanId, key }: { spanId: string; key: string }) =>
     set((s) => ({
-      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) =>
-        withoutParam(draft, key),
-      ),
+      spanDrafts: withSpanDraft(s.spanDrafts, spanId, (draft) => withoutParam(draft, key)),
     })),
 });
 
@@ -551,8 +529,7 @@ const spanRemovalActions = (set: SetTraceEditState) => ({
 
   restoreSpan: (spanId: string) =>
     set((s) => {
-      const wasDeletedByCorrection =
-        s.basePatch?.deletedSpanIds.includes(spanId) ?? false;
+      const wasDeletedByCorrection = s.basePatch?.deletedSpanIds.includes(spanId) ?? false;
       return {
         deletedSpanIds: s.deletedSpanIds.filter((id) => id !== spanId),
         restoredSpanIds:
@@ -578,17 +555,13 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
 
   setTraceInput: ({ text, baselineText }) =>
     set({
-      traceInputDraft: ioTextIsUnchanged({ text, baselineText })
-        ? null
-        : { text, baselineText },
+      traceInputDraft: ioTextIsUnchanged({ text, baselineText }) ? null : { text, baselineText },
     }),
   resetTraceInput: () => set({ traceInputDraft: null }),
 
   setTraceOutput: ({ text, baselineText }) =>
     set({
-      traceOutputDraft: ioTextIsUnchanged({ text, baselineText })
-        ? null
-        : { text, baselineText },
+      traceOutputDraft: ioTextIsUnchanged({ text, baselineText }) ? null : { text, baselineText },
     }),
   resetTraceOutput: () => set({ traceOutputDraft: null }),
 
@@ -609,10 +582,7 @@ export const useTraceEditStore = create<TraceEditState>((set) => ({
   setOverlayView: (view) => set({ overlayView: view }),
 }));
 
-function withoutKey(
-  drafts: Record<string, unknown>,
-  key: string,
-): Record<string, unknown> {
+function withoutKey(drafts: Record<string, unknown>, key: string): Record<string, unknown> {
   if (!(key in drafts)) return drafts;
   const { [key]: _dropped, ...rest } = drafts;
   return rest;
@@ -819,11 +789,7 @@ function attributePathsByFlatKey(
  * Writes a value at a nested path, copying every object along the way so the
  * baseline the draft started from is never mutated.
  */
-function setAtPath(
-  target: Record<string, unknown>,
-  path: string[],
-  value: unknown,
-): void {
+function setAtPath(target: Record<string, unknown>, path: string[], value: unknown): void {
   let cursor = target;
   for (const segment of path.slice(0, -1)) {
     const next = cursor[segment];
@@ -968,12 +934,8 @@ function mergeTraceMetadata(state: TraceEditDraftState): TraceMetadataEdits {
 /** The trace's own corrected input, output and metadata, when any has one. */
 function mergeTracePatch(state: TraceEditDraftState): TraceEditOverlayPatch["trace"] {
   const base = state.basePatch?.trace;
-  const input = state.traceInputDraft
-    ? { value: state.traceInputDraft.text }
-    : base?.input;
-  const output = state.traceOutputDraft
-    ? { value: state.traceOutputDraft.text }
-    : base?.output;
+  const input = state.traceInputDraft ? { value: state.traceInputDraft.text } : base?.input;
+  const output = state.traceOutputDraft ? { value: state.traceOutputDraft.text } : base?.output;
   const metadata = mergeTraceMetadata(state);
   if (input === undefined && output === undefined && metadata === undefined) {
     return undefined;

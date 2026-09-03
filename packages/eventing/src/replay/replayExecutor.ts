@@ -18,9 +18,7 @@ import type { ReplayEvent } from "./replayEventSource";
 const DEFAULT_WRITE_BATCH_SIZE = 5000;
 
 /** Resolves a tenant's effective retention for a replay-built store context. */
-export type ReplayRetentionResolver = (
-  tenantId: string,
-) => Promise<RetentionPolicy | null>;
+export type ReplayRetentionResolver = (tenantId: string) => Promise<RetentionPolicy | null>;
 
 /**
  * Wrap a {@link RetentionPolicyResolver} in a per-instance, promise-caching
@@ -30,9 +28,7 @@ export type ReplayRetentionResolver = (
  * wired; the store then stamps PLATFORM_DEFAULT_RETENTION_DAYS (never
  * indefinite), matching the live dispatch fallback.
  */
-function makeRetentionResolver(
-  resolver?: RetentionPolicyResolver,
-): ReplayRetentionResolver {
+function makeRetentionResolver(resolver?: RetentionPolicyResolver): ReplayRetentionResolver {
   const cache = new Map<string, Promise<RetentionPolicy | null>>();
   return (tenantId: string) => {
     if (!resolver) return Promise.resolve(null);
@@ -112,10 +108,7 @@ export class FoldAccumulator {
     if (writeBatchSize <= 0) throw new Error("writeBatchSize must be > 0");
 
     // Group by tenant so each CH INSERT targets a single tenant
-    const byTenant = new Map<
-      string,
-      Array<{ state: any; context: ProjectionStoreContext }>
-    >();
+    const byTenant = new Map<string, Array<{ state: any; context: ProjectionStoreContext }>>();
 
     for (const scopedKey of this.touchedKeys) {
       const tenantId = this.keyTenantIds.get(scopedKey)!;

@@ -168,9 +168,7 @@ describe("<ScenarioRunExportDialog/> and its trigger", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.queryByRole("button", { name: /export csv/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /export csv/i })).not.toBeInTheDocument();
       expect(screen.getByText(/exporting 1,200 of 5,000 runs/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
     });

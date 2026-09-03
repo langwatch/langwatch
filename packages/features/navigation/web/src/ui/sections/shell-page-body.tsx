@@ -88,10 +88,7 @@ export const ShellPageBody = ({
       refetchOnMount: false,
     },
   );
-  const { data: ssoStatus } = navigationApi.user.getSsoStatus.useQuery(
-    {},
-    { enabled: !!user },
-  );
+  const { data: ssoStatus } = navigationApi.user.getSsoStatus.useQuery({}, { enabled: !!user });
 
   const isOnOwnPersonalProject = !!team?.isPersonal && team.ownerUserId === user?.id;
 
@@ -172,8 +169,8 @@ export const ShellPageBody = ({
           <Alert.Indicator />
           <Alert.Content>
             <Text>
-              Please check your environment variables, the following variables are not set
-              which are required for evaluations and workflows:
+              Please check your environment variables, the following variables are not set which are
+              required for evaluations and workflows:
             </Text>
             {!deployment.hasNlpService && <Text>LANGWATCH_NLP_SERVICE</Text>}
             {!deployment.hasLangevals && <Text>LANGEVALS_ENDPOINT</Text>}
@@ -251,12 +248,10 @@ export const ShellPageBody = ({
           <Alert.Content>
             <HStack width="full" gap={4}>
               <VStack align="start" gap={0} flex={1}>
-                <Alert.Title fontWeight="bold">
-                  Action Required: Link your SSO account
-                </Alert.Title>
+                <Alert.Title fontWeight="bold">Action Required: Link your SSO account</Alert.Title>
                 <Text fontSize="sm">
-                  Your organization requires SSO login. Please link your account by logging
-                  in via the email input box on the sign-in page.
+                  Your organization requires SSO login. Please link your account by logging in via
+                  the email input box on the sign-in page.
                 </Text>
               </VStack>
               <Button size="sm" colorPalette="red" flexShrink={0} color="white" asChild>
@@ -308,8 +303,8 @@ export const ShellPageBody = ({
           <Alert.Content>
             <HStack width="full" gap={4}>
               <Text flex={1}>
-                You are not part of any team in this organization. Ask your administrator to
-                add you, or{" "}
+                You are not part of any team in this organization. Ask your administrator to add
+                you, or{" "}
                 <NavigationLink href="/" textDecoration="underline">
                   go back to your home page
                 </NavigationLink>

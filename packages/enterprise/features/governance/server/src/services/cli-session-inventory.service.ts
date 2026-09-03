@@ -15,17 +15,13 @@ export class DefaultGovernanceCliSessionInventoryService {
   private constructor(
     private readonly store: CliTokenStorePort | undefined,
     private readonly diagnostics: GovernanceDiagnosticsPort | undefined,
-  ) {
-  }
+  ) {}
 
   static create(options: {
     store?: CliTokenStorePort;
     diagnostics?: GovernanceDiagnosticsPort;
   }): DefaultGovernanceCliSessionInventoryService {
-    return new DefaultGovernanceCliSessionInventoryService(
-      options.store,
-      options.diagnostics,
-    );
+    return new DefaultGovernanceCliSessionInventoryService(options.store, options.diagnostics);
   }
 
   async listForUser(input: CliUserInput): Promise<CliSession[]> {
@@ -91,10 +87,7 @@ export class DefaultGovernanceCliSessionInventoryService {
       revokedTokens += await this.store.delete(tokenKey);
     }
     if (target.tokenKeys.length > 0) {
-      await this.store.removeMembers(
-        cliUserTokensIndexKey(parsed.userId),
-        target.tokenKeys,
-      );
+      await this.store.removeMembers(cliUserTokensIndexKey(parsed.userId), target.tokenKeys);
     }
     return { revokedTokens };
   }

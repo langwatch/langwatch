@@ -24,11 +24,7 @@ export const NOTE_FLAG_HELP = `Why this run is being started: its hypothesis or 
  * command before anything is scheduled, so the caller can shorten it and run
  * once, rather than finding the refusal after a batch already started.
  */
-export const parseRunNoteFlag = ({
-  note,
-}: {
-  note: string | undefined;
-}): string | undefined => {
+export const parseRunNoteFlag = ({ note }: { note: string | undefined }): string | undefined => {
   const trimmed = note?.trim();
   if (!trimmed) return undefined;
   if (trimmed.length > MAX_RUN_NOTE_LENGTH) {

@@ -62,14 +62,7 @@ export interface RegisteredStateProjection {
 
 export type ProjectionKind = "fold" | "map" | "state";
 
-export type BatchPhase =
-  | "mark"
-  | "pause"
-  | "drain"
-  | "cutoff"
-  | "replay"
-  | "write"
-  | "unmark";
+export type BatchPhase = "mark" | "pause" | "drain" | "cutoff" | "replay" | "write" | "unmark";
 
 export interface ReplayProgress {
   phase: "replaying";

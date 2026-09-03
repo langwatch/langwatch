@@ -1,10 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { EvaluationsFacade } from "../evaluations.facade";
-import {
-  EvaluatorNotFoundError,
-  EvaluationsApiError,
-  EvaluatorCallError,
-} from "../errors";
+import { EvaluatorNotFoundError, EvaluationsApiError, EvaluatorCallError } from "../errors";
 import type { EvaluateResponse } from "../types";
 import { NoOpLogger } from "@/logger";
 

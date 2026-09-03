@@ -117,9 +117,7 @@ setup("authenticate", async ({ page, request }) => {
     console.log("initializeOrganization status:", initResponse.status());
     const initData = await initResponse.json().catch(() => null);
     if (!initResponse.ok() || initData?.["0"]?.error) {
-      throw new Error(
-        `initializeOrganization failed: ${JSON.stringify(initData).slice(0, 500)}`,
-      );
+      throw new Error(`initializeOrganization failed: ${JSON.stringify(initData).slice(0, 500)}`);
     }
     console.log("Org + project created successfully.");
   } else {

@@ -76,11 +76,7 @@ export class PrismaIdentityNewbornRepository {
    * than adopted — and refused before the append, so the attach fact never
    * lands in the standing user's stream.
    */
-  async tryFindUserAtPinnedId({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<{ id: string } | null> {
+  async tryFindUserAtPinnedId({ userId }: { userId: string }): Promise<{ id: string } | null> {
     return this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true },

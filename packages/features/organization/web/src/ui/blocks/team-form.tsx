@@ -281,13 +281,10 @@ export const TeamForm = ({
                             <Tooltip
                               content={
                                 <>
-                                  <Text>
-                                    Those are existing members of your organization.
-                                  </Text>
+                                  <Text>Those are existing members of your organization.</Text>
                                   <Text paddingTop={2}>
-                                    Want to add a team member that is not listed yet? You
-                                    can create the team first and invite them later to the
-                                    organization
+                                    Want to add a team member that is not listed yet? You can create
+                                    the team first and invite them later to the organization
                                   </Text>
                                 </>
                               }
@@ -409,11 +406,7 @@ export const TeamForm = ({
   );
 };
 
-function TeamFormProjects({
-  team,
-}: {
-  team: TeamWithProjectsAndMembers;
-}): React.ReactElement {
+function TeamFormProjects({ team }: { team: TeamWithProjectsAndMembers }): React.ReactElement {
   const { openDrawer } = useDrawer();
 
   return (

@@ -168,7 +168,5 @@ export function normalizePlanScope({
 
   const coversEvery =
     activeTestSuiteIds.length > 0 && activeTestSuiteIds.every((id) => named.has(id));
-  return coversEvery
-    ? { mode: "all" }
-    : { mode: "test_suites", testSuiteIds: [...named].sort() };
+  return coversEvery ? { mode: "all" } : { mode: "test_suites", testSuiteIds: [...named].sort() };
 }

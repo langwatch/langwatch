@@ -25,9 +25,7 @@ export const useLambdaWarmup = () => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isPageVisibleRef = useRef(true);
 
-  const concurrency = useEvaluationsV3Store(
-    useShallow((state) => state.ui.concurrency ?? 10),
-  );
+  const concurrency = useEvaluationsV3Store(useShallow((state) => state.ui.concurrency ?? 10));
 
   // Calculate number of warmup requests: half of concurrency, min 1
   const warmupCount = Math.max(1, Math.floor(concurrency / 2));

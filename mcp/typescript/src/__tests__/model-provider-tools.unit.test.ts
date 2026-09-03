@@ -5,10 +5,7 @@ vi.mock("../langwatch-api-model-providers.js", () => ({
   setModelProvider: vi.fn(),
 }));
 
-import {
-  listModelProviders,
-  setModelProvider,
-} from "../langwatch-api-model-providers.js";
+import { listModelProviders, setModelProvider } from "../langwatch-api-model-providers.js";
 
 import { handleListModelProviders } from "../tools/list-model-providers.js";
 import { handleSetModelProvider } from "../tools/set-model-provider.js";

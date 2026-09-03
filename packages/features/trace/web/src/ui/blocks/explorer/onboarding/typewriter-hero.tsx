@@ -1,7 +1,10 @@
 import { Heading, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { applyAuroraTextShimmer, BlinkingCursor } from "../../../elements/explorer/onboarding/hero-text";
+import {
+  applyAuroraTextShimmer,
+  BlinkingCursor,
+} from "../../../elements/explorer/onboarding/hero-text";
 
 /**
  * Typewriter cadence — quicker than original 38/22/420/1500. Faster typing
@@ -109,13 +112,7 @@ export function TypewriterHero({
         {headingTyping && <BlinkingCursor />}
       </Heading>
       {subhead && (
-        <Text
-          color="fg.muted"
-          textStyle="md"
-          lineHeight="1.65"
-          maxWidth="48ch"
-          minHeight="1.65em"
-        >
+        <Text color="fg.muted" textStyle="md" lineHeight="1.65" maxWidth="48ch" minHeight="1.65em">
           {applyAuroraTextShimmer(subhead.slice(0, subheadShown))}
           {subheadTyping && <BlinkingCursor color="fg.muted" />}
         </Text>

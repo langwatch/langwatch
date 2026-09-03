@@ -93,10 +93,7 @@ function queryText(query: Record<string, unknown>, keys: string[]): string | und
 }
 
 /** Epoch ms from a flag that may hold epoch ms or an ISO date. */
-function queryEpochMs(
-  query: Record<string, unknown>,
-  keys: string[],
-): number | undefined {
+function queryEpochMs(query: Record<string, unknown>, keys: string[]): number | undefined {
   const raw = queryText(query, keys);
   if (raw === undefined) return undefined;
   const asNumber = Number(raw);
@@ -130,9 +127,7 @@ async function traceByIds({
   ids: string[];
 }): Promise<CapabilityHydration> {
   const settled = await Promise.allSettled(
-    ids.map((traceId) =>
-      utils.tracesV2.header.fetch({ projectId, traceId, full: false }),
-    ),
+    ids.map((traceId) => utils.tracesV2.header.fetch({ projectId, traceId, full: false })),
   );
   const rows: CapabilityHydratedRow[] = [];
   settled.forEach((result, index) => {
@@ -148,9 +143,7 @@ async function traceByIds({
         latencyMs: header.durationMs,
         ...(header.totalCost != null ? { cost: header.totalCost } : {}),
         isError: header.status === "error",
-        ...(header.output
-          ? { output: truncateRowText(header.output, ROW_TEXT_MAX) }
-          : {}),
+        ...(header.output ? { output: truncateRowText(header.output, ROW_TEXT_MAX) } : {}),
       }),
       timestamp: header.timestamp,
     });
@@ -176,8 +169,7 @@ async function traceByQuery({
   limit: number;
 }): Promise<CapabilityHydration> {
   const to = queryEpochMs(query, ["end-date", "endDate"]) ?? Date.now();
-  const from =
-    queryEpochMs(query, ["start-date", "startDate"]) ?? to - DEFAULT_SEARCH_WINDOW_MS;
+  const from = queryEpochMs(query, ["start-date", "startDate"]) ?? to - DEFAULT_SEARCH_WINDOW_MS;
   const text = queryText(query, ["q", "query"]);
 
   const page = await utils.tracesV2.list.fetch({
@@ -232,9 +224,7 @@ async function datasetByIds({
   const datasets = await utils.dataset.getAll.fetch({ projectId });
   const rows: CapabilityHydratedRow[] = [];
   for (const id of ids) {
-    const dataset = datasets.find((candidate) =>
-      matchesId(candidate, id, ["id", "slug"]),
-    );
+    const dataset = datasets.find((candidate) => matchesId(candidate, id, ["id", "slug"]));
     if (!dataset) continue;
     const records = dataset.recordCount;
     rows.push({
@@ -260,9 +250,7 @@ async function promptByIds({
   });
   const rows: CapabilityHydratedRow[] = [];
   for (const id of ids) {
-    const prompt = prompts.find((candidate) =>
-      matchesId(candidate, id, ["id", "handle"]),
-    );
+    const prompt = prompts.find((candidate) => matchesId(candidate, id, ["id", "handle"]));
     if (!prompt) continue;
     rows.push({
       id: prompt.id,
@@ -287,9 +275,7 @@ async function experimentByIds({
   });
   const rows: CapabilityHydratedRow[] = [];
   for (const id of ids) {
-    const experiment = experiments.find((candidate) =>
-      matchesId(candidate, id, ["slug", "id"]),
-    );
+    const experiment = experiments.find((candidate) => matchesId(candidate, id, ["slug", "id"]));
     if (!experiment) continue;
     rows.push({
       id: experiment.slug ?? experiment.id,

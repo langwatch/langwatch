@@ -2,12 +2,7 @@ import { create } from "zustand";
 import { isPreviewTraceId } from "../model/preview-trace-id";
 import { selectIsTraceEditDirty, useTraceEditStore } from "./trace-edit.store";
 
-export type DrawerViewMode =
-  | "trace"
-  | "summary"
-  | "conversation"
-  | "terminal"
-  | "session";
+export type DrawerViewMode = "trace" | "summary" | "conversation" | "terminal" | "session";
 // Flame was retired during the trace-view redesign on the grounds that
 // Waterfall already showed depth/parent/child — then brought back in
 // Round 3 because the time-weighted block layout reads completely
@@ -149,11 +144,7 @@ interface DrawerState extends DrawerUrlState {
 
   traceBackStack: TraceHistoryEntry[];
 
-  openTrace: (
-    traceId: string,
-    occurredAtMs?: number | null,
-    options?: OpenTraceOptions,
-  ) => void;
+  openTrace: (traceId: string, occurredAtMs?: number | null, options?: OpenTraceOptions) => void;
   /**
    * Fill in the partition-pruning hint after the fact, from a resolved
    * trace timestamp, when the drawer was opened without one (deep link /
@@ -270,12 +261,7 @@ function isVizTab(value: string | null): value is VizTab {
   // carrying that value fall through to the default (waterfall) when
   // the guard returns false. "flame" was retired in the redesign and
   // revived in Round 3 — it's valid again.
-  return (
-    value === "waterfall" ||
-    value === "topology" ||
-    value === "sequence" ||
-    value === "flame"
-  );
+  return value === "waterfall" || value === "topology" || value === "sequence" || value === "flame";
 }
 
 // `isDrawerTab` retired alongside `activeTab` — the SpanDetailPane body
@@ -372,9 +358,7 @@ function readInitialFromURL(): InitialFromURL {
     // (persisted via the ModeSwitch action), then to "trace" if nothing
     // is remembered yet. The localStorage fallback is what lets users
     // who prefer Summary keep landing on Summary across traces.
-    const viewMode: DrawerViewMode = isViewMode(mode)
-      ? mode
-      : (loadLastViewMode() ?? "summary");
+    const viewMode: DrawerViewMode = isViewMode(mode) ? mode : (loadLastViewMode() ?? "summary");
     const vizTab: VizTab = isVizTab(vizRaw) ? vizRaw : (loadLastVizTab() ?? "waterfall");
     const pinnedSpanIds = parsePinnedSpansParam(pinnedRaw);
     const isEditing = parseEditParam({
@@ -574,8 +558,7 @@ function readPaneStateFromStorage(): Record<PaneId, PaneState> {
     if (raw === null) return DEFAULT_PANE_STATE;
     const parsed = JSON.parse(raw) as Partial<Record<PaneId, PaneState>>;
     return {
-      conversationContext:
-        parsed.conversationContext ?? DEFAULT_PANE_STATE.conversationContext,
+      conversationContext: parsed.conversationContext ?? DEFAULT_PANE_STATE.conversationContext,
       visualization: parsed.visualization ?? DEFAULT_PANE_STATE.visualization,
       spanDetail: parsed.spanDetail ?? DEFAULT_PANE_STATE.spanDetail,
     };
@@ -726,14 +709,10 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   toggleSnapMaximize: (viewportWidth) =>
     set((s) => {
-      const snapWidth = Math.max(
-        DRAWER_MIN_WIDTH_PX,
-        viewportWidth - DRAWER_MAXIMIZE_EDGE_PX,
-      );
+      const snapWidth = Math.max(DRAWER_MIN_WIDTH_PX, viewportWidth - DRAWER_MAXIMIZE_EDGE_PX);
       const isAtSnap = s.widthPx !== null && Math.abs(s.widthPx - snapWidth) < 2;
       if (isAtSnap) {
-        const restore =
-          s.preMaximizeWidthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth);
+        const restore = s.preMaximizeWidthPx ?? Math.min(DRAWER_DEFAULT_WIDTH_PX, snapWidth);
         persistWidth(restore);
         return {
           widthPx: restore,
@@ -777,9 +756,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       // pane can be maximized at a time. Without this normalization a
       // sequence of clicks could leave several panes flagged maximized
       // and `PaneLayout` would hide all of them at once.
-      const next: Record<PaneId, PaneState> = (
-        Object.keys(s.paneState) as PaneId[]
-      ).reduce(
+      const next: Record<PaneId, PaneState> = (Object.keys(s.paneState) as PaneId[]).reduce(
         (acc, key) => {
           acc[key] = {
             ...s.paneState[key],

@@ -7,12 +7,7 @@ import { parseRunNoteFlag } from "../../utils/runNote";
 import type { RawOutputFlags } from "../../utils/output";
 import { createCliRunPlansService } from "./cli-run-plans-service";
 import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
-import {
-  buildScope,
-  parseRepeat,
-  parseTargets,
-  type ScopeOptions,
-} from "./scopeFlags";
+import { buildScope, parseRepeat, parseTargets, type ScopeOptions } from "./scopeFlags";
 import { emitRunResult } from "./reportRun";
 
 export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
@@ -36,9 +31,7 @@ export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
  *
  * @see specs/features/run-plan-cli.feature
  */
-export const runRunPlanCommand = async (
-  options: RunPlanRunOptions,
-): Promise<void> => {
+export const runRunPlanCommand = async (options: RunPlanRunOptions): Promise<void> => {
   await resolveCredentials();
 
   // Everything the caller wrote is read before anything is scheduled, so a
@@ -47,10 +40,7 @@ export const runRunPlanCommand = async (
   const note = parseRunNoteFlag({ note: options.note });
   const targets = parseTargets(options.target);
   const repeatCount = parseRepeat(options.repeat);
-  const { scope, scenarioIds } = await buildScope(
-    options,
-    createCliTestSuitesService(),
-  );
+  const { scope, scenarioIds } = await buildScope(options, createCliTestSuitesService());
 
   const service = createCliRunPlansService();
   const spinner = createSpinner("Scheduling run...").start();
@@ -63,14 +53,10 @@ export const runRunPlanCommand = async (
         targets,
         ...(scenarioIds ? { scenarioIds } : {}),
         ...(repeatCount !== undefined ? { repeatCount } : {}),
-        ...(options.simulatorModel
-          ? { simulatorModel: options.simulatorModel }
-          : {}),
+        ...(options.simulatorModel ? { simulatorModel: options.simulatorModel } : {}),
         ...(options.judgeModel ? { judgeModel: options.judgeModel } : {}),
       },
-      ...(options.idempotencyKey
-        ? { idempotencyKey: options.idempotencyKey }
-        : {}),
+      ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
       ...(parameters ? { parameters } : {}),
       ...(note ? { note } : {}),
     };

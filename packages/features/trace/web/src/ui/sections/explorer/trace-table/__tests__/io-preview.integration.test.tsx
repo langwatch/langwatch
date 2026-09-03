@@ -128,9 +128,7 @@ describe("IOPreview media badges", () => {
       // Text first, image after it in document order — the same
       // text-then-media order the drawer renders.
       const text = getByText(/what is in this picture\?/);
-      expect(
-        text.compareDocumentPosition(thumb) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+      expect(text.compareDocumentPosition(thumb) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
 
@@ -145,10 +143,7 @@ describe("IOPreview media badges", () => {
         input: [{ kind: "image", url: "/api/files/p1/child-img", role: "user" }],
       });
 
-      expect(getByTestId("io-preview-thumbnail")).toHaveAttribute(
-        "src",
-        "/api/files/p1/child-img",
-      );
+      expect(getByTestId("io-preview-thumbnail")).toHaveAttribute("src", "/api/files/p1/child-img");
     });
 
     it("marks audio and attachments from the refs too", () => {
@@ -221,15 +216,10 @@ describe("IOPreview missing-side placeholders", () => {
   describe("given a row with input but no recorded output", () => {
     describe("when the list renders it with placeholders enabled", () => {
       it("renders the input plus a muted no-output placeholder", () => {
-        const { getByTestId, container } = renderWithPlaceholders(
-          "hello claudinho",
-          null,
-        );
+        const { getByTestId, container } = renderWithPlaceholders("hello claudinho", null);
 
         expect(container.textContent).toContain("hello claudinho");
-        expect(getByTestId("io-preview-missing-output").textContent).toBe(
-          "— no output recorded",
-        );
+        expect(getByTestId("io-preview-missing-output").textContent).toBe("— no output recorded");
       });
     });
 
@@ -259,9 +249,7 @@ describe("IOPreview missing-side placeholders", () => {
       it("renders the no-input placeholder before the output", () => {
         const { getByTestId } = renderWithPlaceholders(null, "done!");
 
-        expect(getByTestId("io-preview-missing-input").textContent).toBe(
-          "— no input recorded",
-        );
+        expect(getByTestId("io-preview-missing-input").textContent).toBe("— no input recorded");
       });
     });
   });

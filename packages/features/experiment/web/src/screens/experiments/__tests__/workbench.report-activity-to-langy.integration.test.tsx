@@ -184,7 +184,11 @@ afterEach(() => {
 describe("given the workbench is open", () => {
   describe("when nothing is running", () => {
     it("reports nothing, leaving the line to the turn", () => {
-      render(<ChakraProvider value={defaultSystem}><WorkbenchPage /></ChakraProvider>);
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <WorkbenchPage />
+        </ChakraProvider>,
+      );
 
       expect(reported()).toBeNull();
     });
@@ -196,7 +200,11 @@ describe("given the workbench is open", () => {
       execution.status = "running";
       execution.progress = { completed: 12, total: 20 };
 
-      render(<ChakraProvider value={defaultSystem}><WorkbenchPage /></ChakraProvider>);
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <WorkbenchPage />
+        </ChakraProvider>,
+      );
 
       expect(reported()).toContain("12 of 20 cells");
     });
@@ -208,7 +216,11 @@ describe("given the workbench is open", () => {
       execution.status = "running";
       execution.progress = { completed: 5, total: 20 };
 
-      const view = render(<ChakraProvider value={defaultSystem}><WorkbenchPage /></ChakraProvider>);
+      const view = render(
+        <ChakraProvider value={defaultSystem}>
+          <WorkbenchPage />
+        </ChakraProvider>,
+      );
       expect(reported()).not.toBeNull();
 
       view.unmount();

@@ -27,9 +27,9 @@ export type OrganizationTeamProjectReading = {
   hasOrgPermission: (permission: string) => boolean;
 };
 
-export function useOrganizationTeamProject(
-  _options?: { redirectToOnboarding?: boolean },
-): OrganizationTeamProjectReading {
+export function useOrganizationTeamProject(_options?: {
+  redirectToOnboarding?: boolean;
+}): OrganizationTeamProjectReading {
   const host = useOrganizationHost();
   return {
     organization: host.organization(),

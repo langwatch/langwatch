@@ -31,9 +31,7 @@ export interface CeremonyAccountRow {
  * carry states nothing, and so does a detach of a tombstone.
  */
 export interface IdentityAccountCeremonies {
-  beforeAccountCreate(
-    account: CeremonyAccountRow,
-  ): Promise<{ data: { id: string } } | undefined>;
+  beforeAccountCreate(account: CeremonyAccountRow): Promise<{ data: { id: string } } | undefined>;
   beforeAccountDelete(account: CeremonyAccountRow): Promise<void>;
   /**
    * A `user` update that touches `email`, on the identity branch (ADR-116

@@ -1,4 +1,7 @@
-import type { AnalyticsFilterValue as FilterParam, FilterField } from "@langwatch/analytics-contract";
+import type {
+  AnalyticsFilterValue as FilterParam,
+  FilterField,
+} from "@langwatch/analytics-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";

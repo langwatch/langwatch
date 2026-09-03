@@ -3,12 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { MONO_FONT } from "../../model/front-door-theme";
 import type { Direction, SnakeGame } from "../../model/castle-snake";
-import {
-  advance,
-  advanceChaser,
-  createGame,
-  queueTurn,
-} from "../../model/castle-snake";
+import { advance, advanceChaser, createGame, queueTurn } from "../../model/castle-snake";
 
 /**
  * Double-tap the castle and a snake comes out of it.
@@ -141,9 +136,7 @@ export function CastleSnake() {
         <Text as="span" color="frontDoor.detail">
           {hud.eaten} tokens
         </Text>
-        <Text as="span">
-          {hud.ending ? ` · ${hud.ending} · esc` : " · esc to stop"}
-        </Text>
+        <Text as="span">{hud.ending ? ` · ${hud.ending} · esc` : " · esc to stop"}</Text>
       </Box>
     </>
   );
@@ -422,10 +415,7 @@ function paintBurst({
  * the lattice wrapped, so a crossing is never drawn as a dash across the
  * whole page.
  */
-function spineRuns(
-  game: SnakeGame,
-  progress: number,
-): { x: number; y: number }[][] {
+function spineRuns(game: SnakeGame, progress: number): { x: number; y: number }[][] {
   const step = STEP_PIXELS[game.direction];
   const head = px(game.snake[0]!);
   const reaching = {
@@ -459,10 +449,7 @@ function spineRuns(
  * curve rather than a right angle, which is most of what "smooth" means at
  * this size.
  */
-function traceRounded(
-  context: CanvasRenderingContext2D,
-  points: { x: number; y: number }[],
-) {
+function traceRounded(context: CanvasRenderingContext2D, points: { x: number; y: number }[]) {
   if (points.length < 2) return;
   context.moveTo(points[0]!.x, points[0]!.y);
 
@@ -573,25 +560,15 @@ function buildMolecule() {
   const r = 5.2;
   const span = r * Math.sqrt(3);
   /** The centre of the ring fused across the edge facing `degrees`. */
-  const fused = (
-    centre: readonly [number, number],
-    degrees: number,
-  ): readonly [number, number] => [
+  const fused = (centre: readonly [number, number], degrees: number): readonly [number, number] => [
     centre[0] + span * Math.cos((degrees * Math.PI) / 180),
     centre[1] + span * Math.sin((degrees * Math.PI) / 180),
   ];
 
-  const polygon = (
-    centre: readonly [number, number],
-    radius: number,
-    sides: number,
-  ) => {
+  const polygon = (centre: readonly [number, number], radius: number, sides: number) => {
     const points = Array.from({ length: sides }, (_, i) => {
       const angle = (i * 2 * Math.PI) / sides;
-      return [
-        centre[0] + radius * Math.cos(angle),
-        centre[1] + radius * Math.sin(angle),
-      ] as const;
+      return [centre[0] + radius * Math.cos(angle), centre[1] + radius * Math.sin(angle)] as const;
     });
     return [...points, points[0]!];
   };
@@ -640,9 +617,7 @@ function buildMolecule() {
 
   // Centred on its own bounding box, so it sits ON the intersection it
   // occupies rather than hanging off one corner of it.
-  return strokes.map((stroke) =>
-    stroke.map(([x, y]) => [x - centre[0], y - centre[1]] as const),
-  );
+  return strokes.map((stroke) => stroke.map(([x, y]) => [x - centre[0], y - centre[1]] as const));
 }
 
 /** Not a token colour: nothing else on the front door is allowed to be this. */
@@ -661,9 +636,7 @@ function moleculeAt(game: SnakeGame, fx: Effects, now: number) {
   const to = game.chaser;
   if (!adjacent(from, to)) return px(to);
 
-  const t = easeInOut(
-    Math.min(1, (now - fx.chaserMovedAt) / (TICK_MS * CHASER_EVERY)),
-  );
+  const t = easeInOut(Math.min(1, (now - fx.chaserMovedAt) / (TICK_MS * CHASER_EVERY)));
   const a = px(from);
   const b = px(to);
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
@@ -698,9 +671,7 @@ function paintMolecule({
 
   for (const stroke of MOLECULE) {
     context.beginPath();
-    stroke.forEach(([x, y], i) =>
-      i === 0 ? context.moveTo(x, y) : context.lineTo(x, y),
-    );
+    stroke.forEach(([x, y], i) => (i === 0 ? context.moveTo(x, y) : context.lineTo(x, y)));
     context.stroke();
   }
 

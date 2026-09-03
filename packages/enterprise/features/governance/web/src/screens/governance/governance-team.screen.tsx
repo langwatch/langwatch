@@ -1,12 +1,4 @@
-import {
-  Box,
-  Heading,
-  HStack,
-  SimpleGrid,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Heading, HStack, SimpleGrid, Spinner, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import GovernanceLayout from "../../ui/sections/governance-layout";
 import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice";
@@ -58,8 +50,8 @@ function GovernanceTeamDetailPage() {
   // PersonalSidebar via the v2 chrome retention discriminator (admin's
   // not a TeamUser → AdminViewingAsBanner fires from DashboardLayout).
   const teamProjectSlug =
-    organizations?.flatMap((org) => org.teams ?? []).find((t) => t.id === teamId)
-      ?.projects?.[0]?.slug ?? null;
+    organizations?.flatMap((org) => org.teams ?? []).find((t) => t.id === teamId)?.projects?.[0]
+      ?.slug ?? null;
 
   const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 500 },
@@ -110,8 +102,8 @@ function GovernanceTeamDetailPage() {
         ) : !team ? (
           <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={5}>
             <Text fontSize="sm" color="fg.muted">
-              No spend data for this team in the last 30 days. The team may not have any
-              associated ingestion sources reporting activity yet.
+              No spend data for this team in the last 30 days. The team may not have any associated
+              ingestion sources reporting activity yet.
             </Text>
           </Box>
         ) : (
@@ -126,18 +118,13 @@ function GovernanceTeamDetailPage() {
               />
             </SimpleGrid>
 
-            <Box
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="md"
-              padding={4}
-            >
+            <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
               <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
                 Detail metrics
               </Text>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Per-day spend, per-user breakdown, and model mix for this team will land
-                here in a follow-up.
+                Per-day spend, per-user breakdown, and model mix for this team will land here in a
+                follow-up.
               </Text>
               {teamProjectSlug && (
                 <>
@@ -150,8 +137,8 @@ function GovernanceTeamDetailPage() {
                     View this team's workspace traces →
                   </Link>
                   <Text fontSize="xs" color="fg.subtle" marginTop={1} marginBottom={3}>
-                    The trace explorer opens with the team's data. A 'Viewing as admin'
-                    banner stays present + the access is logged to /settings/audit-log.
+                    The trace explorer opens with the team's data. A 'Viewing as admin' banner stays
+                    present + the access is logged to /settings/audit-log.
                   </Text>
                 </>
               )}
@@ -159,8 +146,8 @@ function GovernanceTeamDetailPage() {
                 See this team in the bird's-eye chart →
               </Link>
               <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                The chart's {`'By Team'`} toggle exercises the same data through one
-                orthogonal lens until the dedicated drilldown ships.
+                The chart's {`'By Team'`} toggle exercises the same data through one orthogonal lens
+                until the dedicated drilldown ships.
               </Text>
             </Box>
           </>

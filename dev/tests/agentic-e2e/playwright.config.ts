@@ -45,9 +45,7 @@ export default defineConfig({
      * (E2E_BROWSER_CHANNEL=chrome) to skip the ~170 MB Chromium download.
      * Locally it falls back to Playwright's bundled Chromium. Applies to all
      * projects (setup + specs) since none override channel. */
-    ...(process.env.E2E_BROWSER_CHANNEL
-      ? { channel: process.env.E2E_BROWSER_CHANNEL }
-      : {}),
+    ...(process.env.E2E_BROWSER_CHANNEL ? { channel: process.env.E2E_BROWSER_CHANNEL } : {}),
 
     /* Collect trace on failure for debugging */
     trace: "retain-on-failure",

@@ -30,10 +30,7 @@
 
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
-import type {
-  GatewayBudget,
-  GatewayBudgetWindow,
-} from "@langwatch/prisma-client/generated";
+import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/prisma-client/generated";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import {
   createTestClickHouseClient,
@@ -46,14 +43,7 @@ const chUrl = testClickHouseUrl();
 const suffix = nanoid(8);
 const TENANT_ID = `proj-periodstart-${suffix}`;
 
-const ALL_WINDOWS: GatewayBudgetWindow[] = [
-  "MINUTE",
-  "HOUR",
-  "DAY",
-  "WEEK",
-  "MONTH",
-  "TOTAL",
-];
+const ALL_WINDOWS: GatewayBudgetWindow[] = ["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL"];
 
 const DEBIT_USD = "0.0010000000";
 // The BudgetDebitRow the repo actually takes: same amount as DEBIT_USD,
@@ -90,9 +80,7 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
   let spendByBudgetId: Map<string, string>;
 
   beforeAll(async () => {
-    repo = new GatewayBudgetClickHouseRepository(async () =>
-      createTestClickHouseClient(chUrl!),
-    );
+    repo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
 
     // One pinned instant for every debit and for the read below. The
     // reader computes the current period from the instant it is handed;
@@ -137,14 +125,15 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
     });
 
     /** @scenario "Spend recorded against a budget is visible on that budget" */
-    it.each(
-      ALL_WINDOWS,
-    )("reports a %s budget as past its limit once spend exceeds it", (window) => {
-      const budget = budgets.find((b) => b.window === window)!;
-      const spent = Number.parseFloat(spendByBudgetId.get(budget.id)!);
+    it.each(ALL_WINDOWS)(
+      "reports a %s budget as past its limit once spend exceeds it",
+      (window) => {
+        const budget = budgets.find((b) => b.window === window)!;
+        const spent = Number.parseFloat(spendByBudgetId.get(budget.id)!);
 
-      expect(spent).toBeGreaterThanOrEqual(Number.parseFloat(LIMIT_USD));
-    });
+        expect(spent).toBeGreaterThanOrEqual(Number.parseFloat(LIMIT_USD));
+      },
+    );
   });
 
   describe("when the ClickHouse server does not run in UTC", () => {
@@ -212,15 +201,9 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
     }, 120_000);
 
     /** @scenario "Spend stays visible when the ClickHouse server does not run in UTC" */
-    it.each(
-      TZ_WINDOWS,
-    )("still reports non-zero spend on a %s budget", async (window) => {
+    it.each(TZ_WINDOWS)("still reports non-zero spend on a %s budget", async (window) => {
       const budget = tzBudgets.find((b) => b.window === window)!;
-      const spend = await repo.getSpendForBudgets(
-        TENANT_ID,
-        [budget],
-        tzOccurredAt,
-      );
+      const spend = await repo.getSpendForBudgets(TENANT_ID, [budget], tzOccurredAt);
 
       expect(Number.parseFloat(spend[0]!.spentUsd)).toBeGreaterThan(0);
     });

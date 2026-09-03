@@ -86,9 +86,7 @@ describe("fold failures after the state was stored", () => {
     const store = createMockFoldProjectionStore<{ count: number }>();
     (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     if (shouldStoreFail) {
-      (store.store as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error("store boom"),
-      );
+      (store.store as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("store boom"));
     }
 
     const fold = createMockFoldProjectionDefinition("counter", {
@@ -140,9 +138,7 @@ describe("fold failures after the state was stored", () => {
       context: unknown,
     ) => Promise<void>;
 
-    return await onEvent("counter", options.event, { tenantId }).catch(
-      (error: unknown) => error,
-    );
+    return await onEvent("counter", options.event, { tenantId }).catch((error: unknown) => error);
   }
 
   describe("when a subscriber throws after the fold state was stored", () => {

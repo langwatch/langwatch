@@ -148,14 +148,7 @@ describe("span.ts", () => {
 
     it("accepts all valid span types", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-      const validTypes: SpanType[] = [
-        "span",
-        "llm",
-        "chain",
-        "tool",
-        "agent",
-        "guardrail",
-      ];
+      const validTypes: SpanType[] = ["span", "llm", "chain", "tool", "agent", "guardrail"];
 
       validTypes.forEach((type) => {
         langwatchSpan.setType(type);
@@ -496,10 +489,7 @@ describe("span.ts", () => {
       const { langwatchSpan } = testScenarios.createSpanTest();
 
       const operations = await performanceUtils.createConcurrentOperations(async (i) => {
-        langwatchSpan
-          .setAttribute(`concurrent.${i}`, i)
-          .addEvent(`event-${i}`)
-          .setType("llm");
+        langwatchSpan.setAttribute(`concurrent.${i}`, i).addEvent(`event-${i}`).setType("llm");
         return i;
       }, 50);
 

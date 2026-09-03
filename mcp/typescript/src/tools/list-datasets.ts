@@ -1,7 +1,4 @@
-import {
-  listDatasets as apiListDatasets,
-  type DatasetSummary,
-} from "../langwatch-api-datasets.js";
+import { listDatasets as apiListDatasets, type DatasetSummary } from "../langwatch-api-datasets.js";
 import { escapeMarkdown } from "../utils/escape-markdown.js";
 
 /**
@@ -72,9 +69,7 @@ export async function handleListDatasets(
     lines.push("");
   }
 
-  lines.push(
-    "> Use `platform_get_dataset` with the slug to see full dataset details and records.",
-  );
+  lines.push("> Use `platform_get_dataset` with the slug to see full dataset details and records.");
 
   return lines.join("\n");
 }

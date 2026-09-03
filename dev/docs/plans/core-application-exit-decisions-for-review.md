@@ -225,7 +225,7 @@ They do **not** get an `apps/api` mount the way every core vertical does.
 **Why.** The exit plan's own rule (line 103) is that core never imports
 enterprise implementations, and that role-specific enterprise composition stays
 under `packages/enterprise/composition/**`. `apps/api` is core, and mounting
-these needs the enterprise *server* packages rather than their contracts. The
+these needs the enterprise _server_ packages rather than their contracts. The
 precedent is `apps/worker`, which reaches enterprise only through
 `@langwatch/enterprise-worker`.
 
@@ -336,7 +336,7 @@ targets (`LegacyUiShellAdapter`). A prefix redirect is a permanent routing
 primitive, and the thing that is legacy is the URL, not the element.
 
 **Why it moved at all.** It depends on `react-router` and nothing else, which is
-rare in the shell closure. The redirect *table* (`legacyRedirects.tsx`) is
+rare in the shell closure. The redirect _table_ (`legacyRedirects.tsx`) is
 application route data and stays in `platform/app`; ADR-001's model is exactly
 that — a global `ui/` primitive, composed by app-owned data.
 
@@ -383,7 +383,7 @@ should have one.
 **Reversibility.** Trivial.
 
 **Watch this one.** Both onboarding pages mount a design-system provider
-*inside* an application that already mounts one in `OuterProviders`. That
+_inside_ an application that already mounts one in `OuterProviders`. That
 nesting is pre-existing and was preserved exactly; it is worth a separate look,
 because a nested Chakra provider is usually a mistake rather than an intent.
 
@@ -1112,7 +1112,7 @@ the code.
 A reviewer must run, before this is deployed:
 
 1. `pnpm --filter @langwatch/worker typecheck` and `pnpm --filter
-   @langwatch/worker test:unit` — the new module and its two moved tests.
+@langwatch/worker test:unit` — the new module and its two moved tests.
    `apps/worker/tsconfig.json` sets `"types": []` and the package declares no
    `@types/node`; the new file needs `node:http` and `node:worker_threads` the
    same way `worker-stored-object-storage.adapter.ts` already needs `node:fs`,
@@ -1128,7 +1128,7 @@ A reviewer must run, before this is deployed:
    samples on `/metrics`. This is the one that matters: a mistake here is a
    crash-looping worker fleet on the next deploy, not a red test.
 5. `WORKERS_IN_PROCESS=1 pnpm dev` — the in-process path calls `startWorkers({
-   shouldStartMetricsServer: false })`, so it never reaches the moved code, but
+shouldStartMetricsServer: false })`, so it never reaches the moved code, but
    the new top-level import is evaluated before `setEnvironment()` and must stay
    side-effect-free (it imports two node built-ins, a type, and two constants).
 
@@ -1146,7 +1146,7 @@ annotated test; a binding the checker cannot see is a spec that reads as
 unimplemented while a real test covers it. The failure is silent in the
 direction that matters — it under-reports enforcement, so nobody investigates.
 
-**It compounds with [entry 18].** `apps/**` gates no CI *and* was outside the
+**It compounds with [entry 18].** `apps/**` gates no CI _and_ was outside the
 parity roots. Code leaving `platform/app` with its tests was losing both its CI
 gate and its spec binding at the same moment, which is the exact opposite of
 what moving code into a canonical owner is supposed to achieve.
@@ -1370,7 +1370,7 @@ The test was added in `557774e72f` — the commit immediately before this slice 
 and has been red since. Porting it unchanged would have made a new package
 suite permanently red for a behaviour the transport deliberately does not have.
 
-**What was NOT decided here.** Whether revocation *should* move up to the
+**What was NOT decided here.** Whether revocation _should_ move up to the
 transport. There is a real argument for it — an explicit composed effect reads
 better than one buried in a repository — but adding it during a transport move
 would be a redesign, and it would double-revoke while the repository still
@@ -1525,20 +1525,20 @@ was restored from `origin/main`, and no file was created under `platform/app`.
 
 Clusters and where they were pointed:
 
-| Cluster | Repointed to |
-| --- | --- |
-| `server/event-sourcing/{commands,domain,projections,pipeline,stores,eventSourcing,replay}` (5 pipelines + the identity app-layer, 28 files) | `@langwatch/eventing` |
-| `~/components/ui/{menu,tooltip,popover,switch,color-mode}` (16 importers) | `@langwatch/design-system/<name>` |
-| `~/components/suites/*` (run-history-transforms, RunMetricsSummary, NowProvider, ScenarioRunContent, format-run-status-label) | `@langwatch/suite-web` |
-| `~/components/simulations/*`, `~/components/scenarios/*` | `@langwatch/scenario-web` |
-| `~/components/shared/formatters`, `PassRateIndicator`, `~/utils/jsonValueText` | `@langwatch/design-system/{metric-value-formatters,pass-rate-indicator,json-value-text}` |
-| `~/components/datasets/editor/*` | `@langwatch/dataset-web` |
-| `~/optimization_studio/hooks/useWorkflowStore` (18 test mocks), `utils/{workflowFields,datasetUtils}`, `components/ExecutionState` | `@langwatch/workflow-web` / `@langwatch/workflow-contract` |
-| `features/analytics-query/visualization/*` | `@langwatch/analytics-web/visualization` |
-| `features/langy/logic/*`, `components/StreamingStatCard`, `capabilities/cliResultDocument` | `@langwatch/langy-web` |
-| `~/server/app-layer/langy/{errors,langyApiKeyIdentity,streaming/langyTokenBuffer}` | `@langwatch/langy-contract`, `~/runtime/app/features/langy-api-key-identity.adapter`, `@langwatch/langy-server` |
-| `~/server/{evaluations/evaluators,prompt-config/prompt.service,agents/agent.repository,modelProviders/registry}` | the matching `@langwatch/*-contract` |
-| `pages/governance/{inventory,ingestion-sources.enterprise}` (12 test files) | `../inventory.enterprise` (the two pages are one file now) |
+| Cluster                                                                                                                                     | Repointed to                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `server/event-sourcing/{commands,domain,projections,pipeline,stores,eventSourcing,replay}` (5 pipelines + the identity app-layer, 28 files) | `@langwatch/eventing`                                                                                           |
+| `~/components/ui/{menu,tooltip,popover,switch,color-mode}` (16 importers)                                                                   | `@langwatch/design-system/<name>`                                                                               |
+| `~/components/suites/*` (run-history-transforms, RunMetricsSummary, NowProvider, ScenarioRunContent, format-run-status-label)               | `@langwatch/suite-web`                                                                                          |
+| `~/components/simulations/*`, `~/components/scenarios/*`                                                                                    | `@langwatch/scenario-web`                                                                                       |
+| `~/components/shared/formatters`, `PassRateIndicator`, `~/utils/jsonValueText`                                                              | `@langwatch/design-system/{metric-value-formatters,pass-rate-indicator,json-value-text}`                        |
+| `~/components/datasets/editor/*`                                                                                                            | `@langwatch/dataset-web`                                                                                        |
+| `~/optimization_studio/hooks/useWorkflowStore` (18 test mocks), `utils/{workflowFields,datasetUtils}`, `components/ExecutionState`          | `@langwatch/workflow-web` / `@langwatch/workflow-contract`                                                      |
+| `features/analytics-query/visualization/*`                                                                                                  | `@langwatch/analytics-web/visualization`                                                                        |
+| `features/langy/logic/*`, `components/StreamingStatCard`, `capabilities/cliResultDocument`                                                  | `@langwatch/langy-web`                                                                                          |
+| `~/server/app-layer/langy/{errors,langyApiKeyIdentity,streaming/langyTokenBuffer}`                                                          | `@langwatch/langy-contract`, `~/runtime/app/features/langy-api-key-identity.adapter`, `@langwatch/langy-server` |
+| `~/server/{evaluations/evaluators,prompt-config/prompt.service,agents/agent.repository,modelProviders/registry}`                            | the matching `@langwatch/*-contract`                                                                            |
+| `pages/governance/{inventory,ingestion-sources.enterprise}` (12 test files)                                                                 | `../inventory.enterprise` (the two pages are one file now)                                                      |
 
 **Why repoint rather than restore.** Every one of these modules had a live
 owner in a package; restoring the deleted file would have grown `platform/app`
@@ -2875,7 +2875,7 @@ Three seams changed shape, each to an existing house pattern:
 - `platformUrl` arrives as the shared `PlatformUrlBuilder` port, added to
   `AppRestFeaturePorts`;
 - `handleDashboardError` is replaced by `createFamilyErrorHandler({ loggerName,
-  label, boundary: security.legacyErrorHandler })`, the shared helper another
+label, boundary: security.legacyErrorHandler })`, the shared helper another
   lane extracted for exactly this.
 
 **Cost, stated honestly.** `createFamilyErrorHandler` logs a sub-500 refusal at
@@ -3170,14 +3170,14 @@ one owns its procedures rather than delegating to a feature package.
 **Why.** The brief named this the lane's open question, and all three tidier
 answers are worse:
 
-- *Split it across the trace and scenario packages.* Renames the wire surface.
+- _Split it across the trace and scenario packages._ Renames the wire surface.
   `export.onExportProgress` is what two browser hooks call; moving it to
   `traces.onExportProgress` breaks them, and the preservation contract for a
   transport move forbids it.
-- *Put both procedures in one feature package.* Whichever package took it would
+- _Put both procedures in one feature package._ Whichever package took it would
   own the other's permission. `scenarios:view` living in the trace package is a
   worse lie than the one being fixed.
-- *Create a `packages/features/export` package.* The strict contract lint
+- _Create a `packages/features/export` package._ The strict contract lint
   requires a `<subject>.service.ts` capability, and there is no service — the
   whole surface is a relay over the process's broadcast channel, filtered by
   `exportId`. Inventing a service to satisfy a linter is not an improvement.
@@ -3218,12 +3218,12 @@ told not to edit, so the lines were handed to the coordinator instead.
 **Decided.** Four modules that two or more families share were moved rather than
 injected:
 
-| Was | Now | Foreign files repointed |
-| --- | --- | --- |
-| `server/routes/experiments-v3.schemas.ts` | `apps/api/src/features/experiment/experiment-rest.schemas.ts` | `routes/experiments-v3.ts`, `routes/misc.ts` |
-| `server/experiments-v3/workbench-actor.ts` | `apps/api/src/features/experiment/experiment-rest.workbench-actor.ts` | `routes/experiments-v3.ts` |
-| `server/stored-objects/media-response.ts` | `apps/api/src/app-rest/app-rest.media-response.ts` | `app/api/user-avatar/[[...route]]/app.ts` |
-| `server/stored-objects/safe-media-types.ts` | `@langwatch/stored-object-contract` | `server/stored-objects/content-extractor.ts` |
+| Was                                         | Now                                                                   | Foreign files repointed                      |
+| ------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------- |
+| `server/routes/experiments-v3.schemas.ts`   | `apps/api/src/features/experiment/experiment-rest.schemas.ts`         | `routes/experiments-v3.ts`, `routes/misc.ts` |
+| `server/experiments-v3/workbench-actor.ts`  | `apps/api/src/features/experiment/experiment-rest.workbench-actor.ts` | `routes/experiments-v3.ts`                   |
+| `server/stored-objects/media-response.ts`   | `apps/api/src/app-rest/app-rest.media-response.ts`                    | `app/api/user-avatar/[[...route]]/app.ts`    |
+| `server/stored-objects/safe-media-types.ts` | `@langwatch/stored-object-contract`                                   | `server/stored-objects/content-extractor.ts` |
 
 `server/experiments-v3/blank-workbench-state.ts` also moved, but it had only one
 consumer, so it is not in the table.
@@ -4342,10 +4342,9 @@ better than the split.
 
 ```ts
 prisma.apiKey.updateMany({
-  where: { name: AGENT_SANDBOX_API_KEY_NAME, revokedAt: null,
-           expiresAt: { not: null, lte: now } },
+  where: { name: AGENT_SANDBOX_API_KEY_NAME, revokedAt: null, expiresAt: { not: null, lte: now } },
   data: { revokedAt: now },
-})
+});
 ```
 
 with no `projectId` and no `organizationId`. It was left exactly as it is.
@@ -4402,10 +4401,10 @@ stays at `platform/app/src/server/event-sourcing/pipelines/identity/`, and its
 The second is still true and this change preserves it; the first is now false.
 An accepted ADR is history, so I recorded the supersession here rather than
 rewriting it. The amendment, if you want one, is one paragraph under §4:
-*"Revised: the framework half moved to `@langwatch/identity-eventing` when the
+_"Revised: the framework half moved to `@langwatch/identity-eventing` when the
 core application exit deleted its host. The dependency rule is unchanged —
 `identity-server` still never imports the framework; the new package sits below
-it."*
+it."_
 
 **Cost.** A spec and an ADR that disagree until someone writes that paragraph.
 
@@ -5333,12 +5332,12 @@ lane's nine modules and the `workflow.api.ts` additions move together.
 parse is supplied by the process at wiring time. They are exported from the
 contract as functions taking that parser (or generator):
 
-| Contract export | Parameter | Why it is injected |
-| --- | --- | --- |
-| `virtualKeyApiCreateInputSchema` / `virtualKeyApiUpdateInputSchema` | `budgetInput: z.ZodType<TBudget>` | the canonical budget parser (decimal regex + positive-amount refinement) lives in the process; a second copy could drift from the write path |
-| `monitorApiCreateInputSchema` / `monitorApiUpdateInputSchema` | `preconditions: MonitorApiPreconditionsParser` | the precondition vocabulary is the evaluation surface's, injected as a port today |
-| `roleApiCreateInputSchema` / `roleApiUpdateInputSchema` | `customRolePermission: CustomRolePermissionSchema` | the permission vocabulary spans every feature, so the process owns it |
-| `agentApiCreateInputSchema` / `agentApiCopyInputSchema`, `evaluatorApiCreateInputSchema` / `evaluatorApiCopyInputSchema` | `generateId: () => string` | `nanoid` is not a dependency of either contract package, and `pnpm install` has not run on this branch |
+| Contract export                                                                                                          | Parameter                                          | Why it is injected                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `virtualKeyApiCreateInputSchema` / `virtualKeyApiUpdateInputSchema`                                                      | `budgetInput: z.ZodType<TBudget>`                  | the canonical budget parser (decimal regex + positive-amount refinement) lives in the process; a second copy could drift from the write path |
+| `monitorApiCreateInputSchema` / `monitorApiUpdateInputSchema`                                                            | `preconditions: MonitorApiPreconditionsParser`     | the precondition vocabulary is the evaluation surface's, injected as a port today                                                            |
+| `roleApiCreateInputSchema` / `roleApiUpdateInputSchema`                                                                  | `customRolePermission: CustomRolePermissionSchema` | the permission vocabulary spans every feature, so the process owns it                                                                        |
+| `agentApiCreateInputSchema` / `agentApiCopyInputSchema`, `evaluatorApiCreateInputSchema` / `evaluatorApiCopyInputSchema` | `generateId: () => string`                         | `nanoid` is not a dependency of either contract package, and `pnpm install` has not run on this branch                                       |
 
 **Why a factory and not a widened constant.** The obvious alternative was
 `z.ZodTypeAny` for the injected part, which would have made the parsed field
@@ -5370,14 +5369,14 @@ out of scope for a schema lift.
 **Decided.** Four of the lifted transport schemas have a same-named sibling in
 the very contract module they were moved into, and I left both.
 
-| Transport schema | Existing service schema | The difference that matters |
-| --- | --- | --- |
-| `gatewayBudgetApiCreateInputSchema` | `createGatewayBudgetInputSchema` | service requires `actorUserId`, is `.strict()`, publishes `externalId`/`metadata`, accepts an `ATTRIBUTED_USER` scope, and takes any finite `limitUsd`; the wire form requires a **positive** `limitUsd` and takes the actor from the session |
-| `gatewayBudgetApiUpdateInputSchema` / `...ResetInputSchema` | `updateGatewayBudgetInputSchema` / `resetGatewayBudgetInputSchema` | same `actorUserId` and `.strict()` split |
-| `monitorApiMonitorInputSchema` | `monitorIdInputSchema` | service is `.strict()` with `.min(1)` on both ids |
-| `monitorApiNameAvailabilityInputSchema` | `monitorNameAvailabilityInputSchema` | same |
-| `datasetApiValidateNameInputSchema` | `datasetNameInputSchema` | same |
-| `roleBindingApiBindingWriteSchema` | `authzBindingWriteSchema` (authz contract) | `customRoleId` is `.optional()` here and `.nullish()` there, and the authz one is `.strict()` with `.min(1)` |
+| Transport schema                                            | Existing service schema                                            | The difference that matters                                                                                                                                                                                                                   |
+| ----------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gatewayBudgetApiCreateInputSchema`                         | `createGatewayBudgetInputSchema`                                   | service requires `actorUserId`, is `.strict()`, publishes `externalId`/`metadata`, accepts an `ATTRIBUTED_USER` scope, and takes any finite `limitUsd`; the wire form requires a **positive** `limitUsd` and takes the actor from the session |
+| `gatewayBudgetApiUpdateInputSchema` / `...ResetInputSchema` | `updateGatewayBudgetInputSchema` / `resetGatewayBudgetInputSchema` | same `actorUserId` and `.strict()` split                                                                                                                                                                                                      |
+| `monitorApiMonitorInputSchema`                              | `monitorIdInputSchema`                                             | service is `.strict()` with `.min(1)` on both ids                                                                                                                                                                                             |
+| `monitorApiNameAvailabilityInputSchema`                     | `monitorNameAvailabilityInputSchema`                               | same                                                                                                                                                                                                                                          |
+| `datasetApiValidateNameInputSchema`                         | `datasetNameInputSchema`                                           | same                                                                                                                                                                                                                                          |
+| `roleBindingApiBindingWriteSchema`                          | `authzBindingWriteSchema` (authz contract)                         | `customRoleId` is `.optional()` here and `.nullish()` there, and the authz one is `.strict()` with `.min(1)`                                                                                                                                  |
 
 **Why.** Every one of those differences changes what a live endpoint accepts.
 Adopting the service schema would newly reject an empty-string id, newly reject
@@ -6195,7 +6194,7 @@ were not `app-rest.features.ts`:
   it already called `requireEnterprisePlanRest(...)` directly for the other
   three families.
 - `apps/api/package.json` gained `"@langwatch/enterprise-plan-gate":
-  "workspace:*"`. The type has to come from the package that owns the
+"workspace:*"`. The type has to come from the package that owns the
   vocabulary; restating the union in `apps/api` would be a second definition of
   it, which CLAUDE.md forbids. See entry 256.
 
@@ -6655,7 +6654,7 @@ is one feature deep.
 The scale: trace's `types/` has 122 inbound edges and cannot move until an
 annotation row has a real DTO instead of `RouterOutputs[...]`; `agent-testing`
 makes 20 `~/utils/api` imports, 21 of `useOrganizationTeamProject` and 11 of
-`useDrawer`; the optimization studio's residue is *by design* the composition
+`useDrawer`; the optimization studio's residue is _by design_ the composition
 adapters over `workflow/web`, which already owns the graph state, node
 registry, properties panels and editor.
 

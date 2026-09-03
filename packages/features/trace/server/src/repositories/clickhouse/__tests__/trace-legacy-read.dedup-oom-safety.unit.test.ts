@@ -26,8 +26,7 @@ function extractMethodBody(source: string, methodName: string): string {
   const match = source.match(pattern);
   if (!match) {
     throw new Error(
-      `Could not extract method "${methodName}" from source. ` +
-        `Pattern: ${pattern.source}`,
+      `Could not extract method "${methodName}" from source. ` + `Pattern: ${pattern.source}`,
     );
   }
   return match[0];
@@ -41,8 +40,7 @@ function extractFunctionBody(source: string, functionName: string): string {
   const match = source.match(pattern);
   if (!match) {
     throw new Error(
-      `Could not extract function "${functionName}" from source. ` +
-        `Pattern: ${pattern.source}`,
+      `Could not extract function "${functionName}" from source. ` + `Pattern: ${pattern.source}`,
     );
   }
   return withoutComments(match[0]);
@@ -91,10 +89,7 @@ describe("trace dedup OOM safety", () => {
   // clickhouse-trace.service.ts: fetchTracesWithPagination + fetchTraceSummaryRows
   // ---------------------------------------------------------------------------
   describe("fetchTracesWithPagination()", () => {
-    const paginationBody = extractMethodBody(
-      traceServiceSource,
-      "fetchTracesWithPagination",
-    );
+    const paginationBody = extractMethodBody(traceServiceSource, "fetchTracesWithPagination");
     const summaryBody = extractMethodBody(traceServiceSource, "fetchTraceSummaryRows");
     const body = paginationBody + summaryBody;
 
@@ -238,7 +233,10 @@ describe("trace dedup OOM safety", () => {
   // aggregation-builder.ts: dedupedTraceSummaries (@regression #3158)
   // ---------------------------------------------------------------------------
   describe("dedupedTraceSummaries() (analytics)", () => {
-    const aggregationBuilderPath = path.join(repoRoot(), "packages/features/analytics/server/src/clickhouse/aggregation-builder.ts");
+    const aggregationBuilderPath = path.join(
+      repoRoot(),
+      "packages/features/analytics/server/src/clickhouse/aggregation-builder.ts",
+    );
     const aggregationBuilderSource = fs.readFileSync(aggregationBuilderPath, "utf-8");
     const body = extractFunctionBody(aggregationBuilderSource, "dedupedTraceSummaries");
 
@@ -277,7 +275,9 @@ describe("trace dedup OOM safety", () => {
       repoRoot(),
       "packages/features/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run.repository.ts",
     );
-    const experimentRunServiceSource = withoutComments(fs.readFileSync(experimentRunServicePath, "utf-8"));
+    const experimentRunServiceSource = withoutComments(
+      fs.readFileSync(experimentRunServicePath, "utf-8"),
+    );
 
     it("does not use LIMIT 1 BY anywhere", () => {
       expect(experimentRunServiceSource).not.toContain("LIMIT 1 BY");

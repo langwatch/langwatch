@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  LANGY_FEATURE_ID,
-  langyRelayFrameSchema,
-  langyTurnInputSchema,
-} from "../index";
+import { LANGY_FEATURE_ID, langyRelayFrameSchema, langyTurnInputSchema } from "../index";
 
 describe("Langy contract", () => {
   it("identifies the singular feature", () => {

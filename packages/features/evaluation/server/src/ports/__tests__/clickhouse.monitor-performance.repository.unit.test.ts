@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ClickHouseMonitorPerformanceRepository } from "../../repositories/clickhouse/monitor-performance.repository";
-import type {
-  EvaluationClickHouseClient,
-  EvaluationClickHouseQuery,
-} from "../evaluation.port";
+import type { EvaluationClickHouseClient, EvaluationClickHouseQuery } from "../evaluation.port";
 
 describe("ClickHouseMonitorPerformanceRepository", () => {
   /** @scenario "Monitor performance uses the same capability" */

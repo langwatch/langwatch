@@ -8,14 +8,8 @@ export const LEGACY_EXPERIMENT_TASK_TYPES = {
 
 export type LegacyExperimentTaskType = keyof typeof LEGACY_EXPERIMENT_TASK_TYPES;
 
-export const isLegacyOnlineEvaluationWorkbenchState = (
-  workbenchState: unknown,
-): boolean => {
-  if (
-    !workbenchState ||
-    typeof workbenchState !== "object" ||
-    Array.isArray(workbenchState)
-  ) {
+export const isLegacyOnlineEvaluationWorkbenchState = (workbenchState: unknown): boolean => {
+  if (!workbenchState || typeof workbenchState !== "object" || Array.isArray(workbenchState)) {
     return false;
   }
 

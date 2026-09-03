@@ -27,9 +27,7 @@ import { rowToJoinRequest } from "./prisma.join-request-projection.repository";
  *  look like theirs by typing an address at it. */
 const VERIFIED_IDENTIFIER_STATES = ["VERIFIED", "PRIMARY"] as const;
 
-export class PrismaJoinRequestReadRepository
-  implements JoinRequestReadRepository
-{
+export class PrismaJoinRequestReadRepository implements JoinRequestReadRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findRequest({
@@ -88,11 +86,7 @@ export class PrismaJoinRequestReadRepository
   }
 
   /** Everything one person is waiting on. */
-  async findPendingForUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<JoinRequestAggregateState[]> {
+  async findPendingForUser({ userId }: { userId: string }): Promise<JoinRequestAggregateState[]> {
     const rows = await this.prisma.joinRequest.findMany({
       where: { userId, state: "PENDING" },
       orderBy: { createdAt: "desc" },
@@ -145,9 +139,7 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
 
     const verifiedByOrganization = new Map<string, Set<string>>();
     for (const membership of memberships) {
-      const held =
-        verifiedByOrganization.get(membership.organizationId) ??
-        new Set<string>();
+      const held = verifiedByOrganization.get(membership.organizationId) ?? new Set<string>();
       held.add(membership.userId);
       verifiedByOrganization.set(membership.organizationId, held);
     }
@@ -167,11 +159,7 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     domain: string;
   }): Promise<JoinCandidateOrganization | null> {
     const candidates = await this.findCandidateOrganizations({ domain });
-    return (
-      candidates.find(
-        (candidate) => candidate.organizationId === organizationId,
-      ) ?? null
-    );
+    return candidates.find((candidate) => candidate.organizationId === organizationId) ?? null;
   }
 
   private async describe({
@@ -217,9 +205,7 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     const memberCountByOrganization = new Map(
       memberCounts.map((row) => [row.organizationId, row._count.userId]),
     );
-    const admittedByConnection = new Set(
-      connections.map((row) => row.organizationId),
-    );
+    const admittedByConnection = new Set(connections.map((row) => row.organizationId));
 
     return organizations.map((organization) => ({
       organizationId: organization.id,
@@ -230,10 +216,8 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
       // people, and an organization whose provider already lets colleagues in
       // must not also be offered as somewhere to ask.
       connectionAdmitsDomain:
-        admittedByConnection.has(organization.id) ||
-        organization.ssoDomain === domain,
-      verifiedMembersOnDomain:
-        verifiedByOrganization.get(organization.id)?.size ?? 0,
+        admittedByConnection.has(organization.id) || organization.ssoDomain === domain,
+      verifiedMembersOnDomain: verifiedByOrganization.get(organization.id)?.size ?? 0,
       memberCount: memberCountByOrganization.get(organization.id) ?? 0,
       autoJoinDomains: organization.joinDomains,
     }));

@@ -173,9 +173,7 @@ describe("listSimulationRunsCommand()", () => {
 
       setOutputFormat("json");
       try {
-        await expect(
-          listSimulationRunsCommand({ limit: "200" }),
-        ).rejects.toThrow(ProcessExitError);
+        await expect(listSimulationRunsCommand({ limit: "200" })).rejects.toThrow(ProcessExitError);
       } finally {
         setOutputFormat(undefined);
       }
@@ -300,9 +298,7 @@ describe("getSimulationRunCommand()", () => {
         text: async () => '{"error":"Not found"}',
       });
 
-      await expect(getSimulationRunCommand("nonexistent")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(getSimulationRunCommand("nonexistent")).rejects.toThrow(ProcessExitError);
     });
   });
 
@@ -420,8 +416,7 @@ describe("the note and the scenario version", () => {
     it("shows the note of the batch and the version the run used", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () =>
-          makeRun({ note: "after the retry fix", scenarioVersion: 3 }),
+        json: async () => makeRun({ note: "after the retry fix", scenarioVersion: 3 }),
       });
 
       const result = await getSimulationRunCommand("run_abc123");

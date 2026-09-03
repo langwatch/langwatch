@@ -6,9 +6,9 @@ description: "Upgrade guide for Helm deployments: datasets move to object storag
 Datasets are now stored in object storage instead of PostgreSQL. This makes large datasets faster to load, cheaper to store, and enables direct browser uploads. When you upgrade to a chart version that includes this change, a one-time migration runs automatically and moves your existing datasets to the new storage backend.
 
 <Tip>
-  The migration **never deletes your data**. All dataset rows are kept in PostgreSQL as a
-  fallback, so you can roll back safely. It is also safe to re-run: if it is interrupted
-  or a dataset fails to migrate, the next `helm upgrade` picks up where it left off.
+  The migration **never deletes your data**. All dataset rows are kept in PostgreSQL as a fallback,
+  so you can roll back safely. It is also safe to re-run: if it is interrupted or a dataset fails to
+  migrate, the next `helm upgrade` picks up where it left off.
 </Tip>
 
 ## What Changed
@@ -121,11 +121,10 @@ helm upgrade langwatch langwatch/langwatch \
 ```
 
 <Warning>
-  Without `--wait`, the migration can move a dataset while an old-version pod is still
-  serving traffic. Any dataset edits made through that old pod after its dataset was
-  migrated do not appear in the new storage layout (the rows stay in PostgreSQL, but
-  reconciling them is manual). `--wait` ensures the new pods are serving before the
-  migration starts.
+  Without `--wait`, the migration can move a dataset while an old-version pod is still serving
+  traffic. Any dataset edits made through that old pod after its dataset was migrated do not appear
+  in the new storage layout (the rows stay in PostgreSQL, but reconciling them is manual). `--wait`
+  ensures the new pods are serving before the migration starts.
 </Warning>
 
 **ArgoCD and Flux users**: no action needed. The migration hook maps to a PostSync hook, which already waits for a healthy rollout before running.

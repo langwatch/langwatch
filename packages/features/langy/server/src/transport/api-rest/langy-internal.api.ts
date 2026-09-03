@@ -65,9 +65,7 @@ export type LangyInternalRestPorts = Readonly<{
  * A plain `===` leaks the secret one byte at a time to anything that can time
  * our responses, and this surface is reachable from inside the cluster.
  */
-export function verifyLangyInternalSecret(
-  secretOf: () => string | undefined,
-): MiddlewareHandler {
+export function verifyLangyInternalSecret(secretOf: () => string | undefined): MiddlewareHandler {
   return async (c: Context, next: Next) => {
     const secret = secretOf();
     if (!secret) {
@@ -83,10 +81,7 @@ export function verifyLangyInternalSecret(
   };
 }
 
-function isAuthorized(
-  authorizationHeader: string | undefined,
-  expected: string,
-): boolean {
+function isAuthorized(authorizationHeader: string | undefined, expected: string): boolean {
   if (!authorizationHeader?.startsWith("Bearer ")) return false;
   const presented = Buffer.from(authorizationHeader.slice("Bearer ".length));
   const expectedBuf = Buffer.from(expected);

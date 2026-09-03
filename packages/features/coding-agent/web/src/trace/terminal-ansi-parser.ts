@@ -47,9 +47,7 @@ export type AnsiColorName =
  * the renderer); `rgb` values are concrete hex from 256-colour/truecolor
  * codes, which carry their own absolute colour.
  */
-export type AnsiColor =
-  | { kind: "named"; name: AnsiColorName }
-  | { kind: "rgb"; hex: string };
+export type AnsiColor = { kind: "named"; name: AnsiColorName } | { kind: "rgb"; hex: string };
 
 export interface AnsiStyle {
   fg?: AnsiColor;
@@ -389,10 +387,7 @@ export function parseAnsi(input: string): AnsiLine[] {
  * character — often `\n` — which must be re-processed as text, not swallowed
  * as the sequence's final byte (that eats line breaks).
  */
-function scanCsi(
-  input: string,
-  start: number,
-): { next: number; sgrParams: string | null } {
+function scanCsi(input: string, start: number): { next: number; sgrParams: string | null } {
   const len = input.length;
   let j = start + 2;
   while (j < len) {

@@ -13,9 +13,7 @@ describe("given the count printed after a summaries walk", () => {
   describe("when one dimension is grouped and no bucket is set", () => {
     it("names that dimension", () => {
       expect(summaryCountNoun({ groupBy: ["model"] })).toBe("models");
-      expect(summaryCountNoun({ groupBy: ["end_user"], bucket: "none" })).toBe(
-        "end users",
-      );
+      expect(summaryCountNoun({ groupBy: ["end_user"], bucket: "none" })).toBe("end users");
     });
 
     it("falls back to a neutral noun for a dimension it has no label for", () => {

@@ -7,22 +7,12 @@
  * cells, portal editor); only the tRPC transport is mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import {
-  DatasetEditorTable,
-  type InMemoryDataset,
-} from "../dataset-editor-table";
+import { DatasetEditorTable, type InMemoryDataset } from "../dataset-editor-table";
 
 // ── Mocks ────────────────────────────────────────────────────────────
 
@@ -97,9 +87,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const renderInMemory = (
-  overrides: Partial<Parameters<typeof DatasetEditorTable>[0]> = {},
-) => {
+const renderInMemory = (overrides: Partial<Parameters<typeof DatasetEditorTable>[0]> = {}) => {
   const onUpdateDataset = vi.fn();
   const utils = render(
     <DatasetEditorTable
@@ -139,9 +127,7 @@ describe("given an in-memory dataset", () => {
       expect(screen.getByText("world")).toBeInTheDocument();
       expect(screen.getByText("ping")).toBeInTheDocument();
       expect(screen.getByText("pong")).toBeInTheDocument();
-      expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-        "2 records",
-      );
+      expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("2 records");
     });
   });
 
@@ -254,9 +240,7 @@ describe("given an in-memory dataset", () => {
       await user.click(screen.getByTestId("add-row"));
 
       await waitFor(() => {
-        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "3 records",
-        );
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("3 records");
       });
       // Add row must not steal focus or pop the cell editor open
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
@@ -277,9 +261,7 @@ describe("given an in-memory dataset", () => {
       await user.click(deleteButton);
 
       await waitFor(() => {
-        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "0 records",
-        );
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("0 records");
       });
       expect(screen.queryByText("hello")).not.toBeInTheDocument();
       const updated = onUpdateDataset.mock.calls.at(-1)?.[0];
@@ -295,9 +277,7 @@ describe("given a saved dataset", () => {
     id: "ds-1",
     name: "Saved DS",
     columnTypes,
-    datasetRecords: [
-      { id: "rec-1", entry: { input: "hello", expected_output: "world" } },
-    ],
+    datasetRecords: [{ id: "rec-1", entry: { input: "hello", expected_output: "world" } }],
   };
 
   beforeEach(() => {
@@ -311,11 +291,9 @@ describe("given a saved dataset", () => {
   describe("when a cell edit is saved", () => {
     /** @scenario Cell edits autosave to the dataset */
     it("syncs the full record to the database and confirms in the status chip", async () => {
-      updateMutate.mockImplementation(
-        (_args: unknown, opts: { onSuccess: () => void }) => {
-          opts.onSuccess();
-        },
-      );
+      updateMutate.mockImplementation((_args: unknown, opts: { onSuccess: () => void }) => {
+        opts.onSuccess();
+      });
       const user = userEvent.setup();
       render(<DatasetEditorTable datasetId="ds-1" />, { wrapper: Wrapper });
 
@@ -343,9 +321,7 @@ describe("given a saved dataset", () => {
         },
         { timeout: 2000 },
       );
-      expect(
-        await screen.findByTestId("save-status-saved"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("save-status-saved")).toBeInTheDocument();
     });
   });
 
@@ -353,10 +329,7 @@ describe("given a saved dataset", () => {
     /** @scenario A failed save is visible, never silent */
     it("shows a failed-to-save state instead of pretending success", async () => {
       updateMutate.mockImplementation(
-        (
-          _args: unknown,
-          opts: { onError: (e: { message: string }) => void },
-        ) => {
+        (_args: unknown, opts: { onError: (e: { message: string }) => void }) => {
           opts.onError({ message: "Plan limit reached" });
         },
       );
@@ -382,11 +355,9 @@ describe("given a saved dataset", () => {
 
   describe("when rows are deleted", () => {
     it("syncs the deletion to the database", async () => {
-      deleteManyMutate.mockImplementation(
-        (_args: unknown, opts: { onSuccess: () => void }) => {
-          opts.onSuccess();
-        },
-      );
+      deleteManyMutate.mockImplementation((_args: unknown, opts: { onSuccess: () => void }) => {
+        opts.onSuccess();
+      });
       const user = userEvent.setup();
       render(<DatasetEditorTable datasetId="ds-1" />, { wrapper: Wrapper });
 
@@ -435,14 +406,10 @@ describe("given the saved dataset's record count", () => {
       render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
       await waitFor(() =>
-        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "1,640 records",
-        ),
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("1,640 records"),
       );
       // Pagination replaced byte-cap truncation — no "X out of Y" partial notice.
-      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-        "out of",
-      );
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent("out of");
     });
   });
 
@@ -472,9 +439,7 @@ describe("given the saved dataset's record count", () => {
       render(<DatasetEditorTable datasetId="empty" />, { wrapper: Wrapper });
 
       await waitFor(() =>
-        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "0 records",
-        ),
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("0 records"),
       );
       expect(screen.queryByTestId("pagination")).not.toBeInTheDocument();
       // An empty dataset is its own last page, so the add-row stays available.
@@ -533,14 +498,10 @@ describe("given a saved dataset larger than one page", () => {
   it("shows the first page, the pager, and the whole-dataset total", async () => {
     renderPaged();
     await waitFor(() =>
-      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "showing 1–50",
-      ),
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent("showing 1–50"),
     );
     // Total reflects the whole dataset, not just the loaded page.
-    expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-      "150 records",
-    );
+    expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("150 records");
     expect(screen.getByTestId("pagination-prev")).toBeDisabled();
     expect(screen.getByTestId("pagination-next")).toBeEnabled();
     // The add-row affordance is not offered on an earlier, full page.
@@ -555,9 +516,7 @@ describe("given a saved dataset larger than one page", () => {
 
     await user.click(screen.getByTestId("pagination-next"));
     await waitFor(() =>
-      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "showing 51–100",
-      ),
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent("showing 51–100"),
     );
     // The editor requested page 2 from the server (windowed read, not a slice).
     expect(getAllQuery).toHaveBeenCalledWith(
@@ -567,9 +526,7 @@ describe("given a saved dataset larger than one page", () => {
 
     await user.click(screen.getByTestId("pagination-prev"));
     await waitFor(() =>
-      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "showing 1–50",
-      ),
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent("showing 1–50"),
     );
   });
 
@@ -615,8 +572,7 @@ describe("given a saved dataset larger than one page", () => {
           return fresh.get(p);
         }
         // Previous page held while page p loads → flagged isPlaceholderData.
-        if (!held.has(lastReady))
-          held.set(lastReady, pageResult(lastReady, true));
+        if (!held.has(lastReady)) held.set(lastReady, pageResult(lastReady, true));
         return held.get(lastReady);
       });
 
@@ -625,30 +581,23 @@ describe("given a saved dataset larger than one page", () => {
         wrapper: Wrapper,
       });
       await waitFor(() =>
-        expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-          "showing 1–50",
-        ),
+        expect(screen.getByTestId("pagination-indicator")).toHaveTextContent("showing 1–50"),
       );
 
       await user.click(screen.getByTestId("pagination-next"));
       // Page 2 is still loading — the indicator must show page 2, not bounce to 1,
       // and the last request must be for page 2.
       await waitFor(() =>
-        expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-          "showing 51–100",
-        ),
+        expect(screen.getByTestId("pagination-indicator")).toHaveTextContent("showing 51–100"),
       );
-      expect(
-        (getAllQuery.mock.calls.at(-1)![0] as { page?: number }).page,
-      ).toBe(2);
+      expect((getAllQuery.mock.calls.at(-1)![0] as { page?: number }).page).toBe(2);
     });
   });
 
   /** @scenario Edits on a page are saved to the right record */
   it("saves an edit made on a later page to that page's own record", async () => {
-    updateMutate.mockImplementation(
-      (_args: unknown, opts?: { onSuccess?: () => void }) =>
-        opts?.onSuccess?.(),
+    updateMutate.mockImplementation((_args: unknown, opts?: { onSuccess?: () => void }) =>
+      opts?.onSuccess?.(),
     );
     const user = userEvent.setup();
     renderPaged();
@@ -689,9 +638,7 @@ describe("given a saved dataset larger than one page", () => {
     await user.click(screen.getByTestId("pagination-next")); // page 2
     await user.click(screen.getByTestId("pagination-next")); // page 3 (last)
     await waitFor(() =>
-      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "showing 101–150",
-      ),
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent("showing 101–150"),
     );
     expect(screen.getByTestId("add-row")).toBeInTheDocument();
   });
@@ -708,9 +655,7 @@ describe("given a saved dataset larger than one page", () => {
     // Move off page 1 first so the reset-to-page-1 is observable.
     await user.click(screen.getByTestId("pagination-next"));
     await waitFor(() =>
-      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "showing 51–100",
-      ),
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent("showing 51–100"),
     );
 
     // Switch to 100 rows per page. The page count is derived from
@@ -720,9 +665,7 @@ describe("given a saved dataset larger than one page", () => {
       target: { value: "100" },
     });
     await waitFor(() =>
-      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "showing 1–100",
-      ),
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent("showing 1–100"),
     );
     const lastCall = getAllQuery.mock.calls.at(-1)![0] as {
       page?: number;
@@ -745,9 +688,7 @@ describe("given the editor is switched to a different dataset", () => {
       count: 1,
       totalPages: 1,
       page: 1,
-      datasetRecords: [
-        { id: "a1", entry: { input: "alpha", expected_output: "x" } },
-      ],
+      datasetRecords: [{ id: "a1", entry: { input: "alpha", expected_output: "x" } }],
     },
     isLoading: false,
     // react-query sets this while keepPreviousData serves the prior key's data.
@@ -759,18 +700,16 @@ describe("given the editor is switched to a different dataset", () => {
     // Regression: robustness of the keepPreviousData hold across a datasetId
     // switch — not a feature scenario, so deliberately not @scenario-bound.
     it("never hydrates the new dataset id with the previous dataset's rows", async () => {
-      updateMutate.mockImplementation(
-        (_args: unknown, opts?: { onSuccess?: () => void }) =>
-          opts?.onSuccess?.(),
+      updateMutate.mockImplementation((_args: unknown, opts?: { onSuccess?: () => void }) =>
+        opts?.onSuccess?.(),
       );
       getAllQuery.mockReset();
       getAllQuery.mockReturnValue(datasetAResult(false));
 
       const user = userEvent.setup();
-      const { rerender } = render(
-        <DatasetEditorTable datasetId="dataset_a" />,
-        { wrapper: Wrapper },
-      );
+      const { rerender } = render(<DatasetEditorTable datasetId="dataset_a" />, {
+        wrapper: Wrapper,
+      });
       await screen.findByText("alpha");
 
       // Point the editor at dataset B; keepPreviousData still serves A's rows
@@ -805,9 +744,8 @@ describe("given rows are deleted from a paginated dataset", () => {
   describe("when the deletion is saved", () => {
     // Regression: post-delete count refresh — not a feature scenario.
     it("refreshes the server total so the pager cannot strand an empty page", async () => {
-      deleteManyMutate.mockImplementation(
-        (_args: unknown, opts?: { onSuccess?: () => void }) =>
-          opts?.onSuccess?.(),
+      deleteManyMutate.mockImplementation((_args: unknown, opts?: { onSuccess?: () => void }) =>
+        opts?.onSuccess?.(),
       );
       const refetchSpy = vi.fn();
       getAllQuery.mockReset();
@@ -856,16 +794,11 @@ describe("given rows are deleted from a paginated dataset", () => {
       // delete's own success.)
       let resolveDelete: (() => void) | undefined;
       let rejectUpdate: ((e: { message: string }) => void) | undefined;
-      deleteManyMutate.mockImplementation(
-        (_args: unknown, opts?: { onSuccess?: () => void }) => {
-          resolveDelete = opts?.onSuccess;
-        },
-      );
+      deleteManyMutate.mockImplementation((_args: unknown, opts?: { onSuccess?: () => void }) => {
+        resolveDelete = opts?.onSuccess;
+      });
       updateMutate.mockImplementation(
-        (
-          _args: unknown,
-          opts?: { onError?: (e: { message: string }) => void },
-        ) => {
+        (_args: unknown, opts?: { onError?: (e: { message: string }) => void }) => {
           rejectUpdate = opts?.onError;
         },
       );

@@ -229,14 +229,13 @@ describe("FoldProjectionExecutor declared read window", () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
         const getWithApplied = vi
           .fn()
-          .mockImplementation(
-            async (_key: string, readContext: ProjectionStoreContext) =>
-              readContext.readWindow === undefined
-                ? {
-                    state: { count: 2, LastEventOccurredAt: OCCURRED_AT - 1 },
-                    appliedEventIds: [],
-                  }
-                : { state: null, appliedEventIds: [] },
+          .mockImplementation(async (_key: string, readContext: ProjectionStoreContext) =>
+            readContext.readWindow === undefined
+              ? {
+                  state: { count: 2, LastEventOccurredAt: OCCURRED_AT - 1 },
+                  appliedEventIds: [],
+                }
+              : { state: null, appliedEventIds: [] },
           );
         store.getWithApplied = getWithApplied;
 
@@ -258,8 +257,9 @@ describe("FoldProjectionExecutor declared read window", () => {
         });
         // A history to rebuild FROM: an empty one is its own failure case,
         // covered below.
-        (fold as typeof fold & { eventLoaderUpTo?: unknown }).eventLoaderUpTo =
-          async () => [eventAt(OCCURRED_AT)];
+        (fold as typeof fold & { eventLoaderUpTo?: unknown }).eventLoaderUpTo = async () => [
+          eventAt(OCCURRED_AT),
+        ];
         const getWithApplied = vi.fn().mockResolvedValue({
           state: null,
           appliedEventIds: [],
@@ -292,9 +292,9 @@ describe("FoldProjectionExecutor declared read window", () => {
           miss: "undecodable",
         });
 
-        await expect(
-          executor.execute(fold, eventAt(OCCURRED_AT), context),
-        ).rejects.toThrow(/cannot decode/);
+        await expect(executor.execute(fold, eventAt(OCCURRED_AT), context)).rejects.toThrow(
+          /cannot decode/,
+        );
 
         // The committed row survives: folding from `init()` would have written
         // a partial state stamped at the CURRENT version, which the gate that
@@ -322,9 +322,9 @@ describe("FoldProjectionExecutor declared read window", () => {
           miss: "undecodable",
         });
 
-        await expect(
-          executor.execute(fold, eventAt(OCCURRED_AT), context),
-        ).rejects.toThrow(/produced no state/);
+        await expect(executor.execute(fold, eventAt(OCCURRED_AT), context)).rejects.toThrow(
+          /produced no state/,
+        );
 
         expect(store.store).not.toHaveBeenCalled();
       });

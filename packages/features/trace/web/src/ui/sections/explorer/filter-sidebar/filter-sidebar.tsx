@@ -329,8 +329,7 @@ export const FilterSidebar: React.FC = () => {
   // wired through but it'll only fire in genuinely degenerate states
   // (empty FACET_DEFAULTS, etc.) so as not to silently regress to a
   // blank rail if the synthesis is ever short-circuited.
-  const showSkeleton =
-    facetsLoading && descriptors.length === 0 && categoricals.length === 0;
+  const showSkeleton = facetsLoading && descriptors.length === 0 && categoricals.length === 0;
 
   // Hide the sidebar entirely when the discover endpoint has returned
   // with no descriptors AND the project has never received a real trace.
@@ -453,9 +452,7 @@ export const FilterSidebar: React.FC = () => {
             positioning={{ placement: "bottom" }}
             content={
               <HStack gap={1.5}>
-                <Text>
-                  {allExpanded ? "Collapse all sections" : "Expand all sections"}
-                </Text>
+                <Text>{allExpanded ? "Collapse all sections" : "Expand all sections"}</Text>
                 <Kbd>E</Kbd>
               </HStack>
             }
@@ -499,13 +496,7 @@ export const FilterSidebar: React.FC = () => {
             so the sidebar isn't blank, but a small hint reassures the user
             that live data is coming. Disappears as soon as discover responds. */}
         {facetsLoading && (!descriptors || descriptors.length === 0) && (
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            paddingX={3}
-            paddingTop={2}
-            paddingBottom={1}
-          >
+          <Text textStyle="2xs" color="fg.subtle" paddingX={3} paddingTop={2} paddingBottom={1}>
             Getting filters ready…
           </Text>
         )}

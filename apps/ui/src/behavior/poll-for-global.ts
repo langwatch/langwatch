@@ -5,10 +5,7 @@
 export function pollForGlobal<T>(
   getValue: () => T | undefined,
   onFound: (value: T) => void,
-  {
-    intervalMs = 250,
-    timeoutMs = 10_000,
-  }: { intervalMs?: number; timeoutMs?: number } = {},
+  { intervalMs = 250, timeoutMs = 10_000 }: { intervalMs?: number; timeoutMs?: number } = {},
 ): () => void {
   const existing = getValue();
   if (existing) {

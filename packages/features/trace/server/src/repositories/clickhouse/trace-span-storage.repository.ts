@@ -2,7 +2,11 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedSpan, SpanInsertData } from "@langwatch/trace-contract";
 import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port";
-import { type FullSpanRow, mapChRowToNormalized, serializeAttributes } from "./stored-span-row.codec";
+import {
+  type FullSpanRow,
+  mapChRowToNormalized,
+  serializeAttributes,
+} from "./stored-span-row.codec";
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read";
 
 const logger = createLogger("langwatch:trace:span-storage-repository");

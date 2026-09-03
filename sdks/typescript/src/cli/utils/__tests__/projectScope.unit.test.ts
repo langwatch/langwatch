@@ -48,12 +48,7 @@ const listing = (
 const failingListing = (status: number): ProjectsApiService =>
   ({
     list: vi.fn(async () => {
-      throw new ProjectsApiError(
-        "Failed to list projects",
-        "list projects",
-        undefined,
-        status,
-      );
+      throw new ProjectsApiError("Failed to list projects", "list projects", undefined, status);
     }),
   }) as unknown as ProjectsApiService;
 

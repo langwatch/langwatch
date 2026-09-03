@@ -1,7 +1,4 @@
-import {
-  authFailureMessage,
-  isCredentialRejection,
-} from "../model/auth-failure-message";
+import { authFailureMessage, isCredentialRejection } from "../model/auth-failure-message";
 import { signIn } from "./auth-client";
 import { credentialSignInFailure } from "../model/credential-sign-in";
 

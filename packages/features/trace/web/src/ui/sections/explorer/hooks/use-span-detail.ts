@@ -50,8 +50,5 @@ export function useSpanDetail() {
     [detail, patch],
   );
 
-  return useMemo(
-    () => (data === detail ? query : { ...query, data }),
-    [query, data, detail],
-  );
+  return useMemo(() => (data === detail ? query : { ...query, data }), [query, data, detail]);
 }

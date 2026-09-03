@@ -65,10 +65,7 @@ export function settlementGraceMs(raw: string | undefined): number {
   if (!raw) return SETTLEMENT_GRACE_MS_DEFAULT;
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < 1000) {
-    logger.warn(
-      { raw },
-      "ignoring invalid LW_SPEND_SETTLEMENT_GRACE_MS; using the default",
-    );
+    logger.warn({ raw }, "ignoring invalid LW_SPEND_SETTLEMENT_GRACE_MS; using the default");
     return SETTLEMENT_GRACE_MS_DEFAULT;
   }
   return parsed;
@@ -101,10 +98,7 @@ export interface SpendSettlementProcessDeps {
  * sweep, which is exactly what the sweep is for.
  */
 export function runSpendSettlementSweep(deps: SpendSettlementProcessDeps) {
-  return async (
-    _payload: { scheduledFor: number },
-    context: IntentContext,
-  ): Promise<void> => {
+  return async (_payload: { scheduledFor: number }, context: IntentContext): Promise<void> => {
     const now = (deps.now ?? Date.now)();
     const graceMs = deps.graceMs ?? SETTLEMENT_GRACE_MS_DEFAULT;
     const open = await deps.findOpenAdmissions({

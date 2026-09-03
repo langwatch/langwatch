@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MIN_VIEWPORT_MS, WHEEL_ZOOM_SENSITIVITY, ZOOM_ANIMATION_MS } from "../../model/flame/constants";
+import {
+  MIN_VIEWPORT_MS,
+  WHEEL_ZOOM_SENSITIVITY,
+  ZOOM_ANIMATION_MS,
+} from "../../model/flame/constants";
 import type { Viewport } from "./types";
 
 export interface UseFlameViewportResult {

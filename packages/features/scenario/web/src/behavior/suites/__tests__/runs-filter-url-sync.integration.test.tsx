@@ -30,10 +30,7 @@ import { ScenarioHostPort, ScenarioHostProvider } from "../../../model/scenario-
 // router. For these tests we need the real compat layer because the bug
 // under test lives in its buildUrl / routeParamKeys logic.
 vi.unmock("../../next-router");
-vi.mock(
-  "../../next-router",
-  async () => await vi.importActual<object>("../../next-router"),
-);
+vi.mock("../../next-router", async () => await vi.importActual<object>("../../next-router"));
 
 import { useRouter } from "../../next-router";
 import { createRunHistoryStore } from "@langwatch/suite-web";
@@ -185,9 +182,7 @@ describe("given the Runs page at /my-project/simulations (All Runs)", () => {
 
       expect(screen.getByTestId("selection").textContent).toBe(ALL_RUNS_ID);
       expect(screen.getByTestId("pathname").textContent).toBe("/my-project/simulations");
-      expect(screen.getByTestId("selection").textContent).not.toContain(
-        EXTERNAL_SET_PREFIX,
-      );
+      expect(screen.getByTestId("selection").textContent).not.toContain(EXTERNAL_SET_PREFIX);
     });
   });
 

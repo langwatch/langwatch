@@ -190,9 +190,7 @@ export function sessionContextFingerprint(
   { repository, branch, worktree }: SessionContext,
   titles?: { title?: string | null; name?: string | null },
 ): string {
-  const repo = repository
-    ? `${repository.host}/${repository.owner}/${repository.name}`
-    : "";
+  const repo = repository ? `${repository.host}/${repository.owner}/${repository.name}` : "";
   // The titles are part of the identity on purpose: a renamed session must
   // re-post, or the rename never reaches the platform.
   return `${repo}@${branch ?? ""}#${worktree ?? ""}!${titles?.title ?? ""}~${titles?.name ?? ""}`;

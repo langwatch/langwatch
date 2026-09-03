@@ -85,9 +85,7 @@ describe("Agents service", () => {
     const { service, database } = setup();
     vi.mocked(database.agent.findFirst).mockResolvedValue({ id: "agent_1" });
 
-    await expect(service.exists({ id: "agent_1", projectId: "project_1" })).resolves.toBe(
-      true,
-    );
+    await expect(service.exists({ id: "agent_1", projectId: "project_1" })).resolves.toBe(true);
     expect(database.agent.findFirst).toHaveBeenCalledWith({
       where: {
         id: "agent_1",

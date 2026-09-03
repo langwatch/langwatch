@@ -28,17 +28,17 @@ import {
 } from "recharts";
 
 import { disambiguateNames } from "./presentation";
-import { axisLabelProps, buildAxisLabels } from "../../../model/batch-evaluation-results.chart-axis";
+import {
+  axisLabelProps,
+  buildAxisLabels,
+} from "../../../model/batch-evaluation-results.chart-axis";
 import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
 } from "../batch-evaluation-results.verdict";
 import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline";
-import type {
-  BatchComparisonColumn,
-  BatchResultRow,
-} from "../batch-evaluation-results.types";
+import type { BatchComparisonColumn, BatchResultRow } from "../batch-evaluation-results.types";
 import { useBTLeaderboard } from "../use-bt-leaderboard";
 import { useVariantMetrics } from "../use-variant-metrics";
 import { VARIANT_COLORS } from "./win-rate-chart";
@@ -238,8 +238,7 @@ function LeaderboardBars({
           }}
           formatter={(value) => [(value as number).toFixed(2), "Score"]}
           labelFormatter={(label, payload) =>
-            (payload?.[0]?.payload as { fullName?: string } | undefined)?.fullName ??
-            label
+            (payload?.[0]?.payload as { fullName?: string } | undefined)?.fullName ?? label
           }
         />
         <Bar dataKey="score" name="Score" radius={[0, 4, 4, 0]}>

@@ -24,9 +24,7 @@ const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 describe("pickFreshEvents", () => {
   describe("when next batch contains nothing newer than the cursor", () => {
     it("returns an empty array", () => {
-      const next = [
-        mkEvent({ eventId: "a", eventTimestampIso: "2026-04-27T07:00:00.000Z" }),
-      ];
+      const next = [mkEvent({ eventId: "a", eventTimestampIso: "2026-04-27T07:00:00.000Z" })];
       const fresh = pickFreshEvents(next, {
         cursorIso: "2026-04-27T08:00:00.000Z",
         seen: new Set(),

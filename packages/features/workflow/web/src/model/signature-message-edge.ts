@@ -35,8 +35,7 @@ export const computeMessageEdgeUpdate = ({
   }
 
   const systemIndex = formMessages.findIndex((message) => message.role === "system");
-  const adjustedIndex =
-    systemIndex >= 0 && formIndex > systemIndex ? formIndex - 1 : formIndex;
+  const adjustedIndex = systemIndex >= 0 && formIndex > systemIndex ? formIndex - 1 : formIndex;
 
   const messagesParam = nodeParameters.find((param) => param.identifier === "messages");
 

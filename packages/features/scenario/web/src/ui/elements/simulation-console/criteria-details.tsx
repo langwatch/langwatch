@@ -1,6 +1,9 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { SimulationRunResult as ScenarioResults } from "@langwatch/scenario-contract";
-import { CONSOLE_COLORS, REASONING_VERDICT_COLOR_MAP } from "../../../model/simulation-console/constants";
+import {
+  CONSOLE_COLORS,
+  REASONING_VERDICT_COLOR_MAP,
+} from "../../../model/simulation-console/constants";
 
 interface CriteriaDetailsProps {
   results?: ScenarioResults | null;

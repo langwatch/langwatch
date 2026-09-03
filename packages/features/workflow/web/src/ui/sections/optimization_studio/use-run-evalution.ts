@@ -42,12 +42,11 @@ export const useRunEvalution = () => {
     },
   });
 
-  const { previousVersion, previousVersionDsl, nextVersion, latestVersion } =
-    useVersionState({
-      project,
-      form: form,
-      allowSaveIfAutoSaveIsCurrentButNotLatest: true,
-    });
+  const { previousVersion, previousVersionDsl, nextVersion, latestVersion } = useVersionState({
+    project,
+    form: form,
+    allowSaveIfAutoSaveIsCurrentButNotLatest: true,
+  });
 
   const generateCommitMessage = api.workflow.generateCommitMessage.useMutation();
 
@@ -135,8 +134,7 @@ export const useRunEvalution = () => {
         (previousVersionDsl ? hasDSLChanged(workflow, previousVersionDsl, false) : true);
 
       let versionId =
-        workflow_version_id ??
-        (latestVersion?.autoSaved ? previousVersion?.id : latestVersion?.id);
+        workflow_version_id ?? (latestVersion?.autoSaved ? previousVersion?.id : latestVersion?.id);
       // Automatically generate a new version if there are changes and no version id was provided (e.g. when running from the wizard)
       if (hasChanges && !workflow_version_id) {
         let commitMessage = previousVersion ? "autosaved" : "first version";
@@ -152,10 +150,7 @@ export const useRunEvalution = () => {
             // Autogen is cosmetic sugar over the "autosaved" fallback;
             // surfacing it as an error toast mid-evaluate reads like the
             // run itself failed.
-            logger.error(
-              { error: err },
-              "evaluation: error auto-generating version description",
-            );
+            logger.error({ error: err }, "evaluation: error auto-generating version description");
           }
         }
 

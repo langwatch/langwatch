@@ -7,20 +7,19 @@ sidebarTitle: Audit log
 The audit log is the immutable record of every state-changing action in your LangWatch organization, who did what to which resource, when, from where. It lives at `/settings/audit-log` and shows up in the **Settings → Teams & Access** sidebar group.
 
 <Info>
-  **Pairs with:** [Compliance architecture](/ai-governance/compliance-architecture) (the
-  OCSF v1.1 export consumes the same event stream), [CLI debug](/ai-governance/cli-debug)
-  (`langwatch governance status` mirrors the same setup-state signals the audit log
-  records on first activation), and [Ingestion sources](/ai-governance/ingestion-sources)
-  (S3 audit log feeds from external SaaS platforms, Workato, Copilot Studio, Anthropic
-  Compliance, land here as OTel-shaped events through the same pipeline, so a single audit
-  log query covers in-platform mutations *and* third-party-tool activity in one place).
+  **Pairs with:** [Compliance architecture](/ai-governance/compliance-architecture) (the OCSF v1.1
+  export consumes the same event stream), [CLI debug](/ai-governance/cli-debug) (`langwatch
+  governance status` mirrors the same setup-state signals the audit log records on first
+  activation), and [Ingestion sources](/ai-governance/ingestion-sources) (S3 audit log feeds from
+  external SaaS platforms, Workato, Copilot Studio, Anthropic Compliance, land here as OTel-shaped
+  events through the same pipeline, so a single audit log query covers in-platform mutations *and*
+  third-party-tool activity in one place).
 </Info>
 
 <Note>
-  **Permission required**: the audit log surface is gated to `organization:manage`
-  (admins). Members on the org see an "Access Restricted" panel when they navigate here
-  directly. The underlying tRPC procedure is also gated server-side, so direct API calls
-  return UNAUTHORIZED for non-admins.
+  **Permission required**: the audit log surface is gated to `organization:manage` (admins). Members
+  on the org see an "Access Restricted" panel when they navigate here directly. The underlying tRPC
+  procedure is also gated server-side, so direct API calls return UNAUTHORIZED for non-admins.
 </Note>
 
 ## What lands in the log

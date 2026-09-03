@@ -74,8 +74,7 @@ export function HandledErrorAlert({
   // A procedure that wrote its own sentence for the customer is the one
   // channel below the registry: #5984 left a non-5xx `TRPCError`'s message
   // alone precisely so it could be read here.
-  const description =
-    registered?.description ?? readAuthoredMessage(error) ?? UNKNOWN_DESCRIPTION;
+  const description = registered?.description ?? readAuthoredMessage(error) ?? UNKNOWN_DESCRIPTION;
   const tips = handled?.tips ?? [];
   const traceId = readErrorTraceId(error);
 

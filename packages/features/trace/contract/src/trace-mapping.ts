@@ -4,7 +4,10 @@ import {
   type AnnotationAnchorRef,
   describeAnnotationAnchor,
 } from "@langwatch/annotation-contract";
-import type { AnnotationScore, AnnotationWithUser as Annotation } from "@langwatch/annotation-contract";
+import type {
+  AnnotationScore,
+  AnnotationWithUser as Annotation,
+} from "@langwatch/annotation-contract";
 import {
   type Trace as BaseTrace,
   type DatasetSpan,
@@ -71,9 +74,7 @@ export const SPAN_SUBFIELDS: SpanSubfield[] = [
  * @param spanNames - Dynamic span names extracted from project traces
  * @returns Array of span field children with nested subfields
  */
-export function buildSpanFieldChildren(
-  spanNames: Array<{ key: string; label: string }>,
-): Array<{
+export function buildSpanFieldChildren(spanNames: Array<{ key: string; label: string }>): Array<{
   name: string;
   label: string;
   type: "dict";
@@ -202,11 +203,7 @@ const readableScoreParts = ({
   scoreOptions: TraceAnnotation["scoreOptions"];
   projectScores?: AnnotationScore[];
 }): string[] => {
-  if (
-    typeof scoreOptions !== "object" ||
-    scoreOptions === null ||
-    Array.isArray(scoreOptions)
-  ) {
+  if (typeof scoreOptions !== "object" || scoreOptions === null || Array.isArray(scoreOptions)) {
     return [];
   }
 
@@ -342,11 +339,7 @@ const namedScoreOptions = ({
   scoreOptions: TraceAnnotation["scoreOptions"];
   projectScores?: AnnotationScore[];
 }): Record<string, AnnotationScoreOption> => {
-  if (
-    typeof scoreOptions !== "object" ||
-    scoreOptions === null ||
-    Array.isArray(scoreOptions)
-  ) {
+  if (typeof scoreOptions !== "object" || scoreOptions === null || Array.isArray(scoreOptions)) {
     return {};
   }
 
@@ -390,18 +383,14 @@ export function buildAnnotationRecord({
   });
   const suggestion = oneLine(annotation.expectedOutput ?? "");
   const suggestionKey =
-    suggestionLabel(annotation) === "suggested input"
-      ? "suggested_input"
-      : "expected_output";
+    suggestionLabel(annotation) === "suggested input" ? "suggested_input" : "expected_output";
   const createdAt = new Date(annotation.createdAt as unknown as string | number | Date);
 
   return {
     author: readableAnnotationAuthor(annotation),
     ...(part ? { on: part } : {}),
     ...(comment ? { comment } : {}),
-    ...(typeof annotation.isThumbsUp === "boolean"
-      ? { is_thumbs_up: annotation.isThumbsUp }
-      : {}),
+    ...(typeof annotation.isThumbsUp === "boolean" ? { is_thumbs_up: annotation.isThumbsUp } : {}),
     ...(Object.keys(scores).length > 0 ? { score: scores } : {}),
     ...(suggestion ? { [suggestionKey]: suggestion } : {}),
     ...(Number.isNaN(createdAt.getTime()) ? {} : { created_at: createdAt.toISOString() }),
@@ -416,8 +405,7 @@ export const TRACE_MAPPINGS = {
     mapping: (trace: TraceWithAnnotations) => trace.metadata?.thread_id ?? "",
   },
   timestamp: {
-    mapping: (trace: TraceWithAnnotations) =>
-      new Date(trace.timestamps.started_at).toISOString(),
+    mapping: (trace: TraceWithAnnotations) => new Date(trace.timestamps.started_at).toISOString(),
   },
   input: {
     mapping: (trace: TraceWithAnnotations) => trace.input?.value ?? "",
@@ -460,9 +448,7 @@ export const TRACE_MAPPINGS = {
     keys: (traces: TraceWithAnnotations[]) => {
       return Array.from(
         new Set(
-          traces.flatMap(
-            (trace) => trace.spans?.map((span) => getSpanNameOrModel(span)) ?? [],
-          ),
+          traces.flatMap((trace) => trace.spans?.map((span) => getSpanNameOrModel(span)) ?? []),
         ),
       ).map((key) => ({
         key: key ?? "",
@@ -474,9 +460,7 @@ export const TRACE_MAPPINGS = {
         .flatMap((trace) => trace.spans ?? [])
         .filter((span) => getSpanNameOrModel(span) === key);
       return Object.keys(spans[0] || {})
-        .filter((key) =>
-          ["input", "output", "generated", "params", "contexts"].includes(key),
-        )
+        .filter((key) => ["input", "output", "generated", "params", "contexts"].includes(key))
         .map((key) => ({
           key,
           label: key,
@@ -502,16 +486,12 @@ export const TRACE_MAPPINGS = {
   },
   "spans.llm.input": {
     mapping: (trace: TraceWithAnnotations) =>
-      trace.spans
-        ?.filter((span) => span.type === "llm")
-        ?.map((span) => span.input?.value) ?? [],
+      trace.spans?.filter((span) => span.type === "llm")?.map((span) => span.input?.value) ?? [],
     expandable_by: "spans.llm.span_id",
   },
   "spans.llm.output": {
     mapping: (trace: TraceWithAnnotations) =>
-      trace.spans
-        ?.filter((span) => span.type === "llm")
-        ?.map((span) => span.output?.value) ?? [],
+      trace.spans?.filter((span) => span.type === "llm")?.map((span) => span.output?.value) ?? [],
     expandable_by: "spans.llm.span_id",
   },
   metadata: {
@@ -548,12 +528,10 @@ export const TRACE_MAPPINGS = {
           .flatMap((trace) => trace.evaluations ?? [])
           .map((evaluation) => [evaluation.evaluator_id, evaluation]),
       );
-      return Object.entries(evaluationsByEvaluatorId).map(
-        ([evaluator_id, evaluation]) => ({
-          key: evaluator_id,
-          label: evaluation.name ?? "",
-        }),
-      );
+      return Object.entries(evaluationsByEvaluatorId).map(([evaluator_id, evaluation]) => ({
+        key: evaluator_id,
+        label: evaluation.name ?? "",
+      }));
     },
     subkeys: (
       traces: TraceWithAnnotations[],
@@ -564,9 +542,7 @@ export const TRACE_MAPPINGS = {
         .flatMap((trace) => trace.evaluations ?? [])
         .find((evaluation) => evaluation.evaluator_id === key);
       return Object.keys(evaluation || {})
-        .filter((key) =>
-          ["passed", "score", "label", "details", "status", "error"].includes(key),
-        )
+        .filter((key) => ["passed", "score", "label", "details", "status", "error"].includes(key))
         .map((key) => ({
           key,
           label: key,
@@ -576,9 +552,7 @@ export const TRACE_MAPPINGS = {
       if (!key) {
         return trace.evaluations ?? [];
       }
-      const evaluation = trace.evaluations?.find(
-        (evaluation) => evaluation.evaluator_id === key,
-      );
+      const evaluation = trace.evaluations?.find((evaluation) => evaluation.evaluator_id === key);
       if (!subkey) {
         return evaluation;
       }
@@ -693,9 +667,7 @@ export const TRACE_MAPPINGS = {
     keys: (traces: TraceWithAnnotations[]) => {
       return Array.from(
         new Set(
-          traces.flatMap(
-            (trace) => trace.events?.flatMap((event) => event.event_type) ?? [],
-          ),
+          traces.flatMap((trace) => trace.events?.flatMap((event) => event.event_type) ?? []),
         ),
       ).map((key) => ({
         key,
@@ -783,9 +755,7 @@ export const TRACE_MAPPINGS = {
       label: string;
     }[];
     mapping:
-      | ((
-          trace: TraceWithAnnotations,
-        ) => string | number | object | undefined | unknown[])
+      | ((trace: TraceWithAnnotations) => string | number | object | undefined | unknown[])
       | ((
           trace: TraceWithAnnotations,
           key: string,
@@ -871,11 +841,7 @@ export const TRACE_EXPANSIONS = {
  * Extract selected fields from traces based on trace mapping configuration
  * Single Responsibility: Transform traces array into field values based on selectedFields
  */
-const DEFAULT_TRACE_FIELDS: (keyof typeof TRACE_MAPPINGS)[] = [
-  "trace_id",
-  "input",
-  "output",
-];
+const DEFAULT_TRACE_FIELDS: (keyof typeof TRACE_MAPPINGS)[] = ["trace_id", "input", "output"];
 
 export const extractTracesFields = (
   traces: TraceWithAnnotations[],
@@ -901,8 +867,7 @@ export const extractTracesFields = (
  */
 export const THREAD_MAPPINGS = {
   thread_id: {
-    mapping: (thread: { thread_id: string; traces: TraceWithAnnotations[] }) =>
-      thread.thread_id,
+    mapping: (thread: { thread_id: string; traces: TraceWithAnnotations[] }) => thread.thread_id,
   },
   traces: {
     mapping: (
@@ -975,9 +940,7 @@ export const mappingStateSchema = z.object({
         }),
     ]),
   ),
-  expansions: z.array(
-    z.enum(Object.keys(TRACE_EXPANSIONS) as [keyof typeof TRACE_EXPANSIONS]),
-  ),
+  expansions: z.array(z.enum(Object.keys(TRACE_EXPANSIONS) as [keyof typeof TRACE_EXPANSIONS])),
 });
 
 export type MappingState = z.infer<typeof mappingStateSchema>;
@@ -992,11 +955,7 @@ export type MappingState = z.infer<typeof mappingStateSchema>;
 // infer the output type from the inner mappingStateSchema for the OpenAPI spec.
 export const monitorMappingsSchema = z.preprocess((value) => {
   if (value === null || value === undefined) return value;
-  if (
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    "mapping" in (value as object)
-  ) {
+  if (typeof value === "object" && !Array.isArray(value) && "mapping" in (value as object)) {
     return value;
   }
   return { mapping: {}, expansions: [] };
@@ -1038,14 +997,10 @@ export type ThreadMappingState = {
  * Convert thread mappings to unified MappingState format
  * Single Responsibility: Transform thread mappings from wizard format to the unified mapping format
  */
-export function convertThreadMappingsToUnified(
-  threadMapping: ThreadMappingState,
-): MappingState {
+export function convertThreadMappingsToUnified(threadMapping: ThreadMappingState): MappingState {
   const unifiedMapping: MappingState["mapping"] = {};
 
-  for (const [targetField, { source, selectedFields }] of Object.entries(
-    threadMapping.mapping,
-  )) {
+  for (const [targetField, { source, selectedFields }] of Object.entries(threadMapping.mapping)) {
     if (source) {
       unifiedMapping[targetField] = {
         type: "thread" as const,
@@ -1152,9 +1107,7 @@ export const mapTraceToDatasetEntry = (
 
         return [
           column,
-          typeof value !== "string" && typeof value !== "number"
-            ? JSON.stringify(value)
-            : value,
+          typeof value !== "string" && typeof value !== "number" ? JSON.stringify(value) : value,
         ];
       }),
     ),
@@ -1193,22 +1146,15 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
     return undefined;
   }
   if (type === "string") {
-    return (
-      typeof value === "string" ? value : JSON.stringify(value)
-    ) as StringTypeToType[T];
+    return (typeof value === "string" ? value : JSON.stringify(value)) as StringTypeToType[T];
   }
   if (type === "number") {
     return Number(value) as StringTypeToType[T];
   }
   if (Array.isArray(value) && type === "string[]") {
-    return value.map((v) =>
-      tryAndConvertTo(v, "string"),
-    ) as unknown as StringTypeToType[T];
+    return value.map((v) => tryAndConvertTo(v, "string")) as unknown as StringTypeToType[T];
   }
-  if (
-    typeof value === "string" &&
-    (type === "object" || type === "string[]" || type === "array")
-  ) {
+  if (typeof value === "string" && (type === "object" || type === "string[]" || type === "array")) {
     try {
       const parsed = JSON.parse(value);
       if (!Array.isArray(parsed) && typeof parsed === "object") {
@@ -1216,9 +1162,7 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
       }
       if (Array.isArray(parsed)) {
         if (type === "string[]") {
-          return parsed.map((v) =>
-            tryAndConvertTo(v, "string"),
-          ) as unknown as StringTypeToType[T];
+          return parsed.map((v) => tryAndConvertTo(v, "string")) as unknown as StringTypeToType[T];
         }
         return parsed as unknown as StringTypeToType[T];
       }

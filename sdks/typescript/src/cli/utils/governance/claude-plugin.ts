@@ -196,12 +196,8 @@ export function readClaudePluginState(): ClaudePluginState {
   const settings = readJsonObject(claudeSettingsPath());
 
   const marketplaceCandidate = marketplaces[CLAUDE_PLUGIN_MARKETPLACE];
-  const marketplaceEntry = isPlainObject(marketplaceCandidate)
-    ? marketplaceCandidate
-    : null;
-  const enabledPlugins = isPlainObject(settings.enabledPlugins)
-    ? settings.enabledPlugins
-    : {};
+  const marketplaceEntry = isPlainObject(marketplaceCandidate) ? marketplaceCandidate : null;
+  const enabledPlugins = isPlainObject(settings.enabledPlugins) ? settings.enabledPlugins : {};
 
   return {
     pluginInstalled: hasInstallRecord(installed),
@@ -286,10 +282,7 @@ function pointsAtOwnedRepo(value: unknown): boolean {
 
   const scp = /^git@([^:]+):(.+)$/.exec(lowered);
   if (scp) {
-    return (
-      OWNED_HOSTS.has(scp[1]!) &&
-      stripRepoPath(scp[2]!) === CLAUDE_PLUGIN_MARKETPLACE_REPO
-    );
+    return OWNED_HOSTS.has(scp[1]!) && stripRepoPath(scp[2]!) === CLAUDE_PLUGIN_MARKETPLACE_REPO;
   }
 
   try {
@@ -589,15 +582,11 @@ function applyUpdate({
  * off them.
  */
 function readUserScopeInstall(): Record<string, unknown> | null {
-  const document = readJsonObject(
-    path.join(claudePluginsDir(), "installed_plugins.json"),
-  );
+  const document = readJsonObject(path.join(claudePluginsDir(), "installed_plugins.json"));
   const plugins = isPlainObject(document.plugins) ? document.plugins : document;
   const records = plugins[CLAUDE_PLUGIN_REF];
   if (!Array.isArray(records)) return null;
-  const userScoped = records.find(
-    (record) => isPlainObject(record) && record.scope === "user",
-  );
+  const userScoped = records.find((record) => isPlainObject(record) && record.scope === "user");
   return isPlainObject(userScoped) ? userScoped : null;
 }
 
@@ -630,15 +619,9 @@ function readPublishedPluginVersion(): string | null {
  * one, and a wrong guess only costs an unreadable manifest.
  */
 function marketplaceListingDir(): string {
-  const marketplaces = readJsonObject(
-    path.join(claudePluginsDir(), "known_marketplaces.json"),
-  );
+  const marketplaces = readJsonObject(path.join(claudePluginsDir(), "known_marketplaces.json"));
   const entry = marketplaces[CLAUDE_PLUGIN_MARKETPLACE];
-  if (
-    isPlainObject(entry) &&
-    typeof entry.installLocation === "string" &&
-    entry.installLocation
-  ) {
+  if (isPlainObject(entry) && typeof entry.installLocation === "string" && entry.installLocation) {
     return entry.installLocation;
   }
   return path.join(claudePluginsDir(), "marketplaces", CLAUDE_PLUGIN_MARKETPLACE);
@@ -782,18 +765,14 @@ function disableInSettings(): boolean {
   const filePath = claudeSettingsPath();
   try {
     const settings = readAppSettingsFileForUpdate(filePath);
-    const enabled = isPlainObject(settings.enabledPlugins)
-      ? { ...settings.enabledPlugins }
-      : {};
+    const enabled = isPlainObject(settings.enabledPlugins) ? { ...settings.enabledPlugins } : {};
     if (enabled[CLAUDE_PLUGIN_REF] === false) return true;
     enabled[CLAUDE_PLUGIN_REF] = false;
     settings.enabledPlugins = enabled;
     writeAppSettingsFile({ filePath, settings });
     return true;
   } catch (err) {
-    debugLog(
-      `could not disable the plugin in the settings file: ${(err as Error).message}`,
-    );
+    debugLog(`could not disable the plugin in the settings file: ${(err as Error).message}`);
     return false;
   }
 }

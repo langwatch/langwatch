@@ -218,10 +218,7 @@ describe("the pull effect's pulled-usage emit seam", () => {
 
     it("resolves the flag once per run, not once per usage item", async () => {
       runOnce.mockResolvedValue({
-        events: [
-          usageEvent(),
-          usageEvent({ dimensions: { w: "2" } }, "usage:2026-08-01:ws_2"),
-        ],
+        events: [usageEvent(), usageEvent({ dimensions: { w: "2" } }, "usage:2026-08-01:ws_2")],
         cursor: null,
         errorCount: 0,
       });

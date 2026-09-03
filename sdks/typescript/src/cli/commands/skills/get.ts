@@ -7,11 +7,7 @@
  * document instead — an explicit `-o agents` is a request for compact JSON,
  * not for the raw body an agent caller would have gotten anyway.
  */
-import {
-  hasExplicitFormatRequest,
-  printResult,
-  type RawOutputFlags,
-} from "../../utils/output";
+import { hasExplicitFormatRequest, printResult, type RawOutputFlags } from "../../utils/output";
 import { findSkill, SKILLS_BUNDLE } from "./installer";
 import { throwValidationError } from "./validation";
 

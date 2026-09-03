@@ -129,10 +129,7 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
         ...(query ? { Title: { contains: query, mode: "insensitive" as const } } : {}),
         ...(cursor ? { AND: [afterCursor(cursor)] } : {}),
       },
-      orderBy: [
-        { LastActivityAt: { sort: "desc", nulls: "last" } },
-        { ConversationId: "desc" },
-      ],
+      orderBy: [{ LastActivityAt: { sort: "desc", nulls: "last" } }, { ConversationId: "desc" }],
       take: limit,
     });
     return rows.map(toRow);

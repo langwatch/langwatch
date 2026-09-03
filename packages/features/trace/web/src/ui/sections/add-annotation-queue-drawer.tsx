@@ -14,11 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
-import {
-  applyHandledErrorToForm,
-  FormServerError,
-  showErrorToast,
-} from "./errors";
+import { applyHandledErrorToForm, FormServerError, showErrorToast } from "./errors";
 import { useDrawer } from "../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { api } from "./trace-api";
@@ -129,9 +125,7 @@ export const AddAnnotationQueueDrawer = ({
   // Sync local state when queue data loads (edit mode hydration)
   useEffect(() => {
     if (!queue.data) return;
-    setParticipants(
-      queue.data.members.map((m) => ({ id: m.user.id, name: m.user.name })),
-    );
+    setParticipants(queue.data.members.map((m) => ({ id: m.user.id, name: m.user.name })));
     setScoreTypes(
       queue.data.AnnotationQueueScores.map((s) => ({
         id: s.annotationScore.id,
@@ -286,9 +280,7 @@ export const AddAnnotationQueueDrawer = ({
                       <Popover.Body>
                         <VStack align="start" gap={1}>
                           {users.data?.members.map((member) => {
-                            const isSelected = participants.some(
-                              (p) => p.id === member.user.id,
-                            );
+                            const isSelected = participants.some((p) => p.id === member.user.id);
                             return (
                               <Button
                                 key={member.user.id}
@@ -299,18 +291,10 @@ export const AddAnnotationQueueDrawer = ({
                                 height="auto"
                                 fontWeight="normal"
                                 aria-pressed={isSelected}
-                                onClick={() =>
-                                  toggleParticipant(member.user.id, member.user.name)
-                                }
+                                onClick={() => toggleParticipant(member.user.id, member.user.name)}
                               >
-                                <Check
-                                  size={16}
-                                  color={isSelected ? "green" : "transparent"}
-                                />
-                                <RandomColorAvatar
-                                  size="2xs"
-                                  name={member.user.name ?? ""}
-                                />
+                                <Check size={16} color={isSelected ? "green" : "transparent"} />
+                                <RandomColorAvatar size="2xs" name={member.user.name ?? ""} />
                                 <Text fontSize="sm">{member.user.name}</Text>
                               </Button>
                             );
@@ -377,9 +361,7 @@ export const AddAnnotationQueueDrawer = ({
                         <Box maxH="250px" overflowY="auto" padding={2}>
                           <VStack align="start" gap={1}>
                             {annotationScores.data?.map((score) => {
-                              const isSelected = scoreTypes.some(
-                                (s) => s.id === score.id,
-                              );
+                              const isSelected = scoreTypes.some((s) => s.id === score.id);
                               return (
                                 <Button
                                   key={score.id}
@@ -392,10 +374,7 @@ export const AddAnnotationQueueDrawer = ({
                                   aria-pressed={isSelected}
                                   onClick={() => toggleScoreType(score.id, score.name)}
                                 >
-                                  <Check
-                                    size={16}
-                                    color={isSelected ? "green" : "transparent"}
-                                  />
+                                  <Check size={16} color={isSelected ? "green" : "transparent"} />
                                   <Text fontSize="sm">{score.name}</Text>
                                 </Button>
                               );

@@ -25,9 +25,7 @@ const { mintIngestionKeyMock, spawnSyncMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/cli/utils/governance/cli-api", async () => {
-  const actual = await vi.importActual<typeof CliApiModule>(
-    "@/cli/utils/governance/cli-api",
-  );
+  const actual = await vi.importActual<typeof CliApiModule>("@/cli/utils/governance/cli-api");
   return { ...actual, mintIngestionKey: mintIngestionKeyMock };
 });
 
@@ -149,10 +147,7 @@ describe("the claude_code ingestion install", () => {
     it("writes the hook entries into the settings file", async () => {
       await runInstall();
 
-      const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")) as Record<
-        string,
-        unknown
-      >;
+      const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")) as Record<string, unknown>;
       expect(Object.keys(settings.hooks as object)).toEqual(["SessionStart", "Stop"]);
     });
   });

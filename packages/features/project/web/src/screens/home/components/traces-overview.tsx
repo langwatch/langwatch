@@ -2,7 +2,10 @@ import { Box, chakra, Grid, HStack, Spacer, Text, VStack } from "@chakra-ui/reac
 import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
 import { analyticsMetrics } from "@langwatch/analytics-web/analytics-registry";
-import { CustomGraph, type CustomGraphInput } from "@langwatch/analytics-web/components/CustomGraph";
+import {
+  CustomGraph,
+  type CustomGraphInput,
+} from "@langwatch/analytics-web/components/CustomGraph";
 import { usePeriodSelector } from "@langwatch/analytics-web/components/PeriodSelector";
 import { Link } from "../../../ui/elements/app-link";
 import { HomeCard } from "./home-card";
@@ -151,8 +154,7 @@ export function TracesOverview({
   // Two forms of one fact: the chip above the figures, and the same window
   // read as part of a sentence in the control that opens the trend.
   const periodLabel = daysDifference === 1 ? "Last day" : `Last ${daysDifference} days`;
-  const periodPhrase =
-    daysDifference === 1 ? "the last day" : `the last ${daysDifference} days`;
+  const periodPhrase = daysDifference === 1 ? "the last day" : `the last ${daysDifference} days`;
   // The window is bucketed daily for the curve, so its length IS the number of
   // readings the curve would be drawn through.
   const trendIsMeaningful = daysDifference >= MIN_POINTS_FOR_A_TREND;

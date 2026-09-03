@@ -26,8 +26,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
       diagnostics?: GovernanceDiagnosticsPort;
       clock: () => number;
     },
-  ) {
-  }
+  ) {}
 
   static create(options: {
     repository: AdminWorkspaceViewAuditRepository;
@@ -49,10 +48,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
       actorUserId: parsed.actorUserId,
     });
     if (!team || team.organizationId !== parsed.organizationId) return skipped();
-    if (
-      (team.isPersonal && team.ownerUserId === parsed.actorUserId) ||
-      team.actorIsMember
-    ) {
+    if ((team.isPersonal && team.ownerUserId === parsed.actorUserId) || team.actorIsMember) {
       return skipped();
     }
 

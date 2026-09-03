@@ -1,7 +1,4 @@
-import {
-  LIVE_IDENTIFIER_STATES,
-  type SsoConnectionState,
-} from "@langwatch/identity-contract";
+import { LIVE_IDENTIFIER_STATES, type SsoConnectionState } from "@langwatch/identity-contract";
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
@@ -56,9 +53,7 @@ export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepos
       where: { state: "ACTIVE", verifiedDomains: { has: domain } },
       select: { id: true, organizationId: true },
     });
-    return row === null
-      ? null
-      : { connectionId: row.id, organizationId: row.organizationId };
+    return row === null ? null : { connectionId: row.id, organizationId: row.organizationId };
   }
 }
 
@@ -80,11 +75,7 @@ export class PrismaSsoConnectionStrandingRepository implements SsoConnectionStra
 
   constructor(private readonly prisma: PrismaSsoConnectionStrandingDatabase) {}
 
-  async findStrandedUserIds({
-    connectionId,
-  }: {
-    connectionId: string;
-  }): Promise<string[]> {
+  async findStrandedUserIds({ connectionId }: { connectionId: string }): Promise<string[]> {
     const held = await this.prisma.identifier.findMany({
       where: {
         connectionId,

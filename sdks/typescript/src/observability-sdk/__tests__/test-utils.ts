@@ -23,8 +23,7 @@ import { getLangWatchTracerFromProvider } from "../tracer";
 export class MockSpan implements Span {
   private _name: string;
   private _attributes: Record<string, AttributeValue> = {};
-  private _events: Array<{ name: string; attributes?: Attributes; timestamp?: number }> =
-    [];
+  private _events: Array<{ name: string; attributes?: Attributes; timestamp?: number }> = [];
   private _status?: SpanStatus;
   private _ended = false;
   private _links: Link[] = [];
@@ -48,12 +47,10 @@ export class MockSpan implements Span {
     return this;
   });
 
-  public readonly addEvent = vi.fn(
-    (name: string, attributes?: Attributes, timestamp?: number) => {
-      this._events.push({ name, attributes, timestamp });
-      return this;
-    },
-  );
+  public readonly addEvent = vi.fn((name: string, attributes?: Attributes, timestamp?: number) => {
+    this._events.push({ name, attributes, timestamp });
+    return this;
+  });
 
   public readonly recordException = vi.fn((exception: Exception) => {
     const exceptionName =
@@ -518,11 +515,7 @@ export const testScenarios = {
    */
   createTracerTest: (tracerName = "test-tracer", version?: string) => {
     const mockProvider = new MockTracerProvider();
-    const langwatchTracer = getLangWatchTracerFromProvider(
-      mockProvider,
-      tracerName,
-      version,
-    );
+    const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, tracerName, version);
     const mockTracer = mockProvider.getTracerByName(tracerName, version)!;
     return { mockProvider, langwatchTracer, mockTracer };
   },

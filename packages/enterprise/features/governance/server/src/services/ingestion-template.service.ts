@@ -25,8 +25,7 @@ export class IngestionTemplateService {
     private readonly repository: IngestionTemplateRepository,
     private readonly newSlugSuffix: () => string,
     private readonly now: () => Date,
-  ) {
-  }
+  ) {}
 
   static create(options: {
     repository: IngestionTemplateRepository;
@@ -57,18 +56,13 @@ export class IngestionTemplateService {
     return this.repository.tryFindVisible(input);
   }
 
-  async getByIdForOrg(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<IngestionTemplate> {
+  async getByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate> {
     const template = await this.repository.tryFindVisible(input);
     if (!template) throw new TemplateNotFoundError(input.id);
     return template;
   }
 
-  async createOrgTemplate(
-    input: CreateIngestionTemplateInput,
-  ): Promise<IngestionTemplate> {
+  async createOrgTemplate(input: CreateIngestionTemplateInput): Promise<IngestionTemplate> {
     const parsed = createIngestionTemplateInputSchema.parse(input);
     if (!ingestionTemplateSourceTypeSchema.safeParse(parsed.sourceType).success) {
       throw new InvalidSourceTypeError();
@@ -89,9 +83,7 @@ export class IngestionTemplateService {
     });
   }
 
-  async updateOttlRules(
-    input: UpdateIngestionTemplateOttlInput,
-  ): Promise<IngestionTemplate> {
+  async updateOttlRules(input: UpdateIngestionTemplateOttlInput): Promise<IngestionTemplate> {
     const parsed = updateIngestionTemplateOttlInputSchema.parse(input);
     const result = await this.repository.updateOttlRulesWithAudit({
       ...parsed,
@@ -121,9 +113,7 @@ export class IngestionTemplateService {
     }
   }
 
-  async cloneFromPlatform(
-    input: CloneIngestionTemplateInput,
-  ): Promise<IngestionTemplate> {
+  async cloneFromPlatform(input: CloneIngestionTemplateInput): Promise<IngestionTemplate> {
     const parsed = cloneIngestionTemplateInputSchema.parse(input);
     const source = await this.repository.tryFindPlatform(parsed.sourceTemplateId);
     if (!source) throw new TemplateNotFoundError(parsed.sourceTemplateId);

@@ -78,12 +78,8 @@ describe("NoModelsConfiguredCallout", () => {
   });
 
   it("includes the surface-specific label when forFeatureLabel is provided", () => {
-    render(
-      withProviders(<NoModelsConfiguredCallout forFeatureLabel="evaluators" />),
-    );
-    expect(
-      screen.getByText(/No models configured for evaluators/i),
-    ).toBeInTheDocument();
+    render(withProviders(<NoModelsConfiguredCallout forFeatureLabel="evaluators" />));
+    expect(screen.getByText(/No models configured for evaluators/i)).toBeInTheDocument();
   });
 });
 
@@ -104,12 +100,8 @@ describe("<ModelSelector /> empty state", () => {
     );
 
     // Empty-state callout is in the DOM …
-    expect(
-      screen.getByTestId("no-models-configured-callout"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/No models configured for AI search/i),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("no-models-configured-callout")).toBeInTheDocument();
+    expect(screen.getByText(/No models configured for AI search/i)).toBeInTheDocument();
 
     // … and the System fallback string is NOT rendered as a selected value
     // anywhere in the trigger (the dropdown itself is replaced).

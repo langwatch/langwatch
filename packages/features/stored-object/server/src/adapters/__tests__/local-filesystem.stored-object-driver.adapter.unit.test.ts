@@ -254,9 +254,9 @@ describe("given a URI whose encoded segment decodes into path separators", () =>
   const escaping = `file://${tmpDir}/proj/${encodeURIComponent("../../../../etc/evil")}/obj`;
 
   it("refuses to read, write or delete outside the path it names", async () => {
-    await expect(
-      driver.put(escaping, Buffer.from("owned"), "text/plain"),
-    ).rejects.toThrow(/single component/i);
+    await expect(driver.put(escaping, Buffer.from("owned"), "text/plain")).rejects.toThrow(
+      /single component/i,
+    );
     await expect(driver.get(escaping)).rejects.toThrow(/single component/i);
     await expect(driver.delete(escaping)).rejects.toThrow(/single component/i);
     await expect(driver.exists(escaping)).rejects.toThrow(/single component/i);
@@ -290,8 +290,6 @@ describe("given a storage root configured with a trailing slash", () => {
     await driver.put(uri, Buffer.from("payload"), "application/octet-stream");
 
     expect(await streamToBuffer(await driver.get(uri))).toEqual(Buffer.from("payload"));
-    await expect(
-      fs.access(path.join(tmpDir, "proj-1", "abc123")),
-    ).resolves.toBeUndefined();
+    await expect(fs.access(path.join(tmpDir, "proj-1", "abc123"))).resolves.toBeUndefined();
   });
 });

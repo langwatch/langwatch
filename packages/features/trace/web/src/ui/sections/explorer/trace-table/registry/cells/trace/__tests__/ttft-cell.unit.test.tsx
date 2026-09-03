@@ -7,10 +7,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { TraceListItem } from "../../../../../types/trace";
 import { NO_TRACE_EVENTS } from "../../../../../types/trace";
-import {
-  TraceStatisticsProvider,
-  useTraceStatistics,
-} from "../../../../trace-statistics-context";
+import { TraceStatisticsProvider, useTraceStatistics } from "../../../../trace-statistics-context";
 import type { CellRenderContext } from "../../../types";
 import { TtftCell } from "../ttft-cell";
 

@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Input,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Archive, ExternalLink, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
@@ -61,16 +52,13 @@ function PeoplePage() {
           </Text>
           <Heading size="md">Departments</Heading>
           <Text color="fg.muted" fontSize="sm" maxW="2xl">
-            A department is an accounting label for spend. Assign people, teams, and
-            projects to one, and spend rolls up by department across the org, including
-            personal AI use. Departments never grant or restrict access.
+            A department is an accounting label for spend. Assign people, teams, and projects to
+            one, and spend rolls up by department across the org, including personal AI use.
+            Departments never grant or restrict access.
           </Text>
         </VStack>
 
-        <HandledErrorAlert
-          error={listQuery.error}
-          fallbackTitle="Couldn't load departments"
-        />
+        <HandledErrorAlert error={listQuery.error} fallbackTitle="Couldn't load departments" />
 
         {canManage && <CreateDepartmentBox orgId={orgId} onCreated={refresh} />}
 
@@ -112,8 +100,7 @@ function CreateDepartmentBox({
       toaster.create({ title: "Department created", type: "success" });
       await onCreated();
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't create department" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't create department" }),
   });
 
   const submit = () => {
@@ -178,8 +165,8 @@ function AssignmentGuide() {
           Assigning departments
         </Text>
         <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-          Assign people and teams to a department where you already manage them. Spend
-          rolls up by department, including personal AI use.
+          Assign people and teams to a department where you already manage them. Spend rolls up by
+          department, including personal AI use.
         </Text>
       </Box>
       <AssignmentLink

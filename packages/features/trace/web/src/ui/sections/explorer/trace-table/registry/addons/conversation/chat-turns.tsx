@@ -7,7 +7,10 @@ import type { TraceListItem } from "../../../../types/trace";
 import { formatDuration } from "../../../../../../../index";
 import { SystemPromptBanner } from "../../../../trace-drawer/conversation-view/system-prompt-banner";
 import { TraceIdPeek } from "../../../../trace-id-peek";
-import { findMessageContent, parseSystemPrompt } from "../../../../../../../model/explorer/trace-table/chat-content";
+import {
+  findMessageContent,
+  parseSystemPrompt,
+} from "../../../../../../../model/explorer/trace-table/chat-content";
 import type { ConversationGroup } from "../../../conversation-groups";
 import { type RowStyle, StatusDot } from "../../../status-row";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives";
@@ -30,9 +33,7 @@ interface ChatTurnsProps {
 
 export const ChatTurns: React.FC<ChatTurnsProps> = ({ group, colSpan, style }) => {
   const systemPrompt = parseSystemPrompt(group.traces[0]?.input);
-  const { head, tail, hiddenCount, showMore, showAll, canShowMore } = useTurnsWindow(
-    group.traces,
-  );
+  const { head, tail, hiddenCount, showMore, showAll, canShowMore } = useTurnsWindow(group.traces);
   const nextStep = Math.min(SHOW_MORE_STEP, hiddenCount);
 
   return (
@@ -72,11 +73,7 @@ export const ChatTurns: React.FC<ChatTurnsProps> = ({ group, colSpan, style }) =
               </HStack>
             )}
             {tail && (
-              <ChatTurn
-                trace={tail}
-                turnIndex={group.traces.length - 1}
-                prevTrace={undefined}
-              />
+              <ChatTurn trace={tail} turnIndex={group.traces.length - 1} prevTrace={undefined} />
             )}
           </VStack>
         </VStack>
@@ -95,8 +92,7 @@ const ChatTurn: React.FC<ChatTurnProps> = ({ trace, turnIndex, prevTrace }) => {
   const { currentDrawer } = useDrawer();
   const params = useDrawerParams();
   const openTraceDrawer = useOpenTraceDrawer();
-  const selectedTraceId =
-    currentDrawer === "traceV2Details" ? (params.traceId ?? null) : null;
+  const selectedTraceId = currentDrawer === "traceV2Details" ? (params.traceId ?? null) : null;
   const isSelected = selectedTraceId === trace.traceId;
 
   const gapSeconds = turnGapSeconds({ trace, prevTrace });

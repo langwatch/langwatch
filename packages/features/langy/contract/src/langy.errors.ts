@@ -153,14 +153,10 @@ export class LangyModelNotAllowedError extends HandledError {
 export class LangyEgressMisconfiguredError extends HandledError {
   declare readonly code: "langy_egress_misconfigured";
   constructor() {
-    super(
-      "langy_egress_misconfigured",
-      "Langy egress policy is misconfigured for this project.",
-      {
-        httpStatus: 409,
-        ...remediation("langy_egress_misconfigured"),
-      },
-    );
+    super("langy_egress_misconfigured", "Langy egress policy is misconfigured for this project.", {
+      httpStatus: 409,
+      ...remediation("langy_egress_misconfigured"),
+    });
     this.name = "LangyEgressMisconfiguredError";
   }
 }
@@ -238,14 +234,10 @@ export class LangyRateLimitedError extends HandledError {
 export class LangyTurnInProgressError extends HandledError {
   declare readonly code: "langy_turn_in_progress";
   constructor() {
-    super(
-      "langy_turn_in_progress",
-      "A response is already in progress for this conversation.",
-      {
-        httpStatus: 409,
-        ...remediation("langy_turn_in_progress"),
-      },
-    );
+    super("langy_turn_in_progress", "A response is already in progress for this conversation.", {
+      httpStatus: 409,
+      ...remediation("langy_turn_in_progress"),
+    });
     this.name = "LangyTurnInProgressError";
   }
 }
@@ -287,14 +279,10 @@ export class LangyTurnNotStoppableError extends HandledError {
 export class LangyDispatchRejectedError extends HandledError {
   declare readonly code: "langy_dispatch_rejected";
   constructor() {
-    super(
-      "langy_dispatch_rejected",
-      "The agent rejected this turn's request as invalid.",
-      {
-        httpStatus: 422,
-        ...remediation("langy_dispatch_rejected"),
-      },
-    );
+    super("langy_dispatch_rejected", "The agent rejected this turn's request as invalid.", {
+      httpStatus: 422,
+      ...remediation("langy_dispatch_rejected"),
+    });
     this.name = "LangyDispatchRejectedError";
   }
 }
@@ -361,10 +349,7 @@ export class LangyApiIdentityDeniedError extends HandledError {
     | "langy_api_key_no_langy_access"
     | "langy_api_actor_missing";
   constructor(
-    code:
-      | "langy_api_key_unowned"
-      | "langy_api_key_no_langy_access"
-      | "langy_api_actor_missing",
+    code: "langy_api_key_unowned" | "langy_api_key_no_langy_access" | "langy_api_actor_missing",
     message: string,
   ) {
     super(code, message, {
@@ -528,25 +513,18 @@ const UNTYPED_HANDLER_FAILURE = "langy_ui_handler_failed";
 export class LangyUiHandlerFailedError extends HandledError {
   declare readonly code: "langy_ui_handler_failed";
   constructor(kind: string, errorCode?: string) {
-    super(
-      "langy_ui_handler_failed",
-      `The page could not carry out "${kind}".`,
-      {
-        httpStatus: 502,
-        fault:
-          errorCode && errorCode !== UNTYPED_HANDLER_FAILURE
-            ? "customer"
-            : "platform",
-        meta: { kind, ...(errorCode ? { errorCode } : {}) },
-        // The page's own code first when it has advice of its own: the generic
-        // tip only says to read `meta.errorCode`, which is a name, not a next
-        // step.
-        ...{
-          ...remediation("langy_ui_handler_failed"),
-          ...remediationFor(errorCode),
-        },
+    super("langy_ui_handler_failed", `The page could not carry out "${kind}".`, {
+      httpStatus: 502,
+      fault: errorCode && errorCode !== UNTYPED_HANDLER_FAILURE ? "customer" : "platform",
+      meta: { kind, ...(errorCode ? { errorCode } : {}) },
+      // The page's own code first when it has advice of its own: the generic
+      // tip only says to read `meta.errorCode`, which is a name, not a next
+      // step.
+      ...{
+        ...remediation("langy_ui_handler_failed"),
+        ...remediationFor(errorCode),
       },
-    );
+    });
     this.name = "LangyUiHandlerFailedError";
   }
 }

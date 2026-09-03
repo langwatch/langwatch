@@ -76,9 +76,7 @@ Then run CLI commands:
             toolCallFix(state);
 
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+status/);
@@ -120,8 +118,7 @@ Prompt management commands:
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "CLI prompt version management",
-        description:
-          "Developer wants to inspect prompt versions and tags using the LangWatch CLI.",
+        description: "Developer wants to inspect prompt versions and tags using the LangWatch CLI.",
         agents: [
           createClaudeCodeAgent({
             workingDirectory: tempFolder,
@@ -145,9 +142,7 @@ Prompt management commands:
             toolCallFix(state);
 
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+prompt/);

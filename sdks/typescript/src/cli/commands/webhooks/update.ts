@@ -74,10 +74,7 @@ export const updateWebhookCommand = async (
   }
   // Number("abc") is NaN and JSON.stringify turns NaN into null, so loose
   // parsing here would ship a null patch the server cannot bound-check.
-  const parseIntOption = (
-    value: string | undefined,
-    flag: string,
-  ): number | undefined => {
+  const parseIntOption = (value: string | undefined, flag: string): number | undefined => {
     if (value === undefined) return undefined;
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || value.trim() === "") {
@@ -157,17 +154,13 @@ export const enableWebhookCommand = async (id: string): Promise<CommandResult | 
   }
 };
 
-export const disableWebhookCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const disableWebhookCommand = async (id: string): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Disabling webhook endpoint...").start();
   try {
     const endpoint = await service.update(id, { status: "disabled" });
-    spinner.succeed(
-      `Endpoint ${endpoint.id} disabled (deliveries drain without sending)`,
-    );
+    spinner.succeed(`Endpoint ${endpoint.id} disabled (deliveries drain without sending)`);
     return {
       data: endpoint,
       table: () => {

@@ -39,9 +39,7 @@ export interface CodexDeviceCode {
 }
 
 /** One poll's outcome: still waiting, or a full token set. */
-export type CodexPollResult =
-  | { status: "pending" }
-  | { status: "complete"; keys: CodexTokenKeys };
+export type CodexPollResult = { status: "pending" } | { status: "complete"; keys: CodexTokenKeys };
 
 /**
  * A HandledError (not a bare Error) so the tRPC error formatter serializes
@@ -172,14 +170,8 @@ export class CodexAccountService {
       json = await this.postForm(`${this.issuer}/oauth/token`, form);
     } catch (error) {
       if (isTerminalOAuthRejection(error)) {
-        logger.warn(
-          { error: error.message },
-          "codex token refresh rejected by the issuer",
-        );
-        throw new CodexAuthError(
-          "refresh_rejected",
-          "OpenAI session expired; sign in again",
-        );
+        logger.warn({ error: error.message }, "codex token refresh rejected by the issuer");
+        throw new CodexAuthError("refresh_rejected", "OpenAI session expired; sign in again");
       }
       logger.warn(
         { error: error instanceof Error ? error.message : String(error) },
@@ -188,10 +180,7 @@ export class CodexAccountService {
       if (error instanceof CodexAuthError) throw error;
       // A raw fetch failure (DNS, timeout, reset) — wrap it so callers get
       // the same retryable HandledError shape as an issuer 5xx.
-      throw new CodexAuthError(
-        "http",
-        error instanceof Error ? error.message : String(error),
-      );
+      throw new CodexAuthError("http", error instanceof Error ? error.message : String(error));
     }
     const tokens = this.parseTokens(json, {
       idToken: keys.CODEX_ID_TOKEN,
@@ -257,10 +246,7 @@ export class CodexAccountService {
     });
   }
 
-  private async postForm(
-    url: string,
-    form: URLSearchParams,
-  ): Promise<Record<string, unknown>> {
+  private async postForm(url: string, form: URLSearchParams): Promise<Record<string, unknown>> {
     return this.send(url, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -321,8 +307,7 @@ export function decodeCodexClaims(idToken: string): CodexClaims {
     >;
     const auth = (json["https://api.openai.com/auth"] ?? {}) as Record<string, unknown>;
     return {
-      accountId:
-        typeof auth.chatgpt_account_id === "string" ? auth.chatgpt_account_id : "",
+      accountId: typeof auth.chatgpt_account_id === "string" ? auth.chatgpt_account_id : "",
       email: typeof json.email === "string" ? json.email : "",
       plan: typeof auth.chatgpt_plan_type === "string" ? auth.chatgpt_plan_type : "",
     };
@@ -342,9 +327,7 @@ export function decodeCodexClaims(idToken: string): CodexClaims {
  * propagates.
  */
 export class CodexOAuthModelProviderTokenRefresherAdapter extends CodexTokenRefresher {
-  static create(
-    input: { issuer?: string } = {},
-  ): CodexOAuthModelProviderTokenRefresherAdapter {
+  static create(input: { issuer?: string } = {}): CodexOAuthModelProviderTokenRefresherAdapter {
     return new CodexOAuthModelProviderTokenRefresherAdapter(
       new CodexAccountService(fetch, input.issuer),
     );

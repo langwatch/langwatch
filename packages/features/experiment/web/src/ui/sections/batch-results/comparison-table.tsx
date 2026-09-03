@@ -175,11 +175,7 @@ const buildComparisonColumns = ({
                 runId: run.runId,
                 color: run.color,
                 value: (
-                  <ExpandableDatasetCell
-                    value={value}
-                    columnName={colName}
-                    rowHeight={rowHeight}
-                  />
+                  <ExpandableDatasetCell value={value} columnName={colName} rowHeight={rowHeight} />
                 ),
               };
             });
@@ -265,19 +261,14 @@ const buildComparisonRows = (comparisonData: ComparisonRunData[]): ComparisonRow
   // Find the max row count across all runs
   const maxRows = Math.max(
     0,
-    ...comparisonData
-      .filter((run) => run.data !== null)
-      .map((run) => run.data!.rows.length),
+    ...comparisonData.filter((run) => run.data !== null).map((run) => run.data!.rows.length),
   );
 
   const rows: ComparisonRow[] = [];
 
   for (let i = 0; i < maxRows; i++) {
     const datasetEntries: Record<string, Record<string, unknown>> = {};
-    const targetsByRun: Record<
-      string,
-      Record<string, BatchResultRow["targets"][string]>
-    > = {};
+    const targetsByRun: Record<string, Record<string, BatchResultRow["targets"][string]>> = {};
     const runColors: Record<string, string> = {};
 
     for (const run of comparisonData) {
@@ -357,10 +348,7 @@ type GroupAggregates = Record<
 >;
 
 /** Running sum/count per evaluatorId, before it is turned into a mean. */
-type EvaluatorScoreTotals = Map<
-  string,
-  { sum: number; count: number; evaluatorName: string }
->;
+type EvaluatorScoreTotals = Map<string, { sum: number; count: number; evaluatorName: string }>;
 
 /** Fold one target's scored evaluator results into the running totals. */
 const accumulateTargetScores = (
@@ -509,11 +497,7 @@ const GroupHeaderRow = ({
           {rowCount === 1 ? " row" : " rows"}
         </Text>
         <Spacer />
-        <GroupMeanBadges
-          value={value}
-          aggregates={aggregates}
-          comparisonData={comparisonData}
-        />
+        <GroupMeanBadges value={value} aggregates={aggregates} comparisonData={comparisonData} />
       </HStack>
     </td>
   </tr>
@@ -634,9 +618,7 @@ export function ComparisonTable({
   // row in its own singleton group and read as a broken table rather than as a
   // stale parameter.
   const effectiveGroupBy =
-    requestedGroupBy && availableKeys.includes(requestedGroupBy)
-      ? requestedGroupBy
-      : null;
+    requestedGroupBy && availableKeys.includes(requestedGroupBy) ? requestedGroupBy : null;
 
   // Collapse state for grouped sections.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
@@ -710,8 +692,7 @@ export function ComparisonTable({
   // Calculate minimum table width from first run with data
   const firstRunWithData = comparisonData.find((run) => run.data !== null);
   const datasetColCount =
-    firstRunWithData?.data?.datasetColumns.filter((c) => !hiddenColumns.has(c.name))
-      .length ?? 0;
+    firstRunWithData?.data?.datasetColumns.filter((c) => !hiddenColumns.has(c.name)).length ?? 0;
   const targetColCount =
     showOutputs || showEvaluations || showCostAndLatency
       ? (firstRunWithData?.data?.targetColumns.length ?? 0)
@@ -731,9 +712,7 @@ export function ComparisonTable({
   // Calculate padding to maintain scroll position (only when virtualizing)
   const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
   const paddingBottom =
-    virtualRows.length > 0
-      ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
-      : 0;
+    virtualRows.length > 0 ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0) : 0;
 
   return (
     <VStack align="stretch" width="100%" height="100%" gap={0}>
@@ -795,10 +774,7 @@ export function ComparisonTable({
                   {/* Top padding row to maintain scroll position */}
                   {paddingTop > 0 && (
                     <tr>
-                      <td
-                        style={{ height: `${paddingTop}px`, padding: 0 }}
-                        colSpan={columnCount}
-                      />
+                      <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
                     </tr>
                   )}
                   {/* Render only virtualized rows - empty until container is measured */}

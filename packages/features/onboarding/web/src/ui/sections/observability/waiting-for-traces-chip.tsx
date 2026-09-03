@@ -90,13 +90,7 @@ export function WaitingForTracesChip(): React.ReactElement {
   }, [detected, secondsLeft, goToTraces]);
 
   return (
-    <Box
-      position="fixed"
-      left="50%"
-      bottom="24px"
-      transform="translateX(-50%)"
-      zIndex={10}
-    >
+    <Box position="fixed" left="50%" bottom="24px" transform="translateX(-50%)" zIndex={10}>
       <Box position="relative" display="inline-block">
         <HStack
           position="relative"
@@ -120,20 +114,13 @@ export function WaitingForTracesChip(): React.ReactElement {
               </Box>
               <Text fontWeight="medium" fontSize="sm">
                 Traces detected.
-                {secondsLeft !== null &&
-                  secondsLeft > 0 &&
-                  ` redirecting in ${secondsLeft}..`}
+                {secondsLeft !== null && secondsLeft > 0 && ` redirecting in ${secondsLeft}..`}
                 {secondsLeft !== null && secondsLeft === 0 && ` redirecting...`}
               </Text>
             </>
           ) : (
             <>
-              <Spinner
-                color={accent}
-                borderWidth="2px"
-                animationDuration="2s"
-                size="sm"
-              />
+              <Spinner color={accent} borderWidth="2px" animationDuration="2s" size="sm" />
               <Text fontWeight="medium" fontSize="sm">
                 Waiting to receive traces…
               </Text>

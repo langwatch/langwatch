@@ -57,13 +57,7 @@ export function ProviderRow({
       : null;
 
   return (
-    <VStack
-      align="stretch"
-      gap={0}
-      borderWidth="1px"
-      borderColor="border.subtle"
-      borderRadius="md"
-    >
+    <VStack align="stretch" gap={0} borderWidth="1px" borderColor="border.subtle" borderRadius="md">
       <HStack paddingX={2} paddingY={1.5} gap={2}>
         <Checkbox
           size="sm"

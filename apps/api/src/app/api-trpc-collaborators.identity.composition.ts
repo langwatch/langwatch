@@ -552,10 +552,7 @@ class ApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
     return resource === "members" ? plan.maxMembers : plan.maxMembersLite;
   }
 
-  private seatsTaken(
-    organizationId: string,
-    resource: "members" | "membersLite",
-  ): Promise<number> {
+  private seatsTaken(organizationId: string, resource: "members" | "membersLite"): Promise<number> {
     return resource === "members"
       ? this.options.memberships.getMemberCount(organizationId)
       : this.options.memberships.getMembersLiteCount(organizationId);
@@ -841,8 +838,7 @@ export function composeApiIdentityCollaborators(
     domains: deployment.authProvider
       ? new SsoConnectionDomainRoutingRepository(
           prisma,
-          async (methodId) =>
-            (await resolveFederatedMethod(resolveAuthProvider))?.id === methodId,
+          async (methodId) => (await resolveFederatedMethod(resolveAuthProvider))?.id === methodId,
         )
       : new LegacySsoDomainRoutingRepository(prisma, () =>
           resolveFederatedMethod(resolveAuthProvider),
@@ -1040,8 +1036,7 @@ export function composeApiIdentityCollaborators(
       // thing the throttle can key on — and this process reads it from the
       // request the transport already resolved rather than from a header a
       // client controls.
-      clientIp: (ctx: unknown) =>
-        (ctx as { clientIp?: () => string }).clientIp?.() ?? "unknown",
+      clientIp: (ctx: unknown) => (ctx as { clientIp?: () => string }).clientIp?.() ?? "unknown",
       rateLimit: async (input) => ({ allowed: (await rateLimit(input)).allowed }),
       route: (input): Promise<RoutingDecision> => signInRouter.route(input),
       addressIsRegistered: (_ctx, input) => requireSignUpVerification().addressIsRegistered(input),
@@ -1170,8 +1165,7 @@ export function composeApiIdentityCollaborators(
       resolveAuthProvider,
       deploymentOffersPasskeys: () => deployment.passkeysEnabled === true,
       appBaseUrl: () => deployment.baseUrl ?? null,
-      clientIp: (ctx: unknown) =>
-        (ctx as { clientIp?: () => string }).clientIp?.() ?? "unknown",
+      clientIp: (ctx: unknown) => (ctx as { clientIp?: () => string }).clientIp?.() ?? "unknown",
       rateLimit: async (input) => ({ allowed: (await rateLimit(input)).allowed }),
       // The product-analytics sink is the deployment's. Absent, and silent on
       // purpose: an analytics write has never been allowed to fail a request.
@@ -1298,4 +1292,3 @@ async function firstAdminEmail(
   });
   return admin?.user.email ?? null;
 }
-

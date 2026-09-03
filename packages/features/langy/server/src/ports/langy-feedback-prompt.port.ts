@@ -87,8 +87,7 @@ function parseRecord(raw: string | null): LastAskRecord | null {
     }
     return {
       atMs: parsed.atMs,
-      conversationId:
-        typeof parsed.conversationId === "string" ? parsed.conversationId : "",
+      conversationId: typeof parsed.conversationId === "string" ? parsed.conversationId : "",
     };
   } catch {
     return null;

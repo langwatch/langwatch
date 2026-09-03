@@ -53,7 +53,10 @@ export type AnalyticsTimeseriesRestBody = Omit<
  * REST for a project's analytics timeseries, built against one process's
  * security.
  */
-export function createAnalyticsRestApp<TBody extends AnalyticsTimeseriesRestBody, TBodyRaw>(options: {
+export function createAnalyticsRestApp<
+  TBody extends AnalyticsTimeseriesRestBody,
+  TBodyRaw,
+>(options: {
   security: AppRestSecurity;
   /**
    * Resolved per request, as reading it off the Hono context used to be:

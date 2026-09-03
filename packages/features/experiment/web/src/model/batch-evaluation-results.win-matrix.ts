@@ -46,9 +46,7 @@ export const winMatrixHasPairwiseDetail = ({
     const row = winMatrix[rowId];
     if (!row) continue;
 
-    const values = variantIds
-      .filter((colId) => colId !== rowId)
-      .map((colId) => row[colId] ?? 0);
+    const values = variantIds.filter((colId) => colId !== rowId).map((colId) => row[colId] ?? 0);
 
     if (values.length < 2) continue;
     if (values.every((value) => value === 0)) continue;

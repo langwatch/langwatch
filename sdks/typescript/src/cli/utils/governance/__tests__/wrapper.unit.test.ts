@@ -157,9 +157,7 @@ describe("envForTool", () => {
   // Regression: claude + codex must NOT carry the /v1 suffix. Their
   // CLIs append /v1 themselves; a double /v1 would 404.
   it("claude + codex base URLs stay /v1-less (CLI appends /v1 itself)", () => {
-    expect(envForTool(cfg, "claude").vars.ANTHROPIC_BASE_URL).toBe(
-      "http://gw.example.com",
-    );
+    expect(envForTool(cfg, "claude").vars.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
     expect(envForTool(cfg, "codex").vars.OPENAI_BASE_URL).toBe("http://gw.example.com");
   });
 
@@ -318,9 +316,7 @@ describe("buildShellReapply", () => {
         clears: ["ANTHROPIC_API_KEY"],
         vars: { ANTHROPIC_BASE_URL: "http://gw" },
       });
-      expect(reapply).toBe(
-        "unset ANTHROPIC_API_KEY; export ANTHROPIC_BASE_URL='http://gw'",
-      );
+      expect(reapply).toBe("unset ANTHROPIC_API_KEY; export ANTHROPIC_BASE_URL='http://gw'");
     });
   });
 });
@@ -514,29 +510,19 @@ describe("preflightWrapper", () => {
 describe("shouldForgetGatewayPin", () => {
   describe("when the user pinned the gateway path", () => {
     it("forgets the pin on a structural failure (no provider / no VK)", () => {
-      expect(shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: false })).toBe(
-        true,
-      );
-      expect(
-        shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: undefined }),
-      ).toBe(true);
+      expect(shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: false })).toBe(true);
+      expect(shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: undefined })).toBe(true);
     });
 
     it("keeps the pin on a transient gateway-down failure", () => {
-      expect(shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: true })).toBe(
-        false,
-      );
+      expect(shouldForgetGatewayPin({ pinnedMode: "gateway", retryable: true })).toBe(false);
     });
   });
 
   describe("when the gateway path was not pinned", () => {
     it("never forgets a non-existent or ingestion pin", () => {
-      expect(shouldForgetGatewayPin({ pinnedMode: undefined, retryable: false })).toBe(
-        false,
-      );
-      expect(shouldForgetGatewayPin({ pinnedMode: "ingestion", retryable: false })).toBe(
-        false,
-      );
+      expect(shouldForgetGatewayPin({ pinnedMode: undefined, retryable: false })).toBe(false);
+      expect(shouldForgetGatewayPin({ pinnedMode: "ingestion", retryable: false })).toBe(false);
     });
   });
 });

@@ -102,9 +102,7 @@ const SECRET_SWITCH_TOOLTIP =
   "The value is a credential. The run delivers it to the target as secrets.NAME, and records the name without the value.";
 
 /** Remove absent own keys so clearing a value clears the declaration field. */
-function withoutEmptyFields(
-  definition: ScenarioParameterDefinition,
-): ScenarioParameterDefinition {
+function withoutEmptyFields(definition: ScenarioParameterDefinition): ScenarioParameterDefinition {
   const result: ScenarioParameterDefinition = { name: definition.name };
 
   if (definition.description !== void 0) {
@@ -200,11 +198,7 @@ function ParameterRow({
         )}
       </HStack>
       {error && (
-        <Text
-          fontSize="xs"
-          color="fg.error"
-          data-testid={`scenario-parameter-error-${index}`}
-        >
+        <Text fontSize="xs" color="fg.error" data-testid={`scenario-parameter-error-${index}`}>
           {error}
         </Text>
       )}
@@ -212,10 +206,7 @@ function ParameterRow({
   );
 }
 
-type UpdateRow = (update: {
-  index: number;
-  patch: Partial<ScenarioParameterDefinition>;
-}) => void;
+type UpdateRow = (update: { index: number; patch: Partial<ScenarioParameterDefinition> }) => void;
 
 function DefaultValueCell({
   index,
@@ -285,9 +276,7 @@ function SecretSwitchCell({
               // A secret carries no default: the value is supplied when the
               // run starts, so whatever was typed is dropped here rather than
               // kept out of sight until the save is refused.
-              patch: checked
-                ? { secret: true, defaultValue: void 0 }
-                : { secret: void 0 },
+              patch: checked ? { secret: true, defaultValue: void 0 } : { secret: void 0 },
             })
           }
           inputProps={{

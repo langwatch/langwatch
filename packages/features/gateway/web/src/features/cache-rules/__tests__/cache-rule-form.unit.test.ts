@@ -25,9 +25,7 @@ describe("cacheRule.form", () => {
   describe("validateForm", () => {
     describe("when name is empty", () => {
       it("rejects", () => {
-        expect(
-          validateForm(buildState({ matchVkId: "vk_01", name: "   " })),
-        ).toMatchObject({
+        expect(validateForm(buildState({ matchVkId: "vk_01", name: "   " }))).toMatchObject({
           field: "name",
           message: expect.stringContaining("Name is required"),
         });
@@ -169,9 +167,7 @@ describe("cacheRule.form", () => {
           ),
         ).toMatchObject({
           field: null,
-          message: expect.stringContaining(
-            "Request metadata needs both a key and a value",
-          ),
+          message: expect.stringContaining("Request metadata needs both a key and a value"),
         });
       });
 
@@ -186,9 +182,7 @@ describe("cacheRule.form", () => {
           ),
         ).toMatchObject({
           field: null,
-          message: expect.stringContaining(
-            "Request metadata needs both a key and a value",
-          ),
+          message: expect.stringContaining("Request metadata needs both a key and a value"),
         });
       });
     });
@@ -208,9 +202,7 @@ describe("cacheRule.form", () => {
       });
 
       it("accepts vk_prefix alone", () => {
-        expect(
-          validateForm(buildState({ name: "x", matchVkPrefix: "vk-lw-" })),
-        ).toBeNull();
+        expect(validateForm(buildState({ name: "x", matchVkPrefix: "vk-lw-" }))).toBeNull();
       });
 
       it("accepts vk_tags CSV alone", () => {
@@ -220,15 +212,11 @@ describe("cacheRule.form", () => {
       });
 
       it("accepts principal_id alone", () => {
-        expect(
-          validateForm(buildState({ name: "x", matchPrincipalId: "user_01" })),
-        ).toBeNull();
+        expect(validateForm(buildState({ name: "x", matchPrincipalId: "user_01" }))).toBeNull();
       });
 
       it("accepts model alone", () => {
-        expect(
-          validateForm(buildState({ name: "x", matchModel: "gpt-5-mini" })),
-        ).toBeNull();
+        expect(validateForm(buildState({ name: "x", matchModel: "gpt-5-mini" }))).toBeNull();
       });
 
       it("accepts full metadata key+value", () => {

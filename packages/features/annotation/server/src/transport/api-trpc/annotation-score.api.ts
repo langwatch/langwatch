@@ -19,11 +19,7 @@
  * Spec: packages/features/annotation/specs/annotation-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { AnnotationApp } from "#app/annotation.app";
@@ -127,8 +123,7 @@ export class AnnotationScoreTrpcApi {
       ),
 
       getAll: policy("annotations:view")(procedure.input(projectScopeSchema)).query(
-        async ({ ctx, input }) =>
-          ctx.app.annotations.listScores({ projectId: input.projectId }),
+        async ({ ctx, input }) => ctx.app.annotations.listScores({ projectId: input.projectId }),
       ),
 
       getAllActive: policy("annotations:view")(procedure.input(projectScopeSchema)).query(

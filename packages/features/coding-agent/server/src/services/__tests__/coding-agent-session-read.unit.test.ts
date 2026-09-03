@@ -83,9 +83,7 @@ describe("Coding Agent session reads", () => {
       fromMs: row.startedAtMs - CODING_AGENT_SESSION_READ_WINDOW_MS,
       toMs: row.startedAtMs + CODING_AGENT_SESSION_READ_WINDOW_MS,
     });
-    expect(events.inputs[1]?.occurredAt?.fromMs).toBe(
-      events.inputs[0]?.occurredAt?.fromMs,
-    );
+    expect(events.inputs[1]?.occurredAt?.fromMs).toBe(events.inputs[0]?.occurredAt?.fromMs);
     expect(events.inputs[1]?.occurredAt?.toMs).toBe(TEST_NOW_MS);
   });
 
@@ -152,10 +150,7 @@ describe("Coding Agent session reads", () => {
 
     expect(resolved?.modelCalls).toBe(3);
     expect(traceSessions.inputs).toEqual([{ tenantId: PROJECT, traceId: TRACE }]);
-    expect(sessions.findInputs.map((input) => input.window === undefined)).toEqual([
-      false,
-      true,
-    ]);
+    expect(sessions.findInputs.map((input) => input.window === undefined)).toEqual([false, true]);
   });
 
   /** @scenario "a stale hint degrades to a slower read, not a missing session" */
@@ -364,7 +359,10 @@ describe("Coding Agent session reads", () => {
         });
         sessions.rows = [row];
         const events = new TestEvents();
-        const stubEvent = { sessionId: SESSION, timeUnixMs: row.startedAtMs } as CodingAgentSessionEvent;
+        const stubEvent = {
+          sessionId: SESSION,
+          timeUnixMs: row.startedAtMs,
+        } as CodingAgentSessionEvent;
         events.pages = [
           { events: [], nextCursor: null },
           { events: [stubEvent], nextCursor: null },
@@ -570,7 +568,11 @@ describe("Coding Agent session reads", () => {
       ];
       const service = serviceWith({ sessions });
 
-      const totals = await service.getUsageTotals({ projectId: PROJECT, fromMs: 0, toMs: TEST_NOW_MS });
+      const totals = await service.getUsageTotals({
+        projectId: PROJECT,
+        fromMs: 0,
+        toMs: TEST_NOW_MS,
+      });
 
       expect(totals.sessionCount).toBe(2);
       expect(totals.costUsd).toBeCloseTo(2.0);
@@ -596,7 +598,11 @@ describe("Coding Agent session reads", () => {
       ];
       const service = serviceWith({ sessions, metricSeries: metrics });
 
-      const totals = await service.getUsageTotals({ projectId: PROJECT, fromMs: 0, toMs: TEST_NOW_MS });
+      const totals = await service.getUsageTotals({
+        projectId: PROJECT,
+        fromMs: 0,
+        toMs: TEST_NOW_MS,
+      });
 
       expect(totals.sessionCount).toBe(1);
       expect(totals.costUsd).toBeCloseTo(0.8);
@@ -609,7 +615,11 @@ describe("Coding Agent session reads", () => {
       sessions.rows = [];
       const service = serviceWith({ sessions });
 
-      const totals = await service.getUsageTotals({ projectId: PROJECT, fromMs: 0, toMs: TEST_NOW_MS });
+      const totals = await service.getUsageTotals({
+        projectId: PROJECT,
+        fromMs: 0,
+        toMs: TEST_NOW_MS,
+      });
 
       expect(totals).toMatchObject({
         sessionCount: 0,

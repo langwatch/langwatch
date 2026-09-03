@@ -5,13 +5,9 @@ const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
   findTraceSummariesTotalUniq: vi.fn(),
 }));
 
-let billableEvents:
-  | { findTraceSummariesTotalUniq: typeof findTraceSummariesTotalUniq }
-  | undefined;
+let billableEvents: { findTraceSummariesTotalUniq: typeof findTraceSummariesTotalUniq } | undefined;
 const service = () =>
-  BillableEventsQueryService.create(
-    billableEvents as unknown as BillableEventsRepository,
-  );
+  BillableEventsQueryService.create(billableEvents as unknown as BillableEventsRepository);
 
 describe("billingMonthDateRange", () => {
   describe("when given a mid-year billing month", () => {
@@ -71,9 +67,7 @@ describe("queryTraceSummariesTotalUniq", () => {
     it("returns null so callers can distinguish outage from zero usage", async () => {
       billableEvents = undefined;
 
-      const result = await BillableEventsQueryService.create(
-        null,
-      ).tryQueryTraceSummariesTotalUniq({
+      const result = await BillableEventsQueryService.create(null).tryQueryTraceSummariesTotalUniq({
         projectIds: ["proj-1"],
         billingMonth: "2026-02",
       });

@@ -10,10 +10,7 @@ export const PROVIDER_BUCKET_SEPARATOR = "|provider:";
  * otherwise share a bucket and each report the other's spend. The provider
  * filter therefore rides the bucket id.
  */
-export function bucketScopeIdFor(
-  budget: ProviderFilteredBudget,
-  baseScopeId: string,
-): string {
+export function bucketScopeIdFor(budget: ProviderFilteredBudget, baseScopeId: string): string {
   return budget.providerKey
     ? `${baseScopeId}${PROVIDER_BUCKET_SEPARATOR}${budget.providerKey}`
     : baseScopeId;

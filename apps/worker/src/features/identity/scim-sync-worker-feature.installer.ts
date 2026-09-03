@@ -1,8 +1,5 @@
 import type { ScimSyncPipeline } from "@langwatch/identity-server";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** Directory sync's worker-facing capability: the built pipeline definition. */

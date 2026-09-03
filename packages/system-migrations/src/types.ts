@@ -27,9 +27,7 @@ export type TenantMigrationStatus = "migrated" | "finalized" | "parked" | "rolle
  * the runner and any harness composing a pass around the same state table
  * can never drift onto different skip rules.
  */
-export function isTerminalTenantStatus(
-  status: TenantMigrationStatus | undefined,
-): boolean {
+export function isTerminalTenantStatus(status: TenantMigrationStatus | undefined): boolean {
   return status === "finalized" || status === "rolled_back";
 }
 

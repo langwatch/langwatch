@@ -1,9 +1,5 @@
 import { safeUnflatten } from "./trace-attribute-unflatten";
-import {
-  flattenSpanTree,
-  organizeSpansIntoTree,
-  typedValueToText,
-} from "./trace-collector-common";
+import { flattenSpanTree, organizeSpansIntoTree, typedValueToText } from "./trace-collector-common";
 import { extractRAGTextualContext } from "./trace-rag-chunks";
 import type {
   ElasticSearchEvaluation,
@@ -79,9 +75,7 @@ export const getRAGInfo = (
   return { input, output, contexts };
 };
 
-export const elasticSearchToTypedValue = (
-  typed: ElasticSearchInputOutput,
-): SpanInputOutput => {
+export const elasticSearchToTypedValue = (typed: ElasticSearchInputOutput): SpanInputOutput => {
   try {
     return {
       type: typed.type,
@@ -103,18 +97,14 @@ export const elasticSearchEvaluationsToEvaluations = (
   });
 };
 
-export const elasticSearchEventsToEvents = (
-  elasticSearchEvents: ElasticSearchEvent[],
-): Event[] => {
+export const elasticSearchEventsToEvents = (elasticSearchEvents: ElasticSearchEvent[]): Event[] => {
   return elasticSearchEvents.map(elasticSearchEventToEvent);
 };
 
 export const elasticSearchEventToEvent = (event: ElasticSearchEvent): Event => {
   return {
     ...event,
-    metrics: Object.fromEntries(
-      event.metrics.map((metric) => [metric.key, metric.value]),
-    ),
+    metrics: Object.fromEntries(event.metrics.map((metric) => [metric.key, metric.value])),
     event_details: Object.fromEntries(
       event.event_details.map((detail) => [detail.key, detail.value]),
     ),
@@ -180,11 +170,7 @@ export const convertFromUnixNano = (timeUnixNano: unknown): number => {
   return Math.round(unixNano / 1000000);
 };
 
-export const setNestedProperty = (
-  obj: Record<string, any>,
-  path: string,
-  value: any,
-): void => {
+export const setNestedProperty = (obj: Record<string, any>, path: string, value: any): void => {
   const unflattened = safeUnflatten({ [path]: value }) as Record<string, any>;
 
   // Merge the unflattened object into the target object

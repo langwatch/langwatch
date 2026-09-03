@@ -39,10 +39,10 @@ Images can be provided in any of these formats:
 Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, `.tiff`
 
 <Note>
-  Image detection is strict by design, a field is treated as an image only when the
-  **entire value** is an image URL or base64 string. Mixed text-and-image content is sent
-  as plain text. This prevents unintended multipart content when a field happens to
-  contain an image URL as part of a longer string.
+  Image detection is strict by design, a field is treated as an image only when the **entire value**
+  is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This
+  prevents unintended multipart content when a field happens to contain an image URL as part of a
+  longer string.
 </Note>
 
 ## Evaluating Images via UI
@@ -55,10 +55,7 @@ Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, 
 
 <div style={{ display: "flex", justifyContent: "center" }}>
   <Frame caption="Set column type to image" style={{ maxWidth: "300px" }}>
-    <img
-      src="/images/dataset-image-select.png"
-      alt="Column type selector showing image option"
-    />
+    <img src="/images/dataset-image-select.png" alt="Column type selector showing image option" />
   </Frame>
 </div>
 
@@ -271,9 +268,8 @@ EOF
 ```
 
 <Warning>
-  Base64 image payloads can be large. The evaluator API supports request bodies up to **30
-  MB**. If you are working with many high-resolution images, prefer using image URLs over
-  base64 encoding.
+  Base64 image payloads can be large. The evaluator API supports request bodies up to **30 MB**. If
+  you are working with many high-resolution images, prefer using image URLs over base64 encoding.
 </Warning>
 
 ## Model Compatibility
@@ -287,8 +283,8 @@ Image evaluation requires a **vision-capable model**. Any model supported by [li
 | Google    | `gemini-2.0-flash`, `gemini-2.5-pro`            |
 
 <Note>
-  If a non-vision model is selected, the evaluator falls back to sending plain text
-  descriptions. For accurate image evaluation, always select a vision-capable model.
+  If a non-vision model is selected, the evaluator falls back to sending plain text descriptions.
+  For accurate image evaluation, always select a vision-capable model.
 </Note>
 
 ## Next Steps

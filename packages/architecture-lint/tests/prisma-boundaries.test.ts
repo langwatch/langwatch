@@ -32,10 +32,7 @@ function applicationPackage(name: string, relativeRoot: string): ClassifiedPacka
   };
 }
 
-function enterpriseCompositionPackage(
-  name: string,
-  relativeRoot: string,
-): ClassifiedPackage {
+function enterpriseCompositionPackage(name: string, relativeRoot: string): ClassifiedPackage {
   return {
     name,
     root: join(root, relativeRoot),
@@ -54,7 +51,9 @@ describe("prisma-containment on composition roots", () => {
         "export function build(client: PrismaClient) { return client; }\n",
     );
 
-    const violations = lintPrismaBoundaries([applicationPackage("@langwatch/platform-api", "apps/api")]);
+    const violations = lintPrismaBoundaries([
+      applicationPackage("@langwatch/platform-api", "apps/api"),
+    ]);
 
     expect(violations).toEqual([]);
   });
@@ -71,7 +70,9 @@ describe("prisma-containment on composition roots", () => {
         "export function build(client: PrismaClient) { return client; }\n",
     );
 
-    const violations = lintPrismaBoundaries([applicationPackage("@langwatch/platform-api", "apps/api")]);
+    const violations = lintPrismaBoundaries([
+      applicationPackage("@langwatch/platform-api", "apps/api"),
+    ]);
 
     expect(violations).toEqual([]);
   });
@@ -84,7 +85,10 @@ describe("prisma-containment on composition roots", () => {
     );
 
     const violations = lintPrismaBoundaries([
-      enterpriseCompositionPackage("@langwatch/enterprise-api", "packages/enterprise/composition/api"),
+      enterpriseCompositionPackage(
+        "@langwatch/enterprise-api",
+        "packages/enterprise/composition/api",
+      ),
     ]);
 
     expect(violations).toEqual([]);
@@ -97,7 +101,9 @@ describe("prisma-containment on composition roots", () => {
         "export function build(client: PrismaClient) { return client; }\n",
     );
 
-    const violations = lintPrismaBoundaries([applicationPackage("@langwatch/platform-api", "apps/api")]);
+    const violations = lintPrismaBoundaries([
+      applicationPackage("@langwatch/platform-api", "apps/api"),
+    ]);
 
     expect(violations).toMatchObject([
       {

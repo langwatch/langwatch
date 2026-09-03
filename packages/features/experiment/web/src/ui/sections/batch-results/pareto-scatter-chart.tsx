@@ -22,10 +22,7 @@ import type {
   BTLeaderboard,
   BTLeaderboardEntry,
 } from "../../../model/batch-evaluation-results.bt-leaderboard";
-import {
-  computeParetoDominance,
-  type ParetoDominance,
-} from "../batch-evaluation-results.pareto";
+import { computeParetoDominance, type ParetoDominance } from "../batch-evaluation-results.pareto";
 import type { VariantMetrics } from "../batch-evaluation-results.variant-metrics";
 import { VARIANT_COLORS } from "./win-rate-chart";
 
@@ -202,9 +199,7 @@ export const buildParetoPoints = ({
           value: entry.score,
           ci: finiteCI(entry.scoreCI),
         }),
-        color:
-          targetColors?.[entry.variantId] ??
-          VARIANT_COLORS[index % VARIANT_COLORS.length]!,
+        color: targetColors?.[entry.variantId] ?? VARIANT_COLORS[index % VARIANT_COLORS.length]!,
       };
     })
     .filter((point): point is ParetoPoint => point !== null);
@@ -412,18 +407,14 @@ function ParetoTooltip({
       </Text>
       <Text>
         {axis.xLabel}: {axis.formatX(point.x)}
-        {point.xCI
-          ? ` (${axis.formatX(point.xCI[0])} to ${axis.formatX(point.xCI[1])})`
-          : ""}
+        {point.xCI ? ` (${axis.formatX(point.xCI[0])} to ${axis.formatX(point.xCI[1])})` : ""}
       </Text>
       {point.size !== null ? (
         <Text>
           {metricTitle(axis.sizeMetric)}: {axis.formatSize(point.size)}
         </Text>
       ) : null}
-      {point.dominated ? (
-        <Text color="fg.muted">Beaten outright by another variant</Text>
-      ) : null}
+      {point.dominated ? <Text color="fg.muted">Beaten outright by another variant</Text> : null}
     </VStack>
   );
 }

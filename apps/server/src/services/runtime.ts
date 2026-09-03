@@ -176,9 +176,7 @@ const runtimeImpl: RuntimeApi = {
     for (const r of results) {
       if (r.status === "fulfilled") handles.push(r.value);
     }
-    const failure = results.find(
-      (r): r is PromiseRejectedResult => r.status === "rejected",
-    );
+    const failure = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
     if (failure) {
       await stopHandles(handles);
       throw failure.reason;

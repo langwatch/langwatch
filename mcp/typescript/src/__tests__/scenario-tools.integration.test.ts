@@ -41,11 +41,7 @@ const CANNED_SCENARIO_UPDATED = {
   id: "scen_abc123",
   name: "Login Flow - Valid Credentials",
   situation: "User logs in with correct email and pass",
-  criteria: [
-    "Responds with welcome message",
-    "Sets session cookie",
-    "Redirects to dashboard",
-  ],
+  criteria: ["Responds with welcome message", "Sets session cookie", "Redirects to dashboard"],
   labels: ["auth", "happy-path"],
 };
 
@@ -77,18 +73,12 @@ function createMockServer(): Server {
         res.end(JSON.stringify(CANNED_SCENARIOS_LIST));
       }
       // GET /api/scenarios/:id - get scenario detail
-      else if (
-        url.match(/^\/api\/scenarios\/scen_abc123(\?|$)/) &&
-        req.method === "GET"
-      ) {
+      else if (url.match(/^\/api\/scenarios\/scen_abc123(\?|$)/) && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_DETAIL));
       }
       // GET /api/scenarios/:id - not found
-      else if (
-        url.match(/^\/api\/scenarios\/scen_nonexistent(\?|$)/) &&
-        req.method === "GET"
-      ) {
+      else if (url.match(/^\/api\/scenarios\/scen_nonexistent(\?|$)/) && req.method === "GET") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Scenario not found" }));
       }
@@ -109,10 +99,7 @@ function createMockServer(): Server {
         res.end(JSON.stringify(CANNED_SCENARIO_UPDATED));
       }
       // PUT /api/scenarios/:id - not found
-      else if (
-        url.match(/^\/api\/scenarios\/scen_nonexistent$/) &&
-        req.method === "PUT"
-      ) {
+      else if (url.match(/^\/api\/scenarios\/scen_nonexistent$/) && req.method === "PUT") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Scenario not found" }));
       }
@@ -186,9 +173,7 @@ describe("MCP scenario tools integration", () => {
     describe("when the scenario does not exist", () => {
       it("propagates the 404 error", async () => {
         const { handleGetScenario } = await import("../tools/get-scenario.js");
-        await expect(
-          handleGetScenario({ scenarioId: "scen_nonexistent" }),
-        ).rejects.toThrow("404");
+        await expect(handleGetScenario({ scenarioId: "scen_nonexistent" })).rejects.toThrow("404");
       });
     });
   });

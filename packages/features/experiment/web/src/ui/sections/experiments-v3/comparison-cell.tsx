@@ -1,12 +1,4 @@
-import {
-  Box,
-  HStack,
-  Icon,
-  IconButton,
-  Popover,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, Icon, IconButton, Popover, Text, VStack } from "@chakra-ui/react";
 import { CircleAlert, Equal, Play, Trophy } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import { Markdown } from "@langwatch/workflow-web/components/Markdown";
@@ -19,10 +11,7 @@ import {
   explainEvaluatorDomainError,
   MISSING_MODEL_API_KEY_EXPLANATION,
 } from "../../../model/experiments-v3/explain-evaluator-domain-error";
-import {
-  labelNamesVariant,
-  resolveVerdictLabel,
-} from "@langwatch/experiment-contract";
+import { labelNamesVariant, resolveVerdictLabel } from "@langwatch/experiment-contract";
 
 /**
  * How long a clicked winner's column stays highlighted before it
@@ -79,11 +68,7 @@ function friendlyError(details: string | undefined): {
   ) {
     return { ...MISSING_MODEL_API_KEY_EXPLANATION, raw };
   }
-  if (
-    lower.includes("rate limit") ||
-    lower.includes("ratelimit") ||
-    lower.includes("429")
-  ) {
+  if (lower.includes("rate limit") || lower.includes("ratelimit") || lower.includes("429")) {
     return {
       headline: "Judge model rate-limited",
       hint: "Slow the run down (lower concurrency) or try a different model.",
@@ -156,13 +141,9 @@ function WinnerLabel({
   label: string | undefined;
   onClickPreview: (targetId: string) => void;
 }) {
-  const resolved = useTargetName(
-    target ?? (PLACEHOLDER_TARGET as TargetConfig),
-  );
+  const resolved = useTargetName(target ?? (PLACEHOLDER_TARGET as TargetConfig));
   const isWinner =
-    !!target &&
-    !!label &&
-    labelNamesVariant({ label, target, resolvedName: resolved });
+    !!target && !!label && labelNamesVariant({ label, target, resolvedName: resolved });
   if (!isWinner) return null;
 
   return (
@@ -218,8 +199,7 @@ export function ComparisonCell({
     clickHighlightClearTimer = setTimeout(() => {
       // Only clear if this variant is still the one highlighted — a
       // second click may have already picked a different winner by now.
-      const current =
-        useEvaluationsV3Store.getState().ui.highlightedVariantTargetId;
+      const current = useEvaluationsV3Store.getState().ui.highlightedVariantTargetId;
       if (current === targetId) {
         setHighlightedVariantTargetId(undefined);
       }
@@ -276,13 +256,7 @@ export function ComparisonCell({
         }
       : friendlyError(parsed.details);
     return withRunAction(
-      <Box
-        p={2}
-        bg="red.subtle"
-        color="red.fg"
-        borderRadius="md"
-        fontSize="13px"
-      >
+      <Box p={2} bg="red.subtle" color="red.fg" borderRadius="md" fontSize="13px">
         <HStack gap={1.5} align="start">
           <Icon as={CircleAlert} boxSize="14px" marginTop="2px" />
           <VStack align="stretch" gap={0.5}>
@@ -348,23 +322,14 @@ export function ComparisonCell({
         {reasoning ? (
           <Popover.Root>
             <Popover.Trigger asChild>
-              <Box
-                as="button"
-                textAlign="left"
-                color="fg.muted"
-                _hover={{ color: "fg" }}
-              >
+              <Box as="button" textAlign="left" color="fg.muted" _hover={{ color: "fg" }}>
                 <Text fontSize="12px" lineClamp={2} wordBreak="break-word">
                   {reasoningPreview}
                 </Text>
               </Box>
             </Popover.Trigger>
             <Popover.Positioner>
-              <Popover.Content
-                maxWidth="560px"
-                maxHeight="420px"
-                overflowY="auto"
-              >
+              <Popover.Content maxWidth="560px" maxHeight="420px" overflowY="auto">
                 <Popover.Arrow />
                 <Popover.Body fontSize="13px">
                   <Markdown>{reasoning}</Markdown>
@@ -402,23 +367,14 @@ export function ComparisonCell({
       {reasoning ? (
         <Popover.Root>
           <Popover.Trigger asChild>
-            <Box
-              as="button"
-              textAlign="left"
-              color="fg.muted"
-              _hover={{ color: "fg" }}
-            >
+            <Box as="button" textAlign="left" color="fg.muted" _hover={{ color: "fg" }}>
               <Text fontSize="12px" lineClamp={2} wordBreak="break-word">
                 {reasoningPreview}
               </Text>
             </Box>
           </Popover.Trigger>
           <Popover.Positioner>
-            <Popover.Content
-              maxWidth="560px"
-              maxHeight="420px"
-              overflowY="auto"
-            >
+            <Popover.Content maxWidth="560px" maxHeight="420px" overflowY="auto">
               <Popover.Arrow />
               <Popover.Body fontSize="13px">
                 <Markdown>{reasoning}</Markdown>
@@ -433,7 +389,5 @@ export function ComparisonCell({
 
 function truncateReasoning(reasoning: string): string {
   const normalized = reasoning.replace(/\s+/g, " ").trim();
-  return normalized.length > 220
-    ? `${normalized.slice(0, 217).trimEnd()}...`
-    : normalized;
+  return normalized.length > 220 ? `${normalized.slice(0, 217).trimEnd()}...` : normalized;
 }

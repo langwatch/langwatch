@@ -64,12 +64,7 @@ export function ConnectionSettings({ compact = false }: { compact?: boolean }) {
 
         {isOpen && (
           <>
-            <Box
-              position="fixed"
-              inset={0}
-              zIndex={40}
-              onClick={() => setIsOpen(false)}
-            />
+            <Box position="fixed" inset={0} zIndex={40} onClick={() => setIsOpen(false)} />
             <Box
               position="absolute"
               left={0}

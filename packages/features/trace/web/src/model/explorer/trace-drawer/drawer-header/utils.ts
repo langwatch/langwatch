@@ -22,13 +22,7 @@ export function readNumberAttribute(
  *    a pill pollutes the strip; we unwrap to a `·`-separated list so the
  *    user sees the labels themselves.
  */
-export function formatPinValue({
-  key,
-  value,
-}: {
-  value: unknown;
-  key?: string;
-}): string | null {
+export function formatPinValue({ key, value }: { value: unknown; key?: string }): string | null {
   if (value === undefined || value === null || value === "") return null;
 
   // Key-aware formatting goes first so it can return without falling

@@ -93,14 +93,12 @@ describe("the plan-limit surface", () => {
     });
 
     it("answers every limit at once, keyed by limit type", async () => {
-      checkLimit.mockImplementation(
-        async ({ limitType }: { limitType: string }) => ({
-          allowed: limitType === "members",
-          current: 1,
-          max: 2,
-          limitType,
-        }),
-      );
+      checkLimit.mockImplementation(async ({ limitType }: { limitType: string }) => ({
+        allowed: limitType === "members",
+        current: 1,
+        max: 2,
+        limitType,
+      }));
 
       const limits = await caller.checkAllLimits({ organizationId: ORGANIZATION });
 

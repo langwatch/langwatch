@@ -16,9 +16,7 @@ describe("replay drain", () => {
       .fn()
       .mockResolvedValueOnce([
         "0",
-        [
-          "{event-sourcing/jobs}:gq:group:project-1/state/conversationState/conversation-1:active",
-        ],
+        ["{event-sourcing/jobs}:gq:group:project-1/state/conversationState/conversation-1:active"],
       ])
       .mockResolvedValueOnce(["0", []]);
     const redis = { scan } as unknown as IORedis;

@@ -26,9 +26,7 @@ export async function handleListPrompts(): Promise<string> {
     lines.push(`| ${handle} | ${name} | ${version} |`);
   }
 
-  lines.push(
-    "\n> Use `platform_get_prompt` with the handle or ID to see full prompt details.",
-  );
+  lines.push("\n> Use `platform_get_prompt` with the handle or ID to see full prompt details.");
 
   return lines.join("\n");
 }

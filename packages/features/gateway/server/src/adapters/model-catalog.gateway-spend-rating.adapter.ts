@@ -153,8 +153,7 @@ export function rateSpendNanoUsd({
       })
     : 0;
   const costNanoUsd = Math.round((usd ?? 0) * NANO_USD_PER_USD);
-  const stamp =
-    rateVersion && rateVersion.length > 0 ? rateVersion : currentRegistryRateVersion();
+  const stamp = rateVersion && rateVersion.length > 0 ? rateVersion : currentRegistryRateVersion();
   if (costNanoUsd === 0) {
     warnUnpriced({ model, usage, rule: rate, rateVersion: stamp });
   }

@@ -120,9 +120,7 @@ export function inputFor(labelText: string): HTMLInputElement {
   }
   const inputs = node.querySelectorAll("input");
   if (inputs.length !== 1) {
-    throw new Error(
-      `expected exactly one input near label "${labelText}", found ${inputs.length}`,
-    );
+    throw new Error(`expected exactly one input near label "${labelText}", found ${inputs.length}`);
   }
   return inputs[0] as HTMLInputElement;
 }

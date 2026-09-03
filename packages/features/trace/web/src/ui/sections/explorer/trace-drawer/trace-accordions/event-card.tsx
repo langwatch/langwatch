@@ -59,21 +59,11 @@ export const EventCard: React.FC<EventCardProps> = ({
             : "border.subtle"
       }
       borderRadius="md"
-      bg={
-        tone === "danger"
-          ? "red.solid/8"
-          : tone === "warning"
-            ? "yellow.solid/8"
-            : "bg.subtle"
-      }
+      bg={tone === "danger" ? "red.solid/8" : tone === "warning" ? "yellow.solid/8" : "bg.subtle"}
       overflow="hidden"
     >
       {tone !== "neutral" && (
-        <Box
-          width="3px"
-          flexShrink={0}
-          bg={tone === "danger" ? "red.solid" : "yellow.solid"}
-        />
+        <Box width="3px" flexShrink={0} bg={tone === "danger" ? "red.solid" : "yellow.solid"} />
       )}
       <Box flex={1} minWidth={0} paddingX={3} paddingY={2}>
         <HStack gap={3} align="center">

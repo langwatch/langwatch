@@ -17,17 +17,13 @@ export class DefaultGovernancePersonalUsageService {
   private constructor(
     private readonly reader: PersonalUsageReaderPort | undefined,
     private readonly clock: () => number,
-  ) {
-  }
+  ) {}
 
   static create(options: {
     reader?: PersonalUsageReaderPort;
     clock?: () => number;
   }): DefaultGovernancePersonalUsageService {
-    return new DefaultGovernancePersonalUsageService(
-      options.reader,
-      options.clock ?? Date.now,
-    );
+    return new DefaultGovernancePersonalUsageService(options.reader, options.clock ?? Date.now);
   }
 
   async summary(input: PersonalUsageQueryInput): Promise<PersonalUsageSummary> {
@@ -53,10 +49,7 @@ export class DefaultGovernancePersonalUsageService {
       topModel && summary.requestCount > 0
         ? { name: topModel.model, requests: topModel.requests }
         : null;
-    if (
-      ingestion?.topModel &&
-      (!mostUsed || ingestion.topModel.requests > mostUsed.requests)
-    ) {
+    if (ingestion?.topModel && (!mostUsed || ingestion.topModel.requests > mostUsed.requests)) {
       mostUsed = ingestion.topModel;
     }
 

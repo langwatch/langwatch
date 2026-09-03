@@ -63,8 +63,7 @@ export function EditableIOField({
   const isCapturedJson = useMemo(() => isJsonText(captured ?? ""), [captured]);
   // Only warn when the captured value WAS structured. Warning on prose would
   // fire on every keystroke of a field that was never JSON to begin with.
-  const isPlainTextWarningVisible =
-    isCapturedJson && value.trim().length > 0 && !isJsonText(value);
+  const isPlainTextWarningVisible = isCapturedJson && value.trim().length > 0 && !isJsonText(value);
 
   const delta = value.length - seed.length;
   const rows = useMemo(

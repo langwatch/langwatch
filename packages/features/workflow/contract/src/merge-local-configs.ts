@@ -28,9 +28,7 @@ const localComponentConfigSchema = z.object({
  * Convert editor-only local state into the execution DSL without mutating the
  * graph. The local fields are deliberately removed before dispatch.
  */
-export function mergeLocalConfigsIntoDsl(
-  nodes: StudioNode<Component>[],
-): StudioNode<Component>[] {
+export function mergeLocalConfigsIntoDsl(nodes: StudioNode<Component>[]): StudioNode<Component>[] {
   return nodes.map((node) => {
     if (node.type === "signature" && hasLocalPromptConfig(node.data)) {
       return mergeSignatureLocalConfig(node);
@@ -100,9 +98,11 @@ function mergeEvaluatorLocalConfig(node: StudioNode<Component>): StudioNode<Comp
 
   const data = node.data;
   const local = parseLocalComponentConfig(data.localConfig);
-  const parameters: Field[] = Object.entries(local.settings ?? {}).map(
-    ([identifier, value]) => ({ identifier, type: "str", value }),
-  );
+  const parameters: Field[] = Object.entries(local.settings ?? {}).map(([identifier, value]) => ({
+    identifier,
+    type: "str",
+    value,
+  }));
 
   return {
     ...node,
@@ -170,12 +170,8 @@ function hasLocalPromptConfig(
   return isSignature(data);
 }
 
-function isEvaluator(
-  data: Component,
-): data is Evaluator & { localConfig: LocalComponentConfig } {
-  return (
-    "localConfig" in data && data.localConfig !== null && data.localConfig !== void 0
-  );
+function isEvaluator(data: Component): data is Evaluator & { localConfig: LocalComponentConfig } {
+  return "localConfig" in data && data.localConfig !== null && data.localConfig !== void 0;
 }
 
 function hasLocalConfig(
@@ -184,12 +180,8 @@ function hasLocalConfig(
   return isEvaluator(data);
 }
 
-function isAgent(
-  data: Component,
-): data is AgentComponent & { localConfig: LocalComponentConfig } {
-  return (
-    "localConfig" in data && data.localConfig !== null && data.localConfig !== void 0
-  );
+function isAgent(data: Component): data is AgentComponent & { localConfig: LocalComponentConfig } {
+  return "localConfig" in data && data.localConfig !== null && data.localConfig !== void 0;
 }
 
 function hasAgentLocalConfig(

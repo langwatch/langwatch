@@ -41,9 +41,7 @@ export const listTriggersCommand = async (): Promise<CommandResult | void> => {
       alertType: string | null;
     }>;
 
-    spinner.succeed(
-      `Found ${triggers.length} trigger${triggers.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${triggers.length} trigger${triggers.length !== 1 ? "s" : ""}`);
 
     return {
       // See ./redact.ts — actionParams is plaintext and never shown to humans.
@@ -53,9 +51,7 @@ export const listTriggersCommand = async (): Promise<CommandResult | void> => {
           console.log();
           console.log(chalk.gray("No triggers found."));
           console.log(chalk.gray("Create one with:"));
-          console.log(
-            chalk.cyan('  langwatch trigger create "My Alert" --action SEND_EMAIL'),
-          );
+          console.log(chalk.cyan('  langwatch trigger create "My Alert" --action SEND_EMAIL'));
           return;
         }
 

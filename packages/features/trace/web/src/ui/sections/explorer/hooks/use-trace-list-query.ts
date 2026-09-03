@@ -100,8 +100,7 @@ export function useTraceListQuery(): TraceListQueryResult {
   // `#?page=N` link, or a page number the sessions lens left behind with a
   // string cursor this lens cannot read) is answered by offset rather than
   // snapped back to the first batch.
-  const traceCursor =
-    pageCursor && typeof pageCursor === "object" ? pageCursor : undefined;
+  const traceCursor = pageCursor && typeof pageCursor === "object" ? pageCursor : undefined;
   const effectivePage = ownsPagination ? page : 1;
 
   // Skip the tRPC request entirely while sample preview is active —
@@ -124,10 +123,7 @@ export function useTraceListQuery(): TraceListQueryResult {
     },
   );
 
-  const data = useMemo<TraceListItem[]>(
-    () => mapTraceListPayload(query.data),
-    [query.data],
-  );
+  const data = useMemo<TraceListItem[]>(() => mapTraceListPayload(query.data), [query.data]);
 
   if (samplePreview) {
     return {

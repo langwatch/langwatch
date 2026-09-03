@@ -114,12 +114,8 @@ export function PaneLayout({
   useEffect(() => {
     const flushDrag = () => {
       try {
-        window.dispatchEvent(
-          new PointerEvent("pointerup", { bubbles: true, cancelable: true }),
-        );
-        window.dispatchEvent(
-          new MouseEvent("mouseup", { bubbles: true, cancelable: true }),
-        );
+        window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true }));
+        window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
       } catch {
         // Older browsers without PointerEvent ctor — mouseup alone
         // is enough for the legacy mousemove/mouseup listeners.
@@ -465,12 +461,7 @@ export function PaneLayout({
           autoSaveId={vizDetailGroupId}
           style={{ flex: 1, minHeight: 0, minWidth: 0 }}
         >
-          <Panel
-            id="viz"
-            order={1}
-            defaultSize={layout === "horizontal" ? 55 : 50}
-            minSize={15}
-          >
+          <Panel id="viz" order={1} defaultSize={layout === "horizontal" ? 55 : 50} minSize={15}>
             {vizPanel}
           </Panel>
           <PanelResizeHandle
@@ -524,9 +515,7 @@ export function PaneLayout({
         // No selection — full-width viz. We render the same VizPlaceholder
         // (just without a sibling resize handle) so its internal scroll /
         // height / tab strip behave identically.
-        <Box style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex" }}>
-          {vizPanel}
-        </Box>
+        <Box style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex" }}>{vizPanel}</Box>
       )}
     </Box>
   );
@@ -553,10 +542,7 @@ export function PaneLayout({
       direction="column"
       bg={{ base: "bg.surface", _dark: "bg.panel" }}
     >
-      <Box
-        ref={ctxBodyGroupRef}
-        style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex" }}
-      >
+      <Box ref={ctxBodyGroupRef} style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex" }}>
         <PanelGroup
           direction="vertical"
           autoSaveId={`${PANE_GROUP_STORAGE_PREFIX}:ctx-body:v`}

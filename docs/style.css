@@ -556,7 +556,9 @@ code {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.lw-agent-report a:hover { color: #6b7280; }
+.lw-agent-report a:hover {
+  color: #6b7280;
+}
 .lw-agent-report code {
   font-size: 13px;
   white-space: nowrap;
@@ -565,8 +567,12 @@ code {
   border-radius: 4px;
   padding: 1px 5px;
 }
-.dark .lw-agent-report { color: #6b7280; }
-.dark .lw-agent-report a:hover { color: #9ca3af; }
+.dark .lw-agent-report {
+  color: #6b7280;
+}
+.dark .lw-agent-report a:hover {
+  color: #9ca3af;
+}
 .dark .lw-agent-report code {
   background: rgba(255, 255, 255, 0.05);
   border-color: #374151;

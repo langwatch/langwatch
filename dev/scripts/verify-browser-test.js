@@ -58,9 +58,7 @@ async function main() {
   console.log(
     `Chromium:    ${path.basename(path.dirname(chromiumPath))}/${path.basename(chromiumPath)}`,
   );
-  console.log(
-    `Screenshots: ${path.relative(path.join(__dirname, "..", ".."), SCREENSHOT_DIR)}\n`,
-  );
+  console.log(`Screenshots: ${path.relative(path.join(__dirname, "..", ".."), SCREENSHOT_DIR)}\n`);
 
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
 

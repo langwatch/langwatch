@@ -63,10 +63,7 @@ export class AnnotationsApiService {
     return data;
   }
 
-  async create(
-    traceId: string,
-    params: CreateAnnotationBody,
-  ): Promise<AnnotationResponse> {
+  async create(traceId: string, params: CreateAnnotationBody): Promise<AnnotationResponse> {
     const { data, error } = await this.apiClient.POST("/api/annotations/trace/{id}", {
       params: { path: { id: traceId } },
       body: params,

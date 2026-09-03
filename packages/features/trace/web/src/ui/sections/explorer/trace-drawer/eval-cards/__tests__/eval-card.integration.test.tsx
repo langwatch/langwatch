@@ -65,9 +65,7 @@ describe("EvalCard evaluator inputs", () => {
         // The lazy query only returns data when enabled (panel open).
         getEvaluationInputsUseQueryMock.mockImplementation(
           (_input: unknown, opts: { enabled?: boolean }) => ({
-            data: opts?.enabled
-              ? { input: "the prompt", output: "the reply" }
-              : undefined,
+            data: opts?.enabled ? { input: "the prompt", output: "the reply" } : undefined,
             isLoading: false,
           }),
         );

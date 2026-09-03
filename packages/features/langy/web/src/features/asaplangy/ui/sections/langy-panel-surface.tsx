@@ -85,9 +85,7 @@ export function LangyPanelSurface({
             initial={false}
             animate={reduce ? { opacity: 0.55 } : { opacity: [0.4, 0.72, 0.4] }}
             transition={
-              reduce
-                ? { duration: 0 }
-                : { duration: 7, repeat: Infinity, ease: "easeInOut" }
+              reduce ? { duration: 0 } : { duration: 7, repeat: Infinity, ease: "easeInOut" }
             }
           />
         ) : null}

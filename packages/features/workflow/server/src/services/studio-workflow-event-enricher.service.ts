@@ -24,10 +24,7 @@ type StudioWorkflowEventEnricherOptions = {
 type WorkflowEvent = Exclude<StudioClientEvent, { type: "is_alive" | "stop_execution" }>;
 
 export type StudioEventEnricher = {
-  enrich(input: {
-    event: StudioClientEvent;
-    projectId: string;
-  }): Promise<StudioClientEvent>;
+  enrich(input: { event: StudioClientEvent; projectId: string }): Promise<StudioClientEvent>;
 };
 
 /**
@@ -35,18 +32,13 @@ export type StudioEventEnricher = {
  * validated Studio event. Process-specific reads stay behind named ports.
  */
 export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
-  static create(
-    options: StudioWorkflowEventEnricherOptions,
-  ): StudioWorkflowEventEnricherService {
+  static create(options: StudioWorkflowEventEnricherOptions): StudioWorkflowEventEnricherService {
     return new StudioWorkflowEventEnricherService(options);
   }
 
   private constructor(private readonly options: StudioWorkflowEventEnricherOptions) {}
 
-  async enrich(input: {
-    event: StudioClientEvent;
-    projectId: string;
-  }): Promise<StudioClientEvent> {
+  async enrich(input: { event: StudioClientEvent; projectId: string }): Promise<StudioClientEvent> {
     const event = input.event;
     if (event.type === "is_alive" || event.type === "stop_execution") {
       return event;
@@ -156,20 +148,19 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
     event: WorkflowEvent,
     nodes: StudioWorkflow["nodes"],
   ): Array<{ llm: LLMConfig; nodeName?: string }> {
-    const parameters: Array<{ llm: LLMConfig; nodeName?: string }> = nodes.flatMap(
-      (node) =>
-        (node.data.parameters ?? []).flatMap((parameter) => {
-          if (parameter.type !== "llm") {
-            return [];
-          }
+    const parameters: Array<{ llm: LLMConfig; nodeName?: string }> = nodes.flatMap((node) =>
+      (node.data.parameters ?? []).flatMap((parameter) => {
+        if (parameter.type !== "llm") {
+          return [];
+        }
 
-          const llm = workflowLlmConfigSchema.parse(parameter.value);
-          if (!llm?.model) {
-            throw new LlmModelNotSetError(node.data.name ?? node.id);
-          }
+        const llm = workflowLlmConfigSchema.parse(parameter.value);
+        if (!llm?.model) {
+          throw new LlmModelNotSetError(node.data.name ?? node.id);
+        }
 
-          return [{ llm, nodeName: node.data.name ?? node.id }];
-        }),
+        return [{ llm, nodeName: node.data.name ?? node.id }];
+      }),
     );
 
     if (event.type === "execute_optimization" && event.payload.params.llm) {
@@ -200,9 +191,7 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
     }
 
     if (!resolution.enabled) {
-      throw new Error(
-        `${provider} model provider is disabled, go to settings to enable it`,
-      );
+      throw new Error(`${provider} model provider is disabled, go to settings to enable it`);
     }
 
     if (!resolution.litellmParams) {

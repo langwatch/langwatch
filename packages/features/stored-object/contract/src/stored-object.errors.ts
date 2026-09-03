@@ -1,10 +1,6 @@
 import { HandledError, type HandledErrorFault } from "@langwatch/handled-error";
 import { z } from "zod";
-import type {
-  StoredObjectId,
-  StoredObjectOperationId,
-  StoredObjectProjectId,
-} from "./ids";
+import type { StoredObjectId, StoredObjectOperationId, StoredObjectProjectId } from "./ids";
 
 export const STORED_OBJECT_PROBLEM_CODES = [
   "direct_upload_unavailable",
@@ -144,14 +140,10 @@ export class UploadChecksumMismatchError extends StoredObjectHandledError {
   readonly name = "UploadChecksumMismatchError";
 
   constructor(readonly operationId?: StoredObjectOperationId) {
-    super(
-      "upload_checksum_mismatch",
-      "The uploaded bytes do not match their declared checksum.",
-      {
-        meta: operationId ? { operationId } : undefined,
-        tips: ["Create a new upload using the SHA-256 of the exact bytes."],
-      },
-    );
+    super("upload_checksum_mismatch", "The uploaded bytes do not match their declared checksum.", {
+      meta: operationId ? { operationId } : undefined,
+      tips: ["Create a new upload using the SHA-256 of the exact bytes."],
+    });
   }
 }
 
@@ -257,10 +249,8 @@ export class IdempotencyConflictError extends StoredObjectHandledError {
   readonly name = "IdempotencyConflictError";
 
   constructor() {
-    super(
-      "idempotency_conflict",
-      "The idempotency key was already used for different input.",
-      { tips: ["Use a new idempotency key for the new command."] },
-    );
+    super("idempotency_conflict", "The idempotency key was already used for different input.", {
+      tips: ["Use a new idempotency key for the new command."],
+    });
   }
 }

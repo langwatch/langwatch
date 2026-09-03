@@ -92,13 +92,7 @@ function ProjectSearchHeader() {
   );
 }
 
-function ProjectItemRow({
-  item,
-  isCurrent,
-}: {
-  item: ProjectPickItem;
-  isCurrent: boolean;
-}) {
+function ProjectItemRow({ item, isCurrent }: { item: ProjectPickItem; isCurrent: boolean }) {
   return (
     <Combobox.Item
       item={item}

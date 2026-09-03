@@ -89,9 +89,7 @@ export function SaveVersionDialog({
                 })}
               />
               {errors.commitMessage && (
-                <Field.ErrorText>
-                  {errors.commitMessage.message?.toString()}
-                </Field.ErrorText>
+                <Field.ErrorText>{errors.commitMessage.message?.toString()}</Field.ErrorText>
               )}
             </Field.Root>
           </form>

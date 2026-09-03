@@ -47,10 +47,7 @@ vi.mock("langwatch", () => ({
 }));
 
 import type { BlobStore } from "../trace-blob-store.service";
-import {
-  BlobFieldNotFoundError,
-  BlobNotFoundError,
-} from "../trace-blob-store.service";
+import { BlobFieldNotFoundError, BlobNotFoundError } from "../trace-blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
 import {
@@ -137,9 +134,7 @@ function fakeBlobStore(resolvedValues: Record<string, string>): BlobStore {
 function unconfiguredBlobStore(): BlobStore {
   return {
     getFromEventLog: vi.fn(async () => {
-      throw new Error(
-        "ClickHouseClient not configured — cannot read from event_log (ADR-022)",
-      );
+      throw new Error("ClickHouseClient not configured — cannot read from event_log (ADR-022)");
     }),
     putSpool: vi.fn(),
     getSpool: vi.fn(),
@@ -177,8 +172,7 @@ function makeLargeValue(byteCount: number = LARGE_BYTE_COUNT): string {
  * emoji intact.
  */
 const MULTIBYTE_BOUNDARY_EMOJI = "🎉"; // 4 UTF-8 bytes
-const MULTIBYTE_BOUNDARY_VALUE =
-  "a".repeat(IO_PREVIEW_BYTES - 2) + MULTIBYTE_BOUNDARY_EMOJI;
+const MULTIBYTE_BOUNDARY_VALUE = "a".repeat(IO_PREVIEW_BYTES - 2) + MULTIBYTE_BOUNDARY_EMOJI;
 
 // The full value is 65538 bytes — over threshold.
 // The preview would stop somewhere inside or just before the emoji.
@@ -231,9 +225,7 @@ describe("resolveOffloadedTraces() — AC1: >64 KB field byte-identical after re
           });
 
           const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
-          expect(Buffer.byteLength(resolved, "utf8")).toBe(
-            Buffer.byteLength(fullValue, "utf8"),
-          );
+          expect(Buffer.byteLength(resolved, "utf8")).toBe(Buffer.byteLength(fullValue, "utf8"));
         });
 
         it(`${attrKey} — resolved span attribute value is === (strict equality) to event_log value`, async () => {
@@ -352,9 +344,7 @@ describe("resolveOffloadedTraces() — AC1: >64 KB field byte-identical after re
         });
 
         const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
-        expect(Buffer.byteLength(resolved, "utf8")).toBe(
-          Buffer.byteLength(fullValue, "utf8"),
-        );
+        expect(Buffer.byteLength(resolved, "utf8")).toBe(Buffer.byteLength(fullValue, "utf8"));
       });
     });
   });
@@ -407,9 +397,7 @@ describe("resolveOffloadedTraces() — AC3: eventref resolves + reserved keys st
         });
 
         const attrs = result.resolvedSpans[0]!.spanAttributes;
-        const hasReserved = Object.keys(attrs).some((k) =>
-          k.startsWith("langwatch.reserved."),
-        );
+        const hasReserved = Object.keys(attrs).some((k) => k.startsWith("langwatch.reserved."));
         expect(hasReserved).toBe(false);
       });
 
@@ -588,9 +576,7 @@ describe("resolveOffloadedTraces() — AC5: resolution failure degrades to previ
           logger,
         });
         const attrs = result.resolvedSpans[0]!.spanAttributes;
-        const hasReserved = Object.keys(attrs).some((k) =>
-          k.startsWith("langwatch.reserved."),
-        );
+        const hasReserved = Object.keys(attrs).some((k) => k.startsWith("langwatch.reserved."));
         expect(hasReserved).toBe(false);
       });
     });

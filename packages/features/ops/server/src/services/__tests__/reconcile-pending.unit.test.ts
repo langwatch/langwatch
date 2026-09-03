@@ -30,9 +30,7 @@ const runReconcile = async (ops: OpsMetricsTestAdapter) => {
   });
   await collector.discoverQueues();
   // Access via bracket notation to avoid exposing a test-only public API.
-  await (
-    collector as unknown as { reconcilePending(): Promise<void> }
-  ).reconcilePending();
+  await (collector as unknown as { reconcilePending(): Promise<void> }).reconcilePending();
   return collector.getDashboardData().pendingDrift;
 };
 

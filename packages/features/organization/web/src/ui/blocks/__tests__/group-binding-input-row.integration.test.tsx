@@ -49,13 +49,10 @@ const Wrapper = ({ children }: { children?: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function renderRow(
-  overrides: Partial<ComponentProps<typeof BindingInputRow>> = {},
-) {
-  return render(
-    <BindingInputRow organizationId="org-1" onAdd={vi.fn()} {...overrides} />,
-    { wrapper: Wrapper },
-  );
+function renderRow(overrides: Partial<ComponentProps<typeof BindingInputRow>> = {}) {
+  return render(<BindingInputRow organizationId="org-1" onAdd={vi.fn()} {...overrides} />, {
+    wrapper: Wrapper,
+  });
 }
 
 /** The role picker is the first select in the row: role, then scope type. */
@@ -77,9 +74,7 @@ describe("<BindingInputRow/>", () => {
       const listbox = await screen.findByRole("listbox");
 
       for (const label of ["Admin", "Member", "Viewer", "Data Scientist"]) {
-        expect(
-          within(listbox).getByRole("option", { name: label }),
-        ).toBeTruthy();
+        expect(within(listbox).getByRole("option", { name: label })).toBeTruthy();
       }
     });
 
@@ -91,9 +86,7 @@ describe("<BindingInputRow/>", () => {
       await user.click(scopeTypePicker());
       const listbox = await screen.findByRole("listbox");
 
-      expect(
-        within(listbox).getByRole("option", { name: "Organization" }),
-      ).toBeTruthy();
+      expect(within(listbox).getByRole("option", { name: "Organization" })).toBeTruthy();
     });
 
     it("starts from the Member role", () => {
@@ -111,15 +104,9 @@ describe("<BindingInputRow/>", () => {
       await user.click(rolePicker());
       const listbox = await screen.findByRole("listbox");
 
-      expect(
-        within(listbox).getByRole("option", { name: "Viewer" }),
-      ).toBeTruthy();
-      expect(
-        within(listbox).queryByRole("option", { name: "Admin" }),
-      ).toBeNull();
-      expect(
-        within(listbox).queryByRole("option", { name: "Member" }),
-      ).toBeNull();
+      expect(within(listbox).getByRole("option", { name: "Viewer" })).toBeTruthy();
+      expect(within(listbox).queryByRole("option", { name: "Admin" })).toBeNull();
+      expect(within(listbox).queryByRole("option", { name: "Member" })).toBeNull();
     });
 
     /** @scenario Custom roles are not offered for a member on a Lite Member seat */
@@ -130,9 +117,7 @@ describe("<BindingInputRow/>", () => {
       await user.click(rolePicker());
       const listbox = await screen.findByRole("listbox");
 
-      expect(
-        within(listbox).queryByRole("option", { name: "Data Scientist" }),
-      ).toBeNull();
+      expect(within(listbox).queryByRole("option", { name: "Data Scientist" })).toBeNull();
     });
 
     /** @scenario The dialog offers only the Viewer role for a member on a Lite Member seat */
@@ -148,15 +133,9 @@ describe("<BindingInputRow/>", () => {
       await user.click(scopeTypePicker());
       const listbox = await screen.findByRole("listbox");
 
-      expect(
-        within(listbox).queryByRole("option", { name: "Organization" }),
-      ).toBeNull();
-      expect(
-        within(listbox).getByRole("option", { name: "Team" }),
-      ).toBeTruthy();
-      expect(
-        within(listbox).getByRole("option", { name: "Project" }),
-      ).toBeTruthy();
+      expect(within(listbox).queryByRole("option", { name: "Organization" })).toBeNull();
+      expect(within(listbox).getByRole("option", { name: "Team" })).toBeTruthy();
+      expect(within(listbox).getByRole("option", { name: "Project" })).toBeTruthy();
     });
   });
 

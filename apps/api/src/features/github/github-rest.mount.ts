@@ -46,9 +46,7 @@ export type ApiGithubRestOptions = Readonly<{
  * for a caller it cannot identify is the cross-tenant rebind the flow's whole
  * guard chain exists to prevent.
  */
-export function composeApiGithubRest(
-  options: ApiGithubRestOptions,
-): GithubRestPorts | undefined {
+export function composeApiGithubRest(options: ApiGithubRestOptions): GithubRestPorts | undefined {
   const { github, session, authz } = options;
   if (!github || !session || !authz) return undefined;
 

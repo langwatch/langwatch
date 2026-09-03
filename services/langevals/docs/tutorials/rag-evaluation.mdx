@@ -39,18 +39,17 @@ how do you think, what will be the result of its evaluation on context relevancy
 
 <AccordionGroup>
   <Accordion title="Example RAG Evaluations Output">
-    As you can see the result of the evaluation is an object with a few attributes. It
-    returns the status of the evaluation, the score of the evaluation and the cost (as far
-    as RAG evaluators use another LLM to perform evaluation). ```bash status='processed'
-    score=1.0 passed=None details=None cost=Money(currency='USD', amount=0.002036)
-    status='processed' score=0.3333333333333333 passed=None details=None
-    cost=Money(currency='USD', amount=0.00033600000000000004) status='processed' score=1.0
-    passed=None details=None cost=Money(currency='USD', amount=0.0038910000000000004) ```
-    The second result corresponds to the `entry2` being evaluated on context relevancy.
-    With no surprise we observe a low score of 0.333, as the output is absolutely
-    unrelated to the given contexts. This might be a sign that your RAG is retrieving the
-    wrong documents or that it generates responses that are not based on the given
-    contexts.
+    As you can see the result of the evaluation is an object with a few attributes. It returns the
+    status of the evaluation, the score of the evaluation and the cost (as far as RAG evaluators use
+    another LLM to perform evaluation). ```bash status='processed' score=1.0 passed=None
+    details=None cost=Money(currency='USD', amount=0.002036) status='processed'
+    score=0.3333333333333333 passed=None details=None cost=Money(currency='USD',
+    amount=0.00033600000000000004) status='processed' score=1.0 passed=None details=None
+    cost=Money(currency='USD', amount=0.0038910000000000004) ``` The second result corresponds to
+    the `entry2` being evaluated on context relevancy. With no surprise we observe a low score of
+    0.333, as the output is absolutely unrelated to the given contexts. This might be a sign that
+    your RAG is retrieving the wrong documents or that it generates responses that are not based on
+    the given contexts.
   </Accordion>
 </AccordionGroup>
 

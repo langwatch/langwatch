@@ -28,13 +28,7 @@ import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox";
 
 function ScopeDivider() {
   return (
-    <Box
-      width="1px"
-      height="20px"
-      background="border.emphasized"
-      marginX={1}
-      flexShrink={0}
-    />
+    <Box width="1px" height="20px" background="border.emphasized" marginX={1} flexShrink={0} />
   );
 }
 
@@ -142,10 +136,7 @@ function ProjectMenu({
       <Portal>
         <Menu.Content minWidth="240px">
           {groups.map(({ team, projects: teamProjects }) => (
-            <Menu.ItemGroup
-              key={team.teamId}
-              title={showTeamHeaders ? team.label : "Projects"}
-            >
+            <Menu.ItemGroup key={team.teamId} title={showTeamHeaders ? team.label : "Projects"}>
               {teamProjects.map((candidate) => (
                 <Menu.Item
                   key={candidate.projectId}
@@ -180,11 +171,7 @@ function ProjectMenu({
  *
  * Spec: specs/navigation/product-switcher-navigation.feature
  */
-export function ProductScopeControl({
-  activeProductId,
-}: {
-  activeProductId: ProductId | null;
-}) {
+export function ProductScopeControl({ activeProductId }: { activeProductId: ProductId | null }) {
   // Each scope renders its own leading divider, so a scope that has
   // nothing to show leaves no separator behind it.
   if (activeProductId === "llm-ops") return <ProjectScopeMenu />;

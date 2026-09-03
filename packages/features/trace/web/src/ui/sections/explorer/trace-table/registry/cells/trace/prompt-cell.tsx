@@ -16,10 +16,7 @@ type Density = "compact" | "comfortable";
  * cached query regardless of how many rows render this cell). Clicking
  * the chip filters by `lastUsedPrompt`; the ↗ opens the prompts page.
  */
-const PromptCellView: React.FC<{ row: TraceListItem; density: Density }> = ({
-  row,
-  density,
-}) => {
+const PromptCellView: React.FC<{ row: TraceListItem; density: Density }> = ({ row, density }) => {
   const promptId = row.promptId ?? null;
   const { project } = useOrganizationTeamProject();
   const promptsQuery = api.prompts.getAllPromptsForProject.useQuery(
@@ -35,9 +32,7 @@ const PromptCellView: React.FC<{ row: TraceListItem; density: Density }> = ({
     );
   }
 
-  const config = promptsQuery.data?.find(
-    (p) => p.id === promptId || p.handle === promptId,
-  );
+  const config = promptsQuery.data?.find((p) => p.id === promptId || p.handle === promptId);
   const name = config?.handle ?? config?.name ?? promptId;
   const slug = project?.slug;
   const version = row.promptVersionNumber;

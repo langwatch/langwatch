@@ -42,18 +42,13 @@ export class ApiKeyCliService {
     const selection = cliKeySelectionSchema.parse(input.selection);
     const bindings = [
       ...new Map(
-        selection.bindings.map((binding) => [
-          `${binding.scopeType}:${binding.scopeId}`,
-          binding,
-        ]),
+        selection.bindings.map((binding) => [`${binding.scopeType}:${binding.scopeId}`, binding]),
       ).values(),
     ];
     if (bindings.length === 0) {
       throw new CliKeySelectionInvalidError({ bindings: ["Select at least one scope"] });
     }
-    const unknown = selection.permissions.filter(
-      (permission) => !isRegistryPermission(permission),
-    );
+    const unknown = selection.permissions.filter((permission) => !isRegistryPermission(permission));
     if (unknown.length > 0) {
       throw new CliKeySelectionInvalidError({
         permissions: unknown.map((permission) => `Unknown permission "${permission}"`),
@@ -62,9 +57,7 @@ export class ApiKeyCliService {
     const permissions = [...new Set(selection.permissions)].filter(
       (permission) =>
         bindings.some((binding) => binding.scopeType === "ORGANIZATION") ||
-        !["organization:manage", "organization:delete", "team:manage"].includes(
-          permission,
-        ),
+        !["organization:manage", "organization:delete", "team:manage"].includes(permission),
     );
     if (permissions.length === 0) {
       throw new CliKeySelectionInvalidError({
@@ -86,9 +79,7 @@ export class ApiKeyCliService {
   }): Promise<CliKeySelection | null> {
     const defaults = ALL_PERMISSIONS.filter(
       (permission) =>
-        !["organization:manage", "organization:delete", "team:manage"].includes(
-          permission,
-        ),
+        !["organization:manage", "organization:delete", "team:manage"].includes(permission),
     ) as AuthzPermission[];
     if (await this.policy.isOrgAdmin(input)) {
       return {
@@ -127,9 +118,7 @@ export class ApiKeyCliService {
     for (const [teamId, held] of heldByTeam) {
       selectedTeams.push(teamId);
       permissions =
-        permissions === null
-          ? held
-          : permissions.filter((permission) => held.includes(permission));
+        permissions === null ? held : permissions.filter((permission) => held.includes(permission));
     }
     if (!permissions || permissions.length === 0) {
       return null;
@@ -227,10 +216,7 @@ export class ApiKeyCliService {
         organizationId: input.organizationId,
       });
     } catch (error) {
-      if (
-        error instanceof ApiKeyNotFoundError ||
-        error instanceof ApiKeyAlreadyRevokedError
-      ) {
+      if (error instanceof ApiKeyNotFoundError || error instanceof ApiKeyAlreadyRevokedError) {
         return;
       }
       throw error;
@@ -256,9 +242,7 @@ export class ApiKeyCliService {
         page: 1,
         limit: 1000,
       })
-    ).data.filter(
-      (project) => projectIds.includes(project.id) || teamIds.includes(project.teamId),
-    );
+    ).data.filter((project) => projectIds.includes(project.id) || teamIds.includes(project.teamId));
     return { kind: "projects", projectIds: projects.map((project) => project.id).sort() };
   }
 }

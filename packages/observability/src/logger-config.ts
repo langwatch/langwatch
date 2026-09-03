@@ -110,9 +110,7 @@ export interface ProcessLoggerInputs {
  * one) hands its parsed config here, so a new logger field lands in exactly
  * one map instead of drifting across N copies.
  */
-export function loggerConfigurationFrom(
-  inputs: ProcessLoggerInputs,
-): LoggerConfiguration {
+export function loggerConfigurationFrom(inputs: ProcessLoggerInputs): LoggerConfiguration {
   return {
     environment: inputs.nodeEnvironment,
     format: inputs.logger.format,

@@ -27,11 +27,7 @@ export const EVAL_FIELD_LABELS: Record<EvalColumnField, string> = {
 };
 
 /** Order the field selector and any field-iterating UI render in. */
-export const EVAL_COLUMN_FIELDS: readonly EvalColumnField[] = [
-  "score",
-  "verdict",
-  "label",
-];
+export const EVAL_COLUMN_FIELDS: readonly EvalColumnField[] = ["score", "verdict", "label"];
 
 export interface ParsedEvalColumnId {
   field: EvalColumnField;

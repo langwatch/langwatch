@@ -73,9 +73,7 @@ describe("given a span carries a comment about its output", () => {
 
       fireEvent.click(screen.getByText("Go to the comment"));
 
-      await waitFor(() =>
-        expect(screen.getByTestId("io-section")).toHaveTextContent("open"),
-      );
+      await waitFor(() => expect(screen.getByTestId("io-section")).toHaveTextContent("open"));
     });
 
     /** @scenario "Jumping to a comment on a field opens the part of the detail holding it" */

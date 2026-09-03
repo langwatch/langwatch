@@ -356,12 +356,8 @@ describe("the Idempotency-Key receipt ledger", () => {
 
     /** @scenario "A claim that stopped reporting itself alive is taken over" */
     it("releases the claim once the tolerance is past", () => {
-      expect(
-        isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS + 1), now }),
-      ).toBe(true);
-      expect(
-        isClaimAbandoned({ heartbeatAt: lastBeat(10 * 60_000), now }),
-      ).toBe(true);
+      expect(isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS + 1), now })).toBe(true);
+      expect(isClaimAbandoned({ heartbeatAt: lastBeat(10 * 60_000), now })).toBe(true);
     });
   });
 });

@@ -48,9 +48,8 @@ export class GovernanceLifecycleOperationsService {
   readonly routingPolicyList: GovernanceService["routingPolicyList"] = (...args) =>
     this.routingPolicies.list(...args);
 
-  readonly tryFindRoutingPolicyById: GovernanceService["tryFindRoutingPolicyById"] = (
-    ...args
-  ) => this.routingPolicies.tryFindById(...args);
+  readonly tryFindRoutingPolicyById: GovernanceService["tryFindRoutingPolicyById"] = (...args) =>
+    this.routingPolicies.tryFindById(...args);
 
   readonly routingPolicyGetById: GovernanceService["routingPolicyGetById"] = (...args) =>
     this.routingPolicies.getById(...args);
@@ -61,9 +60,8 @@ export class GovernanceLifecycleOperationsService {
   readonly routingPolicyUpdate: GovernanceService["routingPolicyUpdate"] = (...args) =>
     this.routingPolicies.update(...args);
 
-  readonly routingPolicySetDefault: GovernanceService["routingPolicySetDefault"] = (
-    ...args
-  ) => this.routingPolicies.setDefault(...args);
+  readonly routingPolicySetDefault: GovernanceService["routingPolicySetDefault"] = (...args) =>
+    this.routingPolicies.setDefault(...args);
 
   readonly routingPolicyDelete: GovernanceService["routingPolicyDelete"] = (...args) =>
     this.routingPolicies.delete(...args);
@@ -71,20 +69,18 @@ export class GovernanceLifecycleOperationsService {
   readonly tryResolveDefaultRoutingPolicyForUser: GovernanceService["tryResolveDefaultRoutingPolicyForUser"] =
     (...args) => this.routingPolicies.tryResolveDefaultForUser(...args);
 
-  readonly personalVirtualKeyEnsureDefault: GovernanceService["personalVirtualKeyEnsureDefault"] =
-    (...args) => this.personalVirtualKeys.ensureDefault(...args);
-
-  readonly personalVirtualKeyIssue: GovernanceService["personalVirtualKeyIssue"] = (
+  readonly personalVirtualKeyEnsureDefault: GovernanceService["personalVirtualKeyEnsureDefault"] = (
     ...args
-  ) => this.personalVirtualKeys.issue(...args);
+  ) => this.personalVirtualKeys.ensureDefault(...args);
 
-  readonly personalVirtualKeyList: GovernanceService["personalVirtualKeyList"] = (
-    ...args
-  ) => this.personalVirtualKeys.list(...args);
+  readonly personalVirtualKeyIssue: GovernanceService["personalVirtualKeyIssue"] = (...args) =>
+    this.personalVirtualKeys.issue(...args);
 
-  readonly personalVirtualKeyRevoke: GovernanceService["personalVirtualKeyRevoke"] = (
-    ...args
-  ) => this.personalVirtualKeys.revoke(...args);
+  readonly personalVirtualKeyList: GovernanceService["personalVirtualKeyList"] = (...args) =>
+    this.personalVirtualKeys.list(...args);
+
+  readonly personalVirtualKeyRevoke: GovernanceService["personalVirtualKeyRevoke"] = (...args) =>
+    this.personalVirtualKeys.revoke(...args);
 
   readonly personalVirtualKeyRevokeAllForUser: GovernanceService["personalVirtualKeyRevokeAllForUser"] =
     (...args) => this.personalVirtualKeys.revokeAllForUser(...args);
@@ -92,24 +88,20 @@ export class GovernanceLifecycleOperationsService {
   readonly cliBootstrapResolve: GovernanceService["cliBootstrapResolve"] = (...args) =>
     this.cliBootstrap.resolve(...args);
 
-  readonly cliSessionListForUser: GovernanceService["cliSessionListForUser"] = (
-    ...args
-  ) => this.cliSessions.listForUser(...args);
+  readonly cliSessionListForUser: GovernanceService["cliSessionListForUser"] = (...args) =>
+    this.cliSessions.listForUser(...args);
 
   readonly cliSessionRevoke: GovernanceService["cliSessionRevoke"] = (...args) =>
     this.cliSessions.revokeSession(...args);
 
-  readonly cliTokenRevokeForUser: GovernanceService["cliTokenRevokeForUser"] = (
-    ...args
-  ) => this.cliTokenRevocation.revokeForUser(...args);
+  readonly cliTokenRevokeForUser: GovernanceService["cliTokenRevokeForUser"] = (...args) =>
+    this.cliTokenRevocation.revokeForUser(...args);
 
-  readonly adminWorkspaceRecordView: GovernanceService["adminWorkspaceRecordView"] = (
-    ...args
-  ) => this.adminWorkspaceViewAudit.recordView(...args);
+  readonly adminWorkspaceRecordView: GovernanceService["adminWorkspaceRecordView"] = (...args) =>
+    this.adminWorkspaceViewAudit.recordView(...args);
 
-  readonly quarantineFillEvaluate: GovernanceService["quarantineFillEvaluate"] = (
-    ...args
-  ) => this.quarantineFill.evaluate(...args);
+  readonly quarantineFillEvaluate: GovernanceService["quarantineFillEvaluate"] = (...args) =>
+    this.quarantineFill.evaluate(...args);
 
   readonly resolveSetupState: GovernanceService["resolveSetupState"] = (...args) =>
     this.setupState.resolve(...args);

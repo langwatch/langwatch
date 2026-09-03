@@ -157,9 +157,7 @@ describe("updateLangwatchClaudePlugin", () => {
         action: "up_to_date",
         from: "0.2.0",
       });
-      expect(commandsRun()).not.toContain(
-        "plugin update langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).not.toContain("plugin update langwatch@langwatch --scope user");
     });
 
     it("leaves an install ahead of the listing where it is", async () => {
@@ -269,22 +267,14 @@ describe("updateLangwatchClaudePlugin", () => {
       const result = updateLangwatchClaudePlugin();
 
       expect(result.action).toBe("unknown_version");
-      expect(commandsRun()).not.toContain(
-        "plugin update langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).not.toContain("plugin update langwatch@langwatch --scope user");
     });
 
     it("does not update against a version it cannot make sense of", async () => {
       seedInstalledPlugin({ version: "0.1.0" });
       seedMarketplace();
       writeJson({
-        segments: [
-          "plugins",
-          "marketplaces",
-          "langwatch",
-          ".claude-plugin",
-          "plugin.json",
-        ],
+        segments: ["plugins", "marketplaces", "langwatch", ".claude-plugin", "plugin.json"],
         value: { name: "langwatch", version: "main" },
       });
       const { updateLangwatchClaudePlugin } = await loadModule();

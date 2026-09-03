@@ -81,12 +81,7 @@ export function ProcessFleetCard({
   return (
     <Card.Root>
       <Card.Body padding={0}>
-        <HStack
-          paddingX={4}
-          paddingY={2.5}
-          borderBottom="1px solid"
-          borderBottomColor="border"
-        >
+        <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
           <Text textStyle="sm" fontWeight="medium">
             Process Managers
           </Text>

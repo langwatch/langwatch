@@ -48,12 +48,7 @@ describe("Metadata and Labels E2E", () => {
         const trace = await expectTraceToBeIngested(setup.client, traceId!, 1);
         const span = trace.spans![0]!;
 
-        expectSpanAttributeWithTrace(
-          trace,
-          span,
-          semconv.ATTR_LANGWATCH_USER_ID,
-          testIds.userId,
-        );
+        expectSpanAttributeWithTrace(trace, span, semconv.ATTR_LANGWATCH_USER_ID, testIds.userId);
         expectSpanAttributeWithTrace(
           trace,
           span,

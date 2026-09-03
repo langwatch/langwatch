@@ -78,9 +78,7 @@ export const syncCommand = async (): Promise<void> => {
     // Print cleaned up files
     if (result.cleaned.length > 0) {
       for (const name of result.cleaned) {
-        console.log(
-          chalk.yellow(`✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`),
-        );
+        console.log(chalk.yellow(`✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`));
       }
     }
 
@@ -93,8 +91,7 @@ export const syncCommand = async (): Promise<void> => {
 
     // Print summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    const totalActions =
-      result.fetched.length + result.pushed.length + result.cleaned.length;
+    const totalActions = result.fetched.length + result.pushed.length + result.cleaned.length;
 
     if (totalActions === 0 && result.errors.length === 0) {
       console.log(chalk.gray(`Synced in ${duration}s, no changes`));

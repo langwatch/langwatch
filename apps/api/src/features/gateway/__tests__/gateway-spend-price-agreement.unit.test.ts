@@ -235,7 +235,9 @@ function envelopeFor(costNanoUsd: number, rateVersion: string) {
     throw new Error(`expected one deliver intent, got ${result.intents.length}`);
   }
   const row = WebhookDeliveryService.payloadToRow(
-    result.intents[0]!.payload as unknown as Parameters<typeof WebhookDeliveryService.payloadToRow>[0],
+    result.intents[0]!.payload as unknown as Parameters<
+      typeof WebhookDeliveryService.payloadToRow
+    >[0],
   );
   return { costNanoUsd: row.costNanoUsd, rateVersion: row.rateVersion };
 }

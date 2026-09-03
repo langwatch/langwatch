@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Flex,
-  HStack,
-  Icon,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { hasRedactionMarker } from "@langwatch/redaction";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, ChevronsDownUp, ChevronsUpDown, Copy } from "lucide-react";
@@ -35,11 +26,7 @@ import {
 import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation";
 import type { TraceListItem } from "../../types/trace";
 import { FormatSelect } from "../../../../blocks/explorer/trace-drawer/format-select";
-import {
-  extractReadableText,
-  extractReasoningText,
-  extractSystemText,
-} from "../transcript";
+import { extractReadableText, extractReasoningText, extractSystemText } from "../transcript";
 import { AnnotatedTurnRow } from "./annotated-turn-row";
 import { ConversationExpandContext } from "../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context";
 import {
@@ -158,9 +145,7 @@ export const ConversationView = memo(function ConversationView({
     for (let i = 0; i < turns.length; i++) {
       const t = turns[i]!;
       const prev = i > 0 ? turns[i - 1]! : undefined;
-      const gapSecs = prev
-        ? (t.timestamp - (prev.timestamp + prev.durationMs)) / 1000
-        : 0;
+      const gapSecs = prev ? (t.timestamp - (prev.timestamp + prev.durationMs)) / 1000 : 0;
       out[i] = {
         turn: t,
         // Use the shared Transcript helper so we handle the same shapes
@@ -288,13 +273,7 @@ const ConversationTurn: React.FC<{
   isRailActive: boolean;
   railLayout: RailLayout;
   showSessionCheckbox: boolean;
-}> = ({
-  parsed,
-  annotationsByTrace,
-  annotationsByAnchor,
-  showSessionCheckbox,
-  ...rowProps
-}) => (
+}> = ({ parsed, annotationsByTrace, annotationsByAnchor, showSessionCheckbox, ...rowProps }) => (
   <AnnotatedTurnRow
     parsed={parsed}
     {...rowProps}
@@ -422,9 +401,7 @@ const SKELETON_TURNS: { user: string; assistant: [string, string?] }[] = [
   { user: "70%", assistant: ["92%", "68%"] },
 ];
 
-const ConversationSkeleton: React.FC<{ conversationId: string }> = ({
-  conversationId,
-}) => {
+const ConversationSkeleton: React.FC<{ conversationId: string }> = ({ conversationId }) => {
   return (
     <VStack
       align="stretch"
@@ -572,10 +549,7 @@ const ConversationHeader: React.FC<{
           onClick={onToggleExpandAll}
           aria-pressed={isExpandAllEnabled}
         >
-          <Icon
-            as={isExpandAllEnabled ? ChevronsDownUp : ChevronsUpDown}
-            boxSize="13px"
-          />
+          <Icon as={isExpandAllEnabled ? ChevronsDownUp : ChevronsUpDown} boxSize="13px" />
           {isExpandAllEnabled ? "Collapse all" : "Expand all"}
         </Button>
       )}
@@ -628,13 +602,11 @@ interface TurnsViewProps {
  * ones through a virtualizer. Each path scrolls itself, so the one that is not
  * rendering sets nothing up.
  */
-const TurnsView: React.FC<
-  TurnsViewProps & { systemPromptInput: string | null | undefined }
-> = ({ systemPromptInput, ...listProps }) => {
-  const systemPrompt = useMemo(
-    () => extractSystemText(systemPromptInput),
-    [systemPromptInput],
-  );
+const TurnsView: React.FC<TurnsViewProps & { systemPromptInput: string | null | undefined }> = ({
+  systemPromptInput,
+  ...listProps
+}) => {
+  const systemPrompt = useMemo(() => extractSystemText(systemPromptInput), [systemPromptInput]);
 
   if (listProps.parsedTurns.length >= VIRTUALIZE_AT) {
     return <VirtualizedTurnsView systemPrompt={systemPrompt} {...listProps} />;
@@ -754,10 +726,7 @@ function useScrollFocusedTurnInVirtualizer({
   focusTraceId,
 }: {
   virtualizer: {
-    scrollToIndex: (
-      index: number,
-      options: { align: "center"; behavior: "smooth" },
-    ) => void;
+    scrollToIndex: (index: number, options: { align: "center"; behavior: "smooth" }) => void;
   };
   parsedTurns: ParsedTurn[];
   focusTraceId: string | undefined;
@@ -883,9 +852,7 @@ function useVirtualizedTurnList({
  * codebase. The system-prompt banner stays sticky at the top, outside the
  * virtual range, so it doesn't get measured + remeasured every scroll.
  */
-const VirtualizedTurnsView: React.FC<
-  TurnsViewProps & { systemPrompt: string | null }
-> = ({
+const VirtualizedTurnsView: React.FC<TurnsViewProps & { systemPrompt: string | null }> = ({
   layout,
   parsedTurns,
   systemPrompt,

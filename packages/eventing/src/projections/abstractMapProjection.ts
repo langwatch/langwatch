@@ -73,10 +73,7 @@ export type MapEventHandlers<
  * }
  * ```
  */
-export abstract class AbstractMapProjection<
-  Record,
-  Schemas extends readonly AnyEventSchema[],
-> {
+export abstract class AbstractMapProjection<Record, Schemas extends readonly AnyEventSchema[]> {
   abstract readonly name: string;
   abstract readonly store: AppendStore<Record>;
   protected abstract readonly events: Schemas;
@@ -113,9 +110,7 @@ export abstract class AbstractMapProjection<
     const handlerName = this.dispatchMap[event.type];
     if (!handlerName) return null;
 
-    const handler = this[handlerName as keyof this] as (e: {
-      type: string;
-    }) => Record | null;
+    const handler = this[handlerName as keyof this] as (e: { type: string }) => Record | null;
     return handler.call(this, event);
   }
 }

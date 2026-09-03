@@ -317,13 +317,7 @@ export class SchedulerService {
     }
   }
 
-  private async fireJob({
-    job,
-    now,
-  }: {
-    job: ScheduledJobRecord;
-    now: Date;
-  }): Promise<void> {
+  private async fireJob({ job, now }: { job: ScheduledJobRecord; now: Date }): Promise<void> {
     // The lease is still conditioned on the row's CURRENT wake instant — that
     // is what `findDue` read and what a racing worker would also condition on.
     const claimAt = job.nextRunAt;

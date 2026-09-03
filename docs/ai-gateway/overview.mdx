@@ -7,9 +7,8 @@ sidebarTitle: Overview
 The **LangWatch AI Gateway** is a single OpenAI- and Anthropic-compatible endpoint that every application, SDK, or coding CLI in your organization can send LLM traffic to. The gateway applies organisation-wide policy, attribution, budget enforcement, caching, guardrails, and fallback in the path of every request, and emits per-tenant OpenTelemetry traces that land in each project's LangWatch workspace.
 
 <Info>
-  **~11 µs of gateway-side overhead at 5k RPS sustained.** Written in Go with chi +
-  in-process JWT verification. The hot path sits in front of every LLM call, it has to be
-  close to free.
+  **~11 µs of gateway-side overhead at 5k RPS sustained.** Written in Go with chi + in-process JWT
+  verification. The hot path sits in front of every LLM call, it has to be close to free.
 </Info>
 
 ## Try it in 30 seconds

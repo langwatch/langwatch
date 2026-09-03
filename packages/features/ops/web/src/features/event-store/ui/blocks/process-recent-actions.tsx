@@ -10,24 +10,13 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 /** Recent operator actions, so "why did this run at 03:14" is answerable here. */
-export function ProcessRecentActions({
-  rows,
-  now,
-}: {
-  rows: ProcessAction[];
-  now: number;
-}) {
+export function ProcessRecentActions({ rows, now }: { rows: ProcessAction[]; now: number }) {
   if (rows.length === 0) return null;
 
   return (
     <Card.Root>
       <Card.Body padding={0}>
-        <HStack
-          paddingX={4}
-          paddingY={2.5}
-          borderBottom="1px solid"
-          borderBottomColor="border"
-        >
+        <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
           <Text textStyle="sm" fontWeight="medium">
             Recent Actions
           </Text>
@@ -46,12 +35,7 @@ export function ProcessRecentActions({
                     <Text textStyle="xs">{ACTION_LABELS[row.action] ?? row.action}</Text>
                   </Table.Cell>
                   <Table.Cell>
-                    <Text
-                      textStyle="xs"
-                      fontFamily="mono"
-                      color="fg.muted"
-                      title={row.targetId}
-                    >
+                    <Text textStyle="xs" fontFamily="mono" color="fg.muted" title={row.targetId}>
                       {middleEllipsis(row.targetId, 64)}
                     </Text>
                   </Table.Cell>

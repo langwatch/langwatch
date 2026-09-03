@@ -46,8 +46,7 @@ vi.mock("../../../../../index", async (importOriginal) => {
 
   return {
     ...actual,
-    useDensityStore: (selector: (state: unknown) => unknown) =>
-      selector({ density: mockDensity }),
+    useDensityStore: (selector: (state: unknown) => unknown) => selector({ density: mockDensity }),
     useRefreshUIStore: (selector: (state: unknown) => unknown) =>
       selector({
         pulse: vi.fn(),

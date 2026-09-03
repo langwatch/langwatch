@@ -33,9 +33,7 @@ const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
  * none of which any of these three asks anything.
  */
 export class PrismaCodingAgentActivityRepository {
-  static create(
-    database: PrismaCodingAgentActivityDatabase,
-  ): PrismaCodingAgentActivityRepository {
+  static create(database: PrismaCodingAgentActivityDatabase): PrismaCodingAgentActivityRepository {
     return new PrismaCodingAgentActivityRepository(database);
   }
 

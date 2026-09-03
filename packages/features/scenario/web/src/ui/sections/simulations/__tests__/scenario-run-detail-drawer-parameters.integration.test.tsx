@@ -174,9 +174,7 @@ describe("<ScenarioRunDetailDrawer/> parameters", () => {
 
         renderDrawer();
 
-        expect(screen.getByTestId("run-parameters").textContent).toBe(
-          "api_token••••••••",
-        );
+        expect(screen.getByTestId("run-parameters").textContent).toBe("api_token••••••••");
       });
 
       it("shows the section for a run whose only parameters are secret", () => {

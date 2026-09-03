@@ -68,11 +68,7 @@ export function SignInMethodPicker({
   return (
     <VStack width="full" align="stretch" gap={4} data-testid="method-picker">
       {guidance ? (
-        <Alert.Root
-          status="info"
-          borderStartWidth="4px"
-          borderStartColor="colorPalette.solid"
-        >
+        <Alert.Root status="info" borderStartWidth="4px" borderStartColor="colorPalette.solid">
           <Alert.Content>
             <Alert.Title>{guidance.title}</Alert.Title>
             <Alert.Description>{guidance.describe}</Alert.Description>
@@ -82,8 +78,7 @@ export function SignInMethodPicker({
 
       {methodSet.length === 0 ? (
         <Text>
-          There is no way to sign in to this installation yet. Ask whoever runs
-          it to set one up.
+          There is no way to sign in to this installation yet. Ask whoever runs it to set one up.
         </Text>
       ) : null}
 
@@ -108,14 +103,10 @@ export function SignInMethodPicker({
  * layout's orphan "OR": ask this before passing `alternatives`, and pass
  * nothing when the answer is no.
  */
-export function hasAlternativeMethods(
-  methodSet: readonly SignInMethod[],
-): boolean {
+export function hasAlternativeMethods(methodSet: readonly SignInMethod[]): boolean {
   return (
     DEV_SHOWS_ALL_SOCIAL ||
-    methodSet.some(
-      (method) => method.kind === "federated" || method.kind === "passkey",
-    )
+    methodSet.some((method) => method.kind === "federated" || method.kind === "passkey")
   );
 }
 
@@ -143,19 +134,11 @@ export function AlternativeMethods({
   const offered = methodSet.filter((method) => method.kind === "federated");
   const offeredIds = new Set(offered.map((method) => method.id));
   const methods = DEV_SHOWS_ALL_SOCIAL
-    ? [
-        ...offered,
-        ...SOCIAL_METHODS.filter((method) => !offeredIds.has(method.id)),
-      ]
+    ? [...offered, ...SOCIAL_METHODS.filter((method) => !offeredIds.has(method.id))]
     : offered;
 
   return (
-    <VStack
-      width="full"
-      align="stretch"
-      gap={3}
-      data-testid="alternative-methods"
-    >
+    <VStack width="full" align="stretch" gap={3} data-testid="alternative-methods">
       {/* First in the rail, and above the providers, because it is the only
           way in that asks for NOTHING — no address here, none at the step
           this rail sits under, and no second screen at the provider's end.

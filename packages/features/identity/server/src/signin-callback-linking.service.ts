@@ -6,10 +6,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { IdentityCeremonyClock } from "./better-auth/ceremony-types";
 import type { IdentityLinkProposalWrites } from "./identity-writes";
-import {
-  IdentityJitDisabledError,
-  IdentityLinkProposedError,
-} from "./signin-callback-errors";
+import { IdentityJitDisabledError, IdentityLinkProposedError } from "./signin-callback-errors";
 
 /**
  * What happens when an SSO callback comes back (ADR-117 §3), in one place and
@@ -75,9 +72,7 @@ export interface SignInCallbackDirectoryPort {
     subject: string;
   }): Promise<{ userId: string } | null>;
 
-  findUsersByEmail(input: {
-    normalizedEmail: string;
-  }): Promise<readonly CallbackUserMatch[]>;
+  findUsersByEmail(input: { normalizedEmail: string }): Promise<readonly CallbackUserMatch[]>;
 
   /**
    * Links the callback's provider account to a user through better-auth's own
@@ -153,9 +148,7 @@ export class SignInCallbackLinkingService {
     this.newProposalId = deps.newProposalId;
   }
 
-  async complete(
-    assertion: CallbackAssertion,
-  ): Promise<CallbackLinkOutcome> {
+  async complete(assertion: CallbackAssertion): Promise<CallbackLinkOutcome> {
     const known = await this.directory.findUserByProviderSubject({
       connectionId: assertion.connectionId,
       provider: assertion.provider,
@@ -165,9 +158,7 @@ export class SignInCallbackLinkingService {
     // through this connection before, and saying so again states no new fact.
     if (known) return { kind: "signed_in", userId: known.userId, linked: false };
 
-    const normalizedEmail = assertion.email
-      ? normalizeIdentifierValue(assertion.email)
-      : null;
+    const normalizedEmail = assertion.email ? normalizeIdentifierValue(assertion.email) : null;
     if (!normalizedEmail) return this.provision(assertion, null);
 
     const candidates = await this.directory.findUsersByEmail({
@@ -211,9 +202,7 @@ export class SignInCallbackLinkingService {
     assertion: CallbackAssertion;
     userId: string;
   }): Promise<CallbackLinkOutcome> {
-    const normalizedEmail = assertion.email
-      ? normalizeIdentifierValue(assertion.email)
-      : "";
+    const normalizedEmail = assertion.email ? normalizeIdentifierValue(assertion.email) : "";
     return this.link({ assertion, normalizedEmail, userId });
   }
 
@@ -240,9 +229,7 @@ export class SignInCallbackLinkingService {
     const vouched = assertion.email
       ? identifierDomain(normalizeIdentifierValue(assertion.email))
       : null;
-    const unvouched = target.identifierDomains.filter(
-      (domain) => domain !== vouched,
-    );
+    const unvouched = target.identifierDomains.filter((domain) => domain !== vouched);
     return unvouched.length > 0 ? "unvouched_identifiers" : null;
   }
 

@@ -85,12 +85,9 @@ describe("Coding Agent ClickHouse query contract", () => {
 
     const request = endpoint.requests[0];
     expect(request?.body).toContain("AND UserId = {userId:String}");
-    expect(request?.body).toContain(
-      "StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64})",
-    );
+    expect(request?.body).toContain("StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64})");
     expect(request?.body).toContain("SELECT TenantId, SessionId, max(UpdatedAt)");
-    const dedup =
-      request?.body.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
+    const dedup = request?.body.split("SELECT TenantId, SessionId, max(UpdatedAt)")[1] ?? "";
     expect(dedup).not.toContain("StartedAt BETWEEN");
     expect(dedup).not.toContain("UserId =");
     expect(request?.url).toContain("param_limit=50");
@@ -113,9 +110,7 @@ describe("Coding Agent ClickHouse query contract", () => {
     });
     const request = endpoint.requests[0];
     if (request === undefined) throw new Error("session projection did not write");
-    endpoint.queryRows.push([
-      z.record(z.string(), z.unknown()).parse(JSON.parse(request.body)),
-    ]);
+    endpoint.queryRows.push([z.record(z.string(), z.unknown()).parse(JSON.parse(request.body))]);
 
     const found = await service.tryGetBySessionId({
       projectId: "project-1",

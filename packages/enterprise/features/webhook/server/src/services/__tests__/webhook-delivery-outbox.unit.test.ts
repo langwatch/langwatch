@@ -126,9 +126,7 @@ describe("the webhook delivery process manager's outbox", () => {
     expect(elapsed).toBeGreaterThan(48 * 60 * 60 * 1000);
     // Cadence settles at 12h once the explicit rungs are exhausted.
     expect(delays.at(-1)).toBe(12 * 60 * 60 * 1000);
-    expect(WebhookDeliveryService.retryDelayMs({ attempt: 99 })).toBe(
-      12 * 60 * 60 * 1000,
-    );
+    expect(WebhookDeliveryService.retryDelayMs({ attempt: 99 })).toBe(12 * 60 * 60 * 1000);
     // The explicit rungs are exactly the documented schedule.
     expect(WEBHOOK_RETRY_LADDER_MS).toEqual([
       60_000,

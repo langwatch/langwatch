@@ -20,9 +20,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 // Helper to create target column
-const createTargetColumn = (
-  overrides: Partial<BatchTargetColumn> = {},
-): BatchTargetColumn => ({
+const createTargetColumn = (overrides: Partial<BatchTargetColumn> = {}): BatchTargetColumn => ({
   id: "target-1",
   name: "Test Target",
   type: "prompt",
@@ -31,9 +29,7 @@ const createTargetColumn = (
 });
 
 // Helper to create aggregates
-const createAggregate = (
-  overrides: Partial<BatchTargetAggregate> = {},
-): BatchTargetAggregate => ({
+const createAggregate = (overrides: Partial<BatchTargetAggregate> = {}): BatchTargetAggregate => ({
   targetId: "target-1",
   completedRows: 5,
   totalRows: 10,

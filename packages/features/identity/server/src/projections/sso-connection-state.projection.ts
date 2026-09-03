@@ -61,9 +61,7 @@ export const connectionRegisteredEventSchema = EventSchema.extend({
   type: z.literal(CONNECTION_REGISTERED_EVENT_TYPE),
   data: connectionRegisteredPayloadSchema,
 });
-export type ConnectionRegisteredEvent = z.infer<
-  typeof connectionRegisteredEventSchema
->;
+export type ConnectionRegisteredEvent = z.infer<typeof connectionRegisteredEventSchema>;
 
 export const domainClaimedEventSchema = EventSchema.extend({
   type: z.literal(DOMAIN_CLAIMED_EVENT_TYPE),
@@ -75,33 +73,25 @@ export const domainClaimApprovedEventSchema = EventSchema.extend({
   type: z.literal(DOMAIN_CLAIM_APPROVED_EVENT_TYPE),
   data: domainClaimApprovedPayloadSchema,
 });
-export type DomainClaimApprovedEvent = z.infer<
-  typeof domainClaimApprovedEventSchema
->;
+export type DomainClaimApprovedEvent = z.infer<typeof domainClaimApprovedEventSchema>;
 
 export const domainClaimRejectedEventSchema = EventSchema.extend({
   type: z.literal(DOMAIN_CLAIM_REJECTED_EVENT_TYPE),
   data: domainClaimRejectedPayloadSchema,
 });
-export type DomainClaimRejectedEvent = z.infer<
-  typeof domainClaimRejectedEventSchema
->;
+export type DomainClaimRejectedEvent = z.infer<typeof domainClaimRejectedEventSchema>;
 
 export const connectionDiscardedEventSchema = EventSchema.extend({
   type: z.literal(CONNECTION_DISCARDED_EVENT_TYPE),
   data: connectionDiscardedPayloadSchema,
 });
-export type ConnectionDiscardedEvent = z.infer<
-  typeof connectionDiscardedEventSchema
->;
+export type ConnectionDiscardedEvent = z.infer<typeof connectionDiscardedEventSchema>;
 
 export const verificationRequestedEventSchema = EventSchema.extend({
   type: z.literal(VERIFICATION_REQUESTED_EVENT_TYPE),
   data: verificationRequestedPayloadSchema,
 });
-export type VerificationRequestedEvent = z.infer<
-  typeof verificationRequestedEventSchema
->;
+export type VerificationRequestedEvent = z.infer<typeof verificationRequestedEventSchema>;
 
 export const domainAttestedEventSchema = EventSchema.extend({
   type: z.literal(DOMAIN_ATTESTED_EVENT_TYPE),
@@ -119,41 +109,31 @@ export const connectionActivatedEventSchema = EventSchema.extend({
   type: z.literal(CONNECTION_ACTIVATED_EVENT_TYPE),
   data: connectionActivatedPayloadSchema,
 });
-export type ConnectionActivatedEvent = z.infer<
-  typeof connectionActivatedEventSchema
->;
+export type ConnectionActivatedEvent = z.infer<typeof connectionActivatedEventSchema>;
 
 export const connectionSuspendedEventSchema = EventSchema.extend({
   type: z.literal(CONNECTION_SUSPENDED_EVENT_TYPE),
   data: connectionSuspendedPayloadSchema,
 });
-export type ConnectionSuspendedEvent = z.infer<
-  typeof connectionSuspendedEventSchema
->;
+export type ConnectionSuspendedEvent = z.infer<typeof connectionSuspendedEventSchema>;
 
 export const connectionResumedEventSchema = EventSchema.extend({
   type: z.literal(CONNECTION_RESUMED_EVENT_TYPE),
   data: connectionResumedPayloadSchema,
 });
-export type ConnectionResumedEvent = z.infer<
-  typeof connectionResumedEventSchema
->;
+export type ConnectionResumedEvent = z.infer<typeof connectionResumedEventSchema>;
 
 export const teardownRequestedEventSchema = EventSchema.extend({
   type: z.literal(TEARDOWN_REQUESTED_EVENT_TYPE),
   data: teardownRequestedPayloadSchema,
 });
-export type TeardownRequestedEvent = z.infer<
-  typeof teardownRequestedEventSchema
->;
+export type TeardownRequestedEvent = z.infer<typeof teardownRequestedEventSchema>;
 
 export const connectionTornDownEventSchema = EventSchema.extend({
   type: z.literal(CONNECTION_TORN_DOWN_EVENT_TYPE),
   data: connectionTornDownPayloadSchema,
 });
-export type ConnectionTornDownEvent = z.infer<
-  typeof connectionTornDownEventSchema
->;
+export type ConnectionTornDownEvent = z.infer<typeof connectionTornDownEventSchema>;
 
 export const ssoConnectionEventSchema = z.discriminatedUnion("type", [
   connectionRegisteredEventSchema,
@@ -224,8 +204,7 @@ export class SsoConnectionStateFoldProjection
     "LastEventOccurredAt",
     StateProjectionStore<SsoConnectionFoldState>
   >
-  implements
-    FoldEventHandlers<typeof ssoConnectionEvents, SsoConnectionFoldState>
+  implements FoldEventHandlers<typeof ssoConnectionEvents, SsoConnectionFoldState>
 {
   readonly name = SSO_CONNECTION_PROJECTION_NAME;
   readonly version = SSO_CONNECTION_PROJECTION_VERSION;
@@ -242,10 +221,7 @@ export class SsoConnectionStateFoldProjection
     return emptySsoConnection({ connectionId: "" });
   }
 
-  private fold(
-    event: SsoConnectionEvent,
-    state: SsoConnectionFoldState,
-  ): SsoConnectionFoldState {
+  private fold(event: SsoConnectionEvent, state: SsoConnectionFoldState): SsoConnectionFoldState {
     const parsed = ssoConnectionEventSchema.parse(event);
     const next = reduceSsoConnection({
       state,
@@ -255,8 +231,7 @@ export class SsoConnectionStateFoldProjection
       ...state,
       ...next,
       // init() cannot know the connection; the first applied event does.
-      connectionId:
-        next.connectionId === "" ? parsed.aggregateId : next.connectionId,
+      connectionId: next.connectionId === "" ? parsed.aggregateId : next.connectionId,
     };
   }
 

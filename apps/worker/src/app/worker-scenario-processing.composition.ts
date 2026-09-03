@@ -269,9 +269,7 @@ class WorkerScenarioExecutionAdapter extends ScenarioExecutionService {
   }
 
   finishUnsuccessfulRun(): Promise<never> {
-    return Promise.reject(
-      new Error("Scenario failure handling is not composed in this process."),
-    );
+    return Promise.reject(new Error("Scenario failure handling is not composed in this process."));
   }
 }
 

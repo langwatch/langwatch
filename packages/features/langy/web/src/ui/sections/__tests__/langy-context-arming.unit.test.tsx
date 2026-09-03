@@ -25,9 +25,7 @@ const armSource = () => useLangyContextTargetStore.getState().armSource;
 /** A keydown as the browser delivers it — on the focused element, bubbling. */
 function press(key: string, target: EventTarget = document.body) {
   act(() => {
-    target.dispatchEvent(
-      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
-    );
+    target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
   });
 }
 

@@ -173,13 +173,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
 }));
 
 vi.mock("../../scenarios/scenario-form-drawer", () => ({
-  ScenarioFormDrawer: ({
-    open,
-    onClose,
-  }: {
-    open?: boolean;
-    onClose?: () => void;
-  }) =>
+  ScenarioFormDrawer: ({ open, onClose }: { open?: boolean; onClose?: () => void }) =>
     open ? (
       <div data-testid="scenario-editor-child-drawer">
         <span>Create Scenario</span>
@@ -189,13 +183,7 @@ vi.mock("../../scenarios/scenario-form-drawer", () => ({
 }));
 
 vi.mock("../../agents/agent-http-editor-drawer", () => ({
-  AgentHttpEditorDrawer: ({
-    open,
-    onClose,
-  }: {
-    open?: boolean;
-    onClose?: () => void;
-  }) =>
+  AgentHttpEditorDrawer: ({ open, onClose }: { open?: boolean; onClose?: () => void }) =>
     open ? (
       <div data-testid="agent-http-editor-child-drawer">
         <span>New HTTP Agent</span>
@@ -208,9 +196,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function makeSuiteConfig(
-  overrides: Partial<SimulationSuite> = {},
-): SimulationSuite {
+function makeSuiteConfig(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
     id: "suite_1",
     projectId: "proj_1",
@@ -260,13 +246,9 @@ describe("<SuiteFormDrawer/>", () => {
     it("renders fields for Name, Description, Scenarios, and Targets", () => {
       render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
+      expect(screen.getByPlaceholderText("e.g., Critical Path Run Plan")).toBeInTheDocument();
       expect(
-        screen.getByPlaceholderText("e.g., Critical Path Run Plan"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByPlaceholderText(
-          "Core journeys that must pass before deploy",
-        ),
+        screen.getByPlaceholderText("Core journeys that must pass before deploy"),
       ).toBeInTheDocument();
       expect(screen.getByText(/^Scenarios/)).toBeInTheDocument();
       expect(screen.getByText(/^Target\(s\)/)).toBeInTheDocument();
@@ -275,12 +257,8 @@ describe("<SuiteFormDrawer/>", () => {
     it("renders Save and Run Now buttons", () => {
       render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
-      expect(
-        screen.getByRole("button", { name: /^Save$/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /Run Now/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Save$/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Run Now/i })).toBeInTheDocument();
     });
 
     /** @scenario "The run plan drawer exposes simulator and judge model fields" */
@@ -312,17 +290,13 @@ describe("<SuiteFormDrawer/>", () => {
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Type a name
-        const nameInput = screen.getByPlaceholderText(
-          "e.g., Critical Path Run Plan",
-        );
+        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
         await user.type(nameInput, "Test Suite");
 
         const saveButton = screen.getByRole("button", { name: /Save/i });
         await user.click(saveButton);
 
-        expect(
-          screen.getByText("At least one scenario is required"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("At least one scenario is required")).toBeInTheDocument();
       });
     });
 
@@ -333,9 +307,7 @@ describe("<SuiteFormDrawer/>", () => {
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Type a name
-        const nameInput = screen.getByPlaceholderText(
-          "e.g., Critical Path Run Plan",
-        );
+        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
         await user.type(nameInput, "Test Suite");
 
         // Select a scenario by clicking its checkbox
@@ -345,9 +317,7 @@ describe("<SuiteFormDrawer/>", () => {
         const saveButton = screen.getByRole("button", { name: /Save/i });
         await user.click(saveButton);
 
-        expect(
-          screen.getByText("At least one target is required"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("At least one target is required")).toBeInTheDocument();
       });
     });
 
@@ -363,29 +333,19 @@ describe("<SuiteFormDrawer/>", () => {
 
         // All three errors visible
         expect(screen.getByText("Name is required")).toBeInTheDocument();
-        expect(
-          screen.getByText("At least one scenario is required"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText("At least one target is required"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("At least one scenario is required")).toBeInTheDocument();
+        expect(screen.getByText("At least one target is required")).toBeInTheDocument();
 
         // Type in the name field
-        const nameInput = screen.getByPlaceholderText(
-          "e.g., Critical Path Run Plan",
-        );
+        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
         await user.type(nameInput, "My Suite");
 
         // Name error is gone
         expect(screen.queryByText("Name is required")).not.toBeInTheDocument();
 
         // Other errors persist
-        expect(
-          screen.getByText("At least one scenario is required"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText("At least one target is required"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("At least one scenario is required")).toBeInTheDocument();
+        expect(screen.getByText("At least one target is required")).toBeInTheDocument();
       });
     });
   });
@@ -450,9 +410,7 @@ describe("<SuiteFormDrawer/>", () => {
         // Only matching scenario visible
         expect(screen.getByText("Angry refund request")).toBeInTheDocument();
         expect(screen.queryByText("Policy violation")).not.toBeInTheDocument();
-        expect(
-          screen.queryByText("Happy path checkout"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Happy path checkout")).not.toBeInTheDocument();
       });
     });
   });
@@ -465,9 +423,7 @@ describe("<SuiteFormDrawer/>", () => {
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Fill in required fields
-        const nameInput = screen.getByPlaceholderText(
-          "e.g., Critical Path Run Plan",
-        );
+        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
         await user.type(nameInput, "Test Suite");
 
         // Select a scenario
@@ -530,9 +486,7 @@ describe("<SuiteFormDrawer/>", () => {
 
         await user.click(screen.getByRole("button", { name: "Add Scenario" }));
 
-        expect(
-          screen.getByTestId("scenario-editor-child-drawer"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("scenario-editor-child-drawer")).toBeInTheDocument();
       });
 
       it("keeps the suite editor mounted underneath", async () => {
@@ -542,9 +496,7 @@ describe("<SuiteFormDrawer/>", () => {
         await user.click(screen.getByRole("button", { name: "Add Scenario" }));
 
         // Parent suite editor content remains in the DOM
-        expect(
-          screen.getByPlaceholderText("e.g., Critical Path Run Plan"),
-        ).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("e.g., Critical Path Run Plan")).toBeInTheDocument();
         expect(screen.getByText("Scenarios *")).toBeInTheDocument();
       });
     });
@@ -556,24 +508,18 @@ describe("<SuiteFormDrawer/>", () => {
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Enter a name to establish form state
-        const nameInput = screen.getByPlaceholderText(
-          "e.g., Critical Path Run Plan",
-        );
+        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
         await user.type(nameInput, "My Suite");
 
         // Open scenario editor
         await user.click(screen.getByRole("button", { name: "Add Scenario" }));
-        expect(
-          screen.getByTestId("scenario-editor-child-drawer"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("scenario-editor-child-drawer")).toBeInTheDocument();
 
         // Close scenario editor (fireEvent bypasses pointer-events from parent mock)
         fireEvent.click(screen.getByText("Close Scenario Editor"));
 
         // Child drawer is gone
-        expect(
-          screen.queryByTestId("scenario-editor-child-drawer"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("scenario-editor-child-drawer")).not.toBeInTheDocument();
 
         // Suite editor still shows form state
         const nameInputAfter = screen.getByPlaceholderText(
@@ -591,9 +537,7 @@ describe("<SuiteFormDrawer/>", () => {
 
         await user.click(screen.getByRole("button", { name: "Add Target" }));
 
-        expect(
-          screen.getByTestId("agent-http-editor-child-drawer"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("agent-http-editor-child-drawer")).toBeInTheDocument();
       });
 
       it("keeps the suite editor mounted underneath", async () => {
@@ -603,9 +547,7 @@ describe("<SuiteFormDrawer/>", () => {
         await user.click(screen.getByRole("button", { name: "Add Target" }));
 
         // Parent suite editor content remains in the DOM
-        expect(
-          screen.getByPlaceholderText("e.g., Critical Path Run Plan"),
-        ).toBeInTheDocument();
+        expect(screen.getByPlaceholderText("e.g., Critical Path Run Plan")).toBeInTheDocument();
         expect(screen.getByText("Scenarios *")).toBeInTheDocument();
       });
     });
@@ -617,24 +559,18 @@ describe("<SuiteFormDrawer/>", () => {
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Enter a name to establish form state
-        const nameInput = screen.getByPlaceholderText(
-          "e.g., Critical Path Run Plan",
-        );
+        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
         await user.type(nameInput, "My Suite");
 
         // Open agent editor
         await user.click(screen.getByRole("button", { name: "Add Target" }));
-        expect(
-          screen.getByTestId("agent-http-editor-child-drawer"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("agent-http-editor-child-drawer")).toBeInTheDocument();
 
         // Close agent editor
         fireEvent.click(screen.getByText("Close Agent Editor"));
 
         // Child drawer is gone
-        expect(
-          screen.queryByTestId("agent-http-editor-child-drawer"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("agent-http-editor-child-drawer")).not.toBeInTheDocument();
 
         // Suite editor still shows form state
         const nameInputAfter = screen.getByPlaceholderText(
@@ -651,9 +587,7 @@ describe("<SuiteFormDrawer/>", () => {
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Fill in name
-        const nameInput = screen.getByPlaceholderText(
-          "e.g., Critical Path Run Plan",
-        );
+        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
         await user.type(nameInput, "My Suite");
 
         // Select a scenario
@@ -668,9 +602,7 @@ describe("<SuiteFormDrawer/>", () => {
           "e.g., Critical Path Run Plan",
         ) as HTMLInputElement;
         expect(nameInputAfter.value).toBe("My Suite");
-        const scenarioCheckboxAfter = screen.getAllByRole(
-          "checkbox",
-        )[0] as HTMLInputElement;
+        const scenarioCheckboxAfter = screen.getAllByRole("checkbox")[0] as HTMLInputElement;
         expect(scenarioCheckboxAfter).toBeChecked();
       });
     });

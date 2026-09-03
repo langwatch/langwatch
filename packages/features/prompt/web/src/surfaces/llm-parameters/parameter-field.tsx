@@ -130,10 +130,7 @@ function SelectField({ config, value, onChange, disabled }: SelectFieldProps) {
         {config.label}
       </Text>
       <NativeSelect.Root size="sm" disabled={disabled}>
-        <NativeSelect.Field
-          value={currentValue}
-          onChange={(e) => onChange(e.target.value)}
-        >
+        <NativeSelect.Field value={currentValue} onChange={(e) => onChange(e.target.value)}>
           {config.options.map((option) => (
             <option key={option} value={option}>
               {option.charAt(0).toUpperCase() + option.slice(1)}

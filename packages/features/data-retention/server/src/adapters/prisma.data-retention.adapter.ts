@@ -55,9 +55,7 @@ export class PrismaDataRetentionAdapter {
     });
   }
 
-  private static adaptMeterClient(
-    client: ClickHouseClient,
-  ): StorageMeterClickHouseClient {
+  private static adaptMeterClient(client: ClickHouseClient): StorageMeterClickHouseClient {
     return {
       query: async (input: QueryParams) => {
         const result = await client.query(input);

@@ -22,10 +22,7 @@ import type {
   OrganizationApiKeyResolutionInput,
   ResolvedApiKeyToken,
 } from "./api-key.tokens";
-import type {
-  ApiKeyVisibleProjects,
-  ApiKeyVisibleProjectsInput,
-} from "./api-key.visibility";
+import type { ApiKeyVisibleProjects, ApiKeyVisibleProjectsInput } from "./api-key.visibility";
 export type ApiKeySelectionInput = {
   userId: string;
   organizationId: string;
@@ -54,9 +51,7 @@ export abstract class ApiKeyService {
   /** Authentication is an attempted lookup: invalid credentials return null. */
   abstract tryVerify(input: ApiKeyVerifyInput): Promise<ApiKeyVerification | null>;
   /** Resolves either a current API key or the deprecated project credential. */
-  abstract tryResolveToken(
-    input: ApiKeyTokenResolutionInput,
-  ): Promise<ResolvedApiKeyToken | null>;
+  abstract tryResolveToken(input: ApiKeyTokenResolutionInput): Promise<ResolvedApiKeyToken | null>;
   /** Rotates a deprecated project credential while preserving its wire format. */
   abstract regenerateLegacyProjectKey(input: { projectId: string }): Promise<string>;
   /** Resolves organization-only credentials while keeping refusal classes apart. */

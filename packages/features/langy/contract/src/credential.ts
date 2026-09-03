@@ -1,8 +1,4 @@
-import type {
-  LangyCredentialSession,
-  LangyMirrorTier,
-  LangyWorkerCredentials,
-} from "./langy";
+import type { LangyCredentialSession, LangyMirrorTier, LangyWorkerCredentials } from "./langy";
 
 export function resolveLangyMirrorTier(
   { projectId }: { projectId: string },
@@ -21,9 +17,7 @@ export function resolveWorkerCallbackUrl(
 export function resolveWorkerGatewayBaseUrl(
   env: Record<string, string | undefined> = {},
 ): string | undefined {
-  return (
-    env.LANGY_WORKER_GATEWAY_URL ?? env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL
-  );
+  return env.LANGY_WORKER_GATEWAY_URL ?? env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL;
 }
 
 export function ensureGatewayV1BaseUrl(baseUrl: string): string {

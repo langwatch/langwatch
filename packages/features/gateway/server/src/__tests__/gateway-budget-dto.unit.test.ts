@@ -124,8 +124,9 @@ describe("toBudgetDto", () => {
     expect(toBudgetDto({ budget: budget(), memberCount: 4 })).toMatchObject({
       member_count: 4,
     });
-    expect(
-      toBudgetDto({ budget: budget({ endUsersSeen: 7, endUsersOver: 2 }) }),
-    ).toMatchObject({ end_users_seen: 7, end_users_over: 2 });
+    expect(toBudgetDto({ budget: budget({ endUsersSeen: 7, endUsersOver: 2 }) })).toMatchObject({
+      end_users_seen: 7,
+      end_users_over: 2,
+    });
   });
 });

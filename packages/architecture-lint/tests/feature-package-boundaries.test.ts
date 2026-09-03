@@ -902,7 +902,7 @@ describe("strict feature source layout", () => {
         'import { isSiblingRule } from "./agent-support.rules";',
         "",
         "export function isEligible(input: string): boolean {",
-        "  return Boolean(value) && isSiblingRule(input.length) && createHash(\"sha256\").update(input).digest(\"hex\").length > 0;",
+        '  return Boolean(value) && isSiblingRule(input.length) && createHash("sha256").update(input).digest("hex").length > 0;',
         "}",
         "",
         "export const ELIGIBILITY_THRESHOLD = 1;",

@@ -31,9 +31,7 @@ describe("buildLimitMessage", () => {
       deployment: selfHosted,
     });
     expect(message).toContain("Free limit of 50000 events reached");
-    expect(message).toContain(
-      "buy a license at https://my-langwatch.example.com/settings/license",
-    );
+    expect(message).toContain("buy a license at https://my-langwatch.example.com/settings/license");
   });
 
   /** @scenario Paid TIERED org on SaaS told to upgrade with traces unit */
@@ -59,8 +57,6 @@ describe("buildLimitMessage", () => {
       deployment: selfHosted,
     });
     expect(message).toContain("Monthly limit of 10000 traces reached");
-    expect(message).toContain(
-      "buy a license at https://my-langwatch.example.com/settings/license",
-    );
+    expect(message).toContain("buy a license at https://my-langwatch.example.com/settings/license");
   });
 });

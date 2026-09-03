@@ -15,9 +15,7 @@ import type { RangeSectionData } from "../../../../../behavior/explorer/filter-s
  *     stays a slider regardless of override).
  */
 
-const range = (
-  partial: Partial<RangeSectionData> & { key: string },
-): RangeSectionData => ({
+const range = (partial: Partial<RangeSectionData> & { key: string }): RangeSectionData => ({
   kind: "range",
   group: "trace",
   label: partial.key,

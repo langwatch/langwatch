@@ -40,14 +40,14 @@ brew install ffmpeg librsvg
 
 ## Options
 
-| Option | What it does |
-|---|---|
-| `--out PATH` | write here instead of the timeline's `output` |
-| `--background PATH` | override `frame.background`, to render a second variant |
-| `--preview A:B` | render only seconds A to B **of the result**, for a fast loop while you author beats |
-| `--stills "1,4,8.5"` | write a PNG for each listed second of the result |
-| `--stills-dir DIR` | where those PNGs go, default `stills/` next to the output |
-| `--crf N` | override the encoder quality, lower is better |
+| Option               | What it does                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| `--out PATH`         | write here instead of the timeline's `output`                                        |
+| `--background PATH`  | override `frame.background`, to render a second variant                              |
+| `--preview A:B`      | render only seconds A to B **of the result**, for a fast loop while you author beats |
+| `--stills "1,4,8.5"` | write a PNG for each listed second of the result                                     |
+| `--stills-dir DIR`   | where those PNGs go, default `stills/` next to the output                            |
+| `--crf N`            | override the encoder quality, lower is better                                        |
 
 Use `--preview` and `--stills` together while you tune. A 12 second preview
 renders in about 15 seconds, and the stills are how you check that the cursor
@@ -64,58 +64,64 @@ Paths are relative to the timeline file, except `cursors/*` and
   "input": "../raw/take.webm",
   "output": "../../media/videos/name.webm",
   "fps": 30,
-  "page":    { "width": 1440, "height": 900 },   // the recording viewport
-  "size":    { "width": 1664, "height": 1040 },  // output, defaults to the source
+  "page": { "width": 1440, "height": 900 }, // the recording viewport
+  "size": { "width": 1664, "height": 1040 }, // output, defaults to the source
   "quality": { "crf": 38, "cpuUsed": 2 },
 
   // Optional. Applies the cut list in the same pass, so there is one encode.
-  "cut": { "speed": 2, "segments": [[17.2, 29.6], [31.6, 39.2]] },
+  "cut": {
+    "speed": 2,
+    "segments": [
+      [17.2, 29.6],
+      [31.6, 39.2],
+    ],
+  },
 
   "frame": {
     "background": "backgrounds/default.webp",
-    "fit": "native",                  // 1 output px per source px at 1x
-    "radius": 13,                     // window corner radius
-    "follow": 1,                      // how far the camera follows the target
+    "fit": "native", // 1 output px per source px at 1x
+    "radius": 13, // window corner radius
+    "follow": 1, // how far the camera follows the target
     "shadow": { "blur": 44, "offsetX": 0, "offsetY": 20, "spread": 2, "opacity": 0.3 },
-    "border": { "width": 1, "color": [255, 255, 255], "opacity": 0.45 }
+    "border": { "width": 1, "color": [255, 255, 255], "opacity": 0.45 },
   },
 
   "cursor": {
-    "size": 128,                      // arrow height in output pixels
-    "start": { "x": 308, "y": 264 },  // where it waits at t=0
-    "speed": 850,                     // page px per second, sets the travel time
+    "size": 128, // arrow height in output pixels
+    "start": { "x": 308, "y": 264 }, // where it waits at t=0
+    "speed": 850, // page px per second, sets the travel time
     // it arrives `settle` before a plain click, and `settle + pause.before`
     // before a click the timeline asked to hold on
     "minTravel": 0.45,
     "maxTravel": 1.5,
-    "settle": 0.14,                   // it arrives this long before the click
-    "arc": 0.08,                      // how much the path bows, 0 is a straight line
+    "settle": 0.14, // it arrives this long before the click
+    "arc": 0.08, // how much the path bows, 0 is a straight line
     "fade": 0.3,
-    "press":  { "scale": 0.84, "duration": 0.16 },
-    "shadow": { "blur": 14, "offsetX": 1, "offsetY": 6, "opacity": 0.38 }
+    "press": { "scale": 0.84, "duration": 0.16 },
+    "shadow": { "blur": 14, "offsetX": 1, "offsetY": 6, "opacity": 0.38 },
   },
 
   // Freezes the source frame where a move would be too fast to follow.
   "pace": { "auto": true, "speed": 850, "dwell": 0.3, "afterDelay": 0.35 },
 
   "click": {
-    "radius": [6, 42],                // the ring grows between these
+    "radius": [6, 42], // the ring grows between these
     "duration": 0.55,
-    "fill": 0.05,                     // opacity of the disc inside the ring
+    "fill": 0.05, // opacity of the disc inside the ring
     "stroke": 0.3,
     "strokeWidth": 2,
-    "color": [86, 86, 86]
+    "color": [86, 86, 86],
   },
 
   "zoom": {
-    "default": 1.9,    // used by a beat that names no zoom
-    "lead": 0.5,       // the zoom completes this long before the click
-    "in": 0.62,        // ease in, at `default`; a weaker zoom takes less
-    "out": 0.8,        // ease out, same rule
-    "hold": 0.8        // default seconds to stay zoomed after the click
+    "default": 1.9, // used by a beat that names no zoom
+    "lead": 0.5, // the zoom completes this long before the click
+    "in": 0.62, // ease in, at `default`; a weaker zoom takes less
+    "out": 0.8, // ease out, same rule
+    "hold": 0.8, // default seconds to stay zoomed after the click
   },
 
-  "beats": [ /* see below */ ]
+  "beats": [/* see below */],
 }
 ```
 
@@ -197,24 +203,24 @@ One beat per click, in seconds of the cut source. Pacing moves them onto the
 output clock for you, so a `pause` on one beat never means retiming the rest.
 Coordinates are page pixels, the same numbers a `boundingBox()` returns.
 
-| Field | Meaning |
-|---|---|
-| `t` | the moment of the click, in seconds of the cut source |
-| `tRaw` | the same moment in seconds of the raw take, mapped through `cut` |
-| `x`, `y` | the click point, in page pixels |
-| `zoom` | zoom factor for this beat, `1` for no zoom |
-| `zoomAt` | zoom centre, when the click point is not what you want to frame |
-| `hold` | seconds to stay zoomed after the click |
-| `lead` | the zoom completes this long before the click |
-| `in`, `out` | ease durations for this beat |
-| `travel` | override the travel time into this beat |
-| `arc` | how much the path into this beat bows, `0` for a ruled line |
-| `pause` | `{ before, after }` seconds to freeze the source around the click |
-| `skip` | seconds of source to drop immediately before this beat |
-| `click` | `false` moves the cursor without a click, and it stays an arrow |
-| `cursor` | `false` zooms without moving the cursor |
-| `hide` / `show` | fade the cursor out or back in at `t` |
-| `note` | a comment for whoever reads the timeline next |
+| Field           | Meaning                                                           |
+| --------------- | ----------------------------------------------------------------- |
+| `t`             | the moment of the click, in seconds of the cut source             |
+| `tRaw`          | the same moment in seconds of the raw take, mapped through `cut`  |
+| `x`, `y`        | the click point, in page pixels                                   |
+| `zoom`          | zoom factor for this beat, `1` for no zoom                        |
+| `zoomAt`        | zoom centre, when the click point is not what you want to frame   |
+| `hold`          | seconds to stay zoomed after the click                            |
+| `lead`          | the zoom completes this long before the click                     |
+| `in`, `out`     | ease durations for this beat                                      |
+| `travel`        | override the travel time into this beat                           |
+| `arc`           | how much the path into this beat bows, `0` for a ruled line       |
+| `pause`         | `{ before, after }` seconds to freeze the source around the click |
+| `skip`          | seconds of source to drop immediately before this beat            |
+| `click`         | `false` moves the cursor without a click, and it stays an arrow   |
+| `cursor`        | `false` zooms without moving the cursor                           |
+| `hide` / `show` | fade the cursor out or back in at `t`                             |
+| `note`          | a comment for whoever reads the timeline next                     |
 
 Two beats close together merge: when the second zoom starts before the first
 has returned to 1x, the camera pans straight from one focus point to the other

@@ -29,9 +29,7 @@ describe("tagRenameCommand", () => {
     vi.clearAllMocks();
     mockRenameTag = vi.fn();
     vi.mocked(PromptsApiService).mockImplementation(function () {
-      return { renameTag: mockRenameTag } as unknown as InstanceType<
-        typeof PromptsApiService
-      >;
+      return { renameTag: mockRenameTag } as unknown as InstanceType<typeof PromptsApiService>;
     });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
@@ -63,21 +61,15 @@ describe("tagRenameCommand", () => {
 
   describe("when given an invalid new name", () => {
     it("does not call renameTag", async () => {
-      await expect(tagRenameCommand("canary", "INVALID!")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(tagRenameCommand("canary", "INVALID!")).rejects.toThrow(ProcessExitError);
 
       expect(mockRenameTag).not.toHaveBeenCalled();
     });
 
     it("prints an error about invalid tag name format", async () => {
-      await expect(tagRenameCommand("canary", "INVALID!")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(tagRenameCommand("canary", "INVALID!")).rejects.toThrow(ProcessExitError);
 
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("Invalid tag name"),
-      );
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining("Invalid tag name"));
     });
 
     it("exits with code 1", async () => {

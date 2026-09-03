@@ -96,9 +96,7 @@ export const createInvitesCommand = async (
       if (result.invites.some((invite) => invite.emailNotSent)) {
         console.log();
         console.log(
-          chalk.yellow(
-            "Some invite emails could not be sent. Share the links above directly.",
-          ),
+          chalk.yellow("Some invite emails could not be sent. Share the links above directly."),
         );
       }
       console.log();

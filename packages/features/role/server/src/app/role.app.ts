@@ -70,10 +70,7 @@ export class RoleApp {
   }
 
   /** Defines a custom role, attributed to the caller who asked for it. */
-  createRole(
-    input: Readonly<{ role: RoleCreate }>,
-    by: RoleCaller,
-  ): Promise<Role> {
+  createRole(input: Readonly<{ role: RoleCreate }>, by: RoleCaller): Promise<Role> {
     return this.dependencies.roles.create({ role: input.role, actor: this.actorFor(by) });
   }
 
@@ -90,10 +87,7 @@ export class RoleApp {
   }
 
   /** Deletes a custom role. */
-  deleteRole(
-    input: Readonly<{ roleId: string }>,
-    by: RoleCaller,
-  ): Promise<{ success: true }> {
+  deleteRole(input: Readonly<{ roleId: string }>, by: RoleCaller): Promise<{ success: true }> {
     return this.dependencies.roles.remove({ roleId: input.roleId, actor: this.actorFor(by) });
   }
 

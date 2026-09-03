@@ -3,9 +3,7 @@ import {
   getAnnotationsByTrace as apiGetByTrace,
 } from "../langwatch-api-annotations.js";
 
-export async function handleListAnnotations(params: {
-  traceId?: string;
-}): Promise<string> {
+export async function handleListAnnotations(params: { traceId?: string }): Promise<string> {
   const annotations = params.traceId
     ? await apiGetByTrace(params.traceId)
     : await apiListAnnotations();

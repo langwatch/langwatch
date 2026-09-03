@@ -48,11 +48,7 @@ const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
  * when the unstable API grows a program, a printer and a scanner, or when the
  * rules are restructured to parse the whole tree in one exchange.
  */
-const HELD_ON_SIX = new Set([
-  "sdks/typescript",
-  "mcp/typescript",
-  "packages/architecture-lint",
-]);
+const HELD_ON_SIX = new Set(["sdks/typescript", "mcp/typescript", "packages/architecture-lint"]);
 
 /**
  * Where the workspace's own package manifests live, relative to the root.

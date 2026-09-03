@@ -44,13 +44,7 @@ export function composeSystemPrompt({
  * turn prompt, clearly labeled so the model reads it as context, not as the
  * user's words.
  */
-export function prependResumeSeed({
-  prompt,
-  seed,
-}: {
-  prompt: string;
-  seed: string;
-}): string {
+export function prependResumeSeed({ prompt, seed }: { prompt: string; seed: string }): string {
   return [
     "[Resumed conversation: digest of the previous worker's session. Newest messages last; the oldest may be truncated.]",
     seed,

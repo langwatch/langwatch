@@ -13,26 +13,20 @@ describe("memberRoleConstraints", () => {
   describe("getOrganizationRoleLabel()", () => {
     describe("when role is ADMIN", () => {
       it("returns Organization Admin", () => {
-        expect(getOrganizationRoleLabel(OrganizationUserRole.ADMIN)).toBe(
-          "Organization Admin",
-        );
+        expect(getOrganizationRoleLabel(OrganizationUserRole.ADMIN)).toBe("Organization Admin");
       });
     });
 
     describe("when role is MEMBER", () => {
       it("returns Organization Member", () => {
-        expect(getOrganizationRoleLabel(OrganizationUserRole.MEMBER)).toBe(
-          "Organization Member",
-        );
+        expect(getOrganizationRoleLabel(OrganizationUserRole.MEMBER)).toBe("Organization Member");
       });
     });
 
     describe("when role is EXTERNAL", () => {
       /** @scenario Organization role dropdown shows "Lite Member" instead of "External / Viewer" */
       it("returns Lite Member", () => {
-        expect(getOrganizationRoleLabel(OrganizationUserRole.EXTERNAL)).toBe(
-          "Lite Member",
-        );
+        expect(getOrganizationRoleLabel(OrganizationUserRole.EXTERNAL)).toBe("Lite Member");
       });
     });
   });

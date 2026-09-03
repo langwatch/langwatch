@@ -1,9 +1,6 @@
 import type { Field } from "@langwatch/workflow-contract";
 import type { TargetConfig } from "../../types";
-import {
-  type SetTargetPromptPayload,
-  setTargetPromptPayloadSchema,
-} from "../schemas";
+import { type SetTargetPromptPayload, setTargetPromptPayloadSchema } from "../schemas";
 import { requireTarget } from "./helpers";
 import type { Transform } from "./types";
 
@@ -15,10 +12,10 @@ import type { Transform } from "./types";
  * edit lands without touching the saved version. Inputs and outputs travel with
  * it: a changed message set usually changes the variables the target needs.
  */
-export const setTargetPrompt: Transform<
-  SetTargetPromptPayload,
-  { targetId: string }
-> = ({ state, payload }) => {
+export const setTargetPrompt: Transform<SetTargetPromptPayload, { targetId: string }> = ({
+  state,
+  payload,
+}) => {
   const { targetId, localPromptConfig, inputs, outputs } =
     setTargetPromptPayloadSchema.parse(payload);
   const target = requireTarget({ state, targetId });

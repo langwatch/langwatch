@@ -39,9 +39,7 @@ describe("langy tool call id", () => {
     describe("when each frame is parsed", () => {
       /** @scenario A start and an end frame for the same call still pair up */
       it("resolves both to the same tool call id", () => {
-        const start = langyRelayFrameSchema.parse(
-          toolFrame({ id: POLLUTED_ID, phase: "start" }),
-        );
+        const start = langyRelayFrameSchema.parse(toolFrame({ id: POLLUTED_ID, phase: "start" }));
         // The end frame carries the turn's LATER signature — a different blob
         // for the same call, which is exactly why the raw id could not pair.
         const end = langyRelayFrameSchema.parse(
@@ -75,9 +73,9 @@ describe("langy tool call id", () => {
       /** @scenario A separator inside a normal id is not mistaken for a signature */
       it("records the id unchanged", () => {
         // Too short to be a stapled blob, so it is part of the name.
-        expect(
-          langyRelayFrameSchema.parse(toolFrame({ id: "run_ts_migrations" })),
-        ).toMatchObject({ id: "run_ts_migrations" });
+        expect(langyRelayFrameSchema.parse(toolFrame({ id: "run_ts_migrations" }))).toMatchObject({
+          id: "run_ts_migrations",
+        });
       });
 
       /** @scenario A separator inside a normal id is not mistaken for a signature */
@@ -113,9 +111,7 @@ describe("langy tool call id", () => {
     describe("when the frame is parsed", () => {
       /** @scenario An absurdly long id is refused as an invalid frame */
       it("rejects the frame rather than storing it", () => {
-        const result = langyRelayFrameSchema.safeParse(
-          toolFrame({ id: "x".repeat(4000) }),
-        );
+        const result = langyRelayFrameSchema.safeParse(toolFrame({ id: "x".repeat(4000) }));
 
         expect(result.success).toBe(false);
       });

@@ -77,9 +77,7 @@ export function mutationInit(options?: MutationOptions): ObservedRequestInit {
  * Per-call plumbing for a create the server will deduplicate: the key on the
  * way out, and the replay verdict on the way back.
  */
-export function idempotentCreateInit(
-  options?: IdempotentCreateOptions,
-): ObservedRequestInit {
+export function idempotentCreateInit(options?: IdempotentCreateOptions): ObservedRequestInit {
   const onIdempotentReplay = options?.onIdempotentReplay;
   return {
     ...mutationInit(options),

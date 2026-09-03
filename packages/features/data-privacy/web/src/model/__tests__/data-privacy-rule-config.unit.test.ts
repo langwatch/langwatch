@@ -144,9 +144,10 @@ describe("buildRuleConfig", () => {
       expect(build({ piiChoice: "disabled" }).pii).toEqual({
         level: "disabled",
       });
-      expect(
-        build({ piiChoice: "custom", piiEntities: ["BR_CPF", "EMAIL_ADDRESS"] }).pii,
-      ).toEqual({ level: "custom", entities: ["BR_CPF", "EMAIL_ADDRESS"] });
+      expect(build({ piiChoice: "custom", piiEntities: ["BR_CPF", "EMAIL_ADDRESS"] }).pii).toEqual({
+        level: "custom",
+        entities: ["BR_CPF", "EMAIL_ADDRESS"],
+      });
     });
   });
 
@@ -210,9 +211,7 @@ describe("buildRuleConfig", () => {
         ],
       });
 
-      expect(config.customAttributes).toEqual([
-        { pattern: "ok.key", disposition: "drop" },
-      ]);
+      expect(config.customAttributes).toEqual([{ pattern: "ok.key", disposition: "drop" }]);
     });
   });
 });
@@ -251,9 +250,7 @@ describe("configToFormState", () => {
 
   describe("given a config that disables secrets", () => {
     it("reads secrets as explicitly off, not inherit", () => {
-      expect(configToFormState({ secrets: { enabled: false } }).secretsChoice).toBe(
-        "off",
-      );
+      expect(configToFormState({ secrets: { enabled: false } }).secretsChoice).toBe("off");
       expect(configToFormState({ secrets: { enabled: true } }).secretsChoice).toBe("on");
     });
   });
@@ -277,9 +274,7 @@ describe("configToFormState", () => {
       expect(state.piiChoice).toBe("strict");
       expect(state.secretsChoice).toBe("on");
       expect(state.secretsPatterns).toEqual(["acme_[0-9]+"]);
-      expect(state.customAttributes).toEqual([
-        { pattern: "app.token", disposition: "drop" },
-      ]);
+      expect(state.customAttributes).toEqual([{ pattern: "app.token", disposition: "drop" }]);
     });
 
     it("round-trips back to an equal config", () => {
@@ -417,10 +412,7 @@ describe("audience selection", () => {
     /** @scenario Picking All members replaces any narrower audience selection */
     it("collapses to All members alone and drops it again on a narrower pick", () => {
       const narrower = [ROLE_VALUES.admins, "group:security"];
-      const collapsed = applyAudienceSelection(narrower, [
-        ...narrower,
-        ALL_MEMBERS_VALUE,
-      ]);
+      const collapsed = applyAudienceSelection(narrower, [...narrower, ALL_MEMBERS_VALUE]);
       expect(collapsed).toEqual([ALL_MEMBERS_VALUE]);
 
       const widened = applyAudienceSelection(collapsed, [...collapsed, "group:security"]);
@@ -474,8 +466,8 @@ describe("PII exception patterns in the rule form", () => {
   });
 
   it("counts exceptions in the rule summary", () => {
-    expect(
-      ruleSummary(build({ piiChoice: "essential", piiExceptPatterns: ["a", "b"] })),
-    ).toContain("2 PII exceptions");
+    expect(ruleSummary(build({ piiChoice: "essential", piiExceptPatterns: ["a", "b"] }))).toContain(
+      "2 PII exceptions",
+    );
   });
 });

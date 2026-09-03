@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LIMIT } from "@langwatch/enterprise-licensing-contract";
 import { LicenseGenerationService, NodeLicenseCryptographyAdapter } from "../index";
-import {
-  ENTERPRISE_TEMPLATE,
-  GROWTH_TEMPLATE,
-} from "@langwatch/enterprise-licensing-contract";
+import { ENTERPRISE_TEMPLATE, GROWTH_TEMPLATE } from "@langwatch/enterprise-licensing-contract";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing";
 
 const baseParams = {
@@ -81,9 +78,7 @@ describe("generateLicenseKey", () => {
       // those fields became optional reject a license without them. See
       // `buildMintedPlan`. Everything else is simply absent.
       for (const cap of ["maxProjects", "maxWorkflows"] as const) {
-        expect(plan[cap], `${cap} should be minted as unlimited`).toBe(
-          Number.MAX_SAFE_INTEGER,
-        );
+        expect(plan[cap], `${cap} should be minted as unlimited`).toBe(Number.MAX_SAFE_INTEGER);
       }
 
       const uncappedAndUnminted = [
@@ -322,9 +317,7 @@ describe("generateLicenseKey overrides", () => {
       const { licenseData } = generateLicenseKey(enterpriseParams);
 
       expect(licenseData.plan.maxMembersLite).toBe(ENTERPRISE_TEMPLATE.maxMembersLite);
-      expect(licenseData.plan.maxMessagesPerMonth).toBe(
-        ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-      );
+      expect(licenseData.plan.maxMessagesPerMonth).toBe(ENTERPRISE_TEMPLATE.maxMessagesPerMonth);
       expect(licenseData.expiresAt).toBe("2026-06-15T12:00:00.000Z");
     });
   });

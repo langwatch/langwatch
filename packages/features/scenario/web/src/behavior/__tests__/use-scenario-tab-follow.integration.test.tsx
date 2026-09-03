@@ -122,9 +122,7 @@ describe("useScenarioTabFollow", () => {
     it("adopts the machine key from the query param", async () => {
       renderAt("/acme/simulations/checkout?scenarioTab=machine-abc");
 
-      await waitFor(() =>
-        expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"),
-      );
+      await waitFor(() => expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"));
       expect(screen.getByTestId("tab-id")).toHaveTextContent("assigned");
     });
 
@@ -133,46 +131,29 @@ describe("useScenarioTabFollow", () => {
       renderAt("/acme/simulations/checkout?scenarioTab=machine-abc");
 
       await waitFor(() =>
-        expect(
-          window.sessionStorage.getItem("langwatch:scenario-tab-key"),
-        ).toBe("machine-abc"),
+        expect(window.sessionStorage.getItem("langwatch:scenario-tab-key")).toBe("machine-abc"),
       );
-      expect(
-        window.localStorage.getItem("langwatch:scenario-tab-key"),
-      ).toBeNull();
+      expect(window.localStorage.getItem("langwatch:scenario-tab-key")).toBeNull();
     });
 
     it("recovers the key after a reload, without the query param", async () => {
-      window.sessionStorage.setItem(
-        "langwatch:scenario-tab-key",
-        "machine-abc",
-      );
+      window.sessionStorage.setItem("langwatch:scenario-tab-key", "machine-abc");
 
       renderAt("/acme/simulations/checkout");
 
-      await waitFor(() =>
-        expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"),
-      );
+      await waitFor(() => expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"));
     });
 
     it("keeps the same tab id across re-renders", async () => {
-      const { unmount } = renderAt(
-        "/acme/simulations/checkout?scenarioTab=machine-abc",
-      );
-      await waitFor(() =>
-        expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"),
-      );
+      const { unmount } = renderAt("/acme/simulations/checkout?scenarioTab=machine-abc");
+      await waitFor(() => expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"));
       const first = window.sessionStorage.getItem("langwatch:scenario-tab-id");
       unmount();
 
       renderAt("/acme/simulations/checkout");
-      await waitFor(() =>
-        expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"),
-      );
+      await waitFor(() => expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"));
 
-      expect(window.sessionStorage.getItem("langwatch:scenario-tab-id")).toBe(
-        first,
-      );
+      expect(window.sessionStorage.getItem("langwatch:scenario-tab-id")).toBe(first);
       expect(first).toBeTruthy();
     });
   });
@@ -182,9 +163,7 @@ describe("useScenarioTabFollow", () => {
     it("stays anonymous so the SDK never steers it", async () => {
       renderAt("/acme/simulations/checkout");
 
-      await waitFor(() =>
-        expect(screen.getByTestId("tab-key")).toHaveTextContent("none"),
-      );
+      await waitFor(() => expect(screen.getByTestId("tab-key")).toHaveTextContent("none"));
       expect(screen.getByTestId("tab-id")).toHaveTextContent("none");
     });
   });

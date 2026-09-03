@@ -50,9 +50,7 @@ export default function Studio() {
   }, []);
 
   useEffect(() => {
-    const dsl = workflow.data?.currentVersion?.dsl as unknown as
-      | StudioWorkflow
-      | undefined;
+    const dsl = workflow.data?.currentVersion?.dsl as unknown as StudioWorkflow | undefined;
     if (dsl) {
       // Prevent autosave from triggering after load
       setAutosavedWorkflow(undefined);

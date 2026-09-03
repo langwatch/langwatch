@@ -44,10 +44,9 @@ describe("rewriteCodeSignature", () => {
 
     describe("when the signature has a return type annotation", () => {
       it("preserves the return type while rewriting the parameters", () => {
-        const next = rewriteCodeSignature(
-          "def __call__(self, output: str) -> dict:\n  return {}",
-          [{ identifier: "output", type: "str" }],
-        );
+        const next = rewriteCodeSignature("def __call__(self, output: str) -> dict:\n  return {}", [
+          { identifier: "output", type: "str" },
+        ]);
         expect(next).toContain("def __call__(self, output: str = None) -> dict:");
       });
     });

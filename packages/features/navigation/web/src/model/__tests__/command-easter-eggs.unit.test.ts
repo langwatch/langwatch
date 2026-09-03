@@ -41,9 +41,7 @@ describe("easterEggs", () => {
       expect(result).not.toBeNull();
       expect(result?.id).toBe("easter-42");
       expect(result?.effect).toBe("toast");
-      expect(result?.toastMessage).toBe(
-        "The answer to life, the universe, and everything.",
-      );
+      expect(result?.toastMessage).toBe("The answer to life, the universe, and everything.");
     });
 
     it("finds 42 easter egg with 'meaning of life'", () => {

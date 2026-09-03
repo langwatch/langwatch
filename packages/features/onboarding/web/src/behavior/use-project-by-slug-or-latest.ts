@@ -51,9 +51,7 @@ export function useProjectBySlugOrLatest(organization?: MinimalOrganization) {
       if (matching[0]) return matching[0];
     }
 
-    return allProjects.sort(
-      (a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt),
-    )[0];
+    return allProjects.sort((a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt))[0];
   }, [organization, rawSlug]);
 
   const slug = project?.slug ?? rawSlug ?? undefined;

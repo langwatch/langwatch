@@ -6,10 +6,7 @@ export abstract class PersonalVirtualKeyRepository {
     organizationId: string;
     personalProjectId: string;
   }): Promise<PersonalVirtualKey | null>;
-  abstract list(input: {
-    organizationId: string;
-    userId?: string;
-  }): Promise<PersonalVirtualKey[]>;
+  abstract list(input: { organizationId: string; userId?: string }): Promise<PersonalVirtualKey[]>;
   abstract tryFindOwned(input: {
     id: string;
     organizationId: string;

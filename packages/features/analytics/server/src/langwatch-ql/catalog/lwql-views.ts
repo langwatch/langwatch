@@ -194,8 +194,7 @@ const TRACES: LangWatchQLViewDefinition = {
     {
       name: "TokensEstimated",
       type: "Bool",
-      description:
-        "Whether token counts were estimated rather than reported by the provider.",
+      description: "Whether token counts were estimated rather than reported by the provider.",
       gates: [],
       sourceColumns: ["TokensEstimated"],
     },
@@ -838,8 +837,7 @@ const TRACE_METRICS: LangWatchQLViewDefinition = {
     {
       name: "OccurredAt",
       type: "DateTime64(3)",
-      description:
-        "When the trace was first observed. Filter on this to prune partitions.",
+      description: "When the trace was first observed. Filter on this to prune partitions.",
       gates: [],
       sourceColumns: ["OccurredAt"],
     },
@@ -1068,8 +1066,7 @@ const TRACE_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
     {
       name: "BucketStart",
       type: "DateTime64(3)",
-      description:
-        "Start of the minute the measures cover. Filter on this to prune partitions.",
+      description: "Start of the minute the measures cover. Filter on this to prune partitions.",
       gates: [],
       sourceColumns: ["BucketStart"],
     },
@@ -1148,8 +1145,7 @@ const TRACE_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
       name: "CacheReadTokensSum",
       type: "UInt64",
       unit: "tokens",
-      description:
-        "Tokens served from the provider's prompt cache across the bucket's spans.",
+      description: "Tokens served from the provider's prompt cache across the bucket's spans.",
       gates: [],
       sourceColumns: ["CacheReadTokensSum"],
       summed: true,
@@ -1158,8 +1154,7 @@ const TRACE_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
       name: "CacheWriteTokensSum",
       type: "UInt64",
       unit: "tokens",
-      description:
-        "Tokens written into the provider's prompt cache across the bucket's spans.",
+      description: "Tokens written into the provider's prompt cache across the bucket's spans.",
       gates: [],
       sourceColumns: ["CacheWriteTokensSum"],
       summed: true,
@@ -1190,8 +1185,7 @@ const MODEL_USAGE_BY_MINUTE: LangWatchQLViewDefinition = {
   description:
     "Span metrics summed per minute, per model and span type: span counts, costs and tokens.",
   gates: [],
-  grain:
-    "one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed",
+  grain: "one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed",
   // The whole bucket key: every column here is a *sum*, so a join that
   // matches less than the key meets several buckets and multiplies them —
   // a wrong number rather than a repeated row.
@@ -1215,8 +1209,7 @@ const MODEL_USAGE_BY_MINUTE: LangWatchQLViewDefinition = {
     {
       name: "BucketStart",
       type: "DateTime64(3)",
-      description:
-        "Start of the minute the measures cover. Filter on this to prune partitions.",
+      description: "Start of the minute the measures cover. Filter on this to prune partitions.",
       gates: [],
       sourceColumns: ["BucketStart"],
     },
@@ -1283,8 +1276,7 @@ const MODEL_USAGE_BY_MINUTE: LangWatchQLViewDefinition = {
       name: "CacheReadTokensSum",
       type: "UInt64",
       unit: "tokens",
-      description:
-        "Tokens served from the provider's prompt cache across the bucket's spans.",
+      description: "Tokens served from the provider's prompt cache across the bucket's spans.",
       gates: [],
       sourceColumns: ["CacheReadTokensSum"],
       summed: true,
@@ -1293,8 +1285,7 @@ const MODEL_USAGE_BY_MINUTE: LangWatchQLViewDefinition = {
       name: "CacheWriteTokensSum",
       type: "UInt64",
       unit: "tokens",
-      description:
-        "Tokens written into the provider's prompt cache across the bucket's spans.",
+      description: "Tokens written into the provider's prompt cache across the bucket's spans.",
       gates: [],
       sourceColumns: ["CacheWriteTokensSum"],
       summed: true,
@@ -1497,8 +1488,7 @@ const EVALUATION_METRICS: LangWatchQLViewDefinition = {
     {
       name: "Attributes",
       type: "Map(String, String)",
-      description:
-        "Evaluation-level attributes, with every captured-content key removed.",
+      description: "Evaluation-level attributes, with every captured-content key removed.",
       gates: [],
       sourceColumns: ["Attributes"],
       expression: (source) => contentFilteredMapSql(source("Attributes")),
@@ -1513,8 +1503,7 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
   description:
     "Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount.",
   gates: [],
-  grain:
-    "one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed",
+  grain: "one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed",
   // The whole bucket key: every column here is a *sum*, so a join that
   // matches less than the key meets several buckets and multiplies them —
   // a wrong number rather than a repeated row.
@@ -1536,8 +1525,7 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
     {
       name: "BucketStart",
       type: "DateTime64(3)",
-      description:
-        "Start of the minute the measures cover. Filter on this to prune partitions.",
+      description: "Start of the minute the measures cover. Filter on this to prune partitions.",
       gates: [],
       sourceColumns: ["BucketStart"],
     },
@@ -1600,8 +1588,7 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
     {
       name: "ScoreSum",
       type: "Float64",
-      description:
-        "Scores added up across the bucket. Divide by ScoreCount for the average score.",
+      description: "Scores added up across the bucket. Divide by ScoreCount for the average score.",
       gates: [],
       sourceColumns: ["ScoreSum"],
       summed: true,
@@ -1619,8 +1606,7 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
       name: "DurationSum",
       type: "Int64",
       unit: "ms",
-      description:
-        "Total wall-clock duration of the bucket's evaluations, in milliseconds.",
+      description: "Total wall-clock duration of the bucket's evaluations, in milliseconds.",
       gates: [],
       sourceColumns: ["DurationSum"],
       summed: true,

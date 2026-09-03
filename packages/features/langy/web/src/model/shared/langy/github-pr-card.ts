@@ -86,9 +86,7 @@ export function parseGithubPrCard(output: unknown): GithubPrCardData | null {
   // guarantees, so a card that cannot produce them is not a PR we opened.
   if (!owner || !repo || !url || number === undefined) return null;
 
-  const state = STATES.includes(pr.state as GithubPrState)
-    ? (pr.state as GithubPrState)
-    : "open";
+  const state = STATES.includes(pr.state as GithubPrState) ? (pr.state as GithubPrState) : "open";
 
   return {
     owner,
@@ -102,9 +100,7 @@ export function parseGithubPrCard(output: unknown): GithubPrCardData | null {
     ...(str(pr.author) ? { author: str(pr.author)! } : {}),
     ...(num(pr.additions) !== undefined ? { additions: num(pr.additions)! } : {}),
     ...(num(pr.deletions) !== undefined ? { deletions: num(pr.deletions)! } : {}),
-    ...(num(pr.changedFiles) !== undefined
-      ? { changedFiles: num(pr.changedFiles)! }
-      : {}),
+    ...(num(pr.changedFiles) !== undefined ? { changedFiles: num(pr.changedFiles)! } : {}),
   };
 }
 

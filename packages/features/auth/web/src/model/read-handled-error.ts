@@ -115,8 +115,7 @@ export function readErrorTraceId(error: unknown): string | undefined {
 export function readAuthoredMessage(error: unknown): string | undefined {
   if (readHandledError(error)) return undefined;
 
-  const data = (error as { data?: { httpStatus?: unknown; authored?: unknown } } | null)
-    ?.data;
+  const data = (error as { data?: { httpStatus?: unknown; authored?: unknown } } | null)?.data;
 
   // The fact, not a guess about it. Without this the channel also carried
   // `new TRPCError({ code: "NOT_FOUND" })` — whose message tRPC defaults to

@@ -140,9 +140,7 @@ export async function whenIAddDatasetRow(
 ) {
   // Click on input cell
   const inputCell = page
-    .locator(
-      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="input"]`,
-    )
+    .locator(`[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="input"]`)
     .last();
   await inputCell.click();
 
@@ -217,9 +215,7 @@ export async function whenIWaitForEvaluationComplete(page: Page, rowCount: numbe
   // Wait for all rows to complete execution
   for (let i = 0; i < rowCount; i++) {
     // Wait for loading skeletons to disappear
-    const loadingIndicator = page.locator(
-      `[data-row="${i}"] [data-testid="loading-skeleton"]`,
-    );
+    const loadingIndicator = page.locator(`[data-row="${i}"] [data-testid="loading-skeleton"]`);
     await expect(loadingIndicator).not.toBeVisible({ timeout: 30000 });
   }
 }
@@ -227,15 +223,9 @@ export async function whenIWaitForEvaluationComplete(page: Page, rowCount: numbe
 /**
  * When I click play button on specific cell
  */
-export async function whenIClickPlayButtonOnCell(
-  page: Page,
-  rowIndex: number,
-  columnId: string,
-) {
+export async function whenIClickPlayButtonOnCell(page: Page, rowIndex: number, columnId: string) {
   const cell = page
-    .locator(
-      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`,
-    )
+    .locator(`[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`)
     .last();
   await cell.hover();
 
@@ -246,15 +236,9 @@ export async function whenIClickPlayButtonOnCell(
 /**
  * When I modify dataset row input
  */
-export async function whenIModifyDatasetRowInput(
-  page: Page,
-  rowIndex: number,
-  newInput: string,
-) {
+export async function whenIModifyDatasetRowInput(page: Page, rowIndex: number, newInput: string) {
   const inputCell = page
-    .locator(
-      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="input"]`,
-    )
+    .locator(`[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="input"]`)
     .last();
   await inputCell.click();
 
@@ -278,9 +262,7 @@ export async function thenTargetCellsShowOutput(
 ) {
   for (let i = 0; i < expectedOutputs.length; i++) {
     const cell = page
-      .locator(
-        `[data-testid="spreadsheet-cell"][data-row="${i}"][data-column="${targetColumnId}"]`,
-      )
+      .locator(`[data-testid="spreadsheet-cell"][data-row="${i}"][data-column="${targetColumnId}"]`)
       .last();
     await expect(cell).toContainText(expectedOutputs[i], { timeout: 15000 });
   }
@@ -311,10 +293,7 @@ export async function thenEvaluatorCellsShowPass(
 /**
  * Then target header shows aggregate pass rate
  */
-export async function thenTargetHeaderShowsPassRate(
-  page: Page,
-  expectedRate: string | RegExp,
-) {
+export async function thenTargetHeaderShowsPassRate(page: Page, expectedRate: string | RegExp) {
   const headerPassRate = page.getByText(expectedRate);
   await expect(headerPassRate).toBeVisible({ timeout: 10000 });
 }
@@ -359,9 +338,7 @@ export async function thenCellShowsOutput(
   expectedOutput: string,
 ) {
   const cell = page
-    .locator(
-      `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`,
-    )
+    .locator(`[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`)
     .last();
   await expect(cell).toContainText(expectedOutput, { timeout: 15000 });
 }

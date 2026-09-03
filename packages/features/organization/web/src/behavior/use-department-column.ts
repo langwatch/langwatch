@@ -43,9 +43,7 @@ export function useDepartmentColumn(
 
   const byUser = new Map(assignments?.users.map((u) => [u.id, u.departmentId]) ?? []);
   const byTeam = new Map(assignments?.teams.map((t) => [t.id, t.departmentId]) ?? []);
-  const byProject = new Map(
-    assignments?.projects.map((p) => [p.id, p.departmentId]) ?? [],
-  );
+  const byProject = new Map(assignments?.projects.map((p) => [p.id, p.departmentId]) ?? []);
 
   return {
     show: ffOn && departments.length > 0,

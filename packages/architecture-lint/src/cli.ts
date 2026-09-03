@@ -26,15 +26,11 @@ function valueAfter(flag: string): string | undefined {
 }
 
 const root = resolve(valueAfter("--root") ?? process.cwd());
-const serviceQualityBaselineReference = valueAfter(
-  "--service-quality-baseline-reference",
-);
+const serviceQualityBaselineReference = valueAfter("--service-quality-baseline-reference");
 const baselineReferenceDirectory = valueAfter("--baseline-reference-dir");
 const portModuleBaselineReference =
   valueAfter("--port-module-baseline-reference") ??
-  (baselineReferenceDirectory
-    ? `${baselineReferenceDirectory}/port-module-baseline.json`
-    : void 0);
+  (baselineReferenceDirectory ? `${baselineReferenceDirectory}/port-module-baseline.json` : void 0);
 const resolvedServiceQualityBaselineReference =
   serviceQualityBaselineReference ??
   (baselineReferenceDirectory
@@ -66,10 +62,7 @@ const baselineBoundaryEdges = baselineDiscovery
   : [];
 const baselineCheck = baselineOnly
   ? {
-      serviceQuality: lintServiceQualityBaseline(
-        root,
-        resolvedServiceQualityBaselineReference,
-      ),
+      serviceQuality: lintServiceQualityBaseline(root, resolvedServiceQualityBaselineReference),
       strictPorts: lintStrictPortBaseline(root, portModuleBaselineReference),
       boundaryEdges: lintBoundaryEdgeBaseline(
         root,
@@ -135,10 +128,7 @@ const violations = reviewCommentBlocks
 if (reviewCommentBlocks && commentBlocks.reviews.length > 0) {
   process.stdout.write(
     `architecture-lint: comment-block review queue\n${commentBlocks.reviews
-      .map(
-        (review) =>
-          `[${review.category}] ${review.file}:${review.line}\n  ${review.message}`,
-      )
+      .map((review) => `[${review.category}] ${review.file}:${review.line}\n  ${review.message}`)
       .join("\n\n")}\n`,
   );
 }
@@ -149,10 +139,7 @@ if (reviewCommentBlocks && commentBlocks.reviews.length > 0) {
 if (!reviewCommentBlocks && !reviewTestQuality && commentBlocks.reviews.length > 0) {
   process.stderr.write(
     `architecture-lint: comment-block review\n${commentBlocks.reviews
-      .map(
-        (review) =>
-          `[${review.category}] ${review.file}:${review.line}\n  ${review.message}`,
-      )
+      .map((review) => `[${review.category}] ${review.file}:${review.line}\n  ${review.message}`)
       .join("\n\n")}\n\n`,
   );
 }

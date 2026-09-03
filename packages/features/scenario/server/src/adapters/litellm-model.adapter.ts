@@ -57,9 +57,7 @@ const REASONING_EFFORT_PARAM = "reasoning_effort";
 const REQUESTED_REASONING_OFF = [`'${REASONING_OFF}'`, `"${REASONING_OFF}"`] as const;
 
 const providerErrorBodySchema = z.object({
-  error: z
-    .object({ message: z.string().optional(), param: z.string().optional() })
-    .optional(),
+  error: z.object({ message: z.string().optional(), param: z.string().optional() }).optional(),
 });
 const retryRequestBodySchema = z.looseObject({
   tools: z.array(z.unknown()).optional(),
@@ -89,12 +87,10 @@ function rejectionAsksForReasoningOff(body: string): boolean {
 
   const message = parsed.data.error?.message ?? "";
   const isAboutReasoningEffort =
-    parsed.data.error?.param === REASONING_EFFORT_PARAM ||
-    message.includes(REASONING_EFFORT_PARAM);
+    parsed.data.error?.param === REASONING_EFFORT_PARAM || message.includes(REASONING_EFFORT_PARAM);
 
   return (
-    isAboutReasoningEffort &&
-    REQUESTED_REASONING_OFF.some((quoted) => message.includes(quoted))
+    isAboutReasoningEffort && REQUESTED_REASONING_OFF.some((quoted) => message.includes(quoted))
   );
 }
 
@@ -127,9 +123,7 @@ function retryEligibleRequestBody(
  * Wrap `fetch` to retry a tool-carrying request with reasoning declared off
  * when — and only when — the provider rejected it for exactly that reason.
  */
-function withReasoningOffRetry(
-  baseFetch: typeof globalThis.fetch,
-): typeof globalThis.fetch {
+function withReasoningOffRetry(baseFetch: typeof globalThis.fetch): typeof globalThis.fetch {
   return async (input, init) => {
     const response = await baseFetch(input, init);
     if (response.status !== 400) return response;

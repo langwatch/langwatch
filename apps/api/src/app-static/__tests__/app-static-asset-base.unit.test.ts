@@ -64,9 +64,7 @@ describe("normalizeAssetBase", () => {
     });
 
     it("throws on a non-http(s) scheme", () => {
-      expect(() => normalizeAssetBase("ftp://cdn.langwatch.ai/abc123/")).toThrow(
-        /http or https/,
-      );
+      expect(() => normalizeAssetBase("ftp://cdn.langwatch.ai/abc123/")).toThrow(/http or https/);
     });
   });
 
@@ -134,9 +132,7 @@ describe("injectAssetBaseIntoHtml", () => {
       const out = injectAssetBaseIntoHtml({ html: shell, base: "/" });
       expect(out).toContain(`window.${ASSET_URL_GLOBAL}`);
       // bootstrap lands inside <head>, before the entry script
-      expect(out.indexOf(ASSET_URL_GLOBAL)).toBeLessThan(
-        out.indexOf("index-deadbeef.js"),
-      );
+      expect(out.indexOf(ASSET_URL_GLOBAL)).toBeLessThan(out.indexOf("index-deadbeef.js"));
     });
 
     /** @scenario Same-origin rewriting is a no-op for the entry references */
@@ -174,9 +170,7 @@ describe("injectAssetBaseIntoHtml", () => {
         html: shell,
         base: "https://cdn.example.com/a$1b/",
       });
-      expect(out).toContain(
-        'src="https://cdn.example.com/a$1b/assets/index-deadbeef.js"',
-      );
+      expect(out).toContain('src="https://cdn.example.com/a$1b/assets/index-deadbeef.js"');
     });
   });
 

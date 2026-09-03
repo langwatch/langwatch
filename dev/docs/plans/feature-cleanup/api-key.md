@@ -81,7 +81,7 @@ The cost is paid twice more:
 
 - Every method re-writes its input shape inline even though the contract already
   names it. `api-key.service.ts:162-167` spells out `{ id; organizationId;
-  callerUserId; callerCanReadAnyKey }`, which is `ApiKeyCallerReadInput`
+callerUserId; callerCanReadAnyKey }`, which is `ApiKeyCallerReadInput`
   (`contract/src/api-key.service.ts:43-48`). Nine of the named input types in
   the contract have zero users.
 - A test that exercises four methods must stub thirty-one:
@@ -98,12 +98,12 @@ the service directly at lines 380-381, 422, 463, 511, 544 and 572.
 
 So the mint rules exist twice and are not the same rules:
 
-| | `ApiKeyApp.createKey` | REST `POST /` |
-|---|---|---|
-| membership proof | `ensureMember` first, `api-key.app.ts:253` | none |
-| owner resolution | `api-key.app.ts:264` | `resolveKeyOwner`, `api-key.api.ts:217-225` |
-| admin refusal | `ApiKeyAdminRequiredError`, `api-key.app.ts:258` | `c.json({error:"Forbidden"},403)`, `api-key.api.ts:307-313` |
-| refusal cases | 2 (`create-service-key`, `assign-to-another-user`) | 3 — adds "keys that no member owns", `api-key.api.ts:266` |
+|                  | `ApiKeyApp.createKey`                              | REST `POST /`                                               |
+| ---------------- | -------------------------------------------------- | ----------------------------------------------------------- |
+| membership proof | `ensureMember` first, `api-key.app.ts:253`         | none                                                        |
+| owner resolution | `api-key.app.ts:264`                               | `resolveKeyOwner`, `api-key.api.ts:217-225`                 |
+| admin refusal    | `ApiKeyAdminRequiredError`, `api-key.app.ts:258`   | `c.json({error:"Forbidden"},403)`, `api-key.api.ts:307-313` |
+| refusal cases    | 2 (`create-service-key`, `assign-to-another-user`) | 3 — adds "keys that no member owns", `api-key.api.ts:266`   |
 
 `refuseNonAdminPrivilegedMint` (`api-key.api.ts:282-314`), `privilegedMintRefusal`
 (254-267), `resolveKeyOwner` (217-225) and `requestedBindings` (233-252) are
@@ -125,8 +125,8 @@ one, and it is what both customer listings filter on
 (`prisma.api-key.repository.ts:71` and `:83`).
 
 The contract states in the same file what that list means
-(`api-key.names.ts:11-25`): *"System-managed keys are hidden from customer
-listings… THIS IS ALSO A TENANT-ISOLATION BOUNDARY, not merely a UI filter."*
+(`api-key.names.ts:11-25`): _"System-managed keys are hidden from customer
+listings… THIS IS ALSO A TENANT-ISOLATION BOUNDARY, not merely a UI filter."_
 `platform/app/src/utils/dbOrganizationIdProtection.ts:90` imports the contract
 list to decide which rows may be swept without an `organizationId`.
 
@@ -154,19 +154,19 @@ the drift the contract comment warns against, and the fix is one import.
 `contract/src/api-key.errors.ts:87-97` takes a free-form `message` and no `meta`.
 It is thrown thirteen times for thirteen different reasons:
 
-| Site | Cause |
-|---|---|
-| `api-key-grant-policy.service.ts:34` | not a member of the organization |
-| `:91`, `:96`, `:101` | the three restricted-mode rules |
-| `:109` | permission string is not `resource:action` |
-| `:132` | personal-workspace scope granted to a non-owner |
-| `:145` | organization scope does not match the key's organization |
-| `:158` | team not found in this organization |
-| `:166` | project not found or archived |
-| `:199` | permission beyond the owner's ceiling |
-| `:244` | CUSTOM role without a `customRoleId` |
-| `:256` | custom role missing or malformed |
-| `api-key-lifecycle.service.ts:79` | a personal key with no binding |
+| Site                                 | Cause                                                    |
+| ------------------------------------ | -------------------------------------------------------- |
+| `api-key-grant-policy.service.ts:34` | not a member of the organization                         |
+| `:91`, `:96`, `:101`                 | the three restricted-mode rules                          |
+| `:109`                               | permission string is not `resource:action`               |
+| `:132`                               | personal-workspace scope granted to a non-owner          |
+| `:145`                               | organization scope does not match the key's organization |
+| `:158`                               | team not found in this organization                      |
+| `:166`                               | project not found or archived                            |
+| `:199`                               | permission beyond the owner's ceiling                    |
+| `:244`                               | CUSTOM role without a `customRoleId`                     |
+| `:256`                               | custom role missing or malformed                         |
+| `api-key-lifecycle.service.ts:79`    | a personal key with no binding                           |
 
 Since #5984 the wire message for a handled error is the code slug, so all thirteen
 reach the customer as the single registry line
@@ -193,10 +193,14 @@ exists and is already in the presentation registry.
 The contract owns it (`contract/src/api-key.permissions.ts:280-289`):
 
 ```ts
-export const CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS = ["organization:manage", "organization:delete", "team:manage"];
+export const CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS = [
+  "organization:manage",
+  "organization:delete",
+  "team:manage",
+];
 export function defaultCliKeyPermissions(): AuthzPermission[] {
   const excluded = new Set(CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS);
-  return categorizablePermissions().filter((p) => !excluded.has(p));   // platform tier already stripped
+  return categorizablePermissions().filter((p) => !excluded.has(p)); // platform tier already stripped
 }
 ```
 
@@ -206,7 +210,8 @@ the three names written out as a literal, and writes the same literal again at
 
 ```ts
 const defaults = ALL_PERMISSIONS.filter(
-  (permission) => !["organization:manage", "organization:delete", "team:manage"].includes(permission),
+  (permission) =>
+    !["organization:manage", "organization:delete", "team:manage"].includes(permission),
 ) as AuthzPermission[];
 ```
 
@@ -379,7 +384,9 @@ the sub-services already draw, and each one implements its own segment:
 export abstract class ApiKeyTokenService {
   abstract tryVerify(input: ApiKeyVerifyInput): Promise<ApiKeyVerification | null>;
   abstract tryResolveToken(input: ApiKeyTokenResolutionInput): Promise<ResolvedApiKeyToken | null>;
-  abstract resolveOrganizationToken(input: OrganizationApiKeyResolutionInput): Promise<OrganizationApiKeyResolution>;
+  abstract resolveOrganizationToken(
+    input: OrganizationApiKeyResolutionInput,
+  ): Promise<OrganizationApiKeyResolution>;
   abstract regenerateLegacyProjectKey(input: { projectId: string }): Promise<string>;
   abstract markUsed(input: ApiKeyIdInput): void;
 }
@@ -394,7 +401,9 @@ export abstract class ApiKeyService {
 }
 
 /** The CLI device-login lifecycle, which runs against a device grant. */
-export abstract class ApiKeyCliService { /* 5 */ }
+export abstract class ApiKeyCliService {
+  /* 5 */
+}
 ```
 
 `services/api-key.service.ts` then has nothing left to say and is deleted;
@@ -408,7 +417,7 @@ to hold a type that also declares `enrichApiKeyList`.
 ```ts
 export function createApiKeysRestApp(options: {
   security: AppRestSecurity;
-  apiKeys: () => ApiKeyApp;          // was: () => ApiKeyService
+  apiKeys: () => ApiKeyApp; // was: () => ApiKeyService
   permissions: () => AuthzService;
   audit: AppRestManagementAuditPort;
 }): SecuredApp<{ Variables: AppRestOrganizationVariables }>;
@@ -424,7 +433,7 @@ const { token, apiKey } = await apiKeys().createKey(
     keyType: body.keyType,
     assignedToUserId: body.assignedToUserId,
     permissions: body.permissions,
-    bindings: requestedBindings(body),   // the projectIds shorthand stays: it is wire shape
+    bindings: requestedBindings(body), // the projectIds shorthand stays: it is wire shape
   },
   caller,
 );
@@ -446,13 +455,16 @@ one-field widening of `ApiKeyCaller` (`app/api-key.app.ts:44-46`) to carry
 export class ApiKeyCeilingExceededError extends HandledError {
   declare readonly code: "api_key_ceiling_exceeded";
   constructor(input: { permission: string; scopeType: ApiKeyScopeType; scopeId: string }) {
-    super("api_key_ceiling_exceeded",
-      `An API key cannot be granted ${input.permission}, because you do not hold it here`, {
+    super(
+      "api_key_ceiling_exceeded",
+      `An API key cannot be granted ${input.permission}, because you do not hold it here`,
+      {
         meta: input,
         httpStatus: 403,
         fault: "customer",
         tips: ["Ask an organization admin to raise your role, or narrow the key's permissions"],
-      });
+      },
+    );
     this.name = "ApiKeyCeilingExceededError";
   }
 }
@@ -543,17 +555,17 @@ door must be on `ApiKeyApp` before the service type splits under it).
 
 **`@langwatch/api-key-server`** — 9 source files and 1 test outside the feature:
 
-| File | Symbols |
-|---|---|
-| `apps/api/src/app-rest/app-rest.features.ts:31,347` | `createApiKeysRestApp` |
-| `apps/api/src/features/api-key/api-key-trpc.mount.ts:13` | `ApiKeyTrpcApi`, `ApiKeyTrpcContext` |
-| `apps/api/src/index.ts:127` | re-exports `createApiKeysRestApp` |
-| `platform/app/src/server/app-layer/app.ts:4,125,342` | `ApiKeyApp` |
-| `platform/app/src/runtime/app/features/api-key.ts:3-8` | `PostgresApiKeyAdapter`, `ApiKeyDiagnosticsPort`, `ApiKeyBindingIdPort`, `AuthzBindingIdDeriver` |
-| `platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts:176` | `EventingAgentSandboxMaintenanceAdapter` |
-| `platform/app/prisma/seed.ts:77,306,316,365,373` | `ApiKeyTokenAdapter.hashApiKeySecret` (static) |
-| `platform/app/src/tasks/generateOpenAPISpec.ts:7,275` | `createApiKeysRestApp`, via the `apps/api` barrel |
-| `apps/api/src/features/api-key/__tests__/api-key-trpc.mount.unit.test.ts` | `ApiKeyApp` |
+| File                                                                          | Symbols                                                                                          |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `apps/api/src/app-rest/app-rest.features.ts:31,347`                           | `createApiKeysRestApp`                                                                           |
+| `apps/api/src/features/api-key/api-key-trpc.mount.ts:13`                      | `ApiKeyTrpcApi`, `ApiKeyTrpcContext`                                                             |
+| `apps/api/src/index.ts:127`                                                   | re-exports `createApiKeysRestApp`                                                                |
+| `platform/app/src/server/app-layer/app.ts:4,125,342`                          | `ApiKeyApp`                                                                                      |
+| `platform/app/src/runtime/app/features/api-key.ts:3-8`                        | `PostgresApiKeyAdapter`, `ApiKeyDiagnosticsPort`, `ApiKeyBindingIdPort`, `AuthzBindingIdDeriver` |
+| `platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts:176` | `EventingAgentSandboxMaintenanceAdapter`                                                         |
+| `platform/app/prisma/seed.ts:77,306,316,365,373`                              | `ApiKeyTokenAdapter.hashApiKeySecret` (static)                                                   |
+| `platform/app/src/tasks/generateOpenAPISpec.ts:7,275`                         | `createApiKeysRestApp`, via the `apps/api` barrel                                                |
+| `apps/api/src/features/api-key/__tests__/api-key-trpc.mount.unit.test.ts`     | `ApiKeyApp`                                                                                      |
 
 **`@langwatch/api-key-contract`** — 66 files outside the feature. 28 of them name
 the `ApiKeyService` type and are what commit 5 touches, most notably

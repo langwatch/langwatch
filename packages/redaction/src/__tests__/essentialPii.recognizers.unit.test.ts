@@ -56,9 +56,7 @@ describe("redactEssentialPiiInText", () => {
 
   describe("given an IBAN", () => {
     it("redacts a checksum-valid IBAN", () => {
-      expect(redact("iban DE89370400440532013000 here").text).toBe(
-        "iban [IBAN_CODE] here",
-      );
+      expect(redact("iban DE89370400440532013000 here").text).toBe("iban [IBAN_CODE] here");
     });
 
     it("leaves a checksum-invalid IBAN intact", () => {
@@ -96,9 +94,7 @@ describe("redactEssentialPiiInText", () => {
 
     /** @scenario "A digit run that reads as a phone number is still redacted in a sentence" */
     it("still redacts the same digits standing on their own", () => {
-      expect(redact("ref 2026081209 checkpoint").text).toBe(
-        "ref [PHONE_NUMBER] checkpoint",
-      );
+      expect(redact("ref 2026081209 checkpoint").text).toBe("ref [PHONE_NUMBER] checkpoint");
       expect(redact("call 2026081209 now").text).toBe("call [PHONE_NUMBER] now");
     });
 
@@ -158,8 +154,7 @@ describe("redactEssentialPiiInText", () => {
     });
 
     it("leaves chat completion and request ids intact", () => {
-      const payload =
-        "chatcmpl-Ab12Cd34Ef56Gh78 req_9f8e7d6c5b4a3210 trace_dp2_1781159836000";
+      const payload = "chatcmpl-Ab12Cd34Ef56Gh78 req_9f8e7d6c5b4a3210 trace_dp2_1781159836000";
       const { text, redactedCount } = redact(payload);
       expect(text).toBe(payload);
       expect(redactedCount).toBe(0);
@@ -260,8 +255,7 @@ describe("redactEssentialPiiInText", () => {
   });
 
   describe("when the text is one attribute value", () => {
-    const asValue = (text: string) =>
-      redactEssentialPiiInText({ text, isAttributeValue: true });
+    const asValue = (text: string) => redactEssentialPiiInText({ text, isAttributeValue: true });
 
     describe("given a value that is exclusively one identifier-shaped token", () => {
       it.each([
@@ -289,19 +283,14 @@ describe("redactEssentialPiiInText", () => {
     });
 
     describe("given a value with no letters in it", () => {
-      it.each(["+31 6 12345678", "20260812-09", "2026081209"])(
-        "still redacts %s",
-        (value) => {
-          expect(asValue(value).text).toBe("[PHONE_NUMBER]");
-        },
-      );
+      it.each(["+31 6 12345678", "20260812-09", "2026081209"])("still redacts %s", (value) => {
+        expect(asValue(value).text).toBe("[PHONE_NUMBER]");
+      });
     });
 
     describe("given a value that is a sentence rather than one token", () => {
       it("redacts as it does anywhere else", () => {
-        expect(asValue("ref 2026081209 checkpoint").text).toBe(
-          "ref [PHONE_NUMBER] checkpoint",
-        );
+        expect(asValue("ref 2026081209 checkpoint").text).toBe("ref [PHONE_NUMBER] checkpoint");
       });
     });
   });
@@ -340,10 +329,9 @@ describe("redactEssentialPiiInText with exception patterns", () => {
 
   describe("given an exception for one specific address", () => {
     it("keeps that address and redacts the rest", () => {
-      const { text } = withExceptions(
-        "write orders@acme.example or personal@example.com",
-        ["orders@acme\\.example"],
-      );
+      const { text } = withExceptions("write orders@acme.example or personal@example.com", [
+        "orders@acme\\.example",
+      ]);
       expect(text).toBe("write orders@acme.example or [EMAIL_ADDRESS]");
     });
   });
@@ -376,9 +364,7 @@ describe("subtractProtectedRanges", () => {
   const span = { start: 10, end: 20 };
 
   it("returns the span untouched when nothing overlaps", () => {
-    expect(subtractProtectedRanges(span, [{ start: 0, end: 5 }])).toEqual([
-      { start: 10, end: 20 },
-    ]);
+    expect(subtractProtectedRanges(span, [{ start: 0, end: 5 }])).toEqual([{ start: 10, end: 20 }]);
   });
 
   it("returns nothing when a protected range covers the whole span", () => {

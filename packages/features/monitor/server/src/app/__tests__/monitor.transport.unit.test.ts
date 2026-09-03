@@ -104,7 +104,8 @@ function testSecurity(): { security: AppRestSecurity; chain: string[] } {
     authorizeApiKeyCeiling: ({ permission }) => record(`ceiling:${permission}`),
     authenticateOrganization: () => record("authenticateOrganization"),
     authorizeOrganizationPermission: ({ permission }) => record(`authorizeOrg:${permission}`),
-    authorizeRouteProjectPermission: ({ permission }) => record(`authorizeRouteProject:${permission}`),
+    authorizeRouteProjectPermission: ({ permission }) =>
+      record(`authorizeRouteProject:${permission}`),
     authenticateOrganizationThrowing: record("authenticateOrganizationThrowing"),
     authorizeOrganizationPermissionThrowing: (permission) =>
       record(`authorizeOrgThrowing:${permission}`),

@@ -174,11 +174,7 @@ interface TraceTableRowProps {
   onSelect: (traceId: string) => void;
 }
 
-export const TraceTableRow: React.FC<TraceTableRowProps> = ({
-  trace,
-  isSelected,
-  onSelect,
-}) => {
+export const TraceTableRow: React.FC<TraceTableRowProps> = ({ trace, isSelected, onSelect }) => {
   return (
     <Tr
       py="trace.rowPy"

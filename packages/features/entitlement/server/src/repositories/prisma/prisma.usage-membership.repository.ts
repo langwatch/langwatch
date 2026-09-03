@@ -203,10 +203,7 @@ export class PrismaUsageMembershipRepository extends UsageMembershipPort {
 
     // Count from pending invites
     for (const invite of context.pendingInvites) {
-      const permissions = this.getInvitePermissions(
-        invite.teamAssignments,
-        context.customRoleMap,
-      );
+      const permissions = this.getInvitePermissions(invite.teamAssignments, context.customRoleMap);
       if (predicate(invite.role, permissions)) {
         count++;
       }

@@ -112,9 +112,7 @@ export function parseEventPayload(rawPayload: unknown): unknown {
  * Events with the same idempotencyKey are treated as duplicates even if they have different EventIds.
  * Legacy events without an idempotencyKey are only deduped by EventId.
  */
-export function deduplicateEvents<EventType extends Event>(
-  events: EventType[],
-): EventType[] {
+export function deduplicateEvents<EventType extends Event>(events: EventType[]): EventType[] {
   const seenEventIds = new Set<string>();
   const seenIdempotencyKeys = new Set<string>();
   return events.filter((event) => {

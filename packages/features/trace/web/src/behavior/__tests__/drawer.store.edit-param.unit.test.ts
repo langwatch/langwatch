@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  parseEditParam,
-  useDrawerStore,
-  viewModeForEditState,
-} from "../drawer.store";
+import { parseEditParam, useDrawerStore, viewModeForEditState } from "../drawer.store";
 import { selectIsTraceEditDirty, useTraceEditStore } from "../trace-edit.store";
 
 describe("drawer.edit URL parameter", () => {
@@ -58,9 +54,7 @@ describe("drawer.edit URL parameter", () => {
       });
 
       it("keeps a view the pass can act on", () => {
-        expect(viewModeForEditState({ viewMode: "summary", isEditing: true })).toBe(
-          "summary",
-        );
+        expect(viewModeForEditState({ viewMode: "summary", isEditing: true })).toBe("summary");
       });
     });
   });

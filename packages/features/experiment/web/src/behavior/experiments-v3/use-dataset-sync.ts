@@ -14,17 +14,13 @@ import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 export const useDatasetSync = () => {
   const { project } = useOrganizationTeamProject();
 
-  const {
-    datasets,
-    pendingSavedChanges,
-    clearPendingChange,
-    setAutosaveStatus,
-  } = useEvaluationsV3Store((state) => ({
-    datasets: state.datasets,
-    pendingSavedChanges: state.pendingSavedChanges,
-    clearPendingChange: state.clearPendingChange,
-    setAutosaveStatus: state.setAutosaveStatus,
-  }));
+  const { datasets, pendingSavedChanges, clearPendingChange, setAutosaveStatus } =
+    useEvaluationsV3Store((state) => ({
+      datasets: state.datasets,
+      pendingSavedChanges: state.pendingSavedChanges,
+      clearPendingChange: state.clearPendingChange,
+      setAutosaveStatus: state.setAutosaveStatus,
+    }));
 
   const resolveFullRecord = useCallback(
     (dbDatasetId: string, recordId: string) => {

@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createTenantId } from "../storage";
 import { detectCompression, MSGPACK_MIN_BYTES } from "../bodyCodec";
-import {
-  decodeJobEnvelope,
-  encodeJobEnvelope,
-  splitEnvelope,
-} from "../jobEnvelope";
+import { decodeJobEnvelope, encodeJobEnvelope, splitEnvelope } from "../jobEnvelope";
 import { TieredBlobStore } from "../tieredBlobStore";
 import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles";
 
@@ -71,11 +67,7 @@ describe("jobEnvelope body codecs", () => {
         projectId: PROJECT,
       },
     });
-    expect(Object.keys(header.ref ?? {}).sort()).toEqual([
-      "hash",
-      "projectId",
-      "tier",
-    ]);
+    expect(Object.keys(header.ref ?? {}).sort()).toEqual(["hash", "projectId", "tier"]);
   });
 
   describe("given a blob written before the codec change (gzip + JSON)", () => {
@@ -92,18 +84,13 @@ describe("jobEnvelope body codecs", () => {
           projectId: PROJECT,
         });
 
-        const stored = [
-          ...redisBlobs.store.values(),
-          ...objectStore.store.values(),
-        ];
+        const stored = [...redisBlobs.store.values(), ...objectStore.store.values()];
         expect(stored).toHaveLength(1);
         expect(detectCompression(stored[0]!)).toBe("gzip");
 
         // Now read it on a pod that has the new codecs enabled (reading is
         // codec-agnostic — the decoder detects from the stored bytes).
-        expect(
-          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
-        ).toEqual(jobData);
+        expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(jobData);
       });
     });
   });
@@ -119,10 +106,7 @@ describe("jobEnvelope body codecs", () => {
         compression: "zstd",
       });
 
-      const stored = [
-        ...redisBlobs.store.values(),
-        ...objectStore.store.values(),
-      ];
+      const stored = [...redisBlobs.store.values(), ...objectStore.store.values()];
       expect(detectCompression(stored[0]!)).toBe("zstd");
     });
 
@@ -137,9 +121,7 @@ describe("jobEnvelope body codecs", () => {
         compression: "zstd",
       });
 
-      expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(
-        jobData,
-      );
+      expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(jobData);
     });
 
     it("round-trips multibyte characters", async () => {
@@ -156,9 +138,7 @@ describe("jobEnvelope body codecs", () => {
         compression: "zstd",
       });
 
-      expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(
-        jobData,
-      );
+      expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(jobData);
     });
   });
 
@@ -175,9 +155,7 @@ describe("jobEnvelope body codecs", () => {
           payloadCodec: "msgpack",
         });
 
-        expect(
-          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
-        ).toEqual(jobData);
+        expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(jobData);
       });
 
       it("stores it under a different content-addressed key than the JSON encoding", async () => {
@@ -223,9 +201,7 @@ describe("jobEnvelope body codecs", () => {
         // Small bodies stay inline in the envelope, and an inline body is always
         // JSON — so the payload is readable in the raw envelope string.
         expect(encoded).toContain('"input":{"value":"hello"}');
-        expect(
-          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
-        ).toEqual(jobData);
+        expect(await decodeJobEnvelope({ value: encoded, tieredBlobs })).toEqual(jobData);
       });
     });
   });
@@ -252,10 +228,7 @@ describe("jobEnvelope body codecs", () => {
         ),
       );
 
-      const stored = [
-        ...redisBlobs.store.values(),
-        ...objectStore.store.values(),
-      ];
+      const stored = [...redisBlobs.store.values(), ...objectStore.store.values()];
       expect(stored).toHaveLength(1);
 
       for (const [i, value] of encoded.entries()) {

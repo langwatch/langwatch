@@ -97,9 +97,7 @@ export const useLatestPromptVersion = ({
   } else {
     // Fresh data available
     isOutdated =
-      latestVersion !== undefined &&
-      currentVersion !== undefined &&
-      latestVersion > currentVersion;
+      latestVersion !== undefined && currentVersion !== undefined && latestVersion > currentVersion;
     lastOutdatedRef.current = isOutdated;
   }
 

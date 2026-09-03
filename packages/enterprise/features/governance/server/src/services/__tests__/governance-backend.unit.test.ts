@@ -30,9 +30,7 @@ describe("governance backend services", () => {
     const adapter = PostgresGovernanceAdapter.create({
       database: {
         aiToolEntry: {
-          findMany: async () => [
-            { config: { assistantKind: "codex", bundledPlan: false } },
-          ],
+          findMany: async () => [{ config: { assistantKind: "codex", bundledPlan: false } }],
         },
       },
     });
@@ -67,9 +65,7 @@ describe("governance backend services", () => {
   });
 
   it("preserves department precedence", () => {
-    const service = PostgresGovernancePolicyService.create(
-      new MemoryPolicyRepository([]),
-    );
+    const service = PostgresGovernancePolicyService.create(new MemoryPolicyRepository([]));
     expect(
       service.resolveTraceDepartment({
         hasPrincipalUser: true,

@@ -43,14 +43,12 @@ class StubAuthzGrantsService extends AuthzGrantsService {
   update = vi.fn((_args: AuthzUpdateGrantInput) => Promise.resolve());
   revoke = vi.fn((_args: AuthzRevokeGrantInput) => Promise.resolve());
   replace = vi.fn((_args: AuthzReplaceGrantInput) => Promise.reject(new Error("unused")));
-  offboard = vi.fn(
-    (_args: AuthzOffboardInput): Promise<AuthzOffboardOutput> =>
-      Promise.reject(new Error("unused")),
+  offboard = vi.fn((_args: AuthzOffboardInput): Promise<AuthzOffboardOutput> =>
+    Promise.reject(new Error("unused")),
   );
   invalidateOrganization = vi.fn(() => Promise.resolve());
-  attachBindings = vi.fn(
-    (_args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput> =>
-      Promise.resolve({ attached: [], duplicates: [] }),
+  attachBindings = vi.fn((_args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput> =>
+    Promise.resolve({ attached: [], duplicates: [] }),
   );
   attachResourceGrant = vi.fn((_args: AuthzAttachResourceGrantInput) =>
     Promise.reject(new Error("unused")),
@@ -103,9 +101,7 @@ class StubAnnouncementsPort implements BetterAuthAnnouncementsPort {
   readonly reportError = vi.fn();
 }
 
-function organizationPrisma(
-  organization: { id: string; ssoDomain: string } | null,
-): PrismaClient {
+function organizationPrisma(organization: { id: string; ssoDomain: string } | null): PrismaClient {
   return {
     organization: { findUnique: vi.fn().mockResolvedValue(organization) },
     organizationUser: { create: vi.fn().mockResolvedValue(undefined) },

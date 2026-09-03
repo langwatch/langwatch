@@ -52,9 +52,7 @@ export class SecretPublicRestApi {
             tags: ["Secrets"],
           })
           .handle(async (context, input) =>
-            toSecretPublic(
-              await context.app.get({ projectId: input.projectId, id: input.id }),
-            ),
+            toSecretPublic(await context.app.get({ projectId: input.projectId, id: input.id })),
           ),
       )
       .post("/", SECRET_PUBLIC_API_VERSION, (endpoint) =>

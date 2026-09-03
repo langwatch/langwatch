@@ -64,7 +64,10 @@ vi.mock("../../../behavior/model-provider-api", () => {
     listAllForProjectForFrontend: query([EXISTING_PROVIDER]),
     update: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
     validateApiKey: {
-      useMutation: () => ({ mutateAsync: vi.fn().mockResolvedValue({ valid: true }), isPending: false }),
+      useMutation: () => ({
+        mutateAsync: vi.fn().mockResolvedValue({ valid: true }),
+        isPending: false,
+      }),
     },
     setRoleAssignmentForScope: {
       useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -149,9 +152,7 @@ describe("Feature: Advanced (Gateway) accordion on ModelProvider drawer", () => 
         // hidden from accessibility queries via `hidden` attribute. We
         // assert no rate-limit input is exposed.
         const placeholderMatches = screen.queryAllByPlaceholderText(/no cap/i);
-        const visible = placeholderMatches.filter(
-          (el) => !el.closest("[hidden]"),
-        );
+        const visible = placeholderMatches.filter((el) => !el.closest("[hidden]"));
         expect(visible).toHaveLength(0);
       });
 

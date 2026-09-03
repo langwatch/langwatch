@@ -63,12 +63,12 @@ describe("controlFlow helpers", () => {
 
   describe("nodeHasGateInput", () => {
     it("detects an existing gate input", () => {
-      expect(
-        nodeHasGateInput(node("c", "code", [{ identifier: "gate", type: "bool" }])),
-      ).toBe(true);
-      expect(
-        nodeHasGateInput(node("c", "code", [{ identifier: "question", type: "str" }])),
-      ).toBe(false);
+      expect(nodeHasGateInput(node("c", "code", [{ identifier: "gate", type: "bool" }]))).toBe(
+        true,
+      );
+      expect(nodeHasGateInput(node("c", "code", [{ identifier: "question", type: "str" }]))).toBe(
+        false,
+      );
     });
   });
 
@@ -85,9 +85,7 @@ describe("controlFlow helpers", () => {
         }),
       ).toBe(false);
       // the drag's own source node
-      expect(
-        showsTemporaryGate({ node: node("gate", "if_else"), sourceId: "gate" }),
-      ).toBe(false);
+      expect(showsTemporaryGate({ node: node("gate", "if_else"), sourceId: "gate" })).toBe(false);
       // entry / prompting_technique are excluded
       expect(showsTemporaryGate({ node: node("entry", "entry"), sourceId })).toBe(false);
       expect(

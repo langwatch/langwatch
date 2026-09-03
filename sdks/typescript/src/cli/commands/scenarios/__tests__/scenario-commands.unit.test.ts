@@ -109,9 +109,7 @@ describe("listScenariosCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      mockGetAll.mockRejectedValue(
-        new ScenariosApiError("Network error", "fetch all scenarios"),
-      );
+      mockGetAll.mockRejectedValue(new ScenariosApiError("Network error", "fetch all scenarios"));
 
       await expect(listScenariosCommand()).rejects.toThrow(ProcessExitError);
     });
@@ -215,13 +213,11 @@ describe("createScenarioCommand()", () => {
 
   describe("when creation fails", () => {
     it("exits with code 1", async () => {
-      mockCreate.mockRejectedValue(
-        new ScenariosApiError("Limit reached", "create scenario"),
-      );
+      mockCreate.mockRejectedValue(new ScenariosApiError("Limit reached", "create scenario"));
 
-      await expect(
-        createScenarioCommand("My Scenario", { situation: "test" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createScenarioCommand("My Scenario", { situation: "test" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -276,9 +272,9 @@ describe("updateScenarioCommand()", () => {
     it("exits with code 1", async () => {
       mockUpdate.mockRejectedValue(new ScenariosApiError("Not found", "update scenario"));
 
-      await expect(
-        updateScenarioCommand("nonexistent", { name: "Updated" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(updateScenarioCommand("nonexistent", { name: "Updated" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -321,9 +317,7 @@ describe("deleteScenarioCommand()", () => {
     it("exits with code 1 without calling delete", async () => {
       mockGet.mockRejectedValue(new ScenariosApiError("Not found", "fetch scenario"));
 
-      await expect(deleteScenarioCommand("nonexistent")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(deleteScenarioCommand("nonexistent")).rejects.toThrow(ProcessExitError);
       expect(mockDelete).not.toHaveBeenCalled();
     });
   });
@@ -331,13 +325,9 @@ describe("deleteScenarioCommand()", () => {
   describe("when delete API call fails", () => {
     it("exits with code 1", async () => {
       mockGet.mockResolvedValue(makeScenario());
-      mockDelete.mockRejectedValue(
-        new ScenariosApiError("Server error", "delete scenario"),
-      );
+      mockDelete.mockRejectedValue(new ScenariosApiError("Server error", "delete scenario"));
 
-      await expect(deleteScenarioCommand("scenario_abc123")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(deleteScenarioCommand("scenario_abc123")).rejects.toThrow(ProcessExitError);
     });
   });
 });

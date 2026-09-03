@@ -135,8 +135,7 @@ function complexityOf(node: ts.Node): number {
     if (isFunctionLike(current)) return;
     const isControlFlow = COMPLEXITY_CONTROL_FLOW.has(current.kind);
     const isShortCircuit =
-      ts.isBinaryExpression(current) &&
-      COMPLEXITY_SHORT_CIRCUIT.has(current.operatorToken.kind);
+      ts.isBinaryExpression(current) && COMPLEXITY_SHORT_CIRCUIT.has(current.operatorToken.kind);
     if (isControlFlow || isShortCircuit) {
       complexity += 1;
     }
@@ -254,11 +253,7 @@ export function lintServiceQualityBaseline(
     return { violations, bootstrapped: current.exists };
   }
   violations.push(
-    ...compareServiceQualityBaselines(
-      reference.baseline,
-      current.baseline,
-      baselineFile(root),
-    ),
+    ...compareServiceQualityBaselines(reference.baseline, current.baseline, baselineFile(root)),
   );
   return { violations, bootstrapped: false };
 }
@@ -331,9 +326,7 @@ function lintServiceQualityFileAgainstBaseline(
 ): ArchitectureViolation[] {
   const relativeFile = relative(root, file).replaceAll("\\", "/");
   const quality = serviceQuality(file, readFileSync(file, "utf8"));
-  const entry = new Map(baseline.map((candidate) => [candidate.file, candidate])).get(
-    relativeFile,
-  );
+  const entry = new Map(baseline.map((candidate) => [candidate.file, candidate])).get(relativeFile);
   const ceiling = entry ?? defaults;
   const violations: ArchitectureViolation[] = [];
   if (exceeds(quality, ceiling)) {
@@ -341,8 +334,7 @@ function lintServiceQualityFileAgainstBaseline(
       policy: "service-quality",
       file,
       message: `Service module exceeds its quality ceiling (lines ${quality.moduleLines}/${ceiling.moduleLines}, longest method ${quality.methodLines}/${ceiling.methodLines}, statements ${quality.statements}/${ceiling.statements}, complexity ${quality.complexity}/${ceiling.complexity}, line length ${quality.lineLength}/${ceiling.lineLength}).`,
-      allowed:
-        "Split coherent private collaborators. Existing ceiling entries may only shrink.",
+      allowed: "Split coherent private collaborators. Existing ceiling entries may only shrink.",
     });
   }
   if (entry && !matchesCeiling(entry, expectedCeiling(quality))) {
@@ -358,18 +350,11 @@ function lintServiceQualityFileAgainstBaseline(
 }
 
 /** Fast exact-path check for focused regression tests and targeted migration batches. */
-export function lintServiceQualityFile(
-  root: string,
-  path: string,
-): ArchitectureViolation[] {
+export function lintServiceQualityFile(root: string, path: string): ArchitectureViolation[] {
   const baselineResult = readServiceQualityBaselineFile(baselineFile(root));
   return [
     ...baselineResult.violations,
-    ...lintServiceQualityFileAgainstBaseline(
-      root,
-      resolve(root, path),
-      baselineResult.baseline,
-    ),
+    ...lintServiceQualityFileAgainstBaseline(root, resolve(root, path), baselineResult.baseline),
   ];
 }
 

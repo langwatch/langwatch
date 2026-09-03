@@ -3,11 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { setEvaluatorMapping, setTargetMapping } from "../transforms";
-import {
-  baseState,
-  refusalCode,
-  secondInlineDataset,
-} from "./workbench-fixtures";
+import { baseState, refusalCode, secondInlineDataset } from "./workbench-fixtures";
 
 describe("setTargetMapping", () => {
   it("writes the mapping for that dataset only", () => {

@@ -123,7 +123,10 @@ function testSecurity({ requireToken = false } = {}): {
   return { security: createAppRestSecurity(ports), chain };
 }
 
-function buildApi(overrides: Record<string, unknown> = {}, options: { requireToken?: boolean } = {}) {
+function buildApi(
+  overrides: Record<string, unknown> = {},
+  options: { requireToken?: boolean } = {},
+) {
   const { security, chain } = testSecurity(options);
   const stub = {
     getPage: vi.fn(async () => ({ experiments: [experiment], totalHits: 1 })),
@@ -247,9 +250,7 @@ describe("createExperimentsRestApp", () => {
     it("caps the page size and falls back on a window that is not a positive number", async () => {
       const capped = buildApi();
       await capped.hono.request("/api/experiments?pageSize=5000");
-      expect(capped.stub.getPage).toHaveBeenCalledWith(
-        expect.objectContaining({ pageSize: 200 }),
-      );
+      expect(capped.stub.getPage).toHaveBeenCalledWith(expect.objectContaining({ pageSize: 200 }));
 
       const nonsense = buildApi();
       await nonsense.hono.request("/api/experiments?page=0&pageSize=not-a-number");

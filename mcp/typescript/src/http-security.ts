@@ -126,12 +126,8 @@ export function apiKeysMatch({
   presentedKey: string;
   expectedKey: string;
 }): boolean {
-  const presented = createHmac("sha256", KEY_DERIVATION_SECRET)
-    .update(presentedKey)
-    .digest();
-  const expected = createHmac("sha256", KEY_DERIVATION_SECRET)
-    .update(expectedKey)
-    .digest();
+  const presented = createHmac("sha256", KEY_DERIVATION_SECRET).update(presentedKey).digest();
+  const expected = createHmac("sha256", KEY_DERIVATION_SECRET).update(expectedKey).digest();
   return timingSafeEqual(presented, expected);
 }
 

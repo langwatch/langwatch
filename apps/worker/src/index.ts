@@ -142,9 +142,7 @@ export {
   type WorkerExecutableHost,
   type WorkerExecutableOptions,
 } from "./worker.executable";
-export {
-  WorkerStandaloneComposition,
-} from "./app/worker-standalone.composition";
+export { WorkerStandaloneComposition } from "./app/worker-standalone.composition";
 export {
   describeWorkerFailure,
   startStandaloneWorker,

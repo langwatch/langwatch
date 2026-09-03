@@ -142,9 +142,7 @@ describe("resolveOffloadedTraces()", () => {
           logger,
         });
 
-        expect(result.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
-          fullOutput,
-        );
+        expect(result.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(fullOutput);
       });
 
       it("reserved eventref keys are stripped from the resolved span attributes", async () => {
@@ -220,9 +218,7 @@ describe("resolveOffloadedTraces()", () => {
           "langwatch.output": "full output",
         });
         expect(
-          result.resolvedSpans[0]!.spanAttributes[
-            `${EVENTREF_ATTR_PREFIX}langwatch.output`
-          ],
+          result.resolvedSpans[0]!.spanAttributes[`${EVENTREF_ATTR_PREFIX}langwatch.output`],
         ).toBeUndefined();
       });
     });
@@ -336,9 +332,7 @@ describe("resolveOffloadedTraces()", () => {
           logger,
         });
 
-        expect(result.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
-          "preview…",
-        );
+        expect(result.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe("preview…");
       });
 
       it("logs a warning at warn level", async () => {
@@ -395,9 +389,7 @@ describe("resolveOffloadedTraces()", () => {
         });
 
         const attrs = result.resolvedSpans[0]!.spanAttributes;
-        const hasReservedKey = Object.keys(attrs).some((k) =>
-          k.startsWith(EVENTREF_ATTR_PREFIX),
-        );
+        const hasReservedKey = Object.keys(attrs).some((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
         expect(hasReservedKey).toBe(false);
       });
     });

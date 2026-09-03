@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LIMIT } from "../index";
-import {
-  ENTERPRISE_TEMPLATE,
-  GROWTH_TEMPLATE,
-  getPlanTemplate,
-  PRO_TEMPLATE,
-} from "../index";
+import { ENTERPRISE_TEMPLATE, GROWTH_TEMPLATE, getPlanTemplate, PRO_TEMPLATE } from "../index";
 
 describe("PRO_TEMPLATE", () => {
   it("has type PRO", () => {
@@ -82,9 +77,7 @@ describe("GROWTH_TEMPLATE", () => {
       const unlimitedFields = ["maxMembersLite", "maxMessagesPerMonth"] as const;
 
       for (const field of unlimitedFields) {
-        expect(GROWTH_TEMPLATE[field], `${field} is not DEFAULT_LIMIT`).toBe(
-          DEFAULT_LIMIT,
-        );
+        expect(GROWTH_TEMPLATE[field], `${field} is not DEFAULT_LIMIT`).toBe(DEFAULT_LIMIT);
       }
     });
 

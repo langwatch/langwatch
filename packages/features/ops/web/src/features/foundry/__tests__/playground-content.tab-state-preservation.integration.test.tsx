@@ -18,10 +18,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  FoundryRuntimeProvider,
-  type FoundryTransport,
-} from "../behavior/foundry-runtime";
+import { FoundryRuntimeProvider, type FoundryTransport } from "../behavior/foundry-runtime";
 import { PlaygroundContent } from "../ui/sections/playground-content";
 import { createDefaultTrace, useTraceStore } from "../behavior/trace.store";
 

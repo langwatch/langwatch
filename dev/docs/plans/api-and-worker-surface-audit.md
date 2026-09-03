@@ -338,12 +338,12 @@ procedure publishes and `{}` is what the client reads back.
 
 Two are fixed, and the shape of the win is the argument for the rest:
 
-| port | what it said | what it always returned |
-| --- | --- | --- |
-| `OpsReplayRunner` (5 methods) | `Promise<unknown>` | `ReplayStatus`, `ReplayHistoryEntry[]` |
+| port                              | what it said       | what it always returned                            |
+| --------------------------------- | ------------------ | -------------------------------------------------- |
+| `OpsReplayRunner` (5 methods)     | `Promise<unknown>` | `ReplayStatus`, `ReplayHistoryEntry[]`             |
 | `OpsProcessExplorer` (20 methods) | `Promise<unknown>` | `ProcessFleetSummary[]`, `ProcessInstanceRow[]`, … |
-| `OpsEventExplorer` (4 methods) | `Promise<unknown>` | `AggregateDiscovery`, `AggregateSearchResult[]`, … |
-| `LimitsTrpcPorts.getUsageStats` | `Promise<unknown>` | `UsageStats` |
+| `OpsEventExplorer` (4 methods)    | `Promise<unknown>` | `AggregateDiscovery`, `AggregateSearchResult[]`, … |
+| `LimitsTrpcPorts.getUsageStats`   | `Promise<unknown>` | `UsageStats`                                       |
 
 Neither type was missing — both implementations have always declared them.
 They lived in `platform/app`, where a feature package cannot name them, so the

@@ -71,9 +71,7 @@ describe("ExperimentsApiService.getRunResults()", () => {
   describe("given the API returns an error", () => {
     describe("when the run is missing", () => {
       it("throws ExperimentsApiServiceError with operation context", async () => {
-        mockFetch.mockResolvedValueOnce(
-          jsonResponse({ error: "Run not found" }, { status: 404 }),
-        );
+        mockFetch.mockResolvedValueOnce(jsonResponse({ error: "Run not found" }, { status: 404 }));
 
         const service = new ExperimentsApiService();
         const err = await service.getRunResults({ runId: "missing" }).catch((e) => e);

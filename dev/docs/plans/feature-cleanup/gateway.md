@@ -13,19 +13,19 @@ contract it is noted, never changed.
 (10 files) and a 376-line web package (8 files). **3,287 of the 16,278 server
 lines (20.2%) are comment.**
 
-| Directory | Files | Lines |
-|---|---:|---:|
-| `transport/api-rest` | 1 | 2,088 |
-| `transport/api-trpc` | 6 | 1,285 |
-| `app` | 1 | 858 |
-| `services` | 8 | 1,445 |
-| `ports` | 9 | 610 |
-| `adapters` | 29 | 2,560 |
-| `repositories` (abstract) | 3 | 173 |
-| `repositories/prisma` | 10 | 2,976 |
-| `repositories/clickhouse` | 4 | 2,918 |
-| `intents` · `processes` · `projections` · `stores` | 6 | 1,225 |
-| `index.ts` · `testing.ts` | 2 | 140 |
+| Directory                                          | Files | Lines |
+| -------------------------------------------------- | ----: | ----: |
+| `transport/api-rest`                               |     1 | 2,088 |
+| `transport/api-trpc`                               |     6 | 1,285 |
+| `app`                                              |     1 |   858 |
+| `services`                                         |     8 | 1,445 |
+| `ports`                                            |     9 |   610 |
+| `adapters`                                         |    29 | 2,560 |
+| `repositories` (abstract)                          |     3 |   173 |
+| `repositories/prisma`                              |    10 | 2,976 |
+| `repositories/clickhouse`                          |     4 | 2,918 |
+| `intents` · `processes` · `projections` · `stores` |     6 | 1,225 |
+| `index.ts` · `testing.ts`                          |     2 |   140 |
 
 The budget/cache-rule/guardrail path, transport to datastore:
 
@@ -109,11 +109,11 @@ which no code path can observe.
 
 ### P3 — Three transports reach past the application (breaks R1)
 
-| Site | What it imports |
-|---|---|
-| `transport/api-trpc/gateway-budget.api.ts:33` | `providerLabelFor` from `../../repositories/prisma/prisma.gateway-provider-label.repository` |
-| `transport/api-trpc/gateway-cache-rule.api.ts:13` | `GatewayCacheRule` from `@langwatch/prisma-client/generated` |
-| `transport/api-trpc/gateway-guardrail.api.ts:19` | `GatewayGuardrailDirection`, `GatewayGuardrailFailureMode` from the same |
+| Site                                              | What it imports                                                                              |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `transport/api-trpc/gateway-budget.api.ts:33`     | `providerLabelFor` from `../../repositories/prisma/prisma.gateway-provider-label.repository` |
+| `transport/api-trpc/gateway-cache-rule.api.ts:13` | `GatewayCacheRule` from `@langwatch/prisma-client/generated`                                 |
+| `transport/api-trpc/gateway-guardrail.api.ts:19`  | `GatewayGuardrailDirection`, `GatewayGuardrailFailureMode` from the same                     |
 
 All three are reported by `[api-transport-import-boundary]`; the latter two also
 by `[prisma-containment]`.
@@ -128,17 +128,17 @@ forces the transports to import them.
 
 ### P4 — Five of nine ports have one implementation beside them; one has none (breaks R4)
 
-| Port | Implementations | Verdict |
-|---|---|---|
+| Port                                                                     | Implementations                                                                                                                                                                                     | Verdict  |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `GatewayOpenAdmissionsPort` (`ports/gateway-open-admissions.port.ts:44`) | 2 — `ClickHouseGatewayOpenAdmissionsRepository` (one instance) and `ClickHouseGatewayOpenAdmissionsAdapter` (fan-out across instances, `adapters/clickhouse.gateway-open-admissions.adapter.ts:36`) | **Keep** |
-| `GatewayVirtualKeysPort` (`ports/gateway-virtual-key.port.ts:78`) | 1 in-package, but consumed across the package boundary by `platform/app/src/server/gateway/virtualKey.service.ts:232` | **Keep** |
-| `GatewayBudgetSpendPort` (`ports/gateway-budget-spend.port.ts:106`) | 1 — `clickhouse.gateway-budget.repository.ts:518` | Delete |
-| `GatewayVirtualKeySpendPort` (`:34`) | 1 — `clickhouse.gateway-virtual-key-spend.repository.ts:40` | Delete |
-| `GatewaySpendEventsPort` (`:13`) | 1 — `clickhouse.gateway-spend-events.repository.ts:380` | Delete |
-| `GatewayAuditPort` (`gateway-audit.port.ts:46`) | 1 — `prisma.gateway-audit.repository.ts:60` | Delete |
-| `GatewayChangeEventsPort` (`:41`) | 1 — `prisma.gateway-change-event.repository.ts:16` | Delete |
-| `GatewaySettlementPolicyPort` (`:1`, 3 lines) | 1 — `FixedGatewaySettlementPolicy`, 21 lines to hold one integer | Delete |
-| `GatewayClickHousePort` (`ports/gateway-clickhouse.port.ts:33`) | **0** | Delete |
+| `GatewayVirtualKeysPort` (`ports/gateway-virtual-key.port.ts:78`)        | 1 in-package, but consumed across the package boundary by `platform/app/src/server/gateway/virtualKey.service.ts:232`                                                                               | **Keep** |
+| `GatewayBudgetSpendPort` (`ports/gateway-budget-spend.port.ts:106`)      | 1 — `clickhouse.gateway-budget.repository.ts:518`                                                                                                                                                   | Delete   |
+| `GatewayVirtualKeySpendPort` (`:34`)                                     | 1 — `clickhouse.gateway-virtual-key-spend.repository.ts:40`                                                                                                                                         | Delete   |
+| `GatewaySpendEventsPort` (`:13`)                                         | 1 — `clickhouse.gateway-spend-events.repository.ts:380`                                                                                                                                             | Delete   |
+| `GatewayAuditPort` (`gateway-audit.port.ts:46`)                          | 1 — `prisma.gateway-audit.repository.ts:60`                                                                                                                                                         | Delete   |
+| `GatewayChangeEventsPort` (`:41`)                                        | 1 — `prisma.gateway-change-event.repository.ts:16`                                                                                                                                                  | Delete   |
+| `GatewaySettlementPolicyPort` (`:1`, 3 lines)                            | 1 — `FixedGatewaySettlementPolicy`, 21 lines to hold one integer                                                                                                                                    | Delete   |
+| `GatewayClickHousePort` (`ports/gateway-clickhouse.port.ts:33`)          | **0**                                                                                                                                                                                               | Delete   |
 
 `GatewayClickHousePort` is dead. A repo-wide grep for the identifier returns
 exactly one hit: its own declaration. The seam that is actually used is the
@@ -177,12 +177,12 @@ subpath `./realtime-session-reconciliation` points at it.
 **`GatewaySpendEventsService`** (`services/gateway-spend-events.service.ts`, 74
 lines) — 4 methods, **4 pass-throughs**, three of them renamed on the way past:
 
-| Method | Body |
-|---|---|
+| Method                     | Body                                                |
+| -------------------------- | --------------------------------------------------- |
 | `getSpendEventsPage` `:20` | `return this.repository.readSpendEventsPage(input)` |
-| `getSpendSummaries` `:31` | `return this.repository.readSpendSummaries(input)` |
-| `walkSpendEvents` `:45` | `return this.repository.walkSpendEvents(input)` |
-| `getEndUserSpend` `:56` | `return this.repository.readEndUserSpend(input)` |
+| `getSpendSummaries` `:31`  | `return this.repository.readSpendSummaries(input)`  |
+| `walkSpendEvents` `:45`    | `return this.repository.walkSpendEvents(input)`     |
+| `getEndUserSpend` `:56`    | `return this.repository.readEndUserSpend(input)`    |
 
 **`GatewayCacheRulePersistence`** (`services/gateway-cache-rule.service.ts`) — 7
 methods over a repository declaring the same 7 names
@@ -231,12 +231,12 @@ interface, and then `presets.ts` to find the closure that actually runs.
 
 ### P8 — "List the cache rules" is declared five times in four vocabularies (breaks R8)
 
-| Declaration | Returns |
-|---|---|
-| `repositories/gateway-cache-rule.repository.ts:10` `list` | `GatewayCacheRuleResource[]` |
-| `services/gateway-cache-rule.service.ts:22` `list` | `GatewayCacheRuleResource[]` |
-| `contract/src/gateway.service.ts:77` `cacheRuleList` | `GatewayCacheRuleResource[]` |
-| `services/gateway.service.ts:240` `cacheRuleList` | `GatewayCacheRuleResource[]` |
+| Declaration                                                | Returns                             |
+| ---------------------------------------------------------- | ----------------------------------- |
+| `repositories/gateway-cache-rule.repository.ts:10` `list`  | `GatewayCacheRuleResource[]`        |
+| `services/gateway-cache-rule.service.ts:22` `list`         | `GatewayCacheRuleResource[]`        |
+| `contract/src/gateway.service.ts:77` `cacheRuleList`       | `GatewayCacheRuleResource[]`        |
+| `services/gateway.service.ts:240` `cacheRuleList`          | `GatewayCacheRuleResource[]`        |
 | `app/gateway.app.ts:209` `GatewayCacheRuleOperations.list` | **`GatewayCacheRule`** (Prisma row) |
 
 The last one returns a different type for the same operation, which is what
@@ -505,9 +505,13 @@ repository, and gains the return type the Go side already has:
 
 ```ts
 export type EndUserCap = Readonly<{
-  budget_id: string; anchor_id: string;
-  window: Lowercase<GatewayBudgetWindow>; on_breach: Lowercase<GatewayOnBreach>;
-  limit_usd: string; spent_usd: string; period_started_at: string;
+  budget_id: string;
+  anchor_id: string;
+  window: Lowercase<GatewayBudgetWindow>;
+  on_breach: Lowercase<GatewayOnBreach>;
+  limit_usd: string;
+  spent_usd: string;
+  period_started_at: string;
 }>;
 ```
 
@@ -539,7 +543,7 @@ export class GatewayCacheRuleService {
     return this.rules.update(parsed);
   }
 
-  async archive(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>
+  async archive(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
 }
 ```
 
@@ -676,15 +680,15 @@ cleanup.
 
 By entry point:
 
-| Entry | Importing files |
-|---|---:|
-| `@langwatch/gateway-server` (main) | 151 import sites |
-| `./composition/gateway-audit` | 5 |
-| `./composition/gateway-provider-labels` | 3 |
-| `./composition/gateway-change-events` | 3 |
-| `./testing` | 2 |
-| `./realtime-session-reconciliation` | 2 |
-| `./composition/gateway-virtual-keys` | 1 |
+| Entry                                   |  Importing files |
+| --------------------------------------- | ---------------: |
+| `@langwatch/gateway-server` (main)      | 151 import sites |
+| `./composition/gateway-audit`           |                5 |
+| `./composition/gateway-provider-labels` |                3 |
+| `./composition/gateway-change-events`   |                3 |
+| `./testing`                             |                2 |
+| `./realtime-session-reconciliation`     |                2 |
+| `./composition/gateway-virtual-keys`    |                1 |
 
 The four `./composition/*` subpaths in `server/package.json:31-46` point
 **directly at Prisma repository files**, so 12 external files hold repositories

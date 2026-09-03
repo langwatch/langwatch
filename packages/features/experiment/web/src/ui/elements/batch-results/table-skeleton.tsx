@@ -15,10 +15,7 @@ type TableSkeletonProps = {
   withCard?: boolean;
 };
 
-const SkeletonTable = ({
-  rows = 5,
-  columns = 3,
-}: Omit<TableSkeletonProps, "withCard">) => (
+const SkeletonTable = ({ rows = 5, columns = 3 }: Omit<TableSkeletonProps, "withCard">) => (
   <Box
     overflowX="auto"
     width="full"
@@ -64,11 +61,7 @@ const SkeletonTable = ({
   </Box>
 );
 
-export const TableSkeleton = ({
-  rows = 5,
-  columns = 3,
-  withCard = false,
-}: TableSkeletonProps) => {
+export const TableSkeleton = ({ rows = 5, columns = 3, withCard = false }: TableSkeletonProps) => {
   if (withCard) {
     return (
       <Card.Root width="100%" overflow="hidden">

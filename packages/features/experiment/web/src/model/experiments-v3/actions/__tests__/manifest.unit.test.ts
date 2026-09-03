@@ -31,9 +31,7 @@ describe("given the workbench action manifest", () => {
   });
 
   /** @scenario "Every action names the permission it needs" */
-  it.each(
-    entries,
-  )("%s has a payload schema and a permission", (_kind, definition) => {
+  it.each(entries)("%s has a payload schema and a permission", (_kind, definition) => {
     expect(typeof definition.payloadSchema.safeParse).toBe("function");
     expect(definition.requiredPermission).toMatch(/^[a-zA-Z]+:[a-z]+$/);
   });
@@ -102,9 +100,7 @@ describe("given the workbench action manifest", () => {
     const FLOOR_MS = 10_000;
     for (const [kind, definition] of entries) {
       if (definition.backend !== "transform") continue;
-      expect(definition.executeBudgetMs ?? 0, kind).toBeGreaterThanOrEqual(
-        FLOOR_MS,
-      );
+      expect(definition.executeBudgetMs ?? 0, kind).toBeGreaterThanOrEqual(FLOOR_MS);
     }
   });
 

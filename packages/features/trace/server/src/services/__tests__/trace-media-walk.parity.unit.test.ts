@@ -99,7 +99,6 @@ describe("media walk parity", () => {
       const escaped = JSON.stringify({ type: "raw", value: wrapped });
       expect(containsMediaMarkers(escaped)).toBe(true);
     });
-
   });
 
   describe.each(RENDER_COLLECTOR_EXAMPLES)("given the extractable shape: $name", ({ part }) => {
@@ -119,16 +118,19 @@ describe("media walk parity", () => {
     });
   });
 
-  describe.each(NON_EXTRACTABLE_PART_EXAMPLES)("given the non-extractable shape: $name", ({ part }) => {
-    it("is not classified extractable and passes the rewriter untouched", async () => {
-      expect(isExtractableMediaPart(part)).toBe(false);
-      const { part: rewritten, ref } = await processContentPart({
-        part,
-        service: makeFakeService(),
-        ...PARAMS,
+  describe.each(NON_EXTRACTABLE_PART_EXAMPLES)(
+    "given the non-extractable shape: $name",
+    ({ part }) => {
+      it("is not classified extractable and passes the rewriter untouched", async () => {
+        expect(isExtractableMediaPart(part)).toBe(false);
+        const { part: rewritten, ref } = await processContentPart({
+          part,
+          service: makeFakeService(),
+          ...PARAMS,
+        });
+        expect(ref).toBeNull();
+        expect(rewritten).toBe(part);
       });
-      expect(ref).toBeNull();
-      expect(rewritten).toBe(part);
-    });
-  });
+    },
+  );
 });

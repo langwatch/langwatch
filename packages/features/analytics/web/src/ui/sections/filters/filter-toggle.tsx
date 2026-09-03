@@ -12,18 +12,14 @@ import { FilterIconWithBadge } from "./filter-icon-with-badge";
 /**
  * Utility to get filter count from a filters object
  */
-export const getFilterCount = (
-  filters: Partial<Record<FilterField, FilterParam>> | undefined,
-) => {
+export const getFilterCount = (filters: Partial<Record<FilterField, FilterParam>> | undefined) => {
   const nonEmptyFilters = filterOutEmptyFilters(filters);
   const filterCount = Object.keys(nonEmptyFilters).length;
   const hasAnyFilters = filterCount > 0;
   return { nonEmptyFilters, filterCount, hasAnyFilters };
 };
 
-export const useFilterToggle = (
-  { defaultShowFilters } = { defaultShowFilters: false },
-) => {
+export const useFilterToggle = ({ defaultShowFilters } = { defaultShowFilters: false }) => {
   const router = useRouter();
   const { filterParams, filterCount, hasAnyFilters, clearFilters, setNegateFilters } =
     useFilterParams();
@@ -36,10 +32,7 @@ export const useFilterToggle = (
   const setShowFilters = (show: boolean) => {
     const currentPath = router.asPath.split("?")[0] ?? router.asPath;
     const queryString = router.asPath.split("?")[1] ?? "";
-    const queryParams = qs.parse(
-      queryString.replaceAll("%2C", ","),
-      URL_QS_PARSE_OPTIONS,
-    );
+    const queryParams = qs.parse(queryString.replaceAll("%2C", ","), URL_QS_PARSE_OPTIONS);
 
     const showFiltersValue = show
       ? defaultShowFilters
@@ -92,11 +85,7 @@ export const useFilterToggle = (
   };
 };
 
-export function FilterToggle({
-  defaultShowFilters = false,
-}: {
-  defaultShowFilters?: boolean;
-}) {
+export function FilterToggle({ defaultShowFilters = false }: { defaultShowFilters?: boolean }) {
   const { showFilters, setShowFilters, filterParams, clearFilters, setNegateFilters } =
     useFilterToggle({
       defaultShowFilters,

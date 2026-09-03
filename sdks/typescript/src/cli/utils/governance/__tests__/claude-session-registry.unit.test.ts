@@ -11,10 +11,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  defaultClaudeSessionRegistryDir,
-  readClaudeSessionName,
-} from "../claude-session-registry";
+import { defaultClaudeSessionRegistryDir, readClaudeSessionName } from "../claude-session-registry";
 
 const SESSION = "0199a1f4-2c5e-7a10-9f61-2d7f0a3b5c11";
 
@@ -41,9 +38,7 @@ describe("the claude session registry", () => {
     it("answers the session's current name", () => {
       writeFileSync(join(registryDir, "83315.json"), JSON.stringify(entry()));
 
-      expect(readClaudeSessionName({ sessionId: SESSION, registryDir })).toBe(
-        "probe-name-test",
-      );
+      expect(readClaudeSessionName({ sessionId: SESSION, registryDir })).toBe("probe-name-test");
     });
 
     /** @scenario "A mid-session rename reaches the next hook through the registry" */
@@ -57,9 +52,7 @@ describe("the claude session registry", () => {
         JSON.stringify(entry({ name: "lw-renamed-probe", updatedAt: 2 })),
       );
 
-      expect(readClaudeSessionName({ sessionId: SESSION, registryDir })).toBe(
-        "lw-renamed-probe",
-      );
+      expect(readClaudeSessionName({ sessionId: SESSION, registryDir })).toBe("lw-renamed-probe");
     });
   });
 
@@ -88,9 +81,7 @@ describe("the claude session registry", () => {
       mkdirSync(join(registryDir, "subdir.json"));
       writeFileSync(join(registryDir, "83315.json"), JSON.stringify(entry()));
 
-      expect(readClaudeSessionName({ sessionId: SESSION, registryDir })).toBe(
-        "probe-name-test",
-      );
+      expect(readClaudeSessionName({ sessionId: SESSION, registryDir })).toBe("probe-name-test");
     });
   });
 
@@ -99,9 +90,7 @@ describe("the claude session registry", () => {
       expect(defaultClaudeSessionRegistryDir({ CLAUDE_CONFIG_DIR: "/etc/claude" })).toBe(
         join("/etc/claude", "sessions"),
       );
-      expect(defaultClaudeSessionRegistryDir({})).toBe(
-        join(homedir(), ".claude", "sessions"),
-      );
+      expect(defaultClaudeSessionRegistryDir({})).toBe(join(homedir(), ".claude", "sessions"));
     });
 
     it("falls back to the home directory when the variable is blank", () => {

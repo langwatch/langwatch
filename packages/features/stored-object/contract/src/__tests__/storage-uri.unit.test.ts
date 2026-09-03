@@ -54,9 +54,7 @@ describe("stored object storage URIs", () => {
       "S3://***/proj-abc/sha256",
     );
     expect(
-      redactStoredObjectStorageUrisInText(
-        "failed at gs://customer-private/proj-abc/sha256: 404",
-      ),
+      redactStoredObjectStorageUrisInText("failed at gs://customer-private/proj-abc/sha256: 404"),
     ).toBe("failed at gs://***/proj-abc/sha256: 404");
     expect(
       redactStoredObjectAuthorizationMaterial(
@@ -70,17 +68,14 @@ describe("stored object storage URIs", () => {
     const xml =
       '<AuthenticationErrorDetail xml:space="preserve">MAC signature over GET</AuthenticationErrorDetail>';
 
-    expect(redactStoredObjectAuthorizationMaterial(sharedKey)).toBe(
-      "Authorization: SharedKey ***",
-    );
+    expect(redactStoredObjectAuthorizationMaterial(sharedKey)).toBe("Authorization: SharedKey ***");
     expect(redactStoredObjectAuthorizationMaterial(xml)).toBe(
       "<AuthenticationErrorDetail>***</AuthenticationErrorDetail>",
     );
   });
 
   it("redacts token fields without corrupting structured text", () => {
-    const token =
-      "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJzdG9yYWdlIn0.signature";
+    const token = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJzdG9yYWdlIn0.signature";
     const json = `{"token_type":"Bearer","access_token":"${token}"}`;
     const form = `grant_type=client_credentials&client_assertion=${token}&scope=x`;
     const redactedJson = redactStoredObjectAuthorizationMaterial(json);
@@ -94,8 +89,7 @@ describe("stored object storage URIs", () => {
 
   it("redacts both the destination and credential on an error path", () => {
     const token = "abcdefghijklmnopqrstuvwxyz1234567890";
-    const error =
-      `failed on azure-blob://lwacct/private/proj-1/abc123 ` + `with Bearer ${token}`;
+    const error = `failed on azure-blob://lwacct/private/proj-1/abc123 ` + `with Bearer ${token}`;
     const redacted = redactStoredObjectStorageErrorText(error);
 
     expect(redacted).not.toContain("lwacct/private");

@@ -77,7 +77,10 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
 import { nanoid } from "nanoid";
-import type { ApiRateLimitRequest, ApiRateLimitResult } from "../platform/infrastructure/api-rate-limit.infrastructure";
+import type {
+  ApiRateLimitRequest,
+  ApiRateLimitResult,
+} from "../platform/infrastructure/api-rate-limit.infrastructure";
 
 /** Everything the model gateway is composed from. */
 export type ApiModelProviderCompositionOptions = Readonly<{
@@ -228,9 +231,7 @@ class ApiManagedProviderConfigurationReporter extends ManagedProviderConfigurati
  * composition root is the one place both are in scope.
  */
 class ApiManagedModelProviderGatewayAdapter extends ModelProviderManagedGatewayPort {
-  static create(input: {
-    service: ManagedProviderService;
-  }): ApiManagedModelProviderGatewayAdapter {
+  static create(input: { service: ManagedProviderService }): ApiManagedModelProviderGatewayAdapter {
     return new ApiManagedModelProviderGatewayAdapter(input.service);
   }
 

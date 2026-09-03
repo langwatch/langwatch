@@ -75,11 +75,10 @@ Under the `servers` object, add an entry named `langwatch` with these fields:
   </Tab>
 
 <Tab title="Cursor">
-  1. Open Cursor Settings 2. Navigate to the **Tools and MCP** section in the sidebar 3.
-  Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named
-  `langwatch` with these fields: - `command`: `npx` - `args`: `-y`, then the package name
-  `@langwatch/mcp-server` on a separate token - `env.LANGWATCH_API_KEY`: your LangWatch
-  API key
+  1. Open Cursor Settings 2. Navigate to the **Tools and MCP** section in the sidebar 3. Add the
+  LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with these
+  fields: - `command`: `npx` - `args`: `-y`, then the package name `@langwatch/mcp-server` on a
+  separate token - `env.LANGWATCH_API_KEY`: your LangWatch API key
 </Tab>
 
 <Tab title="ChatGPT">
@@ -416,9 +415,8 @@ The MCP server provides tools organized into categories. Your AI assistant autom
 | `platform_revoke_api_key`  | Revoke an API key                                             |
 
 <Info>
-  Organization management tools require an API key with org-level permissions. If the
-  configured key lacks organization permissions, these tools will return a clear error
-  message.
+  Organization management tools require an API key with org-level permissions. If the configured key
+  lacks organization permissions, these tools will return a clear error message.
 </Info>
 
 ### Tool Details
@@ -524,8 +522,8 @@ Fetches Scenario documentation pages to understand how to write agent tests.
 - `url` (optional): The full URL of a specific doc page. If not provided, fetches the docs index.
 
 <Info>
-  Your AI assistant will automatically choose the right tools based on your request. You
-  don't need to call these tools manually.
+  Your AI assistant will automatically choose the right tools based on your request. You don't need
+  to call these tools manually.
 </Info>
 
 <AgentReportNotice />

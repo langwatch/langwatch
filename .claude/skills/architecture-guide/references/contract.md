@@ -88,7 +88,7 @@ client whose cache keys are the same as the application's:
 // web/src/behavior/secret-api.ts
 export type SecretApiMap = {
   secrets: {
-    list:   { query:    { input: ListSecretsInput;  output: Secret[] } };
+    list: { query: { input: ListSecretsInput; output: Secret[] } };
     create: { mutation: { input: CreateSecretInput; output: Secret } };
   };
 };

@@ -4,18 +4,15 @@ import {
   eraseUserCommandDataSchema,
 } from "@langwatch/identity-contract";
 import type { IdentityGuards } from "../guards";
-import {
-  type Command,
-  type CommandHandler,
-  defineCommandSchema,
-} from "@langwatch/eventing";
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { identityEventsFor } from "../projections/identity-state.projection";
 import type { IdentityEvent } from "../projections/identity-state.projection";
 
 /** The staged re-run: the calling path's guard, the calling path's envelope. */
-export class EraseUserCommand
-  implements CommandHandler<Command<EraseUserCommandData>, IdentityEvent>
-{
+export class EraseUserCommand implements CommandHandler<
+  Command<EraseUserCommandData>,
+  IdentityEvent
+> {
   static readonly schema = defineCommandSchema(
     ERASE_USER_COMMAND_TYPE,
     eraseUserCommandDataSchema,
@@ -28,9 +25,7 @@ export class EraseUserCommand
 
   constructor(private readonly guards: IdentityGuards) {}
 
-  async handle(
-    command: Command<EraseUserCommandData>,
-  ): Promise<IdentityEvent[]> {
+  async handle(command: Command<EraseUserCommandData>): Promise<IdentityEvent[]> {
     const facts = await this.guards.eraseUser(command.data);
     return identityEventsFor({
       command: { type: ERASE_USER_COMMAND_TYPE, data: command.data },

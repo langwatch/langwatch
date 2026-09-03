@@ -60,9 +60,7 @@ export const computeExecutionCells = ({
   // asked for; the backend planner drops the repeats the same way, so the two
   // agree on how many cells a run covers.
   const picked = (indices: number[]) =>
-    Array.from(
-      new Set(indices.filter((i) => i >= 0 && i < datasetRows.length)),
-    );
+    Array.from(new Set(indices.filter((i) => i >= 0 && i < datasetRows.length)));
 
   // Determine which row indices to process based on scope
   let rowIndices: number[];
@@ -74,9 +72,7 @@ export const computeExecutionCells = ({
       rowIndices = picked(scope.rowIndices);
       break;
     case "target-rows":
-      rowIndices = scope.rowIndices
-        ? picked(scope.rowIndices)
-        : datasetRows.map((_, i) => i);
+      rowIndices = scope.rowIndices ? picked(scope.rowIndices) : datasetRows.map((_, i) => i);
       break;
     case "target":
       rowIndices = datasetRows.map((_, i) => i);
@@ -148,9 +144,7 @@ export const isCellInExecution = (
  * Get the count of cells that will be executed.
  * This is useful for progress display.
  */
-export const getExecutionCellCount = (
-  params: ComputeExecutionCellsParams,
-): number => {
+export const getExecutionCellCount = (params: ComputeExecutionCellsParams): number => {
   return computeExecutionCells(params).length;
 };
 

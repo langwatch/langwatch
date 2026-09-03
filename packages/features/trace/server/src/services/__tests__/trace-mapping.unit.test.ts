@@ -196,16 +196,10 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
   });
 
   it("filters spans by specific name", () => {
-    const result = TRACE_MAPPINGS.spans.mapping(
-      mockTrace as any,
-      "openai/gpt-4",
-      "",
-    );
+    const result = TRACE_MAPPINGS.spans.mapping(mockTrace as any, "openai/gpt-4", "");
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual(
-      expect.objectContaining({ name: "openai/gpt-4" }),
-    );
+    expect(result[0]).toEqual(expect.objectContaining({ name: "openai/gpt-4" }));
   });
 
   it("returns input field from all spans when key is * and subkey is input", () => {
@@ -233,11 +227,7 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
   });
 
   it("returns specific field from specific span", () => {
-    const result = TRACE_MAPPINGS.spans.mapping(
-      mockTrace as any,
-      "openai/gpt-4",
-      "output",
-    );
+    const result = TRACE_MAPPINGS.spans.mapping(mockTrace as any, "openai/gpt-4", "output");
 
     expect(result).toHaveLength(1);
     // output field is an object with { type, value }
@@ -245,11 +235,7 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
   });
 
   it("returns full span object when key is specific and subkey is *", () => {
-    const result = TRACE_MAPPINGS.spans.mapping(
-      mockTrace as any,
-      "my-custom-span",
-      "*",
-    );
+    const result = TRACE_MAPPINGS.spans.mapping(mockTrace as any, "my-custom-span", "*");
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
@@ -309,11 +295,7 @@ describe("mapTraceToDatasetEntry span expansion", () => {
   describe("when no expansion is enabled", () => {
     /** @scenario Without the span expansion the trace stays a single row */
     it("produces a single row whose spans field holds all spans", () => {
-      const rows = mapTraceToDatasetEntry(
-        threeSpanTrace as any,
-        spansMapping,
-        new Set() as any,
-      );
+      const rows = mapTraceToDatasetEntry(threeSpanTrace as any, spansMapping, new Set() as any);
 
       expect(rows).toHaveLength(1);
       // The spans column is serialized as JSON; it should contain all 3 spans.
@@ -555,11 +537,8 @@ describe("mapTraceToDatasetEntry annotations expected_output column", () => {
   });
 
   const expectedColumnOf = (annotation: Record<string, unknown>) =>
-    mapTraceToDatasetEntry(
-      tracedWith(annotation) as any,
-      suggestionMapping,
-      new Set() as any,
-    )[0]?.expected;
+    mapTraceToDatasetEntry(tracedWith(annotation) as any, suggestionMapping, new Set() as any)[0]
+      ?.expected;
 
   describe("when the suggestion is about the trace's output", () => {
     it("carries the suggestion", () => {
@@ -652,10 +631,7 @@ describe("TRACE_MAPPINGS.metadata.mapping", () => {
   });
 
   it("returns undefined for non-existent key", () => {
-    const result = TRACE_MAPPINGS.metadata.mapping(
-      mockTrace as any,
-      "non_existent",
-    );
+    const result = TRACE_MAPPINGS.metadata.mapping(mockTrace as any, "non_existent");
 
     expect(result).toBeUndefined();
   });
@@ -858,9 +834,7 @@ describe("formatSpansDigest", () => {
     ];
 
     const result = (
-      await Promise.all(
-        [trace1Spans, trace2Spans].map((spans) => formatSpansDigest(spans)),
-      )
+      await Promise.all([trace1Spans, trace2Spans].map((spans) => formatSpansDigest(spans)))
     ).join("\n\n---\n\n");
 
     expect(typeof result).toBe("string");
@@ -875,9 +849,7 @@ describe("getTraceAvailableSources", () => {
   it("includes formatted_trace with label 'Full Trace (AI-Readable)'", () => {
     const sources = getTraceAvailableSources([], []);
     const traceSource = sources[0]!;
-    const formattedField = traceSource.fields.find(
-      (f) => f.name === "formatted_trace",
-    );
+    const formattedField = traceSource.fields.find((f) => f.name === "formatted_trace");
 
     expect(formattedField).toBeDefined();
     expect(formattedField!.label).toBe("Full Trace (AI-Readable)");
@@ -897,9 +869,7 @@ describe("getThreadAvailableSources", () => {
   it("includes formatted_traces with label 'Full Thread (AI-Readable)'", () => {
     const sources = getThreadAvailableSources();
     const threadSource = sources[0]!;
-    const formattedField = threadSource.fields.find(
-      (f) => f.name === "formatted_traces",
-    );
+    const formattedField = threadSource.fields.find((f) => f.name === "formatted_traces");
 
     expect(formattedField).toBeDefined();
     expect(formattedField!.label).toBe("Full Thread (AI-Readable)");
@@ -1013,13 +983,10 @@ describe("mapTraceToDatasetEntry()", () => {
         },
       };
 
-      const result = mapTraceToDatasetEntry(
-        trace1 as any,
-        mapping,
-        new Set(),
-        undefined,
-        [trace1, trace2] as any[],
-      );
+      const result = mapTraceToDatasetEntry(trace1 as any, mapping, new Set(), undefined, [
+        trace1,
+        trace2,
+      ] as any[]);
 
       expect(result).toHaveLength(1);
       // The threads mapping returns an array of objects, which gets JSON.stringified
@@ -1051,12 +1018,7 @@ describe("TRACE_MAPPINGS keys for threads sub-field selection", () => {
 });
 
 describe("threads_until_current mapping", () => {
-  const makeTrace = (
-    traceId: string,
-    threadId: string,
-    startedAt: number,
-    input: string,
-  ) =>
+  const makeTrace = (traceId: string, threadId: string, startedAt: number, input: string) =>
     ({
       trace_id: traceId,
       metadata: { thread_id: threadId },
@@ -1075,60 +1037,46 @@ describe("threads_until_current mapping", () => {
 
   it("returns only traces up to and including the current trace timestamp", () => {
     const currentTrace = allTraces[1]!; // t2, timestamp 2000
-    const result = TRACE_MAPPINGS.threads_until_current.mapping(
-      currentTrace,
-      "",
-      "",
-      { allTraces },
-    ) as any[];
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(currentTrace, "", "", {
+      allTraces,
+    }) as any[];
 
     expect(result.map((t: any) => t.trace_id)).toEqual(["t1", "t2"]);
   });
 
   it("includes traces with equal timestamps", () => {
     const currentTrace = allTraces[2]!; // t3, timestamp 3000
-    const result = TRACE_MAPPINGS.threads_until_current.mapping(
-      currentTrace,
-      "",
-      "",
-      { allTraces },
-    ) as any[];
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(currentTrace, "", "", {
+      allTraces,
+    }) as any[];
 
     expect(result.map((t: any) => t.trace_id)).toEqual(["t1", "t2", "t3"]);
   });
 
   it("excludes traces from other threads", () => {
     const currentTrace = allTraces[2]!; // t3, thread-A
-    const result = TRACE_MAPPINGS.threads_until_current.mapping(
-      currentTrace,
-      "",
-      "",
-      { allTraces },
-    ) as any[];
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(currentTrace, "", "", {
+      allTraces,
+    }) as any[];
 
     expect(result.map((t: any) => t.trace_id)).not.toContain("t4");
   });
 
   it("extracts selectedFields from filtered traces", () => {
     const currentTrace = allTraces[1]!; // t2, timestamp 2000
-    const result = TRACE_MAPPINGS.threads_until_current.mapping(
-      currentTrace,
-      "",
-      "",
-      { allTraces, selectedFields: ["input"] },
-    ) as Record<string, unknown>[];
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(currentTrace, "", "", {
+      allTraces,
+      selectedFields: ["input"],
+    }) as Record<string, unknown>[];
 
     expect(result).toEqual([{ input: "first" }, { input: "second" }]);
   });
 
   it("returns empty array when trace has no thread_id", () => {
     const noThreadTrace = { ...allTraces[0]!, metadata: {} } as any;
-    const result = TRACE_MAPPINGS.threads_until_current.mapping(
-      noThreadTrace,
-      "",
-      "",
-      { allTraces },
-    );
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(noThreadTrace, "", "", {
+      allTraces,
+    });
 
     expect(result).toEqual([]);
   });
@@ -1185,9 +1133,7 @@ describe("tryAndConvertTo", () => {
   describe("when given an OTel typed-object wrapper", () => {
     it("returns the bare value when the wrapper type is 'text'", () => {
       // Bug: currently returns '{"type":"text","value":"stockout"}' instead of "stockout"
-      expect(
-        tryAndConvertTo({ type: "text", value: "stockout" }, "string"),
-      ).toBe("stockout");
+      expect(tryAndConvertTo({ type: "text", value: "stockout" }, "string")).toBe("stockout");
     });
 
     it("returns the bare value stringified when the wrapper type is 'json' and value is a number", () => {

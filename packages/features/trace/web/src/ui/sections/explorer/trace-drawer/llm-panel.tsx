@@ -46,9 +46,7 @@ const CHUNK_ESTIMATE_PX = 480;
 export function LlmPanel({ trace, spans }: LlmPanelProps) {
   const [config, setConfig] = useState<MarkdownConfig>(LLM_PANEL_DEFAULT);
 
-  const fullSpansQuery = useSpansFull(
-    config.includeSpanAttributes || config.includeSpanIO,
-  );
+  const fullSpansQuery = useSpansFull(config.includeSpanAttributes || config.includeSpanIO);
   const fullSpans = fullSpansQuery.data;
 
   const { events } = useTraceEvents();
@@ -91,11 +89,7 @@ export function LlmPanel({ trace, spans }: LlmPanelProps) {
           Rendered for reading · Copy gives you the raw markdown source
         </Text>
         <HStack gap={1.5}>
-          <MarkdownConfigurePopover
-            config={config}
-            onChange={setConfig}
-            placement="bottom-end"
-          />
+          <MarkdownConfigurePopover config={config} onChange={setConfig} placement="bottom-end" />
           <MarkdownCopyButton markdown={markdown} />
         </HStack>
       </HStack>

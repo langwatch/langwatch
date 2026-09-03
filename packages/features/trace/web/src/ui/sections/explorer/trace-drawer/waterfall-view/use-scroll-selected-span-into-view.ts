@@ -58,15 +58,7 @@ export function useScrollSelectedSpanIntoView({
       groupKeyOf,
     });
     // The effect re-runs on the rows that unfolding produces, and scrolls then.
-  }, [
-    selectedSpanId,
-    rows,
-    spans,
-    virtualizer,
-    setCollapsedIds,
-    setExpandedGroups,
-    groupKeyOf,
-  ]);
+  }, [selectedSpanId, rows, spans, virtualizer, setCollapsedIds, setExpandedGroups, groupKeyOf]);
 }
 
 /** Opens the collapsed parents and the folded sibling group hiding a span. */
@@ -95,8 +87,7 @@ function unfoldWhateverHides({
   }
 
   const foldedInto = rows.find(
-    (row) =>
-      row.kind === "group" && row.spans.some((span) => span.spanId === selectedSpanId),
+    (row) => row.kind === "group" && row.spans.some((span) => span.spanId === selectedSpanId),
   );
   if (foldedInto?.kind !== "group") return;
 

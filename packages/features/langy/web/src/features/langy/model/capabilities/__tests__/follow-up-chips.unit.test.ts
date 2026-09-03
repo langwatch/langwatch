@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  deriveFollowUpChips,
-  MAX_FOLLOW_UP_CHIPS,
-  type SettledCall,
-} from "../follow-up-chips";
+import { deriveFollowUpChips, MAX_FOLLOW_UP_CHIPS, type SettledCall } from "../follow-up-chips";
 
 /**
  * A settled trace search exactly as the live transport hands it to the panel:
@@ -212,9 +208,7 @@ describe("deriveFollowUpChips", () => {
         });
 
         expect(chips.map((chip) => chip.label)).not.toContain("Open in Experiments");
-        expect(chips.map((chip) => chip.label)).not.toContain(
-          "Open in Online Evaluations",
-        );
+        expect(chips.map((chip) => chip.label)).not.toContain("Open in Online Evaluations");
       });
     });
   });
@@ -230,9 +224,7 @@ describe("deriveFollowUpChips", () => {
     describe("when its consumers cannot carry the prompt across", () => {
       /** @scenario A prompts result earns no bare surface chips */
       it("offers no chip at all — no destination can receive a prompt", () => {
-        expect(deriveFollowUpChips({ call: promptList, projectSlug: "demo" })).toEqual(
-          [],
-        );
+        expect(deriveFollowUpChips({ call: promptList, projectSlug: "demo" })).toEqual([]);
       });
     });
   });

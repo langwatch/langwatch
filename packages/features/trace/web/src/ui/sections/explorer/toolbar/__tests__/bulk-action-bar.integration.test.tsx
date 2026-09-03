@@ -101,9 +101,7 @@ describe("BulkActionBar Add to context", () => {
       useSelectionStore.getState().setMany(["t1"], true);
       renderBar();
 
-      expect(
-        screen.queryByRole("button", { name: /Add to context/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Add to context/ })).not.toBeInTheDocument();
       // The other bulk actions still render.
       expect(screen.getByRole("button", { name: /Export selected/ })).toBeInTheDocument();
     });

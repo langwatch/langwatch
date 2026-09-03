@@ -12,12 +12,7 @@ import type { AddonDef } from "../../types";
  * so the wrapped preview text can never bleed into a column that carries its
  * own content. Resolved against the live cells, so it survives reorder / hide.
  */
-export const RESERVED_PREVIEW_COLUMN_IDS = [
-  "labels",
-  "evaluations",
-  "prompt",
-  "events",
-] as const;
+export const RESERVED_PREVIEW_COLUMN_IDS = ["labels", "evaluations", "prompt", "events"] as const;
 
 const RESERVED_PREVIEW_COLUMN_SET = new Set<string>(RESERVED_PREVIEW_COLUMN_IDS);
 

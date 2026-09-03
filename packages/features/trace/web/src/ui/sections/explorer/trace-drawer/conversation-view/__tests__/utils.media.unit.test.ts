@@ -24,15 +24,11 @@ describe("turnMediaForSide", () => {
     const refs = [audioRef(CALLER, "user"), audioRef(REPLY, "assistant")];
 
     it("keeps the caller's recording on the input side", () => {
-      expect(urls(turnMediaForSide({ refs, value: null, side: "input" }))).toEqual([
-        CALLER,
-      ]);
+      expect(urls(turnMediaForSide({ refs, value: null, side: "input" }))).toEqual([CALLER]);
     });
 
     it("keeps the reply recording on the output side", () => {
-      expect(urls(turnMediaForSide({ refs, value: null, side: "output" }))).toEqual([
-        REPLY,
-      ]);
+      expect(urls(turnMediaForSide({ refs, value: null, side: "output" }))).toEqual([REPLY]);
     });
   });
 
@@ -40,12 +36,8 @@ describe("turnMediaForSide", () => {
     const refs = [audioRef(CALLER)];
 
     it("renders them on either side asked for", () => {
-      expect(urls(turnMediaForSide({ refs, value: null, side: "input" }))).toEqual([
-        CALLER,
-      ]);
-      expect(urls(turnMediaForSide({ refs, value: null, side: "output" }))).toEqual([
-        CALLER,
-      ]);
+      expect(urls(turnMediaForSide({ refs, value: null, side: "input" }))).toEqual([CALLER]);
+      expect(urls(turnMediaForSide({ refs, value: null, side: "output" }))).toEqual([CALLER]);
     });
   });
 
@@ -62,12 +54,8 @@ describe("turnMediaForSide", () => {
     ]);
 
     it("walks the payload and splits it by the role each part sat under", () => {
-      expect(urls(turnMediaForSide({ refs: undefined, value, side: "input" }))).toEqual([
-        CALLER,
-      ]);
-      expect(urls(turnMediaForSide({ refs: undefined, value, side: "output" }))).toEqual([
-        REPLY,
-      ]);
+      expect(urls(turnMediaForSide({ refs: undefined, value, side: "input" }))).toEqual([CALLER]);
+      expect(urls(turnMediaForSide({ refs: undefined, value, side: "output" }))).toEqual([REPLY]);
     });
 
     it("reaches media through a nested JSON string", () => {
@@ -81,9 +69,9 @@ describe("turnMediaForSide", () => {
         ]),
       });
 
-      expect(
-        urls(turnMediaForSide({ refs: undefined, value: nested, side: "input" })),
-      ).toEqual([CALLER]);
+      expect(urls(turnMediaForSide({ refs: undefined, value: nested, side: "input" }))).toEqual([
+        CALLER,
+      ]);
     });
   });
 
@@ -110,12 +98,8 @@ describe("turnMediaForSide", () => {
 
   describe("given a turn with no media at all", () => {
     it("returns nothing for either side", () => {
-      expect(
-        turnMediaForSide({ refs: [], value: "just text", side: "input" }),
-      ).toHaveLength(0);
-      expect(
-        turnMediaForSide({ refs: undefined, value: null, side: "output" }),
-      ).toHaveLength(0);
+      expect(turnMediaForSide({ refs: [], value: "just text", side: "input" })).toHaveLength(0);
+      expect(turnMediaForSide({ refs: undefined, value: null, side: "output" })).toHaveLength(0);
     });
   });
 });

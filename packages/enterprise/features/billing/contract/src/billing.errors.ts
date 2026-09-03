@@ -284,11 +284,11 @@ export class SubscriptionRecordNotFoundError extends HandledError {
   declare readonly code: "subscription_sync_failed";
 
   constructor(identifier: string) {
-    super(
-      "subscription_sync_failed",
-      "No subscription record matches this billing event",
-      { httpStatus: 500, fault: "platform", meta: { identifier } },
-    );
+    super("subscription_sync_failed", "No subscription record matches this billing event", {
+      httpStatus: 500,
+      fault: "platform",
+      meta: { identifier },
+    });
     this.name = "SubscriptionRecordNotFoundError";
   }
 }
@@ -353,11 +353,10 @@ export class BillingCustomerDeletedError extends HandledError {
   declare readonly code: "billing_customer_deleted";
 
   constructor() {
-    super(
-      "billing_customer_deleted",
-      "This account's billing profile is no longer active",
-      { httpStatus: 409, fault: "platform" },
-    );
+    super("billing_customer_deleted", "This account's billing profile is no longer active", {
+      httpStatus: 409,
+      fault: "platform",
+    });
     this.name = "BillingCustomerDeletedError";
   }
 }

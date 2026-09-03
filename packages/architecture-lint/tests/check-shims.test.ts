@@ -130,9 +130,7 @@ describe("check-queue bin shims", () => {
     describe("when the run walks the whole project", () => {
       /** @scenario "A whole-project run counts however it was started" */
       it("counts a --project run", () => {
-        expect(counted({ name: "tsgo", args: ["--noEmit", "-p", "tsconfig.json"] })).toBe(
-          true,
-        );
+        expect(counted({ name: "tsgo", args: ["--noEmit", "-p", "tsconfig.json"] })).toBe(true);
         expect(
           counted({
             name: "tsgo",
@@ -181,9 +179,7 @@ describe("check-queue bin shims", () => {
       it("does not count a watch or a language server", () => {
         expect(counted({ name: "tsgo", args: ["--watch"] })).toBe(false);
         expect(counted({ name: "tsgo", args: ["--lsp"] })).toBe(false);
-        expect(counted({ name: "tsgo", args: ["-p", "tsconfig.json", "--watch"] })).toBe(
-          false,
-        );
+        expect(counted({ name: "tsgo", args: ["-p", "tsconfig.json", "--watch"] })).toBe(false);
       });
     });
   });
@@ -197,9 +193,9 @@ describe("check-queue bin shims", () => {
     describe("when it runs on either route", () => {
       /** @scenario "The tool behaves the same either way" */
       it("passes arguments through unchanged", () => {
-        expect(
-          runCheck({ name: "tsgo", args: ["--noEmit", "-p", "tsconfig.json"] }).stdout,
-        ).toBe("real --noEmit -p tsconfig.json\n");
+        expect(runCheck({ name: "tsgo", args: ["--noEmit", "-p", "tsconfig.json"] }).stdout).toBe(
+          "real --noEmit -p tsconfig.json\n",
+        );
         writeFileSync(path.join(scratch, "foo.ts"), "export {};", "utf8");
         expect(runCheck({ name: "tsgo", args: ["--noEmit", "foo.ts"] }).stdout).toBe(
           "real --noEmit foo.ts\n",
@@ -225,9 +221,7 @@ describe("check-queue bin shims", () => {
         expect(readFileSync(path.join(binDir, "tsgo"), "utf8")).toBe(shimmed);
         // The launcher was not swallowed by a second round of renaming.
         expect(readFileSync(path.join(binDir, "tsgo.real"), "utf8")).toBe(LAUNCHER);
-        expect(runCheck({ name: "tsgo", args: ["--noEmit"] }).stdout).toBe(
-          "real --noEmit\n",
-        );
+        expect(runCheck({ name: "tsgo", args: ["--noEmit"] }).stdout).toBe("real --noEmit\n");
       });
 
       /** @scenario "A fresh install restores the counting pnpm overwrote" */
@@ -235,9 +229,7 @@ describe("check-queue bin shims", () => {
         // What `pnpm install` does: the bin entry is replaced by a fresh
         // launcher, leaving the previous .real behind.
         writeLauncher("tsgo");
-        expect(runCheck({ name: "tsgo", args: ["--noEmit"] }).stdout).toBe(
-          "real --noEmit\n",
-        );
+        expect(runCheck({ name: "tsgo", args: ["--noEmit"] }).stdout).toBe("real --noEmit\n");
 
         install();
 
@@ -245,9 +237,7 @@ describe("check-queue bin shims", () => {
           "langwatch-check-queue-shim",
         );
         expect(existsSync(path.join(binDir, "tsgo.real"))).toBe(true);
-        expect(runCheck({ name: "tsgo", args: ["--noEmit"] }).stdout).toBe(
-          "real --noEmit\n",
-        );
+        expect(runCheck({ name: "tsgo", args: ["--noEmit"] }).stdout).toBe("real --noEmit\n");
       });
 
       /** @scenario "An earlier version of the routing is brought up to date" */
@@ -269,9 +259,7 @@ describe("check-queue bin shims", () => {
         // The launcher must not end up buried under the replacement: the old
         // shim was standing in for it, not holding it.
         expect(readFileSync(path.join(binDir, "tsgo.real"), "utf8")).toBe(LAUNCHER);
-        expect(runCheck({ name: "tsgo", args: ["--noEmit"] }).stdout).toBe(
-          "real --noEmit\n",
-        );
+        expect(runCheck({ name: "tsgo", args: ["--noEmit"] }).stdout).toBe("real --noEmit\n");
       });
     });
   });
@@ -294,9 +282,7 @@ describe("check-queue bin shims", () => {
         expect(result.status).toBe(0);
         expect(result.stderr).toContain("could not shim tsgo");
         // The bin entry is the thing that must survive.
-        expect(runCheck({ name: "tsgo", args: ["--noEmit"] }).stdout).toBe(
-          "real --noEmit\n",
-        );
+        expect(runCheck({ name: "tsgo", args: ["--noEmit"] }).stdout).toBe("real --noEmit\n");
         expect(existsSync(path.join(binDir, "tsgo.shim-staging"))).toBe(false);
       },
     );

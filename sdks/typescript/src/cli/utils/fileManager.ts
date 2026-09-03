@@ -2,12 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import chalk from "chalk";
-import type {
-  PromptsConfig,
-  LocalPromptConfig,
-  MaterializedPrompt,
-  PromptsLock,
-} from "../types";
+import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock } from "../types";
 import { localPromptConfigSchema } from "../types-prompt";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptFileNotFoundError } from "./errors/prompt-not-found.error";
@@ -133,9 +128,7 @@ export class FileManager {
       const content = fs.readFileSync(configPath, "utf-8");
       return JSON.parse(content) as PromptsConfig;
     } catch (error) {
-      throw new Error(
-        `Failed to parse prompts.json: ${formatApiErrorMessage({ error })}`,
-      );
+      throw new Error(`Failed to parse prompts.json: ${formatApiErrorMessage({ error })}`);
     }
   }
 
@@ -171,9 +164,7 @@ export class FileManager {
       const content = fs.readFileSync(lockPath, "utf-8");
       return JSON.parse(content) as PromptsLock;
     } catch (error) {
-      throw new Error(
-        `Failed to parse prompts-lock.json: ${formatApiErrorMessage({ error })}`,
-      );
+      throw new Error(`Failed to parse prompts-lock.json: ${formatApiErrorMessage({ error })}`);
     }
   };
 
@@ -228,10 +219,7 @@ export class FileManager {
 
       return result.data;
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.message.includes("Invalid prompt configuration")
-      ) {
+      if (error instanceof Error && error.message.includes("Invalid prompt configuration")) {
         throw error; // Re-throw zod validation errors as-is
       }
       throw new Error(
@@ -392,9 +380,7 @@ export class FileManager {
     }
 
     // Add entry to .gitignore
-    const newContent = content.endsWith("\n")
-      ? `${content}${entry}\n`
-      : `${content}\n${entry}\n`;
+    const newContent = content.endsWith("\n") ? `${content}${entry}\n` : `${content}\n${entry}\n`;
     fs.writeFileSync(gitignorePath, newContent);
 
     return { added: true, existed: false };

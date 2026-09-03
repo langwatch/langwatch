@@ -60,9 +60,7 @@ describe.skipIf(!DB_URL)(
 
     connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
-    }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }),
-    );
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
     membershipRepository = PrismaOrganizationMembershipRepository.create({
       database: prisma,
@@ -80,9 +78,7 @@ describe.skipIf(!DB_URL)(
       return user;
     }
 
-    async function createOrg(params: {
-      primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
-    }) {
+    async function createOrg(params: { primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS" | null }) {
       const user = await createUser();
       const suffix = nanoid(6).toLowerCase();
       const result = await membershipRepository.createAndAssign({
@@ -187,9 +183,7 @@ describe.skipIf(!DB_URL)(
         const legacy = await createOrg({});
 
         for (const result of [governance, llmops, legacy]) {
-          expect(Object.keys(result).sort()).toEqual(
-            Object.keys(governance).sort(),
-          );
+          expect(Object.keys(result).sort()).toEqual(Object.keys(governance).sort());
           expect(result.organization).toEqual(
             expect.objectContaining({
               id: expect.any(String),

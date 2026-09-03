@@ -39,10 +39,7 @@ export class IngestionPullRunStatusProjection {
     };
   }
 
-  fold(
-    state: IngestionPullRunStatus,
-    event: IngestionPullProcessingEvent,
-  ): IngestionPullRunStatus {
+  fold(state: IngestionPullRunStatus, event: IngestionPullProcessingEvent): IngestionPullRunStatus {
     switch (event.type) {
       case INGESTION_PULL_EVENT_TYPES.CONFIGURED:
         return {

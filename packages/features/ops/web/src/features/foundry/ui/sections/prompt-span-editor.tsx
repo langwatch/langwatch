@@ -15,13 +15,7 @@ export function PromptSpanEditor({ span }: { span: SpanConfig }) {
   const entries = Object.entries(variables);
 
   return (
-    <Box
-      rounded="lg"
-      border="1px solid"
-      borderColor="yellow.500/20"
-      bg="yellow.500/5"
-      p={4}
-    >
+    <Box rounded="lg" border="1px solid" borderColor="yellow.500/20" bg="yellow.500/5" p={4}>
       <Text fontSize="sm" fontWeight="semibold" color="yellow.400" mb={3}>
         Prompt Configuration
       </Text>

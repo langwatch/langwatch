@@ -71,10 +71,7 @@ export class StripeCustomerCurrencyService {
     // record but refuses to attach anything to it, so no currency makes this
     // checkout work — recovering the stored id belongs in its own audited flow.
     if (customer.deleted) {
-      logger.warn(
-        { organizationId },
-        "[billing] Stored billing customer no longer exists",
-      );
+      logger.warn({ organizationId }, "[billing] Stored billing customer no longer exists");
       return { status: "deleted" };
     }
 

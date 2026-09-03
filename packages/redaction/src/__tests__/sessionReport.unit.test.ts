@@ -95,12 +95,8 @@ describe("redactReportText", () => {
     });
 
     it("redacts punctuated national phone numbers", () => {
-      expect(redactReportText({ text: "tel (415) 555-2671." }).text).toBe(
-        "tel [PHONE_NUMBER].",
-      );
-      expect(redactReportText({ text: "tel 415-555-2671." }).text).toBe(
-        "tel [PHONE_NUMBER].",
-      );
+      expect(redactReportText({ text: "tel (415) 555-2671." }).text).toBe("tel [PHONE_NUMBER].");
+      expect(redactReportText({ text: "tel 415-555-2671." }).text).toBe("tel [PHONE_NUMBER].");
     });
 
     it("redacts Luhn-valid card numbers, formatted or bare", () => {
@@ -121,8 +117,7 @@ describe("redactReportText", () => {
   describe("when the text contains debugging data that only looks sensitive", () => {
     /** @scenario "Loopback and private network addresses stay readable" */
     it("keeps loopback and private addresses", () => {
-      const text =
-        "listening on 127.0.0.1:5560, lan 192.168.1.5, vpc 10.0.0.3, docker 172.17.0.2";
+      const text = "listening on 127.0.0.1:5560, lan 192.168.1.5, vpc 10.0.0.3, docker 172.17.0.2";
       expect(redactReportText({ text }).text).toBe(text);
     });
 
@@ -181,9 +176,7 @@ describe("redactSessionJsonl", () => {
         }),
       ].join("\n");
       const result = redactSessionJsonl({ jsonl });
-      const lines = result.text
-        .split("\n")
-        .map((l) => JSON.parse(l) as { content: string });
+      const lines = result.text.split("\n").map((l) => JSON.parse(l) as { content: string });
       expect(lines[0]?.content).toBe("my key is [SECRET]");
       expect(lines[1]?.content).toBe("ok, email [EMAIL_ADDRESS]");
       expect(result.redactedCount).toBe(2);

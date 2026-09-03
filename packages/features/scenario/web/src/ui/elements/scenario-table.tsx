@@ -14,13 +14,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Archive, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
-import {
-  useMemo,
-  useState,
-  type CSSProperties,
-  type ReactElement,
-  type ReactNode,
-} from "react";
+import { useMemo, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import type { ScenarioListItem } from "../../model/scenario-list.types";
 
 export type ScenarioTableProps = {
@@ -51,9 +45,7 @@ const labelsFilterFn: FilterFn<ScenarioListItem> = (row, columnId, filterValue) 
   const activeLabels = Array.isArray(filterValue)
     ? filterValue.filter((value): value is string => typeof value === "string")
     : [];
-  return (
-    activeLabels.length === 0 || activeLabels.some((label) => labels.includes(label))
-  );
+  return activeLabels.length === 0 || activeLabels.some((label) => labels.includes(label));
 };
 
 export function ScenarioTable({

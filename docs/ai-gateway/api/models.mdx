@@ -62,10 +62,10 @@ OpenAI-shape `list` object:
 A discovered model from a provider that has a [routing handle](/ai-gateway/model-naming#routing-handles) is listed under the handle-qualified id, for example `europe/claude-sonnet-5`. That is the name that reaches that exact provider, so two providers of the same type keep separate entries instead of collapsing into one. `owned_by` stays the provider type in both entries, because it is what a picker groups by.
 
 <Note>
-  The list is deliberately permissive, it covers everything the VK could plausibly route,
-  not a strict enumeration. `models_allowed` globs and provider shortcuts may not expand
-  to real upstream models until you send a real request. The gateway's per-request model
-  resolution remains the source of truth for "will this actually route?"
+  The list is deliberately permissive, it covers everything the VK could plausibly route, not a
+  strict enumeration. `models_allowed` globs and provider shortcuts may not expand to real upstream
+  models until you send a real request. The gateway's per-request model resolution remains the
+  source of truth for "will this actually route?"
 </Note>
 
 ## Permissions

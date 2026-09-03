@@ -64,9 +64,7 @@ describe("given the Cadence section of the composer", () => {
       renderField({ sourceType: "anthropic_admin", initialValue: "" });
       const frequency = screen.getByLabelText<HTMLSelectElement>("Frequency");
       expect(frequency.value).toBe("hourly");
-      expect(
-        screen.getByText("Checks for new activity every hour, on the hour"),
-      ).toBeTruthy();
+      expect(screen.getByText("Checks for new activity every hour, on the hour")).toBeTruthy();
     });
 
     it("renders nothing for a source that has no pull schedule", () => {
@@ -87,9 +85,7 @@ describe("given the Cadence section of the composer", () => {
       const user = userEvent.setup();
       await user.selectOptions(screen.getByLabelText("Frequency"), "hourly");
       expect(onChangeSpy).toHaveBeenLastCalledWith("0 * * * *");
-      expect(
-        screen.getByText("Checks for new activity every hour, on the hour"),
-      ).toBeTruthy();
+      expect(screen.getByText("Checks for new activity every hour, on the hour")).toBeTruthy();
     });
 
     /** @scenario "Leaving the cadence untouched keeps the recommended schedule" */

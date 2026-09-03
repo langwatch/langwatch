@@ -98,7 +98,11 @@ export function createDatasetDirectUploadAuthorizer(options: {
       if (isCrossSiteRequest(c)) {
         return { ok: false, status: 403, error: "Cross-site request blocked." };
       }
-      const permitted = await session.permitted({ session: person, projectId, permission: PERMISSION });
+      const permitted = await session.permitted({
+        session: person,
+        projectId,
+        permission: PERMISSION,
+      });
       if (!permitted) {
         return {
           ok: false,

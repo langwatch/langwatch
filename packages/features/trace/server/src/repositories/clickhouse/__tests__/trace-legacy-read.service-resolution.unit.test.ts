@@ -34,8 +34,7 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
  * repository takes the resolver instead, so the fake is stated where every
  * other dependency of the read is.
  */
-const testResolveClickHouseClient = () =>
-  Promise.resolve({ query: mockClickHouseQuery } as never);
+const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
 // Stub the filter module to return empty conditions
 vi.mock("~/server/filters/clickhouse", () => ({
@@ -228,7 +227,7 @@ describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => 
           setupGetTracesWithSpansMocks("trace-1", "span-1");
 
           const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+            resolveClickHouseClient: testResolveClickHouseClient,
             prisma: { project: { findUnique: vi.fn() } } as never,
             resolveTraceSpans: resolveTraceSpansFn,
             traceCanonicalisation,

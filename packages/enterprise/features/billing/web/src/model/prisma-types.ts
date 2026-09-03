@@ -24,8 +24,7 @@ export const OrganizationUserRole = {
   MEMBER: "MEMBER",
   EXTERNAL: "EXTERNAL",
 } as const;
-export type OrganizationUserRole =
-  (typeof OrganizationUserRole)[keyof typeof OrganizationUserRole];
+export type OrganizationUserRole = (typeof OrganizationUserRole)[keyof typeof OrganizationUserRole];
 
 export const TeamUserRole = {
   ADMIN: "ADMIN",

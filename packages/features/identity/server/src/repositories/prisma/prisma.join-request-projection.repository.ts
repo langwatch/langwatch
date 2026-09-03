@@ -27,9 +27,7 @@ import type {
  * it is a value the next event or the next replay overwrites — which is why
  * every answer an admin gives goes through a command.
  */
-export class PrismaJoinRequestProjectionRepository
-  implements StateProjectionStore<JoinRequestFoldState>
-{
+export class PrismaJoinRequestProjectionRepository implements StateProjectionStore<JoinRequestFoldState> {
   constructor(private readonly prisma: PrismaClient) {}
 
   async tryLoad(
@@ -70,10 +68,8 @@ export class PrismaJoinRequestProjectionRepository
       domain: state.domain,
       state: state.state,
       matchedVia: state.matchedVia,
-      expiresAt:
-        state.expiresAtMs === null ? null : new Date(state.expiresAtMs),
-      resolvedAt:
-        state.resolvedAtMs === null ? null : new Date(state.resolvedAtMs),
+      expiresAt: state.expiresAtMs === null ? null : new Date(state.expiresAtMs),
+      resolvedAt: state.resolvedAtMs === null ? null : new Date(state.resolvedAtMs),
       resolvedByType: state.resolvedByType,
       resolvedById: state.resolvedById,
       withdrawalCause: state.withdrawalCause,
@@ -114,7 +110,6 @@ export function rowToJoinRequest(row: JoinRequest): JoinRequestAggregateState {
     resolvedAtMs: row.resolvedAt?.getTime() ?? null,
     resolvedByType: (row.resolvedByType as JoinResolverType | null) ?? null,
     resolvedById: row.resolvedById,
-    withdrawalCause:
-      (row.withdrawalCause as JoinWithdrawalCause | null) ?? null,
+    withdrawalCause: (row.withdrawalCause as JoinWithdrawalCause | null) ?? null,
   };
 }

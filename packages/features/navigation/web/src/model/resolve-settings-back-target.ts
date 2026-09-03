@@ -75,9 +75,7 @@ function readCapturedReturn(): CapturedReturn | null {
  * user is in. An organization switch inside Settings makes the captured
  * project address belong to somewhere else, so it is dropped.
  */
-function targetFromCapturedPath(
-  currentOrganizationId: string | null,
-): SettingsBackTarget | null {
+function targetFromCapturedPath(currentOrganizationId: string | null): SettingsBackTarget | null {
   const captured = readCapturedReturn();
   if (!captured) return null;
   if (captured.organizationId !== currentOrganizationId) return null;

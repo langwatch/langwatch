@@ -106,10 +106,7 @@ function VirtualKeysPage() {
 
   const utils = api.useUtils();
   const orgId = organization?.id ?? "";
-  const listQuery = api.virtualKeys.list.useQuery(
-    { organizationId: orgId },
-    { enabled: !!orgId },
-  );
+  const listQuery = api.virtualKeys.list.useQuery({ organizationId: orgId }, { enabled: !!orgId });
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId },
@@ -190,14 +187,8 @@ function VirtualKeysPage() {
   // and it used to appear in neither tab, which left the only route to it a
   // link somebody had kept. Revoked is the one terminal state, so it keeps
   // its own tab.
-  const activeRows = useMemo(
-    () => allRows.filter((vk) => vk.status !== "revoked"),
-    [allRows],
-  );
-  const revokedRows = useMemo(
-    () => allRows.filter((vk) => vk.status === "revoked"),
-    [allRows],
-  );
+  const activeRows = useMemo(() => allRows.filter((vk) => vk.status !== "revoked"), [allRows]);
+  const revokedRows = useMemo(() => allRows.filter((vk) => vk.status === "revoked"), [allRows]);
   const rows = statusTab === "active" ? activeRows : revokedRows;
 
   // Keys whose traces can actually be opened. A key missing from this map
@@ -280,15 +271,11 @@ function VirtualKeysPage() {
                   </EmptyState.Indicator>
                   <EmptyState.Title>No virtual keys yet</EmptyState.Title>
                   <EmptyState.Description>
-                    Mint your first virtual key to route requests through the LangWatch AI
-                    Gateway with budgets, guardrails, and per-tenant tracing attached.
+                    Mint your first virtual key to route requests through the LangWatch AI Gateway
+                    with budgets, guardrails, and per-tenant tracing attached.
                   </EmptyState.Description>
                   {canCreate && (
-                    <Button
-                      colorPalette="orange"
-                      onClick={() => setCreateOpen(true)}
-                      mt={2}
-                    >
+                    <Button colorPalette="orange" onClick={() => setCreateOpen(true)} mt={2}>
                       <Plus size={14} /> New virtual key
                     </Button>
                   )}
@@ -367,17 +354,12 @@ function VirtualKeysPage() {
                             key={vk.id}
                             cursor="pointer"
                             _hover={{ bg: "bg.subtle" }}
-                            onClick={() =>
-                              void router.push(`/gateway/virtual-keys/${vk.id}`)
-                            }
+                            onClick={() => void router.push(`/gateway/virtual-keys/${vk.id}`)}
                           >
                             <Table.Cell>
                               <VStack align="start" gap={1}>
                                 <HStack gap={2} align="center">
-                                  <Link
-                                    href={`/gateway/virtual-keys/${vk.id}`}
-                                    fontWeight="medium"
-                                  >
+                                  <Link href={`/gateway/virtual-keys/${vk.id}`} fontWeight="medium">
                                     {vk.name}
                                   </Link>
                                 </HStack>
@@ -446,8 +428,7 @@ function VirtualKeysPage() {
                             <Table.Cell>
                               {vk.routingPolicyId ? (
                                 <Badge variant="subtle" colorPalette="purple">
-                                  {policyNameById.get(vk.routingPolicyId) ??
-                                    vk.routingPolicyId}
+                                  {policyNameById.get(vk.routingPolicyId) ?? vk.routingPolicyId}
                                 </Badge>
                               ) : vk.routingMode === "FALLBACK_ALL" ? (
                                 <Text fontSize="xs" color="fg.muted">
@@ -490,9 +471,7 @@ function VirtualKeysPage() {
                                         ? "…"
                                         : spendQuery.isError
                                           ? "n/a"
-                                          : formatBudgetUsd(
-                                              spendByKeyId.get(vk.id) ?? "0",
-                                            )}
+                                          : formatBudgetUsd(spendByKeyId.get(vk.id) ?? "0")}
                                     </Text>
                                     <Box
                                       as="span"
@@ -513,9 +492,7 @@ function VirtualKeysPage() {
                             </Table.Cell>
                             <Table.Cell>
                               {vk.lastUsedAt ? (
-                                <Tooltip
-                                  content={new Date(vk.lastUsedAt).toLocaleString()}
-                                >
+                                <Tooltip content={new Date(vk.lastUsedAt).toLocaleString()}>
                                   <Text fontSize="sm">
                                     {formatTimeAgo(new Date(vk.lastUsedAt).getTime())}
                                   </Text>
@@ -526,18 +503,11 @@ function VirtualKeysPage() {
                                 </Text>
                               )}
                             </Table.Cell>
-                            <Table.Cell
-                              onClick={(e) => e.stopPropagation()}
-                              cursor="default"
-                            >
+                            <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
                               {vk.status !== "revoked" && (
                                 <Menu.Root>
                                   <Menu.Trigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="xs"
-                                      aria-label="Actions"
-                                    >
+                                    <Button variant="ghost" size="xs" aria-label="Actions">
                                       <MoreVertical size={14} />
                                     </Button>
                                   </Menu.Trigger>
@@ -567,10 +537,7 @@ function VirtualKeysPage() {
                                         key to be live. Its detail page has
                                         the Enable button. */}
                                     {canUpdate && vk.status === "active" && (
-                                      <Menu.Item
-                                        value="edit"
-                                        onClick={() => setEditing(vk)}
-                                      >
+                                      <Menu.Item value="edit" onClick={() => setEditing(vk)}>
                                         <Pencil size={14} /> Edit
                                       </Menu.Item>
                                     )}
@@ -705,8 +672,7 @@ function GatewayCapabilityPreview() {
       icon: <Gauge size={14} />,
       label: "Rate limits",
       defaultValue: "unlimited",
-      detail:
-        "Per-VK RPM and RPD. 429 + Retry-After emitted by the gateway when exceeded.",
+      detail: "Per-VK RPM and RPD. 429 + Retry-After emitted by the gateway when exceeded.",
     },
   ];
   return (

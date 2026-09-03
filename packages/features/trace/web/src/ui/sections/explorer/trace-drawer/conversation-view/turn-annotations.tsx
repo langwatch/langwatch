@@ -8,12 +8,12 @@ import { useDrawer } from "../../../../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import { api, type RouterOutputs } from "../../../trace-api";
 import { isSessionMarked, useAnnotationQueueSessionStore } from "../../../../../index";
-import {
-  openTraceEditorFromConversation,
-  tracePartitionHint,
-} from "../../utils/trace-edit-mode";
+import { openTraceEditorFromConversation, tracePartitionHint } from "../../utils/trace-edit-mode";
 import { AnnotationPopover } from "./annotation-popover";
-import { HoverActionButton, HoverActionCluster } from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster";
+import {
+  HoverActionButton,
+  HoverActionCluster,
+} from "../../../../elements/explorer/trace-drawer/conversation-view/hover-action-cluster";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
 
@@ -65,9 +65,7 @@ export function TurnEditTraceAction({
  * annotated and thought better of.
  */
 export function TurnSessionCheckbox({ traceId }: { traceId: string }) {
-  const isMarked = useAnnotationQueueSessionStore((s) =>
-    isSessionMarked(s.marks, traceId),
-  );
+  const isMarked = useAnnotationQueueSessionStore((s) => isSessionMarked(s.marks, traceId));
   const toggle = useAnnotationQueueSessionStore((s) => s.toggle);
 
   return (
@@ -114,10 +112,7 @@ export function TurnAnnotationBadges({
   const annotations = api.annotation.getByTraceId.useQuery(
     { projectId: project?.id ?? "", traceId, anchor: "trace" },
     {
-      enabled:
-        !!project?.id &&
-        hasPermission("annotations:view") &&
-        prefetchedItems === undefined,
+      enabled: !!project?.id && hasPermission("annotations:view") && prefetchedItems === undefined,
     },
   );
 
@@ -164,11 +159,7 @@ export function TurnAnnotationBadges({
           {hasCorrection && <Icon as={Lightbulb} boxSize={3} color="yellow.fg" />}
         </Button>
       </Popover.Trigger>
-      <Popover.Content
-        width="320px"
-        bg="bg.panel/92"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <Popover.Content width="320px" bg="bg.panel/92" onClick={(e) => e.stopPropagation()}>
         <Popover.Arrow />
         <Popover.Body padding={1.5}>
           <VStack align="stretch" gap={0.5}>
@@ -266,9 +257,7 @@ function AnnotationListRowSummary({ annotation }: { annotation: AnnotationItem }
           <Text textStyle="2xs" fontWeight="600">
             {annotation.user?.name ?? annotation.email ?? "anonymous"}
           </Text>
-          {annotation.expectedOutput && (
-            <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />
-          )}
+          {annotation.expectedOutput && <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />}
           <Box flex={1} />
           <Text textStyle="2xs" color="fg.subtle">
             {new Date(annotation.createdAt).toLocaleDateString()}

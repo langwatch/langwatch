@@ -109,9 +109,7 @@ const traceProcessing = definePipeline({
 })
   .withCommand("recordSpan", RecordSpanCommand)
   .withClickHouseMapProjection(new SpanStorageMapProjection({ store: deps.spanStorage }))
-  .withClickHouseFoldProjection(
-    new TraceSummaryFoldProjection({ store: deps.traceSummary }),
-  )
+  .withClickHouseFoldProjection(new TraceSummaryFoldProjection({ store: deps.traceSummary }))
   .withPostgresProjection(new GrantsStateProjection({ store: deps.grants }))
   .build();
 ```

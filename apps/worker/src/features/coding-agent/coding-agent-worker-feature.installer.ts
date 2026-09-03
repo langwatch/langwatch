@@ -1,9 +1,6 @@
 import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
 import type { CodingAgentProcessingPipeline } from "@langwatch/coding-agent-server";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /**

@@ -16,7 +16,9 @@ const INTEGRATIONS_PAGE_PERMISSION = "organization:manage";
 
 export const githubPageLoaders: UiPageLoaderRegistry = {
   "pages/settings/integrations": uiPage({
-    screen: async () => ({ default: (await githubScreens.integrations()).default as ComponentType }),
+    screen: async () => ({
+      default: (await githubScreens.integrations()).default as ComponentType,
+    }),
     host: GithubHost,
     settingsLayout: true,
     permission: INTEGRATIONS_PAGE_PERMISSION,

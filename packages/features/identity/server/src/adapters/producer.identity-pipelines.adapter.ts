@@ -51,13 +51,22 @@ import type {
   SsoPlatformOperatorRepository,
 } from "../sso-connection.repository";
 import type { StateProjectionStore, StoredProjection } from "@langwatch/eventing";
-import { createIdentityPipeline, type IdentityPipeline } from "./identity-pipeline-definition.adapter";
+import {
+  createIdentityPipeline,
+  type IdentityPipeline,
+} from "./identity-pipeline-definition.adapter";
 import type { IdentityFoldState } from "../projections/identity-state.projection";
 import type { MfaFoldState } from "../projections/mfa-enrollment-state.projection";
-import { createJoinRequestPipeline, type JoinRequestPipeline } from "./join-request-pipeline-definition.adapter";
+import {
+  createJoinRequestPipeline,
+  type JoinRequestPipeline,
+} from "./join-request-pipeline-definition.adapter";
 import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process";
 import type { JoinRequestFoldState } from "../projections/join-request-state.projection";
-import { createScimSyncPipeline, type ScimSyncPipeline } from "./scim-sync-pipeline-definition.adapter";
+import {
+  createScimSyncPipeline,
+  type ScimSyncPipeline,
+} from "./scim-sync-pipeline-definition.adapter";
 import type { ScimSyncFoldState } from "../projections/scim-sync-state.projection";
 import { createSsoConnectionPipeline } from "./sso-connection-pipeline-definition.adapter";
 import type { ConnectionTeardownPort } from "../processes/connection-teardown.process";

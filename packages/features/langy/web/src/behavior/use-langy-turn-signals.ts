@@ -58,9 +58,7 @@ export function useLangyTurnSignals(_conversationId: string | null): LangyTurnSi
     progress,
     progressSample,
     metrics: null,
-    segment: progressSample
-      ? { index: progressSample.current, total: progressSample.total }
-      : null,
+    segment: progressSample ? { index: progressSample.current, total: progressSample.total } : null,
     reasoning,
     isCatchingUp: false,
   };

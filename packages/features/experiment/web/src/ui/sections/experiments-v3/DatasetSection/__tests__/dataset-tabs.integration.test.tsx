@@ -42,9 +42,7 @@ describe("DatasetTabs", () => {
         render(<DatasetTabs {...handlers} />, { wrapper: Wrapper });
 
         expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
-        expect(
-          screen.getByRole("button", { name: "Edit columns" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Edit columns" })).toBeInTheDocument();
       });
     });
 

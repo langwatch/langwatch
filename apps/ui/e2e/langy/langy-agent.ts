@@ -84,9 +84,7 @@ function getSessionCookie(): Promise<string> {
         // in chunks) can land on the auth rate limiter. That is the runner
         // being throttled, not a scenario failing: wait out the window.
         if (res.status !== 429 || attempt >= 6) break;
-        console.log(
-          `[scenario] sign-in rate-limited (429), waiting 20s (attempt ${attempt})`,
-        );
+        console.log(`[scenario] sign-in rate-limited (429), waiting 20s (attempt ${attempt})`);
         await new Promise((resolve) => setTimeout(resolve, 20_000));
       }
       if (!res.ok) {
@@ -232,9 +230,7 @@ async function trpcMutateWithTurnLockRetry<T>({
 export function isTransientInfrastructureError(error: unknown): boolean {
   let current: unknown = error;
   for (let hops = 0; current && hops < 8; hops++) {
-    if (
-      (current as { transientInfrastructure?: boolean }).transientInfrastructure === true
-    ) {
+    if ((current as { transientInfrastructure?: boolean }).transientInfrastructure === true) {
       return true;
     }
     current = (current as { cause?: unknown }).cause;
@@ -276,9 +272,7 @@ function parseHandledStreamError(entry: {
   if (typeof code !== "string") return null;
   return {
     code,
-    tips: Array.isArray(tips)
-      ? tips.filter((tip): tip is string => typeof tip === "string")
-      : [],
+    tips: Array.isArray(tips) ? tips.filter((tip): tip is string => typeof tip === "string") : [],
   };
 }
 
@@ -436,8 +430,7 @@ async function streamTurnText({
           // that shape: a langy-card block is the rubric's marker for the
           // product's own UI, not Langy's prose.
           const installCard = `\`\`\`langy-card\n${
-            parsed.tips[0] ??
-            "The LangWatch GitHub App is not installed for this project."
+            parsed.tips[0] ?? "The LangWatch GitHub App is not installed for this project."
           }\n\`\`\``;
           // Both buffers: the fold below returns textAfterLastTool whenever a
           // tool ran and that buffer is non-empty, so a card appended to
@@ -507,8 +500,7 @@ async function streamTurnText({
   }
   // Whitespace is truthy, so a turn whose only deltas were blank lines would
   // otherwise be handed to the judge as a reply the user cannot see.
-  if (assistantText.trim())
-    return { text: assistantText, hasEndedOnText: !sawTool };
+  if (assistantText.trim()) return { text: assistantText, hasEndedOnText: !sawTool };
 
   // No text. WHICH no-text this is decides whether a judge should ever see it,
   // and the two used to be indistinguishable behind a literal "(no response)"
@@ -534,9 +526,7 @@ async function streamTurnText({
 }
 
 /** One thing a turn did, in the order it did it. */
-type TurnSegment =
-  | { kind: "text"; narration: string }
-  | { kind: "tool"; call: SettledToolCall };
+type TurnSegment = { kind: "text"; narration: string } | { kind: "tool"; call: SettledToolCall };
 
 /**
  * The turn as the scenario framework receives it: what Langy wrote and what it

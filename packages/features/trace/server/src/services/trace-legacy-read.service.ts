@@ -67,9 +67,7 @@ export class AmbiguousTraceIdPrefixError extends Error {
     public readonly prefix: string,
     public readonly candidateTraceIds: string[],
   ) {
-    const preview = candidateTraceIds
-      .slice(0, TRACE_ID_PREFIX_CANDIDATE_LIMIT)
-      .join(", ");
+    const preview = candidateTraceIds.slice(0, TRACE_ID_PREFIX_CANDIDATE_LIMIT).join(", ");
     const suffix =
       candidateTraceIds.length > TRACE_ID_PREFIX_CANDIDATE_LIMIT
         ? `, …${candidateTraceIds.length - TRACE_ID_PREFIX_CANDIDATE_LIMIT} more`
@@ -234,7 +232,7 @@ export class TraceService {
     this.injectedLogRecordStorage = logRecordStorage;
   }
 
-/**
+  /**
    * The log-record store for read-time Claude Code content enrichment.
    *
    * Required rather than resolved from a process singleton: the platform app
@@ -259,9 +257,7 @@ export class TraceService {
    * never touches Postgres for the overlay table.
    */
   private editOverlayService(): TraceEditOverlayService {
-    return (this.cachedEditOverlayService ??= TraceEditOverlayService.create(
-      this.prisma,
-    ));
+    return (this.cachedEditOverlayService ??= TraceEditOverlayService.create(this.prisma));
   }
 
   /**
@@ -479,10 +475,7 @@ export class TraceService {
    * project that never uses a coding assistant never touches the log store.
    * Best-effort per trace.
    */
-  private async enrichCodingAgentTraces(
-    projectId: string,
-    traces: Trace[],
-  ): Promise<Trace[]> {
+  private async enrichCodingAgentTraces(projectId: string, traces: Trace[]): Promise<Trace[]> {
     const hasCodingAgentTrace = traces.some(
       (trace) => trace.metadata?.["langwatch.origin"] === CODING_AGENT_ORIGIN,
     );
@@ -787,9 +780,7 @@ export class TraceService {
    * @param input - Filter parameters including projectId and date range
    * @returns CustomersAndLabelsResult with unique customer IDs and labels
    */
-  async getCustomersAndLabels(
-    input: AggregationFiltersInput,
-  ): Promise<CustomersAndLabelsResult> {
+  async getCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult> {
     return this.tracer.withActiveSpan(
       "TraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
@@ -816,11 +807,7 @@ export class TraceService {
       "TraceService.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
       async () => {
-        return this.clickHouseService.getDistinctFieldNames(
-          projectId,
-          startDate,
-          endDate,
-        );
+        return this.clickHouseService.getDistinctFieldNames(projectId, startDate, endDate);
       },
     );
   }

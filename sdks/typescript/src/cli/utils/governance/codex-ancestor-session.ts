@@ -69,11 +69,8 @@ function runCommand({
   timeoutMs: number;
 }): Promise<string> {
   return new Promise((resolve) => {
-    execFile(
-      file,
-      args,
-      { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 },
-      (error, stdout) => resolve(error ? "" : stdout),
+    execFile(file, args, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) =>
+      resolve(error ? "" : stdout),
     );
   });
 }
@@ -158,10 +155,7 @@ export async function readSymlinkedPaths({
 }
 
 /** `/proc/<pid>/fd` on linux, `lsof -Fn` everywhere else. */
-async function readOpenFiles(
-  pid: number,
-  timeoutMs: number,
-): Promise<string[]> {
+async function readOpenFiles(pid: number, timeoutMs: number): Promise<string[]> {
   if (isLinux) {
     return readSymlinkedPaths({ dir: `/proc/${pid}/fd`, timeoutMs });
   }
@@ -185,13 +179,7 @@ export const systemAncestorProbe: AncestorProbe = {
 };
 
 /** Whether a path sits inside a directory, symlink games and `..` resolved. */
-function isInside({
-  root,
-  candidate,
-}: {
-  root: string;
-  candidate: string;
-}): boolean {
+function isInside({ root, candidate }: { root: string; candidate: string }): boolean {
   const resolvedRoot = resolve(root);
   const resolvedCandidate = resolve(candidate);
   return (
@@ -231,10 +219,7 @@ export async function resolveCodexSessionFromAncestors({
 
     let openFiles: string[] = [];
     try {
-      openFiles = await probe.openFilesOf(
-        pid,
-        Math.min(OPEN_FILES_TIMEOUT_MS, remaining),
-      );
+      openFiles = await probe.openFilesOf(pid, Math.min(OPEN_FILES_TIMEOUT_MS, remaining));
     } catch {
       /* this ancestor does not answer: the next one still might */
     }

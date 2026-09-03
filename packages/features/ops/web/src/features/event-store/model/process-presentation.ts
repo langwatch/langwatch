@@ -4,10 +4,7 @@ import { formatTimeAgo } from "../../../model/ops-formatters";
 /** Anything the summary counted as wrong — decides row tinting. */
 export function hasFleetTrouble(row: ProcessFleetSummary): boolean {
   return (
-    row.deadMessages > 0 ||
-    row.lapsedLeases > 0 ||
-    row.overduePending > 0 ||
-    row.overdueWakes > 0
+    row.deadMessages > 0 || row.lapsedLeases > 0 || row.overduePending > 0 || row.overdueWakes > 0
   );
 }
 

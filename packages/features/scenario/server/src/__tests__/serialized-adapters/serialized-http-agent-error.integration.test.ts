@@ -17,16 +17,7 @@
 
 import http from "node:http";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { HttpAgentData } from "@langwatch/scenario-contract";
 import { createNativeHttpAgentAdapter } from "../support/test-scenario-http.port";
@@ -119,9 +110,7 @@ function collectEntries(logger: FakeLogger): Record<string, unknown>[] {
       entries.push({
         level,
         msg,
-        ...(typeof obj === "object" && obj !== null
-          ? (obj as Record<string, unknown>)
-          : {}),
+        ...(typeof obj === "object" && obj !== null ? (obj as Record<string, unknown>) : {}),
       });
     }
   }
@@ -464,9 +453,7 @@ describe("given an HTTP agent target pointed at a stub returning 200 (for diagno
         logger: loggerArg(logger),
       });
       await adapter.call(baseInput).catch(() => undefined);
-      const hasDuration = collectEntries(logger).some(
-        (e) => typeof e.durationMs === "number",
-      );
+      const hasDuration = collectEntries(logger).some((e) => typeof e.durationMs === "number");
       expect(hasDuration).toBe(true);
     });
 

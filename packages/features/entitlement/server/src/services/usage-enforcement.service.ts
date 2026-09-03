@@ -10,10 +10,7 @@ import {
   type UsageVolumeCounterPort,
 } from "../ports/usage-enforcement.ports";
 import { resolveUsageMeter } from "./usage-meter-policy.service";
-import {
-  buildLimitMessage,
-  type UsageDeployment,
-} from "./usage-limit-message.service";
+import { buildLimitMessage, type UsageDeployment } from "./usage-limit-message.service";
 
 const logger = createLogger("langwatch:usage");
 
@@ -91,8 +88,7 @@ export class UsageService {
   }
 
   async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {
-    const organizationId =
-      await this.organizations.tryGetOrganizationIdByTeamId({ teamId });
+    const organizationId = await this.organizations.tryGetOrganizationIdByTeamId({ teamId });
     if (!organizationId) {
       throw new OrganizationNotFoundForTeamError(teamId);
     }
@@ -146,11 +142,7 @@ export class UsageService {
    * Returns the resolved usage unit for the given organization.
    * Delegates to the cached meter decision.
    */
-  async getResolvedUsageUnit({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<UsageUnit> {
+  async getResolvedUsageUnit({ organizationId }: { organizationId: string }): Promise<UsageUnit> {
     const decision = await this.getCachedUsageMeterReading(organizationId);
     return decision.usageUnit;
   }
@@ -285,8 +277,7 @@ export class UsageService {
     organizationId: string,
     resolvedPlan?: PlanInfo,
   ): Promise<UsageMeterReading> {
-    const pricingModel =
-      await this.organizations.tryGetPricingModel(organizationId);
+    const pricingModel = await this.organizations.tryGetPricingModel(organizationId);
     const plan = resolvedPlan ?? (await this.planResolver(organizationId));
     const hasValidLicenseOverride = plan.planSource === "license";
 

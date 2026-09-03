@@ -195,10 +195,7 @@ function redactPiiPatterns(text: string): SessionRedactionResult {
   return { text: result, redactedCount };
 }
 
-function scrubEnvLiterals(
-  text: string,
-  envValues: readonly string[],
-): SessionRedactionResult {
+function scrubEnvLiterals(text: string, envValues: readonly string[]): SessionRedactionResult {
   let result = text;
   let redactedCount = 0;
   for (const value of envValues) {

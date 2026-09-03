@@ -7,10 +7,7 @@ import { RedactedField } from "../../../redacted-field";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { changedTraceMetadataKeys } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views";
-import {
-  RESERVED_INPUT_MEDIA_REFS,
-  RESERVED_OUTPUT_MEDIA_REFS,
-} from "@langwatch/trace-contract";
+import { RESERVED_INPUT_MEDIA_REFS, RESERVED_OUTPUT_MEDIA_REFS } from "@langwatch/trace-contract";
 import {
   mediaRefBelongsToSide,
   parseMediaRefs,
@@ -37,7 +34,10 @@ import { IOViewer } from "../io-viewer";
 import { PromptsPanel } from "../prompts-panel";
 import { ScopeBlock } from "../../../../elements/explorer/trace-drawer/scope-chip";
 import { AccordionShell, Section } from "./accordion-shell";
-import { EmptyHint, EmptySignalCard } from "../../../../blocks/explorer/trace-drawer/trace-accordions/empty-states";
+import {
+  EmptyHint,
+  EmptySignalCard,
+} from "../../../../blocks/explorer/trace-drawer/trace-accordions/empty-states";
 import { EventCard } from "./event-card";
 import { SectionFocusGlow } from "../../../../elements/explorer/trace-drawer/trace-accordions/section-focus-glow";
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence";
@@ -104,11 +104,7 @@ export function TraceSummaryAccordions({
   const hasAttributes = hasTraceAttributes || hasResourceAttributes;
   const hasScope = !!resources.scope?.name;
 
-  const {
-    rich: richEvals,
-    pendingCount,
-    isLoading: evalsLoading,
-  } = useTraceEvaluations();
+  const { rich: richEvals, pendingCount, isLoading: evalsLoading } = useTraceEvaluations();
 
   // What has been said about the trace's own parts: a count on each section
   // header, and the comments each metadata row carries.
@@ -188,14 +184,7 @@ export function TraceSummaryAccordions({
 
   const sections = useMemo(() => {
     const list: Array<
-      | "io"
-      | "prompts"
-      | "attributes"
-      | "scope"
-      | "evals"
-      | "events"
-      | "exceptions"
-      | "other"
+      "io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other"
     > = [];
     if (hasError && !hasIO) list.push("exceptions");
     list.push("io");
@@ -216,14 +205,7 @@ export function TraceSummaryAccordions({
     if (hasEventsContent) list.push("events");
     if (showOther) list.push("other");
     return list;
-  }, [
-    hasIO,
-    hasError,
-    trace.containsPrompt,
-    hasEvalsContent,
-    hasEventsContent,
-    showOther,
-  ]);
+  }, [hasIO, hasError, trace.containsPrompt, hasEvalsContent, hasEventsContent, showOther]);
 
   // Auto-open Metadata only when the trace has its own attributes — when
   // only resource attributes are present (which is most of the time on
@@ -304,18 +286,10 @@ export function TraceSummaryAccordions({
                     ) : trace.input ? (
                       inputCorrected ? (
                         <CorrectedFieldFrame label="Input" original={capturedInput}>
-                          <IOViewer
-                            label="Input"
-                            content={trace.input}
-                            traceId={trace.traceId}
-                          />
+                          <IOViewer label="Input" content={trace.input} traceId={trace.traceId} />
                         </CorrectedFieldFrame>
                       ) : (
-                        <IOViewer
-                          label="Input"
-                          content={trace.input}
-                          traceId={trace.traceId}
-                        />
+                        <IOViewer label="Input" content={trace.input} traceId={trace.traceId} />
                       )
                     ) : (
                       <MissingIORow label="Input" mode="input" />
@@ -382,8 +356,7 @@ export function TraceSummaryAccordions({
           }
           if (id === "attributes") {
             const attrCount =
-              countFlatLeaves(traceAttributes) +
-              countFlatLeaves(resources.resourceAttributes);
+              countFlatLeaves(traceAttributes) + countFlatLeaves(resources.resourceAttributes);
             return (
               <Section
                 key="attributes"
@@ -490,13 +463,7 @@ export function TraceSummaryAccordions({
             // of compact cards instead of each consuming a full-width
             // accordion — same info, far less vertical space.
             return (
-              <Section
-                key="other"
-                value="other"
-                title="Other"
-                isFirst={isFirst}
-                open={isOpen}
-              >
+              <Section key="other" value="other" title="Other" isFirst={isFirst} open={isOpen}>
                 <HStack align="stretch" gap={2} flexWrap="wrap">
                   {emptyCards.map((card) => {
                     if (card === "evals") {
@@ -532,10 +499,7 @@ export function TraceSummaryAccordions({
                         title="No managed prompt"
                         description="Version, test, and reuse prompts across traces."
                         ctaLabel={promptsHref ? "Set up a prompt" : "Learn more"}
-                        ctaHref={
-                          promptsHref ??
-                          "https://docs.langwatch.ai/prompts/template-syntax"
-                        }
+                        ctaHref={promptsHref ?? "https://docs.langwatch.ai/prompts/template-syntax"}
                         isCtaExternal={!promptsHref}
                       />
                     );
@@ -594,9 +558,7 @@ export function filterReservedMediaRefAttributes(
   attributes: Record<string, string>,
 ): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(attributes).filter(
-      ([key]) => !key.startsWith("langwatch.reserved.media_refs."),
-    ),
+    Object.entries(attributes).filter(([key]) => !key.startsWith("langwatch.reserved.media_refs.")),
   );
 }
 

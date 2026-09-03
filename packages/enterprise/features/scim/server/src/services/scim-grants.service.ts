@@ -22,10 +22,7 @@ import {
   authzBindingIdentityKey,
 } from "@langwatch/authz-contract";
 import { randomUUID } from "node:crypto";
-import type {
-  ScimGrantBindingScope,
-  ScimGrantRepositoryPort,
-} from "../ports/scim-repository.port";
+import type { ScimGrantBindingScope, ScimGrantRepositoryPort } from "../ports/scim-repository.port";
 
 /** What the directory says this principal should hold, minus the ids. */
 export type DesiredScimGrant = {
@@ -118,12 +115,8 @@ export class ScimGrantsService {
     const desiredKeys = new Set(input.desired.map(keyOfDesired));
     const currentKeys = new Set(current.map((row) => grantKey(row)));
 
-    const toRevoke = current
-      .filter((row) => !desiredKeys.has(grantKey(row)))
-      .map((row) => row.id);
-    const toAttach = input.desired.filter(
-      (grant) => !currentKeys.has(keyOfDesired(grant)),
-    );
+    const toRevoke = current.filter((row) => !desiredKeys.has(grantKey(row))).map((row) => row.id);
+    const toAttach = input.desired.filter((grant) => !currentKeys.has(keyOfDesired(grant)));
 
     if (toRevoke.length > 0) {
       await this.grants.revokeBindings({

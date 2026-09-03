@@ -91,12 +91,10 @@ describe("setupObservability Integration - Configuration Options", () => {
     expect(getInternalTracerConfig(provider).resource.attributes["service.name"]).toBe(
       "test-service",
     );
-    expect(
-      getInternalTracerConfig(provider).resource.attributes["deployment.environment"],
-    ).toBe("test");
-    expect(getInternalTracerConfig(provider).resource.attributes["service.version"]).toBe(
-      "1.0.0",
+    expect(getInternalTracerConfig(provider).resource.attributes["deployment.environment"]).toBe(
+      "test",
     );
+    expect(getInternalTracerConfig(provider).resource.attributes["service.version"]).toBe("1.0.0");
     await handle.shutdown();
   });
 
@@ -110,9 +108,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     };
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
-    expect(getInternalTracerConfig(provider).resource.attributes["custom.resource"]).toBe(
-      "yes",
-    );
+    expect(getInternalTracerConfig(provider).resource.attributes["custom.resource"]).toBe("yes");
     await handle.shutdown();
   });
 
@@ -170,9 +166,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     const handle = setupObservability(options);
     const provider: any = getConcreteProvider(trace.getTracerProvider());
     expect(getInternalTracerConfig(provider).idGenerator.generateSpanId()).toBe("spanid");
-    expect(getInternalTracerConfig(provider).idGenerator.generateTraceId()).toBe(
-      "traceid",
-    );
+    expect(getInternalTracerConfig(provider).idGenerator.generateTraceId()).toBe("traceid");
     await handle.shutdown();
   });
 
@@ -204,9 +198,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     await handle.shutdown().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       if (
-        !/export failed|otlp|enotfound|econnrefused|getaddrinfo|fetch failed|network/i.test(
-          message,
-        )
+        !/export failed|otlp|enotfound|econnrefused|getaddrinfo|fetch failed|network/i.test(message)
       ) {
         throw error;
       }
@@ -528,8 +520,7 @@ describe("setupObservability Integration - Configuration Options", () => {
       const handle = setupObservability(options);
 
       // Import config module to check the setting
-      const { shouldCaptureInput, shouldCaptureOutput } =
-        await import("../../../../config.js");
+      const { shouldCaptureInput, shouldCaptureOutput } = await import("../../../../config.js");
       expect(shouldCaptureInput()).toBe(false);
       expect(shouldCaptureOutput()).toBe(false);
 
@@ -546,8 +537,7 @@ describe("setupObservability Integration - Configuration Options", () => {
       const handle = setupObservability(options);
 
       // Import config module to check the setting
-      const { shouldCaptureInput, shouldCaptureOutput } =
-        await import("../../../../config.js");
+      const { shouldCaptureInput, shouldCaptureOutput } = await import("../../../../config.js");
       expect(shouldCaptureInput()).toBe(true);
       expect(shouldCaptureOutput()).toBe(false);
 
@@ -564,8 +554,7 @@ describe("setupObservability Integration - Configuration Options", () => {
       const handle = setupObservability(options);
 
       // Import config module to check the setting
-      const { shouldCaptureInput, shouldCaptureOutput } =
-        await import("../../../../config.js");
+      const { shouldCaptureInput, shouldCaptureOutput } = await import("../../../../config.js");
       expect(shouldCaptureInput()).toBe(false);
       expect(shouldCaptureOutput()).toBe(true);
 
@@ -582,8 +571,7 @@ describe("setupObservability Integration - Configuration Options", () => {
       const handle = setupObservability(options);
 
       // Import config module to check the setting
-      const { shouldCaptureInput, shouldCaptureOutput } =
-        await import("../../../../config.js");
+      const { shouldCaptureInput, shouldCaptureOutput } = await import("../../../../config.js");
       expect(shouldCaptureInput()).toBe(true);
       expect(shouldCaptureOutput()).toBe(true);
 
@@ -599,8 +587,7 @@ describe("setupObservability Integration - Configuration Options", () => {
       const handle = setupObservability(options);
 
       // Import config module to check default values
-      const { shouldCaptureInput, shouldCaptureOutput } =
-        await import("../../../../config.js");
+      const { shouldCaptureInput, shouldCaptureOutput } = await import("../../../../config.js");
       expect(shouldCaptureInput()).toBe(true);
       expect(shouldCaptureOutput()).toBe(true);
 

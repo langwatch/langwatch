@@ -1,8 +1,5 @@
 import { EventingLangyMaintenanceAdapter } from "@langwatch/langy-server";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** The revoke half of the sweep, so a caller can supply one without a database. */

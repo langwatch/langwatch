@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection";
-import { createInitState, createTestRuntime, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createTestRuntime,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 const runtime = createTestRuntime();
 const applySpanToSummary = (input: {

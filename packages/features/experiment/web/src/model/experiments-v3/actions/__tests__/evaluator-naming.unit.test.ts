@@ -23,9 +23,7 @@ describe("given an agent adding an evaluator", () => {
 
       expect(result.success).toBe(false);
       expect(
-        result.success
-          ? []
-          : result.error.issues.map((issue) => issue.path.join(".")),
+        result.success ? [] : result.error.issues.map((issue) => issue.path.join(".")),
       ).toContain("name");
     });
 
@@ -48,13 +46,8 @@ describe("given an agent adding an evaluator", () => {
 
   describe("when the name is blank or only spaces", () => {
     /** @scenario "An agent must name the evaluator it adds" */
-    it.each([
-      "",
-      "   ",
-    ])("refuses %j rather than storing an empty name", (name) => {
-      expect(
-        addEvaluatorPayloadSchema.safeParse(exactMatch(name)).success,
-      ).toBe(false);
+    it.each(["", "   "])("refuses %j rather than storing an empty name", (name) => {
+      expect(addEvaluatorPayloadSchema.safeParse(exactMatch(name)).success).toBe(false);
     });
   });
 
@@ -70,9 +63,11 @@ describe("given an agent adding an evaluator", () => {
         payload: exactMatch("l2 exact match"),
       });
 
-      expect(
-        second.state.evaluators.map((e) => e.localEvaluatorConfig?.name),
-      ).toEqual([undefined, "l1 exact match", "l2 exact match"]);
+      expect(second.state.evaluators.map((e) => e.localEvaluatorConfig?.name)).toEqual([
+        undefined,
+        "l1 exact match",
+        "l2 exact match",
+      ]);
     });
 
     // The execution side reads `localEvaluatorConfig?.settings` and falls
@@ -85,9 +80,7 @@ describe("given an agent adding an evaluator", () => {
         payload: exactMatch("l1 exact match"),
       });
 
-      expect(
-        state.evaluators[1]?.localEvaluatorConfig?.settings,
-      ).toBeUndefined();
+      expect(state.evaluators[1]?.localEvaluatorConfig?.settings).toBeUndefined();
     });
   });
 

@@ -39,8 +39,7 @@ describe("<ExportProgress/>", () => {
       expect(
         screen.getByText(
           (_, el) =>
-            el?.tagName.toLowerCase() === "p" &&
-            el.textContent === "Exported 0 of 500 traces…",
+            el?.tagName.toLowerCase() === "p" && el.textContent === "Exported 0 of 500 traces…",
         ),
       ).toBeInTheDocument();
     });
@@ -57,16 +56,14 @@ describe("<ExportProgress/>", () => {
 
   describe("when progress updates", () => {
     it("updates the text to reflect new exported count", () => {
-      const { rerender } = render(
-        <ExportProgress {...defaultProps} exported={100} total={500} />,
-        { wrapper: Wrapper },
-      );
+      const { rerender } = render(<ExportProgress {...defaultProps} exported={100} total={500} />, {
+        wrapper: Wrapper,
+      });
 
       expect(
         screen.getByText(
           (_, el) =>
-            el?.tagName.toLowerCase() === "p" &&
-            el.textContent === "Exported 100 of 500 traces…",
+            el?.tagName.toLowerCase() === "p" && el.textContent === "Exported 100 of 500 traces…",
         ),
       ).toBeInTheDocument();
 
@@ -79,8 +76,7 @@ describe("<ExportProgress/>", () => {
       expect(
         screen.getByText(
           (_, el) =>
-            el?.tagName.toLowerCase() === "p" &&
-            el.textContent === "Exported 300 of 500 traces…",
+            el?.tagName.toLowerCase() === "p" && el.textContent === "Exported 300 of 500 traces…",
         ),
       ).toBeInTheDocument();
     });

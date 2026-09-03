@@ -178,10 +178,7 @@ describe("RedisConnectionService", () => {
 
       const error = new Error("boom");
       connection.emit("error", error);
-      expect(logger.error).toHaveBeenCalledWith(
-        { mode: "standalone", db: 0, error },
-        "error",
-      );
+      expect(logger.error).toHaveBeenCalledWith({ mode: "standalone", db: 0, error }, "error");
     });
 
     it("warns even when no connection is created", () => {

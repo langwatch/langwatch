@@ -36,9 +36,7 @@ const mockSources: AvailableSource[] = [
   },
 ];
 
-const renderComponent = (
-  props: Partial<Parameters<typeof VariableMappingInput>[0]> = {},
-) => {
+const renderComponent = (props: Partial<Parameters<typeof VariableMappingInput>[0]> = {}) => {
   return render(
     <ChakraProvider value={defaultSystem}>
       <VariableMappingInput availableSources={mockSources} {...props} />
@@ -109,16 +107,11 @@ describe("VariableMappingInput", () => {
       };
       render(
         <ChakraProvider value={defaultSystem}>
-          <VariableMappingInput
-            availableSources={sourcesWithUnresolvedName}
-            mapping={mapping}
-          />
+          <VariableMappingInput availableSources={sourcesWithUnresolvedName} mapping={mapping} />
         </ChakraProvider>,
       );
 
-      expect(screen.getByTestId("source-mapping-tag")).toHaveTextContent(
-        "target_1778838627724.l3",
-      );
+      expect(screen.getByTestId("source-mapping-tag")).toHaveTextContent("target_1778838627724.l3");
     });
   });
 
@@ -182,9 +175,7 @@ describe("VariableMappingInput", () => {
       await waitFor(() => {
         // No matching fields, but "use as value" option should appear
         expect(screen.getByTestId("use-as-value-option")).toBeInTheDocument();
-        expect(screen.getByTestId("use-as-value-option").textContent).toContain(
-          "nonexistent",
-        );
+        expect(screen.getByTestId("use-as-value-option").textContent).toContain("nonexistent");
       });
     });
   });
@@ -405,9 +396,7 @@ describe("VariableMappingInput", () => {
         expect(screen.getByTestId("use-as-value-option")).toBeInTheDocument();
         // The value is in a nested span, so just check the option contains it
         expect(screen.getByTestId("use-as-value-option").textContent).toContain("custom");
-        expect(screen.getByTestId("use-as-value-option").textContent).toContain(
-          "as value",
-        );
+        expect(screen.getByTestId("use-as-value-option").textContent).toContain("as value");
       });
     });
 
@@ -585,10 +574,7 @@ describe("VariableMappingInput", () => {
       // Start with no mapping
       const { rerender } = render(
         <ChakraProvider value={defaultSystem}>
-          <VariableMappingInput
-            availableSources={mockSources}
-            onMappingChange={onMappingChange}
-          />
+          <VariableMappingInput availableSources={mockSources} onMappingChange={onMappingChange} />
         </ChakraProvider>,
       );
 

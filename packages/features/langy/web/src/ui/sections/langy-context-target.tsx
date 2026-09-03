@@ -58,9 +58,7 @@ export function LangyContextTarget({
   // ring class and sheen-phase variable are added alongside them.
   return cloneElement(children, {
     ...targetProps,
-    className: [children.props.className, targetProps.className]
-      .filter(Boolean)
-      .join(" "),
+    className: [children.props.className, targetProps.className].filter(Boolean).join(" "),
     style: { ...children.props.style, ...targetProps.style },
   } as Partial<{ className?: string; style?: CSSProperties }>);
 }

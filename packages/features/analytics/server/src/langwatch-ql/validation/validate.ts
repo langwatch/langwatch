@@ -68,10 +68,7 @@
  * @see ../provisioning.ts — the database-layer isolation this backs up
  */
 
-import {
-  isAllowedLangWatchQLFunction,
-  isLangWatchQLAggregateFunction,
-} from "./functions";
+import { isAllowedLangWatchQLFunction, isLangWatchQLAggregateFunction } from "./functions";
 import {
   clickHouseSqlParser,
   type LangWatchQLParser,
@@ -436,13 +433,7 @@ function walkFields({ rule, node, frame, ctx }: NodeArgs & { rule: NodeRule }): 
   }
 }
 
-function applyFieldRule({
-  rule,
-  value,
-  node,
-  frame,
-  ctx,
-}: FieldArgs & { rule: FieldRule }): void {
+function applyFieldRule({ rule, value, node, frame, ctx }: FieldArgs & { rule: FieldRule }): void {
   switch (rule.kind) {
     case "scalar":
       return;
@@ -596,13 +587,7 @@ function walkLimitBy({ value, node, frame, ctx }: FieldArgs): void {
   }
 }
 
-function walkLimitByField({
-  field,
-  value,
-  node,
-  frame,
-  ctx,
-}: FieldArgs & { field: string }): void {
+function walkLimitByField({ field, value, node, frame, ctx }: FieldArgs & { field: string }): void {
   if (value === undefined) return;
   if (field === "length" || field === "offset") {
     walkChildNode({ value, node, frame, ctx });
@@ -641,8 +626,7 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
     filteredColumns: new Set<string>(),
     groupByColumns: new Set<string>(),
     hasGroupBy:
-      (Array.isArray(node.group_by) && node.group_by.length > 0) ||
-      node.group_by_all === true,
+      (Array.isArray(node.group_by) && node.group_by.length > 0) || node.group_by_all === true,
     isAggregated: false,
   };
   ctx.blocks.push(block);
@@ -709,8 +693,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       ctx,
       frame,
       code: "TABLE_NOT_ALLOWED",
-      message:
-        "Name the dataset directly — a table cannot be chosen by a bound parameter.",
+      message: "Name the dataset directly — a table cannot be chosen by a bound parameter.",
       node,
     });
     return null;
@@ -741,9 +724,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
     defaultDatabase: ctx.policy.defaultDatabase,
   });
   if (!ctx.policy.allowedTables.has(qualified)) {
-    const written = reference.database
-      ? `${reference.database}.${reference.name}`
-      : reference.name;
+    const written = reference.database ? `${reference.database}.${reference.name}` : reference.name;
     report({
       ctx,
       frame,
@@ -786,13 +767,7 @@ function joinSideName(value: unknown): string | null {
  * recording it would tell a diagnostic that two datasets line up on a column
  * when they may not.
  */
-function collectJoinEdges({
-  node,
-  block,
-}: {
-  node: SqlAstNode;
-  block: BlockAccumulator;
-}): void {
+function collectJoinEdges({ node, block }: { node: SqlAstNode; block: BlockAccumulator }): void {
   collectUsingEdges({ using: node.using, block });
   collectOnEdges({ on: node.on, block });
 }
@@ -803,13 +778,7 @@ function collectJoinEdges({
  * `USING` matches the same name on both sides, which is exactly the pair an
  * `ON` would have spelled out.
  */
-function collectUsingEdges({
-  using,
-  block,
-}: {
-  using: unknown;
-  block: BlockAccumulator;
-}): void {
+function collectUsingEdges({ using, block }: { using: unknown; block: BlockAccumulator }): void {
   if (!Array.isArray(using)) return;
   for (const element of using) {
     const name = joinSideName(element);
@@ -953,8 +922,7 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
         ctx,
         frame,
         code: "GATED_COLUMN",
-        message:
-          "Name the field directly — a field cannot be chosen by a bound parameter.",
+        message: "Name the field directly — a field cannot be chosen by a bound parameter.",
         node,
       });
       return null;
@@ -1045,8 +1013,7 @@ const REFUSE_SETTINGS: FieldRule = {
 const REFUSE_OUTPUT: FieldRule = {
   kind: "refuse",
   code: "OUTPUT_CLAUSE",
-  message:
-    "FORMAT and INTO OUTFILE cannot be used here. The API decides how results are returned.",
+  message: "FORMAT and INTO OUTFILE cannot be used here. The API decides how results are returned.",
 };
 
 /**
@@ -1440,8 +1407,7 @@ function screenSubmission(
   if (parsed.statements.length > 1) {
     return statementRejection({
       code: "MULTIPLE_STATEMENTS",
-      message:
-        "Only one statement can be submitted at a time. Send a single SELECT statement.",
+      message: "Only one statement can be submitted at a time. Send a single SELECT statement.",
     });
   }
   const statement = parsed.statements[0];

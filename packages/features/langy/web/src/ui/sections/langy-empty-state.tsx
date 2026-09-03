@@ -116,8 +116,7 @@ export const SETUP_SUGGESTIONS: LangySuggestion[] = [
   {
     icon: ShieldCheck,
     label: "Choose what to measure",
-    prompt:
-      "What should I measure about my agent, and which evaluators would you start with?",
+    prompt: "What should I measure about my agent, and which evaluators would you start with?",
     until: "evaluations",
   },
   {
@@ -171,10 +170,7 @@ export function EmptyState({
 }) {
   const sidebar = variant === "sidebar";
   const metrics = emptyStateMetrics({ variant, width: panelWidth });
-  const greeting = useMemo(
-    () => GREETINGS[Math.floor(Math.random() * GREETINGS.length)],
-    [],
-  );
+  const greeting = useMemo(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)], []);
   return (
     <VStack
       // The invitation belongs to a genuinely new chat. Named so the restore

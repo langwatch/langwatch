@@ -199,9 +199,10 @@ describe("parseTimeseriesRows", () => {
       });
       const runsName = buildSeriesName(runsSeries, 0);
       const scoreName = buildSeriesName(scoreSeries, 1);
-      const groups = result.currentPeriod[0]?.[
-        "evaluations.evaluation_passed"
-      ] as Record<string, Record<string, number>>;
+      const groups = result.currentPeriod[0]?.["evaluations.evaluation_passed"] as Record<
+        string,
+        Record<string, number>
+      >;
 
       it("preserves the count for both groups", () => {
         expect(groups.passed?.[runsName]).toBe(6);

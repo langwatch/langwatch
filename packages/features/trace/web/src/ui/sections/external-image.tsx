@@ -60,11 +60,7 @@ export const getImageUrl = (str: unknown): string | null => {
       const pathSegments = pathname.split("/");
       const lastSegment = pathSegments[pathSegments.length - 1];
 
-      if (
-        lastSegment &&
-        lastSegment.length > 50 &&
-        /^[A-Za-z0-9+/=]+$/.test(lastSegment)
-      ) {
+      if (lastSegment && lastSegment.length > 50 && /^[A-Za-z0-9+/=]+$/.test(lastSegment)) {
         return str_;
       }
     }

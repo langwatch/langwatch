@@ -146,11 +146,7 @@ const convertCpuProfile = (cpuprofile, name) => {
     const cached = stackCache.get(leafId);
     if (cached) return cached;
     const ids = [];
-    for (
-      let id = leafId;
-      id !== undefined && !ids.includes(id);
-      id = parentById.get(id)
-    ) {
+    for (let id = leafId; id !== undefined && !ids.includes(id); id = parentById.get(id)) {
       ids.push(id);
     }
     const stack = ids.reverse().map(frameIndex);

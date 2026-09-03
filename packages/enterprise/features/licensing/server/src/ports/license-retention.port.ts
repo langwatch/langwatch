@@ -5,9 +5,7 @@ export type LicenseRetentionRule = {
 };
 
 export abstract class LicenseRetentionPort {
-  abstract listOrganizationRules(
-    organizationId: string,
-  ): Promise<readonly LicenseRetentionRule[]>;
+  abstract listOrganizationRules(organizationId: string): Promise<readonly LicenseRetentionRule[]>;
 
   abstract setForOrganization(input: {
     organizationId: string;

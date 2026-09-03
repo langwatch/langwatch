@@ -26,29 +26,17 @@ export function newIdentityCommandId(): string {
 }
 
 /** Adopting the identifier an `Account` row implies. */
-export function adoptAccountCommandId({
-  accountId,
-}: {
-  accountId: string;
-}): string {
+export function adoptAccountCommandId({ accountId }: { accountId: string }): string {
   return `backfill:${accountId}`;
 }
 
 /** Adopting the identifier `User.email` implies. */
-export function adoptUserEmailCommandId({
-  userId,
-}: {
-  userId: string;
-}): string {
+export function adoptUserEmailCommandId({ userId }: { userId: string }): string {
   return `backfill:user-email:${userId}`;
 }
 
 /** Establishing that email as verified, because `User.emailVerified` says so. */
-export function establishUserEmailCommandId({
-  userId,
-}: {
-  userId: string;
-}): string {
+export function establishUserEmailCommandId({ userId }: { userId: string }): string {
   return `backfill:verify-email:${userId}`;
 }
 

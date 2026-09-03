@@ -46,17 +46,12 @@ export const storedObjectDirectUploadTargetSchema = z
     expiresAt: storedObjectTimestampSchema,
   })
   .strict();
-export type StoredObjectDirectUploadTarget = z.infer<
-  typeof storedObjectDirectUploadTargetSchema
->;
+export type StoredObjectDirectUploadTarget = z.infer<typeof storedObjectDirectUploadTargetSchema>;
 
-export const storedObjectsCreateUploadInputSchema =
-  storedObjectUploadMetadataSchema.extend({
-    projectId: storedObjectProjectIdSchema,
-  });
-export type StoredObjectsCreateUploadInput = z.infer<
-  typeof storedObjectsCreateUploadInputSchema
->;
+export const storedObjectsCreateUploadInputSchema = storedObjectUploadMetadataSchema.extend({
+  projectId: storedObjectProjectIdSchema,
+});
+export type StoredObjectsCreateUploadInput = z.infer<typeof storedObjectsCreateUploadInputSchema>;
 
 export function createStoredObjectsCreateUploadInputSchema(maximumUploadBytes: number) {
   return createStoredObjectUploadMetadataSchema(maximumUploadBytes).extend({
@@ -81,9 +76,7 @@ export const storedObjectsCreateUploadOutputSchema = z.discriminatedUnion("statu
     })
     .strict(),
 ]);
-export type StoredObjectsCreateUploadOutput = z.infer<
-  typeof storedObjectsCreateUploadOutputSchema
->;
+export type StoredObjectsCreateUploadOutput = z.infer<typeof storedObjectsCreateUploadOutputSchema>;
 
 export const storedObjectsConfirmUploadInputSchema = z
   .object({
@@ -91,9 +84,7 @@ export const storedObjectsConfirmUploadInputSchema = z
     uploadToken: storedObjectUploadTokenSchema,
   })
   .strict();
-export type StoredObjectsConfirmUploadInput = z.infer<
-  typeof storedObjectsConfirmUploadInputSchema
->;
+export type StoredObjectsConfirmUploadInput = z.infer<typeof storedObjectsConfirmUploadInputSchema>;
 
 export const storedObjectsConfirmUploadOutputSchema = storedObjectReferenceSchema;
 export type StoredObjectsConfirmUploadOutput = z.infer<

@@ -54,11 +54,7 @@ export class RedisScenarioTabStoreAdapter extends ScenarioTabStorePort {
     return this.connection.zcard(input.key);
   }
 
-  async setPending(input: {
-    key: string;
-    url: string;
-    ttlSeconds: number;
-  }): Promise<void> {
+  async setPending(input: { key: string; url: string; ttlSeconds: number }): Promise<void> {
     await this.connection.set(input.key, input.url, "EX", input.ttlSeconds);
   }
 

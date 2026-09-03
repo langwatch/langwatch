@@ -28,9 +28,7 @@ export const enterpriseFeatureDescriptorSchema = z.object({
   serverPackage: z.string().min(1).optional(),
   webPackage: z.string().min(1).optional(),
 });
-export type EnterpriseFeatureDescriptor = z.infer<
-  typeof enterpriseFeatureDescriptorSchema
->;
+export type EnterpriseFeatureDescriptor = z.infer<typeof enterpriseFeatureDescriptorSchema>;
 
 const LICENSING_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
   id: LICENSING_FEATURE_ID,
@@ -91,9 +89,7 @@ const WEBHOOKS_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
 
 /** Portable feature discovery. Runtime installers belong to composition packages. */
 export class EnterpriseCatalogue {
-  private constructor(
-    private readonly descriptors: readonly EnterpriseFeatureDescriptor[],
-  ) {}
+  private constructor(private readonly descriptors: readonly EnterpriseFeatureDescriptor[]) {}
 
   static create(): EnterpriseCatalogue {
     return new EnterpriseCatalogue([

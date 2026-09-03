@@ -17,16 +17,13 @@ export const activityMonitorWindowQuerySchema = z
   .strict();
 export type ActivityMonitorWindowQuery = z.infer<typeof activityMonitorWindowQuerySchema>;
 
-export const activityMonitorPagedWindowQuerySchema =
-  activityMonitorWindowQuerySchema.extend({
-    limit: z.number().int().positive().optional(),
-    offset: z.number().int().nonnegative().optional(),
-    sortBy: spendSortFieldSchema.optional(),
-    sortDir: governanceSortDirectionSchema.optional(),
-  });
-export type ActivityMonitorPagedWindowQuery = z.infer<
-  typeof activityMonitorPagedWindowQuerySchema
->;
+export const activityMonitorPagedWindowQuerySchema = activityMonitorWindowQuerySchema.extend({
+  limit: z.number().int().positive().optional(),
+  offset: z.number().int().nonnegative().optional(),
+  sortBy: spendSortFieldSchema.optional(),
+  sortDir: governanceSortDirectionSchema.optional(),
+});
+export type ActivityMonitorPagedWindowQuery = z.infer<typeof activityMonitorPagedWindowQuerySchema>;
 
 export const activityMonitorSummarySchema = z
   .object({

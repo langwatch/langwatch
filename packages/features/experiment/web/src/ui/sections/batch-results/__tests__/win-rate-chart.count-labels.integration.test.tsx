@@ -24,11 +24,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BatchComparisonColumn } from "@langwatch/experiment-web";
-import {
-  COUNT_LABEL_FONT_SIZE,
-  COUNT_LABEL_OFFSET,
-  WinRateChart,
-} from "../win-rate-chart";
+import { COUNT_LABEL_FONT_SIZE, COUNT_LABEL_OFFSET, WinRateChart } from "../win-rate-chart";
 
 // recharts lays its chart out from measurements jsdom cannot produce, so the
 // mock surfaces the geometry the component hands it instead. `margin.top` is
@@ -38,13 +34,7 @@ vi.mock("recharts", () => {
   const MockComponent = ({ children }: { children?: ReactNode }) => children ?? null;
   return {
     ResponsiveContainer: MockComponent,
-    BarChart: ({
-      margin,
-      children,
-    }: {
-      margin?: { top?: number };
-      children?: ReactNode;
-    }) => (
+    BarChart: ({ margin, children }: { margin?: { top?: number }; children?: ReactNode }) => (
       <div data-testid="bar-chart" data-margin-top={String(margin?.top)}>
         {children}
       </div>

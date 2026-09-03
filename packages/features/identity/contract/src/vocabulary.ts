@@ -32,8 +32,7 @@ export const IDENTIFIER_LIFECYCLE_STATES = [
   "DEAD_END",
   "DETACHED",
 ] as const;
-export type IdentifierLifecycleState =
-  (typeof IDENTIFIER_LIFECYCLE_STATES)[number];
+export type IdentifierLifecycleState = (typeof IDENTIFIER_LIFECYCLE_STATES)[number];
 
 /**
  * An identifier arrives ATTACHED or VERIFIED, never further along:
@@ -43,16 +42,9 @@ export type IdentifierLifecycleState =
  * DETACHED are transitions, not arrivals — each has its own event.
  */
 export const identifierArrivalStateSchema = z.enum(["ATTACHED", "VERIFIED"]);
-export type IdentifierArrivalState = z.infer<
-  typeof identifierArrivalStateSchema
->;
+export type IdentifierArrivalState = z.infer<typeof identifierArrivalStateSchema>;
 
-export const verificationMethodSchema = z.enum([
-  "magic-link",
-  "oauth",
-  "saml",
-  "creation",
-]);
+export const verificationMethodSchema = z.enum(["magic-link", "oauth", "saml", "creation"]);
 export type VerificationMethod = z.infer<typeof verificationMethodSchema>;
 
 export const identityActorSchema = z.object({
@@ -68,9 +60,7 @@ export type IdentityActor = z.infer<typeof identityActorSchema>;
  * magic-link ceremony. Legacy-migration providers arrive VERIFIED — D09
  * migrates only established sign-ins.
  */
-export function arrivalStateForProvider(
-  provider: IdentifierProvider,
-): IdentifierArrivalState {
+export function arrivalStateForProvider(provider: IdentifierProvider): IdentifierArrivalState {
   return provider === "email" ? "ATTACHED" : "VERIFIED";
 }
 

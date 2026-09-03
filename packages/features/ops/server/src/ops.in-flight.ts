@@ -23,15 +23,10 @@ export type InFlightCounts = {
   parkedGroupCount: number;
 };
 
-export function totalInFlight({
-  queues,
-}: {
-  queues: readonly InFlightCounts[];
-}): number {
+export function totalInFlight({ queues }: { queues: readonly InFlightCounts[] }): number {
   let total = 0;
   for (const queue of queues) {
-    total +=
-      queue.totalPendingJobs + queue.activeGroupCount + queue.parkedGroupCount;
+    total += queue.totalPendingJobs + queue.activeGroupCount + queue.parkedGroupCount;
   }
   return total;
 }

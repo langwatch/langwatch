@@ -80,10 +80,7 @@ export const SpanDetailPane = memo(function SpanDetailPane({
       bg={{ base: "bg.surface", _dark: "bg.panel" }}
     >
       <Box flexShrink={0} bg={{ base: "bg.surface", _dark: "bg.panel" }}>
-        <IsolatedErrorBoundary
-          scope="Couldn't render span tabs"
-          resetKeys={[trace.traceId]}
-        >
+        <IsolatedErrorBoundary scope="Couldn't render span tabs" resetKeys={[trace.traceId]}>
           <SpanTabBar
             spanTree={spans}
             collapsePosition={layout === "horizontal" ? "leading" : "trailing"}

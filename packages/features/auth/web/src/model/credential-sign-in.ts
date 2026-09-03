@@ -37,8 +37,7 @@ export function credentialSignInFailure({
   fallback?: string;
 }): CredentialSignInFailure | null {
   const failed =
-    Boolean(response?.error) ||
-    (response?.status !== undefined && response.status >= 400);
+    Boolean(response?.error) || (response?.status !== undefined && response.status >= 400);
   if (!failed) return null;
 
   const wait = response?.retryAfterSeconds;
@@ -50,9 +49,7 @@ export function credentialSignInFailure({
       fallback,
     }),
     retryAfterSeconds:
-      response?.status === 429 && typeof wait === "number" && wait > 0
-        ? Math.ceil(wait)
-        : null,
+      response?.status === 429 && typeof wait === "number" && wait > 0 ? Math.ceil(wait) : null,
   };
 }
 

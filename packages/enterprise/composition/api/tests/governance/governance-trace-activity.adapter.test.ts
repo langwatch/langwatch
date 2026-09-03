@@ -13,9 +13,7 @@ describe("AppGovernanceTraceActivityAdapter", () => {
   describe("when probing for recent governance activity", () => {
     it("returns true when the probe finds a row", async () => {
       const client = makeClient([{ hit: 1 }]);
-      const repository = new AppGovernanceTraceActivityAdapter(
-        async () => client as never,
-      );
+      const repository = new AppGovernanceTraceActivityAdapter(async () => client as never);
 
       await expect(
         repository.hasRecentActivity({ tenantId: "proj-1", sinceMs: 1_000 }),
@@ -24,9 +22,7 @@ describe("AppGovernanceTraceActivityAdapter", () => {
 
     it("returns false when the probe finds nothing", async () => {
       const client = makeClient([]);
-      const repository = new AppGovernanceTraceActivityAdapter(
-        async () => client as never,
-      );
+      const repository = new AppGovernanceTraceActivityAdapter(async () => client as never);
 
       await expect(
         repository.hasRecentActivity({ tenantId: "proj-1", sinceMs: 1_000 }),
@@ -37,9 +33,7 @@ describe("AppGovernanceTraceActivityAdapter", () => {
   describe("when aggregating span counts by ingestion source", () => {
     it("coerces stringified spanCount values from ClickHouse", async () => {
       const client = makeClient([{ sourceId: "is-typed-str", spanCount: "75" }]);
-      const repository = new AppGovernanceTraceActivityAdapter(
-        async () => client as never,
-      );
+      const repository = new AppGovernanceTraceActivityAdapter(async () => client as never);
 
       await expect(
         repository.findSpanCountsBySource({ tenantId: "proj-1", sinceMs: 1_000 }),
@@ -51,9 +45,7 @@ describe("AppGovernanceTraceActivityAdapter", () => {
         { sourceId: "is-real", spanCount: 40 },
         { sourceId: "", spanCount: 10 },
       ]);
-      const repository = new AppGovernanceTraceActivityAdapter(
-        async () => client as never,
-      );
+      const repository = new AppGovernanceTraceActivityAdapter(async () => client as never);
 
       await expect(
         repository.findSpanCountsBySource({ tenantId: "proj-1", sinceMs: 1_000 }),
@@ -65,9 +57,7 @@ describe("AppGovernanceTraceActivityAdapter", () => {
 
     it("binds its requested tenant and time window", async () => {
       const client = makeClient([]);
-      const repository = new AppGovernanceTraceActivityAdapter(
-        async () => client as never,
-      );
+      const repository = new AppGovernanceTraceActivityAdapter(async () => client as never);
 
       await repository.findSpanCountsBySource({ tenantId: "proj-1", sinceMs: 5_000 });
 

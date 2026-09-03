@@ -57,5 +57,4 @@ export const noLegacyEmailHolders = (): InMemoryUsers => new InMemoryUsers();
 
 /** The normalizer the guard applies before it asks, exposed so a suite can
  *  seed the address a value actually collides on. */
-export const asStoredEmail = (value: string): string =>
-  normalizeIdentifierValue(value);
+export const asStoredEmail = (value: string): string => normalizeIdentifierValue(value);

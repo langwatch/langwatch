@@ -74,9 +74,7 @@ export class LocalPromptsService {
    * Searches for prompt using explicit file mapping in prompts.json.
    * Looks for dependencies with a 'file' property pointing to a specific path.
    */
-  private async getFromConfig(
-    dependency: PromptDependency,
-  ): Promise<LocalPromptConfig | null> {
+  private async getFromConfig(dependency: PromptDependency): Promise<LocalPromptConfig | null> {
     if (typeof dependency === "string" && dependency.startsWith("file:")) {
       return this.fileManager.loadLocalPrompt(dependency.slice(5));
     }
@@ -120,9 +118,7 @@ export class LocalPromptsService {
   /**
    * Get dependency from config
    */
-  private async getDependencyFromConfig(
-    handleOrId: string,
-  ): Promise<PromptDependency | null> {
+  private async getDependencyFromConfig(handleOrId: string): Promise<PromptDependency | null> {
     const config = this.fileManager.loadPromptsConfig();
     const dependency = config.prompts[handleOrId];
 
@@ -132,9 +128,7 @@ export class LocalPromptsService {
   /**
    * Converts LocalPromptConfig to PromptData format
    */
-  private convertToPromptData(
-    config: LocalPromptConfig & { handle: string },
-  ): PromptData {
+  private convertToPromptData(config: LocalPromptConfig & { handle: string }): PromptData {
     const { modelParameters, ...rest } = config;
     return {
       maxTokens: modelParameters?.max_tokens,

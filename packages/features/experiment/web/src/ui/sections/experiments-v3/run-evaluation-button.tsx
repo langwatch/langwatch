@@ -36,16 +36,13 @@ type RunEvaluationButtonProps = {
   disabled?: boolean;
 };
 
-export const RunEvaluationButton = ({
-  disabled = false,
-}: RunEvaluationButtonProps) => {
+export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonProps) => {
   const { openDrawer } = useDrawer();
   const { openTargetEditor } = useOpenTargetEditor();
   const openComparisonEditor = useOpenComparisonEditor();
   const resolveTargetName = useResolveTargetName();
   const promptTemplateFields = usePromptTemplateFields();
-  const { status, progress, execute, abort, isAborting } =
-    useExecuteEvaluation();
+  const { status, progress, execute, abort, isAborting } = useExecuteEvaluation();
 
   const {
     targets,
@@ -144,17 +141,13 @@ export const RunEvaluationButton = ({
           });
         }
 
-        const storeMappings =
-          evaluator.mappings[activeDatasetId]?.[targetId] ?? {};
+        const storeMappings = evaluator.mappings[activeDatasetId]?.[targetId] ?? {};
         const initialMappings: Record<string, UIFieldMapping> = {};
         for (const [key, mapping] of Object.entries(storeMappings)) {
           initialMappings[key] = convertToUIMapping(mapping);
         }
 
-        const onMappingChange = (
-          identifier: string,
-          mapping: UIFieldMapping | undefined,
-        ) => {
+        const onMappingChange = (identifier: string, mapping: UIFieldMapping | undefined) => {
           if (mapping) {
             setEvaluatorMapping(
               evaluator.id,
@@ -164,12 +157,7 @@ export const RunEvaluationButton = ({
               convertFromUIMapping(mapping, isDatasetSource),
             );
           } else {
-            removeEvaluatorMapping(
-              evaluator.id,
-              activeDatasetId,
-              targetId,
-              identifier,
-            );
+            removeEvaluatorMapping(evaluator.id, activeDatasetId, targetId, identifier);
           }
         };
 
@@ -180,10 +168,7 @@ export const RunEvaluationButton = ({
         // Embedding it in mappingsConfig instead left "Run" opening a drawer
         // with no mapping controls, so the user could not map the evaluator's
         // required fields (issue #950). Mirrors useOpenEvaluatorEditor.
-        setFlowCallbacks(
-          "evaluatorEditor",
-          createEvaluatorEditorCallbacks({ onMappingChange }),
-        );
+        setFlowCallbacks("evaluatorEditor", createEvaluatorEditorCallbacks({ onMappingChange }));
 
         // Open the evaluator editor drawer. mappingsConfig is an object so it
         // rides complexProps; the durable onMappingChange lives in flowCallbacks.
@@ -229,11 +214,7 @@ export const RunEvaluationButton = ({
   };
 
   return (
-    <Tooltip
-      content={getTooltipContent()}
-      positioning={{ placement: "bottom" }}
-      openDelay={200}
-    >
+    <Tooltip content={getTooltipContent()} positioning={{ placement: "bottom" }} openDelay={200}>
       <Button
         size="sm"
         variant="outline"

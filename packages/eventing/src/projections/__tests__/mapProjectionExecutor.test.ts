@@ -100,18 +100,14 @@ describe("MapProjectionExecutor.execute", () => {
         tenantId,
       };
 
-      await expect(executor.execute(mapDef, event, context)).rejects.toThrow(
-        "map failed",
-      );
+      await expect(executor.execute(mapDef, event, context)).rejects.toThrow("map failed");
     });
   });
 
   describe("when store.append throws", () => {
     it("propagates the error", async () => {
       const store = createMockAppendStore<{ name: string }>();
-      (store.append as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error("append failed"),
-      );
+      (store.append as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("append failed"));
 
       const mapDef = createMockMapProjectionDefinition("mapper", {
         store,
@@ -129,9 +125,7 @@ describe("MapProjectionExecutor.execute", () => {
         tenantId,
       };
 
-      await expect(executor.execute(mapDef, event, context)).rejects.toThrow(
-        "append failed",
-      );
+      await expect(executor.execute(mapDef, event, context)).rejects.toThrow("append failed");
     });
   });
 });
@@ -164,13 +158,10 @@ describe("MapProjectionExecutor.executeBatch", () => {
       { aggregateId: "two" },
     ]);
     expect(bulkAppend).toHaveBeenCalledTimes(1);
-    expect(bulkAppend).toHaveBeenCalledWith(
-      [{ aggregateId: "one" }, { aggregateId: "two" }],
-      {
-        tenantId,
-        retentionPolicy: { traces: 49, scenarios: 49, experiments: 49 },
-      },
-    );
+    expect(bulkAppend).toHaveBeenCalledWith([{ aggregateId: "one" }, { aggregateId: "two" }], {
+      tenantId,
+      retentionPolicy: { traces: 49, scenarios: 49, experiments: 49 },
+    });
     expect(store.append).not.toHaveBeenCalled();
   });
 

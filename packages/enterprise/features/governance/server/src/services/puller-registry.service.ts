@@ -1,7 +1,4 @@
-import type {
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
+import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
 export interface RegisteredGovernancePuller {
   readonly id: string;

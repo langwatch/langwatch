@@ -78,9 +78,7 @@ describe("the grants ledger's wire boundary", () => {
 
   describe("when a principal's id disagrees with its type", () => {
     it("refuses a subject-less user", () => {
-      expect(parse({}, { principal: { type: "user", id: null } }).success).toBe(
-        false,
-      );
+      expect(parse({}, { principal: { type: "user", id: null } }).success).toBe(false);
     });
 
     it("refuses an `anyone` wearing a subject's id", () => {
@@ -154,9 +152,7 @@ describe("the grants ledger's wire boundary", () => {
     });
 
     it("refuses a kind outside the stored vocabulary", () => {
-      expect(resourceGrant({ ...SHARE_TERMS, kind: "dataset" }).success).toBe(
-        false,
-      );
+      expect(resourceGrant({ ...SHARE_TERMS, kind: "dataset" }).success).toBe(false);
     });
 
     it("refuses terms that name no project", () => {
@@ -165,11 +161,7 @@ describe("the grants ledger's wire boundary", () => {
     });
 
     it("refuses an empty token, project or permission", () => {
-      for (const empty of [
-        { token: "" },
-        { projectId: "" },
-        { permission: "" },
-      ]) {
+      for (const empty of [{ token: "" }, { projectId: "" }, { permission: "" }]) {
         expect(resourceGrant({ ...SHARE_TERMS, ...empty }).success).toBe(false);
       }
     });
@@ -192,10 +184,7 @@ describe("the grants ledger's wire boundary", () => {
     });
 
     it("refuses a `project` principal at TEAM scope", () => {
-      expect(
-        parse({}, { principal: { type: "project", id: "proj_chatbot" } })
-          .success,
-      ).toBe(false);
+      expect(parse({}, { principal: { type: "project", id: "proj_chatbot" } }).success).toBe(false);
     });
 
     it("refuses a `project` principal on a FOREIGN project", () => {
@@ -273,9 +262,7 @@ describe("the grants ledger's wire boundary", () => {
     });
 
     it("refuses a source the vocabulary does not name", () => {
-      expect(parse({}, { source: "a-surface-nobody-declared" }).success).toBe(
-        false,
-      );
+      expect(parse({}, { source: "a-surface-nobody-declared" }).success).toBe(false);
     });
   });
 });

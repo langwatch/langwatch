@@ -53,9 +53,7 @@ describe("deriveTokenTimeline", () => {
 describe("findCacheRebuilds", () => {
   describe("given a cold start", () => {
     it("does not flag the first call — there is nothing to reuse yet", () => {
-      const events = findCacheRebuilds([
-        modelCall({ atMs: 1_000, cacheCreationTokens: 50_000 }),
-      ]);
+      const events = findCacheRebuilds([modelCall({ atMs: 1_000, cacheCreationTokens: 50_000 })]);
       expect(events).toEqual([]);
     });
   });

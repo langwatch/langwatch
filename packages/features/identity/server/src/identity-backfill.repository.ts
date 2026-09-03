@@ -28,7 +28,5 @@ export interface BackfillAccountRow {
 export interface IdentityBackfillRepository {
   tryFindUser(args: { userId: string }): Promise<BackfillUserRow | null>;
   findAccountRows(args: { userId: string }): Promise<BackfillAccountRow[]>;
-  findIdentifierRows(args: {
-    userId: string;
-  }): Promise<BackfillIdentifierRow[]>;
+  findIdentifierRows(args: { userId: string }): Promise<BackfillIdentifierRow[]>;
 }

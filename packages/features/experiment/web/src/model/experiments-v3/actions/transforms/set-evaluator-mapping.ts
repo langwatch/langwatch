@@ -1,7 +1,4 @@
-import {
-  type SetEvaluatorMappingPayload,
-  setEvaluatorMappingPayloadSchema,
-} from "../schemas";
+import { type SetEvaluatorMappingPayload, setEvaluatorMappingPayloadSchema } from "../schemas";
 import { requireDataset, requireEvaluator, requireTarget } from "./helpers";
 import type { Transform } from "./types";
 

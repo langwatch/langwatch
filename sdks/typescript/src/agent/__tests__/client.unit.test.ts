@@ -31,7 +31,8 @@ type Frame = Record<string, unknown> & { type: string };
 
 class Connection {
   readonly frames: Frame[] = [];
-  private readonly waiters: Array<{ type: string | undefined; resolve: (frame: Frame) => void }> = [];
+  private readonly waiters: Array<{ type: string | undefined; resolve: (frame: Frame) => void }> =
+    [];
 
   constructor(
     readonly socket: WsSocket,
@@ -39,7 +40,9 @@ class Connection {
   ) {
     socket.on("message", (data) => {
       const frame = JSON.parse(Buffer.from(data as Buffer).toString("utf8")) as Frame;
-      const index = this.waiters.findIndex((waiter) => waiter.type === undefined || waiter.type === frame.type);
+      const index = this.waiters.findIndex(
+        (waiter) => waiter.type === undefined || waiter.type === frame.type,
+      );
       if (index === -1) this.frames.push(frame);
       else this.waiters.splice(index, 1)[0]!.resolve(frame);
     });
@@ -48,7 +51,9 @@ class Connection {
   nextFrame<T extends { type: string } = Frame>(type?: string): Promise<T> {
     const already = this.frames.findIndex((frame) => type === undefined || frame.type === type);
     if (already !== -1) return Promise.resolve(this.frames.splice(already, 1)[0] as T);
-    return new Promise((resolve) => this.waiters.push({ type, resolve: resolve as (frame: Frame) => void }));
+    return new Promise((resolve) =>
+      this.waiters.push({ type, resolve: resolve as (frame: Frame) => void }),
+    );
   }
 
   send(frame: Record<string, unknown>): void {
@@ -93,7 +98,9 @@ class FakePlatform {
       server.once("error", reject);
       server.once("listening", () => {
         const address = server.address();
-        resolve(new FakePlatform(server, typeof address === "object" && address ? address.port : port));
+        resolve(
+          new FakePlatform(server, typeof address === "object" && address ? address.port : port),
+        );
       });
     });
   }
@@ -129,7 +136,12 @@ const recordingLogger = () => {
   const log = (level: string) => (message: string) => {
     calls.push([level, message]);
   };
-  const logger: Logger = { debug: log("debug"), info: log("info"), warn: log("warn"), error: log("error") };
+  const logger: Logger = {
+    debug: log("debug"),
+    info: log("info"),
+    warn: log("warn"),
+    error: log("error"),
+  };
   return {
     logger,
     lines: (level: string, pattern = /./) =>
@@ -304,7 +316,11 @@ describe("the agent client, given a fake platform", () => {
       const register = await connection.nextFrame<RegisterFrame>("register");
 
       expect(register.protocol).toBe(1);
-      expect(register.sdk).toEqual({ name: "langwatch-typescript", version: LANGWATCH_SDK_VERSION, language: "typescript" });
+      expect(register.sdk).toEqual({
+        name: "langwatch-typescript",
+        version: LANGWATCH_SDK_VERSION,
+        language: "typescript",
+      });
       expect(register.instance.id).toMatch(/^inst_/);
       expect(typeof register.instance.hostname).toBe("string");
       expect(typeof register.instance.username).toBe("string");
@@ -318,7 +334,9 @@ describe("the agent client, given a fake platform", () => {
           environment: "development",
           parameters: {
             type: "object",
-            properties: { model: { type: "string", enum: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" } },
+            properties: {
+              model: { type: "string", enum: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" },
+            },
           },
           concurrency: 1,
           timeoutMs: 30_000,
@@ -328,7 +346,9 @@ describe("the agent client, given a fake platform", () => {
       expect(connection.request.url).toBe("/api/v1/agents/connect");
       expect(connection.request.headers.authorization).toBe("Bearer sk-lw-test");
       expect(connection.request.headers["x-project-id"]).toBe("proj_1");
-      expect(connection.request.headers["user-agent"]).toBe(`langwatch-typescript/${LANGWATCH_SDK_VERSION}`);
+      expect(connection.request.headers["user-agent"]).toBe(
+        `langwatch-typescript/${LANGWATCH_SDK_VERSION}`,
+      );
     });
 
     /** @scenario "The environment is the explicit option first" */
@@ -366,9 +386,7 @@ describe("the agent client, given a fake platform", () => {
         connection.send(callFrame({}));
         await connection.nextFrame("ack");
         await vi.waitFor(() => expect(forceFlush).toHaveBeenCalledTimes(1));
-        expect(connection.frames.some((frame) => frame.type === "result")).toBe(
-          false,
-        );
+        expect(connection.frames.some((frame) => frame.type === "result")).toBe(false);
 
         releaseFlush();
         expect(await connection.nextFrame("result")).toMatchObject({
@@ -403,10 +421,13 @@ describe("the agent client, given a fake platform", () => {
     /** @scenario "A call frame reaches the handler as one object" */
     it("acks, runs the handler with the turn fields, and sends the result", async () => {
       const seen: AgentCall<Record<string, AgentParameterValue>>[] = [];
-      const { connection } = await connectSupport(async (call) => {
-        seen.push(call);
-        return "hello";
-      }, { parameters: { plan: { default: "free" } } });
+      const { connection } = await connectSupport(
+        async (call) => {
+          seen.push(call);
+          return "hello";
+        },
+        { parameters: { plan: { default: "free" } } },
+      );
 
       connection.send(callFrame({ params: { plan: "pro" }, session: { id: "s1" } }));
 
@@ -427,7 +448,10 @@ describe("the agent client, given a fake platform", () => {
 
     /** @scenario "A reply with a session echoes the session" */
     it("sends the session beside the output", async () => {
-      const { connection } = await connectSupport(async () => ({ output: { role: "assistant", content: "x" }, session: { cursor: 2 } }));
+      const { connection } = await connectSupport(async () => ({
+        output: { role: "assistant", content: "x" },
+        session: { cursor: 2 },
+      }));
 
       connection.send(callFrame());
 
@@ -458,7 +482,10 @@ describe("the agent client, given a fake platform", () => {
       });
 
       connection.send(callFrame({ callId: "call_2" }));
-      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_2", output: "fine now" });
+      expect(await connection.nextFrame("result")).toMatchObject({
+        callId: "call_2",
+        output: "fine now",
+      });
     });
 
     /** @scenario "A missing parameter takes its default" */
@@ -484,19 +511,28 @@ describe("the agent client, given a fake platform", () => {
     it("refuses a missing required value or a value outside the options without running the handler", async () => {
       const handler = vi.fn(async () => "never");
       const { connection } = await connectSupport(handler, {
-        parameters: { plan: { description: "required" }, model: { options: ["a", "b"], default: "a" } },
+        parameters: {
+          plan: { description: "required" },
+          model: { options: ["a", "b"], default: "a" },
+        },
       });
 
       connection.send(callFrame({ callId: "call_1", params: {} }));
       expect(await connection.nextFrame("result")).toMatchObject({
         callId: "call_1",
-        error: { code: "agent_parameter_invalid", message: expect.stringContaining('"plan" is required') },
+        error: {
+          code: "agent_parameter_invalid",
+          message: expect.stringContaining('"plan" is required'),
+        },
       });
 
       connection.send(callFrame({ callId: "call_2", params: { plan: "pro", model: "c" } }));
       expect(await connection.nextFrame("result")).toMatchObject({
         callId: "call_2",
-        error: { code: "agent_parameter_invalid", message: expect.stringContaining('"model" must be one of a, b') },
+        error: {
+          code: "agent_parameter_invalid",
+          message: expect.stringContaining('"model" must be one of a, b'),
+        },
       });
       expect(handler).not.toHaveBeenCalled();
       expect(connection.frames.filter((frame) => frame.type === "ack")).toHaveLength(0);
@@ -522,7 +558,10 @@ describe("the agent client, given a fake platform", () => {
         error: { code: "agent_busy" },
       });
       release();
-      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_1", output: "first" });
+      expect(await connection.nextFrame("result")).toMatchObject({
+        callId: "call_1",
+        output: "first",
+      });
     });
 
     /** @scenario "A cancel frame drops the result of that call" */
@@ -551,13 +590,19 @@ describe("the agent client, given a fake platform", () => {
       // One socket keeps the order, so the result of a call sent after the
       // cancel proves the client read the cancel first.
       connection.send(callFrame({ callId: "call_2" }));
-      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_2", output: "second" });
+      expect(await connection.nextFrame("result")).toMatchObject({
+        callId: "call_2",
+        output: "second",
+      });
 
       release();
       // The same again after the handler returned: the third result proves the
       // first call had its chance to answer.
       connection.send(callFrame({ callId: "call_3" }));
-      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_3", output: "second" });
+      expect(await connection.nextFrame("result")).toMatchObject({
+        callId: "call_3",
+        output: "second",
+      });
       expect(connection.frames.filter((frame) => frame.type === "result")).toHaveLength(0);
     });
 
@@ -582,7 +627,10 @@ describe("the agent client, given a fake platform", () => {
       connection.send({ type: "cancel", callId: "call_1" });
       connection.send(callFrame({ callId: "call_2" }));
 
-      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_2", output: "second" });
+      expect(await connection.nextFrame("result")).toMatchObject({
+        callId: "call_2",
+        output: "second",
+      });
       release();
     });
 
@@ -606,7 +654,10 @@ describe("the agent client, given a fake platform", () => {
       });
 
       connection.send(callFrame({ callId: "call_2" }));
-      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_2", output: "second" });
+      expect(await connection.nextFrame("result")).toMatchObject({
+        callId: "call_2",
+        output: "second",
+      });
     });
 
     /** @scenario "The concurrency slot is taken before the parameters are read" */
@@ -628,7 +679,10 @@ describe("the agent client, given a fake platform", () => {
         error: { code: "agent_busy" },
       });
       openGate();
-      expect(await connection.nextFrame("result")).toMatchObject({ callId: "call_1", output: "ok" });
+      expect(await connection.nextFrame("result")).toMatchObject({
+        callId: "call_1",
+        output: "ok",
+      });
       expect(handler).toHaveBeenCalledTimes(1);
     });
 
@@ -656,9 +710,7 @@ describe("the agent client, given a fake platform", () => {
 
         // Well past the 60 ms limit, with the export still pending.
         await new Promise((resolve) => setTimeout(resolve, 200));
-        expect(connection.frames.some((frame) => frame.type === "result")).toBe(
-          false,
-        );
+        expect(connection.frames.some((frame) => frame.type === "result")).toBe(false);
 
         releaseFlush();
         expect(await connection.nextFrame("result")).toMatchObject({
@@ -667,9 +719,7 @@ describe("the agent client, given a fake platform", () => {
         });
         // One frame for one call: no timeout error beside the result.
         await new Promise((resolve) => setTimeout(resolve, 50));
-        expect(connection.frames.filter((frame) => frame.type === "result")).toHaveLength(
-          0,
-        );
+        expect(connection.frames.filter((frame) => frame.type === "result")).toHaveLength(0);
       } finally {
         providerSpy.mockRestore();
       }
@@ -681,7 +731,9 @@ describe("the agent client, given a fake platform", () => {
 
       connection.send(callFrame({ deadlineAt: Date.now() - 1000 }));
 
-      expect(await connection.nextFrame("result")).toMatchObject({ error: { code: "agent_call_timeout" } });
+      expect(await connection.nextFrame("result")).toMatchObject({
+        error: { code: "agent_call_timeout" },
+      });
       expect(handler).not.toHaveBeenCalled();
     });
   });
@@ -702,7 +754,9 @@ describe("the agent client, given a fake platform", () => {
           return "ok";
         });
 
-        connection.send(callFrame({ traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" }));
+        connection.send(
+          callFrame({ traceparent: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01" }),
+        );
         await connection.nextFrame("result");
 
         expect(activeTraceId).toBe("0af7651916cd43dd8448eb211c80319c");
@@ -744,7 +798,12 @@ describe("the agent client, given a fake platform", () => {
         type: "refused",
         code: "project_required",
         message: "pick a project",
-        meta: { projects: [{ id: "proj_1", name: "Support" }, { id: "proj_2", name: "Billing" }] },
+        meta: {
+          projects: [
+            { id: "proj_1", name: "Support" },
+            { id: "proj_2", name: "Billing" },
+          ],
+        },
       });
       await until(() => sharedClientForTests()?.isStopped === true);
 
@@ -763,8 +822,12 @@ describe("the agent client, given a fake platform", () => {
       expect(advice("key_type_not_allowed")).toMatch(/personal or project API key/);
       expect(advice("permission_denied")).toMatch(/scenarios:manage/);
       expect(advice("parameters_invalid", "model: enum too long")).toBe("model: enum too long");
-      expect(advice("environment_invalid", "environment must match")).toBe("environment must match");
-      expect(advice("protocol_invalid", "protocol 0 is not supported.")).toMatch(/Update the langwatch package/);
+      expect(advice("environment_invalid", "environment must match")).toBe(
+        "environment must match",
+      );
+      expect(advice("protocol_invalid", "protocol 0 is not supported.")).toMatch(
+        /Update the langwatch package/,
+      );
       expect(advice("replica_count_unsupported", "two replicas.")).toMatch(/one app replica/);
       expect(advice("something_else")).toBe("server says so (something_else)");
     });
@@ -774,7 +837,10 @@ describe("the agent client, given a fake platform", () => {
     /** @scenario "An unreachable endpoint is one warning and silent retries" */
     /** @scenario "The socket keeps the event loop alive while connected" */
     it("warns once naming the endpoint, keeps a ref'd reconnect timer, and stays quiet after", async () => {
-      overrideSharedClientForTests({ backoff: { baseMs: 10, maxMs: 20 }, failureNoticeIntervalMs: 60_000 });
+      overrideSharedClientForTests({
+        backoff: { baseMs: 10, maxMs: 20 },
+        failureNoticeIntervalMs: 60_000,
+      });
       const closed = await FakePlatform.start();
       const port = closed.port;
       await closed.close();
@@ -793,7 +859,10 @@ describe("the agent client, given a fake platform", () => {
 
     /** @scenario "A connection that comes back is reported once" */
     it("logs one info line when the platform comes back", async () => {
-      overrideSharedClientForTests({ backoff: { baseMs: 10, maxMs: 20 }, failureNoticeIntervalMs: 60_000 });
+      overrideSharedClientForTests({
+        backoff: { baseMs: 10, maxMs: 20 },
+        failureNoticeIntervalMs: 60_000,
+      });
       const first = await FakePlatform.start();
       const port = first.port;
       await first.close();
@@ -888,14 +957,19 @@ describe("the agent client, given a fake platform", () => {
     /** @scenario "SIGINT and SIGTERM send deregister" */
     it("sends deregister when the process receives SIGTERM", async () => {
       const { connection } = await connectSupport(async () => "ok");
-      const closed = new Promise<void>((resolve) => connection.socket.once("close", () => resolve()));
+      const closed = new Promise<void>((resolve) =>
+        connection.socket.once("close", () => resolve()),
+      );
       const keepAlive = () => {
         // A listener of the application's own, so the test process is not re-signalled.
       };
       process.on("SIGTERM", keepAlive);
       try {
         shutdownForTests.onShutdownSignal("SIGTERM");
-        expect(await connection.nextFrame("deregister")).toEqual({ type: "deregister", protocol: 1 });
+        expect(await connection.nextFrame("deregister")).toEqual({
+          type: "deregister",
+          protocol: 1,
+        });
         await closed;
         await wait(100);
       } finally {

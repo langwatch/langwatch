@@ -30,9 +30,7 @@ export function TraceViewerProvider({
   children,
 }: TraceViewer & { children: ReactNode }) {
   const value = useMemo(() => ({ traceId, isReadOnly }), [traceId, isReadOnly]);
-  return (
-    <TraceViewerContext.Provider value={value}>{children}</TraceViewerContext.Provider>
-  );
+  return <TraceViewerContext.Provider value={value}>{children}</TraceViewerContext.Provider>;
 }
 
 /** Defaults to the live in-app drawer when no provider is mounted. */

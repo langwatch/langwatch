@@ -1,7 +1,4 @@
-import {
-  detectCodingAgent,
-  WITHHELD_PROMPT_TEXT,
-} from "./telemetry/coding-agent-normalization";
+import { detectCodingAgent, WITHHELD_PROMPT_TEXT } from "./telemetry/coding-agent-normalization";
 import type { CodingAgent } from "./telemetry";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { collectLogEntries } from "./coding-agent-transcript-log";
@@ -129,9 +126,7 @@ function addUnduplicatedSpanReplies(
 
   for (const reply of spanReplies) {
     const duplicatedByLog = logReplyTimes.some(
-      (atMs) =>
-        atMs >= reply.windowStartMs &&
-        atMs <= reply.windowEndMs + LOG_REPLY_FLUSH_SLACK_MS,
+      (atMs) => atMs >= reply.windowStartMs && atMs <= reply.windowEndMs + LOG_REPLY_FLUSH_SLACK_MS,
     );
     if (!duplicatedByLog) entries.push(reply.entry);
   }
@@ -173,10 +168,7 @@ function isUserPromptEntry(entry: TranscriptEntry): entry is UserPromptEntry {
 }
 
 function isWithheldPrompt(entry: TranscriptEntry): entry is UserPromptEntry {
-  return (
-    isUserPromptEntry(entry) &&
-    (entry.text === null || entry.text === WITHHELD_PROMPT_TEXT)
-  );
+  return isUserPromptEntry(entry) && (entry.text === null || entry.text === WITHHELD_PROMPT_TEXT);
 }
 
 function nearestUnclaimedStub({
@@ -195,8 +187,7 @@ function nearestUnclaimedStub({
     if (claimed.has(index) || entry.chars !== prompt.chars) continue;
 
     const distanceMs = Math.abs(entry.atMs - prompt.atMs);
-    if (distanceMs > PROMPT_STUB_SAME_TURN_MS || distanceMs >= nearestDistanceMs)
-      continue;
+    if (distanceMs > PROMPT_STUB_SAME_TURN_MS || distanceMs >= nearestDistanceMs) continue;
 
     nearestDistanceMs = distanceMs;
     nearestIndex = index;

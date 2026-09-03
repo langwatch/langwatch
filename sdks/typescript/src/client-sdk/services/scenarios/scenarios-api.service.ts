@@ -72,33 +72,19 @@ export class ScenariosApiService {
       ...(options?.limit !== undefined && { limit: options.limit }),
       ...(options?.cursor !== undefined && { cursor: options.cursor }),
     };
-    const { data, error } = await this.apiClient.GET(
-      "/api/scenarios/{id}/versions",
-      {
-        params: { path: { id }, query },
-      },
-    );
-    if (error)
-      this.handleApiError(`list versions of scenario "${id}"`, error);
+    const { data, error } = await this.apiClient.GET("/api/scenarios/{id}/versions", {
+      params: { path: { id }, query },
+    });
+    if (error) this.handleApiError(`list versions of scenario "${id}"`, error);
     return data;
   }
 
   /** One saved version of a scenario, with the content it saved. */
-  async getVersion(
-    id: string,
-    version: number,
-  ): Promise<ScenarioVersionDetail> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/scenarios/{id}/versions/{version}",
-      {
-        params: { path: { id, version } },
-      },
-    );
-    if (error)
-      this.handleApiError(
-        `get version ${version} of scenario "${id}"`,
-        error,
-      );
+  async getVersion(id: string, version: number): Promise<ScenarioVersionDetail> {
+    const { data, error } = await this.apiClient.GET("/api/scenarios/{id}/versions/{version}", {
+      params: { path: { id, version } },
+    });
+    if (error) this.handleApiError(`get version ${version} of scenario "${id}"`, error);
     return data;
   }
 

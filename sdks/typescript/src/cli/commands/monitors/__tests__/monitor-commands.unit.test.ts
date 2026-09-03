@@ -71,10 +71,7 @@ describe("listMonitorsCommand()", () => {
   it("lists monitors in table format", async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => [
-        makeMonitor(),
-        makeMonitor({ id: "mon_def", name: "PII Check" }),
-      ],
+      json: async () => [makeMonitor(), makeMonitor({ id: "mon_def", name: "PII Check" })],
     });
 
     await listMonitorsCommand();
@@ -188,9 +185,9 @@ describe("createMonitorCommand()", () => {
     it("fails before calling the API and points at evaluator create and list", async () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-      await expect(
-        createMonitorCommand("Test", { checkType: "ragas/toxicity" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createMonitorCommand("Test", { checkType: "ragas/toxicity" })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(mockFetch).not.toHaveBeenCalled();
       const output = errorSpy.mock.calls.map((call) => call.join(" ")).join("\n");

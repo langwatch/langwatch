@@ -45,15 +45,11 @@ const userIdOf = (stack: Stack): string => stack.db.user?.[0]?.id as string;
  */
 const emailFactsHeld = (stack: Stack) =>
   [...stack.events.rows.values()].filter(
-    (fact) =>
-      fact.type === IDENTIFIER_ATTACHED_EVENT_TYPE &&
-      fact.data.provider === "email",
+    (fact) => fact.type === IDENTIFIER_ATTACHED_EVENT_TYPE && fact.data.provider === "email",
   );
 
 const statedIdentifiers = (stack: Stack) =>
-  [...stack.heads.heads.values()].flatMap((heads) =>
-    Object.values(heads.identifiers),
-  );
+  [...stack.heads.heads.values()].flatMap((heads) => Object.values(heads.identifiers));
 
 describe("better-auth over the born-finalized entrance", () => {
   describe("given a sign-up request carrying the identity-branch opt-in", () => {
@@ -71,16 +67,12 @@ describe("better-auth over the born-finalized entrance", () => {
         // Under the NEW user's tenant, which is the newborn themselves —
         // identity tenants are users (ADR-101).
         expect(
-          stack.commands.map(
-            (command) => (command.data as { tenantId: string }).tenantId,
-          ),
+          stack.commands.map((command) => (command.data as { tenantId: string }).tenantId),
         ).toEqual([userId, userId]);
 
         // Both rows exist by the time sign-up returns: the identifier the
         // fold projected, and the credential row the account create wrote.
-        expect(
-          statedIdentifiers(stack).map((identifier) => identifier.value),
-        ).toContain(EMAIL);
+        expect(statedIdentifiers(stack).map((identifier) => identifier.value)).toContain(EMAIL);
         expect(stack.storage.credentials.size).toBe(1);
         expect(stack.migrationState.get(userId)).toBe("finalized");
       });
@@ -99,9 +91,8 @@ describe("better-auth over the born-finalized entrance", () => {
         );
         expect(credentialIdentifier).toBeDefined();
         expect(
-          stack.storage.credentials.get(
-            credentialIdentifier?.accountId as string,
-          )?.secrets.password,
+          stack.storage.credentials.get(credentialIdentifier?.accountId as string)?.secrets
+            .password,
         ).toEqual(expect.any(String));
         expect(stack.db.account).toHaveLength(0);
       });
@@ -126,9 +117,7 @@ describe("better-auth over the born-finalized entrance", () => {
         expect(userIdOf(stack)).toBe(firstUserId);
         expect(stack.db.user).toHaveLength(1);
         expect(
-          statedIdentifiers(stack).filter(
-            (identifier) => identifier.provider === "email",
-          ),
+          statedIdentifiers(stack).filter((identifier) => identifier.provider === "email"),
         ).toHaveLength(1);
         expect(emailFactsHeld(stack)).toHaveLength(1);
       });
@@ -158,18 +147,14 @@ describe("better-auth over the born-finalized entrance", () => {
 
           expect(userIdOf(stack)).toBe(firstUserId);
           expect(
-            statedIdentifiers(stack).filter(
-              (identifier) => identifier.provider === "email",
-            ),
+            statedIdentifiers(stack).filter((identifier) => identifier.provider === "email"),
           ).toHaveLength(1);
           // Two dispatches of ONE command id, and one fact held under it.
           // The guard cannot be what absorbed this retry — it derived an
           // identifier id the heads had never seen — so the store is, which
           // is the convergence production relies on.
           const emailCommandIds = stack.commands
-            .filter(
-              (command) => command.type === ATTACH_IDENTIFIER_COMMAND_TYPE,
-            )
+            .filter((command) => command.type === ATTACH_IDENTIFIER_COMMAND_TYPE)
             .filter((command) => command.data.provider === "email")
             .map((command) => command.data.commandId);
           expect(emailCommandIds).toHaveLength(2);
@@ -191,9 +176,7 @@ describe("better-auth over the born-finalized entrance", () => {
         // stream; until it runs, the address names nobody on either branch.
         expect(stack.db.user).toHaveLength(0);
         const context = await stack.auth.$context;
-        expect(
-          await context.internalAdapter.findUserByEmail(EMAIL),
-        ).toBeNull();
+        expect(await context.internalAdapter.findUserByEmail(EMAIL)).toBeNull();
         // The claim the entrance wrote before the append is what makes the
         // orphan FINDABLE — the event store enumerates no aggregates, so an
         // unfolded stream leaves nothing else behind.
@@ -211,9 +194,7 @@ describe("better-auth over the born-finalized entrance", () => {
         // adapter boundary turned the refusal into an APIError carrying it —
         // otherwise sign-up answers a generic FAILED_TO_CREATE_USER and the
         // presentation registry has nothing to key on.
-        await expect(
-          flaggedSignUpOrThrow(stack.auth, EMAIL),
-        ).rejects.toMatchObject({
+        await expect(flaggedSignUpOrThrow(stack.auth, EMAIL)).rejects.toMatchObject({
           body: { code: "identity_engine_unavailable" },
           statusCode: 503,
         });
@@ -255,10 +236,7 @@ describe("better-auth over the born-finalized entrance", () => {
  * ADR-116 §3's named residual. The engine goes away between the append and
  * the row write, which is what better-auth's `linkAccount` then trips over.
  */
-async function bearWithoutRows(
-  stack: Stack,
-  email: string,
-): Promise<string | undefined> {
+async function bearWithoutRows(stack: Stack, email: string): Promise<string | undefined> {
   const originalPush = stack.db.user?.push.bind(stack.db.user);
   let bornUserId: string | undefined;
   if (stack.db.user) {

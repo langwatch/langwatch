@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
-import {
-  isAtOrBeforeCutoff,
-  isAtOrBeforeCutoffMarker,
-} from "../../replay/replayConstants";
+import { isAtOrBeforeCutoff, isAtOrBeforeCutoffMarker } from "../../replay/replayConstants";
 import { RedisReplayMarkerChecker, ReplayDeferralError } from "../replayMarkerCheck";
 
 function makeEvent(overrides: Partial<Event> = {}): Event {
@@ -105,9 +102,7 @@ describe("RedisReplayMarkerChecker", () => {
         "projection-replay:cutoff:traceSummary",
         "tenant-1:trace:agg-1",
       );
-      expect(get).toHaveBeenCalledWith(
-        "projection-replay:done:traceSummary:tenant-1:trace:agg-1",
-      );
+      expect(get).toHaveBeenCalledWith("projection-replay:done:traceSummary:tenant-1:trace:agg-1");
     });
   });
 
@@ -116,9 +111,7 @@ describe("RedisReplayMarkerChecker", () => {
       const { checker, setMarkers } = createChecker();
       setMarkers({ cutoff: "pending" });
 
-      await expect(checker.check("traceSummary", makeEvent())).rejects.toThrow(
-        ReplayDeferralError,
-      );
+      await expect(checker.check("traceSummary", makeEvent())).rejects.toThrow(ReplayDeferralError);
       await expect(checker.check("traceSummary", makeEvent())).rejects.toThrow(
         "cutoff being recorded",
       );
@@ -133,10 +126,7 @@ describe("RedisReplayMarkerChecker", () => {
       setMarkers({ cutoff: "1700000001000:evt-010" });
 
       await expect(
-        checker.check(
-          "traceSummary",
-          makeEvent({ createdAt: 1700000000000, id: "evt-001" }),
-        ),
+        checker.check("traceSummary", makeEvent({ createdAt: 1700000000000, id: "evt-001" })),
       ).resolves.toBe("skip");
     });
   });
@@ -149,16 +139,10 @@ describe("RedisReplayMarkerChecker", () => {
       setMarkers({ cutoff: "1700000000000:evt-001" });
 
       await expect(
-        checker.check(
-          "traceSummary",
-          makeEvent({ createdAt: 1700000002000, id: "evt-999" }),
-        ),
+        checker.check("traceSummary", makeEvent({ createdAt: 1700000002000, id: "evt-999" })),
       ).rejects.toThrow(ReplayDeferralError);
       await expect(
-        checker.check(
-          "traceSummary",
-          makeEvent({ createdAt: 1700000002000, id: "evt-999" }),
-        ),
+        checker.check("traceSummary", makeEvent({ createdAt: 1700000002000, id: "evt-999" })),
       ).rejects.toThrow("deferring event past cutoff");
     });
   });
@@ -169,10 +153,7 @@ describe("RedisReplayMarkerChecker", () => {
       setMarkers({ cutoff: "1700000000000:evt-001" });
 
       await expect(
-        checker.check(
-          "traceSummary",
-          makeEvent({ createdAt: 1700000000000, id: "evt-002" }),
-        ),
+        checker.check("traceSummary", makeEvent({ createdAt: 1700000000000, id: "evt-002" })),
       ).rejects.toThrow(ReplayDeferralError);
     });
   });
@@ -183,10 +164,7 @@ describe("RedisReplayMarkerChecker", () => {
       setMarkers({ cutoff: "1700000000000:evt-001" });
 
       await expect(
-        checker.check(
-          "traceSummary",
-          makeEvent({ createdAt: 1700000000000, id: "evt-001" }),
-        ),
+        checker.check("traceSummary", makeEvent({ createdAt: 1700000000000, id: "evt-001" })),
       ).resolves.toBe("skip");
     });
   });
@@ -202,10 +180,7 @@ describe("RedisReplayMarkerChecker", () => {
         setMarkers({ cutoff: null, done: "1700000001000:evt-010" });
 
         await expect(
-          checker.check(
-            "traceSummary",
-            makeEvent({ createdAt: 1700000000000, id: "evt-001" }),
-          ),
+          checker.check("traceSummary", makeEvent({ createdAt: 1700000000000, id: "evt-001" })),
         ).resolves.toBe("skip");
       });
     });
@@ -216,10 +191,7 @@ describe("RedisReplayMarkerChecker", () => {
         setMarkers({ cutoff: null, done: "1700000000000:evt-001" });
 
         await expect(
-          checker.check(
-            "traceSummary",
-            makeEvent({ createdAt: 1700000002000, id: "evt-999" }),
-          ),
+          checker.check("traceSummary", makeEvent({ createdAt: 1700000002000, id: "evt-999" })),
         ).resolves.toBe("process");
       });
     });
@@ -236,10 +208,7 @@ describe("RedisReplayMarkerChecker", () => {
       });
 
       await expect(
-        checker.check(
-          "traceSummary",
-          makeEvent({ createdAt: 1700000002000, id: "evt-999" }),
-        ),
+        checker.check("traceSummary", makeEvent({ createdAt: 1700000002000, id: "evt-999" })),
       ).rejects.toThrow(ReplayDeferralError);
     });
   });
@@ -260,8 +229,6 @@ describe("RedisReplayMarkerChecker", () => {
       "projection-replay:cutoff:evalRun",
       "proj_abc:evaluation:eval-42",
     );
-    expect(get).toHaveBeenCalledWith(
-      "projection-replay:done:evalRun:proj_abc:evaluation:eval-42",
-    );
+    expect(get).toHaveBeenCalledWith("projection-replay:done:evalRun:proj_abc:evaluation:eval-42");
   });
 });

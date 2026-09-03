@@ -1,9 +1,5 @@
 export abstract class OpsSnapshotRedisPort {
-  abstract eval(
-    script: string,
-    numberOfKeys: number,
-    ...args: string[]
-  ): Promise<unknown>;
+  abstract eval(script: string, numberOfKeys: number, ...args: string[]): Promise<unknown>;
   abstract set(
     key: string,
     value: string,

@@ -124,15 +124,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     const span = this.spans[runId];
     if (!span) return;
 
-    addLangChainEvent(
-      span,
-      end.event,
-      runId,
-      end.parentRunId,
-      end.tags,
-      end.md,
-      end.extra,
-    );
+    addLangChainEvent(span, end.event, runId, end.parentRunId, end.tags, end.md, end.extra);
 
     if (end.err) {
       span.recordException(end.err);
@@ -210,11 +202,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     });
   }
 
-  async handleLLMEnd(
-    response: LLMResult,
-    runId: string,
-    parentRunId?: string,
-  ): Promise<void> {
+  async handleLLMEnd(response: LLMResult, runId: string, parentRunId?: string): Promise<void> {
     const span = this.spans[runId];
     const tu = (response.llmOutput as any)?.tokenUsage as
       | {
@@ -280,11 +268,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     }
   }
 
-  async handleChainEnd(
-    output: ChainValues,
-    runId: string,
-    parentRunId?: string,
-  ): Promise<void> {
+  async handleChainEnd(output: ChainValues, runId: string, parentRunId?: string): Promise<void> {
     this.finishRun(runId, { output, event: "handleChainEnd", parentRunId });
   }
 
@@ -333,11 +317,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     }
   }
 
-  async handleToolEnd(
-    output: string,
-    runId: string,
-    parentRunId?: string,
-  ): Promise<void> {
+  async handleToolEnd(output: string, runId: string, parentRunId?: string): Promise<void> {
     this.finishRun(runId, {
       output: shouldCaptureOutput() ? { type: "text", value: output } : void 0,
       event: "handleToolEnd",
@@ -408,12 +388,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     this.finishRun(runId, { event: "handleRetrieverEnd", parentRunId, tags });
   }
 
-  async handleRetrieverError(
-    err: Error,
-    runId: string,
-    parentRunId?: string,
-    tags?: string[],
-  ) {
+  async handleRetrieverError(err: Error, runId: string, parentRunId?: string, tags?: string[]) {
     this.finishRun(runId, {
       err,
       event: "handleRetrieverError",
@@ -442,9 +417,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     tags?: string[],
   ): Promise<void> {
     this.finishRun(runId, {
-      output: shouldCaptureOutput()
-        ? { type: "json", value: action.returnValues }
-        : void 0,
+      output: shouldCaptureOutput() ? { type: "json", value: action.returnValues } : void 0,
       event: "handleAgentEnd",
       parentRunId,
       tags,
@@ -460,9 +433,7 @@ export function convertFromLangChainMessages(messages: BaseMessage[]): ChatMessa
   return out;
 }
 
-function convertFromLangChainMessage(
-  message: BaseMessage & { id?: string[] },
-): ChatMessage {
+function convertFromLangChainMessage(message: BaseMessage & { id?: string[] }): ChatMessage {
   let role: ChatMessage["role"] = "user";
 
   const msgType = (message as any).type as string | undefined;
@@ -520,9 +491,7 @@ function convertFromLangChainMessage(
   return {
     role,
     content,
-    ...(functionCall &&
-    typeof functionCall === "object" &&
-    Object.keys(functionCall).length > 0
+    ...(functionCall && typeof functionCall === "object" && Object.keys(functionCall).length > 0
       ? { function_call: functionCall }
       : {}),
   };
@@ -557,11 +526,7 @@ function ctxSkip(serialized?: Serialized, tags?: string[]) {
 function wrapNonScalarValues(value: unknown): string | number | boolean | undefined {
   if (value === void 0) return void 0;
   if (value === null) return JSON.stringify(null);
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  )
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
     return value;
 
   // Special-case: ChatMessage[] detection via zod schema the project already has
@@ -647,14 +612,12 @@ function applyGenAIAttrs(
 
   const provider = md.ls_provider as string | undefined;
   const requestModel = md.ls_model_name ?? md.kwargs?.model ?? ex.kwargs?.model;
-  const temperature =
-    md.ls_temperature ?? md.kwargs?.temperature ?? ex.kwargs?.temperature;
+  const temperature = md.ls_temperature ?? md.kwargs?.temperature ?? ex.kwargs?.temperature;
   const responseModel = md.response_metadata?.model_name as string | undefined;
 
   if (provider) span.setAttribute("gen_ai.system", provider);
   if (requestModel) span.setAttribute("gen_ai.request.model", requestModel);
-  if (typeof temperature === "number")
-    span.setAttribute("gen_ai.request.temperature", temperature);
+  if (typeof temperature === "number") span.setAttribute("gen_ai.request.temperature", temperature);
   if (responseModel) span.setAttribute("gen_ai.response.model", responseModel);
 }
 
@@ -683,9 +646,7 @@ function deriveNameAndType(opts: {
   const { runType, name, serialized, metadata, inputs } = opts;
 
   // user-specified name / metadata override
-  const hardName = (name?.trim() ?? (metadata as any)?.operation_name) as
-    | string
-    | undefined;
+  const hardName = (name?.trim() ?? (metadata as any)?.operation_name) as string | undefined;
   if (hardName) {
     return {
       name: hardName,
@@ -705,8 +666,7 @@ function deriveNameAndType(opts: {
 
   // LangGraph node / router - prioritize routers over nodes
   const hasNode = md?.langgraph_node != null;
-  const hasTriggers =
-    Array.isArray(md?.langgraph_triggers) && md.langgraph_triggers.length > 0;
+  const hasTriggers = Array.isArray(md?.langgraph_triggers) && md.langgraph_triggers.length > 0;
   const isRouter = cls.startsWith("Branch<") || hasTriggers;
   const isGraphRunner = md?.langgraph_path && !md?.langgraph_node;
 
@@ -716,13 +676,8 @@ function deriveNameAndType(opts: {
     const model = (md?.ls_model_name as string) ?? (cls || "call");
     const temp = md?.ls_temperature;
     const tempStr =
-      temp != null
-        ? typeof temp === "number"
-          ? temp.toString()
-          : JSON.stringify(temp)
-        : null;
-    const nm =
-      tempStr != null ? `${prov} ${model} (temp ${tempStr})` : `${prov} ${model}`;
+      temp != null ? (typeof temp === "number" ? temp.toString() : JSON.stringify(temp)) : null;
+    const nm = tempStr != null ? `${prov} ${model} (temp ${tempStr})` : `${prov} ${model}`;
     return { name: nm, type: "llm" };
   }
 
@@ -742,9 +697,7 @@ function deriveNameAndType(opts: {
 
   if (hasNode) {
     const step = md?.langgraph_step;
-    const nm = `Node: ${md.langgraph_node}${
-      step != null ? ` (step ${String(step)})` : ""
-    }`;
+    const nm = `Node: ${md.langgraph_node}${step != null ? ` (step ${String(step)})` : ""}`;
     return { name: nm, type: "component" };
   }
   if (isGraphRunner && runType === "chain") {

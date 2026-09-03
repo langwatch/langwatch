@@ -119,8 +119,7 @@ function makeService({
   return new LangyUiActionService({
     redis,
     conversations: {
-      findByIdVisible: async () =>
-        conversationExists ? { currentTurnId } : null,
+      findByIdVisible: async () => (conversationExists ? { currentTurnId } : null),
     },
     buffer: {
       appendUiAction: async ({ actionId, kind, payload }) => {
@@ -351,9 +350,7 @@ describe("LangyUiActionService", () => {
       const totalWaitMs = blpopCalls.reduce((sum, s) => sum + s, 0) * 1000;
       expect(totalWaitMs).toBeLessThanOrEqual(UI_ACTION_MAX_BUDGET_MS);
       expect(UI_ACTION_MAX_BUDGET_MS).toBeLessThan(CLI_REQUEST_DEADLINE_MS);
-      expect(CLI_REQUEST_DEADLINE_MS).toBeLessThan(
-        AGENT_HARNESS_COMMAND_LIMIT_MS,
-      );
+      expect(CLI_REQUEST_DEADLINE_MS).toBeLessThan(AGENT_HARNESS_COMMAND_LIMIT_MS);
     });
   });
 
@@ -705,9 +702,7 @@ describe("LangyUiActionService", () => {
       let plantClaim: (() => void) | undefined;
       const { redis, store } = makeRedis([() => plantClaim?.(), "wait-empty"]);
       plantClaim = () => {
-        const pendingKey = [...store.kv.keys()].find((key) =>
-          key.startsWith("langy:ui:pending:"),
-        );
+        const pendingKey = [...store.kv.keys()].find((key) => key.startsWith("langy:ui:pending:"));
         if (!pendingKey) return;
         const actionId = pendingKey.replace("langy:ui:pending:", "");
         store.kv.set(uiActionKeys.claim(actionId), "user-1");

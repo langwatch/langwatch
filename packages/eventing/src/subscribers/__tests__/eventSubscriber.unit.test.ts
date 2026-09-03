@@ -43,19 +43,11 @@ describe("event subscribers", () => {
           eventStore,
           subscribers: [subscriber],
         });
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          aggregateType,
-          tenantId,
-        );
+        const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
         await service.storeEvents([event], context);
 
-        expect(eventStore.storeEvents).toHaveBeenCalledWith(
-          [event],
-          context,
-          aggregateType,
-        );
+        expect(eventStore.storeEvents).toHaveBeenCalledWith([event], context, aggregateType);
         expect(eventStore.getEvents).not.toHaveBeenCalled();
         expect(eventStore.getEventsUpTo).not.toHaveBeenCalled();
         expect(handle).toHaveBeenCalledWith(event, {
@@ -83,11 +75,7 @@ describe("event subscribers", () => {
           eventStore,
           subscribers: [subscriber],
         });
-        const event = createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          aggregateType,
-          tenantId,
-        );
+        const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
         await service.storeEvents([event], context);
 

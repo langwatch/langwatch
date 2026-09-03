@@ -23,11 +23,7 @@ export function LabeledSwitch<T extends string>({
 
   return (
     <HStack gap={2} data-testid={testId}>
-      <Text
-        id={leftLabelId}
-        fontWeight={value === left.value ? "bold" : "normal"}
-        fontSize="sm"
-      >
+      <Text id={leftLabelId} fontWeight={value === left.value ? "bold" : "normal"} fontSize="sm">
         {left.label}
       </Text>
       <Switch
@@ -36,11 +32,7 @@ export function LabeledSwitch<T extends string>({
         onCheckedChange={(e) => onChange(e.checked ? right.value : left.value)}
         aria-labelledby={`${leftLabelId} ${rightLabelId}`}
       />
-      <Text
-        id={rightLabelId}
-        fontWeight={value === right.value ? "bold" : "normal"}
-        fontSize="sm"
-      >
+      <Text id={rightLabelId} fontWeight={value === right.value ? "bold" : "normal"} fontSize="sm">
         {right.label}
       </Text>
     </HStack>

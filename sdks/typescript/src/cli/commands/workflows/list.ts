@@ -15,9 +15,7 @@ export const listWorkflowsCommand = async (): Promise<CommandResult | void> => {
   try {
     const workflows = await service.getAll();
 
-    spinner.succeed(
-      `Found ${workflows.length} workflow${workflows.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${workflows.length} workflow${workflows.length !== 1 ? "s" : ""}`);
 
     return {
       data: workflows,
@@ -55,9 +53,7 @@ export const listWorkflowsCommand = async (): Promise<CommandResult | void> => {
 
         console.log();
         console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch workflow get <id>")} to view workflow details`,
-          ),
+          chalk.gray(`Use ${chalk.cyan("langwatch workflow get <id>")} to view workflow details`),
         );
       },
     };

@@ -203,12 +203,7 @@ describe("reduceScimSync", () => {
     });
 
     it("also recovers when the next push simply lands", () => {
-      const state = fold([
-        tokenIssued(),
-        userPushed(),
-        applyFailed(),
-        userPushed(T0 + 7),
-      ]);
+      const state = fold([tokenIssued(), userPushed(), applyFailed(), userPushed(T0 + 7)]);
 
       expect(state.state).toBe("SYNCING");
       expect(state.lastFailure).toBeNull();

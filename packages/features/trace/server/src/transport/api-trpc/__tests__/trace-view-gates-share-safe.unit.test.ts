@@ -130,7 +130,11 @@ describe("sharedTrace share-safe gates", () => {
       it("still strips the title, which paraphrases both sides", () => {
         const out = gateSessionTitle({
           sessions: [sessionWith("Fix the flaky session fold test")],
-          protections: { ...anonProtections, canSeeCapturedInput: true, canSeeCapturedOutput: false },
+          protections: {
+            ...anonProtections,
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: false,
+          },
         });
 
         expect(out[0]!.codingAgent!.title).toBeNull();
@@ -341,7 +345,11 @@ describe("sharedTrace share-safe gates", () => {
       it("strips details and error text despite output being visible", () => {
         const out = gateEvaluations({
           evaluations,
-          protections: { ...anonProtections, canSeeCapturedInput: false, canSeeCapturedOutput: true },
+          protections: {
+            ...anonProtections,
+            canSeeCapturedInput: false,
+            canSeeCapturedOutput: true,
+          },
         });
         expect(out[0]?.details).toBeNull();
         expect(out[0]?.error?.message).toBe("");

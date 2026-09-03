@@ -74,9 +74,7 @@ describe("nlpgoHandledErrorFrom", () => {
   describe("given errors without a handled envelope", () => {
     it("returns null for a non-JSON provider error body", () => {
       expect(
-        nlpgoHandledErrorFrom(
-          makeAPICallError({ responseBody: "<html>502 Bad Gateway</html>" }),
-        ),
+        nlpgoHandledErrorFrom(makeAPICallError({ responseBody: "<html>502 Bad Gateway</html>" })),
       ).toBeNull();
     });
 

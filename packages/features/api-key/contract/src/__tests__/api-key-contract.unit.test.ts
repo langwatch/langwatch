@@ -12,12 +12,8 @@ import {
 
 describe("API-key contract", () => {
   it("recognizes current and legacy token classes", () => {
-    expect(getTokenType(`${API_KEY_PREFIX}${"a".repeat(16)}_${"b".repeat(48)}`)).toBe(
-      "apiKey",
-    );
-    expect(getTokenType(`${INGEST_KEY_PREFIX}${"a".repeat(16)}_${"b".repeat(48)}`)).toBe(
-      "apiKey",
-    );
+    expect(getTokenType(`${API_KEY_PREFIX}${"a".repeat(16)}_${"b".repeat(48)}`)).toBe("apiKey");
+    expect(getTokenType(`${INGEST_KEY_PREFIX}${"a".repeat(16)}_${"b".repeat(48)}`)).toBe("apiKey");
     expect(getTokenType(`${LEGACY_PAT_PREFIX}lookup_secret`)).toBe("apiKey");
     expect(getTokenType("sk-lw-legacy_key")).toBe("legacyProjectKey");
   });

@@ -216,7 +216,5 @@ export function langyRestingFloorPx({
   expectedMessageCount: number;
 }): number {
   if (emptyAndSettled) return LANGY_FLOATING_FLOOR_EMPTY_PX;
-  return expectedMessageCount <= 1
-    ? LANGY_FLOATING_FLOOR_TURN_PX
-    : LANGY_FLOATING_FLOOR_THREAD_PX;
+  return expectedMessageCount <= 1 ? LANGY_FLOATING_FLOOR_TURN_PX : LANGY_FLOATING_FLOOR_THREAD_PX;
 }

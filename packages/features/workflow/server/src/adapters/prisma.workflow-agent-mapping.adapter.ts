@@ -67,7 +67,9 @@ function extractVariablesFromGraph(dsl: MappingSurfaceGraph): {
   );
 
   const endNodeData = dsl.nodes.find((node) => node.type === "end" || node.id === "end")?.data;
-  const rawOutputs: unknown[] = Array.isArray((endNodeData as { inputs?: unknown } | undefined)?.inputs)
+  const rawOutputs: unknown[] = Array.isArray(
+    (endNodeData as { inputs?: unknown } | undefined)?.inputs,
+  )
     ? (endNodeData as { inputs: unknown[] }).inputs
     : [];
 
@@ -178,8 +180,7 @@ export class PrismaWorkflowAgentMappingAdapter extends WorkflowAgentMappingPort 
           hasExistingMappings &&
           (currentKeys.length !== nextKeys.length ||
             currentKeys.some((key) => !(key in nextMappings)));
-        const needsInitialMappings =
-          !hasExistingMappings && Object.keys(nextMappings).length > 0;
+        const needsInitialMappings = !hasExistingMappings && Object.keys(nextMappings).length > 0;
 
         // Output-field staleness is evaluated independently of the input
         // mappings. It is repaired only when the stored value names a field

@@ -97,11 +97,7 @@ export function createUnsubscribeRestApp(options: {
   // to here for a 405 with an Allow header (matching the legacy contract) rather
   // than a bare 404.
   secured
-    .access(
-      publicEndpoint(
-        "RFC 8058 one-click unsubscribe; method guard returns 405 for non-POST",
-      ),
-    )
+    .access(publicEndpoint("RFC 8058 one-click unsubscribe; method guard returns 405 for non-POST"))
     .all("/unsubscribe", (c) => {
       c.header("Allow", "POST");
       return c.json({ error: "Method not allowed" }, 405);

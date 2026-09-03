@@ -9,11 +9,7 @@ interface StaticHeroProps {
   subhead?: string;
 }
 
-export function StaticHero({
-  stage,
-  heading,
-  subhead,
-}: StaticHeroProps): React.ReactElement {
+export function StaticHero({ stage, heading, subhead }: StaticHeroProps): React.ReactElement {
   return (
     <VStack align="center" gap={4} maxWidth="58ch" textAlign="center">
       <Heading

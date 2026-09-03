@@ -25,10 +25,7 @@ import {
   type AncestorProbe,
   resolveCodexSessionFromAncestors,
 } from "@/cli/utils/governance/codex-ancestor-session";
-import {
-  type CodexRolloutMeta,
-  parseCodexRollout,
-} from "@/cli/utils/governance/codex-rollout";
+import { type CodexRolloutMeta, parseCodexRollout } from "@/cli/utils/governance/codex-rollout";
 import { findRolloutForThread } from "@/cli/utils/governance/codex-rollout-otlp";
 import { resolveLiveCodexSession } from "@/cli/utils/governance/codex-live-session";
 
@@ -138,9 +135,7 @@ async function resolveCodexSession({
  * Which session is asking, in the order above. Each tier announces its own
  * failure, because "nothing was declared" must never be silent to the agent.
  */
-export async function resolveSession(
-  inputs: ResolutionInputs,
-): Promise<ResolvedSession | null> {
+export async function resolveSession(inputs: ResolutionInputs): Promise<ResolvedSession | null> {
   if (inputs.sessionId || inputs.agent) {
     return resolveExplicitSession(inputs);
   }
@@ -152,9 +147,7 @@ export async function resolveSession(
 }
 
 /** The rollout identity at a known transcript path, best-effort. */
-async function readRolloutMeta(
-  rolloutPath: string,
-): Promise<CodexRolloutMeta | null> {
+async function readRolloutMeta(rolloutPath: string): Promise<CodexRolloutMeta | null> {
   try {
     return parseCodexRollout(await readFile(rolloutPath, "utf8")).meta;
   } catch {

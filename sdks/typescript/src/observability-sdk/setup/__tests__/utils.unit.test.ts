@@ -35,17 +35,15 @@ describe("utils.ts", () => {
       ).toBe(false);
     });
     it("returns true for OTel 2.x shape: _activeSpanProcessor._spanProcessors array", () => {
-      expect(
-        utils.isConcreteProvider({ _activeSpanProcessor: { _spanProcessors: [] } }),
-      ).toBe(true);
+      expect(utils.isConcreteProvider({ _activeSpanProcessor: { _spanProcessors: [] } })).toBe(
+        true,
+      );
     });
     it("returns true for OTel 1.x shape: _registeredSpanProcessors array", () => {
       expect(utils.isConcreteProvider({ _registeredSpanProcessors: [] })).toBe(true);
     });
     it("returns true for alternate shape: activeSpanProcessor._spanProcessors array", () => {
-      expect(
-        utils.isConcreteProvider({ activeSpanProcessor: { _spanProcessors: [] } }),
-      ).toBe(true);
+      expect(utils.isConcreteProvider({ activeSpanProcessor: { _spanProcessors: [] } })).toBe(true);
     });
   });
 

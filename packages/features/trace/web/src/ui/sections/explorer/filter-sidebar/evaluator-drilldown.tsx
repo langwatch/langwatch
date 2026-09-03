@@ -9,7 +9,11 @@ import {
   readEvaluatorGroupFromAst,
 } from "@langwatch/trace-contract";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button";
-import { commitRange, RangeEndpointInput, stepForSpan } from "../../../elements/explorer/filter-sidebar/range-controls";
+import {
+  commitRange,
+  RangeEndpointInput,
+  stepForSpan,
+} from "../../../elements/explorer/filter-sidebar/range-controls";
 import type { FacetItem } from "../../../../behavior/explorer/filter-sidebar/types";
 import { formatCount } from "./utils";
 
@@ -67,18 +71,12 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
   // Read THIS evaluator's group state out of the AST — verdict / label /
   // score active state is scoped to `(evaluator:<id> AND …)`, so two active
   // evaluators that share a verdict value don't alias each other.
-  const group = useMemo(
-    () => readEvaluatorGroupFromAst(ast, item.value),
-    [ast, item.value],
-  );
+  const group = useMemo(() => readEvaluatorGroupFromAst(ast, item.value), [ast, item.value]);
   const verdicts = useMemo<VerdictRowSpec[]>(
     () => (aggregates ? buildVerdictSpecs(aggregates) : []),
     [aggregates],
   );
-  const activeVerdicts = useMemo(
-    () => computeActiveSubValues(group, VERDICT_FIELD),
-    [group],
-  );
+  const activeVerdicts = useMemo(() => computeActiveSubValues(group, VERDICT_FIELD), [group]);
   const activeLabels = useMemo(() => computeActiveSubValues(group, LABEL_FIELD), [group]);
   const currentScoreRange = group.score;
 
@@ -100,9 +98,7 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
   // via ScoreRangeControl. `hasScore` alone fired for any non-null
   // score, which is what surfaced the redundant slider.
   const scoreMirrorsVerdict =
-    aggregates.distinctScores === 2 &&
-    aggregates.scoreMin === 0 &&
-    aggregates.scoreMax === 1;
+    aggregates.distinctScores === 2 && aggregates.scoreMin === 0 && aggregates.scoreMax === 1;
   const hasMeaningfulScore = aggregates.hasScore && !scoreMirrorsVerdict;
 
   return (
@@ -130,9 +126,7 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
                 showDot
                 maxCount={maxVerdictCount}
                 active={activeVerdicts.has(v.verdict)}
-                onClick={() =>
-                  toggleSubFilter({ field: VERDICT_FIELD, value: v.verdict })
-                }
+                onClick={() => toggleSubFilter({ field: VERDICT_FIELD, value: v.verdict })}
               />
             ))}
           </VStack>
@@ -234,8 +228,7 @@ const ValueRow: React.FC<{
   onClick: () => void;
   showDot?: boolean;
 }> = ({ label, count, palette, maxCount, active, onClick, showDot = false }) => {
-  const fillPct =
-    maxCount > 0 ? Math.max((count / maxCount) * 100, MIN_VISIBLE_FILL_PCT) : 0;
+  const fillPct = maxCount > 0 ? Math.max((count / maxCount) * 100, MIN_VISIBLE_FILL_PCT) : 0;
   return (
     <RowButton
       type="button"

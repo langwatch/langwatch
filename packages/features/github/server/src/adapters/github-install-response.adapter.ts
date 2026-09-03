@@ -30,10 +30,7 @@ export class GithubInstallResponseAdapter extends GithubInstallResponsePort {
   }
 
   errorHtml(message: string): string {
-    const safe = message
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    const safe = message.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     return `<!doctype html>
 <html><head><meta charset="utf-8"><title>Connection failed</title></head>
 <body style="font:14px system-ui;color:#a00;padding:24px">

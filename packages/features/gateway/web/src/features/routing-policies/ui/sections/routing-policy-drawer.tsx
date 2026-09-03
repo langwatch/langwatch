@@ -15,10 +15,7 @@ import { useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
 import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
-import {
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-} from "@langwatch/authz-web/surfaces/scope-picker";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
@@ -110,9 +107,7 @@ export function RoutingPolicyDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>
-            {isEditing ? "Edit routing policy" : "New routing policy"}
-          </Drawer.Title>
+          <Drawer.Title>{isEditing ? "Edit routing policy" : "New routing policy"}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -143,11 +138,7 @@ export function RoutingPolicyDrawer({
           <VStack align="stretch" gap={3} width="full">
             <Problems problems={problems} />
             {saveError && (
-              <SaveError
-                isEditing={isEditing}
-                message={saveError}
-                onDismiss={clearSaveError}
-              />
+              <SaveError isEditing={isEditing} message={saveError} onDismiss={clearSaveError} />
             )}
             <HStack justifyContent="flex-end" width="full">
               <Button onClick={onSubmit} loading={isSaving} disabled={!canSave}>
@@ -197,11 +188,7 @@ function DrawerBody({
 
       <Field.Root>
         <Field.Label>Description</Field.Label>
-        <Textarea
-          rows={2}
-          placeholder="What this policy is for"
-          {...register("description")}
-        />
+        <Textarea rows={2} placeholder="What this policy is for" {...register("description")} />
       </Field.Root>
 
       {!isEditing && (
@@ -221,8 +208,8 @@ function DrawerBody({
           <>
             <ProviderScopeChips scopes={scopesWithNames} />
             <Field.HelperText>
-              Fixed once the policy exists. Create another policy to cover a different
-              organization, team or project.
+              Fixed once the policy exists. Create another policy to cover a different organization,
+              team or project.
             </Field.HelperText>
           </>
         ) : (
@@ -330,12 +317,7 @@ function SaveError({
             {message}
           </Text>
         </VStack>
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={onDismiss}
-          aria-label="Dismiss the error"
-        >
+        <Button size="xs" variant="ghost" onClick={onDismiss} aria-label="Dismiss the error">
           <X size={12} />
         </Button>
       </HStack>

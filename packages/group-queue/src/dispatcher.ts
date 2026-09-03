@@ -76,10 +76,7 @@ export class GroupQueueDispatcher {
       }
 
       this.running = false;
-      this.params.logger.debug(
-        { queueName: this.params.queueName },
-        "Dispatcher loop stopped",
-      );
+      this.params.logger.debug({ queueName: this.params.queueName }, "Dispatcher loop stopped");
     };
 
     void run();
@@ -97,10 +94,7 @@ export class GroupQueueDispatcher {
 
   private async waitForSignal(): Promise<void> {
     const signalKey = this.params.scripts.getSignalKey();
-    await this.params.blockingConnection.brpop(
-      signalKey,
-      await this.nextWakeTimeoutSec(),
-    );
+    await this.params.blockingConnection.brpop(signalKey, await this.nextWakeTimeoutSec());
     // Drain remaining buffered signals — the upcoming dispatchBatch
     // handles multiple jobs in one Lua call, so N signals = 1 cycle.
     await this.params.blockingConnection.del(signalKey);

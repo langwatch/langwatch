@@ -41,13 +41,10 @@ describe("vscodeUserSettingsPath()", () => {
     ["darwin", "Library/Application Support/Code/User/settings.json"],
     ["linux", ".config/Code/User/settings.json"],
     ["win32", "AppData/Roaming/Code/User/settings.json"],
-  ] as [VscodePlatform, string][])(
-    "resolves the User settings.json for %s",
-    (platform, tail) => {
-      const p = vscodeUserSettingsPath(platform, home);
-      expect(p).toContain(tail.replace(/\//g, path.sep));
-    },
-  );
+  ] as [VscodePlatform, string][])("resolves the User settings.json for %s", (platform, tail) => {
+    const p = vscodeUserSettingsPath(platform, home);
+    expect(p).toContain(tail.replace(/\//g, path.sep));
+  });
 
   it("returns null for an unsupported platform", () => {
     expect(vscodeUserSettingsPath("aix" as VscodePlatform, home)).toBeNull();
@@ -200,16 +197,12 @@ describe("removeVscodeTerminalOtelEnv()", () => {
 
       const s = readJson(p);
       expect(s["editor.tabSize"]).toBe(2);
-      expect((s["terminal.integrated.env.osx"] as Record<string, unknown>).MY_OWN).toBe(
-        "keep",
-      );
+      expect((s["terminal.integrated.env.osx"] as Record<string, unknown>).MY_OWN).toBe("keep");
     });
   });
 
   it("returns false when settings.json is absent (idempotent)", () => {
-    expect(removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS })).toBe(
-      false,
-    );
+    expect(removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS })).toBe(false);
   });
 
   it("leaves a malformed settings.json untouched", () => {
@@ -217,9 +210,7 @@ describe("removeVscodeTerminalOtelEnv()", () => {
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, "{ not valid json ");
 
-    expect(removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS })).toBe(
-      false,
-    );
+    expect(removeVscodeTerminalOtelEnv({ platform: "darwin", home, keys: KEYS })).toBe(false);
     expect(fs.readFileSync(p, "utf8")).toBe("{ not valid json ");
   });
 });

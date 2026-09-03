@@ -81,10 +81,7 @@ export class MfaGuards {
     }
     // A confirmation for a setup nobody started, or for a different one than
     // the person holds, answers exactly the way a wrong code does.
-    if (
-      enrollment.state !== "PENDING" ||
-      enrollment.enrollmentId !== enrollmentId
-    ) {
+    if (enrollment.state !== "PENDING" || enrollment.enrollmentId !== enrollmentId) {
       throw new IdentityMfaCodeInvalidError(
         `confirm_mfa: no pending enrollment ${enrollmentId} for ${userId}`,
       );
@@ -102,20 +99,13 @@ export class MfaGuards {
    * when the person finished it in the meantime, which is the ordinary case
    * and must not overwrite a working enrollment.
    */
-  async expireMfaEnrollment(
-    data: ExpireMfaEnrollmentCommandData,
-  ): Promise<MfaFactInput[]> {
+  async expireMfaEnrollment(data: ExpireMfaEnrollmentCommandData): Promise<MfaFactInput[]> {
     const { userId, enrollmentId } = data;
     const enrollment = await this.enrollments.findEnrollment({ userId });
-    if (
-      enrollment.state !== "PENDING" ||
-      enrollment.enrollmentId !== enrollmentId
-    ) {
+    if (enrollment.state !== "PENDING" || enrollment.enrollmentId !== enrollmentId) {
       return [];
     }
-    return [
-      { type: MFA_ENROLLMENT_EXPIRED_EVENT_TYPE, data: { enrollmentId } },
-    ];
+    return [{ type: MFA_ENROLLMENT_EXPIRED_EVENT_TYPE, data: { enrollmentId } }];
   }
 
   /**
@@ -156,9 +146,7 @@ export class MfaGuards {
    * position it was; this records that the position is gone, and refuses
    * once there is nothing left to spend.
    */
-  async consumeBackupCode(
-    data: ConsumeBackupCodeCommandData,
-  ): Promise<MfaFactInput[]> {
+  async consumeBackupCode(data: ConsumeBackupCodeCommandData): Promise<MfaFactInput[]> {
     const { userId, codeIndex } = data;
     const enrollment = await this.enrollments.findEnrollment({ userId });
     if (enrollment.state !== "ENABLED" || enrollment.enrollmentId === null) {
@@ -187,9 +175,7 @@ export class MfaGuards {
   }
 
   /** Issue a fresh set, discarding whatever was left of the old one. */
-  async regenerateBackupCodes(
-    data: RegenerateBackupCodesCommandData,
-  ): Promise<MfaFactInput[]> {
+  async regenerateBackupCodes(data: RegenerateBackupCodesCommandData): Promise<MfaFactInput[]> {
     const { userId, backupCodeCount, actor } = data;
     const enrollment = await this.enrollments.findEnrollment({ userId });
     if (enrollment.state !== "ENABLED" || enrollment.enrollmentId === null) {

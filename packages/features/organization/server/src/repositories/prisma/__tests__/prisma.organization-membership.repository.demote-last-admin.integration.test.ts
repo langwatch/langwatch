@@ -42,9 +42,7 @@ describe.skipIf(!DB_URL)(
 
     connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
-    }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }),
-    );
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
     repository = PrismaOrganizationMembershipRepository.create({
       database: prisma,

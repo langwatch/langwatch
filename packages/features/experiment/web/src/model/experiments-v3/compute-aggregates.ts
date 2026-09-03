@@ -167,10 +167,7 @@ export const computeTargetAggregates = (
 
   // Compute overall pass rate (sum of passed / sum of passed+failed)
   // Only count evaluators that have explicit pass/fail results, not score-only
-  const totalPassFail = evaluatorAggregates.reduce(
-    (sum, e) => sum + e.passed + e.failed,
-    0,
-  );
+  const totalPassFail = evaluatorAggregates.reduce((sum, e) => sum + e.passed + e.failed, 0);
   const totalPassed = evaluatorAggregates.reduce((sum, e) => sum + e.passed, 0);
   const overallPassRate = totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
 

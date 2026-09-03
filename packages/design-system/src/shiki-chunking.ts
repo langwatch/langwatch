@@ -15,8 +15,7 @@
  * config can import it without pulling in the runtime highlighter.
  */
 const SHIKI_LANGS_OR_THEMES = /[\\/]@shikijs[\\/+](langs|themes)[\\/]/;
-const BASE_LANG_FILES =
-  /[\\/](json|markdown|shellscript|bash|typescript|python|ini)\.m?js$/;
+const BASE_LANG_FILES = /[\\/](json|markdown|shellscript|bash|typescript|python|ini)\.m?js$/;
 const BASE_THEME_FILES = /[\\/](github-dark|github-light)\.m?js$/;
 const SHIKI_CORE =
   /[\\/]node_modules[\\/](\.pnpm[\\/])?(@shikijs[\\/+]|shiki[\\/@]|oniguruma-to-es|oniguruma-parser|hast-util-to-html)/;

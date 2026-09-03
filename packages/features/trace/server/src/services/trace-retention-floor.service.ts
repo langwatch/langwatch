@@ -1,7 +1,4 @@
-import {
-  type RetentionDaysProvider,
-  RetentionFloorService,
-} from "@langwatch/clickhouse-client";
+import { type RetentionDaysProvider, RetentionFloorService } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import {

@@ -2,40 +2,36 @@
 
 ## [1.3.0](https://github.com/langwatch/langwatch/compare/skills@v1.2.0...skills@v1.3.0) (2026-09-01)
 
-
 ### Features
 
-* **agent-testing:** compare agents in one run ([#7654](https://github.com/langwatch/langwatch/issues/7654)) ([3e73916](https://github.com/langwatch/langwatch/commit/3e7391698f5e9b1cac2f8c5f0d0cacc9dec4d02a))
-* **agent-testing:** v2 polish round 6 ([#7590](https://github.com/langwatch/langwatch/issues/7590)) ([1f9efad](https://github.com/langwatch/langwatch/commit/1f9efad30ab94e86d00f57ea478bf0685b437f23))
-* **agents:** connected agents, a decorated function is a simulation target ([#7655](https://github.com/langwatch/langwatch/issues/7655)) ([56922c0](https://github.com/langwatch/langwatch/commit/56922c0ee429bd5a38717960c09ede0d1905c0c3))
-* **experiments:** the workbench copilot measures before it edits ([#7550](https://github.com/langwatch/langwatch/issues/7550)) ([2343dd5](https://github.com/langwatch/langwatch/commit/2343dd587777edf8b567754fe3523ff9cd6b7b1c))
-* **langy:** drive the experiments workbench as a prompt improvement copilot ([#7424](https://github.com/langwatch/langwatch/issues/7424)) ([1e0d104](https://github.com/langwatch/langwatch/commit/1e0d1040b39c13089ecca01e437a15d2590224ae))
-* **langy:** minimal harness, own system prompt, scoped tools, outcome-based judge, overfit-resistant skills ([#7266](https://github.com/langwatch/langwatch/issues/7266)) ([084324f](https://github.com/langwatch/langwatch/commit/084324f9db077cdaea0cc822ff505485b593d278))
-* **lwql:** workbench epic - granularity contract, run-by-chart-id, dashboard widgets, chart CLI, Langy skill, QA fixes ([#7474](https://github.com/langwatch/langwatch/issues/7474)) ([df4f775](https://github.com/langwatch/langwatch/commit/df4f775bd2a3d3547bad95822278a8ec69682a1c))
-
+- **agent-testing:** compare agents in one run ([#7654](https://github.com/langwatch/langwatch/issues/7654)) ([3e73916](https://github.com/langwatch/langwatch/commit/3e7391698f5e9b1cac2f8c5f0d0cacc9dec4d02a))
+- **agent-testing:** v2 polish round 6 ([#7590](https://github.com/langwatch/langwatch/issues/7590)) ([1f9efad](https://github.com/langwatch/langwatch/commit/1f9efad30ab94e86d00f57ea478bf0685b437f23))
+- **agents:** connected agents, a decorated function is a simulation target ([#7655](https://github.com/langwatch/langwatch/issues/7655)) ([56922c0](https://github.com/langwatch/langwatch/commit/56922c0ee429bd5a38717960c09ede0d1905c0c3))
+- **experiments:** the workbench copilot measures before it edits ([#7550](https://github.com/langwatch/langwatch/issues/7550)) ([2343dd5](https://github.com/langwatch/langwatch/commit/2343dd587777edf8b567754fe3523ff9cd6b7b1c))
+- **langy:** drive the experiments workbench as a prompt improvement copilot ([#7424](https://github.com/langwatch/langwatch/issues/7424)) ([1e0d104](https://github.com/langwatch/langwatch/commit/1e0d1040b39c13089ecca01e437a15d2590224ae))
+- **langy:** minimal harness, own system prompt, scoped tools, outcome-based judge, overfit-resistant skills ([#7266](https://github.com/langwatch/langwatch/issues/7266)) ([084324f](https://github.com/langwatch/langwatch/commit/084324f9db077cdaea0cc822ff505485b593d278))
+- **lwql:** workbench epic - granularity contract, run-by-chart-id, dashboard widgets, chart CLI, Langy skill, QA fixes ([#7474](https://github.com/langwatch/langwatch/issues/7474)) ([df4f775](https://github.com/langwatch/langwatch/commit/df4f775bd2a3d3547bad95822278a8ec69682a1c))
 
 ### Bug Fixes
 
-* **agents:** a finished connected-agent run reaches its verdict, and the transcript stays whole ([#7696](https://github.com/langwatch/langwatch/issues/7696)) ([4f7b665](https://github.com/langwatch/langwatch/commit/4f7b665623e1e453e8f505c259f2351bd074ad72))
-* **experiments:** an evaluator chip says what it checks, and the box has jq ([#7615](https://github.com/langwatch/langwatch/issues/7615)) ([2b113b3](https://github.com/langwatch/langwatch/commit/2b113b346c29f2e871d7d59d647420cdd63d11be))
-* **experiments:** the numbers agree across the workbench, the results page and the CLI ([#7606](https://github.com/langwatch/langwatch/issues/7606)) ([07ade28](https://github.com/langwatch/langwatch/commit/07ade28e92ba93610c0e274c06f87beb1a3b81d9))
-* **langy:** the transcript reads in the order the turn happened ([#7510](https://github.com/langwatch/langwatch/issues/7510)) ([ae7c39a](https://github.com/langwatch/langwatch/commit/ae7c39ad7a6779adfefdfced94f2fd71a4f412da))
-* optional legacy answer fields, one vocabulary for test suites and run plans, and named targets for runs from code ([#7638](https://github.com/langwatch/langwatch/issues/7638)) ([6fd37f3](https://github.com/langwatch/langwatch/commit/6fd37f30428c9fc468230fa9e4a79e3dee8cc58f))
-* **scenarios:** fix the seven defects found while dogfooding a customer onboarding demo ([#7271](https://github.com/langwatch/langwatch/issues/7271)) ([7eeac5b](https://github.com/langwatch/langwatch/commit/7eeac5ba6809ed217ce3179d0a1fbb7656f2db52))
-
+- **agents:** a finished connected-agent run reaches its verdict, and the transcript stays whole ([#7696](https://github.com/langwatch/langwatch/issues/7696)) ([4f7b665](https://github.com/langwatch/langwatch/commit/4f7b665623e1e453e8f505c259f2351bd074ad72))
+- **experiments:** an evaluator chip says what it checks, and the box has jq ([#7615](https://github.com/langwatch/langwatch/issues/7615)) ([2b113b3](https://github.com/langwatch/langwatch/commit/2b113b346c29f2e871d7d59d647420cdd63d11be))
+- **experiments:** the numbers agree across the workbench, the results page and the CLI ([#7606](https://github.com/langwatch/langwatch/issues/7606)) ([07ade28](https://github.com/langwatch/langwatch/commit/07ade28e92ba93610c0e274c06f87beb1a3b81d9))
+- **langy:** the transcript reads in the order the turn happened ([#7510](https://github.com/langwatch/langwatch/issues/7510)) ([ae7c39a](https://github.com/langwatch/langwatch/commit/ae7c39ad7a6779adfefdfced94f2fd71a4f412da))
+- optional legacy answer fields, one vocabulary for test suites and run plans, and named targets for runs from code ([#7638](https://github.com/langwatch/langwatch/issues/7638)) ([6fd37f3](https://github.com/langwatch/langwatch/commit/6fd37f30428c9fc468230fa9e4a79e3dee8cc58f))
+- **scenarios:** fix the seven defects found while dogfooding a customer onboarding demo ([#7271](https://github.com/langwatch/langwatch/issues/7271)) ([7eeac5b](https://github.com/langwatch/langwatch/commit/7eeac5ba6809ed217ce3179d0a1fbb7656f2db52))
 
 ### Miscellaneous
 
-* **deps-dev:** bump the types group across 1 directory with 2 updates ([#6789](https://github.com/langwatch/langwatch/issues/6789)) ([7be2d04](https://github.com/langwatch/langwatch/commit/7be2d04c798b46a29b9b5b046dbb28a1e6c369e7))
-* **deps:** bump chalk from 5.6.2 to 6.0.0 ([#6803](https://github.com/langwatch/langwatch/issues/6803)) ([82c62ea](https://github.com/langwatch/langwatch/commit/82c62eacb15d9a9ae33e5f4a14da82feaf1de033))
-
+- **deps-dev:** bump the types group across 1 directory with 2 updates ([#6789](https://github.com/langwatch/langwatch/issues/6789)) ([7be2d04](https://github.com/langwatch/langwatch/commit/7be2d04c798b46a29b9b5b046dbb28a1e6c369e7))
+- **deps:** bump chalk from 5.6.2 to 6.0.0 ([#6803](https://github.com/langwatch/langwatch/issues/6803)) ([82c62ea](https://github.com/langwatch/langwatch/commit/82c62eacb15d9a9ae33e5f4a14da82feaf1de033))
 
 ### Documentation
 
-* **agent-simulations:** use the skill card on the connect-your-agent page ([#7155](https://github.com/langwatch/langwatch/issues/7155)) ([65307a1](https://github.com/langwatch/langwatch/commit/65307a16eebdc9c7dfbc97a0fd2f8de8d1683048))
-* **agent-testing:** connect from a function beside your service startup ([#7698](https://github.com/langwatch/langwatch/issues/7698)) ([60e7d4c](https://github.com/langwatch/langwatch/commit/60e7d4cedd0b0d70ed271891b24b507a0258a05e))
-* **agent-testing:** rename the section to Agent Testing and rewrite it for the shipped interface ([#7659](https://github.com/langwatch/langwatch/issues/7659)) ([eb2f4b6](https://github.com/langwatch/langwatch/commit/eb2f4b626ddf85ec8ba1f9b49186dc3c333828e5))
-* give coding agents their own top-level section ([#7546](https://github.com/langwatch/langwatch/issues/7546)) ([058882c](https://github.com/langwatch/langwatch/commit/058882c08cfd9070210c9db2d0a46fe837647d28))
+- **agent-simulations:** use the skill card on the connect-your-agent page ([#7155](https://github.com/langwatch/langwatch/issues/7155)) ([65307a1](https://github.com/langwatch/langwatch/commit/65307a16eebdc9c7dfbc97a0fd2f8de8d1683048))
+- **agent-testing:** connect from a function beside your service startup ([#7698](https://github.com/langwatch/langwatch/issues/7698)) ([60e7d4c](https://github.com/langwatch/langwatch/commit/60e7d4cedd0b0d70ed271891b24b507a0258a05e))
+- **agent-testing:** rename the section to Agent Testing and rewrite it for the shipped interface ([#7659](https://github.com/langwatch/langwatch/issues/7659)) ([eb2f4b6](https://github.com/langwatch/langwatch/commit/eb2f4b626ddf85ec8ba1f9b49186dc3c333828e5))
+- give coding agents their own top-level section ([#7546](https://github.com/langwatch/langwatch/issues/7546)) ([058882c](https://github.com/langwatch/langwatch/commit/058882c08cfd9070210c9db2d0a46fe837647d28))
 
 ## [1.2.0](https://github.com/langwatch/langwatch/compare/skills@v1.1.0...skills@v1.2.0) (2026-08-18)
 

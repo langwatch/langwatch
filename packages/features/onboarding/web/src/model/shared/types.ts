@@ -50,10 +50,7 @@ export function singleIcon(src: string, alt: string): SingleIcon {
 /**
  * Creates an icon with a label underneath
  */
-export function iconWithLabel(
-  icon: ThemedIcon | SingleIcon,
-  label: string,
-): IconWithLabel {
+export function iconWithLabel(icon: ThemedIcon | SingleIcon, label: string): IconWithLabel {
   return {
     type: "with-label",
     icon,

@@ -162,11 +162,7 @@ function buildSpan(
   const startTimeMs = baseTime + config.offsetMs;
   const endTimeMs = startTimeMs + config.durationMs;
 
-  const span = tracer.startSpan(
-    config.name,
-    { startTime: new Date(startTimeMs) },
-    parentContext,
-  );
+  const span = tracer.startSpan(config.name, { startTime: new Date(startTimeMs) }, parentContext);
 
   span.setAttribute("langwatch.span.type", config.type);
   // Foundry-emitted traces are always tagged "sample" so they're trivial to
@@ -231,9 +227,7 @@ function buildSpan(
           new Date(startTimeMs),
         );
       }
-      const lastAssistant = [...config.llm.messages]
-        .reverse()
-        .find((m) => m.role === "assistant");
+      const lastAssistant = [...config.llm.messages].reverse().find((m) => m.role === "assistant");
       if (lastAssistant) {
         span.addEvent(
           "gen_ai.choice",
@@ -264,10 +258,7 @@ function buildSpan(
         span.setAttribute("gen_ai.usage.input_tokens", config.llm.metrics.promptTokens);
       }
       if (config.llm.metrics.completionTokens !== undefined) {
-        span.setAttribute(
-          "gen_ai.usage.output_tokens",
-          config.llm.metrics.completionTokens,
-        );
+        span.setAttribute("gen_ai.usage.output_tokens", config.llm.metrics.completionTokens);
       }
       span.setAttribute(
         "langwatch.metrics",
@@ -316,10 +307,7 @@ function buildSpan(
       span.setAttribute("langwatch.prompt.selected.id", config.prompt.selectedId);
     }
     if (config.prompt.variables) {
-      span.setAttribute(
-        "langwatch.prompt.variables",
-        JSON.stringify(config.prompt.variables),
-      );
+      span.setAttribute("langwatch.prompt.variables", JSON.stringify(config.prompt.variables));
     }
   }
 

@@ -66,7 +66,6 @@ const otherAggregate = {
   hasWake: false,
 };
 
-
 function fakeStore(
   overrides: {
     findByRef?: () => Promise<unknown>;

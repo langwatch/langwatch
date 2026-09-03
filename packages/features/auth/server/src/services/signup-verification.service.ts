@@ -28,11 +28,7 @@ import {
 
 /** A single-use address-confirmation token, as storage holds it. */
 export interface SignUpVerificationTokenStore {
-  issue(input: {
-    identifier: string;
-    token: string;
-    expires: Date;
-  }): Promise<void>;
+  issue(input: { identifier: string; token: string; expires: Date }): Promise<void>;
   /**
    * Spends a token: returns the identifier it was issued for and makes it
    * unusable, or answers null for a token that never existed, was already
@@ -45,10 +41,7 @@ export interface SignUpVerificationTokenStore {
 }
 
 export interface SignUpVerificationMailer {
-  sendVerificationLink(input: {
-    email: string;
-    verificationUrl: string;
-  }): Promise<void>;
+  sendVerificationLink(input: { email: string; verificationUrl: string }): Promise<void>;
 }
 
 /** Whether an address already has an account (epic Q12: sign-up may say so). */
@@ -58,10 +51,7 @@ export interface SignUpAccountDirectory {
 
 /** Creates the account a confirmed pending credential earned. */
 export interface SignUpAccountFactory {
-  createCredentialAccount(input: {
-    email: string;
-    passwordHash: string;
-  }): Promise<void>;
+  createCredentialAccount(input: { email: string; passwordHash: string }): Promise<void>;
   /**
    * The link came back, so the address is proven.
    *
@@ -243,9 +233,7 @@ function readPendingSignUp(identifier: string): PendingSignUp | null {
   if (!identifier.startsWith(SIGN_UP_TOKEN_NAMESPACE)) return null;
 
   try {
-    const parsed: unknown = JSON.parse(
-      identifier.slice(SIGN_UP_TOKEN_NAMESPACE.length),
-    );
+    const parsed: unknown = JSON.parse(identifier.slice(SIGN_UP_TOKEN_NAMESPACE.length));
     if (typeof parsed !== "object" || parsed === null) return null;
     const { email, passwordHash } = parsed as Record<string, unknown>;
     if (typeof email !== "string" || email.length === 0) return null;

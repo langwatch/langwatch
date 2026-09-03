@@ -41,9 +41,7 @@ export type LangyExploreLinkProps = {
 };
 
 export type LangyDerivedCardPorts = {
-  renderTimeseries?: (
-    card: Extract<LangyDerivedCard, { kind: "timeseries" }>,
-  ) => ReactNode;
+  renderTimeseries?: (card: Extract<LangyDerivedCard, { kind: "timeseries" }>) => ReactNode;
   renderExploreLink?: (props: LangyExploreLinkProps) => ReactNode;
   resolveExploreHref?: (
     query: Record<string, unknown>,
@@ -62,10 +60,7 @@ export type LangyDerivedCardViewProps = {
   /** Choices only: the lock state derived from the recorded conversation. */
   choicesLockState?: LangyChoicesLockState;
   /** Choices only: answer the question. Absent = read-only (time travel). */
-  onChoiceSelect?: (a: {
-    selection: LangyChoiceSelection;
-    card: LangyDerivedChoicesCard;
-  }) => void;
+  onChoiceSelect?: (a: { selection: LangyChoiceSelection; card: LangyDerivedChoicesCard }) => void;
   /** Verify hint: ask Langy to run the real query. Absent = chip hidden. */
   onVerify?: (a: { card: LangyDerivedCard }) => void;
 } & LangyDerivedCardPorts;
@@ -284,12 +279,7 @@ function bindHints({
     // can actually route the request (live conversation, not time travel).
     if (onVerify) {
       chips.push(
-        <Button
-          key="verify"
-          size="xs"
-          variant="outline"
-          onClick={() => onVerify({ card })}
-        >
+        <Button key="verify" size="xs" variant="outline" onClick={() => onVerify({ card })}>
           <BadgeCheck size={12} /> Verify with a real query
         </Button>,
       );

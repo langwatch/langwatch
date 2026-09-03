@@ -24,12 +24,7 @@ import {
   stagingSocketPath,
   type DaemonServer,
 } from "../server";
-import {
-  encodeFrame,
-  FrameDecoder,
-  PROTOCOL_VERSION,
-  type ClientFrame,
-} from "../protocol";
+import { encodeFrame, FrameDecoder, PROTOCOL_VERSION, type ClientFrame } from "../protocol";
 import type { CommandExecution, CommandExecutor } from "../runner";
 import { noopTelemetry, type DaemonTelemetry } from "../telemetry";
 
@@ -309,9 +304,7 @@ describe("daemon over a unix socket", () => {
         // listening handles behind and turn a clean failure into a worker that
         // never settles.
         try {
-          expect(() => publishSocket(loserStaging, socketPath)).toThrow(
-            DaemonAlreadyRunningError,
-          );
+          expect(() => publishSocket(loserStaging, socketPath)).toThrow(DaemonAlreadyRunningError);
 
           // The winner is untouched and still answering — a rename here would
           // have left it alive on an inode no client can dial.
@@ -599,9 +592,7 @@ describe("daemon over a unix socket", () => {
         // The one place a persistent OTLP exporter would get to complete a
         // flush — which is precisely what a 200ms CLI process cannot do.
         expect(shutdown).toHaveBeenCalledOnce();
-        expect(daemonStopping).toHaveBeenCalledWith(
-          expect.objectContaining({ reason: "idle" }),
-        );
+        expect(daemonStopping).toHaveBeenCalledWith(expect.objectContaining({ reason: "idle" }));
       });
 
       it("does not fire while a command is still in flight", async () => {
@@ -1158,9 +1149,7 @@ describe("daemon over a unix socket", () => {
       it("tells the client to run it in-process, having emitted no output", async () => {
         await startDaemon({
           executor: (): CommandExecution => ({
-            completed: Promise.reject(
-              new Error("ENOENT: no such file or directory, chdir"),
-            ),
+            completed: Promise.reject(new Error("ENOENT: no such file or directory, chdir")),
             cancel: () => undefined,
           }),
         });

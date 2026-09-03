@@ -67,19 +67,13 @@ export function PeerCursorOverlay({
     >
       {children}
       {effectivelyEnabled && anchor && projectId
-        ? cursors.map((cursor) => (
-            <PeerCursorMarker key={cursor.sessionId} cursor={cursor} />
-          ))
+        ? cursors.map((cursor) => <PeerCursorMarker key={cursor.sessionId} cursor={cursor} />)
         : null}
     </Box>
   );
 }
 
-const PeerCursorMarker = memo(function PeerCursorMarker({
-  cursor,
-}: {
-  cursor: PeerCursor;
-}) {
+const PeerCursorMarker = memo(function PeerCursorMarker({ cursor }: { cursor: PeerCursor }) {
   const color = presenceUserColor(cursor.user);
   const name = presenceUserDisplayName(cursor.user);
 

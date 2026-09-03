@@ -38,10 +38,7 @@ import {
   inferAllEvaluatorMappings,
   propagateMappingsToNewDataset,
 } from "../../model/experiments-v3/mapping-inference";
-import {
-  normalizeEvaluators,
-  normalizeTargets,
-} from "@langwatch/experiment-contract";
+import { normalizeEvaluators, normalizeTargets } from "@langwatch/experiment-contract";
 
 // ============================================================================
 // Helper Functions
@@ -186,9 +183,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   rememberRunStartedHere: (runId) => {
     set((state) => {
       const known = state.runsStartedHere ?? [];
-      return known.includes(runId)
-        ? {}
-        : { runsStartedHere: [...known, runId] };
+      return known.includes(runId) ? {} : { runsStartedHere: [...known, runId] };
     });
   },
 
@@ -229,11 +224,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
     // Also auto-map evaluator fields for the new dataset
     const evaluatorsWithNewMappings = state.evaluators.map((evaluator) => {
-      const newMappings = inferAllEvaluatorMappings(
-        evaluator,
-        [dataset],
-        targetsWithNewMappings,
-      );
+      const newMappings = inferAllEvaluatorMappings(evaluator, [dataset], targetsWithNewMappings);
       const datasetMappings = newMappings[dataset.id];
       if (datasetMappings && Object.keys(datasetMappings).length > 0) {
         return {
@@ -248,12 +239,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
 
     // Update targets and evaluators with new mappings if any changed
-    const targetsChanged = targetsWithNewMappings.some(
-      (r, i) => r !== state.targets[i],
-    );
-    const evaluatorsChanged = evaluatorsWithNewMappings.some(
-      (e, i) => e !== state.evaluators[i],
-    );
+    const targetsChanged = targetsWithNewMappings.some((r, i) => r !== state.targets[i]);
+    const evaluatorsChanged = evaluatorsWithNewMappings.some((e, i) => e !== state.evaluators[i]);
 
     if (targetsChanged || evaluatorsChanged) {
       set({
@@ -273,15 +260,10 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
       // If removing the active dataset, switch to first available
       const newActiveDatasetId =
-        state.activeDatasetId === datasetId
-          ? newDatasets[0]!.id
-          : state.activeDatasetId;
+        state.activeDatasetId === datasetId ? newDatasets[0]!.id : state.activeDatasetId;
 
       // Clean up mappings pointing to this dataset
-      const { targets, evaluators } = removeMappingsForDataset(
-        state,
-        datasetId,
-      );
+      const { targets, evaluators } = removeMappingsForDataset(state, datasetId);
 
       return {
         datasets: newDatasets,
@@ -302,9 +284,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
   updateDataset: (datasetId, updates) => {
     set((state) => ({
-      datasets: state.datasets.map((d) =>
-        d.id === datasetId ? { ...d, ...updates } : d,
-      ),
+      datasets: state.datasets.map((d) => (d.id === datasetId ? { ...d, ...updates } : d)),
     }));
   },
 
@@ -590,11 +570,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   getSavedRecordInfo: (datasetId, rowIndex) => {
     const state = get();
     const dataset = state.datasets.find((d) => d.id === datasetId);
-    if (
-      dataset?.type !== "saved" ||
-      !dataset.savedRecords ||
-      !dataset.datasetId
-    ) {
+    if (dataset?.type !== "saved" || !dataset.savedRecords || !dataset.datasetId) {
       return null;
     }
 
@@ -635,8 +611,9 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   applyWorkbenchAction: ({ kind, payload }) => {
     // Widened to the definition type: the per-kind union makes `transform`
     // inaccessible because the read/run kinds don't carry one.
-    const definition: WorkbenchActionDefinition | undefined =
-      isWorkbenchActionKind(kind) ? WORKBENCH_ACTIONS[kind] : undefined;
+    const definition: WorkbenchActionDefinition | undefined = isWorkbenchActionKind(kind)
+      ? WORKBENCH_ACTIONS[kind]
+      : undefined;
     const transform = definition?.transform;
     if (!definition || !transform) {
       throw new Error(`No transform-backed workbench action "${kind}"`);
@@ -688,14 +665,10 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       if (newInputs) {
         const existingInputs = existingTarget.inputs ?? [];
         const newInputIds = new Set(newInputs.map((i) => i.identifier));
-        const existingInputIds = new Set(
-          existingInputs.map((i) => i.identifier),
-        );
+        const existingInputIds = new Set(existingInputs.map((i) => i.identifier));
 
         // Find removed inputs (need to clean up mappings)
-        const removedInputIds = [...existingInputIds].filter(
-          (id) => !newInputIds.has(id),
-        );
+        const removedInputIds = [...existingInputIds].filter((id) => !newInputIds.has(id));
 
         if (removedInputIds.length > 0) {
           const mergedMappings = { ...existingTarget.mappings };
@@ -711,9 +684,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       }
 
       return {
-        targets: state.targets.map((r) =>
-          r.id === targetId ? { ...r, ...finalUpdates } : r,
-        ),
+        targets: state.targets.map((r) => (r.id === targetId ? { ...r, ...finalUpdates } : r)),
       };
     });
   },
@@ -751,10 +722,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       // kind of the target is the type check this seam can make: it stops a
       // prompt or agent target that somehow holds a stale comparison config
       // from having derived comparison mappings written onto it.
-      if (
-        existingTarget?.type !== "evaluator" ||
-        !isComparisonEvaluator(existingTarget)
-      ) {
+      if (existingTarget?.type !== "evaluator" || !isComparisonEvaluator(existingTarget)) {
         return state;
       }
 
@@ -776,10 +744,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         "golden",
         "input",
       ];
-      const newDatasetMappings: Record<
-        string,
-        Record<string, FieldMapping>
-      > = {};
+      const newDatasetMappings: Record<string, Record<string, FieldMapping>> = {};
       for (const dataset of state.datasets) {
         const derived = deriveComparisonTargetMappings(comparison, dataset);
         const existing = { ...(existingTarget.mappings[dataset.id] ?? {}) };
@@ -843,10 +808,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     // EvaluatorConfig is already typed, and the auto-mapping is shared.
     set((state) =>
       editOrKeep<PartializedState | EvaluationsV3State>(
-        () =>
-          sliceOf(
-            attachEvaluator({ state: workbenchStateOf(state), evaluator }),
-          ),
+        () => sliceOf(attachEvaluator({ state: workbenchStateOf(state), evaluator })),
         state,
       ),
     );
@@ -885,13 +847,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // Evaluator mapping actions (per-dataset, per-target mappings stored inside evaluator)
   // -------------------------------------------------------------------------
 
-  setEvaluatorMapping: (
-    evaluatorId,
-    datasetId,
-    targetId,
-    inputField,
-    mapping,
-  ) => {
+  setEvaluatorMapping: (evaluatorId, datasetId, targetId, inputField, mapping) => {
     set(
       (state) =>
         runTransformOrKeep({
@@ -1052,9 +1008,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     if (dataset.type === "inline" && dataset.inline) {
       // For inline datasets, remove values from each column's array
       set((currentState) => {
-        const currentDataset = currentState.datasets.find(
-          (d) => d.id === datasetId,
-        );
+        const currentDataset = currentState.datasets.find((d) => d.id === datasetId);
         if (currentDataset?.type !== "inline" || !currentDataset.inline) {
           return currentState;
         }
@@ -1062,12 +1016,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         const newRecords: Record<string, string[]> = {};
 
         // For each column, filter out the selected row indices
-        for (const [columnId, values] of Object.entries(
-          currentDataset.inline.records,
-        )) {
-          const newValues = values.filter(
-            (_, index) => !selectedRows.has(index),
-          );
+        for (const [columnId, values] of Object.entries(currentDataset.inline.records)) {
+          const newValues = values.filter((_, index) => !selectedRows.has(index));
           newRecords[columnId] = newValues;
         }
 
@@ -1103,9 +1053,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     } else if (dataset.type === "saved" && dataset.savedRecords) {
       // For saved datasets, filter out the records and track which to delete from DB
       set((currentState) => {
-        const currentDataset = currentState.datasets.find(
-          (d) => d.id === datasetId,
-        );
+        const currentDataset = currentState.datasets.find((d) => d.id === datasetId);
         if (currentDataset?.type !== "saved" || !currentDataset.savedRecords) {
           return currentState;
         }
@@ -1289,26 +1237,20 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     const state = workbenchState as Record<string, unknown>;
 
     // Load persisted results if available
-    const persistedResults = state.results as
-      | Record<string, unknown>
-      | undefined;
+    const persistedResults = state.results as Record<string, unknown> | undefined;
     const loadedResults = persistedResults
       ? {
           ...createInitialResults(),
           runId: persistedResults.runId as string | undefined,
           versionId: persistedResults.versionId as string | undefined,
-          targetOutputs:
-            (persistedResults.targetOutputs as Record<string, unknown[]>) ?? {},
+          targetOutputs: (persistedResults.targetOutputs as Record<string, unknown[]>) ?? {},
           targetMetadata:
             (persistedResults.targetMetadata as Record<
               string,
               Array<{ cost?: number; duration?: number; traceId?: string }>
             >) ?? {},
           evaluatorResults:
-            (persistedResults.evaluatorResults as Record<
-              string,
-              Record<string, unknown[]>
-            >) ?? {},
+            (persistedResults.evaluatorResults as Record<string, Record<string, unknown[]>>) ?? {},
           errors: (persistedResults.errors as Record<string, string[]>) ?? {},
         }
       : undefined;
@@ -1321,20 +1263,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
       // Load concurrency from persisted state
       const concurrency =
-        typeof state.concurrency === "number"
-          ? state.concurrency
-          : current.ui.concurrency;
+        typeof state.concurrency === "number" ? state.concurrency : current.ui.concurrency;
 
       return {
         ...current,
         experimentId: (state.experimentId as string) ?? current.experimentId,
-        experimentSlug:
-          (state.experimentSlug as string) ?? current.experimentSlug,
+        experimentSlug: (state.experimentSlug as string) ?? current.experimentSlug,
         name: (state.name as string) ?? current.name,
-        datasets:
-          (state.datasets as typeof current.datasets) ?? current.datasets,
-        activeDatasetId:
-          (state.activeDatasetId as string) ?? current.activeDatasetId,
+        datasets: (state.datasets as typeof current.datasets) ?? current.datasets,
+        activeDatasetId: (state.activeDatasetId as string) ?? current.activeDatasetId,
         // Experiments saved before pairwise and N-way were merged carry a
         // two-slot `pairwise` config. This is the load boundary where it is
         // folded into the canonical `comparison` shape — everything
@@ -1367,9 +1304,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   setSavedDatasetRecords: (datasetId: string, records) => {
     set((state) => ({
       datasets: state.datasets.map((d) =>
-        d.id === datasetId && d.type === "saved"
-          ? { ...d, savedRecords: records }
-          : d,
+        d.id === datasetId && d.type === "saved" ? { ...d, savedRecords: records } : d,
       ),
     }));
   },

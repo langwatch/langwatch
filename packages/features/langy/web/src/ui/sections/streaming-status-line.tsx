@@ -63,13 +63,7 @@ export function StatusOrb({ active = true }: { active?: boolean }) {
         display="grid"
         placeItems="center"
       >
-        <Box
-          width="6px"
-          height="6px"
-          borderRadius="full"
-          background="fg.subtle"
-          opacity={0.6}
-        />
+        <Box width="6px" height="6px" borderRadius="full" background="fg.subtle" opacity={0.6} />
       </Box>
     );
   }
@@ -97,9 +91,7 @@ export function StatusOrb({ active = true }: { active?: boolean }) {
             : { opacity: [0.25, 0.65, 0.25], scale: [0.85, 1.5, 0.85] }
         }
         transition={
-          reduce
-            ? { duration: 0 }
-            : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }
+          reduce ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }
         }
       />
       <MotionBox
@@ -112,9 +104,7 @@ export function StatusOrb({ active = true }: { active?: boolean }) {
         initial={false}
         animate={reduce ? { opacity: 1 } : { opacity: [0.85, 1, 0.85] }}
         transition={
-          reduce
-            ? { duration: 0 }
-            : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }
+          reduce ? { duration: 0 } : { duration: 2.2, repeat: Infinity, ease: "easeInOut" }
         }
       />
     </Box>
@@ -174,12 +164,9 @@ export function useProjectedProgress({
     }
 
     const previous = estimate.current;
-    const sameOperation =
-      previous.total === sample.total && sample.current >= previous.current;
+    const sameOperation = previous.total === sample.total && sample.current >= previous.current;
     const observedRate =
-      sample.batchItems && sample.batchDurationMs
-        ? sample.batchItems / sample.batchDurationMs
-        : 0;
+      sample.batchItems && sample.batchDurationMs ? sample.batchItems / sample.batchDurationMs : 0;
     const itemsPerMs =
       observedRate > 0
         ? sameOperation && previous.itemsPerMs > 0
@@ -280,12 +267,7 @@ export function StreamingStatusLine({
 
       {hasProgress ? (
         <VStack align="stretch" gap={1.5}>
-          <Box
-            height="6px"
-            borderRadius="full"
-            background={PROGRESS_TRACK}
-            overflow="hidden"
-          >
+          <Box height="6px" borderRadius="full" background={PROGRESS_TRACK} overflow="hidden">
             <MotionBox
               height="full"
               borderRadius="full"

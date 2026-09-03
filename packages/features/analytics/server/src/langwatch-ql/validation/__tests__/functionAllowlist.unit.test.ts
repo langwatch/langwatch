@@ -36,8 +36,7 @@ function codesOf(result: LangWatchQLValidation): LangWatchQLViolationCode[] {
 function functionRefusalMessage(result: LangWatchQLValidation): string {
   if (result.ok) return "";
   return (
-    result.violations.find((violation) => violation.code === "FUNCTION_NOT_ALLOWED")
-      ?.message ?? ""
+    result.violations.find((violation) => violation.code === "FUNCTION_NOT_ALLOWED")?.message ?? ""
   );
 }
 
@@ -207,14 +206,9 @@ describe("the LangWatchQL function allowlist", () => {
       ["another server", "remote('other-host', 'db', 'tbl')"],
       ["a dictionary, which no row policy covers", "dictGet('d', 'k', TraceId)"],
       ["a JDBC bridge", "jdbc('ds', 'SELECT 1')"],
-      [
-        "encryption over a key the caller names",
-        "encrypt('aes-128-ecb', TraceName, 'k')",
-      ],
+      ["encryption over a key the caller names", "encrypt('aes-128-ecb', TraceName, 'k')"],
     ])("refuses %s in expression position", (_case, call) => {
-      expect(codesOf(validate(`SELECT ${call} FROM traces`))).toEqual([
-        "FUNCTION_NOT_ALLOWED",
-      ]);
+      expect(codesOf(validate(`SELECT ${call} FROM traces`))).toEqual(["FUNCTION_NOT_ALLOWED"]);
     });
 
     /**
@@ -223,9 +217,7 @@ describe("the LangWatchQL function allowlist", () => {
      * the positional one must not quietly become the only thing standing there.
      */
     it("keeps refusing a table function in FROM position, by the positional rule", () => {
-      expect(codesOf(validate("SELECT * FROM url('http://x', CSV)"))).toContain(
-        "TABLE_FUNCTION",
-      );
+      expect(codesOf(validate("SELECT * FROM url('http://x', CSV)"))).toContain("TABLE_FUNCTION");
     });
   });
 
@@ -235,20 +227,12 @@ describe("the LangWatchQL function allowlist", () => {
       ["floating randomness", "randCanonical()"],
       ["a deliberate stall", "sleep(3)"],
       ["a per-row stall", "sleepEachRow(1)"],
-      [
-        "an aggregate named by a string the allowlist cannot read",
-        "arrayReduce('sum', Models)",
-      ],
-      [
-        "an aggregation state built from a named aggregate",
-        "initializeAggregation('sumIf', 1, 1)",
-      ],
+      ["an aggregate named by a string the allowlist cannot read", "arrayReduce('sum', Models)"],
+      ["an aggregation state built from a named aggregate", "initializeAggregation('sumIf', 1, 1)"],
       ["the storage type of a column", "toTypeName(TraceId)"],
       ["a symbol from the server binary", "demangle('x')"],
     ])("refuses %s", (_case, call) => {
-      expect(codesOf(validate(`SELECT ${call} FROM traces`))).toEqual([
-        "FUNCTION_NOT_ALLOWED",
-      ]);
+      expect(codesOf(validate(`SELECT ${call} FROM traces`))).toEqual(["FUNCTION_NOT_ALLOWED"]);
     });
   });
 
@@ -276,9 +260,7 @@ describe("the LangWatchQL function allowlist", () => {
       ["a per-element aggregate", "sumForEach(Models)"],
       ["a resampled aggregate", "sumResample(1, 10, 2)(TotalCost, SpanCount)"],
     ])("refuses %s", (_case, call) => {
-      expect(codesOf(validate(`SELECT ${call} FROM traces`))).toEqual([
-        "FUNCTION_NOT_ALLOWED",
-      ]);
+      expect(codesOf(validate(`SELECT ${call} FROM traces`))).toEqual(["FUNCTION_NOT_ALLOWED"]);
       expect(codesOf(validate("SELECT sum(TotalCost) FROM traces"))).toEqual([]);
     });
 
@@ -311,14 +293,8 @@ describe("the LangWatchQL function allowlist", () => {
         "a common table expression",
         "WITH probe AS (SELECT version() AS v FROM traces) SELECT v FROM probe",
       ],
-      [
-        "an argument of an allowed function",
-        "SELECT concat(TraceName, hostName()) FROM traces",
-      ],
-      [
-        "a lambda body",
-        "SELECT arrayMap(model -> concat(model, hostName()), Models) FROM traces",
-      ],
+      ["an argument of an allowed function", "SELECT concat(TraceName, hostName()) FROM traces"],
+      ["a lambda body", "SELECT arrayMap(model -> concat(model, hostName()), Models) FROM traces"],
     ])("refuses it in %s", (_case, sql) => {
       expect(codesOf(validate(sql))).toContain("FUNCTION_NOT_ALLOWED");
     });
@@ -354,9 +330,7 @@ describe("the LangWatchQL function allowlist", () => {
         gatedColumns: ["body"],
       });
 
-      expect(new Set(codesOf(result))).toEqual(
-        new Set(["FUNCTION_NOT_ALLOWED", "GATED_COLUMN"]),
-      );
+      expect(new Set(codesOf(result))).toEqual(new Set(["FUNCTION_NOT_ALLOWED", "GATED_COLUMN"]));
     });
   });
 });

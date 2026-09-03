@@ -105,9 +105,7 @@ export class LicenseSigningKeyEncryptedError extends HandledError {
       {
         httpStatus: 400,
         fault: "customer",
-        tips: [
-          "Provide an unencrypted private key; signing cannot use a passphrase-protected key",
-        ],
+        tips: ["Provide an unencrypted private key; signing cannot use a passphrase-protected key"],
       },
     );
     this.name = "LicenseSigningKeyEncryptedError";
@@ -127,18 +125,12 @@ export class LicenseSigningFailedError extends HandledError {
   declare readonly code: "license_signing_failed";
 
   constructor(options: { reasons?: readonly Error[] } = {}) {
-    super(
-      "license_signing_failed",
-      "The provided license signing key could not be used to sign",
-      {
-        httpStatus: 400,
-        fault: "customer",
-        tips: [
-          "Check that this is the license signing key and that it was copied in full",
-        ],
-        ...options,
-      },
-    );
+    super("license_signing_failed", "The provided license signing key could not be used to sign", {
+      httpStatus: 400,
+      fault: "customer",
+      tips: ["Check that this is the license signing key and that it was copied in full"],
+      ...options,
+    });
     this.name = "LicenseSigningFailedError";
   }
 }
@@ -154,9 +146,7 @@ export class LicenseSigningFailedError extends HandledError {
  * An unrecognised verdict maps to "invalid", never to success: a licence check
  * must fail closed.
  */
-export function licenseValidationError(
-  verdict: LicenseError | string | undefined,
-): HandledError {
+export function licenseValidationError(verdict: LicenseError | string | undefined): HandledError {
   return verdict === LICENSE_ERRORS.EXPIRED
     ? new LicenseExpiredError()
     : new LicenseKeyInvalidError();

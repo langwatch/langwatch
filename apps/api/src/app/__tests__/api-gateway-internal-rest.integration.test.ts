@@ -97,8 +97,7 @@ function testGuardrails(options?: {
   const findMany = vi.fn(async () => options?.guardrails ?? []);
   const listEnabledGuardrailMonitors = vi.fn(async () => options?.monitors ?? []);
   const runEvaluator =
-    options?.runEvaluator ??
-    vi.fn(async () => ({ status: "processed" as const, passed: true }));
+    options?.runEvaluator ?? vi.fn(async () => ({ status: "processed" as const, passed: true }));
   return { findMany, listEnabledGuardrailMonitors, runEvaluator };
 }
 
@@ -332,30 +331,27 @@ describe("the gateway internal control plane", () => {
   describe("given the guardrail check endpoint", () => {
     /** @scenario "the endpoint accepts the directions the gateway actually sends" */
     /** @scenario "every contract direction is accepted" */
-    it.each(["request", "response", "stream_chunk"])(
-      "accepts direction %s",
-      async (direction) => {
-        const app = composeFamily({ changes: testChangeEventRows(), guardrails: testGuardrails() });
+    it.each(["request", "response", "stream_chunk"])("accepts direction %s", async (direction) => {
+      const app = composeFamily({ changes: testChangeEventRows(), guardrails: testGuardrails() });
 
-        const response = await app.request(
-          signedRequest({
-            method: "POST",
-            path: "/api/internal/gateway/guardrail/check",
-            body: JSON.stringify({
-              vk_id: "vk_test",
-              project_id: "project-1",
-              direction,
-              guardrail_ids: [],
-              content: { messages: [{ role: "user", content: "hello" }] },
-            }),
+      const response = await app.request(
+        signedRequest({
+          method: "POST",
+          path: "/api/internal/gateway/guardrail/check",
+          body: JSON.stringify({
+            vk_id: "vk_test",
+            project_id: "project-1",
+            direction,
+            guardrail_ids: [],
+            content: { messages: [{ role: "user", content: "hello" }] },
           }),
-        );
+        }),
+      );
 
-        expect(response.status).toBe(200);
-        const body = (await response.json()) as { decision: string };
-        expect(["allow", "block", "modify"]).toContain(body.decision);
-      },
-    );
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { decision: string };
+      expect(["allow", "block", "modify"]).toContain(body.decision);
+    });
 
     /** @scenario "a direction outside the contract is rejected" */
     it("rejects a direction outside the contract", async () => {
@@ -383,7 +379,9 @@ describe("the gateway internal control plane", () => {
     it("names the verdict field decision, which is what the Go client reads", async () => {
       const guardrails = testGuardrails({
         guardrails: [{ id: "gr_1", evaluatorId: "eval_1", failureMode: "FAIL_CLOSED" }],
-        monitors: [{ id: "mon_1", evaluatorId: "eval_1", checkType: "langevals/basic", parameters: {} }],
+        monitors: [
+          { id: "mon_1", evaluatorId: "eval_1", checkType: "langevals/basic", parameters: {} },
+        ],
         runEvaluator: vi.fn(async () => ({
           status: "processed" as const,
           passed: false,

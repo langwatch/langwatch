@@ -80,8 +80,7 @@ export function LangyGitHubConnectCard({
           </Text>
         </HStack>
         <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-          Langy opens pull requests on the repositories you choose, using short-lived
-          tokens.
+          Langy opens pull requests on the repositories you choose, using short-lived tokens.
         </Text>
         <Button
           size="sm"

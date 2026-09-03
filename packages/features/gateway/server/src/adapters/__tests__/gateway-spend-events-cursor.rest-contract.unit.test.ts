@@ -24,9 +24,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         // The refusal is the one thing a reconciliation script cannot discover by
         // trying: it only fires on recent windows, so a script written and tested
         // against last month's data meets it first in production.
-        expect(SPEND_SUMMARIES_DESCRIPTION).toContain(
-          "gateway_spend_group_by_unstable",
-        );
+        expect(SPEND_SUMMARIES_DESCRIPTION).toContain("gateway_spend_group_by_unstable");
         expect(SPEND_SUMMARIES_DESCRIPTION).toContain("allow_unstable");
         // Named exactly, because `key` keeping its single-dimension meaning is
         // what stops an existing consumer silently reading one of two dimensions.

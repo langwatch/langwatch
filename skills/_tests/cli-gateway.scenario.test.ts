@@ -27,9 +27,7 @@ describe("LangWatch AI Gateway CLI — Agent Usability", () => {
   it.skipIf(isCI)(
     "agent uses CLI to mint, list, rotate, and revoke a virtual key",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-gateway-vk-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-gateway-vk-"));
 
       fs.writeFileSync(path.join(tempFolder, ".env"), gatewayEnv);
       setupLocalCli(tempFolder);
@@ -83,9 +81,7 @@ Workflow to exercise (in order):
             toolCallFix(state);
 
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+virtual-keys\s+list/);
@@ -103,9 +99,7 @@ Workflow to exercise (in order):
   it.skipIf(isCI)(
     "agent uses CLI to create a budget with a project scope and archive it",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-gateway-budget-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-gateway-budget-"));
 
       fs.writeFileSync(path.join(tempFolder, ".env"), gatewayEnv);
       setupLocalCli(tempFolder);
@@ -154,9 +148,7 @@ Workflow:
             toolCallFix(state);
 
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+gateway-budgets\s+create/);
@@ -174,9 +166,7 @@ Workflow:
   it.skipIf(isCI)(
     "agent discovers gateway CLI surface via --help",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-gateway-help-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-gateway-help-"));
 
       fs.writeFileSync(path.join(tempFolder, ".env"), gatewayEnv);
       setupLocalCli(tempFolder);
@@ -224,9 +214,7 @@ Your goal: report back which top-level command groups are available and what the
             toolCallFix(state);
 
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/virtual-keys.*--help|--help.*virtual-keys/);

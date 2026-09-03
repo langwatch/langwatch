@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  NativeSelect,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, NativeSelect, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { useMemo } from "react";
 
@@ -50,10 +42,7 @@ export function ProviderCredentialPicker({
   // A disabled provider never appears as a new pick. It can stay in a list
   // that already references it, but offering one would mean choosing a
   // provider that fails the moment a key routes through it.
-  const activeAvailable = useMemo(
-    () => available.filter((c) => !c.disabledAt),
-    [available],
-  );
+  const activeAvailable = useMemo(() => available.filter((c) => !c.disabledAt), [available]);
   const remaining = useMemo(
     () => activeAvailable.filter((c) => !selectedIds.includes(c.id)),
     [activeAvailable, selectedIds],
@@ -180,12 +169,7 @@ function NoProvidersToPick({
           {body}
         </Text>
         {modelProvidersAdminPath && (
-          <Link
-            href={modelProvidersAdminPath}
-            color="orange.700"
-            fontSize="xs"
-            fontWeight="medium"
-          >
+          <Link href={modelProvidersAdminPath} color="orange.700" fontSize="xs" fontWeight="medium">
             Open model providers
           </Link>
         )}
@@ -252,12 +236,7 @@ function SelectedProviders({
             >
               <ArrowDown size={12} />
             </Button>
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={() => onRemove(index)}
-              aria-label="Remove"
-            >
+            <Button size="xs" variant="ghost" onClick={() => onRemove(index)} aria-label="Remove">
               <X size={12} />
             </Button>
           </HStack>

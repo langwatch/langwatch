@@ -104,9 +104,9 @@ describe("EnvelopeBlobLifecycle decode tenant guard", () => {
           ref: VICTIM_REF,
         } as EnvelopeHeader);
 
-        await expect(
-          makeLifecycle().decode({ value, groupId: "untenanted-agg" }),
-        ).rejects.toThrow(/tenant mismatch/i);
+        await expect(makeLifecycle().decode({ value, groupId: "untenanted-agg" })).rejects.toThrow(
+          /tenant mismatch/i,
+        );
       });
     });
   });

@@ -84,13 +84,7 @@ class FakeRedis extends OpsSnapshotRedisPort {
     return this.store.get(leaseKey) === token;
   }
 
-  private isOlderThanStored({
-    key,
-    computedAt,
-  }: {
-    key: string;
-    computedAt: string;
-  }): boolean {
+  private isOlderThanStored({ key, computedAt }: { key: string; computedAt: string }): boolean {
     const existing = this.store.get(key);
     if (!existing) return false;
     const previous = Number((JSON.parse(existing) as { computedAt?: number }).computedAt);

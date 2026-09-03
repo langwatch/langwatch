@@ -63,9 +63,7 @@ export const LWQL_POSTGRES_SCHEMA = "public";
  * provisioning into `public` on a deployment that meant another schema is
  * the exact failure this function exists to close.
  */
-export function lwqlPostgresSchemaFromDatabaseUrl(
-  databaseUrl: string | undefined,
-): string {
+export function lwqlPostgresSchemaFromDatabaseUrl(databaseUrl: string | undefined): string {
   if (!databaseUrl) return LWQL_POSTGRES_SCHEMA;
   let url: URL;
   try {
@@ -209,8 +207,7 @@ export function productionPostgresReaderGrantStatements({
   const grants = [
     `GRANT USAGE ON SCHEMA ${quotedSchema} TO ${quotedRole}`,
     ...approvedViews.map(
-      (view) =>
-        `GRANT SELECT ON ${quotedSchema}.${postgresQuoted(view)} TO ${quotedRole}`,
+      (view) => `GRANT SELECT ON ${quotedSchema}.${postgresQuoted(view)} TO ${quotedRole}`,
     ),
   ];
 

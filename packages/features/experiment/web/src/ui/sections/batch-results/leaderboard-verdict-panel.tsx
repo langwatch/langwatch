@@ -12,10 +12,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
 import type { BTLeaderboard } from "../../../model/batch-evaluation-results.bt-leaderboard";
-import type {
-  CheaperAlternative,
-  LeaderboardVerdict,
-} from "../batch-evaluation-results.verdict";
+import type { CheaperAlternative, LeaderboardVerdict } from "../batch-evaluation-results.verdict";
 import { formatLeaderboardHeadline } from "../batch-evaluation-results.headline";
 
 export type LeaderboardVerdictPanelProps = {
@@ -331,10 +328,9 @@ function ScoreBars({
         pinned down, which is what they are for; they just are not the test.
       */}
       <Text fontSize="2xs" color="fg.muted">
-        Bar marks the score, the shaded band the range it could plausibly be. Two bands
-        overlapping does not by itself mean the run failed to separate them — that is
-        judged on the gap between the two scores, which is pinned down better than either
-        score alone
+        Bar marks the score, the shaded band the range it could plausibly be. Two bands overlapping
+        does not by itself mean the run failed to separate them — that is judged on the gap between
+        the two scores, which is pinned down better than either score alone
         {showTieShading
           ? ", and “tied for first” marks the variants it could not separate from the top scorer"
           : ""}

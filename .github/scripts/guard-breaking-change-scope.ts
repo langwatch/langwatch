@@ -33,10 +33,7 @@ export type ReleaseComponent = {
 };
 
 type ReleasePleaseConfig = {
-  packages?: Record<
-    string,
-    { component?: string; "exclude-paths"?: string[] } | undefined
-  >;
+  packages?: Record<string, { component?: string; "exclude-paths"?: string[] } | undefined>;
 };
 
 /**
@@ -58,8 +55,7 @@ export const releaseComponents = (config: ReleasePleaseConfig): ReleaseComponent
 
 export const carriesBreakingChange = (messages: string[]): boolean =>
   messages.some(
-    (message) =>
-      breakingHeaderPattern.test(message) || breakingFooterPattern.test(message),
+    (message) => breakingHeaderPattern.test(message) || breakingFooterPattern.test(message),
   );
 
 /**
@@ -71,9 +67,7 @@ const isBumped = (component: ReleaseComponent, files: string[]): boolean => {
   const owned = files.filter((file) => isUnder(file, component.path));
   return (
     owned.length > 0 &&
-    !owned.every((file) =>
-      component.excludePaths.some((excluded) => isUnder(file, excluded)),
-    )
+    !owned.every((file) => component.excludePaths.some((excluded) => isUnder(file, excluded)))
   );
 };
 
@@ -95,18 +89,14 @@ export const bumpedComponents = (
     }
 
     const owned = files.filter(
-      (file) =>
-        nested.find((candidate) => isUnder(file, candidate.path))?.path ===
-        component.path,
+      (file) => nested.find((candidate) => isUnder(file, candidate.path))?.path === component.path,
     );
     return isBumped(component, owned);
   });
 };
 
 export const shimPath = (component: ReleaseComponent): string =>
-  component.path === rootPath
-    ? ".release-please-shim"
-    : `${component.path}/.release-please-shim`;
+  component.path === rootPath ? ".release-please-shim" : `${component.path}/.release-please-shim`;
 
 /** Every `Release-As:` footer version the pull request carries, in order. */
 export const releaseAsVersions = (messages: string[]): string[] =>
@@ -214,9 +204,7 @@ const reportHalfDonePins = ({
     }
     if (footerVersions.length > 0) {
       console.error("");
-      console.error(
-        `Footers on this pull request: ${unique(footerVersions).join(", ")}.`,
-      );
+      console.error(`Footers on this pull request: ${unique(footerVersions).join(", ")}.`);
     }
     console.error("");
     return;
@@ -271,9 +259,7 @@ const report = ({
   versions: Record<string, string>;
   footerVersions: string[];
 }): void => {
-  console.error(
-    "This pull request carries a breaking-change marker and touches more than",
-  );
+  console.error("This pull request carries a breaking-change marker and touches more than");
   console.error("one release component. release-please splits commits by path");
   console.error("but applies the whole commit message to every component the");
   console.error("commit touched, so the break reaches every one of these:");
@@ -281,9 +267,7 @@ const report = ({
   for (const pin of pins) {
     const current = versions[pin.component.path] ?? "unknown";
     const pinned = pin.pinned === undefined ? "" : `, pinned to ${pin.pinned}`;
-    console.error(
-      `- ${pin.component.name} (${pin.component.path}), now ${current}${pinned}`,
-    );
+    console.error(`- ${pin.component.name} (${pin.component.path}), now ${current}${pinned}`);
   }
   console.error("");
   reportPinsDoNotExempt(pins);
@@ -345,8 +329,7 @@ const main = (): number => {
 };
 
 const isEntrypoint = (): boolean =>
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntrypoint()) {
   process.exitCode = main();

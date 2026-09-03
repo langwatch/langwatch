@@ -13,6 +13,4 @@
  *
  * It ships false for everyone (ADR-101 §2).
  */
-export type IdentityUserGate = (args: {
-  userId: string;
-}) => Promise<boolean>;
+export type IdentityUserGate = (args: { userId: string }) => Promise<boolean>;

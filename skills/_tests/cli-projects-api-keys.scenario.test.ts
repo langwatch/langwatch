@@ -31,10 +31,7 @@ const judgeModel = openai("gpt-5-mini");
  * there is none, the same way the rest of this suite skips without keys.
  */
 function hasOrganizationLogin(): boolean {
-  const cliPath = path.resolve(
-    __dirname,
-    "../../sdks/typescript/dist/cli/index.js",
-  );
+  const cliPath = path.resolve(__dirname, "../../sdks/typescript/dist/cli/index.js");
   if (!fs.existsSync(cliPath)) return false;
   const env = { ...process.env };
   delete env.LANGWATCH_API_KEY;
@@ -59,10 +56,7 @@ function hasOrganizationLogin(): boolean {
 
 /** Runs the CLI on the organization login, away from any project key. */
 function runOnOrganizationLogin(args: string[]): string {
-  const cliPath = path.resolve(
-    __dirname,
-    "../../sdks/typescript/dist/cli/index.js",
-  );
+  const cliPath = path.resolve(__dirname, "../../sdks/typescript/dist/cli/index.js");
   const env = { ...process.env };
   delete env.LANGWATCH_API_KEY;
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-org-cli-"));
@@ -106,9 +100,7 @@ describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
       it.skipIf(isCI || !hasOrganizationLogin())(
         "agent uses CLI to list and create projects",
         async () => {
-          const tempFolder = fs.mkdtempSync(
-            path.join(os.tmpdir(), "langwatch-cli-projects-"),
-          );
+          const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-projects-"));
           const projectName = `CLI Test Project ${Date.now()}`;
 
           fs.writeFileSync(
@@ -143,49 +135,47 @@ describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
           );
 
           try {
-          const result = await scenario.run({
-            setId: SKILL_TESTS_SET_ID,
-            name: "CLI projects lifecycle",
-            description:
-              "Developer wants to list and create projects using the LangWatch CLI (not MCP).",
-            agents: [
-              createClaudeCodeAgent({
-                workingDirectory: tempFolder,
-                omitEnvKeys: ["LANGWATCH_API_KEY"],
-              }),
-              scenario.userSimulatorAgent({ model: judgeModel }),
-              scenario.judgeAgent({
-                model: judgeModel,
-                criteria: [
-                  "Agent ran `langwatch projects list` via the Bash tool",
-                  "Agent ran `langwatch projects create` with --name, --language, --framework, and --new-team-name flags",
-                  "Agent received a service API key in the create output",
-                ],
-              }),
-            ],
-            script: [
-              scenario.user(
-                `Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. \`export PATH="./bin:$PATH"\`\n2. \`langwatch projects list\`\n3. \`langwatch projects create --name "${projectName}" --language python --framework langchain --new-team-name "CLI Team"\`\n\nDo NOT use MCP tools. Use ONLY the Bash tool. Do NOT set LANGWATCH_API_KEY.`,
-              ),
-              scenario.agent(),
-              (state) => {
-                toolCallFix(state);
+            const result = await scenario.run({
+              setId: SKILL_TESTS_SET_ID,
+              name: "CLI projects lifecycle",
+              description:
+                "Developer wants to list and create projects using the LangWatch CLI (not MCP).",
+              agents: [
+                createClaudeCodeAgent({
+                  workingDirectory: tempFolder,
+                  omitEnvKeys: ["LANGWATCH_API_KEY"],
+                }),
+                scenario.userSimulatorAgent({ model: judgeModel }),
+                scenario.judgeAgent({
+                  model: judgeModel,
+                  criteria: [
+                    "Agent ran `langwatch projects list` via the Bash tool",
+                    "Agent ran `langwatch projects create` with --name, --language, --framework, and --new-team-name flags",
+                    "Agent received a service API key in the create output",
+                  ],
+                }),
+              ],
+              script: [
+                scenario.user(
+                  `Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. \`export PATH="./bin:$PATH"\`\n2. \`langwatch projects list\`\n3. \`langwatch projects create --name "${projectName}" --language python --framework langchain --new-team-name "CLI Team"\`\n\nDo NOT use MCP tools. Use ONLY the Bash tool. Do NOT set LANGWATCH_API_KEY.`,
+                ),
+                scenario.agent(),
+                (state) => {
+                  toolCallFix(state);
 
-                const allText = state.messages
-                  .map((m) =>
-                    typeof m.content === "string"
-                      ? m.content
-                      : JSON.stringify(m.content),
-                  )
-                  .join("\n");
+                  const allText = state.messages
+                    .map((m) =>
+                      typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+                    )
+                    .join("\n");
 
-                expect(allText).toMatch(/langwatch\s+projects/);
-              },
-              scenario.judge(),
-            ],
-          });
+                  expect(allText).toMatch(/langwatch\s+projects/);
+                },
+                scenario.judge(),
+              ],
+            });
 
-          expect(result.success).toBe(true);
+            expect(result.success).toBe(true);
           } finally {
             archiveProjectsNamed(projectName);
           }
@@ -198,9 +188,7 @@ describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
       it.skipIf(isCI || !hasOrganizationLogin())(
         "agent uses CLI to list and create API keys",
         async () => {
-          const tempFolder = fs.mkdtempSync(
-            path.join(os.tmpdir(), "langwatch-cli-api-keys-"),
-          );
+          const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-api-keys-"));
 
           fs.writeFileSync(
             path.join(tempFolder, ".env"),
@@ -258,9 +246,7 @@ describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
 
                 const allText = state.messages
                   .map((m) =>
-                    typeof m.content === "string"
-                      ? m.content
-                      : JSON.stringify(m.content),
+                    typeof m.content === "string" ? m.content : JSON.stringify(m.content),
                   )
                   .join("\n");
 

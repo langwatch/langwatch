@@ -33,10 +33,7 @@ describe("sendCanary", () => {
   describe("when the POST fails at the network level", () => {
     /** @scenario A canary the collector never answers is reported as our failure */
     it("fails with the health check code, attributed to the platform", async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockRejectedValue(new Error("connect ECONNREFUSED")),
-      );
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("connect ECONNREFUSED")));
 
       const error = await canary().catch((e: unknown) => e);
 
@@ -72,10 +69,7 @@ describe("sendCanary", () => {
   describe("when our own boundary refuses the canary", () => {
     /** @scenario A canary our own boundary refuses names the status it was refused with */
     it("carries the upstream status for the alert to read", async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({ ok: false, status: 503 }),
-      );
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 503 }));
 
       const error = (await canary().catch((e: unknown) => e)) as HandledError;
 

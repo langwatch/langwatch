@@ -28,11 +28,7 @@ describe("workflowFields", () => {
       data: { behave_as: behaveAs },
     });
 
-    const createEdge = (
-      source: string,
-      target: string,
-      sourceHandle: string,
-    ): StudioEdge => ({
+    const createEdge = (source: string, target: string, sourceHandle: string): StudioEdge => ({
       id: `${source}-${target}`,
       source,
       target,
@@ -58,10 +54,7 @@ describe("workflowFields", () => {
     });
 
     it("returns false when output only connects to node with behave_as evaluator", () => {
-      const nodes = [
-        createNode("entry", "entry"),
-        createNode("custom1", "custom", "evaluator"),
-      ];
+      const nodes = [createNode("entry", "entry"), createNode("custom1", "custom", "evaluator")];
       const edges = [createEdge("entry", "custom1", "outputs.input")];
 
       const result = isOutputConnectedToNonEvaluator("input", edges, nodes);
@@ -124,9 +117,7 @@ describe("workflowFields", () => {
       // "input" connects to signature (non-evaluator) - should be included
       expect(isOutputConnectedToNonEvaluator("input", edges, nodes)).toBe(true);
       // "expected_output" only connects to evaluator - should be excluded
-      expect(isOutputConnectedToNonEvaluator("expected_output", edges, nodes)).toBe(
-        false,
-      );
+      expect(isOutputConnectedToNonEvaluator("expected_output", edges, nodes)).toBe(false);
     });
   });
 

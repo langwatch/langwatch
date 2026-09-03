@@ -100,9 +100,7 @@ export function assertsSecondFactor(value: string): boolean {
  * de-duplicated, so a caller can say WHICH factor satisfied the condition —
  * an administrator looking at a connection needs that, not a boolean.
  */
-export function secondFactorsIn(
-  amr: readonly string[] | null | undefined,
-): readonly Amr[] {
+export function secondFactorsIn(amr: readonly string[] | null | undefined): readonly Amr[] {
   if (!amr) return [];
   const seen = new Set<string>();
   const factors: Amr[] = [];
@@ -118,9 +116,7 @@ export function secondFactorsIn(
  * Whether the sign-in that minted a session proved a second factor on its
  * own — independently of anything set up on the account.
  */
-export function signInProvedSecondFactor(
-  amr: readonly string[] | null | undefined,
-): boolean {
+export function signInProvedSecondFactor(amr: readonly string[] | null | undefined): boolean {
   return secondFactorsIn(amr).length > 0;
 }
 
@@ -130,9 +126,7 @@ export function signInProvedSecondFactor(
  * enrollment — which is why a null `amr` has to be a first-class value here
  * and not an error. Nothing about it ends a session.
  */
-export function recordedNothing(
-  amr: readonly string[] | null | undefined,
-): boolean {
+export function recordedNothing(amr: readonly string[] | null | undefined): boolean {
   return !amr || amr.length === 0;
 }
 

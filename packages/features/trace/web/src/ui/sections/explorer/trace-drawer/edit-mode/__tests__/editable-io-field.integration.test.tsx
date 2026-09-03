@@ -58,9 +58,7 @@ describe("EditableIOField", () => {
       it("warns that the value will be saved as plain text", () => {
         const { getByText } = renderField({ draft: "the answer is 42" });
 
-        expect(
-          getByText("Not valid JSON. It will be saved as plain text."),
-        ).toBeInTheDocument();
+        expect(getByText("Not valid JSON. It will be saved as plain text.")).toBeInTheDocument();
       });
 
       /** @scenario "Text that is not valid JSON is accepted with a warning" */

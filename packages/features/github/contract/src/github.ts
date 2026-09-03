@@ -61,9 +61,7 @@ export type GithubRepositoryRef = z.infer<typeof githubRepositoryRefSchema>;
 export type GithubRepository = z.infer<typeof githubRepositorySchema>;
 export type GithubInstallation = z.infer<typeof githubInstallationSchema>;
 export type GithubPullRequestRef = z.infer<typeof githubPullRequestRefSchema>;
-export type GithubPullRequestLiveStatus = z.infer<
-  typeof githubPullRequestLiveStatusSchema
->;
+export type GithubPullRequestLiveStatus = z.infer<typeof githubPullRequestLiveStatusSchema>;
 export type GithubTurnToken = z.infer<typeof githubTurnTokenSchema>;
 export type GithubPullRequest = z.infer<typeof githubPullRequestSchema>;
 

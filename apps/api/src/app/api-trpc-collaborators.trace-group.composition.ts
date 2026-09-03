@@ -430,12 +430,12 @@ export function composeApiTraceGroupCollaborators(
     schedule: new UnscheduledTopicClustering(),
   });
 
-  const traceReads =
-    options.traceReads ?? options.traceReadsFrom?.({ dataRetention, topics });
+  const traceReads = options.traceReads ?? options.traceReadsFrom?.({ dataRetention, topics });
   if (!traceReads) options.report?.absent("trace-reads");
 
   const traces = TraceApp.create({
-    traces: traceReads?.readers() ?? refuseAll<TraceAppDependencies["traces"]>(refuse, "trace read"),
+    traces:
+      traceReads?.readers() ?? refuseAll<TraceAppDependencies["traces"]>(refuse, "trace read"),
     topics,
     // The PROCESS's broadcast, not Trace's: this is what makes both
     // subscriptions live on a deployment with no read stack at all.
@@ -470,8 +470,7 @@ export function composeApiTraceGroupCollaborators(
 
   const modelProviders = ModelProviderApp.create({
     modelProviders:
-      options.modelProviders ??
-      refuseAll<ModelProviderService>(refuse, "model provider gateway"),
+      options.modelProviders ?? refuseAll<ModelProviderService>(refuse, "model provider gateway"),
     // The cost-rule preview's span reader is the trace read stack's, carried
     // through the application untouched — this process only knows its concrete
     // type where it composes one.
@@ -508,17 +507,31 @@ export function composeApiTraceGroupCollaborators(
     ports: {
       traces: {
         ...(traceReads?.legacyPorts() ??
-          refuseAll<Omit<TracesTrpcPorts<TraceLegacyListInput, unknown, TraceLegacyFilterInput, unknown, unknown>, "getViewerProtections">>(
-            refuse,
-            "the legacy trace grid",
-          )),
+          refuseAll<
+            Omit<
+              TracesTrpcPorts<
+                TraceLegacyListInput,
+                unknown,
+                TraceLegacyFilterInput,
+                unknown,
+                unknown
+              >,
+              "getViewerProtections"
+            >
+          >(refuse, "the legacy trace grid")),
         getViewerProtections: viewerProtections,
       },
       tracesV2: {
         ...(traceReads?.readPorts() ??
-          refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(refuse, "the trace read passes")),
+          refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(
+            refuse,
+            "the trace read passes",
+          )),
         ...(traceReads?.explorerPorts() ??
-          refuseAll<ReturnType<ApiTraceReadStackPort["explorerPorts"]>>(refuse, "the trace explorer")),
+          refuseAll<ReturnType<ApiTraceReadStackPort["explorerPorts"]>>(
+            refuse,
+            "the trace explorer",
+          )),
         // The unmapped-cost hint is the MODEL PROVIDER feature's reading, not
         // the trace store's: it asks whether any rule — stored or static —
         // already prices this model, and only the gateway holds the stored
@@ -544,9 +557,10 @@ export function composeApiTraceGroupCollaborators(
         getViewerProtections: viewerProtections,
       },
       sharedTrace: {
-        mappers: (traceReads?.readPorts() ??
-          refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(refuse, "the trace read passes"))
-          .mappers,
+        mappers: (
+          traceReads?.readPorts() ??
+          refuseAll<ReturnType<ApiTraceReadStackPort["readPorts"]>>(refuse, "the trace read passes")
+        ).mappers,
         tryGetShareViewerProtections: (input) =>
           traceReads
             ? traceReads.tryGetShareViewerProtections(input)
@@ -564,8 +578,7 @@ export function composeApiTraceGroupCollaborators(
       costs: {
         readOrganizationSpend: (input) => readOrganizationSpend(options.prisma, input),
       },
-      llmModelCost:
-        modelProviderHost?.costRules() ?? absentCostRules(refuse),
+      llmModelCost: modelProviderHost?.costRules() ?? absentCostRules(refuse),
       modelProvider: {
         ...(modelProviderHost?.probes() ??
           refuseAll<ReturnType<ApiModelProviderHostPort["probes"]>>(
@@ -577,18 +590,15 @@ export function composeApiTraceGroupCollaborators(
         recordAudit: () => undefined,
       },
       modelProviderChecks: modelProviderChecks(options.authz),
-      translate:
-        modelProviderHost?.translate() ?? {
-          wrapAiCall: (_feature, call) => call(),
-        },
+      translate: modelProviderHost?.translate() ?? {
+        wrapAiCall: (_feature, call) => call(),
+      },
       httpProxy:
-        studio?.ports() ??
-        refuseAll<HttpProxyTrpcPorts>(refuse, "the studio event dispatch"),
+        studio?.ports() ?? refuseAll<HttpProxyTrpcPorts>(refuse, "the studio event dispatch"),
       limits: usage?.ports() ?? refuseAll<LimitsTrpcPorts>(refuse, "the usage reading"),
     },
   };
 }
-
 
 /** Writes each absence to the process log, with what it costs. */
 export class LoggedApiTraceGroupAbsence extends ApiTraceGroupAbsenceReport {
@@ -600,9 +610,7 @@ export class LoggedApiTraceGroupAbsence extends ApiTraceGroupAbsenceReport {
     super();
   }
 
-  absent(
-    capability: "trace-reads" | "model-provider-host" | "studio" | "usage" | "plans",
-  ): void {
+  absent(capability: "trace-reads" | "model-provider-host" | "studio" | "usage" | "plans"): void {
     this.logger.warn({ capability }, `${CONSEQUENCE[capability]}`);
   }
 }
@@ -695,7 +703,8 @@ async function readOrganizationSpend(
  * team demands `team:manage` and project demands `project:manage`.
  */
 function modelProviderChecks(authz: AuthzService): ModelProviderTrpcChecks {
-  const probe = (permission: AuthzPermission) =>
+  const probe =
+    (permission: AuthzPermission) =>
     async (params: {
       ctx: { actor(): { id: string }; permissionChecked?: boolean };
       input: { projectId?: string; organizationId?: string };
@@ -725,9 +734,7 @@ function modelProviderChecks(authz: AuthzService): ModelProviderTrpcChecks {
         },
         async (params: never) => {
           const call = params as unknown as Parameters<ReturnType<typeof probe>>[0];
-          return call.input.projectId
-            ? probe(permission)(call)
-            : probe("organization:view")(call);
+          return call.input.projectId ? probe(permission)(call) : probe("organization:view")(call);
         },
       ),
     credentialProbe: declareAuthzMiddleware(
@@ -798,15 +805,11 @@ class ApiCapabilityUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
 
   constructor(processName: string, capability: string) {
-    super(
-      "service_unavailable",
-      "This part of the product is not available on this deployment",
-      {
-        httpStatus: 503,
-        fault: "platform",
-        meta: { process: processName, capability },
-      },
-    );
+    super("service_unavailable", "This part of the product is not available on this deployment", {
+      httpStatus: 503,
+      fault: "platform",
+      meta: { process: processName, capability },
+    });
     this.name = "ApiCapabilityUnavailableError";
   }
 }

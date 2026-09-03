@@ -29,9 +29,7 @@ describe("isPermissionDenial", () => {
   describe("given a refusal from the permission layer", () => {
     /** @scenario "A denial is recognised without matching on its wording" */
     it("recognises a project permission denial by its code", () => {
-      expect(isPermissionDenial(new ProjectPermissionDeniedError("traces:view"))).toBe(
-        true,
-      );
+      expect(isPermissionDenial(new ProjectPermissionDeniedError("traces:view"))).toBe(true);
     });
 
     it("recognises a lite-member restriction", () => {
@@ -76,9 +74,7 @@ describe("isPermissionDenial", () => {
      */
     it("does not accept a plain error that happens to say the old sentence", () => {
       expect(
-        isPermissionDenial(
-          new Error("You do not have permission to access this project resource"),
-        ),
+        isPermissionDenial(new Error("You do not have permission to access this project resource")),
       ).toBe(false);
     });
 

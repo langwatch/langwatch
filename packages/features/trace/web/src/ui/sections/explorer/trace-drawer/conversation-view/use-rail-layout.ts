@@ -133,9 +133,7 @@ export function useRailLayout(): {
       frame = null;
       const next = resolveRailLayout(el.getBoundingClientRect().width);
       setLayout((current) =>
-        current.mode === next.mode && current.railWidth === next.railWidth
-          ? current
-          : next,
+        current.mode === next.mode && current.railWidth === next.railWidth ? current : next,
       );
     };
     const schedule = () => {

@@ -61,9 +61,7 @@ export class GatewayDebitProcess {
     return (process) =>
       process
         .state<GatewayDebitsState>(INITIAL_STATE)
-        .intent("writeDebits", writeGatewayDebitsSchema, (payload) =>
-          this.intent.execute(payload),
-        )
+        .intent("writeDebits", writeGatewayDebitsSchema, (payload) => this.intent.execute(payload))
         .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data, context) =>
           this.onAdmission(state, context, data),
         )
@@ -99,9 +97,7 @@ export class GatewayDebitProcess {
     };
   }
 
-  private attributionFromOutcome(
-    data: GatewaySpendOutcomeData,
-  ): GatewaySpendAttribution | null {
+  private attributionFromOutcome(data: GatewaySpendOutcomeData): GatewaySpendAttribution | null {
     return data.organization_id ? data : null;
   }
 
@@ -153,9 +149,7 @@ export class GatewayDebitProcess {
         ]
       : undefined;
     if (admitted.outcome_carries_attribution) {
-      return stashed
-        ? { state: { ...state, pendingOutcome: null }, intents: release }
-        : { state };
+      return stashed ? { state: { ...state, pendingOutcome: null }, intents: release } : { state };
     }
     const next = {
       ...state,
@@ -188,11 +182,7 @@ export class GatewayDebitProcess {
         ],
       };
     }
-    const payload = this.payload(
-      this.attributionFromState(state),
-      context.projectId,
-      outcome,
-    );
+    const payload = this.payload(this.attributionFromState(state), context.projectId, outcome);
     return state.admitted
       ? {
           state,

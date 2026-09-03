@@ -92,9 +92,7 @@ export function ToolCatalogPanel() {
   const canManageCatalog = hasAnyPermission("aiTools:manage");
 
   const [drawerState, setDrawerState] = useState<
-    | { mode: "create"; type: AiToolEntry["type"] }
-    | { mode: "edit"; entry: AiToolEntry }
-    | null
+    { mode: "create"; type: AiToolEntry["type"] } | { mode: "edit"; entry: AiToolEntry } | null
   >(null);
 
   if (!organization) {

@@ -3,9 +3,7 @@ import { createTestSuite as apiCreateTestSuite } from "../langwatch-api-test-sui
 /**
  * Handles the platform_create_test_suite MCP tool invocation.
  */
-export async function handleCreateTestSuite(params: {
-  name: string;
-}): Promise<string> {
+export async function handleCreateTestSuite(params: { name: string }): Promise<string> {
   const suite = await apiCreateTestSuite({ name: params.name });
 
   return [

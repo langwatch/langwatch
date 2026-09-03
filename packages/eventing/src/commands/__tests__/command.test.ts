@@ -72,13 +72,7 @@ describe("createCommand", () => {
       const payload = { action: "test" };
       const metadata = { correlationId: "corr-123", traceId: "trace-456" };
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-        metadata,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload, metadata);
 
       expect(command.metadata).toEqual(metadata);
     });
@@ -98,13 +92,7 @@ describe("createCommand", () => {
         array: [1, 2, 3],
       };
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-        metadata,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload, metadata);
 
       expect(command.metadata).toEqual(metadata);
     });
@@ -175,13 +163,7 @@ describe("createCommand", () => {
       const payload = { action: "test" };
       const metadata = { key: "value" };
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-        metadata,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload, metadata);
 
       expect(command.metadata).toEqual(metadata);
     });
@@ -193,13 +175,7 @@ describe("createCommand", () => {
       const payload = { action: "test" };
       const metadata = null;
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-        metadata,
-      );
+      const command = createCommand(tenantId, aggregateId, commandType, payload, metadata);
 
       expect(command.metadata).toBeNull();
     });

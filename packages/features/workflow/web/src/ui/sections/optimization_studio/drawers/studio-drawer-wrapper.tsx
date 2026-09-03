@@ -46,27 +46,17 @@ export type StudioDrawerWrapperProps = {
  * shows the InputPanel on the left and OutputPanel on the right with
  * a Framer Motion animation identical to PropertiesPanel.
  */
-export function StudioDrawerWrapper({
-  node,
-  children,
-  onClose,
-  footer,
-}: StudioDrawerWrapperProps) {
-  const {
-    deselectAllNodes,
-    propertiesExpanded,
-    setPropertiesExpanded,
-    duplicateNode,
-    deleteNode,
-  } = useWorkflowStore(
-    useShallow((state) => ({
-      deselectAllNodes: state.deselectAllNodes,
-      propertiesExpanded: state.propertiesExpanded,
-      setPropertiesExpanded: state.setPropertiesExpanded,
-      duplicateNode: state.duplicateNode,
-      deleteNode: state.deleteNode,
-    })),
-  );
+export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioDrawerWrapperProps) {
+  const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded, duplicateNode, deleteNode } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        deselectAllNodes: state.deselectAllNodes,
+        propertiesExpanded: state.propertiesExpanded,
+        setPropertiesExpanded: state.setPropertiesExpanded,
+        duplicateNode: state.duplicateNode,
+        deleteNode: state.deleteNode,
+      })),
+    );
 
   // Footer registered by child components via useRegisterDrawerFooter
   const [registeredFooter, setRegisteredFooter] = useState<React.ReactNode>(null);
@@ -169,12 +159,7 @@ export function StudioDrawerWrapper({
         {isExpandableNode(node) && (
           <Menu.Root positioning={{ placement: "bottom-end" }}>
             <Menu.Trigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                color="fg.muted"
-                aria-label="Node actions"
-              >
+              <Button variant="ghost" size="sm" color="fg.muted" aria-label="Node actions">
                 <MoreHorizontal size={16} />
               </Button>
             </Menu.Trigger>
@@ -219,12 +204,7 @@ export function StudioDrawerWrapper({
       >
         <Drawer.Content bg="bg" marginTop="56px">
           {node && (
-            <Drawer.Header
-              paddingTop={4}
-              paddingBottom={3}
-              paddingLeft={4}
-              paddingRight={3}
-            >
+            <Drawer.Header paddingTop={4} paddingBottom={3} paddingLeft={4} paddingRight={3}>
               {headerContent}
             </Drawer.Header>
           )}
@@ -236,12 +216,7 @@ export function StudioDrawerWrapper({
           </Drawer.Body>
 
           {effectiveFooter && (
-            <Drawer.Footer
-              borderTopWidth="1px"
-              borderColor="border"
-              paddingX={4}
-              paddingY={3}
-            >
+            <Drawer.Footer borderTopWidth="1px" borderColor="border" paddingX={4} paddingY={3}>
               {effectiveFooter}
             </Drawer.Footer>
           )}

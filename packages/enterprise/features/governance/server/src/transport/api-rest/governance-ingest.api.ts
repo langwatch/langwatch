@@ -117,9 +117,7 @@ export type GovernanceIngestMetricCollectionPort = (input: {
  * deployment with no gateway spend store can honestly say.
  */
 export type GovernanceIngestSpendPort = Readonly<{
-  insertDebit: (
-    rows: ReadonlyArray<Record<string, unknown>>,
-  ) => Promise<unknown>;
+  insertDebit: (rows: ReadonlyArray<Record<string, unknown>>) => Promise<unknown>;
   resolveApplicableBudgets: (scopes: {
     organizationId: string;
     teamId: string;
@@ -200,10 +198,7 @@ function buildOriginAttrs(source: GovernanceIngestionSource): IKeyValue[] {
   ] as IKeyValue[];
 }
 
-const RESERVED_ORIGIN_PREFIXES = [
-  "langwatch.origin.",
-  "langwatch.ingestion_source.",
-] as const;
+const RESERVED_ORIGIN_PREFIXES = ["langwatch.origin.", "langwatch.ingestion_source."] as const;
 
 /**
  * Receiver-authoritative origin attributes REPLACE any the payload supplied
@@ -218,8 +213,7 @@ function withOriginAttrs(
   source: GovernanceIngestionSource,
 ): IKeyValue[] {
   const caller = (existing ?? []).filter(
-    (attribute) =>
-      !RESERVED_ORIGIN_PREFIXES.some((prefix) => attribute.key?.startsWith(prefix)),
+    (attribute) => !RESERVED_ORIGIN_PREFIXES.some((prefix) => attribute.key?.startsWith(prefix)),
   );
   return [...caller, ...buildOriginAttrs(source)];
 }
@@ -382,9 +376,7 @@ async function extractCostEventsForSource(input: {
       return input.governance.extractCanonicalCostEvents(asLogsRequest);
     }
     return input.governance.extractCanonicalCostEvents(
-      reparsed.request as unknown as Parameters<
-        GovernanceService["extractCanonicalCostEvents"]
-      >[0],
+      reparsed.request as unknown as Parameters<GovernanceService["extractCanonicalCostEvents"]>[0],
     );
   } catch (transformErr) {
     logger.warn(
@@ -416,9 +408,7 @@ export function createGovernanceIngestRestApp(options: {
    * The regex runs first so a malformed header costs nothing, which is what
    * makes the throttle ahead of it worth having.
    */
-  const authIngestionSource = async (
-    c: Context,
-  ): Promise<GovernanceIngestionSource | null> => {
+  const authIngestionSource = async (c: Context): Promise<GovernanceIngestionSource | null> => {
     const header = c.req.header("Authorization");
     if (!header) return null;
     const match = /^Bearer\s+(lw_is_[A-Za-z0-9_\-]+)$/.exec(header.trim());
@@ -794,9 +784,7 @@ export function createGovernanceIngestRestApp(options: {
               });
               stampMetricOriginAttrs({ request: parsed.request, source });
               enforceApiKeyIdOnMetricRequest(
-                parsed.request as unknown as Parameters<
-                  typeof enforceApiKeyIdOnMetricRequest
-                >[0],
+                parsed.request as unknown as Parameters<typeof enforceApiKeyIdOnMetricRequest>[0],
                 null,
               );
               const result = await metricCollection({

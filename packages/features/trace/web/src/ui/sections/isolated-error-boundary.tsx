@@ -71,9 +71,7 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
   // A render crash almost never carries a handled payload, so the registry's
   // headline is usually the generic one — and the caller's `scope` ("Couldn't
   // load this trace") names the surface that broke, which is more use.
-  const heading = explanation.isRegistered
-    ? explanation.title
-    : (scope ?? explanation.title);
+  const heading = explanation.isRegistered ? explanation.title : (scope ?? explanation.title);
   const isDev = process.env.NODE_ENV === "development";
   const rawMessage = error instanceof Error ? error.message : String(error);
 
@@ -117,12 +115,7 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
           </Text>
         )}
         <HStack justify="flex-end">
-          <Button
-            size="xs"
-            variant="outline"
-            colorPalette="red"
-            onClick={resetErrorBoundary}
-          >
+          <Button size="xs" variant="outline" colorPalette="red" onClick={resetErrorBoundary}>
             <Icon boxSize="12px">
               <RotateCcw />
             </Icon>

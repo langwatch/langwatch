@@ -81,13 +81,7 @@ export function HandledErrorState({
         </Stack>
 
         {copy.tips.length > 0 && (
-          <List.Root
-            gap={1}
-            fontSize="13.5px"
-            color="fg.muted"
-            textAlign="left"
-            paddingLeft={4}
-          >
+          <List.Root gap={1} fontSize="13.5px" color="fg.muted" textAlign="left" paddingLeft={4}>
             {/* Index key: tips are server-supplied prose, so two can be
                 identical and collide as keys. Their order is fixed. */}
             {copy.tips.map((tip, index) => (

@@ -10,11 +10,7 @@ describe("contentText", () => {
   it("joins the text blocks of a result", () => {
     expect(
       contentText({
-        content: [
-          { type: "text", text: "a" },
-          { type: "image" },
-          { type: "text", text: "b" },
-        ],
+        content: [{ type: "text", text: "a" }, { type: "image" }, { type: "text", text: "b" }],
       }),
     ).toBe("a\nb");
     expect(contentText(undefined)).toBe("");
@@ -26,8 +22,7 @@ describe("settledToolOutput", () => {
   const scratchDirs: string[] = [];
 
   afterEach(() => {
-    for (const dir of scratchDirs.splice(0))
-      rmSync(dir, { recursive: true, force: true });
+    for (const dir of scratchDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
   });
 
   describe("when pi truncated the tool output to a saved file", () => {
@@ -38,9 +33,7 @@ describe("settledToolOutput", () => {
       const document = `{"traces":[{"id":"t1"}],"pagination":{"totalHits":44}}`;
       writeFileSync(full, document);
       const result = {
-        content: [
-          { type: "text", text: '"tail fragment only"\n[Showing lines 10-20 of 20]' },
-        ],
+        content: [{ type: "text", text: '"tail fragment only"\n[Showing lines 10-20 of 20]' }],
         details: { truncation: { truncated: true }, fullOutputPath: full },
       };
       expect(settledToolOutput(result)).toBe(document);
@@ -59,9 +52,7 @@ describe("settledToolOutput", () => {
   });
 
   it("returns the content text untouched when nothing was truncated", () => {
-    expect(settledToolOutput({ content: [{ type: "text", text: "plain" }] })).toBe(
-      "plain",
-    );
+    expect(settledToolOutput({ content: [{ type: "text", text: "plain" }] })).toBe("plain");
   });
 });
 
@@ -101,9 +92,7 @@ describe("TurnEventMapper", () => {
           toolName: "bash",
           args,
         }),
-      ).toEqual([
-        { type: "tool_start", turnId: "t1", id: "c1", name: "bash", input: args },
-      ]);
+      ).toEqual([{ type: "tool_start", turnId: "t1", id: "c1", name: "bash", input: args }]);
       expect(
         mapper.map({
           type: "tool_execution_update",
@@ -112,9 +101,7 @@ describe("TurnEventMapper", () => {
           args,
           partialResult: { content: [{ type: "text", text: "partial" }] },
         }),
-      ).toEqual([
-        { type: "tool_update", turnId: "t1", id: "c1", name: "bash", output: "partial" },
-      ]);
+      ).toEqual([{ type: "tool_update", turnId: "t1", id: "c1", name: "bash", output: "partial" }]);
       expect(
         mapper.map({
           type: "tool_execution_end",

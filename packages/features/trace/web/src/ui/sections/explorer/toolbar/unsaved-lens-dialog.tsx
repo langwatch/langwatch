@@ -39,8 +39,8 @@ export const UnsavedLensDialog: React.FC<UnsavedLensDialogProps> = ({
       </DialogHeader>
       <DialogBody>
         <Text color="fg.muted" fontSize="sm">
-          You have unsaved local changes on <strong>{lensName}</strong>. Save them as a
-          new lens, or discard and switch?
+          You have unsaved local changes on <strong>{lensName}</strong>. Save them as a new lens, or
+          discard and switch?
         </Text>
       </DialogBody>
       <DialogFooter>

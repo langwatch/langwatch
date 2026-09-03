@@ -6,10 +6,7 @@ import {
   type SsoIdpMetadata,
 } from "@langwatch/identity-contract";
 import type { SignInDomainRoutingPort } from "./signin-router.service";
-import {
-  grandfatherCommandId,
-  grandfatheredSsoConnectionId,
-} from "./sso-connection-id";
+import { grandfatherCommandId, grandfatheredSsoConnectionId } from "./sso-connection-id";
 import type { SsoConnectionService } from "./sso-connection.service";
 
 /**
@@ -75,10 +72,7 @@ export interface SsoConnectionGrandfatherDeps {
   /** How the connection is dialed. `providerId` comes from the org's
    *  `ssoProvider`; the rest is what the deployment already holds, which is
    *  why it arrives as a resolver rather than a constant. */
-  idpMetadataFor: (args: {
-    organizationId: string;
-    ssoProvider: string;
-  }) => SsoIdpMetadata;
+  idpMetadataFor: (args: { organizationId: string; ssoProvider: string }) => SsoIdpMetadata;
   connectionType?: SsoConnectionType;
   now?: () => number;
 }

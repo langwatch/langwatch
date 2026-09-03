@@ -20,7 +20,11 @@ import {
   createAnalyticsRestApp,
   timeseriesInputSchema,
 } from "@langwatch/analytics-server";
-import { flexibleDateSchema, type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
+import {
+  flexibleDateSchema,
+  type AppRestSecurity,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 
 /**
  * The charted reads' TWO public paths, bound to one process's analytics

@@ -1,11 +1,7 @@
 /** Scheduler persistence operations exposed to the Ops control surface. */
 export interface SchedulerOpsRepository {
   tryFindByIdForOps(params: { id: string }): Promise<ScheduledJobRecord | null>;
-  setActiveForOps(params: {
-    id: string;
-    projectId: string;
-    active: boolean;
-  }): Promise<boolean>;
+  setActiveForOps(params: { id: string; projectId: string; active: boolean }): Promise<boolean>;
   releaseSlotForOps(params: {
     id: string;
     projectId: string;

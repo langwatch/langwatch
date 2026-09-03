@@ -10,10 +10,7 @@
  * link.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import {
-  createUnsubscribeRestApp,
-  type UnsubscribeRestPorts,
-} from "@langwatch/automation-server";
+import { createUnsubscribeRestApp, type UnsubscribeRestPorts } from "@langwatch/automation-server";
 import { InvalidUnsubscribeTokenError } from "@langwatch/automation-contract";
 import { Hono, type ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";

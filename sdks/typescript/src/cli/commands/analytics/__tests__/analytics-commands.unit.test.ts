@@ -1,17 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AnalyticsApiError } from "@/client-sdk/services/analytics/analytics-api.service";
 
-vi.mock(
-  "@/client-sdk/services/analytics/analytics-api.service",
-  async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    const actual = (await importOriginal()) as Record<string, unknown>;
-    return {
-      ...actual,
-      AnalyticsApiService: vi.fn(),
-    };
-  },
-);
+vi.mock("@/client-sdk/services/analytics/analytics-api.service", async (importOriginal) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    AnalyticsApiService: vi.fn(),
+  };
+});
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -140,9 +137,7 @@ describe("queryAnalyticsCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      mockTimeseries.mockRejectedValue(
-        new AnalyticsApiError("Network error", "query analytics"),
-      );
+      mockTimeseries.mockRejectedValue(new AnalyticsApiError("Network error", "query analytics"));
 
       await expect(queryAnalyticsCommand({})).rejects.toThrow(ProcessExitError);
     });

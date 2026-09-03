@@ -21,11 +21,7 @@ vi.mock("../../../trace-api", () => ({
   },
 }));
 
-const node = (
-  spanId: string,
-  startTimeMs = 0,
-  updatedAtMs = startTimeMs,
-): SpanTreeNode => ({
+const node = (spanId: string, startTimeMs = 0, updatedAtMs = startTimeMs): SpanTreeNode => ({
   spanId,
   parentSpanId: null,
   name: spanId,
@@ -79,9 +75,7 @@ const PAGED_PATH = "tracesV2.spanTreePaginated";
 describe("fetchSpanTreePages", () => {
   describe("when the trace fits in a single page", () => {
     it("returns that page's nodes from one fetch and never reports progress", async () => {
-      const { utils, query } = makeUtils([
-        { nodes: [node("a"), node("b")], nextCursor: null },
-      ]);
+      const { utils, query } = makeUtils([{ nodes: [node("a"), node("b")], nextCursor: null }]);
       const onPage = vi.fn();
 
       const nodes = await fetchSpanTreePages({ utils, input, onPage });
@@ -291,9 +285,7 @@ describe("spanTreeQueryFn progressive publishing", () => {
 describe("spanTreeDeltaSinceMs", () => {
   describe("when the tree has spans", () => {
     it("returns 1ms before the newest row version so same-millisecond writes are re-fetched", () => {
-      expect(spanTreeDeltaSinceMs([node("a", 100), node("b", 300), node("c", 200)])).toBe(
-        299,
-      );
+      expect(spanTreeDeltaSinceMs([node("a", 100), node("b", 300), node("c", 200)])).toBe(299);
     });
 
     it("keys off the row version, not the span start, so in-place updates advance the mark", () => {

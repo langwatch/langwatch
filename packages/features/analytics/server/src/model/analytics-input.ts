@@ -44,12 +44,7 @@ export type PercentileAggregationTypes = Unpacked<typeof percentileAggregationTy
 
 export type AggregationTypes = z.infer<typeof aggregationTypesEnum>;
 
-export const pipelineFieldsEnum = z.enum([
-  "trace_id",
-  "user_id",
-  "thread_id",
-  "customer_id",
-]);
+export const pipelineFieldsEnum = z.enum(["trace_id", "user_id", "thread_id", "customer_id"]);
 
 export type PipelineFields = z.infer<typeof pipelineFieldsEnum>;
 
@@ -150,9 +145,7 @@ export function isZeroWhenAbsentSeries(series: SeriesInput): boolean {
   );
 }
 
-export type TracesPivotFilters = DeepRequired<
-  z.infer<typeof sharedFiltersInputSchema>["filters"]
->;
+export type TracesPivotFilters = DeepRequired<z.infer<typeof sharedFiltersInputSchema>["filters"]>;
 
 export type TracesPivotFilterQuery = {
   name: string;

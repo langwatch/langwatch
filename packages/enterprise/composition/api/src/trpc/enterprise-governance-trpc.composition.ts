@@ -46,10 +46,7 @@ import {
   type PersonalSessionsTrpcContext,
   type SessionPolicyTrpcContext,
 } from "@langwatch/enterprise-governance-server";
-import {
-  ENTERPRISE_FEATURE_ERRORS,
-  requireEnterprisePlan,
-} from "@langwatch/enterprise-plan-gate";
+import { ENTERPRISE_FEATURE_ERRORS, requireEnterprisePlan } from "@langwatch/enterprise-plan-gate";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /** Every context requirement the surfaces place on the process. */

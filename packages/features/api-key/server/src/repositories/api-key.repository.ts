@@ -38,13 +38,8 @@ export abstract class ApiKeyRepository {
     id: string;
     organizationId: string;
   }): Promise<StoredApiKey | null>;
-  abstract listForUser(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<StoredApiKey[]>;
-  abstract listForOrganization(input: {
-    organizationId: string;
-  }): Promise<StoredApiKey[]>;
+  abstract listForUser(input: { organizationId: string; userId: string }): Promise<StoredApiKey[]>;
+  abstract listForOrganization(input: { organizationId: string }): Promise<StoredApiKey[]>;
   abstract update(input: ApiKeyUpdateRecord): Promise<StoredApiKey>;
   abstract revoke(input: { id: string }): Promise<StoredApiKey>;
   abstract updateLastUsedAt(input: { id: string }): Promise<void>;
@@ -59,10 +54,7 @@ export abstract class ApiKeyRepository {
     projectId: string;
   }): Promise<StoredApiKey[]>;
   abstract tryFindLegacyProjectId(input: { token: string }): Promise<string | null>;
-  abstract rotateLegacyProjectKey(input: {
-    projectId: string;
-    token: string;
-  }): Promise<boolean>;
+  abstract rotateLegacyProjectKey(input: { projectId: string; token: string }): Promise<boolean>;
   /**
    * Revokes every unrevoked key of one reserved name whose expiry has elapsed.
    *

@@ -81,9 +81,7 @@ describe("parseLicenseKey", () => {
   });
 
   it("returns null for valid JSON but missing required fields", () => {
-    const invalidStructure = Buffer.from(JSON.stringify({ foo: "bar" })).toString(
-      "base64",
-    );
+    const invalidStructure = Buffer.from(JSON.stringify({ foo: "bar" })).toString("base64");
 
     const result = parseLicenseKey(invalidStructure);
 
@@ -154,9 +152,7 @@ describe("verifySignature", () => {
         const signedLicense = parseLicenseKey(VALID_LICENSE_KEY);
         if (!signedLicense) throw new Error("Expected signedLicense to be defined");
 
-        expect(
-          verifySignature(signedLicense, WRONG_PUBLIC_KEY.replace(/\n/g, "\\n")),
-        ).toBe(false);
+        expect(verifySignature(signedLicense, WRONG_PUBLIC_KEY.replace(/\n/g, "\\n"))).toBe(false);
       });
     });
   });
@@ -353,9 +349,7 @@ describe("validateLicense", () => {
       expect(result.valid).toBe(true);
       if (result.valid) {
         // The field is declared as optional on the schema, so Zod preserves its value on parse.
-        expect(result.licenseData.plan.evaluationsCredit).toBe(
-          BASE_LICENSE.plan.evaluationsCredit,
-        );
+        expect(result.licenseData.plan.evaluationsCredit).toBe(BASE_LICENSE.plan.evaluationsCredit);
       }
     });
 

@@ -110,10 +110,7 @@ describe("useTourEntryPoints", () => {
         expect(mockListInvalidate).not.toHaveBeenCalled();
 
         // Dismissal and tourActive cleared so the user lands on the real table.
-        expect(mockSetSetupDismissedForProject).toHaveBeenCalledWith(
-          "proj-tour-test",
-          true,
-        );
+        expect(mockSetSetupDismissedForProject).toHaveBeenCalledWith("proj-tour-test", true);
         expect(mockSetTourActive).toHaveBeenCalledWith(false);
       });
     });

@@ -7,9 +7,8 @@ sidebarTitle: RBAC
 The AI Gateway is governed by LangWatch's existing RBAC system, the same resources-and-actions model you already use for traces, datasets, evaluations, and prompts. Gateway-specific resources cover the gateway surface; provider credentials reuse the platform-wide `modelProviders` resource (no separate `gatewayProviders` resource since the binding model was retired). Permissions are checked **scope-aware**: every guard names the scope (`ORGANIZATION`, `TEAM`, `PROJECT`) the action operates on, and a higher-scope grant cascades downward (org `manage` allows team and project actions).
 
 <Note>
-  The matrix below is the default. Custom roles can carry any combination of the
-  permissions listed, see [Custom Roles](/platform/rbac#custom-roles) for how to define
-  one.
+  The matrix below is the default. Custom roles can carry any combination of the permissions listed,
+  see [Custom Roles](/platform/rbac#custom-roles) for how to define one.
 </Note>
 
 ## Resources

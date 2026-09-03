@@ -36,11 +36,7 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { AnalyticsApp } from "#app/analytics.app";
 
@@ -193,9 +189,7 @@ export class LangWatchQLTrpcApi {
       ),
 
       /** The datasets and columns this member's permissions unlock. */
-      schema: requireWorkbenchEnabled(
-        policy("analytics:view")(procedure.input(projectScopeSchema)),
-      )
+      schema: requireWorkbenchEnabled(policy("analytics:view")(procedure.input(projectScopeSchema)))
         .output(langWatchQLSchema)
         .query(async ({ ctx, input }) =>
           ctx.app.analytics.describeLangWatchQLSchema({

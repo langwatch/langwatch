@@ -45,10 +45,7 @@
  */
 
 import { containsMediaMarkers } from "@langwatch/trace-contract";
-import {
-  parseBase64DataUri,
-  visitContentPart,
-} from "@langwatch/trace-contract";
+import { parseBase64DataUri, visitContentPart } from "@langwatch/trace-contract";
 import { MAX_MEDIA_WALK_DEPTH } from "@langwatch/trace-contract";
 import { type ExtractedRef, processContentPart } from "./trace-content-extraction.service";
 import type { TraceMediaStorePort } from "../ports/trace-media-store.port";
@@ -153,9 +150,7 @@ export function isExtractableMediaPart(part: unknown): boolean {
 
 /** A string whose ENTIRE value is one base64 `data:` URI. */
 function isBareDataUri(value: string): boolean {
-  return (
-    value.startsWith("data:") && !/\s/.test(value) && parseBase64DataUri(value) !== null
-  );
+  return value.startsWith("data:") && !/\s/.test(value) && parseBase64DataUri(value) !== null;
 }
 
 function collectCandidates(
@@ -171,11 +166,7 @@ function collectCandidates(
       sites.push({ path, node: value, kind: "bareDataUri" });
       return;
     }
-    if (
-      value.length < 2 ||
-      value.length > MAX_NESTED_JSON_BYTES ||
-      !containsMediaMarkers(value)
-    ) {
+    if (value.length < 2 || value.length > MAX_NESTED_JSON_BYTES || !containsMediaMarkers(value)) {
       return;
     }
     let parsed: unknown;

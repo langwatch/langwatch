@@ -97,12 +97,8 @@ describe("<TargetPicker />", () => {
           onRemoveArchived: vi.fn(),
         });
 
-        expect(
-          screen.getByTestId("remove-archived-target-agent_old"),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByTestId("remove-archived-target-prompt_old"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("remove-archived-target-agent_old")).toBeInTheDocument();
+        expect(screen.getByTestId("remove-archived-target-prompt_old")).toBeInTheDocument();
       });
     });
 
@@ -186,9 +182,7 @@ describe("<TargetPicker />", () => {
             { type: "prompt", referenceId: "prompt_1" },
             { type: "http", referenceId: "agent_old" },
           ],
-          archivedTargets: [
-            { type: "http", referenceId: "agent_old", name: "agent_old" },
-          ],
+          archivedTargets: [{ type: "http", referenceId: "agent_old", name: "agent_old" }],
         });
 
         expect(screen.getByText("2 of 3 selected")).toBeInTheDocument();
@@ -228,9 +222,7 @@ describe("<TargetPicker />", () => {
     describe("when the picker renders", () => {
       it("uses singular text for the warning", () => {
         renderPicker({
-          archivedTargets: [
-            { type: "http", referenceId: "agent_old", name: "agent_old" },
-          ],
+          archivedTargets: [{ type: "http", referenceId: "agent_old", name: "agent_old" }],
         });
 
         expect(screen.getByText("1 archived target linked:")).toBeInTheDocument();

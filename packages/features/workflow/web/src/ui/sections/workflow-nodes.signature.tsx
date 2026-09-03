@@ -8,10 +8,7 @@ import {
 } from "./workflow-nodes.prompting-technique";
 
 const isPromptingTechniqueReference = (value: unknown): value is { ref: string } =>
-  typeof value === "object" &&
-  value !== null &&
-  "ref" in value &&
-  typeof value.ref === "string";
+  typeof value === "object" && value !== null && "ref" in value && typeof value.ref === "string";
 
 /**
  * SignatureNode represents an LLM calling node in the workflow editor.
@@ -39,9 +36,7 @@ export const SignatureNode = forwardRef(function SignatureNode(
   return (
     <PromptingTechniqueWrapper
       decoratedBy={
-        isPromptingTechniqueReference(promptingTechniqueValue)
-          ? promptingTechniqueValue
-          : void 0
+        isPromptingTechniqueReference(promptingTechniqueValue) ? promptingTechniqueValue : void 0
       }
     >
       <PromptingTechniqueDropArea id={props.id}>

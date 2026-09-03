@@ -68,9 +68,7 @@ export async function resolvePortConflicts({
     await killPidGroups(report.conflicts.map((c) => c.pid));
     const after = await detectConflicts(base);
     if (after.conflicts.length > 0) {
-      console.error(
-        chalk.red("✗ some processes refused to die — please free the ports manually"),
-      );
+      console.error(chalk.red("✗ some processes refused to die — please free the ports manually"));
       process.exit(1);
     }
     return { base, report: after, resolution: "killed" };

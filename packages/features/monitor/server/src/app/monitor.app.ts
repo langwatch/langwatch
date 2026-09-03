@@ -224,8 +224,7 @@ export class MonitorApp {
       checkType: changes.checkType ?? existing.checkType,
       executionMode: changes.executionMode ?? existing.executionMode,
       preconditions: changes.preconditions ?? existing.preconditions,
-      parameters:
-        changes.parameters ?? (existingParameters.success ? existingParameters.data : {}),
+      parameters: changes.parameters ?? (existingParameters.success ? existingParameters.data : {}),
       mappings: changes.mappings !== undefined ? changes.mappings : existing.mappings,
       sample: changes.sample ?? existing.sample,
       enabled: changes.enabled,

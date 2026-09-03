@@ -66,9 +66,7 @@ function rawCollectionOf(document: unknown): unknown[] | null {
   // the list is unambiguous when the envelope is paginated or holds nothing
   // else; two arrays or an array beside other fields stays null rather than
   // a guess.
-  const arrayKeys = Object.keys(record).filter((key) =>
-    Array.isArray(record[key]),
-  );
+  const arrayKeys = Object.keys(record).filter((key) => Array.isArray(record[key]));
   if (arrayKeys.length === 1) {
     const onlyKey = arrayKeys[0]!;
     if ("pagination" in record || Object.keys(record).length === 1) {
@@ -86,9 +84,7 @@ function rawCollectionOf(document: unknown): unknown[] | null {
 export function collectionOf(document: unknown): unknown[] | null {
   const raw = rawCollectionOf(document);
   if (!raw) return null;
-  return raw.some(isTruncationMarker)
-    ? raw.filter((row) => !isTruncationMarker(row))
-    : raw;
+  return raw.some(isTruncationMarker) ? raw.filter((row) => !isTruncationMarker(row)) : raw;
 }
 
 /**
@@ -103,9 +99,7 @@ export function totalOf(document: unknown): number | null {
 
   const { pagination } = document as { pagination?: unknown };
   const parsed = paginationSchema.safeParse(pagination);
-  const stated = parsed.success
-    ? (parsed.data.totalHits ?? parsed.data.total ?? null)
-    : null;
+  const stated = parsed.success ? (parsed.data.totalHits ?? parsed.data.total ?? null) : null;
   if (stated !== null) return stated;
 
   // No stated total. Count the array instead, and count the rows the reduction

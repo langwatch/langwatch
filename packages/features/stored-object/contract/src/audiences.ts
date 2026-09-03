@@ -7,9 +7,7 @@ import { z } from "zod";
 
 type RegisteredDeliveryAudience = Extract<AuthzPermission, `${string}:view`>;
 
-function isDeliveryAudience(
-  permission: AuthzPermission,
-): permission is RegisteredDeliveryAudience {
+function isDeliveryAudience(permission: AuthzPermission): permission is RegisteredDeliveryAudience {
   return permission.endsWith(":view");
 }
 
@@ -18,16 +16,13 @@ function isDeliveryAudience(
  * derived from the shared authorization vocabulary so new read audiences are
  * explicit authz additions rather than arbitrary strings.
  */
-export const STORED_OBJECT_DELIVERY_AUDIENCES = ALL_PERMISSIONS.filter(
-  isDeliveryAudience,
-) as [RegisteredDeliveryAudience, ...RegisteredDeliveryAudience[]];
+export const STORED_OBJECT_DELIVERY_AUDIENCES = ALL_PERMISSIONS.filter(isDeliveryAudience) as [
+  RegisteredDeliveryAudience,
+  ...RegisteredDeliveryAudience[],
+];
 
-export const storedObjectDeliveryAudienceSchema = z.enum(
-  STORED_OBJECT_DELIVERY_AUDIENCES,
-);
-export type StoredObjectDeliveryAudience = z.infer<
-  typeof storedObjectDeliveryAudienceSchema
->;
+export const storedObjectDeliveryAudienceSchema = z.enum(STORED_OBJECT_DELIVERY_AUDIENCES);
+export type StoredObjectDeliveryAudience = z.infer<typeof storedObjectDeliveryAudienceSchema>;
 
 /** Runtime guard for data that has crossed a persistence or transport boundary. */
 export function isStoredObjectDeliveryAudience(

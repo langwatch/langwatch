@@ -28,11 +28,7 @@ import {
   type GovernanceService,
 } from "@langwatch/enterprise-governance-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 export type AnomalyRulesTrpcContext = Readonly<{

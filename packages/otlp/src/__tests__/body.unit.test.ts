@@ -90,20 +90,14 @@ function buildTraceRequest(): {
 function buildProtobufBody(payload: ReturnType<typeof buildTraceRequest>): ArrayBuffer {
   const message = traceRequestType.create(payload);
   const bytes = traceRequestType.encode(message).finish() as Uint8Array;
-  return bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 function buildJsonBody(payload: ReturnType<typeof buildTraceRequest>): ArrayBuffer {
   return new TextEncoder().encode(JSON.stringify(payload)).buffer as ArrayBuffer;
 }
 
-function makeRequest(
-  body: ArrayBuffer | Buffer,
-  headers: Record<string, string>,
-): Request {
+function makeRequest(body: ArrayBuffer | Buffer, headers: Record<string, string>): Request {
   return new Request("http://localhost/test", {
     method: "POST",
     headers,
@@ -201,26 +195,21 @@ describe("readOtlpBody", () => {
     it("costs a fraction of the wire budget to send", async () => {
       // Worth stating as a number: this is why the compressed limit alone was
       // never a defence.
-      expect(bomb(OTLP_MAX_BODY_BYTES + 1024).byteLength).toBeLessThan(
-        OTLP_MAX_BODY_BYTES / 100,
-      );
+      expect(bomb(OTLP_MAX_BODY_BYTES + 1024).byteLength).toBeLessThan(OTLP_MAX_BODY_BYTES / 100);
     });
 
-    it.each(["gzip", "deflate", "br"])(
-      "applies the cap to %s as well",
-      async (encoding) => {
-        const payload = Buffer.alloc(OTLP_MAX_BODY_BYTES + 1024, 0);
-        const compressed =
-          encoding === "gzip"
-            ? gzipSync(payload)
-            : encoding === "deflate"
-              ? deflateSync(payload)
-              : brotliCompressSync(payload);
-        const req = makeRequest(compressed, { "content-encoding": encoding });
+    it.each(["gzip", "deflate", "br"])("applies the cap to %s as well", async (encoding) => {
+      const payload = Buffer.alloc(OTLP_MAX_BODY_BYTES + 1024, 0);
+      const compressed =
+        encoding === "gzip"
+          ? gzipSync(payload)
+          : encoding === "deflate"
+            ? deflateSync(payload)
+            : brotliCompressSync(payload);
+      const req = makeRequest(compressed, { "content-encoding": encoding });
 
-        await expect(readOtlpBody(req)).rejects.toBeInstanceOf(OtlpBodyTooLargeError);
-      },
-    );
+      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(OtlpBodyTooLargeError);
+    });
 
     it("still accepts a body that sits just under the cap", async () => {
       const payload = Buffer.alloc(OTLP_MAX_BODY_BYTES - 1024, 0);
@@ -228,10 +217,7 @@ describe("readOtlpBody", () => {
         "content-encoding": "gzip",
       });
 
-      await expect(readOtlpBody(req)).resolves.toHaveProperty(
-        "byteLength",
-        payload.byteLength,
-      );
+      await expect(readOtlpBody(req)).resolves.toHaveProperty("byteLength", payload.byteLength);
     });
   });
 
@@ -264,10 +250,7 @@ describe("readOtlpBody", () => {
         "content-type": "application/x-protobuf",
       });
 
-      await expect(readOtlpBody(req)).resolves.toHaveProperty(
-        "byteLength",
-        payload.byteLength,
-      );
+      await expect(readOtlpBody(req)).resolves.toHaveProperty("byteLength", payload.byteLength);
     });
   });
 
@@ -354,10 +337,7 @@ describe("parser equivalence — JSON path produces same shape as protobuf path"
   it("returns the same span count and same canonical attributes regardless of wire format", () => {
     const payload = buildTraceRequest();
     const jsonResult = parseOtlpTraces(buildJsonBody(payload), "application/json");
-    const protoResult = parseOtlpTraces(
-      buildProtobufBody(payload),
-      "application/x-protobuf",
-    );
+    const protoResult = parseOtlpTraces(buildProtobufBody(payload), "application/x-protobuf");
 
     expect(jsonResult.ok).toBe(true);
     expect(protoResult.ok).toBe(true);
@@ -449,8 +429,7 @@ describe("parseOtlpLogs", () => {
           },
         ],
       };
-      const body = new TextEncoder().encode(JSON.stringify(logsPayload))
-        .buffer as ArrayBuffer;
+      const body = new TextEncoder().encode(JSON.stringify(logsPayload)).buffer as ArrayBuffer;
       const result = parseOtlpLogs(body, "application/json");
       expect(result.ok).toBe(true);
       if (result.ok) {

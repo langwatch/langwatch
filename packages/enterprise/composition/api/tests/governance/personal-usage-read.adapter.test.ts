@@ -125,9 +125,7 @@ describe("the ingestion-ledger union's money", () => {
 
   describe("when the per-day and per-model reads answer", () => {
     it("converts each summed nano total to its exact USD figure", async () => {
-      const daily = createRepository([
-        { Day: "2026-08-03", SpentNanoUsd: "1234567", Requests: 3 },
-      ]);
+      const daily = createRepository([{ Day: "2026-08-03", SpentNanoUsd: "1234567", Requests: 3 }]);
       const buckets = await daily.findIngestionPrincipalBuckets(params);
       expect(buckets.find((b) => b.day === "2026-08-03")?.spentUsd).toBe(0.001234567);
 

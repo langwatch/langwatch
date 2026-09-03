@@ -12,10 +12,7 @@ import {
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
 import { ValidationError } from "../../errorHandling";
-import type {
-  ProcessCommandBatchParams,
-  ProcessCommandParams,
-} from "../commandDispatcher";
+import type { ProcessCommandBatchParams, ProcessCommandParams } from "../commandDispatcher";
 import { processCommand, processCommandBatch } from "../commandDispatcher";
 
 describe("processCommand", () => {
@@ -131,9 +128,7 @@ describe("processCommand", () => {
       const params = createDefaultParams({ commandSchema });
 
       await expect(processCommand(params)).rejects.toThrow(ValidationError);
-      await expect(processCommand(params)).rejects.toThrow(
-        /Invalid payload for command type/,
-      );
+      await expect(processCommand(params)).rejects.toThrow(/Invalid payload for command type/);
     });
   });
 
@@ -172,9 +167,7 @@ describe("processCommand", () => {
   describe("handler returns array with undefined element", () => {
     it("throws ValidationError mentioning the index", async () => {
       const handler: CommandHandler<any, Event> = {
-        handle: vi
-          .fn()
-          .mockResolvedValue([makeValidEvent(), undefined, makeValidEvent()]),
+        handle: vi.fn().mockResolvedValue([makeValidEvent(), undefined, makeValidEvent()]),
       };
 
       const params = createDefaultParams({ handler });
@@ -412,9 +405,7 @@ describe("processCommandBatch", () => {
       it("runs cleanup once per handled command", async () => {
         const cleanupAfterStore = vi.fn().mockResolvedValue(undefined);
         const handler = {
-          handle: vi.fn(async (command: any) => [
-            eventWithKey(`k-${command.aggregateId}`),
-          ]),
+          handle: vi.fn(async (command: any) => [eventWithKey(`k-${command.aggregateId}`)]),
           cleanupAfterStore,
         };
         const params = createDefaultBatchParams({
@@ -438,9 +429,7 @@ describe("processCommandBatch", () => {
         const cleanupAfterStore = vi.fn().mockResolvedValue(undefined);
         const handler = {
           handle: vi.fn(async (command: any) =>
-            command.aggregateId === "agg-1"
-              ? []
-              : [eventWithKey(`k-${command.aggregateId}`)],
+            command.aggregateId === "agg-1" ? [] : [eventWithKey(`k-${command.aggregateId}`)],
           ),
           cleanupAfterStore,
         };
@@ -452,9 +441,10 @@ describe("processCommandBatch", () => {
 
         await processCommandBatch(params);
 
-        expect(
-          cleanupAfterStore.mock.calls.map(([command]) => command.aggregateId),
-        ).toEqual(["agg-0", "agg-2"]);
+        expect(cleanupAfterStore.mock.calls.map(([command]) => command.aggregateId)).toEqual([
+          "agg-0",
+          "agg-2",
+        ]);
       });
     });
 
@@ -467,9 +457,7 @@ describe("processCommandBatch", () => {
           }
         });
         const handler = {
-          handle: vi.fn(async (command: any) => [
-            eventWithKey(`k-${command.aggregateId}`),
-          ]),
+          handle: vi.fn(async (command: any) => [eventWithKey(`k-${command.aggregateId}`)]),
           cleanupAfterStore,
         };
         const storeEventsFn = vi.fn().mockResolvedValue(undefined);
@@ -485,9 +473,11 @@ describe("processCommandBatch", () => {
         // neither rolled it back nor stopped the other commands' cleanups.
         expect(storeEventsFn).toHaveBeenCalledTimes(1);
         expect(cleanupAfterStore).toHaveBeenCalledTimes(3);
-        expect(
-          cleanupAfterStore.mock.calls.map(([command]) => command.aggregateId),
-        ).toEqual(["agg-0", "agg-1", "agg-2"]);
+        expect(cleanupAfterStore.mock.calls.map(([command]) => command.aggregateId)).toEqual([
+          "agg-0",
+          "agg-1",
+          "agg-2",
+        ]);
       });
     });
   });

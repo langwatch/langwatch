@@ -69,10 +69,7 @@ export class ApiKeyTokenResolutionService {
     }
 
     if (tokenType === "apiKey") {
-      const resolved = await this.tryResolveCurrentApiKey(
-        parsed.token,
-        parsed.projectId ?? null,
-      );
+      const resolved = await this.tryResolveCurrentApiKey(parsed.token, parsed.projectId ?? null);
       if (resolved) {
         return resolved;
       }
@@ -97,9 +94,7 @@ export class ApiKeyTokenResolutionService {
     return token;
   }
 
-  async resolveOrganizationToken(input: {
-    token: string;
-  }): Promise<OrganizationApiKeyResolution> {
+  async resolveOrganizationToken(input: { token: string }): Promise<OrganizationApiKeyResolution> {
     const parsed = organizationApiKeyResolutionInputSchema.parse(input);
     if (getTokenType(parsed.token) === "apiKey") {
       const apiKey = await this.tryVerify({ token: parsed.token });
@@ -128,17 +123,13 @@ export class ApiKeyTokenResolutionService {
     return this.options.tokens.trySplit(token);
   }
 
-  private async tryResolveLegacyProjectKey(
-    token: string,
-  ): Promise<ResolvedApiKeyToken | null> {
+  private async tryResolveLegacyProjectKey(token: string): Promise<ResolvedApiKeyToken | null> {
     const projectId = await this.repository.tryFindLegacyProjectId({ token });
     if (!projectId) {
       return null;
     }
     const project = await this.options.projects.tryGetIdentity(projectId);
-    return project
-      ? resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project })
-      : null;
+    return project ? resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project }) : null;
   }
 
   private async tryResolveCurrentApiKey(

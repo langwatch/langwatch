@@ -17,9 +17,7 @@ type SourceImport = {
 function isWithin(root: string, path: string): boolean {
   const pathFromRoot = relative(root, path);
   const escapesRoot =
-    pathFromRoot.startsWith(`..${sep}`) ||
-    pathFromRoot === ".." ||
-    isAbsolute(pathFromRoot);
+    pathFromRoot.startsWith(`..${sep}`) || pathFromRoot === ".." || isAbsolute(pathFromRoot);
   return pathFromRoot === "" || !escapesRoot;
 }
 
@@ -40,13 +38,11 @@ function sourceImports(root: string): SourceImport[] {
     return isProductionSource && isNotTestDirectory;
   }).flatMap((file) => {
     const source = readFileSync(file, "utf8");
-    return ts
-      .preProcessFile(source, true, true)
-      .importedFiles.map(({ fileName, pos }) => ({
-        file,
-        line: sourceLine(source, pos),
-        specifier: fileName,
-      }));
+    return ts.preProcessFile(source, true, true).importedFiles.map(({ fileName, pos }) => ({
+      file,
+      line: sourceLine(source, pos),
+      specifier: fileName,
+    }));
   });
 }
 
@@ -95,9 +91,7 @@ function isStrictPrismaAdapter(pkg: ClassifiedPackage, file: string): boolean {
   return /\/src\/adapters\/postgres\.[^/]+\.adapter\.ts$/.test(file);
 }
 
-export function lintPrismaBoundaries(
-  packages: ClassifiedPackage[],
-): ArchitectureViolation[] {
+export function lintPrismaBoundaries(packages: ClassifiedPackage[]): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of packages) {
     for (const sourceImport of sourceImports(join(pkg.root, "src"))) {

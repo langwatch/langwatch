@@ -175,12 +175,7 @@ export async function setupModelEnv(
     : modelProvider.customModels;
   const isCustomModel = customModelList?.some((m) => m.modelId === modelName);
 
-  if (
-    modelList &&
-    modelList.length > 0 &&
-    !modelList.includes(modelName) &&
-    !isCustomModel
-  ) {
+  if (modelList && modelList.length > 0 && !modelList.includes(modelName) && !isCustomModel) {
     // The collapse winner for the provider key is not necessarily the row
     // that serves this model: with multi-instance providers the model may
     // come from a wider-scope row's custom catalog, and
@@ -207,15 +202,11 @@ export async function setupModelEnv(
     }
   }
 
-  const litellmParams = await prepareLitellmParams(
-    modelProvidersService,
-    managedProviders,
-    {
-      model,
-      modelProvider,
-      projectId,
-    },
-  );
+  const litellmParams = await prepareLitellmParams(modelProvidersService, managedProviders, {
+    model,
+    modelProvider,
+    projectId,
+  });
 
   let envResult = Object.fromEntries(
     Object.entries(litellmParams).map(([key, value]) => [

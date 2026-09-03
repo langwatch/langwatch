@@ -109,9 +109,7 @@ export const TokensOutCell = {
   id: "tokensOut",
   label: "Tokens Out",
   render: ({ row }) => (
-    <MonoCell>
-      {row.outputTokens != null ? formatTokens(row.outputTokens) : dash}
-    </MonoCell>
+    <MonoCell>{row.outputTokens != null ? formatTokens(row.outputTokens) : dash}</MonoCell>
   ),
   renderComfortable: ({ row }) => (
     <Text textStyle="sm" color="fg.muted" textAlign="right">

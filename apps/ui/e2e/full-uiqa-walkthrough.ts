@@ -27,12 +27,7 @@ async function shoot(page: Page, name: string, fullPage = false) {
   console.log(`captured ${name}.png`);
 }
 
-async function tryGoto(
-  page: Page,
-  name: string,
-  url: string,
-  waitForText?: string | RegExp,
-) {
+async function tryGoto(page: Page, name: string, url: string, waitForText?: string | RegExp) {
   try {
     const resp = await page.goto(`${BASE_URL}${url}`, {
       waitUntil: "domcontentloaded",
@@ -127,9 +122,7 @@ void (async () => {
 
   // Click "+ New" or first tile to open drawer
   const newTileBtn = page
-    .locator(
-      'button:has-text("New tile"), button:has-text("+ New"), button:has-text("Add tile")',
-    )
+    .locator('button:has-text("New tile"), button:has-text("+ New"), button:has-text("Add tile")')
     .first();
   if ((await newTileBtn.count()) > 0) {
     await newTileBtn.click().catch(() => {});

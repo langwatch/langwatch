@@ -29,8 +29,7 @@ export function NoLicenseCard({
   isActivating,
 }: NoLicenseCardProps) {
   const host = useLicensingHost();
-  const purchaseLinkUrl =
-    host.licensePurchaseUrl() ?? DEFAULT_LICENSE_PURCHASE_URL;
+  const purchaseLinkUrl = host.licensePurchaseUrl() ?? DEFAULT_LICENSE_PURCHASE_URL;
 
   const [activationMethod, setActivationMethod] = useState<ActivationMethod>("file");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);

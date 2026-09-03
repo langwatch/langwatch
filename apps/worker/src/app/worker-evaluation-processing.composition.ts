@@ -34,7 +34,10 @@ import {
   type EvaluationSettingsRecoveryPort,
   type EvaluationTraceEvidencePort,
 } from "@langwatch/evaluation-server";
-import type { EvaluationExecutionResult, ExecuteEvaluationCommand as ExecuteEvaluationCommandInput } from "@langwatch/evaluation-contract";
+import type {
+  EvaluationExecutionResult,
+  ExecuteEvaluationCommand as ExecuteEvaluationCommandInput,
+} from "@langwatch/evaluation-contract";
 import { mappingStateSchema } from "@langwatch/trace-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { EvaluationWorkerCapability } from "../features/evaluation/evaluation-worker-feature.installer";

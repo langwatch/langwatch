@@ -304,7 +304,9 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async tryFindNormalizedSpanById(_params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
+  async tryFindNormalizedSpanById(
+    _params: NormalizedSpanByIdParams,
+  ): Promise<NormalizedSpan | null> {
     return null;
   }
 

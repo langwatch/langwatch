@@ -9,9 +9,7 @@ export class PostgresIngestionPullSourceAdapter extends IngestionPullSourcePort 
   }
 
   static create(database: object): PostgresIngestionPullSourceAdapter {
-    return new PostgresIngestionPullSourceAdapter(
-      PrismaIngestionSourceRepository.create(database),
-    );
+    return new PostgresIngestionPullSourceAdapter(PrismaIngestionSourceRepository.create(database));
   }
 
   tryFindById(id: string): Promise<GovernanceIngestionSource | null> {

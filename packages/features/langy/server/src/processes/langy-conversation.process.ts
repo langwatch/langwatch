@@ -1,12 +1,5 @@
-import type {
-  EventHandler,
-  IntentExecutor,
-  ProcessManagerApplier,
-} from "@langwatch/eventing";
-import {
-  LANGY_CONVERSATION_EVENT_TYPES,
-  LANGY_TITLE_SOURCE,
-} from "@langwatch/langy-contract";
+import type { EventHandler, IntentExecutor, ProcessManagerApplier } from "@langwatch/eventing";
+import { LANGY_CONVERSATION_EVENT_TYPES, LANGY_TITLE_SOURCE } from "@langwatch/langy-contract";
 import type { LangyConversationProcessingEvent } from "../adapters/eventing.langy.adapter";
 import {
   LANGY_PROCESS_INTENT_TYPES,
@@ -18,10 +11,7 @@ import {
   langyProcessEventViewSchema,
   langyWorkerDispatchIntentSchema,
 } from "../ports/langy-conversation-process.port";
-import {
-  LANGY_OUTBOX_LEASE_DURATION_MS,
-  type LangyEffectPorts,
-} from "../ports/langy-effect.port";
+import { LANGY_OUTBOX_LEASE_DURATION_MS, type LangyEffectPorts } from "../ports/langy-effect.port";
 import {
   createLangyGenerateTitleIntent,
   createLangyWorkerDispatchIntent,
@@ -43,9 +33,7 @@ export function buildLangyProcessEventView(
   return {
     turnId: "turnId" in event.data ? (event.data.turnId ?? null) : null,
     outcome:
-      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED
-        ? event.data.outcome
-        : null,
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED ? event.data.outcome : null,
     titleTouched:
       event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED &&
       typeof event.data.title === "string",
@@ -232,14 +220,8 @@ export function langyConversationProcess(
       .on(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED, handleArchived)
       .on(LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED, handleMetadataUpdated)
       .on(LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED, handleTitleGenerated)
-      .on(
-        LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
-        handleHandoffPending,
-      )
-      .on(
-        LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED,
-        handleHandoffConsumed,
-      )
+      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING, handleHandoffPending)
+      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED, handleHandoffConsumed)
       .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED, handleNoDecision)
       .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED, handleNoDecision)
       .on(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED, handleNoDecision)

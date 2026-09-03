@@ -138,8 +138,7 @@ export const FormVariablesSection = ({
           if (
             newVar &&
             currentField &&
-            (newVar.identifier !== currentField.identifier ||
-              newVar.type !== currentField.type)
+            (newVar.identifier !== currentField.identifier || newVar.type !== currentField.type)
           ) {
             update(i, {
               identifier: newVar.identifier,

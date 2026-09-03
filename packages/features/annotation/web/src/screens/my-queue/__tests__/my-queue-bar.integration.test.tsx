@@ -185,11 +185,13 @@ const setItems = (items: TestQueueItem[]) => {
  */
 const page = () => (
   <AnnotationTestHarness
-    host={new StubAnnotationHost({
-      project: { id: "project-1", slug: "acme", name: "Acme" },
-      currentUser: { id: "user-1", name: "Ada", image: null },
-      permissions: ["annotations:update", "annotations:manage"],
-    })}
+    host={
+      new StubAnnotationHost({
+        project: { id: "project-1", slug: "acme", name: "Acme" },
+        currentUser: { id: "user-1", name: "Ada", image: null },
+        permissions: ["annotations:update", "annotations:manage"],
+      })
+    }
   >
     <MyQueuePage />
   </AnnotationTestHarness>
@@ -204,8 +206,7 @@ const datasetCheckbox = (name: string | RegExp = /^Add to dataset at the end/) =
 const session = () => useAnnotationQueueSessionStore.getState();
 
 /** What the conversation does when a reviewer saves an annotation on a turn. */
-const annotateTurn = (traceId: string) =>
-  act(() => session().noteAnnotationSaved(traceId));
+const annotateTurn = (traceId: string) => act(() => session().noteAnnotationSaved(traceId));
 
 /** What the conversation does when a reviewer unticks a turn's checkbox. */
 const toggleTurn = (traceId: string) => act(() => session().toggle(traceId));
@@ -216,10 +217,7 @@ const recordsAdded = () => act(() => session().noteHandoffAdded());
 /** What the server does with an item the reviewer finishes. */
 const marksItemsDone = () => {
   mocks.markDone.mockImplementation(
-    (
-      input: { queueItemId: string },
-      options?: { onSuccess?: () => Promise<void> | void },
-    ) => {
+    (input: { queueItemId: string }, options?: { onSuccess?: () => Promise<void> | void }) => {
       mocks.items = (mocks.items as { id: string }[]).map((item) =>
         item.id === input.queueItemId
           ? { ...item, doneAt: new Date("2026-08-02T10:00:00Z") }
@@ -313,9 +311,7 @@ describe("given a reviewer walking their annotation queue", () => {
         expect.anything(),
       );
       await waitFor(() =>
-        expect(mocks.push).toHaveBeenCalledWith(
-          "/acme/annotations/my-queue?queue-item=item-2",
-        ),
+        expect(mocks.push).toHaveBeenCalledWith("/acme/annotations/my-queue?queue-item=item-2"),
       );
     });
 
@@ -348,9 +344,7 @@ describe("given a reviewer walking their annotation queue", () => {
     it("offers no way to edit the trace, and keeps the rest of the bar", () => {
       renderPage();
 
-      expect(
-        screen.queryByRole("button", { name: /Edit trace/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Edit trace/ })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Next/ })).toBeInTheDocument();
       expect(datasetCheckbox()).toBeInTheDocument();
     });
@@ -624,9 +618,7 @@ describe("given a reviewer walking their annotation queue", () => {
 
       await user.click(screen.getByRole("button", { name: "Cancel" }));
 
-      await waitFor(() =>
-        expect(screen.queryByText(END_SESSION_QUESTION)).not.toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.queryByText(END_SESSION_QUESTION)).not.toBeInTheDocument());
       expect(screen.getByTestId("conversation-view")).toBeInTheDocument();
       expect(screen.queryByTestId("tasks-done")).not.toBeInTheDocument();
       expect(mocks.markDone).not.toHaveBeenCalled();
@@ -681,9 +673,7 @@ describe("given a reviewer walking their annotation queue", () => {
       renderPage();
 
       expect(screen.getByText("This trace is no longer available")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Remove from queue" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove from queue" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Skip" })).toBeInTheDocument();
     });
 
@@ -696,9 +686,7 @@ describe("given a reviewer walking their annotation queue", () => {
       expect(screen.getByText("1 of 2")).toBeInTheDocument();
 
       expect(screen.queryByRole("button", { name: /Done/ })).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /Edit trace/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Edit trace/ })).not.toBeInTheDocument();
       expect(
         screen.queryByRole("checkbox", { name: /Add to dataset at the end/ }),
       ).not.toBeInTheDocument();
@@ -712,9 +700,7 @@ describe("given a reviewer walking their annotation queue", () => {
       await user.click(screen.getByRole("button", { name: /Next/ }));
 
       await waitFor(() =>
-        expect(mocks.push).toHaveBeenCalledWith(
-          "/acme/annotations/my-queue?queue-item=item-2",
-        ),
+        expect(mocks.push).toHaveBeenCalledWith("/acme/annotations/my-queue?queue-item=item-2"),
       );
       expect(mocks.markDone).not.toHaveBeenCalled();
     });
@@ -735,9 +721,7 @@ describe("given a reviewer walking their annotation queue", () => {
         expect.anything(),
       );
       await waitFor(() =>
-        expect(mocks.push).toHaveBeenCalledWith(
-          "/acme/annotations/my-queue?queue-item=item-2",
-        ),
+        expect(mocks.push).toHaveBeenCalledWith("/acme/annotations/my-queue?queue-item=item-2"),
       );
       await waitFor(() => expect(mocks.invalidateQueues).toHaveBeenCalled());
     });
@@ -750,9 +734,7 @@ describe("given a reviewer walking their annotation queue", () => {
       await user.click(screen.getByRole("button", { name: "Skip" }));
 
       await waitFor(() =>
-        expect(mocks.push).toHaveBeenCalledWith(
-          "/acme/annotations/my-queue?queue-item=item-2",
-        ),
+        expect(mocks.push).toHaveBeenCalledWith("/acme/annotations/my-queue?queue-item=item-2"),
       );
       expect(mocks.deleteQueueItems).not.toHaveBeenCalled();
     });
@@ -762,9 +744,7 @@ describe("given a reviewer walking their annotation queue", () => {
       mocks.canUpdateAnnotations = false;
       renderPage();
 
-      expect(
-        screen.queryByRole("button", { name: "Remove from queue" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove from queue" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Skip" })).toBeInTheDocument();
     });
   });

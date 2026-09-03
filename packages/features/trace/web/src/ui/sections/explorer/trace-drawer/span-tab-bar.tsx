@@ -13,11 +13,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  PresenceMarker,
-  selectPeersMatching,
-  usePresenceStore,
-} from "@langwatch/presence-web";
+import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-web";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility";
 import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail";
@@ -93,8 +89,7 @@ function SpanFocusPresenceDot({ traceId, spanId }: { traceId: string; spanId: st
       selectPeersMatching(
         s,
         (session) =>
-          session.location.route.traceId === traceId &&
-          session.location.route.spanId === spanId,
+          session.location.route.traceId === traceId && session.location.route.spanId === spanId,
       ),
     ),
   );
@@ -165,8 +160,7 @@ export const SpanTabBar = memo(function SpanTabBar({
   );
 
   const selectedSpan = useMemo(
-    () =>
-      selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null,
+    () => (selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null),
     [selectedSpanId, spanTree],
   );
 
@@ -193,10 +187,7 @@ export const SpanTabBar = memo(function SpanTabBar({
   // the drawer didn't tear down its DOM, because the boundary kept
   // re-mounting the subtree faster than the URL change could unmount
   // the parent.
-  const inlinePinned = useMemo(
-    () => pinnedSpans.slice(0, inlineCount),
-    [pinnedSpans, inlineCount],
-  );
+  const inlinePinned = useMemo(() => pinnedSpans.slice(0, inlineCount), [pinnedSpans, inlineCount]);
   const overflowPinned = useMemo(
     () => (overflowing ? pinnedSpans.slice(inlineCount) : []),
     [pinnedSpans, inlineCount, overflowing],
@@ -246,9 +237,7 @@ export const SpanTabBar = memo(function SpanTabBar({
             actionLabel="Unpin span tab"
             onAction={() => unpinSpan(span.spanId)}
             presence={
-              traceId ? (
-                <SpanFocusPresenceDot traceId={traceId} spanId={span.spanId} />
-              ) : null
+              traceId ? <SpanFocusPresenceDot traceId={traceId} spanId={span.spanId} /> : null
             }
           />
         ),
@@ -486,13 +475,7 @@ function SpanTab({
         data-overflow-id={overflowId}
       >
         <SpanTypeBadge type={span.type ?? "span"} />
-        <Text
-          textStyle="xs"
-          color="inherit"
-          fontWeight="inherit"
-          maxWidth="180px"
-          truncate
-        >
+        <Text textStyle="xs" color="inherit" fontWeight="inherit" maxWidth="180px" truncate>
           {spanTabLabel(span)}
         </Text>
 
@@ -530,10 +513,7 @@ function SpanTab({
         </Tooltip>
 
         {secondaryActionIcon && onSecondaryAction && (
-          <Tooltip
-            content={secondaryActionLabel ?? ""}
-            positioning={{ placement: "top" }}
-          >
+          <Tooltip content={secondaryActionLabel ?? ""} positioning={{ placement: "top" }}>
             <Flex
               as="button"
               align="center"
@@ -647,9 +627,7 @@ function PinnedSpanOverflowMenu({
                 <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
                   {formatDuration(span.durationMs)}
                 </Text>
-                {span.status === "error" && (
-                  <Circle size="6px" bg="red.solid" flexShrink={0} />
-                )}
+                {span.status === "error" && <Circle size="6px" bg="red.solid" flexShrink={0} />}
                 <Tooltip content="Unpin span tab" positioning={{ placement: "top" }}>
                   <Flex
                     as="button"

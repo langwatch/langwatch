@@ -20,10 +20,7 @@
  * repository writes rather than of the row itself.
  */
 import { createLogger } from "@langwatch/observability";
-import {
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "@langwatch/trace-contract";
+import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
 
 const DECIMAL_NUMBER_RE = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 

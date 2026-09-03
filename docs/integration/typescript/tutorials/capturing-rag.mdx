@@ -206,42 +206,37 @@ async function ragWithMetadata(query: string): Promise<string> {
 When working with RAG operations, it's important to handle errors gracefully and capture error information in your spans:
 
 ```typescript
-async function ragRetrievalWithErrorHandling(
-  query: string,
-): Promise<LangWatchSpanRAGContext[]> {
-  return await tracer.withActiveSpan(
-    "RAG Retrieval with Error Handling",
-    async (span) => {
-      span.setType("rag");
-      span.setInput("text", query);
+async function ragRetrievalWithErrorHandling(query: string): Promise<LangWatchSpanRAGContext[]> {
+  return await tracer.withActiveSpan("RAG Retrieval with Error Handling", async (span) => {
+    span.setType("rag");
+    span.setInput("text", query);
 
-      try {
-        // Simulate retrieval that might fail
-        const retrievedContexts: LangWatchSpanRAGContext[] = [
-          {
-            document_id: "doc_123",
-            chunk_id: "chunk_456",
-            content: "Relevant information from document 123",
-          },
-        ];
+    try {
+      // Simulate retrieval that might fail
+      const retrievedContexts: LangWatchSpanRAGContext[] = [
+        {
+          document_id: "doc_123",
+          chunk_id: "chunk_456",
+          content: "Relevant information from document 123",
+        },
+      ];
 
-        span.setRAGContexts(retrievedContexts);
-        span.setOutput("json", { status: "success", count: retrievedContexts.length });
+      span.setRAGContexts(retrievedContexts);
+      span.setOutput("json", { status: "success", count: retrievedContexts.length });
 
-        return retrievedContexts;
-      } catch (error) {
-        // Capture error information in the span
-        span.setOutput("json", {
-          status: "error",
-          error_message: error instanceof Error ? error.message : String(error),
-          error_type: error instanceof Error ? error.constructor.name : typeof error,
-        });
+      return retrievedContexts;
+    } catch (error) {
+      // Capture error information in the span
+      span.setOutput("json", {
+        status: "error",
+        error_message: error instanceof Error ? error.message : String(error),
+        error_type: error instanceof Error ? error.constructor.name : typeof error,
+      });
 
-        // Re-throw the error (withActiveSpan will automatically mark the span as ERROR)
-        throw error;
-      }
-    },
-  );
+      // Re-throw the error (withActiveSpan will automatically mark the span as ERROR)
+      throw error;
+    }
+  });
 }
 ```
 
@@ -268,6 +263,6 @@ For more advanced RAG patterns and framework-specific implementations:
 
 <Tip>
   For production RAG applications, combine manual RAG spans with [Semantic
-  Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent
-  observability and better analytics.
+  Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent observability
+  and better analytics.
 </Tip>

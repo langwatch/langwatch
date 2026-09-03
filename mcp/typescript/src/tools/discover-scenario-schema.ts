@@ -26,9 +26,7 @@ export function formatScenarioSchema(): string {
   lines.push(
     "- **Persona**: Who is the user? (e.g., a stressed small business owner, a confused teenager)",
   );
-  lines.push(
-    "- **Emotional state**: How are they feeling? (e.g., frustrated, anxious, impatient)",
-  );
+  lines.push("- **Emotional state**: How are they feeling? (e.g., frustrated, anxious, impatient)");
   lines.push("- **Background/Context**: What happened before this conversation?");
   lines.push("- **Intent**: What do they want to accomplish?");
   lines.push(
@@ -62,9 +60,7 @@ export function formatScenarioSchema(): string {
   lines.push(
     '- **Clarification**: "Agent asks clarifying questions before taking irreversible action"',
   );
-  lines.push(
-    '- **Tone**: "Agent maintains a professional and empathetic tone throughout"',
-  );
+  lines.push('- **Tone**: "Agent maintains a professional and empathetic tone throughout"');
   lines.push(
     '- **Completeness**: "Agent confirms the user understands the solution before ending"',
   );
@@ -84,12 +80,8 @@ export function formatScenarioSchema(): string {
 
   lines.push("\n## Tips\n");
   lines.push("- Start simple, then layer complexity (add constraints, edge cases)");
-  lines.push(
-    "- Test edge cases: user changes their mind, gives ambiguous input, makes mistakes",
-  );
-  lines.push(
-    "- Use `fetch_scenario_docs` for the full authoring guide and advanced patterns",
-  );
+  lines.push("- Test edge cases: user changes their mind, gives ambiguous input, makes mistakes");
+  lines.push("- Use `fetch_scenario_docs` for the full authoring guide and advanced patterns");
 
   return lines.join("\n");
 }

@@ -110,9 +110,7 @@ function isBundleCurrent({
   }
 
   try {
-    return sourceRoots.every(
-      (sourceRoot) => !hasFileNewerThan(sourceRoot, bundleMtimeMs),
-    );
+    return sourceRoots.every((sourceRoot) => !hasFileNewerThan(sourceRoot, bundleMtimeMs));
   } catch {
     return false;
   }
@@ -140,12 +138,7 @@ function hasFileNewerThan(dir: string, thresholdMs: number): boolean {
 }
 
 function resolveProductionSpawn(packageRoot: string, sourcePath: string): SpawnConfig {
-  const bundlePath = path.join(
-    packageRoot,
-    "dist",
-    "server",
-    "scenario-child-process.cjs",
-  );
+  const bundlePath = path.join(packageRoot, "dist", "server", "scenario-child-process.cjs");
 
   if (fs.existsSync(bundlePath)) {
     logger.info({ bundlePath }, "Spawning child process from pre-compiled bundle");

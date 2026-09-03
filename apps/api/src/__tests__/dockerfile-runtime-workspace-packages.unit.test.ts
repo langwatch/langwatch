@@ -98,9 +98,7 @@ describe("given the runtime image assembles its node_modules", () => {
       // node_modules is a symlink into it. Omitting this copy builds a clean
       // image whose container dies on its first import — there is no build
       // error to catch it, which is how it shipped broken once already.
-      const storeCopy = stage.search(
-        /COPY --from=builder \/app\/node_modules\s+\.\/node_modules/,
-      );
+      const storeCopy = stage.search(/COPY --from=builder \/app\/node_modules\s+\.\/node_modules/);
       const appCopy = stage.search(
         new RegExp(`COPY --from=builder /app/apps/${app}\\s+\\./apps/${app}`),
       );
@@ -158,9 +156,7 @@ describe("given the runtime image assembles its node_modules", () => {
       // Copying the whole tree satisfies this more strongly than naming the
       // package: it cannot go stale when a new workspace package is added.
       // Either shape is accepted; neither being present is the bug.
-      const hasWholeTreeCopy = /COPY --from=builder \/app\/packages\s+\.\/packages/.test(
-        stage,
-      );
+      const hasWholeTreeCopy = /COPY --from=builder \/app\/packages\s+\.\/packages/.test(stage);
 
       expect(
         hasWholeTreeCopy || stage.includes(`/app/packages/${dir}`),

@@ -236,8 +236,7 @@ tests:
       - eval_time: 10m
         alertname: CircuitOpenTooLong
         exp_alerts:
-          - exp_labels:
-              { credential_id: cred_openai_primary, severity: page, team: ai-platform }
+          - exp_labels: { credential_id: cred_openai_primary, severity: page, team: ai-platform }
 
   # Half the attempts land on a fallback slot, well past the 10% threshold.
   - interval: 1m

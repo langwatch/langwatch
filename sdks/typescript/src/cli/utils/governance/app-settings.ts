@@ -87,10 +87,7 @@ export function appEnvValues(target: AppSettingsTarget): Record<string, string> 
  * run already installed the current export set (so re-running
  * `langwatch <tool>` doesn't nag).
  */
-export function appEnvHasAllVars(
-  target: AppSettingsTarget,
-  vars: Record<string, string>,
-): boolean {
+export function appEnvHasAllVars(target: AppSettingsTarget, vars: Record<string, string>): boolean {
   const current = readEnvMap(target.path);
   for (const [k, v] of Object.entries(vars)) {
     if (current[k] !== v) return false;
@@ -117,10 +114,7 @@ export function appEnvHasAnyVar(target: AppSettingsTarget, keys: string[]): bool
  * Throws when the existing file cannot be read as a JSON object, rather than
  * replacing it. Every caller treats that as best-effort and says so.
  */
-export function installAppEnv(
-  target: AppSettingsTarget,
-  vars: Record<string, string>,
-): void {
+export function installAppEnv(target: AppSettingsTarget, vars: Record<string, string>): void {
   const settings = readAppSettingsFileForUpdate(target.path);
   const existingEnv = settings.env;
   const nextEnv: Record<string, string> = isPlainObject(existingEnv)

@@ -12,15 +12,10 @@ import { describe, expect, it } from "vitest";
 import { verifyElevenLabsSignature } from "../elevenlabs-webhook.api";
 
 const SECRET = "wsec_test";
-const BODY =
-  '{"type":"post_call_transcription","data":{"conversation_id":"conv_1"}}';
+const BODY = '{"type":"post_call_transcription","data":{"conversation_id":"conv_1"}}';
 
 /** The header the vendor sends: `t=<unix seconds>,v0=<hex hmac>`. */
-function signed(params: {
-  body?: string;
-  at: number;
-  secret?: string;
-}): string {
+function signed(params: { body?: string; at: number; secret?: string }): string {
   const ts = String(params.at);
   const mac = createHmac("sha256", params.secret ?? SECRET)
     .update(`${ts}.${params.body ?? BODY}`)

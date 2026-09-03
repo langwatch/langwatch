@@ -84,9 +84,7 @@ function createMockSubscriberDispatchDefinition(
 /**
  * Creates a mock command handler class for testing.
  */
-function createMockCommandHandlerClass(
-  name: string,
-): CommandHandlerClass<any, CommandType, Event> {
+function createMockCommandHandlerClass(name: string): CommandHandlerClass<any, CommandType, Event> {
   const payloadSchema = z.object({
     tenantId: z.string(),
     aggregateId: z.string(),
@@ -150,14 +148,8 @@ describe("QueueManager", () => {
       });
 
       // Initialize all types
-      manager.initializeHandlerQueues(
-        { h1: createMockEventHandlerDefinition("h1") },
-        vi.fn(),
-      );
-      manager.initializeProjectionQueues(
-        { p1: createMockProjectionDefinition("p1") },
-        vi.fn(),
-      );
+      manager.initializeHandlerQueues({ h1: createMockEventHandlerDefinition("h1") }, vi.fn());
+      manager.initializeProjectionQueues({ p1: createMockProjectionDefinition("p1") }, vi.fn());
       manager.initializeCommandQueues(
         [{ name: "c1", handlerClass: createMockCommandHandlerClass("c1") }],
         vi.fn(),
@@ -192,10 +184,7 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeHandlerQueues(
-        { h1: createMockEventHandlerDefinition("h1") },
-        vi.fn(),
-      );
+      manager.initializeHandlerQueues({ h1: createMockEventHandlerDefinition("h1") }, vi.fn());
 
       const entry = globalJobRegistry.get("test-pipeline:handler:h1");
       expect(entry?.groupKeyFn).toBeDefined();
@@ -213,14 +202,8 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeHandlerQueues(
-        { h1: createMockEventHandlerDefinition("h1") },
-        vi.fn(),
-      );
-      manager.initializeProjectionQueues(
-        { p1: createMockProjectionDefinition("p1") },
-        vi.fn(),
-      );
+      manager.initializeHandlerQueues({ h1: createMockEventHandlerDefinition("h1") }, vi.fn());
+      manager.initializeProjectionQueues({ p1: createMockProjectionDefinition("p1") }, vi.fn());
 
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
@@ -250,10 +233,7 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeHandlerQueues(
-        { h1: createMockEventHandlerDefinition("h1") },
-        vi.fn(),
-      );
+      manager.initializeHandlerQueues({ h1: createMockEventHandlerDefinition("h1") }, vi.fn());
 
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -312,10 +292,7 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeProjectionQueues(
-        { p1: createMockProjectionDefinition("p1") },
-        vi.fn(),
-      );
+      manager.initializeProjectionQueues({ p1: createMockProjectionDefinition("p1") }, vi.fn());
 
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
@@ -340,10 +317,7 @@ describe("QueueManager", () => {
         globalJobRegistry,
       });
 
-      manager.initializeHandlerQueues(
-        { h1: createMockEventHandlerDefinition("h1") },
-        vi.fn(),
-      );
+      manager.initializeHandlerQueues({ h1: createMockEventHandlerDefinition("h1") }, vi.fn());
 
       // Verify that a nonexistent key is not in the registry
       expect(globalJobRegistry.has("test-pipeline:handler:nonexistent")).toBe(false);
@@ -742,11 +716,7 @@ describe("QueueManager", () => {
       ];
       const storeEventsFn = vi.fn();
 
-      manager.initializeCommandQueues(
-        commandRegistrations,
-        storeEventsFn,
-        "test-pipeline",
-      );
+      manager.initializeCommandQueues(commandRegistrations, storeEventsFn, "test-pipeline");
 
       expect(manager.getCommandQueues().size).toBe(0);
     });
@@ -774,11 +744,7 @@ describe("QueueManager", () => {
       ];
       const storeEventsFn = vi.fn();
 
-      manager.initializeCommandQueues(
-        commandRegistrations,
-        storeEventsFn,
-        "test-pipeline",
-      );
+      manager.initializeCommandQueues(commandRegistrations, storeEventsFn, "test-pipeline");
 
       // Registry entries exist for each command
       expect(globalJobRegistry.has("test-pipeline:command:command1")).toBe(true);
@@ -814,11 +780,7 @@ describe("QueueManager", () => {
       ];
       const storeEventsFn = vi.fn();
 
-      manager.initializeCommandQueues(
-        commandRegistrations,
-        storeEventsFn,
-        "test-pipeline",
-      );
+      manager.initializeCommandQueues(commandRegistrations, storeEventsFn, "test-pipeline");
 
       const facade = manager.getCommandQueue("command1");
       const payload = {
@@ -858,11 +820,7 @@ describe("QueueManager", () => {
       ];
       const storeEventsFn = vi.fn();
 
-      manager.initializeCommandQueues(
-        commandRegistrations,
-        storeEventsFn,
-        "test-pipeline",
-      );
+      manager.initializeCommandQueues(commandRegistrations, storeEventsFn, "test-pipeline");
 
       const facade = manager.getCommandQueue("command1");
       const payload = {
@@ -897,19 +855,11 @@ describe("QueueManager", () => {
       ];
       const storeEventsFn = vi.fn();
 
-      manager.initializeCommandQueues(
-        commandRegistrations,
-        storeEventsFn,
-        "test-pipeline",
-      );
+      manager.initializeCommandQueues(commandRegistrations, storeEventsFn, "test-pipeline");
 
       // Try to initialize again with same name
       expect(() => {
-        manager.initializeCommandQueues(
-          commandRegistrations,
-          storeEventsFn,
-          "test-pipeline",
-        );
+        manager.initializeCommandQueues(commandRegistrations, storeEventsFn, "test-pipeline");
       }).toThrow(
         'Command handler with name "command1" already exists. Command handler names must be unique within a pipeline.',
       );

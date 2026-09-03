@@ -12,11 +12,7 @@ import { LuCheck, LuCopy } from "react-icons/lu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEscapeKey } from "./presentation";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
-import {
-  COLLAPSED_CELL_HEIGHT_PX,
-  DEFAULT_ROW_HEIGHT,
-  type RowHeight,
-} from "./table-utils";
+import { COLLAPSED_CELL_HEIGHT_PX, DEFAULT_ROW_HEIGHT, type RowHeight } from "./table-utils";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;
@@ -106,9 +102,7 @@ export function ExpandableDatasetCell({
 
   // Truncate if too long
   const isTruncated = rawContent.length > MAX_DISPLAY_CHARS;
-  const displayContent = isTruncated
-    ? rawContent.slice(0, MAX_DISPLAY_CHARS)
-    : rawContent;
+  const displayContent = isTruncated ? rawContent.slice(0, MAX_DISPLAY_CHARS) : rawContent;
 
   // Empty state
   if (!rawContent) {
@@ -168,8 +162,7 @@ export function ExpandableDatasetCell({
             onClick={handleExpand}
             className="cell-fade-overlay"
             css={{
-              background:
-                "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
+              background: "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
               "tr:hover &": {
                 background:
                   "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-muted))",
@@ -220,11 +213,7 @@ export function ExpandableDatasetCell({
   return (
     <>
       {/* Normal collapsed view */}
-      <Box
-        ref={cellRef}
-        position="relative"
-        css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
-      >
+      <Box ref={cellRef} position="relative" css={{ "&:hover .cell-action-btn": { opacity: 1 } }}>
         <VStack align="stretch" height="100%" gap={0}>
           {renderCopyButton(false)}
           {renderContent(false)}

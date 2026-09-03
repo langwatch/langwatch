@@ -16,9 +16,7 @@ interface InstallPreviewProps {
   install?: InstallMatrix;
 }
 
-export function InstallPreview({
-  install,
-}: InstallPreviewProps): React.ReactElement | null {
+export function InstallPreview({ install }: InstallPreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const tabItems: { key: string; title: string; code: string }[] = [];
 
@@ -76,12 +74,7 @@ export function InstallPreview({
               <CodeBlock.Header borderBottomWidth="1px" borderColor="gray.200">
                 <Tabs.List w="full" border="0" ms="-1">
                   {tabItems.map((t) => (
-                    <Tabs.Trigger
-                      colorPalette="teal"
-                      key={t.key}
-                      value={t.key}
-                      textStyle="xs"
-                    >
+                    <Tabs.Trigger colorPalette="teal" key={t.key} value={t.key} textStyle="xs">
                       {t.title}
                     </Tabs.Trigger>
                   ))}

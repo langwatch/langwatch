@@ -8,10 +8,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  GithubInstallationConflictError,
-  type GithubRepository,
-} from "@langwatch/github-contract";
+import { GithubInstallationConflictError, type GithubRepository } from "@langwatch/github-contract";
 import {
   GithubAppTokenAdapter,
   type GithubInstallationDetails,
@@ -88,9 +85,7 @@ function makeAppTokens(
   over: Partial<{
     configured: boolean;
     getInstallation: (installationId: string) => Promise<GithubInstallationDetails>;
-    mintInstallationToken: (
-      input: MintInstallationTokenInput,
-    ) => Promise<GithubInstallationToken>;
+    mintInstallationToken: (input: MintInstallationTokenInput) => Promise<GithubInstallationToken>;
     listInstallationRepositories: (installationId: string) => Promise<GithubRepository[]>;
   }> = {},
 ): GithubAppTokenAdapter {
@@ -108,8 +103,7 @@ function makeAppTokens(
       })),
   );
   vi.spyOn(tokens, "mintInstallationToken").mockImplementation(
-    over.mintInstallationToken ??
-      vi.fn(async () => ({ token: "ghs_tok", expiresAt: "" })),
+    over.mintInstallationToken ?? vi.fn(async () => ({ token: "ghs_tok", expiresAt: "" })),
   );
   vi.spyOn(tokens, "listInstallationRepositories").mockImplementation(
     over.listInstallationRepositories ??

@@ -64,10 +64,7 @@ export const PostEventProvider = ({ children }: { children: React.ReactNode }) =
       }
     };
 
-    const interval = setInterval(
-      isAlive,
-      socketStatus === "connecting-python" ? 5_000 : 30_000,
-    );
+    const interval = setInterval(isAlive, socketStatus === "connecting-python" ? 5_000 : 30_000);
 
     // Make the first call
     if (socketStatus === "disconnected") {
@@ -86,14 +83,13 @@ export const PostEventProvider = ({ children }: { children: React.ReactNode }) =
 export const usePostEvent = () => {
   const { project } = useOrganizationTeamProject();
   const workflowStore = useWorkflowStore();
-  const { socketStatus, setEvaluationState, setComponentExecutionState } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        socketStatus: state.socketStatus,
-        setEvaluationState: state.setEvaluationState,
-        setComponentExecutionState: state.setComponentExecutionState,
-      })),
-    );
+  const { socketStatus, setEvaluationState, setComponentExecutionState } = useWorkflowStore(
+    useShallow((state) => ({
+      socketStatus: state.socketStatus,
+      setEvaluationState: state.setEvaluationState,
+      setComponentExecutionState: state.setComponentExecutionState,
+    })),
+  );
 
   const handleServerMessage = useHandleServerMessage({
     workflowStore,
@@ -257,9 +253,7 @@ export const useHandleServerMessage = ({
           title: "Stopped",
           // Only registered copy has anything to add here; the generic
           // "we've been notified" would be wrong for a deliberate stop.
-          description: explanation.isRegistered
-            ? explanation.description || undefined
-            : undefined,
+          description: explanation.isRegistered ? explanation.description || undefined : undefined,
           type: "info",
           duration: 3000,
         });
@@ -295,10 +289,7 @@ export const useHandleServerMessage = ({
             },
             "component_state_change received",
           );
-          setComponentExecutionState(
-            message.payload.component_id,
-            message.payload.execution_state,
-          );
+          setComponentExecutionState(message.payload.component_id, message.payload.execution_state);
 
           if (message.payload.execution_state?.status === "error") {
             checkIfUnreachableErrorMessage(message.payload.execution_state.error);
@@ -339,8 +330,7 @@ export const useHandleServerMessage = ({
             const failedNode = getWorkflow().nodes.find(
               (node) => node.data.execution_state?.status === "error",
             );
-            const focusNodeId =
-              failedNode?.id ?? getWorkflow().state.execution?.until_node_id;
+            const focusNodeId = failedNode?.id ?? getWorkflow().state.execution?.until_node_id;
             if (focusNodeId) {
               workflowStore.setSelectedNode(focusNodeId);
               workflowStore.setPropertiesExpanded(true);
@@ -400,10 +390,7 @@ export const useHandleServerMessage = ({
           }
           break;
         case "error":
-          logger.error(
-            { message: message.payload.message },
-            "error event received from server",
-          );
+          logger.error({ message: message.payload.message }, "error event received from server");
           checkIfUnreachableErrorMessage(message.payload.message);
           stopWorkflowIfRunning({ error: message.payload.message });
           // The stream's `error` frame carries no code (see StudioServerEvent),

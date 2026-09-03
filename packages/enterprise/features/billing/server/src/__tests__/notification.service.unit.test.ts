@@ -111,9 +111,7 @@ describe("NotificationService", () => {
       it("rethrows the error", async () => {
         usageLimitEmail.send.mockRejectedValueOnce(new Error("SMTP failure"));
 
-        await expect(service.sendUsageLimitEmail(emailParams)).rejects.toThrow(
-          "SMTP failure",
-        );
+        await expect(service.sendUsageLimitEmail(emailParams)).rejects.toThrow("SMTP failure");
       });
     });
   });
@@ -154,16 +152,13 @@ describe("NotificationService", () => {
           expected:
             "Plan limit reached: Acme, jane@acme.com, Plan: Free, Monthly Events: 12000/10000",
         },
-      ])(
-        "names the $limitType cap and the numbers behind it",
-        async ({ limitType, expected }) => {
-          config.slackPlanLimitChannel = "https://hooks.slack.com/test";
+      ])("names the $limitType cap and the numbers behind it", async ({ limitType, expected }) => {
+        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
 
-          await service.sendSlackPlanLimitAlert({ ...context, limitType });
+        await service.sendSlackPlanLimitAlert({ ...context, limitType });
 
-          expect(mockSlackSend).toHaveBeenCalledWith({ text: expected });
-        },
-      );
+        expect(mockSlackSend).toHaveBeenCalledWith({ text: expected });
+      });
 
       /** @scenario "Plan limit alert still sends when the organization has no admin email" */
       it("falls back to unknown when the org has no admin email", async () => {
@@ -629,9 +624,7 @@ describe("NotificationService", () => {
 
     describe("when HubSpot request fails", () => {
       it("catches the error and captures exception", async () => {
-        const mockFetch = vi
-          .fn()
-          .mockResolvedValue(new Response("fail", { status: 500 }));
+        const mockFetch = vi.fn().mockResolvedValue(new Response("fail", { status: 500 }));
         const localService = NotificationService.create({
           config: {
             ...config,
@@ -806,8 +799,7 @@ describe("NotificationService", () => {
         });
 
         const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
-        const field = (name: string) =>
-          body.fields.find((f: any) => f.name === name)?.value;
+        const field = (name: string) => body.fields.find((f: any) => f.name === name)?.value;
 
         expect(field("Features_usage_multiple")).toBe("Other");
         expect(field("user_role")).toBe("Other");
@@ -862,9 +854,7 @@ describe("NotificationService", () => {
 
     describe("when HubSpot returns a non-OK status", () => {
       it("captures a descriptive error", async () => {
-        const mockFetch = vi
-          .fn()
-          .mockResolvedValue(new Response("fail", { status: 500 }));
+        const mockFetch = vi.fn().mockResolvedValue(new Response("fail", { status: 500 }));
         const localService = NotificationService.create({
           config: {
             ...config,

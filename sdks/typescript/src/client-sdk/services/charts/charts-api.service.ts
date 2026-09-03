@@ -1,8 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { scopedProjectId } from "@/internal/credentialContext";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
@@ -103,19 +100,11 @@ export class ChartsApiService {
     this.queryApi = new QueryApiService({
       langwatchApiClient:
         config?.langwatchApiClient ??
-        createLangWatchApiClient(
-          undefined,
-          undefined,
-          this.resolvedProjectId(),
-        ),
+        createLangWatchApiClient(undefined, undefined, this.resolvedProjectId()),
     });
   }
 
-  private handleApiError(
-    operation: string,
-    error: unknown,
-    response?: Response,
-  ): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const status = response?.status ?? extractStatusFromResponse(error);
     const message = formatApiErrorForOperation({
       operation: operation,
@@ -138,11 +127,7 @@ export class ChartsApiService {
    * places (see `QueryApiService`'s own doc comment).
    */
   private resolvedProjectId(): string | undefined {
-    return (
-      this.configuredProjectId ??
-      scopedProjectId() ??
-      process.env.LANGWATCH_PROJECT_ID
-    );
+    return this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
   }
 
   private projectId(operation: string): string {

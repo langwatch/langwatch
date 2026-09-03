@@ -117,10 +117,7 @@ type AttributionFields = Pick<
   | "metadataJson"
 >;
 
-function attributionFromOutcome(
-  state: GatewaySpendState,
-  d: AttributionWire,
-): AttributionFields {
+function attributionFromOutcome(state: GatewaySpendState, d: AttributionWire): AttributionFields {
   return {
     organizationId: state.organizationId || d.organization_id,
     virtualKeyId: state.virtualKeyId || d.virtual_key_id,
@@ -148,10 +145,7 @@ function attributionFromOutcome(
  * brokered voice session used to blank the trace the settlement had just
  * named.
  */
-function attributionFromAdmission(
-  state: GatewaySpendState,
-  d: AttributionWire,
-): AttributionFields {
+function attributionFromAdmission(state: GatewaySpendState, d: AttributionWire): AttributionFields {
   return {
     organizationId: d.organization_id || state.organizationId,
     virtualKeyId: d.virtual_key_id || state.virtualKeyId,
@@ -254,9 +248,7 @@ export class GatewaySpendFoldProjection
       status: state.status === "" ? "admitted" : state.status,
       model: outcomeResolved && state.model !== "" ? state.model : d.model,
       providerKey:
-        outcomeResolved && state.providerKey !== ""
-          ? state.providerKey
-          : d.model_provider_id,
+        outcomeResolved && state.providerKey !== "" ? state.providerKey : d.model_provider_id,
       podId: d.pod_id,
       podSeq: d.pod_seq,
       occurredAtMs: d.occurred_at,

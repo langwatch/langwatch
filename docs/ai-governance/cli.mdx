@@ -5,11 +5,11 @@ sidebarTitle: CLI
 ---
 
 <Info>
-  **Pairs with:** [Governance REST API](/ai-governance/api) (the CLI is a thin shell over
-  it; both call into the same service-layer functions) and [Governance MCP
-  server](/ai-governance/mcp) (same surface for agent invocation). Distinct from
-  [`langwatch ingest …`](/ai-governance/cli-debug): that namespace is for debugging
-  ingestion sources; `langwatch governance …` is for managing every governance resource.
+  **Pairs with:** [Governance REST API](/ai-governance/api) (the CLI is a thin shell over it; both
+  call into the same service-layer functions) and [Governance MCP server](/ai-governance/mcp) (same
+  surface for agent invocation). Distinct from [`langwatch ingest …`](/ai-governance/cli-debug):
+  that namespace is for debugging ingestion sources; `langwatch governance …` is for managing every
+  governance resource.
 </Info>
 
 <Note>**Agentic-first by design.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every governance feature exposes the full CRUD verb set under `langwatch governance <resource> <verb>`. The CLI is built so a customer can fully set up governance via an agent (Claude Code, Codex, Cursor) without ever opening the dashboard, useful for self-hosted onboarding scripts, CI/CD pipelines, and runbook automations.</Note>

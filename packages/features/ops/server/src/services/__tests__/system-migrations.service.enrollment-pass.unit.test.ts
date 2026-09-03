@@ -13,7 +13,10 @@ import {
   type TenantMigrationRecord,
 } from "@langwatch/system-migrations";
 import { describe, expect, it, vi } from "vitest";
-import { migrationRunsOnThisInstallation, organizationMigrates } from "../../ops.system-migration-cohort";
+import {
+  migrationRunsOnThisInstallation,
+  organizationMigrates,
+} from "../../ops.system-migration-cohort";
 
 class InMemoryStateRepository implements SystemMigrationStateRepository {
   private readonly rows = new Map<string, TenantMigrationRecord>();
@@ -50,14 +53,9 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
    * the pass writes, so a suite about who gets processed never has to keep a
    * second source of truth in agreement with the first.
    */
-  async hasFinalizedTenant({
-    migrationName,
-  }: {
-    migrationName: string;
-  }): Promise<boolean> {
+  async hasFinalizedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     return [...this.rows.values()].some(
-      (row) =>
-        row.migrationName === migrationName && row.status === "finalized",
+      (row) => row.migrationName === migrationName && row.status === "finalized",
     );
   }
 
@@ -74,13 +72,7 @@ const grantedLease = {
 
 function tenantSourceOf(ids: string[]) {
   return {
-    async findTenantIdsAfter({
-      cursor,
-      limit,
-    }: {
-      cursor: string | null;
-      limit: number;
-    }) {
+    async findTenantIdsAfter({ cursor, limit }: { cursor: string | null; limit: number }) {
       const start = cursor === null ? 0 : ids.indexOf(cursor) + 1;
       return ids.slice(start, start + limit);
     },
@@ -303,10 +295,7 @@ describe("the migration pass under its cohort rules", () => {
       });
 
       expect(automatic.migrateTenant).toHaveBeenCalledTimes(2);
-      expect(state.tenantIdsWithRecords().sort()).toEqual([
-        "acme",
-        "born_later",
-      ]);
+      expect(state.tenantIdsWithRecords().sort()).toEqual(["acme", "born_later"]);
     });
   });
 });

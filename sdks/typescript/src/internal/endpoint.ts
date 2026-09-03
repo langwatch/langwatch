@@ -58,9 +58,7 @@ export const resolveEndpoint = (endpoint?: string | null): string => {
  * agent plugin. Reaching into the event channel for this one pure env read
  * would put the whole telemetry graph in that bundle.
  */
-export const resolveLogsEndpoint = (
-  env: NodeJS.ProcessEnv = process.env,
-): string | null => {
+export const resolveLogsEndpoint = (env: NodeJS.ProcessEnv = process.env): string | null => {
   const signal = env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT?.trim();
   if (signal) return signal;
 

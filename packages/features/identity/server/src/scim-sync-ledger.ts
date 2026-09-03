@@ -10,8 +10,5 @@ import type { ScimSyncCommand, ScimSyncFactInput } from "@langwatch/identity-con
  * A verb whose guard states nothing never reaches here.
  */
 export interface ScimSyncLedger {
-  commit(args: {
-    command: ScimSyncCommand;
-    facts: ScimSyncFactInput[];
-  }): Promise<void>;
+  commit(args: { command: ScimSyncCommand; facts: ScimSyncFactInput[] }): Promise<void>;
 }

@@ -13,10 +13,7 @@ interface UseSuiteRunMutationOptions {
   onSuccess?: () => void;
 }
 
-export function useSuiteRunMutation({
-  onEditSuite,
-  onSuccess,
-}: UseSuiteRunMutationOptions) {
+export function useSuiteRunMutation({ onEditSuite, onSuccess }: UseSuiteRunMutationOptions) {
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
       onSuccess?.();

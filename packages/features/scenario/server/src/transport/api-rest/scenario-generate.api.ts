@@ -117,7 +117,9 @@ Given a description of an agent and desired scenario, generate:
 When refining an existing scenario, incorporate the user's feedback while preserving the overall structure and any parts they haven't asked to change.`;
 
 /** `/api/scenario/generate`, bound to one process. */
-export function createScenarioGenerateRestApp<TSession extends ScenarioGenerateRestSession>(options: {
+export function createScenarioGenerateRestApp<
+  TSession extends ScenarioGenerateRestSession,
+>(options: {
   security: AppRestSecurity;
   ports: ScenarioGenerateRestPorts<TSession>;
 }): MountableRestApp {

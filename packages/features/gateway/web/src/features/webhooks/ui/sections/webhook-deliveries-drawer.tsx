@@ -23,8 +23,7 @@ type DeliveriesPage = RouterOutputs["webhookEndpoints"]["deliveries"];
 type DeliveryView = DeliveriesPage["deliveries"][number];
 
 function outcomeBadge(outcome: string) {
-  const palette =
-    outcome === "success" ? "green" : outcome === "terminal" ? "red" : "orange";
+  const palette = outcome === "success" ? "green" : outcome === "terminal" ? "red" : "orange";
   return (
     <Badge size="sm" colorPalette={palette}>
       {outcome}
@@ -58,8 +57,7 @@ function healthLabels(health: HealthView | undefined) {
         ? "caught up"
         : formatAge(health.oldestUndeliveredAgeMs),
     sendsPerMinute: health.sendsPerMinute.toFixed(2),
-    successRate:
-      health.successRate === null ? "n/a" : `${Math.round(health.successRate * 100)}%`,
+    successRate: health.successRate === null ? "n/a" : `${Math.round(health.successRate * 100)}%`,
     p95Latency: health.p95LatencyMs === null ? "n/a" : `${health.p95LatencyMs}ms`,
   };
 }
@@ -115,9 +113,7 @@ function WebhookHealthStrip({
         />
         <HealthStat
           label="Failing since"
-          value={
-            endpoint.failingSince ? formatWhen(endpoint.failingSince) : "not failing"
-          }
+          value={endpoint.failingSince ? formatWhen(endpoint.failingSince) : "not failing"}
         />
         {endpoint.status === "DISABLED" && (
           <Badge colorPalette="red" data-testid="webhook-disabled-badge">
@@ -139,9 +135,7 @@ function DeliveryRow({ delivery }: { delivery: DeliveryView }) {
       <Table.Cell>{delivery.eventCount}</Table.Cell>
       <Table.Cell>{outcomeBadge(delivery.outcome)}</Table.Cell>
       <Table.Cell>{delivery.responseStatus ?? ""}</Table.Cell>
-      <Table.Cell>
-        {delivery.latencyMs !== null ? `${delivery.latencyMs}ms` : ""}
-      </Table.Cell>
+      <Table.Cell>{delivery.latencyMs !== null ? `${delivery.latencyMs}ms` : ""}</Table.Cell>
       <Table.Cell
         maxWidth="240px"
         overflow="hidden"
@@ -208,9 +202,7 @@ function DeliveriesTable({
  * polled health summary. A fresh endpoint resets pagination to the first page.
  */
 function useDeliveriesDrawerData(organizationId: string, endpoint: EndpointView | null) {
-  const [cursor, setCursor] = useState<{ firedAt: Date; id: string } | undefined>(
-    undefined,
-  );
+  const [cursor, setCursor] = useState<{ firedAt: Date; id: string } | undefined>(undefined);
   // Loaded pages accumulate in load order, keyed by the cursor that fetched
   // each, so Load more APPENDS below what the reader already scanned and a
   // background refetch of the current page replaces its own slot instead of
@@ -232,9 +224,7 @@ function useDeliveriesDrawerData(organizationId: string, endpoint: EndpointView 
   const page = deliveries.data;
   useEffect(() => {
     if (!page) return;
-    const key = cursor
-      ? `${new Date(cursor.firedAt).toISOString()}:${cursor.id}`
-      : "first";
+    const key = cursor ? `${new Date(cursor.firedAt).toISOString()}:${cursor.id}` : "first";
     setPages((prev) => {
       if (key === "first") return [{ key, rows: page.deliveries }];
       const at = prev.findIndex((p) => p.key === key);
@@ -284,8 +274,10 @@ export function WebhookDeliveriesDrawer({
   endpoint: EndpointView | null;
   onClose: () => void;
 }) {
-  const { deliveries, health, rows, hasMore, isFirstPage, loadMore } =
-    useDeliveriesDrawerData(organizationId, endpoint);
+  const { deliveries, health, rows, hasMore, isFirstPage, loadMore } = useDeliveriesDrawerData(
+    organizationId,
+    endpoint,
+  );
 
   return (
     <Drawer.Root

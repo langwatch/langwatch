@@ -19,9 +19,7 @@ export async function handleSearchTraces(params: {
   format?: "digest" | "json";
 }): Promise<string> {
   const now = Date.now();
-  const startDate = params.startDate
-    ? parseRelativeDate(params.startDate)
-    : now - 86400000;
+  const startDate = params.startDate ? parseRelativeDate(params.startDate) : now - 86400000;
   const endDate = params.endDate ? parseRelativeDate(params.endDate) : now;
   const format = params.format ?? "digest";
 
@@ -55,12 +53,8 @@ export async function handleSearchTraces(params: {
     } else {
       const inputStr = trace.input?.value ? String(trace.input.value) : "N/A";
       const outputStr = trace.output?.value ? String(trace.output.value) : "N/A";
-      lines.push(
-        `- **Input**: ${inputStr.slice(0, 100)}${inputStr.length > 100 ? "..." : ""}`,
-      );
-      lines.push(
-        `- **Output**: ${outputStr.slice(0, 100)}${outputStr.length > 100 ? "..." : ""}`,
-      );
+      lines.push(`- **Input**: ${inputStr.slice(0, 100)}${inputStr.length > 100 ? "..." : ""}`);
+      lines.push(`- **Output**: ${outputStr.slice(0, 100)}${outputStr.length > 100 ? "..." : ""}`);
     }
 
     if (trace.timestamps) {

@@ -73,8 +73,7 @@ const SIGNAL_RULES: readonly SignalRule[] = [
     tone: "danger",
     applies: (row) => row.rateLimited > 0,
     title: (row) => `Rate limited ${row.rateLimited}×`,
-    detail: () =>
-      "The provider turned requests away. Time here is spent waiting, not working.",
+    detail: () => "The provider turned requests away. Time here is spent waiting, not working.",
   },
   {
     id: "retries-exhausted",
@@ -168,8 +167,7 @@ const SIGNAL_RULES: readonly SignalRule[] = [
     tone: "info",
     applies: (row) => row.permissionChanges > 0 && row.permissionMode !== "",
     title: () => "Approval settings changed mid-session",
-    detail: (row) =>
-      `Changed ${row.permissionChanges}× — it ended in ${row.permissionMode}.`,
+    detail: (row) => `Changed ${row.permissionChanges}× — it ended in ${row.permissionMode}.`,
   },
 ];
 

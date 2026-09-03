@@ -26,9 +26,7 @@ const localPromptConfig: LocalPromptConfig = {
   ],
 };
 
-function signatureNode(
-  localConfig?: LocalPromptConfig,
-): StudioNode<LlmPromptConfigComponent> {
+function signatureNode(localConfig?: LocalPromptConfig): StudioNode<LlmPromptConfigComponent> {
   return {
     id: "sig-1",
     type: "signature",
@@ -72,9 +70,7 @@ function evaluatorNode(localConfig?: Evaluator["localConfig"]): StudioNode<Evalu
   };
 }
 
-function agentNode(
-  localConfig?: AgentComponent["localConfig"],
-): StudioNode<AgentComponent> {
+function agentNode(localConfig?: AgentComponent["localConfig"]): StudioNode<AgentComponent> {
   return {
     id: "agent-1",
     type: "agent",
@@ -133,9 +129,7 @@ describe("mergeLocalConfigsIntoDsl", () => {
     const instructions = data.parameters?.find(
       (parameter) => parameter.identifier === "instructions",
     );
-    const messages = data.parameters?.find(
-      (parameter) => parameter.identifier === "messages",
-    );
+    const messages = data.parameters?.find((parameter) => parameter.identifier === "messages");
 
     expect(instructions).toMatchObject({ value: "You are a local assistant." });
     expect(messages).toMatchObject({
@@ -184,9 +178,7 @@ describe("mergeLocalConfigsIntoDsl", () => {
     const merged = first(
       mergeLocalConfigsIntoDsl([agentNode({ settings: { code: "print('draft')" } })]),
     );
-    const code = merged.data.parameters?.find(
-      (parameter) => parameter.identifier === "code",
-    );
+    const code = merged.data.parameters?.find((parameter) => parameter.identifier === "code");
 
     expect(code).toMatchObject({ value: "print('draft')" });
     expect(merged.data.parameters).toContainEqual({

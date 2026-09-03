@@ -79,16 +79,9 @@ export function deriveIdentifierId({
  * convergence, paid only for the flag-listed population this entrance
  * serves.
  */
-export function deriveNewbornUserId({
-  normalizedValue,
-}: {
-  normalizedValue: string;
-}): string {
-  const digest = createHash("sha256")
-    .update(`newborn${normalizedValue}`)
-    .digest();
-  const alphabet =
-    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+export function deriveNewbornUserId({ normalizedValue }: { normalizedValue: string }): string {
+  const digest = createHash("sha256").update(`newborn${normalizedValue}`).digest();
+  const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
   let id = "";
   for (let index = 0; index < 21; index += 1) {
     id += alphabet[(digest[index] as number) % alphabet.length];

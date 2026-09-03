@@ -54,5 +54,4 @@ export const TEMPLATE_LOGIC_CONSTRUCTS: TemplateLogicConstruct[] = [
 ];
 
 /** URL to the Liquid template syntax documentation */
-export const TEMPLATE_SYNTAX_DOCS_URL =
-  "https://docs.langwatch.ai/prompts/template-syntax";
+export const TEMPLATE_SYNTAX_DOCS_URL = "https://docs.langwatch.ai/prompts/template-syntax";

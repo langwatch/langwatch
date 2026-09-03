@@ -65,9 +65,7 @@ export class AdmitSpendCommand implements CommandHandler<
     "Record a gateway request's admission, before any provider outcome",
   );
 
-  async handle(
-    command: Command<AdmitSpendCommandData>,
-  ): Promise<GatewaySpendAdmittedEvent[]> {
+  async handle(command: Command<AdmitSpendCommandData>): Promise<GatewaySpendAdmittedEvent[]> {
     const data = command.data;
     return [
       EventUtils.createEvent<GatewaySpendAdmittedEvent>({
@@ -113,9 +111,7 @@ export class ConfirmSpendCommand implements CommandHandler<
     "Record a gateway request's provider outcome with usage quantities",
   );
 
-  async handle(
-    command: Command<ConfirmSpendCommandData>,
-  ): Promise<GatewaySpendConfirmedEvent[]> {
+  async handle(command: Command<ConfirmSpendCommandData>): Promise<GatewaySpendConfirmedEvent[]> {
     const data = command.data;
     return [
       EventUtils.createEvent<GatewaySpendConfirmedEvent>({
@@ -161,9 +157,7 @@ export class FailSpendCommand implements CommandHandler<
     "Record a gateway request's failure with its full error class",
   );
 
-  async handle(
-    command: Command<FailSpendCommandData>,
-  ): Promise<GatewaySpendFailedEvent[]> {
+  async handle(command: Command<FailSpendCommandData>): Promise<GatewaySpendFailedEvent[]> {
     const data = command.data;
     return [
       EventUtils.createEvent<GatewaySpendFailedEvent>({
@@ -208,9 +202,7 @@ export class SettleSpendCommand implements CommandHandler<
     "Settle an admitted request whose confirmation never arrived",
   );
 
-  async handle(
-    command: Command<SettleSpendCommandData>,
-  ): Promise<GatewaySpendSettledEvent[]> {
+  async handle(command: Command<SettleSpendCommandData>): Promise<GatewaySpendSettledEvent[]> {
     const data = command.data;
     return [
       EventUtils.createEvent<GatewaySpendSettledEvent>({

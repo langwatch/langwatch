@@ -68,10 +68,7 @@ describe("buildStorageConnectSrc", () => {
           S3_ENDPOINT: "https://s3.eu-central-1.amazonaws.com",
           AZURE_BLOB_ENDPOINT: "https://acct.blob.core.windows.net",
         }),
-      ).toEqual([
-        "https://s3.eu-central-1.amazonaws.com",
-        "https://acct.blob.core.windows.net",
-      ]);
+      ).toEqual(["https://s3.eu-central-1.amazonaws.com", "https://acct.blob.core.windows.net"]);
     });
   });
 
@@ -108,10 +105,7 @@ describe("buildStorageConnectSrc", () => {
           S3_ENDPOINT: "not a url",
           S3_REGION: "eu-west-1",
         }),
-      ).toEqual([
-        "https://s3.eu-west-1.amazonaws.com",
-        "https://*.s3.eu-west-1.amazonaws.com",
-      ]);
+      ).toEqual(["https://s3.eu-west-1.amazonaws.com", "https://*.s3.eu-west-1.amazonaws.com"]);
     });
   });
 });

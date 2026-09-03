@@ -32,10 +32,7 @@ import { Link } from "../../ui/elements/link";
 import { Select } from "@langwatch/design-system/select";
 import { OrganizationUserRole } from "../../model/prisma-types";
 import { DepartmentPicker } from "../../ui/elements/department-picker";
-import {
-  type DepartmentOption,
-  useDepartmentColumn,
-} from "../../behavior/use-department-column";
+import { type DepartmentOption, useDepartmentColumn } from "../../behavior/use-department-column";
 import { useDrawer } from "../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import type { RouterOutputs } from "../../behavior/organization-api";
@@ -89,8 +86,7 @@ function RoleSelect({
   ];
   const roleCollection = createListCollection({ items: roleItems });
 
-  const selectValue =
-    value === "CUSTOM" && customRoleId ? `CUSTOM:${customRoleId}` : value;
+  const selectValue = value === "CUSTOM" && customRoleId ? `CUSTOM:${customRoleId}` : value;
 
   return (
     <Select.Root
@@ -158,8 +154,7 @@ function AddToTeamDialog({
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
       onClose();
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't add the member" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't add the member" }),
   });
 
   const userItems = useMemo(
@@ -172,10 +167,7 @@ function AddToTeamDialog({
         })),
     [orgMembers.data, existingMemberIds],
   );
-  const userCollection = useMemo(
-    () => createListCollection({ items: userItems }),
-    [userItems],
-  );
+  const userCollection = useMemo(() => createListCollection({ items: userItems }), [userItems]);
 
   const selectedMemberRole = useMemo(
     () => (orgMembers.data?.members ?? []).find((m) => m.userId === userId)?.role,
@@ -338,8 +330,7 @@ function AddToProjectDialog({
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
       onClose();
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't add the access" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't add the access" }),
   });
 
   const userItems = (orgMembers.data?.members ?? []).map((m) => ({
@@ -418,8 +409,8 @@ function AddToProjectDialog({
             </Field.Root>
 
             <Text fontSize="sm" color="gray.500">
-              If they&apos;re already on the team, this overrides their team role for this
-              project only.
+              If they&apos;re already on the team, this overrides their team role for this project
+              only.
             </Text>
           </VStack>
         </Dialog.Body>
@@ -476,8 +467,7 @@ function ProjectSection({
     onSuccess: () => {
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't remove the access" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't remove the access" }),
   });
 
   const inherited = access.filter((a) => a.source === "team");
@@ -692,13 +682,7 @@ function InlineDepartment({
   onAssigned: () => Promise<unknown> | void;
 }) {
   return (
-    <HStack
-      gap={2}
-      pl={2}
-      color="gray.500"
-      fontSize="sm"
-      onClick={(e) => e.stopPropagation()}
-    >
+    <HStack gap={2} pl={2} color="gray.500" fontSize="sm" onClick={(e) => e.stopPropagation()}>
       <Text>·</Text>
       <Text>Department</Text>
       <DepartmentPicker
@@ -738,8 +722,7 @@ function TeamCard({
     onSuccess: () => {
       void queryClient.team.getTeamsWithRoleBindings.invalidate();
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't remove the member" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't remove the member" }),
   });
 
   const updateBinding = api.roleBinding.update.useMutation({
@@ -753,9 +736,7 @@ function TeamCard({
       }),
   });
 
-  const existingMemberIds = team.directMembers.flatMap((m) =>
-    m.userId ? [m.userId] : [],
-  );
+  const existingMemberIds = team.directMembers.flatMap((m) => (m.userId ? [m.userId] : []));
 
   return (
     <>
@@ -774,8 +755,7 @@ function TeamCard({
           <Text fontSize="sm" color="gray.500">
             {team.projects.length} {team.projects.length === 1 ? "project" : "projects"}
             {" · "}
-            {team.directMembers.length}{" "}
-            {team.directMembers.length === 1 ? "member" : "members"}
+            {team.directMembers.length} {team.directMembers.length === 1 ? "member" : "members"}
             {team.projectOnlyAccess.length > 0 &&
               ` · ${team.projectOnlyAccess.length} via projects`}
           </Text>
@@ -790,10 +770,7 @@ function TeamCard({
             />
           )}
           {canManage && (
-            <Link
-              href={`/settings/teams/${team.slug}`}
-              onClick={(e) => e.stopPropagation()}
-            >
+            <Link href={`/settings/teams/${team.slug}`} onClick={(e) => e.stopPropagation()}>
               <Button size="xs" variant="ghost" color="gray.400">
                 <Pencil size={13} />
                 Edit
@@ -898,8 +875,8 @@ function TeamCard({
                 ))
               )}
               <Text fontSize="xs" color="gray.400" mt={2}>
-                Editing a role here changes their team-level access, inherited by all
-                projects below.
+                Editing a role here changes their team-level access, inherited by all projects
+                below.
               </Text>
             </Box>
 
@@ -921,9 +898,7 @@ function TeamCard({
                     key={i}
                     py={2}
                     fontSize="sm"
-                    borderBottomWidth={
-                      i < team.projectOnlyAccess.length - 1 ? "1px" : "0"
-                    }
+                    borderBottomWidth={i < team.projectOnlyAccess.length - 1 ? "1px" : "0"}
                     borderColor="gray.100"
                     _dark={{ borderColor: "gray.700" }}
                   >
@@ -1043,8 +1018,8 @@ export default function TeamsScreen() {
         <Box>
           <Heading size="md">Teams &amp; Projects</Heading>
           <Text fontSize="sm" color="gray.500" mt={1}>
-            People on a team inherit access to all its projects. Expand a project to add
-            overrides or direct access.
+            People on a team inherit access to all its projects. Expand a project to add overrides
+            or direct access.
           </Text>
         </Box>
         <Spacer />

@@ -19,9 +19,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 // Helper to create test data
-const createTestData = (
-  overrides: Partial<BatchEvaluationData> = {},
-): BatchEvaluationData => ({
+const createTestData = (overrides: Partial<BatchEvaluationData> = {}): BatchEvaluationData => ({
   runId: "run-1",
   experimentId: "exp-1",
   projectId: "proj-1",
@@ -81,12 +79,9 @@ describe("BatchEvaluationResultsTable", () => {
   describe("Loading State", () => {
     /** @scenario Show loading skeleton while fetching results */
     it("shows skeleton when loading", () => {
-      render(
-        <BatchEvaluationResultsTable data={null} isLoading disableVirtualization />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={null} isLoading disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       // Check for skeleton elements
       const skeletons = document.querySelectorAll('[class*="chakra-skeleton"]');
@@ -97,16 +92,9 @@ describe("BatchEvaluationResultsTable", () => {
   describe("Empty State", () => {
     /** @scenario Show empty state when no results */
     it("shows empty message when no data", () => {
-      render(
-        <BatchEvaluationResultsTable
-          data={null}
-          isLoading={false}
-          disableVirtualization
-        />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchEvaluationResultsTable data={null} isLoading={false} disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("No results to display")).toBeInTheDocument();
     });
@@ -436,11 +424,7 @@ describe("BatchEvaluationResultsTable", () => {
       const data = createTestData();
 
       render(
-        <BatchEvaluationResultsTable
-          data={data}
-          showEvaluations={false}
-          disableVirtualization
-        />,
+        <BatchEvaluationResultsTable data={data} showEvaluations={false} disableVirtualization />,
         { wrapper: Wrapper },
       );
 
@@ -454,11 +438,7 @@ describe("BatchEvaluationResultsTable", () => {
       const data = createTestData();
 
       render(
-        <BatchEvaluationResultsTable
-          data={data}
-          showOutputs={false}
-          disableVirtualization
-        />,
+        <BatchEvaluationResultsTable data={data} showOutputs={false} disableVirtualization />,
         { wrapper: Wrapper },
       );
 
@@ -578,14 +558,14 @@ describe("BatchEvaluationResultsTable", () => {
     it("threads the selected tier down to each cell", () => {
       const data = createTestData();
 
-      render(
-        <BatchEvaluationResultsTable data={data} rowHeight="l" disableVirtualization />,
-        { wrapper: Wrapper },
-      );
+      render(<BatchEvaluationResultsTable data={data} rowHeight="l" disableVirtualization />, {
+        wrapper: Wrapper,
+      });
 
-      expect(
-        screen.getByText("What is 2+2?").closest("[data-row-height]"),
-      ).toHaveAttribute("data-row-height", "l");
+      expect(screen.getByText("What is 2+2?").closest("[data-row-height]")).toHaveAttribute(
+        "data-row-height",
+        "l",
+      );
       expect(screen.getByText(/response/).closest("[data-row-height]")).toHaveAttribute(
         "data-row-height",
         "l",

@@ -13,9 +13,7 @@ interface RefreshProgressBarProps {
   forceVisible?: boolean;
 }
 
-export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({
-  forceVisible,
-}) => {
+export const RefreshProgressBar: React.FC<RefreshProgressBarProps> = ({ forceVisible }) => {
   // Two sources, OR-ed:
   //  - pulse: short fixed-duration flash for arrival moments that don't
   //    kick a fetch (0→N new-trace transition, view switches).

@@ -59,9 +59,7 @@ export function parseScopeArg(raw: string): VirtualKeyScope {
         ? (typeRaw as VirtualKeyScopeType)
         : null;
   if (!scopeType) {
-    throw new Error(
-      `--scope type "${typeRaw}" must be one of org | organization | team | project`,
-    );
+    throw new Error(`--scope type "${typeRaw}" must be one of org | organization | team | project`);
   }
   if (!scopeId) {
     throw new Error(`--scope value "${raw}" is missing the id after the colon`);
@@ -111,9 +109,7 @@ export function buildBudgetFlags(
 ): VirtualKeyBudgetInput | null | undefined {
   if (options.clearBudget) {
     if (options.budgetLimit || options.budgetWindow || options.budgetBreach) {
-      throw new Error(
-        "--clear-budget cannot be combined with the other --budget-* flags",
-      );
+      throw new Error("--clear-budget cannot be combined with the other --budget-* flags");
     }
     return null;
   }

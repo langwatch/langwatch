@@ -109,8 +109,7 @@ export function groupTracesByConversation(traces: TraceListItem[]): Conversation
         modelCounts.set(m, (modelCounts.get(m) ?? 0) + 1);
       }
     }
-    const primaryModel =
-      [...modelCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+    const primaryModel = [...modelCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
 
     const services = new Set(sorted.map((t) => t.serviceName).filter(Boolean));
 

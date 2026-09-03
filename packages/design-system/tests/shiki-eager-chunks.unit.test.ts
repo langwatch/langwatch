@@ -60,9 +60,7 @@ describe("shikiManualChunk (vite.config eager Shiki allow-list)", () => {
     it("leaves all ~340 of them to split into their own lazy chunks", () => {
       const nonBase = bundledLanguagesInfo.filter((i) => !baseFiles.has(i.id));
       expect(nonBase.length).toBeGreaterThan(100);
-      const eagerByMistake = nonBase.filter(
-        (i) => shikiManualChunk(langPath(i.id)) !== undefined,
-      );
+      const eagerByMistake = nonBase.filter((i) => shikiManualChunk(langPath(i.id)) !== undefined);
       expect(
         eagerByMistake.map((i) => i.id),
         "these non-base grammars are eager but should be lazy — the base-language regex is over-broad",
@@ -75,10 +73,7 @@ describe("shikiManualChunk (vite.config eager Shiki allow-list)", () => {
     // to avoid the boot-cycle white-screen.
     const corePkgPaths: Array<[string, string]> = [
       ["@shikijs/core", "/repo/node_modules/@shikijs/core/dist/index.mjs"],
-      [
-        "@shikijs/engine-oniguruma",
-        "/repo/node_modules/@shikijs/engine-oniguruma/dist/index.mjs",
-      ],
+      ["@shikijs/engine-oniguruma", "/repo/node_modules/@shikijs/engine-oniguruma/dist/index.mjs"],
       ["shiki", "/repo/node_modules/shiki/dist/index.mjs"],
       ["oniguruma-to-es", "/repo/node_modules/oniguruma-to-es/dist/index.mjs"],
       ["oniguruma-parser", "/repo/node_modules/oniguruma-parser/dist/index.mjs"],

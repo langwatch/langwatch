@@ -5,9 +5,7 @@ import type { ClickHouseExperimentRunResultRecord } from "../projections/experim
 
 const TABLE_NAME = "experiment_run_items" as const;
 
-const logger = createLogger(
-  "langwatch:experiment-run-processing:experiment-run-item-append-store",
-);
+const logger = createLogger("langwatch:experiment-run-processing:experiment-run-item-append-store");
 
 /**
  * Creates an AppendStore for experiment run result items.
@@ -32,8 +30,7 @@ export function createExperimentRunItemAppendStore(
         return;
       }
 
-      const retentionDays =
-        context.retentionPolicy?.experiments ?? defaultRetentionDays;
+      const retentionDays = context.retentionPolicy?.experiments ?? defaultRetentionDays;
       const recordWithRetention = {
         ...record,
         _retention_days: retentionDays,

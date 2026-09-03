@@ -27,9 +27,7 @@ export function AgentLabel({ agent }: { agent: string }) {
           width="14px"
           height="14px"
           objectFit="contain"
-          _dark={
-            preset.darkModeInvert ? { filter: "invert(1) hue-rotate(180deg)" } : undefined
-          }
+          _dark={preset.darkModeInvert ? { filter: "invert(1) hue-rotate(180deg)" } : undefined}
         />
       ) : null}
       <Text as="span">{preset.label}</Text>

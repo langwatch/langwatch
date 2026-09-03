@@ -42,9 +42,7 @@ describe("Coding Agent projection persistence runtime adapter", () => {
     expect(endpoint.requests[0]?.url).toContain("coding_agent_sessions");
     expect(endpoint.requests[0]?.body).toContain('"SessionId":"session-a"');
     expect(endpoint.requests[0]?.body).toContain('"InputTokens":"123"');
-    expect(endpoint.requests[0]?.body).toContain(
-      '"AppliedEventIds":["event-a","event-b"]',
-    );
+    expect(endpoint.requests[0]?.body).toContain('"AppliedEventIds":["event-a","event-b"]');
     expect(endpoint.requests[0]?.body).toContain('"_retention_days":14');
   });
 
@@ -75,8 +73,7 @@ describe("Coding Agent projection persistence runtime adapter", () => {
     await persistence.storeSession({ row, retentionDays: 14, appliedEventIds: [] });
 
     const stamps = endpoint.requests.map(
-      (request) =>
-        z.object({ UpdatedAt: z.string() }).parse(JSON.parse(request.body)).UpdatedAt,
+      (request) => z.object({ UpdatedAt: z.string() }).parse(JSON.parse(request.body)).UpdatedAt,
     );
     expect(Date.parse(stamps[1] ?? "")).toBeGreaterThan(Date.parse(stamps[0] ?? ""));
   });

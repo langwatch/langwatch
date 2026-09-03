@@ -153,14 +153,10 @@ describe("TraceTableShell header drag/sort interplay", () => {
         // browser (jsdom included via fireEvent) then delivers the
         // synthetic click to the sort button, which must be swallowed.
         await act(async () => {
-          handle.dispatchEvent(
-            new FakePointerEvent("pointerdown", { clientX: 10, clientY: 10 }),
-          );
+          handle.dispatchEvent(new FakePointerEvent("pointerdown", { clientX: 10, clientY: 10 }));
         });
         await act(async () => {
-          document.dispatchEvent(
-            new FakePointerEvent("pointermove", { clientX: 40, clientY: 10 }),
-          );
+          document.dispatchEvent(new FakePointerEvent("pointermove", { clientX: 40, clientY: 10 }));
         });
         // The browser delivers the synthetic click in the same task as
         // pointerup, BEFORE the setTimeout(0) that releases the
@@ -168,9 +164,7 @@ describe("TraceTableShell header drag/sort interplay", () => {
         // after the await, where a slow event loop (CI) could let the
         // release timer run first and turn this test flaky.
         await act(async () => {
-          document.dispatchEvent(
-            new FakePointerEvent("pointerup", { clientX: 40, clientY: 10 }),
-          );
+          document.dispatchEvent(new FakePointerEvent("pointerup", { clientX: 40, clientY: 10 }));
           fireEvent.click(screen.getByText("Name"));
         });
         expect(lastTable!.getColumn("name")!.getIsSorted()).toBe(false);

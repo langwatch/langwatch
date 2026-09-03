@@ -66,9 +66,7 @@ describe("ProcessWakeWorker", () => {
     });
 
     it("skips the outbox nudge when the commit inserted no intents", async () => {
-      const handleWake = vi
-        .fn()
-        .mockResolvedValue({ ...committed, insertedMessageKeys: [] });
+      const handleWake = vi.fn().mockResolvedValue({ ...committed, insertedMessageKeys: [] });
       const notifyOutbox = vi.fn();
       const worker = new ProcessWakeWorker({
         store: { findDueWakes: vi.fn().mockResolvedValue([dueWake()]) },

@@ -24,9 +24,7 @@ class FakeRedis {
     entries: Array<{ member: string; score: number }>,
     shouldIncludeScores: boolean,
   ): string[] {
-    return entries.flatMap((e) =>
-      shouldIncludeScores ? [e.member, String(e.score)] : [e.member],
-    );
+    return entries.flatMap((e) => (shouldIncludeScores ? [e.member, String(e.score)] : [e.member]));
   }
 
   async zcard(key: string): Promise<number> {
@@ -66,12 +64,7 @@ class FakeRedis {
   }
 
   // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional zrange signature
-  async zrange(
-    key: string,
-    start: number,
-    stop: number,
-    withScores?: string,
-  ): Promise<string[]> {
+  async zrange(key: string, start: number, stop: number, withScores?: string): Promise<string[]> {
     const entries = this.sorted(key);
     const end = stop === -1 ? entries.length - 1 : stop;
     return FakeRedis.flat(entries.slice(start, end + 1), withScores === "WITHSCORES");
@@ -149,9 +142,7 @@ function stageGroup({
   const ready = redis.zsets.get(`${PREFIX}ready`) ?? [];
   ready.push({ member: groupId, score: readyScore });
   redis.zsets.set(`${PREFIX}ready`, ready);
-  redis.zsets.set(`${PREFIX}group:${groupId}:jobs`, [
-    { member: headJobId, score: headJobScore },
-  ]);
+  redis.zsets.set(`${PREFIX}group:${groupId}:jobs`, [{ member: headJobId, score: headJobScore }]);
 }
 
 async function scan({ redis, topN }: { redis: FakeRedis; topN: number }) {

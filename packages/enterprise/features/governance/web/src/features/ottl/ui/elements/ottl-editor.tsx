@@ -206,9 +206,8 @@ export function OttlEditor({
             OTTL extraction statements
           </Text>
           <Text fontSize="xs" color="fg.muted">
-            Each line maps an upstream OTLP attribute onto the canonical{" "}
-            <code>langwatch.*</code> namespace. The aigateway evaluates them in order via
-            embedded <code>pkg/ottl</code>.
+            Each line maps an upstream OTLP attribute onto the canonical <code>langwatch.*</code>{" "}
+            namespace. The aigateway evaluates them in order via embedded <code>pkg/ottl</code>.
           </Text>
         </VStack>
         <Spacer />
@@ -237,8 +236,8 @@ export function OttlEditor({
                 Template available for this source type
               </Text>
               <Text fontSize="xs" color="fg.muted">
-                Loads the canonical extraction statements maintained by LangWatch. You can
-                customize them after loading.
+                Loads the canonical extraction statements maintained by LangWatch. You can customize
+                them after loading.
               </Text>
             </VStack>
             <Button size="sm" colorPalette="orange" onClick={useTemplate}>

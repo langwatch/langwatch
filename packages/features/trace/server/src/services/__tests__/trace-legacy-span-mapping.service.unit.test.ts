@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
+import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
 import {
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "@langwatch/trace-contract";
-import { mapNormalizedSpanToSpan, unflattenDotNotation } from "../trace-legacy-span-mapping.service";
+  mapNormalizedSpanToSpan,
+  unflattenDotNotation,
+} from "../trace-legacy-span-mapping.service";
 
 const makeSpan = (overrides: Partial<NormalizedSpan> = {}): NormalizedSpan => ({
   id: "test-id",
@@ -69,8 +69,7 @@ describe("mapNormalizedSpanToSpan", () => {
 
       const params = result.params as Record<string, unknown>;
       expect(
-        ((params.gen_ai as Record<string, unknown>).input as Record<string, unknown>)
-          .messages,
+        ((params.gen_ai as Record<string, unknown>).input as Record<string, unknown>).messages,
       ).toEqual([{ role: "user", content: "hello" }]);
     });
 
@@ -381,9 +380,7 @@ describe("mapNormalizedSpanToSpan", () => {
             score: 99,
             details: "This is a custom manual evaluation",
           }),
-          "langwatch.reserved.value_types": JSON.stringify([
-            "langwatch.output=evaluation_result",
-          ]),
+          "langwatch.reserved.value_types": JSON.stringify(["langwatch.output=evaluation_result"]),
         },
       });
 
@@ -411,9 +408,7 @@ describe("mapNormalizedSpanToSpan", () => {
             passed: false,
             score: 0.1,
           }),
-          "langwatch.reserved.value_types": JSON.stringify([
-            "langwatch.output=guardrail_result",
-          ]),
+          "langwatch.reserved.value_types": JSON.stringify(["langwatch.output=guardrail_result"]),
         },
       });
 
@@ -476,9 +471,7 @@ describe("mapNormalizedSpanToSpan", () => {
 
       const result = mapNormalizedSpanToSpan(span);
 
-      expect((result as { contexts: unknown }).contexts).toEqual([
-        { content: "plain chunk" },
-      ]);
+      expect((result as { contexts: unknown }).contexts).toEqual([{ content: "plain chunk" }]);
     });
 
     it("returns empty contexts for malformed JSON strings without throwing", () => {

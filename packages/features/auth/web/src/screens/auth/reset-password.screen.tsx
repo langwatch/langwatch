@@ -118,8 +118,7 @@ function ResetPasswordForm({ token }: { token: string }) {
     } catch {
       // A throw is transport, not a verdict on the link.
       setServerError({
-        message:
-          "Could not reach the server. Check your connection and try again.",
+        message: "Could not reach the server. Check your connection and try again.",
         linkIsDead: false,
       });
     } finally {
@@ -130,9 +129,7 @@ function ResetPasswordForm({ token }: { token: string }) {
   if (isDone) {
     return (
       <AuthCard title="Password updated">
-        <Text>
-          Your password has been reset. You can now sign in with your new password.
-        </Text>
+        <Text>Your password has been reset. You can now sign in with your new password.</Text>
         <Button colorPalette="orange" variant="solid" asChild>
           <Link href="/auth/signin" style={{ color: "white" }}>
             Sign in

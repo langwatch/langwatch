@@ -27,18 +27,14 @@ const EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
  * set it — so it has to be asked for rather than read.
  */
 function readCode(error: object): string | undefined {
-  return "code" in error && typeof error.code === "string"
-    ? error.code
-    : void 0;
+  return "code" in error && typeof error.code === "string" ? error.code : void 0;
 }
 
 /** What went wrong, in a code the client registry has words for. */
 function passkeyFailure(status: number | undefined): { error: string } {
   const refused = status === 400 || status === 401 || status === 403;
   return {
-    error: refused
-      ? "identity_passkey_not_recognized"
-      : "identity_passkey_ceremony_failed",
+    error: refused ? "identity_passkey_not_recognized" : "identity_passkey_ceremony_failed",
   };
 }
 
@@ -59,9 +55,7 @@ type Refusal =
  * account created at the end is for the address the ceremony was started for
  * and cannot be swapped for another in between.
  */
-async function createAccountWithPasskey(
-  email: string,
-): Promise<Refusal | "created"> {
+async function createAccountWithPasskey(email: string): Promise<Refusal | "created"> {
   try {
     const result = await authClient.passkey.addPasskey({
       context: email,

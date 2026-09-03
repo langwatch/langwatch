@@ -31,9 +31,7 @@ const entrySchema = z
     expires: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   })
   .strict();
-const fileSchema = z
-  .object({ version: z.literal(0), edges: z.array(entrySchema) })
-  .strict();
+const fileSchema = z.object({ version: z.literal(0), edges: z.array(entrySchema) }).strict();
 
 export function boundaryEdgeBaselineFile(root: string): string {
   return join(root, "packages/architecture-lint/src", FILE_NAME);
@@ -218,9 +216,7 @@ export function filterBaselinedBoundaryEdges(
   now: Date = new Date(),
 ): ArchitectureViolation[] {
   const today = now.toISOString().slice(0, 10);
-  const allowed = new Set(
-    entries.filter((entry) => entry.expires >= today).map(key),
-  );
+  const allowed = new Set(entries.filter((entry) => entry.expires >= today).map(key));
   return violations.filter((violation) => {
     if (violation.policy !== "cross-feature" && violation.policy !== "private-runtime-export") {
       return true;

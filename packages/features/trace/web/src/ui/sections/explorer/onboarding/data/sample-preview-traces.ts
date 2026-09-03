@@ -11,8 +11,7 @@ import { NO_TRACE_EVENTS } from "../../types/trace";
  * assignable to `utils.tracesV2.conversationContext.setData`. Preview traces are
  * never redacted, so the fixtures fill the flags with their not-redacted values.
  */
-type PreviewConversationTurn =
-  RouterOutputs["tracesV2"]["conversationContext"]["turns"][number];
+type PreviewConversationTurn = RouterOutputs["tracesV2"]["conversationContext"]["turns"][number];
 
 /** The not-redacted flag defaults every preview turn carries. */
 const NOT_REDACTED: Pick<
@@ -99,8 +98,7 @@ function makeTrace(args: MakeTraceArgs): TraceListItem {
     // Synthetic but plausible stored-size for the sample preview: roughly the
     // I/O text plus ~1.2 KB of attribute/metadata overhead per span.
     sizeBytes:
-      args.sizeBytes ??
-      args.input.length + (args.output?.length ?? 0) + args.spanCount * 1200,
+      args.sizeBytes ?? args.input.length + (args.output?.length ?? 0) + args.spanCount * 1200,
     input: args.input,
     output: args.output,
     error: args.error,
@@ -192,8 +190,7 @@ export const SAMPLE_PREVIEW_TRACES: readonly TraceListItem[] = [
     totalCost: 0,
     spanCount: 1,
     input: '{"order_id":"A-2104-77"}',
-    output:
-      '{"order_id":"A-2104-77","status":"shipped","carrier":"DHL","tracking":"1234567890"}',
+    output: '{"order_id":"A-2104-77","status":"shipped","carrier":"DHL","tracking":"1234567890"}',
     conversationId: "conv-7821",
   }),
 
@@ -502,8 +499,7 @@ export const SAMPLE_PREVIEW_TRACES: readonly TraceListItem[] = [
     outputTokens: 208,
     totalCost: 0.004956,
     spanCount: 3,
-    input:
-      "Summarise the key findings on transformer scaling laws from the recent papers.",
+    input: "Summarise the key findings on transformer scaling laws from the recent papers.",
     output:
       "Three converging findings: (1) compute-optimal training favours smaller models on more tokens (Hoffmann et al.), (2) instruction-tuning quality matters more than quantity past a threshold, (3) sparse attention reduces inference cost ~40% with negligible quality loss.",
     userId: "user-19",
@@ -604,8 +600,7 @@ export const SAMPLE_PREVIEW_TRACES: readonly TraceListItem[] = [
     totalCost: 0.000082,
     spanCount: 1,
     input: "Classify this support message for sentiment and urgency.",
-    output:
-      '{"sentiment":"frustrated","urgency":"high","themes":["billing","churn_risk"]}',
+    output: '{"sentiment":"frustrated","urgency":"high","themes":["billing","churn_risk"]}',
     conversationId: "conv-7830",
     userId: "user-22",
   }),
@@ -1695,9 +1690,7 @@ function buildPreviewHeader(trace: TraceListItem): TraceHeader {
   };
 }
 
-function buildPreviewConversation(
-  trace: TraceListItem,
-): RichArrivalConversationContext | null {
+function buildPreviewConversation(trace: TraceListItem): RichArrivalConversationContext | null {
   if (!trace.conversationId) return null;
   // Synthesise a single conversation turn from the trace's own
   // input/output. Users opening the Conversation tab on a sample

@@ -98,11 +98,7 @@ export const migrateDSLVersion = (dsl: WorkflowDsl): StudioWorkflow => {
   if (migrating.spec_version === "1.4") {
     migrating.spec_version = "1.5";
     const defaultLlm = migrating.default_llm;
-    if (
-      isRecord(defaultLlm) &&
-      typeof defaultLlm.model === "string" &&
-      defaultLlm.model !== ""
-    ) {
+    if (isRecord(defaultLlm) && typeof defaultLlm.model === "string" && defaultLlm.model !== "") {
       migrating.nodes.forEach((node) => {
         updateParameters(node, (parameter) => {
           if (parameter.type !== "llm") return parameter;

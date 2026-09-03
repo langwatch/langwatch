@@ -156,8 +156,7 @@ export async function browserQA(check: BrowserQACheck): Promise<BrowserQAResult>
     return { ...verdict, screenshotPath };
   } catch (error) {
     const screenshotPath = path.join(SCREENSHOT_DIR, `${slug}-error.png`);
-    if (page)
-      await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
+    if (page) await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
     return {
       passed: false,
       notes: `Browser QA threw: ${error instanceof Error ? error.message : String(error)}`,
@@ -185,9 +184,7 @@ export async function verifyTextVisible({
     .catch(() => false);
   return {
     passed: visible,
-    notes: visible
-      ? `Found "${name}" in the live UI.`
-      : `Did NOT find "${name}" in the live UI.`,
+    notes: visible ? `Found "${name}" in the live UI.` : `Did NOT find "${name}" in the live UI.`,
   };
 }
 

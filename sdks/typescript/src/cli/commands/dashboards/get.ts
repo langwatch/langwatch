@@ -37,9 +37,7 @@ export const getDashboardCommand = async (id: string): Promise<CommandResult | v
           `    ${chalk.gray("Updated:")} ${new Date(dashboard.updatedAt).toLocaleString()}`,
         );
         if (dashboard.platformUrl) {
-          console.log(
-            `    ${chalk.bold("View:")}   ${chalk.underline(dashboard.platformUrl)}`,
-          );
+          console.log(`    ${chalk.bold("View:")}   ${chalk.underline(dashboard.platformUrl)}`);
         }
         console.log();
       },

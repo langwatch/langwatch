@@ -51,9 +51,7 @@ export function useProjectSpanNames({
     const allKeys = Array.from(new Set([...esKeys, ...reservedKeys]));
 
     const excludedKeys = ["custom", "all_keys"];
-    return allKeys
-      .filter((key) => !excludedKeys.includes(key))
-      .map((key) => ({ key, label: key }));
+    return allKeys.filter((key) => !excludedKeys.includes(key)).map((key) => ({ key, label: key }));
   }, [fieldNames.data]);
 
   return {

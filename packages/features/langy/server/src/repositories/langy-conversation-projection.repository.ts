@@ -59,10 +59,7 @@ export abstract class LangyConversationRepository {
     query?: string;
   }): Promise<LangyConversationRow[]>;
 
-  abstract findActiveOwnedIds(params: {
-    projectId: string;
-    userId: string;
-  }): Promise<string[]>;
+  abstract findActiveOwnedIds(params: { projectId: string; userId: string }): Promise<string[]>;
 
   abstract tryFindPendingHandoff(params: {
     projectId: string;

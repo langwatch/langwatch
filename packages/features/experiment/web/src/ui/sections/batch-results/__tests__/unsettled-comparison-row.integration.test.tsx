@@ -26,15 +26,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 
 import { buildPairwiseComparisons } from "@langwatch/experiment-web";
-import {
-  ComparisonWinnerCell,
-  resolveWinner,
-} from "../comparison-winner-cell";
+import { ComparisonWinnerCell, resolveWinner } from "../comparison-winner-cell";
 import { buildCsvData, buildCsvHeaders } from "@langwatch/experiment-web";
-import type {
-  BatchComparisonColumn,
-  BatchEvaluationData,
-} from "@langwatch/experiment-web";
+import type { BatchComparisonColumn, BatchEvaluationData } from "@langwatch/experiment-web";
 import { transformBatchEvaluationData } from "@langwatch/experiment-web";
 import { WinRateChart } from "../win-rate-chart";
 
@@ -56,9 +50,7 @@ const candidatesInput = (ids: string[]) => ({
   row_index: 0,
 });
 
-const createRun = (
-  evaluations: ExperimentRunWithItems["evaluations"],
-): ExperimentRunWithItems => ({
+const createRun = (evaluations: ExperimentRunWithItems["evaluations"]): ExperimentRunWithItems => ({
   experimentId: "exp-1",
   runId: "run-1",
   projectId: "proj-1",
@@ -249,8 +241,7 @@ describe("given a comparison row the judge ran and could not settle", () => {
 describe("given a win-rate chart over decided and unsettled rows", () => {
   /** @scenario "An unsettled row stays out of the win-rate chart and the ranking" */
   it("counts no ties from the unsettled rows", () => {
-    const column = transformBatchEvaluationData(RUN_WITH_ONE_UNSETTLED_ROW)
-      .comparisonColumns![0]!;
+    const column = transformBatchEvaluationData(RUN_WITH_ONE_UNSETTLED_ROW).comparisonColumns![0]!;
 
     render(
       <Wrapper>
@@ -287,9 +278,7 @@ describe("given a CSV export of a run with an unsettled row", () => {
     const headers = buildCsvHeaders(data);
     const { rows } = buildCsvData(data);
     const values = rows[rowIndex] ?? [];
-    return Object.fromEntries(
-      headers.map((header, position) => [header, values[position] ?? ""]),
-    );
+    return Object.fromEntries(headers.map((header, position) => [header, values[position] ?? ""]));
   };
 
   /** @scenario "An unsettled row exports its explanation" */

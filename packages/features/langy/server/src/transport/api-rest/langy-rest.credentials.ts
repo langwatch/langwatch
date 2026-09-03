@@ -26,7 +26,10 @@ import {
   type LangyCredentialSession,
 } from "@langwatch/langy-contract";
 
-import { resolveLangyActorSession, type LangyActorUserReader } from "#services/langy-actor-session.service";
+import {
+  resolveLangyActorSession,
+  type LangyActorUserReader,
+} from "#services/langy-actor-session.service";
 import { resolveLangyKeyIdentity } from "#services/langy-key-identity.service";
 
 /**

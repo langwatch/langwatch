@@ -44,9 +44,7 @@ export function ComparisonColumnHeader({
   );
   const results = useEvaluationsV3Store((state) => state.results);
   const allTargets = useEvaluationsV3Store((state) => state.targets);
-  const activeDatasetId = useEvaluationsV3Store(
-    (state) => state.activeDatasetId,
-  );
+  const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
 
   const comparison = evaluator ? toComparisonConfig(evaluator) : undefined;
   const variantIds = comparison?.variants;
@@ -59,10 +57,7 @@ export function ComparisonColumnHeader({
   const variantDisplayNames = useMemo(
     () =>
       disambiguateNames(
-        variantNames.map(
-          (variantName, i) =>
-            variantName || variantIds?.[i] || `Variant ${i + 1}`,
-        ),
+        variantNames.map((variantName, i) => variantName || variantIds?.[i] || `Variant ${i + 1}`),
       ),
     [variantNames, variantIds],
   );
@@ -76,10 +71,7 @@ export function ComparisonColumnHeader({
     : 0;
 
   const aggregate = useMemo(
-    () =>
-      evaluator
-        ? computeComparisonAggregate(evaluator, results, rowCount)
-        : null,
+    () => (evaluator ? computeComparisonAggregate(evaluator, results, rowCount) : null),
     [evaluator, results, rowCount],
   );
 
@@ -92,8 +84,7 @@ export function ComparisonColumnHeader({
   // branch of getEvaluatorMissingMappings (it validates comparison.variants
   // directly), so "" is fine here.
   const hasMissingMappings =
-    !!evaluator &&
-    !getEvaluatorMissingMappings(evaluator, activeDatasetId, "").isValid;
+    !!evaluator && !getEvaluatorMissingMappings(evaluator, activeDatasetId, "").isValid;
 
   return (
     <HStack gap={1.5} width="full">

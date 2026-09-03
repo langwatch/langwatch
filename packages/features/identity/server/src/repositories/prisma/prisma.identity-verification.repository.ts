@@ -66,14 +66,10 @@ function parsePayload(raw: string): StoredPayload | null {
   }
 }
 
-export class PrismaIdentityVerificationRepository
-  implements IdentityVerificationRepository
-{
+export class PrismaIdentityVerificationRepository implements IdentityVerificationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async replaceForIdentifier(
-    record: IdentityVerificationRecord,
-  ): Promise<void> {
+  async replaceForIdentifier(record: IdentityVerificationRecord): Promise<void> {
     const identifier = keyFor(record.identifierId);
     // One transaction, so a mint is never observed as a gap between the
     // delete and the insert. It does not make the pair atomic against a

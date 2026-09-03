@@ -6,10 +6,7 @@ import {
   isComparisonEvaluatorType,
 } from "../../types";
 import { inferAllEvaluatorMappings } from "../../mapping-inference";
-import {
-  type AddEvaluatorPayload,
-  addEvaluatorPayloadSchema,
-} from "../schemas";
+import { type AddEvaluatorPayload, addEvaluatorPayloadSchema } from "../schemas";
 import { type Transform, TransformError, type WorkbenchState } from "./types";
 
 export const newEvaluatorId = () => `evaluator_${nanoid(8)}`;
@@ -64,11 +61,7 @@ export const attachEvaluator = ({
         ...evaluator,
         mappings: {
           ...evaluator.mappings,
-          ...inferAllEvaluatorMappings(
-            evaluator,
-            state.datasets,
-            state.targets,
-          ),
+          ...inferAllEvaluatorMappings(evaluator, state.datasets, state.targets),
         },
       },
     ],
@@ -90,10 +83,10 @@ export const attachEvaluator = ({
  * `localEvaluatorConfig?.settings`, which stays undefined here and falls
  * through to the database config the way it does for an unnamed evaluator.
  */
-export const addEvaluator: Transform<
-  AddEvaluatorPayload,
-  { evaluatorId: string }
-> = ({ state, payload }) => {
+export const addEvaluator: Transform<AddEvaluatorPayload, { evaluatorId: string }> = ({
+  state,
+  payload,
+}) => {
   const parsed = addEvaluatorPayloadSchema.parse(payload);
   const requestedId = parsed.id?.trim();
 

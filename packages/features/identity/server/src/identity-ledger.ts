@@ -18,8 +18,5 @@ import type {
  * about a queue, a store or a projection; only the writer does.
  */
 export interface IdentityLedger {
-  commit(args: {
-    command: IdentityCommand;
-    facts: IdentityFactInput[];
-  }): Promise<IdentityFact[]>;
+  commit(args: { command: IdentityCommand; facts: IdentityFactInput[] }): Promise<IdentityFact[]>;
 }

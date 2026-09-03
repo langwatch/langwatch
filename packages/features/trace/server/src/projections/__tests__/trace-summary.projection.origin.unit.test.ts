@@ -1,11 +1,17 @@
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection";
-import { createInitState, createTestRuntime, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createTestRuntime,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 const runtime = createTestRuntime();
-const applySpanToSummary = (input: { state: ReturnType<typeof createInitState>; span: NormalizedSpan }) =>
-  TraceSummaryFoldProjection.applySpanToSummary({ ...input, runtime });
+const applySpanToSummary = (input: {
+  state: ReturnType<typeof createInitState>;
+  span: NormalizedSpan;
+}) => TraceSummaryFoldProjection.applySpanToSummary({ ...input, runtime });
 
 /**
  * The shared fixture only knows span attributes; origin resolution also reads

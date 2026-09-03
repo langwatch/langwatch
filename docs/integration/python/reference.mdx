@@ -61,40 +61,35 @@ client = langwatch.setup(
 </ParamField>
 
 <ParamField path="endpoint_url" type="Optional[str]" default="LangWatch Cloud URL">
-  The URL of the LangWatch backend where traces will be sent. Defaults to the LangWatch
-  Cloud service. For self-hosted instances, you'll need to provide this.
+  The URL of the LangWatch backend where traces will be sent. Defaults to the LangWatch Cloud
+  service. For self-hosted instances, you'll need to provide this.
 </ParamField>
 
 <ParamField path="base_attributes" type="Optional[BaseAttributes]" default="None">
-  A `BaseAttributes` object allowing you to set default tags and properties that will be
-  attached to all traces and spans. See `BaseAttributes` type for more details.
+  A `BaseAttributes` object allowing you to set default tags and properties that will be attached to
+  all traces and spans. See `BaseAttributes` type for more details.
 </ParamField>
 
 <ParamField path="tracer_provider" type="Optional[TracerProvider]" default="None">
-  An OpenTelemetry `TracerProvider` instance. If you have an existing OpenTelemetry setup,
-  you can pass your `TracerProvider` here. LangWatch will add its exporter to this
-  provider. If not provided, LangWatch will configure its own.
+  An OpenTelemetry `TracerProvider` instance. If you have an existing OpenTelemetry setup, you can
+  pass your `TracerProvider` here. LangWatch will add its exporter to this provider. If not
+  provided, LangWatch will configure its own.
 </ParamField>
 
 <ParamField path="instrumentors" type="Optional[Sequence[Instrumentor]]" default="None">
-  A sequence of OpenTelemetry instrumentor instances. LangWatch can automatically apply
-  these instrumentors. (Note: Specific instrumentor types might need to be defined or
-  linked here).
+  A sequence of OpenTelemetry instrumentor instances. LangWatch can automatically apply these
+  instrumentors. (Note: Specific instrumentor types might need to be defined or linked here).
 </ParamField>
 
-<ParamField
-  path="span_exclude_rules"
-  type="Optional[List[SpanProcessingExcludeRule]]"
-  default="[]"
->
-  A list of `SpanProcessingExcludeRule` objects. These rules allow you to filter out
-  specific spans from being exported to LangWatch, based on span name or attributes. See
+<ParamField path="span_exclude_rules" type="Optional[List[SpanProcessingExcludeRule]]" default="[]">
+  A list of `SpanProcessingExcludeRule` objects. These rules allow you to filter out specific spans
+  from being exported to LangWatch, based on span name or attributes. See
   `SpanProcessingExcludeRule` for details.
 </ParamField>
 
 <ParamField path="debug" type="bool" default="False">
-  If `True`, enables debug logging for the LangWatch client, providing more verbose output
-  about its operations.
+  If `True`, enables debug logging for the LangWatch client, providing more verbose output about its
+  operations.
 </ParamField>
 
 **Returns**
@@ -149,57 +144,55 @@ process_data("Sample Data")
   type="Optional[str]"
   default="Name of the decorated function or a default name"
 >
-  The name for the root span of this trace. If used as a decorator and not provided, it
-  defaults to the name of the decorated function. For context manager usage, a name like
-  "LangWatch Trace" might be used if not specified.
+  The name for the root span of this trace. If used as a decorator and not provided, it defaults to
+  the name of the decorated function. For context manager usage, a name like "LangWatch Trace" might
+  be used if not specified.
 </ParamField>
 
 <ParamField path="trace_id" type="Optional[Union[str, UUID]]" default="Auto-generated">
-  (Deprecated) A specific ID to assign to this trace. If not provided, a new UUID will be
-  generated. It's generally recommended to let LangWatch auto-generate trace IDs. This
-  will be mapped to `deprecated.trace_id` in metadata.
+  (Deprecated) A specific ID to assign to this trace. If not provided, a new UUID will be generated.
+  It's generally recommended to let LangWatch auto-generate trace IDs. This will be mapped to
+  `deprecated.trace_id` in metadata.
 </ParamField>
 
 <ParamField path="metadata" type="Optional[TraceMetadata]" default="None">
-  A dictionary of metadata to attach to the entire trace. This can include things like
-  user IDs, session IDs, or any other contextual information relevant to the whole
-  operation. `TraceMetadata` is typically `Dict[str, Any]`.
+  A dictionary of metadata to attach to the entire trace. This can include things like user IDs,
+  session IDs, or any other contextual information relevant to the whole operation. `TraceMetadata`
+  is typically `Dict[str, Any]`.
 </ParamField>
 
 <ParamField path="expected_output" type="Optional[str]" default="None">
-  If you have a known expected output for this trace (e.g., for testing or evaluation),
-  you can provide it here.
+  If you have a known expected output for this trace (e.g., for testing or evaluation), you can
+  provide it here.
 </ParamField>
 
 <ParamField path="api_key" type="Optional[str]" default="Global or None">
-  Overrides the global API key for this specific trace. Useful if you need to direct
-  traces to different projects or accounts dynamically.
+  Overrides the global API key for this specific trace. Useful if you need to direct traces to
+  different projects or accounts dynamically.
 </ParamField>
 
 <ParamField path="disable_sending" type="bool" default="False">
-  If `True`, this trace (and its spans) will be processed but not sent to the LangWatch
-  backend. This can be useful for local debugging or conditional tracing.
+  If `True`, this trace (and its spans) will be processed but not sent to the LangWatch backend.
+  This can be useful for local debugging or conditional tracing.
 </ParamField>
 
 <ParamField path="max_string_length" type="Optional[int]" default="None">
-  Optional per-field byte cap for string values in inputs, outputs, and metadata. Defaults
-  to `None` (no client-side truncation), so full content is sent to the backend, which
-  owns sizing. Set to an integer (≥ 100) to truncate longer strings client-side before
-  transmission.
+  Optional per-field byte cap for string values in inputs, outputs, and metadata. Defaults to `None`
+  (no client-side truncation), so full content is sent to the backend, which owns sizing. Set to an
+  integer (≥ 100) to truncate longer strings client-side before transmission.
 </ParamField>
 
 <Warning>
-  **Upgrade note (behavior change):** earlier SDK versions truncated string values at
-  5,000 bytes by default. Now that `max_string_length` defaults to `None`, full
-  input/output is transmitted, so projects **without** server-side blob offload enabled
-  send larger network payloads than before. If you need to bound client-side payload size,
-  set `max_string_length` to an integer.
+  **Upgrade note (behavior change):** earlier SDK versions truncated string values at 5,000 bytes by
+  default. Now that `max_string_length` defaults to `None`, full input/output is transmitted, so
+  projects **without** server-side blob offload enabled send larger network payloads than before. If
+  you need to bound client-side payload size, set `max_string_length` to an integer.
 </Warning>
 
 <ParamField path="skip_root_span" type="bool" default="False">
-  If `True`, a root span will not be automatically created for this trace. This is an
-  advanced option, typically used if you intend to manage the root span's lifecycle
-  manually or if the trace is purely a logical grouping without its own primary operation.
+  If `True`, a root span will not be automatically created for this trace. This is an advanced
+  option, typically used if you intend to manage the root span's lifecycle manually or if the trace
+  is purely a logical grouping without its own primary operation.
 </ParamField>
 
 <Expandable title="Root Span Parameters">
@@ -222,13 +215,13 @@ The following parameters are used to configure the root span that is automatical
 </ParamField>
 
 <ParamField path="input" type="Optional[Union[SpanInputOutput, str, List[ChatMessage]]]">
-  Explicitly sets the input for the root span. If not provided and `capture_input` is
-  `True`, it may be inferred from function arguments.
+  Explicitly sets the input for the root span. If not provided and `capture_input` is `True`, it may
+  be inferred from function arguments.
 </ParamField>
 
 <ParamField path="output" type="Optional[Union[SpanInputOutput, str, List[ChatMessage]]]">
-  Explicitly sets the output for the root span. If not provided and `capture_output` is
-  `True`, it may be inferred from the function's return value.
+  Explicitly sets the output for the root span. If not provided and `capture_output` is `True`, it
+  may be inferred from the function's return value.
 </ParamField>
 
 <ParamField path="error" type="Optional[Exception]">
@@ -383,9 +376,8 @@ Returns: `LangChainTracer` instance.
 </ParamField>
 
 <ParamField path="share" type="Callable">
-  (Potentially) Generates a shareable link or identifier for this trace. The exact
-  behavior might depend on backend support and configuration. Returns: A string, possibly
-  a URL or an ID.
+  (Potentially) Generates a shareable link or identifier for this trace. The exact behavior might
+  depend on backend support and configuration. Returns: A string, possibly a URL or an ID.
 </ParamField>
 
 <ParamField path="unshare" type="Callable">
@@ -450,21 +442,20 @@ complex_op()
   type="Optional[str]"
   default="Name of the decorated function or a default name"
 >
-  The name for the span. If used as a decorator and not provided, it defaults to the name
-  of the decorated function. For context manager usage, a default name like "LangWatch
-  Span" might be used if not specified.
+  The name for the span. If used as a decorator and not provided, it defaults to the name of the
+  decorated function. For context manager usage, a default name like "LangWatch Span" might be used
+  if not specified.
 </ParamField>
 
 <ParamField path="type" type="Optional[SpanType]" default="'span'">
-  The semantic type of the span, which helps categorize the operation. Common types
-  include `'llm'`, `'rag'`, `'agent'`, `'tool'`, `'embedding'`, or a generic `'span'`.
-  `SpanType` is typically a string literal from `langwatch.domain.SpanTypes`.
+  The semantic type of the span, which helps categorize the operation. Common types include `'llm'`,
+  `'rag'`, `'agent'`, `'tool'`, `'embedding'`, or a generic `'span'`. `SpanType` is typically a
+  string literal from `langwatch.domain.SpanTypes`.
 </ParamField>
 
 <ParamField path="span_id" type="Optional[Union[str, UUID]]" default="Auto-generated">
-  (Deprecated) A specific ID to assign to this span. It's generally recommended to let
-  LangWatch auto-generate span IDs. This will be mapped to `deprecated.span_id` in the
-  span's attributes.
+  (Deprecated) A specific ID to assign to this span. It's generally recommended to let LangWatch
+  auto-generate span IDs. This will be mapped to `deprecated.span_id` in the span's attributes.
 </ParamField>
 
 <ParamField
@@ -472,44 +463,43 @@ complex_op()
   type="Optional[Union[OtelSpan, LangWatchSpan]]"
   default="Current span in context"
 >
-  Explicitly sets the parent for this span. If not provided, the span will be nested under
-  the currently active `LangWatchSpan` or OpenTelemetry span.
+  Explicitly sets the parent for this span. If not provided, the span will be nested under the
+  currently active `LangWatchSpan` or OpenTelemetry span.
 </ParamField>
 
 <ParamField path="capture_input" type="bool" default="True">
-  If `True` (and used as a decorator), automatically captures the arguments of the
-  decorated function as the span's input.
+  If `True` (and used as a decorator), automatically captures the arguments of the decorated
+  function as the span's input.
 </ParamField>
 
 <ParamField path="capture_output" type="bool" default="True">
-  If `True` (and used as a decorator), automatically captures the return value of the
-  decorated function as the span's output.
+  If `True` (and used as a decorator), automatically captures the return value of the decorated
+  function as the span's output.
 </ParamField>
 
 <ParamField path="input" type="SpanInputType" default="None">
-  Explicitly sets the input for this span. `SpanInputType` can be a dictionary, a string,
-  or a list of `ChatMessage` objects. This overrides automatic input capture.
+  Explicitly sets the input for this span. `SpanInputType` can be a dictionary, a string, or a list
+  of `ChatMessage` objects. This overrides automatic input capture.
 </ParamField>
 
 <ParamField path="output" type="SpanInputType" default="None">
-  Explicitly sets the output for this span. `SpanInputType` has the same flexibility as
-  for `input`. This overrides automatic output capture.
+  Explicitly sets the output for this span. `SpanInputType` has the same flexibility as for `input`.
+  This overrides automatic output capture.
 </ParamField>
 
 <ParamField path="error" type="Optional[Exception]" default="None">
-  Records an error for this span. If an exception occurs within a decorated function or
-  context manager, it's often automatically recorded.
+  Records an error for this span. If an exception occurs within a decorated function or context
+  manager, it's often automatically recorded.
 </ParamField>
 
 <ParamField path="timestamps" type="Optional[SpanTimestamps]" default="None">
-  A `SpanTimestamps` object to explicitly set the `start_time` and `end_time` for the
-  span. Useful for instrumenting operations where the duration is known or externally
-  managed.
+  A `SpanTimestamps` object to explicitly set the `start_time` and `end_time` for the span. Useful
+  for instrumenting operations where the duration is known or externally managed.
 </ParamField>
 
 <ParamField path="contexts" type="ContextsType" default="None">
-  Relevant contextual information for this span, especially for RAG operations.
-  `ContextsType` can be a list of `RAGChunk` objects or a list of strings.
+  Relevant contextual information for this span, especially for RAG operations. `ContextsType` can
+  be a list of `RAGChunk` objects or a list of strings.
 </ParamField>
 
 <ParamField path="model" type="Optional[str]" default="None">
@@ -517,18 +507,14 @@ complex_op()
   `'text-embedding-ada-002'`).
 </ParamField>
 
-<ParamField
-  path="params"
-  type="Optional[Union[SpanParams, Dict[str, Any]]]"
-  default="None"
->
-  A dictionary or `SpanParams` object containing parameters relevant to the operation
-  (e.g., temperature for an LLM call, k for a vector search).
+<ParamField path="params" type="Optional[Union[SpanParams, Dict[str, Any]]]" default="None">
+  A dictionary or `SpanParams` object containing parameters relevant to the operation (e.g.,
+  temperature for an LLM call, k for a vector search).
 </ParamField>
 
 <ParamField path="metrics" type="Optional[SpanMetrics]" default="None">
-  A `SpanMetrics` object or dictionary to record quantitative measurements for this span,
-  such as token counts (`input_tokens`, `output_tokens`), cost, or other custom metrics.
+  A `SpanMetrics` object or dictionary to record quantitative measurements for this span, such as
+  token counts (`input_tokens`, `output_tokens`), cost, or other custom metrics.
 </ParamField>
 
 <ParamField path="evaluations" type="Optional[List[Any]]" default="None">
@@ -536,16 +522,15 @@ complex_op()
 </ParamField>
 
 <ParamField path="ignore_missing_trace_warning" type="bool" default="False">
-  If `True`, suppresses the warning that is normally emitted if a span is created without
-  an active parent trace.
+  If `True`, suppresses the warning that is normally emitted if a span is created without an active
+  parent trace.
 </ParamField>
 
 **OpenTelemetry Parameters:**
 These parameters are passed directly to the underlying OpenTelemetry span creation. Refer to OpenTelemetry documentation for more details.
 
 <ParamField path="kind" type="SpanKind" default="SpanKind.INTERNAL">
-  The OpenTelemetry `SpanKind` (e.g., `INTERNAL`, `CLIENT`, `SERVER`, `PRODUCER`,
-  `CONSUMER`).
+  The OpenTelemetry `SpanKind` (e.g., `INTERNAL`, `CLIENT`, `SERVER`, `PRODUCER`, `CONSUMER`).
 </ParamField>
 
 <ParamField path="span_context" type="Optional[Context]" default="None">
@@ -569,8 +554,8 @@ These parameters are passed directly to the underlying OpenTelemetry span creati
 </ParamField>
 
 <ParamField path="set_status_on_exception" type="bool" default="True">
-  Whether OpenTelemetry should automatically set the span status to error when an
-  exception is recorded.
+  Whether OpenTelemetry should automatically set the span status to error when an exception is
+  recorded.
 </ParamField>
 
 **Context Manager Return**
@@ -578,8 +563,8 @@ These parameters are passed directly to the underlying OpenTelemetry span creati
 When used as a context manager, `langwatch.span()` returns a `LangWatchSpan` object.
 
 <ResponseField name="current_span" type="LangWatchSpan">
-  The `LangWatchSpan` instance. You can use this object to call methods like
-  `current_span.update()` or `current_span.add_evaluation()`.
+  The `LangWatchSpan` instance. You can use this object to call methods like `current_span.update()`
+  or `current_span.add_evaluation()`.
 </ResponseField>
 
 #### `LangWatchSpan` Object Methods
@@ -718,14 +703,13 @@ main_operation()
 ```
 
 <ParamField path="suppress_warning" type="bool" default="False">
-  If `True`, suppresses the warning that is normally emitted if this function is called
-  when no LangWatch trace is currently in context.
+  If `True`, suppresses the warning that is normally emitted if this function is called when no
+  LangWatch trace is currently in context.
 </ParamField>
 
 <ResponseField name="trace" type="LangWatchTrace">
-  The current `LangWatchTrace` object. If no trace is active and `suppress_warning` is
-  `False`, a warning is issued and a new (detached) `LangWatchTrace` instance might be
-  returned.
+  The current `LangWatchTrace` object. If no trace is active and `suppress_warning` is `False`, a
+  warning is issued and a new (detached) `LangWatchTrace` instance might be returned.
 </ResponseField>
 
 #### `langwatch.get_current_span()`
@@ -761,9 +745,9 @@ user_flow()
 ```
 
 <ResponseField name="span" type="LangWatchSpan">
-  The current `LangWatchSpan` object. This could be a span initiated by `@langwatch.span`,
-  the root span of a `@langwatch.trace`, or a `LangWatchSpan` wrapping an existing
-  OpenTelemetry span if no LangWatch span is directly in context.
+  The current `LangWatchSpan` object. This could be a span initiated by `@langwatch.span`, the root
+  span of a `@langwatch.trace`, or a `LangWatchSpan` wrapping an existing OpenTelemetry span if no
+  LangWatch span is directly in context.
 </ResponseField>
 
 ## Prompt Management
@@ -797,8 +781,8 @@ prompt = langwatch.prompts.create(
 </ParamField>
 
 <ParamField path="messages" type="Optional[List[Dict[str, str]]]">
-  A list of message objects defining the conversation structure. Cannot be used
-  simultaneously with `prompt`.
+  A list of message objects defining the conversation structure. Cannot be used simultaneously with
+  `prompt`.
 </ParamField>
 
 <ParamField path="inputs" type="Optional[List[Dict[str, Any]]]">
@@ -886,8 +870,8 @@ updated_prompt = langwatch.prompts.update(
 </ResponseField>
 
 <Warning>
-  Each update operation creates a new version of the prompt. Previous versions are
-  preserved for version control and rollback purposes.
+  Each update operation creates a new version of the prompt. Previous versions are preserved for
+  version control and rollback purposes.
 </Warning>
 
 ### `langwatch.prompts.delete()`
@@ -938,8 +922,8 @@ compiled_prompt = prompt.compile(
 </ResponseField>
 
 <Info>
-  Lenient compilation will not throw errors for missing variables, making it suitable for
-  dynamic content where some variables may be optional.
+  Lenient compilation will not throw errors for missing variables, making it suitable for dynamic
+  content where some variables may be optional.
 </Info>
 
 ##### `prompt.compile_strict()`
@@ -955,8 +939,7 @@ compiled_prompt = prompt.compile_strict(
 ```
 
 <ParamField path="variables" type="Dict[str, Any]" required>
-  Variables to substitute into the prompt template. All template variables must be
-  provided.
+  Variables to substitute into the prompt template. All template variables must be provided.
 </ParamField>
 
 **Returns**
@@ -970,8 +953,8 @@ compiled_prompt = prompt.compile_strict(
 </ResponseField>
 
 <Warning>
-  Strict compilation will throw a `PromptCompilationError` if any template variables are
-  missing, ensuring all required data is provided.
+  Strict compilation will throw a `PromptCompilationError` if any template variables are missing,
+  ensuring all required data is provided.
 </Warning>
 
 ## Core Data Types
@@ -1017,8 +1000,8 @@ exclude_internal_utils = SpanProcessingExcludeRule(
 Represents a single message in a chat conversation, typically used for `input` or `output` of LLM spans.
 
 <ResponseField name="role" type="ChatRole" required>
-  The role of the message sender. `ChatRole` is a Literal: `"system"`, `"user"`,
-  `"assistant"`, `"function"`, `"tool"`, `"guardrail"`, `"evaluation"`, `"unknown"`.
+  The role of the message sender. `ChatRole` is a Literal: `"system"`, `"user"`, `"assistant"`,
+  `"function"`, `"tool"`, `"guardrail"`, `"evaluation"`, `"unknown"`.
 </ResponseField>
 <ResponseField name="content" type="Optional[str]">
   The textual content of the message.
@@ -1049,12 +1032,12 @@ Represents a single message in a chat conversation, typically used for `input` o
   </Expandable>
 </ResponseField>
 <ResponseField name="tool_call_id" type="Optional[str]">
-  For messages that are responses from a tool, this is the ID of the tool call that this
-  message is a response to.
+  For messages that are responses from a tool, this is the ID of the tool call that this message is
+  a response to.
 </ResponseField>
 <ResponseField name="name" type="Optional[str]">
-  The name of the function whose result is in the `content` (if role is `"function"`), or
-  the name of the tool/participant (if role is `"tool"`).
+  The name of the function whose result is in the `content` (if role is `"function"`), or the name
+  of the tool/participant (if role is `"tool"`).
 </ResponseField>
 
 ```python Example
@@ -1075,8 +1058,7 @@ Represents a chunk of retrieved context, typically used with RAG (Retrieval Augm
   An identifier for this specific chunk within the document.
 </ResponseField>
 <ResponseField name="content" type="Union[str, Dict[str, Any], List[Any]]" required>
-  The actual content of the RAG chunk. Can be a simple string or a more complex structured
-  object.
+  The actual content of the RAG chunk. Can be a simple string or a more complex structured object.
 </ResponseField>
 
 ```python Example
@@ -1107,17 +1089,17 @@ When providing `input` or `output` to `@langwatch.span()` or `span.update()`, yo
 A dictionary defining custom timestamps for a span, in **milliseconds** since epoch. All fields are optional: any field you don't set falls back to the span's own measured times, so you can pass only the field you want to override (e.g. just `first_token_at`).
 
 <ResponseField name="started_at" type="Optional[int]">
-  Timestamp when the span started (milliseconds since epoch). Falls back to the span's
-  actual start time.
+  Timestamp when the span started (milliseconds since epoch). Falls back to the span's actual start
+  time.
 </ResponseField>
 <ResponseField name="first_token_at" type="Optional[int]">
-  For LLM operations, timestamp when the first token was received (milliseconds since
-  epoch). Powers the Time to First Token (TTFT) metric, see [Tracking Time to First
+  For LLM operations, timestamp when the first token was received (milliseconds since epoch). Powers
+  the Time to First Token (TTFT) metric, see [Tracking Time to First
   Token](/integration/python/tutorials/tracking-time-to-first-token).
 </ResponseField>
 <ResponseField name="finished_at" type="Optional[int]">
-  Timestamp when the span finished (milliseconds since epoch). Falls back to the span's
-  actual end time.
+  Timestamp when the span finished (milliseconds since epoch). Falls back to the span's actual end
+  time.
 </ResponseField>
 
 ### `SpanTypes` (Semantic Span Types)
@@ -1162,21 +1144,19 @@ A dictionary for parameters related to an operation, especially LLM calls.
 Examples include:
 
 <ResponseField name="frequency_penalty" type="Optional[float]">
-  Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing
-  frequency in the text so far, decreasing the model's likelihood to repeat the same line
-  verbatim.
+  Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency
+  in the text so far, decreasing the model's likelihood to repeat the same line verbatim.
 </ResponseField>
 <ResponseField name="logit_bias" type="Optional[Dict[str, float]]">
-  Modify the likelihood of specified tokens appearing in the completion. Accepts a
-  dictionary mapping token IDs (or tokens, depending on the model) to a bias value from
-  -100 to 100.
+  Modify the likelihood of specified tokens appearing in the completion. Accepts a dictionary
+  mapping token IDs (or tokens, depending on the model) to a bias value from -100 to 100.
 </ResponseField>
 <ResponseField name="logprobs" type="Optional[bool]">
   Whether to return log probabilities of the output tokens.
 </ResponseField>
 <ResponseField name="top_logprobs" type="Optional[int]">
-  An integer between 0 and 5 specifying the number of most likely tokens to return at each
-  token position, each with log probability. `logprobs` must be `True` if this is used.
+  An integer between 0 and 5 specifying the number of most likely tokens to return at each token
+  position, each with log probability. `logprobs` must be `True` if this is used.
 </ResponseField>
 <ResponseField name="max_tokens" type="Optional[int]">
   The maximum number of tokens to generate in the completion.
@@ -1185,40 +1165,37 @@ Examples include:
   How many completions to generate for each prompt.
 </ResponseField>
 <ResponseField name="presence_penalty" type="Optional[float]">
-  Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they
-  appear in the text so far, increasing the model's likelihood to talk about new topics.
+  Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in
+  the text so far, increasing the model's likelihood to talk about new topics.
 </ResponseField>
 <ResponseField name="seed" type="Optional[int]">
-  If specified, the system will make a best effort to sample deterministically, such that
-  repeated requests with the same `seed` and parameters should return the same result.
+  If specified, the system will make a best effort to sample deterministically, such that repeated
+  requests with the same `seed` and parameters should return the same result.
 </ResponseField>
 <ResponseField name="stop" type="Optional[Union[str, List[str]]]">
   Up to 4 sequences where the API will stop generating further tokens.
 </ResponseField>
 <ResponseField name="stream" type="Optional[bool]">
-  If set, partial message deltas will be sent, like in ChatGPT. Tokens will be sent as
-  data-only server-sent events as they become available.
+  If set, partial message deltas will be sent, like in ChatGPT. Tokens will be sent as data-only
+  server-sent events as they become available.
 </ResponseField>
 <ResponseField name="temperature" type="Optional[float]">
-  What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the
-  output more random, while lower values like 0.2 will make it more focused and
-  deterministic.
+  What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output
+  more random, while lower values like 0.2 will make it more focused and deterministic.
 </ResponseField>
 <ResponseField name="top_p" type="Optional[float]">
-  An alternative to sampling with temperature, called nucleus sampling, where the model
-  considers the results of the tokens with `top_p` probability mass.
+  An alternative to sampling with temperature, called nucleus sampling, where the model considers
+  the results of the tokens with `top_p` probability mass.
 </ResponseField>
 <ResponseField name="tools" type="Optional[List[Dict[str, Any]]]">
   A list of tools the model may call. Currently, only functions are supported as a tool.
 </ResponseField>
 <ResponseField name="tool_choice" type="Optional[str]">
-  Controls which (if any) tool is called by the model. `none` means the model will not
-  call any tool. `auto` means the model can pick between generating a message or calling a
-  tool.
+  Controls which (if any) tool is called by the model. `none` means the model will not call any
+  tool. `auto` means the model can pick between generating a message or calling a tool.
 </ResponseField>
 <ResponseField name="user" type="Optional[str]">
-  A unique identifier representing your end-user, which can help OpenAI to monitor and
-  detect abuse.
+  A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse.
 </ResponseField>
 
 ### `Prompt`

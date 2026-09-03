@@ -8,12 +8,7 @@
  * client-side navigation asked through the one port the family declares.
  */
 
-import {
-  type AnchorHTMLAttributes,
-  forwardRef,
-  type MouseEvent,
-  type ReactNode,
-} from "react";
+import { type AnchorHTMLAttributes, forwardRef, type MouseEvent, type ReactNode } from "react";
 
 import { useOptionalWorkflowHost } from "../../../model/workflow-host";
 
@@ -34,9 +29,7 @@ interface NextLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "h
   children?: ReactNode;
 }
 
-function buildHref(
-  href: string | { pathname: string; query?: Record<string, any> },
-): string {
+function buildHref(href: string | { pathname: string; query?: Record<string, any> }): string {
   if (typeof href === "string") return href;
   const { pathname, query } = href;
   if (!query || Object.keys(query).length === 0) return pathname;

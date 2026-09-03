@@ -1,8 +1,5 @@
 import type { SpendFilters } from "../adapters/gateway-spend-filters.adapter";
-import type {
-  SpendBucket,
-  SpendGroupByKey,
-} from "../adapters/gateway-spend-grouping.adapter";
+import type { SpendBucket, SpendGroupByKey } from "../adapters/gateway-spend-grouping.adapter";
 import type {
   SpendEventRow,
   SpendEventsPageCursor,

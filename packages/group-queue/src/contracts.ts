@@ -73,10 +73,7 @@ export interface GroupQueueContextMetadata {
 
 export interface GroupQueueContextPort {
   capture(): GroupQueueContextMetadata | undefined;
-  run<T>(
-    metadata: GroupQueueContextMetadata | undefined,
-    operation: () => Promise<T>,
-  ): Promise<T>;
+  run<T>(metadata: GroupQueueContextMetadata | undefined, operation: () => Promise<T>): Promise<T>;
 }
 
 export interface GroupQueueActivityPort<Payload> {
@@ -115,11 +112,7 @@ export interface QueueAuditAdapter<Payload> {
     scheduledAt: Date;
     maxAttempts?: number;
   }): Promise<void>;
-  onLeased(event: {
-    payload: Payload;
-    attempt: number;
-    leasedUntil?: Date;
-  }): Promise<void>;
+  onLeased(event: { payload: Payload; attempt: number; leasedUntil?: Date }): Promise<void>;
   onDispatched(event: { payload: Payload; at: Date; attempt: number }): Promise<void>;
   onFailed(event: {
     payload: Payload;

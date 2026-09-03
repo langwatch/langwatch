@@ -7,11 +7,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, GripVertical, X } from "lucide-react";
 import type React from "react";
@@ -27,9 +23,7 @@ export const VisibleOrderStrip: React.FC<{
   reorderColumns: (from: number, to: number) => void;
   onRemove: (id: string) => void;
 }> = ({ columns, columnOrder, reorderColumns, onRemove }) => {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -43,15 +37,8 @@ export const VisibleOrderStrip: React.FC<{
   };
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={columns.map((c) => c.id)}
-        strategy={verticalListSortingStrategy}
-      >
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={columns.map((c) => c.id)} strategy={verticalListSortingStrategy}>
         <Stack gap={0}>
           {columns.map((column, index) => (
             <SortableVisibleColumnRow
@@ -62,18 +49,12 @@ export const VisibleOrderStrip: React.FC<{
               onMoveUp={() => {
                 const previous = columns[index - 1];
                 if (!previous) return;
-                reorderColumns(
-                  columnOrder.indexOf(column.id),
-                  columnOrder.indexOf(previous.id),
-                );
+                reorderColumns(columnOrder.indexOf(column.id), columnOrder.indexOf(previous.id));
               }}
               onMoveDown={() => {
                 const next = columns[index + 1];
                 if (!next) return;
-                reorderColumns(
-                  columnOrder.indexOf(column.id),
-                  columnOrder.indexOf(next.id),
-                );
+                reorderColumns(columnOrder.indexOf(column.id), columnOrder.indexOf(next.id));
               }}
               onRemove={() => onRemove(column.id)}
             />
@@ -112,8 +93,9 @@ const SortableVisibleColumnRow: React.FC<{
   onMoveDown: () => void;
   onRemove: () => void;
 }> = ({ column, isFirst, isLast, onMoveUp, onMoveDown, onRemove }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: column.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: column.id,
+  });
   return (
     <HStack
       ref={setNodeRef}
@@ -149,18 +131,10 @@ const SortableVisibleColumnRow: React.FC<{
       <Text flex={1} textStyle="xs" color="fg" truncate>
         {column.label}
       </Text>
-      <ReorderIconButton
-        label={`Move ${column.label} up`}
-        disabled={isFirst}
-        onClick={onMoveUp}
-      >
+      <ReorderIconButton label={`Move ${column.label} up`} disabled={isFirst} onClick={onMoveUp}>
         <ArrowUp size={10} />
       </ReorderIconButton>
-      <ReorderIconButton
-        label={`Move ${column.label} down`}
-        disabled={isLast}
-        onClick={onMoveDown}
-      >
+      <ReorderIconButton label={`Move ${column.label} down`} disabled={isLast} onClick={onMoveDown}>
         <ArrowDown size={10} />
       </ReorderIconButton>
       <ReorderIconButton label={`Remove ${column.label}`} onClick={onRemove}>

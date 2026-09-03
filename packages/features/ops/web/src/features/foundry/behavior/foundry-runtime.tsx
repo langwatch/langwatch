@@ -32,9 +32,7 @@ export function FoundryRuntimeProvider({
   transport: FoundryTransport;
 }) {
   return (
-    <FoundryRuntimeContext.Provider value={transport}>
-      {children}
-    </FoundryRuntimeContext.Provider>
+    <FoundryRuntimeContext.Provider value={transport}>{children}</FoundryRuntimeContext.Provider>
   );
 }
 

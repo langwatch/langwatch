@@ -39,15 +39,11 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
     describe("when given an unsupported extension", () => {
       /** @scenario "Reject unknown file extension" */
       it("throws an error for .parquet", () => {
-        expect(() => detectFileFormat("data.parquet")).toThrow(
-          /unsupported file format/i,
-        );
+        expect(() => detectFileFormat("data.parquet")).toThrow(/unsupported file format/i);
       });
 
       it("throws an error for .xlsx", () => {
-        expect(() => detectFileFormat("data.xlsx")).toThrow(
-          /unsupported file format/i,
-        );
+        expect(() => detectFileFormat("data.xlsx")).toThrow(/unsupported file format/i);
       });
     });
 
@@ -117,9 +113,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
     describe("when given a non-array JSON", () => {
       it("throws an error", () => {
-        expect(() => parseJSON('{"name": "Alice"}')).toThrow(
-          /must be an array/i,
-        );
+        expect(() => parseJSON('{"name": "Alice"}')).toThrow(/must be an array/i);
       });
     });
   });
@@ -307,11 +301,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
       expect(dedupeHeaders(["col", "col"])).toEqual(["col", "col_1"]);
       // The literal "col_1" collides with the suffix emitted for the 2nd "col",
       // so it bumps again rather than silently overwriting it.
-      expect(dedupeHeaders(["col", "col", "col_1"])).toEqual([
-        "col",
-        "col_1",
-        "col_1_1",
-      ]);
+      expect(dedupeHeaders(["col", "col", "col_1"])).toEqual(["col", "col_1", "col_1_1"]);
     });
   });
 });

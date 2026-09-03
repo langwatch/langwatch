@@ -46,13 +46,7 @@ export function PipelineTreeNode({
         opacity={paused ? 0.6 : 1}
       >
         <Box width="14px" flexShrink={0}>
-          {hasChildren ? (
-            isExpanded ? (
-              <ChevronDown size={12} />
-            ) : (
-              <ChevronRight size={12} />
-            )
-          ) : null}
+          {hasChildren ? isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} /> : null}
         </Box>
 
         <Text

@@ -320,9 +320,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        container.querySelector('[data-testid="run-summary-footer"]'),
-      ).not.toBeInTheDocument();
+      expect(container.querySelector('[data-testid="run-summary-footer"]')).not.toBeInTheDocument();
     });
 
     it("does not render a RunSummaryFooter when collapsed", () => {
@@ -338,9 +336,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        container.querySelector('[data-testid="run-summary-footer"]'),
-      ).not.toBeInTheDocument();
+      expect(container.querySelector('[data-testid="run-summary-footer"]')).not.toBeInTheDocument();
     });
   });
 

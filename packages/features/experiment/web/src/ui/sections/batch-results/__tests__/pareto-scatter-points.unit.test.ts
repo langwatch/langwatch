@@ -23,11 +23,7 @@ const AXIS = {
   sizeLabel: "avg duration",
 };
 
-const entry = (
-  variantId: string,
-  score: number,
-  isDegenerate = false,
-): BTLeaderboardEntry => ({
+const entry = (variantId: string, score: number, isDegenerate = false): BTLeaderboardEntry => ({
   variantId,
   wins: 5,
   losses: 5,

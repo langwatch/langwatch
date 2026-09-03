@@ -5,9 +5,9 @@ import { HOSTED_GATEWAY_URL, resolveSnippetGatewayBaseUrl } from "../model/gatew
 describe("resolveSnippetGatewayBaseUrl", () => {
   describe("when this deployment exposes its gateway URL via publicEnv", () => {
     it("uses the deployment URL with a /v1 suffix, not the SaaS default", () => {
-      expect(
-        resolveSnippetGatewayBaseUrl(undefined, "https://gw.selfhosted.example"),
-      ).toBe("https://gw.selfhosted.example/v1");
+      expect(resolveSnippetGatewayBaseUrl(undefined, "https://gw.selfhosted.example")).toBe(
+        "https://gw.selfhosted.example/v1",
+      );
     });
 
     it("strips a trailing slash before appending /v1", () => {

@@ -18,7 +18,12 @@ import {
   getStaticModelCostRates,
   llmModels,
 } from "@langwatch/model-provider-contract";
-import { counter, histogram, type CounterHandle, type HistogramHandle } from "@langwatch/observability/metrics";
+import {
+  counter,
+  histogram,
+  type CounterHandle,
+  type HistogramHandle,
+} from "@langwatch/observability/metrics";
 import { createLogger, type Logger } from "@langwatch/observability";
 
 const NANO_USD_PER_USD = 1_000_000_000;

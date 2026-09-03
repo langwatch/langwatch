@@ -3,10 +3,7 @@ import { z } from "zod";
 import type { AggregateType } from "../../domain/aggregateType";
 import { createTenantId } from "../../domain/tenantId";
 import type { Event, EventMetadataBase } from "../../domain/types";
-import {
-  TEST_COMMAND_TYPES,
-  TEST_EVENT_TYPES,
-} from "../../services/__tests__/testHelpers";
+import { TEST_COMMAND_TYPES, TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers";
 import type { Command } from "../command";
 import { defineCommandSchema } from "../commandSchema";
 
@@ -34,10 +31,7 @@ describe("CommandHandlerClass", () => {
   describe("when implementing a minimal CommandHandlerClass", () => {
     it("can call getAggregateId static method", () => {
       class MinimalHandler {
-        static readonly schema = defineCommandSchema(
-          TEST_COMMAND_TYPES[0],
-          testPayloadSchema,
-        );
+        static readonly schema = defineCommandSchema(TEST_COMMAND_TYPES[0], testPayloadSchema);
 
         static readonly dispatcherName = "test-dispatcher" as const;
 
@@ -58,10 +52,7 @@ describe("CommandHandlerClass", () => {
 
     it("can call handle instance method", async () => {
       class MinimalHandler {
-        static readonly schema = defineCommandSchema(
-          TEST_COMMAND_TYPES[0],
-          testPayloadSchema,
-        );
+        static readonly schema = defineCommandSchema(TEST_COMMAND_TYPES[0], testPayloadSchema);
 
         static readonly dispatcherName = "test-dispatcher" as const;
 
@@ -107,10 +98,7 @@ describe("CommandHandlerClass", () => {
   describe("when implementing a CommandHandlerClass with optional methods", () => {
     it("can define optional getSpanAttributes static method", () => {
       class HandlerWithSpanAttributes {
-        static readonly schema = defineCommandSchema(
-          TEST_COMMAND_TYPES[0],
-          testPayloadSchema,
-        );
+        static readonly schema = defineCommandSchema(TEST_COMMAND_TYPES[0], testPayloadSchema);
 
         static readonly dispatcherName = "test-dispatcher" as const;
 
@@ -118,9 +106,7 @@ describe("CommandHandlerClass", () => {
           return payload.id;
         }
 
-        static getSpanAttributes(
-          payload: TestPayload,
-        ): Record<string, string | number | boolean> {
+        static getSpanAttributes(payload: TestPayload): Record<string, string | number | boolean> {
           return {
             "payload.id": payload.id,
             "payload.value": payload.value,
@@ -144,10 +130,7 @@ describe("CommandHandlerClass", () => {
 
     it("can define optional makeJobId static method", () => {
       class HandlerWithJobId {
-        static readonly schema = defineCommandSchema(
-          TEST_COMMAND_TYPES[0],
-          testPayloadSchema,
-        );
+        static readonly schema = defineCommandSchema(TEST_COMMAND_TYPES[0], testPayloadSchema);
 
         static readonly dispatcherName = "test-dispatcher" as const;
 
@@ -174,10 +157,7 @@ describe("CommandHandlerClass", () => {
   describe("when implementing a CommandHandlerClass with optional properties", () => {
     it("can define optional delay property", () => {
       class HandlerWithDelay {
-        static readonly schema = defineCommandSchema(
-          TEST_COMMAND_TYPES[0],
-          testPayloadSchema,
-        );
+        static readonly schema = defineCommandSchema(TEST_COMMAND_TYPES[0], testPayloadSchema);
 
         static readonly dispatcherName = "test-dispatcher" as const;
 
@@ -197,10 +177,7 @@ describe("CommandHandlerClass", () => {
 
     it("can define optional concurrency property", () => {
       class HandlerWithConcurrency {
-        static readonly schema = defineCommandSchema(
-          TEST_COMMAND_TYPES[0],
-          testPayloadSchema,
-        );
+        static readonly schema = defineCommandSchema(TEST_COMMAND_TYPES[0], testPayloadSchema);
 
         static readonly dispatcherName = "test-dispatcher" as const;
 
@@ -222,10 +199,7 @@ describe("CommandHandlerClass", () => {
   describe("when handle method returns different result types", () => {
     it("can return a Promise of events", async () => {
       class AsyncHandler {
-        static readonly schema = defineCommandSchema(
-          TEST_COMMAND_TYPES[0],
-          testPayloadSchema,
-        );
+        static readonly schema = defineCommandSchema(TEST_COMMAND_TYPES[0], testPayloadSchema);
 
         static readonly dispatcherName = "test-dispatcher" as const;
 
@@ -267,10 +241,7 @@ describe("CommandHandlerClass", () => {
 
     it("can return events directly (synchronous)", async () => {
       class SyncHandler {
-        static readonly schema = defineCommandSchema(
-          TEST_COMMAND_TYPES[0],
-          testPayloadSchema,
-        );
+        static readonly schema = defineCommandSchema(TEST_COMMAND_TYPES[0], testPayloadSchema);
 
         static readonly dispatcherName = "test-dispatcher" as const;
 

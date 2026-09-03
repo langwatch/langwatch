@@ -25,9 +25,7 @@ describe("setupObservability Integration - Error Handling", () => {
 
     // Check that logger.error was called with a message containing the expected string
     const errorCalls = logger.error.mock.calls.map((call) => call[0]);
-    expect(errorCalls.some((msg) => msg.includes("Failed to initialize NodeSDK"))).toBe(
-      true,
-    );
+    expect(errorCalls.some((msg) => msg.includes("Failed to initialize NodeSDK"))).toBe(true);
     expect(typeof handle.shutdown).toBe("function");
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });

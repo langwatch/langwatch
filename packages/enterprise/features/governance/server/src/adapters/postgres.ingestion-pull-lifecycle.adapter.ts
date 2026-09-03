@@ -17,9 +17,7 @@ export type PostgresIngestionPullLifecycleAdapterOptions = {
 
 /** Public composition seam; the Prisma repository remains private. */
 export class PostgresIngestionPullLifecycleAdapter {
-  private constructor(
-    private readonly options: PostgresIngestionPullLifecycleAdapterOptions,
-  ) {}
+  private constructor(private readonly options: PostgresIngestionPullLifecycleAdapterOptions) {}
 
   static create(
     options: PostgresIngestionPullLifecycleAdapterOptions,

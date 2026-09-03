@@ -1,17 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AnnotationsApiError } from "@/client-sdk/services/annotations/annotations-api.service";
 
-vi.mock(
-  "@/client-sdk/services/annotations/annotations-api.service",
-  async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    const actual = (await importOriginal()) as Record<string, unknown>;
-    return {
-      ...actual,
-      AnnotationsApiService: vi.fn(),
-    };
-  },
-);
+vi.mock("@/client-sdk/services/annotations/annotations-api.service", async (importOriginal) => {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    AnnotationsApiService: vi.fn(),
+  };
+});
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -242,13 +239,9 @@ describe("deleteAnnotationCommand()", () => {
 
   describe("when deletion fails", () => {
     it("exits with code 1", async () => {
-      mockDelete.mockRejectedValue(
-        new AnnotationsApiError("Not found", "delete annotation"),
-      );
+      mockDelete.mockRejectedValue(new AnnotationsApiError("Not found", "delete annotation"));
 
-      await expect(deleteAnnotationCommand("nonexistent")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(deleteAnnotationCommand("nonexistent")).rejects.toThrow(ProcessExitError);
     });
   });
 });

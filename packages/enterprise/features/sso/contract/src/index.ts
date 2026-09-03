@@ -1,14 +1,6 @@
-export {
-  SSO_FEATURE_ID,
-  ssoConfigurationSchema,
-  type SsoConfiguration,
-} from "./sso.contract";
+export { SSO_FEATURE_ID, ssoConfigurationSchema, type SsoConfiguration } from "./sso.contract";
 export * from "./sso.service";
-export {
-  extractEmailDomain,
-  isSsoProviderMatch,
-  type OAuthAccountLike,
-} from "./sso-matching";
+export { extractEmailDomain, isSsoProviderMatch, type OAuthAccountLike } from "./sso-matching";
 export {
   GATED_SSO_INITIATION_SUFFIXES,
   isCredentialMutationPath,

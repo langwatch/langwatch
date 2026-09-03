@@ -61,7 +61,6 @@ vi.mock("../../../../behavior/studio-host/api", () => ({
   },
 }));
 
-
 vi.mock("../history", () => ({
   useVersionState: () => ({
     previousVersion: { id: "v-1", version: "1.0" },

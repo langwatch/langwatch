@@ -18,10 +18,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import { EvaluationService } from "../../services/evaluation.service";
-import {
-  EvaluationExecutionPort,
-  EvaluationInputsResolutionPort,
-} from "../evaluation.port";
+import { EvaluationExecutionPort, EvaluationInputsResolutionPort } from "../evaluation.port";
 import { EvaluationRunRepository } from "../../repositories/evaluation.repository";
 import {
   MonitorPerformanceRepository,

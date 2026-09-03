@@ -69,8 +69,7 @@ export class TurnRunner {
   private readonly warn: (message: string) => void;
 
   constructor(private readonly options: TurnRunnerOptions) {
-    this.warn =
-      options.warn ?? ((message) => process.stderr.write(`langy-worker: ${message}\n`));
+    this.warn = options.warn ?? ((message) => process.stderr.write(`langy-worker: ${message}\n`));
   }
 
   /** Wire this to `session.subscribe`. Contained: never throws. */

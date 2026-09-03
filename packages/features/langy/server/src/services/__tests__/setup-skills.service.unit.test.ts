@@ -19,9 +19,7 @@ describe("setupSkillBody()", () => {
   });
 
   it("carries no credentials of its own", () => {
-    for (const id of Object.keys(SETUP_SKILL_BODIES) as Array<
-      keyof typeof SETUP_SKILL_BODIES
-    >) {
+    for (const id of Object.keys(SETUP_SKILL_BODIES) as Array<keyof typeof SETUP_SKILL_BODIES>) {
       expect(setupSkillBody(id)).not.toContain("LANGWATCH_API_KEY=");
     }
   });

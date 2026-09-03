@@ -14,16 +14,7 @@
 import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OutboxDispatcherService } from "../outbox/outboxDispatcherService";
 import { ProcessManagerService } from "../processManagerService";
@@ -82,15 +73,12 @@ describe("process-manager trace continuity", () => {
         const baggage = propagation.createBaggage({
           "langwatch.tenant": { value: "tenant_1" },
         });
-        await context.with(
-          propagation.setBaggage(context.active(), baggage),
-          async () => {
-            await service.handleEvent({
-              envelope: pilotEvent({ eventId: "evt_start" }),
-              now: T0,
-            });
-          },
-        );
+        await context.with(propagation.setBaggage(context.active(), baggage), async () => {
+          await service.handleEvent({
+            envelope: pilotEvent({ eventId: "evt_start" }),
+            now: T0,
+          });
+        });
         return { producerTraceId: producer.spanContext().traceId };
       } finally {
         producer.end();
@@ -132,8 +120,7 @@ describe("process-manager trace continuity", () => {
 
   describe("when process evolution fails", () => {
     it("exports a generic exception without customer content or credentials", async () => {
-      const sensitiveFailure =
-        "Authorization: Bearer sk-live-secret prompt-derived customer text";
+      const sensitiveFailure = "Authorization: Bearer sk-live-secret prompt-derived customer text";
       const failingService = new ProcessManagerService({
         definition: {
           ...pilotDefinition,
@@ -155,9 +142,7 @@ describe("process-manager trace continuity", () => {
       const evolveSpan = exporter
         .getFinishedSpans()
         .find((span) => span.name === "process failingProcess evolve");
-      const exceptionEvent = evolveSpan?.events.find(
-        (event) => event.name === "exception",
-      );
+      const exceptionEvent = evolveSpan?.events.find((event) => event.name === "exception");
       expect(exceptionEvent?.attributes).toMatchObject({
         "exception.type": "Error",
         "exception.message": "Operation failed; sensitive details were omitted",
@@ -172,9 +157,7 @@ describe("process-manager trace continuity", () => {
     it("continues the original trace as a consumer span parented on the persisted carrier", async () => {
       const { producerTraceId } = await handleStartedTurnInsideProducerSpan();
       const [message] = await store.findMessagesByRef({ ref: pilotRef });
-      const [, , carrierSpanId] = W3C_TRACEPARENT_REGEX.exec(
-        message!.traceCarrier.traceparent!,
-      )!;
+      const [, , carrierSpanId] = W3C_TRACEPARENT_REGEX.exec(message!.traceCarrier.traceparent!)!;
 
       const dispatcher = new OutboxDispatcherService({
         store,
@@ -188,9 +171,7 @@ describe("process-manager trace continuity", () => {
         .getFinishedSpans()
         .find((span) => span.kind === SpanKind.CONSUMER);
       expect(consumerSpan).toBeDefined();
-      expect(consumerSpan!.name).toBe(
-        "process langyConversation dispatch worker-dispatch",
-      );
+      expect(consumerSpan!.name).toBe("process langyConversation dispatch worker-dispatch");
       expect(consumerSpan!.spanContext().traceId).toBe(producerTraceId);
       expect(consumerSpan!.parentSpanContext?.spanId).toBe(carrierSpanId);
       expect(consumerSpan!.attributes).toMatchObject({
@@ -209,8 +190,7 @@ describe("process-manager trace continuity", () => {
     it("records every retry attempt as a consumer span in the same trace", async () => {
       const { producerTraceId } = await handleStartedTurnInsideProducerSpan();
 
-      const sensitiveFailure =
-        "Authorization: Bearer sk-live-secret prompt-derived customer text";
+      const sensitiveFailure = "Authorization: Bearer sk-live-secret prompt-derived customer text";
       const handler = vi
         .fn()
         .mockRejectedValueOnce(new Error(sensitiveFailure))
@@ -231,16 +211,10 @@ describe("process-manager trace continuity", () => {
       for (const span of consumerSpans) {
         expect(span.spanContext().traceId).toBe(producerTraceId);
       }
-      expect(consumerSpans.map((span) => span.attributes["process.attempt"])).toEqual([
-        1, 2,
-      ]);
+      expect(consumerSpans.map((span) => span.attributes["process.attempt"])).toEqual([1, 2]);
       // The failed attempt carries the exception on its span.
-      expect(consumerSpans[0]!.events.some((event) => event.name === "exception")).toBe(
-        true,
-      );
-      const exceptionEvent = consumerSpans[0]!.events.find(
-        (event) => event.name === "exception",
-      );
+      expect(consumerSpans[0]!.events.some((event) => event.name === "exception")).toBe(true);
+      const exceptionEvent = consumerSpans[0]!.events.find((event) => event.name === "exception");
       expect(exceptionEvent?.attributes).toMatchObject({
         "exception.type": "Error",
         "exception.message": "Operation failed; sensitive details were omitted",

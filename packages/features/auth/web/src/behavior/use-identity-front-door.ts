@@ -1,8 +1,7 @@
 import { usePublicEnv } from "./use-public-env";
 
 /** The flag these screens roll out on. */
-export const IDENTITY_FRONT_DOOR_FLAG =
-  "release_ui_identity_front_door_enabled" as const;
+export const IDENTITY_FRONT_DOOR_FLAG = "release_ui_identity_front_door_enabled" as const;
 
 /**
  * Whether the identifier-first screens are the front door for THIS visitor

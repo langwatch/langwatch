@@ -48,8 +48,7 @@ const fallbackNameImplementation = {
       (typeof profile.displayName === "string" && profile.displayName.trim()) ||
       (typeof profile.login === "string" && profile.login.trim()) ||
       (typeof profile.username === "string" && profile.username.trim()) ||
-      (typeof profile.preferred_username === "string" &&
-        profile.preferred_username.trim()) ||
+      (typeof profile.preferred_username === "string" && profile.preferred_username.trim()) ||
       (typeof profile.email === "string" && profile.email.split("@")[0]) ||
       "User"
     );
@@ -407,9 +406,7 @@ export const LEGACY_CALLBACK_PROVIDER_IDS: readonly string[] = [
  * without re-initializing the module under a different `NEXTAUTH_PROVIDER`.
  */
 const genericOAuthImplementation = {
-  build(
-    configuration: GenericOAuthConfiguration,
-  ): Parameters<typeof genericOAuth>[0]["config"] {
+  build(configuration: GenericOAuthConfiguration): Parameters<typeof genericOAuth>[0]["config"] {
     const genericOAuthConfigs: Parameters<typeof genericOAuth>[0]["config"] = [];
 
     if (

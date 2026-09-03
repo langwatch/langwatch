@@ -81,16 +81,12 @@ describe("<DrawerSpotlights />", () => {
     describe("when the drawer mounts", () => {
       it("shows the Input & output spotlight first", async () => {
         renderDrawerSpotlights();
-        await waitFor(() =>
-          expect(screen.getByText("Input & output")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByText("Input & output")).toBeInTheDocument());
       });
 
       it("marks the displayed spotlight seen immediately", async () => {
         renderDrawerSpotlights();
-        await waitFor(() =>
-          expect(screen.getByText("Input & output")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByText("Input & output")).toBeInTheDocument());
         expect(mockMarkDrawerSpotlightSeen).toHaveBeenCalledWith("drawer-io");
         expect(mockMarkDrawerSpotlightSeen).not.toHaveBeenCalledWith("drawer-events");
       });
@@ -113,9 +109,7 @@ describe("<DrawerSpotlights />", () => {
         fireEvent.click(
           await waitFor(() => screen.getByRole("button", { name: /next spotlight/i })),
         );
-        fireEvent.click(
-          await waitFor(() => screen.getByRole("button", { name: /finish tour/i })),
-        );
+        fireEvent.click(await waitFor(() => screen.getByRole("button", { name: /finish tour/i })));
 
         expect(mockPersistDismissal).toHaveBeenCalledOnce();
       });
@@ -139,9 +133,7 @@ describe("<DrawerSpotlights />", () => {
     describe("when Escape is pressed", () => {
       it("closes the queue", async () => {
         renderDrawerSpotlights();
-        await waitFor(() =>
-          expect(screen.getByTestId("spotlight-popover")).toBeInTheDocument(),
-        );
+        await waitFor(() => expect(screen.getByTestId("spotlight-popover")).toBeInTheDocument());
         fireEvent.keyDown(window, { key: "Escape" });
         await waitFor(() =>
           expect(screen.queryByTestId("spotlight-popover")).not.toBeInTheDocument(),

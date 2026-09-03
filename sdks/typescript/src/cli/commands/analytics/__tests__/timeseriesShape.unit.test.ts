@@ -45,9 +45,7 @@ describe("toTimeseriesShape", () => {
         metric: "performance.total_cost",
       });
 
-      expect(shape?.series[0]?.points.map((p) => p.v)).toEqual([
-        0.12000000000000001, 0.25,
-      ]);
+      expect(shape?.series[0]?.points.map((p) => p.v)).toEqual([0.12000000000000001, 0.25]);
     });
   });
 

@@ -79,7 +79,8 @@ describe("extraction budget", () => {
       expect(calls).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
       expect(result.refs).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
       expect(budget.droppedByCap).toBe(4);
-      const parts = (result.value as Array<{ content: Array<{ image_url: { url: string } }> }>)[0]!.content;
+      const parts = (result.value as Array<{ content: Array<{ image_url: { url: string } }> }>)[0]!
+        .content;
       const externalized = parts.filter((p) => p.image_url.url.startsWith("/api/files/"));
       const inline = parts.filter((p) => p.image_url.url.startsWith("data:"));
       expect(externalized).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
@@ -93,12 +94,16 @@ describe("the marker gate", () => {
     /** @scenario Attributes without media markers are never parsed or rewritten */
     it("never trips the marker gate, stores nothing and hands the value back by identity", async () => {
       const { service, calls } = makeFakeService();
-      const plain = [{ role: "user", content: "just words, and a nested string: {\"answer\": 42}" }];
+      const plain = [{ role: "user", content: 'just words, and a nested string: {"answer": 42}' }];
       const serialized = JSON.stringify(plain);
 
       expect(containsMediaMarkers(serialized)).toBe(false);
 
-      const result = await extractInlineMediaFromValue({ value: plain, service, ...PARAMS } as never);
+      const result = await extractInlineMediaFromValue({
+        value: plain,
+        service,
+        ...PARAMS,
+      } as never);
 
       expect(calls).toHaveLength(0);
       expect(result.refs).toEqual([]);

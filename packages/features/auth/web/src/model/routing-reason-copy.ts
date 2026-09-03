@@ -55,8 +55,7 @@ const routingReasonCopy = {
   },
   jit_disabled: {
     title: "This workspace does not create accounts automatically",
-    describe:
-      "Ask a workspace administrator to invite you, then sign in again.",
+    describe: "Ask a workspace administrator to invite you, then sign in again.",
   },
   link_proposed: {
     title: "An administrator needs to confirm this sign-in",
@@ -71,13 +70,9 @@ const routingReasonCopy = {
  * not know: the value arrives over the wire, and an unrecognised code must
  * render nothing rather than putting itself on screen.
  */
-export function signInRoutingReasonCopy(
-  reasonCode: string,
-): RoutingReasonCopy | null {
+export function signInRoutingReasonCopy(reasonCode: string): RoutingReasonCopy | null {
   return Object.hasOwn(routingReasonCopy, reasonCode)
-    ? ((routingReasonCopy as Record<string, RoutingReasonCopy | null>)[
-        reasonCode
-      ] ?? null)
+    ? ((routingReasonCopy as Record<string, RoutingReasonCopy | null>)[reasonCode] ?? null)
     : null;
 }
 

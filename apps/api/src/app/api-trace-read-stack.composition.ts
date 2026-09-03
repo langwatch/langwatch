@@ -344,9 +344,7 @@ export type ApiTraceDataPrivacyResolver = Readonly<{
 }>;
 
 /** Composes the trace read stack over this process's own connection. */
-export function composeApiTraceReadStack(
-  options: ApiTraceReadStackOptions,
-): ApiTraceReadStackPort {
+export function composeApiTraceReadStack(options: ApiTraceReadStackOptions): ApiTraceReadStackPort {
   return ApiComposedTraceReadStack.create(options);
 }
 
@@ -383,10 +381,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     return this.composed;
   }
 
-  getViewerProtections(
-    ctx: unknown,
-    input: Readonly<{ projectId: string }>,
-  ): Promise<Protections> {
+  getViewerProtections(ctx: unknown, input: Readonly<{ projectId: string }>): Promise<Protections> {
     return this.protections.resolve({
       projectId: input.projectId,
       userId: tryActorId(ctx),
@@ -447,8 +442,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
           piiIncompleteMarkerAttribute: PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
           stripRolesFromChatArrayJson: (json, roles, stripToolCalls) =>
             this.dropPolicy.tryStripRolesFromChatArrayJson(json, roles, stripToolCalls),
-          getResolvedPolicyForProject: (input) =>
-            this.dataPrivacy.getResolvedForProject(input),
+          getResolvedPolicyForProject: (input) => this.dataPrivacy.getResolvedForProject(input),
         },
       },
       codingAgentEnrichment: {
@@ -539,10 +533,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     }>,
   ): boolean {
     const definition = getEvaluatorDefinitions(input.evaluatorType);
-    if (
-      definition?.requiredFields.includes("expected_output") &&
-      !input.expectedOutput?.value
-    ) {
+    if (definition?.requiredFields.includes("expected_output") && !input.expectedOutput?.value) {
       return false;
     }
     return this.preconditions.requiredFieldsArePresent({
@@ -759,9 +750,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       spanId: span.span_id,
       parentSpanId: span.parent_id ?? null,
       startTime: span.timestamps.started_at,
-      attributes: flattenParamsToPromptAttributes(
-        span.params as Record<string, unknown> | null,
-      ),
+      attributes: flattenParamsToPromptAttributes(span.params as Record<string, unknown> | null),
     }));
 
     const reference = findPromptReferenceInAncestors({
@@ -958,9 +947,7 @@ class ApiTraceProtections {
       };
     }
 
-    const restricted = policy.customAttributes.filter(
-      (rule) => rule.disposition === "restrict",
-    );
+    const restricted = policy.customAttributes.filter((rule) => rule.disposition === "restrict");
 
     const anonymous = input.publiclyShared || input.userId === undefined;
     const categories = Object.fromEntries(

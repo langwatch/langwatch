@@ -25,25 +25,14 @@ const captured = vi.hoisted(() => ({
 }));
 
 vi.mock("recharts", () => {
-  const MockComponent = ({ children }: { children?: ReactNode }) =>
-    children ?? null;
+  const MockComponent = ({ children }: { children?: ReactNode }) => children ?? null;
   return {
     ResponsiveContainer: MockComponent,
-    BarChart: ({
-      data,
-      children,
-    }: {
-      data?: { name: string }[];
-      children?: ReactNode;
-    }) => {
+    BarChart: ({ data, children }: { data?: { name: string }[]; children?: ReactNode }) => {
       if (data && captured.chartData.length === 0) captured.chartData = data;
       return <div data-testid="bar-chart">{children}</div>;
     },
-    XAxis: ({
-      tickFormatter,
-    }: {
-      tickFormatter?: (value: unknown, index: number) => string;
-    }) => {
+    XAxis: ({ tickFormatter }: { tickFormatter?: (value: unknown, index: number) => string }) => {
       if (tickFormatter) captured.tickFormatters.push(tickFormatter);
       return null;
     },
@@ -85,9 +74,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 /** A finished run with one output row per named target. */
-const runWithTargets = (
-  targets: { name: string; promptId?: string }[],
-): ComparisonRunData => ({
+const runWithTargets = (targets: { name: string; promptId?: string }[]): ComparisonRunData => ({
   runId: "run-1",
   runName: "Run 1",
   color: "#3182ce",

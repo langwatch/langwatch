@@ -63,11 +63,7 @@ vi.mock("../../../trace-api", () => ({
   },
 }));
 
-import {
-  type AttributeComments,
-  type AttributeEditing,
-  AttributeTable,
-} from "../attribute-table";
+import { type AttributeComments, type AttributeEditing, AttributeTable } from "../attribute-table";
 
 const TRACE_ID = "trace-1";
 const SPAN_ID = "span-7";
@@ -143,9 +139,7 @@ describe("given a span with attributes", () => {
   it("names the attribute in the action that has no room for a label", () => {
     const { container } = renderTable();
 
-    expect(
-      container.querySelector(`[aria-label="Comment on ${MODEL_KEY}"]`),
-    ).toBeInTheDocument();
+    expect(container.querySelector(`[aria-label="Comment on ${MODEL_KEY}"]`)).toBeInTheDocument();
   });
 
   describe("when the reviewer comments on one attribute row", () => {
@@ -207,9 +201,7 @@ describe("given an attribute the reader is not allowed to read", () => {
     expect(
       container.querySelector('[aria-label="Comment on gen_ai.request.temperature"]'),
     ).not.toBeInTheDocument();
-    expect(
-      container.querySelector(`[aria-label="Comment on ${MODEL_KEY}"]`),
-    ).toBeInTheDocument();
+    expect(container.querySelector(`[aria-label="Comment on ${MODEL_KEY}"]`)).toBeInTheDocument();
   });
 });
 
@@ -218,8 +210,6 @@ describe("given an attribute that already carries a comment", () => {
   it("reads the count on the row", () => {
     renderTable({ stored: [comment()] });
 
-    expect(
-      screen.getByRole("button", { name: `1 comment on ${MODEL_KEY}` }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `1 comment on ${MODEL_KEY}` })).toBeInTheDocument();
   });
 });

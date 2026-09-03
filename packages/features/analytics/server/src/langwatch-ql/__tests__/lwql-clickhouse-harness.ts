@@ -56,10 +56,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import {
-  ClickHouseContainer,
-  type StartedClickHouseContainer,
-} from "@testcontainers/clickhouse";
+import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/test-harness";
 import { expect } from "vitest";
 
@@ -126,10 +123,7 @@ export interface LangWatchQLTenantFixture {
   keyHash: string;
 }
 
-function tenantFixture(
-  tenantId: string,
-  rawSecret: string,
-): LangWatchQLTenantFixture {
+function tenantFixture(tenantId: string, rawSecret: string): LangWatchQLTenantFixture {
   return {
     tenantId,
     rawSecret,
@@ -142,14 +136,8 @@ function tenantFixture(
   };
 }
 
-export const TENANT_A = tenantFixture(
-  "tenant-a",
-  "raw-lwql-key-DO-NOT-LOG-abcdef123456",
-);
-export const TENANT_B = tenantFixture(
-  "tenant-b",
-  "raw-lwql-key-VICTIM-DO-NOT-LOG-fedcba654321",
-);
+export const TENANT_A = tenantFixture("tenant-a", "raw-lwql-key-DO-NOT-LOG-abcdef123456");
+export const TENANT_B = tenantFixture("tenant-b", "raw-lwql-key-VICTIM-DO-NOT-LOG-fedcba654321");
 
 /** The seeded fact tables. Fixtures — the real ones come from migrations. */
 const FACT_TABLE_DDL: Record<string, string> = {
@@ -233,11 +221,7 @@ export function lwqlNamesForSuite(suite: string): LangWatchQLNames {
   };
 }
 
-function writeConfigFile(
-  directory: string,
-  name: string,
-  contents: string,
-): string {
+function writeConfigFile(directory: string, name: string, contents: string): string {
   const path = join(directory, name);
   writeFileSync(path, contents);
   return path;
@@ -291,11 +275,7 @@ export async function startLangWatchQLClickHouse({
         target: CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
       },
       {
-        source: writeConfigFile(
-          configDirectory,
-          "access-management.xml",
-          accessManagementXml,
-        ),
+        source: writeConfigFile(configDirectory, "access-management.xml", accessManagementXml),
         target: CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
       },
     ])
@@ -509,10 +489,7 @@ export async function selectRows<T>(
 }
 
 /** Runs a SELECT expected to return exactly one scalar column named `value`. */
-export async function selectScalar<T>(
-  client: ClickHouseClient,
-  query: string,
-): Promise<T> {
+export async function selectScalar<T>(client: ClickHouseClient, query: string): Promise<T> {
   const rows = await selectRows<{ value: T }>(client, query);
   expect(rows, `expected exactly one row from: ${query}`).toHaveLength(1);
   return rows[0]!.value;
@@ -532,14 +509,10 @@ export async function expectRestrictedIdentity({
   client: ClickHouseClient;
   names: LangWatchQLNames;
 }): Promise<void> {
-  const currentUser = await selectScalar<string>(
-    client,
-    "SELECT currentUser() AS value",
+  const currentUser = await selectScalar<string>(client, "SELECT currentUser() AS value");
+  expect(currentUser, "queries in this suite must execute as the restricted identity").toBe(
+    names.restrictedUser,
   );
-  expect(
-    currentUser,
-    "queries in this suite must execute as the restricted identity",
-  ).toBe(names.restrictedUser);
 }
 
 /**
@@ -579,24 +552,15 @@ export async function expectClickHouseError(
   } catch (error) {
     thrown = error;
   }
-  expect(
-    thrown,
-    `${context}: expected a rejection, the statement succeeded`,
-  ).toBeDefined();
+  expect(thrown, `${context}: expected a rejection, the statement succeeded`).toBeDefined();
   const code = clickHouseErrorCode(thrown);
   const message = thrown instanceof Error ? thrown.message : String(thrown);
-  expect(
-    code,
-    `${context}: no ClickHouse error code in "${message}"`,
-  ).not.toBeNull();
+  expect(code, `${context}: no ClickHouse error code in "${message}"`).not.toBeNull();
   expect(code, `${context}: wrong rejection — "${message}"`).toBe(expectedCode);
 }
 
 /** Runs a statement that is expected to be refused, without reading a result. */
-export function runStatement(
-  client: ClickHouseClient,
-  query: string,
-): () => Promise<unknown> {
+export function runStatement(client: ClickHouseClient, query: string): () => Promise<unknown> {
   return async () => {
     const { stream } = await client.exec({ query });
     stream.destroy();
@@ -669,10 +633,7 @@ export function expectOnlyTenantA<T extends Record<string, unknown>>({
   harness: LangWatchQLClickHouseHarness;
   context: string;
 }): void {
-  expect(
-    rows.length,
-    `${context}: read returned nothing to check`,
-  ).toBeGreaterThan(0);
+  expect(rows.length, `${context}: read returned nothing to check`).toBeGreaterThan(0);
   const tenants = [...new Set(rows.map((row) => String(row[tenantColumn])))];
   expect(tenants, `${context}: foreign tenant rows were returned`).toEqual([
     harness.tenantA.tenantId,
@@ -732,9 +693,7 @@ export async function expectZeroRowsWithControl({
   context: string;
 }): Promise<void> {
   const control = await recordSeedControl({ harness, table, tenantColumn });
-  const client = await harness.restrictedClient(
-    keyHash === undefined ? {} : { keyHash },
-  );
+  const client = await harness.restrictedClient(keyHash === undefined ? {} : { keyHash });
   const rows = await selectRows<Record<string, unknown>>(
     client,
     `SELECT * FROM ${harness.names.database}.${table}`,

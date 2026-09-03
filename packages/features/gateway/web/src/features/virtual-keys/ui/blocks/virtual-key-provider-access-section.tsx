@@ -221,9 +221,7 @@ export function VirtualKeyProviderAccessSection({
               onCheck={(checked) => toggleProvider(mp.id, checked)}
               scopeName={scopeName(mp.definedAt)}
               modelsAllowed={value.modelsAllowed}
-              onModelsAllowedChange={(modelsAllowed) =>
-                onChange({ ...value, modelsAllowed })
-              }
+              onModelsAllowedChange={(modelsAllowed) => onChange({ ...value, modelsAllowed })}
             />
           ))}
           {invalidReason && (

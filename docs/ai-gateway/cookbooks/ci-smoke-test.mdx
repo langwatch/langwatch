@@ -6,9 +6,7 @@ sidebarTitle: CI smoke test
 
 Goal: catch misconfigurations in the gateway BEFORE they surface during an on-call incident. This recipe provisions a temporary virtual key, calls `/v1/chat/completions`, verifies the response and its trace headers, and cleans up, all from a CI job using only the `langwatch` CLI and `curl`.
 
-<Info>
-  Runtime: typically 3–8 seconds wall-clock. One gateway request + two REST round-trips.
-</Info>
+<Info>Runtime: typically 3–8 seconds wall-clock. One gateway request + two REST round-trips.</Info>
 
 ## What it validates
 

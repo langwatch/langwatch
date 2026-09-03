@@ -62,8 +62,7 @@ export function parseSpanEventRefs(attrs: NormalizedAttributes): ParsedSpanEvent
         }
         eventrefEntries.push({
           attrKey,
-          field:
-            typeof ref.field === "string" && ref.field.length > 0 ? ref.field : attrKey,
+          field: typeof ref.field === "string" && ref.field.length > 0 ? ref.field : attrKey,
           eventId: ref.eventId,
         });
       } catch {

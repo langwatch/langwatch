@@ -30,9 +30,7 @@ const job = (id: string): ExecutionJobData => ({
 class TestCancellationSubscriber extends CancellationSubscriberPort {
   private onCancellation: ((message: CancellationMessage) => void) | undefined = void 0;
 
-  subscribe(
-    onCancellation: (message: CancellationMessage) => void,
-  ): Promise<() => Promise<void>> {
+  subscribe(onCancellation: (message: CancellationMessage) => void): Promise<() => Promise<void>> {
     this.onCancellation = onCancellation;
     return Promise.resolve(async () => {
       this.onCancellation = void 0;
@@ -72,9 +70,7 @@ class HoldingExecutionRunner extends ScenarioExecutionRunnerPort {
 
 function processorFixture() {
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
-  const execution = Object.create(
-    ScenarioExecutionService.prototype,
-  ) as ScenarioExecutionService;
+  const execution = Object.create(ScenarioExecutionService.prototype) as ScenarioExecutionService;
   const childProcesses = Object.create(
     NodeScenarioChildProcessAdapter.prototype,
   ) as NodeScenarioChildProcessAdapter;
@@ -151,9 +147,9 @@ describe("ScenarioProcessorService", () => {
       const fixture = processorFixture();
       fixture.finishUnsuccessfulRun.mockRejectedValue(new Error("write failed"));
 
-      await expect(
-        fixture.processor.handleFailed(job("run-1"), "failed"),
-      ).rejects.toThrow("write failed");
+      await expect(fixture.processor.handleFailed(job("run-1"), "failed")).rejects.toThrow(
+        "write failed",
+      );
     });
   });
 
@@ -179,9 +175,7 @@ describe("ScenarioProcessorService", () => {
     it("finishes running and pending jobs before clearing the pool", async () => {
       await fixture.processor.drain();
 
-      const runIds = fixture.finishUnsuccessfulRun.mock.calls.map(
-        ([input]) => input.scenarioRunId,
-      );
+      const runIds = fixture.finishUnsuccessfulRun.mock.calls.map(([input]) => input.scenarioRunId);
       expect(runIds).toEqual(expect.arrayContaining(["running", "pending"]));
       expect(fixture.pool.pendingCount).toBe(0);
       expect(killSignals).toContain("SIGTERM");

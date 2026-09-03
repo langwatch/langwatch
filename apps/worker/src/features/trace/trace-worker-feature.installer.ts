@@ -5,10 +5,7 @@ import {
   type RecordSpanCommandData,
   TraceTopicAssignmentPort,
 } from "@langwatch/trace-contract";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 class WorkerTraceTopicAssignments extends TraceTopicAssignmentPort {

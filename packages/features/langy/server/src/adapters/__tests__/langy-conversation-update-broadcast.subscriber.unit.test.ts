@@ -74,8 +74,7 @@ describe("Langy conversation update broadcast subscriber", () => {
       projectId: "project_1",
       conversationId: "conv_1",
     });
-    const [projectId, rawPayload, eventName] =
-      deps.broadcast.broadcastToTenant.mock.calls[0]!;
+    const [projectId, rawPayload, eventName] = deps.broadcast.broadcastToTenant.mock.calls[0]!;
     expect(projectId).toBe("project_1");
     expect(eventName).toBe("langy_conversation_updated");
     expect(JSON.parse(rawPayload as string)).toEqual({
@@ -115,9 +114,7 @@ describe("Langy conversation update broadcast subscriber", () => {
     const deduplication = subscriber.options?.deduplication;
     expect(typeof deduplication).toBe("object");
     if (typeof deduplication === "object") {
-      expect(deduplication.makeId(event)).toBe(
-        "langy-conversation-update:project_2:conv_2",
-      );
+      expect(deduplication.makeId(event)).toBe("langy-conversation-update:project_2:conv_2");
     }
   });
 });

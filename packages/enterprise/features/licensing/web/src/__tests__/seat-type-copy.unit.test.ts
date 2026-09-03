@@ -79,9 +79,7 @@ describe("lite member seat copy", () => {
     });
 
     it("does not promise a resource the permission set withholds", () => {
-      const readable = EXTERNAL_MEMBER_PERMISSIONS.map(
-        (permission) => permission.split(":")[0]!,
-      );
+      const readable = EXTERNAL_MEMBER_PERMISSIONS.map((permission) => permission.split(":")[0]!);
 
       const overpromised = Object.entries(NAMED_IN_COPY)
         .filter(([, phrase]) => LITE_MEMBER_EXPLANATION.includes(phrase))

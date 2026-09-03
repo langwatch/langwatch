@@ -53,9 +53,9 @@ export default function LicenseScreen() {
         )}
       </HStack>
       <Text color="fg.muted">
-        Manage your LangWatch license. Running LangWatch, commercially included, never
-        needs one. A license covers the seats you bought and unlocks the enterprise
-        capabilities: single sign-on, SCIM provisioning and audit logs.
+        Manage your LangWatch license. Running LangWatch, commercially included, never needs one. A
+        license covers the seats you bought and unlocks the enterprise capabilities: single sign-on,
+        SCIM provisioning and audit logs.
       </Text>
       {organizationId ? (
         <LicenseStatusPanel

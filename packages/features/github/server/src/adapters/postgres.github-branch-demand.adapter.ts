@@ -61,9 +61,7 @@ export type PostgresGithubBranchDemandOptions = {
  * service; a worker holds none of those and does not need to.
  */
 export class PostgresGithubBranchDemandAdapter {
-  static create(
-    options: PostgresGithubBranchDemandOptions,
-  ): PostgresGithubBranchDemandAdapter {
+  static create(options: PostgresGithubBranchDemandOptions): PostgresGithubBranchDemandAdapter {
     return new PostgresGithubBranchDemandAdapter(options);
   }
 

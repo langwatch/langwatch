@@ -1,13 +1,4 @@
-import {
-  Alert,
-  HStack,
-  Skeleton,
-  Spacer,
-  Table,
-  Tabs,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, HStack, Skeleton, Spacer, Table, Tabs, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import Parse from "papaparse";
 import React, { useEffect, useRef, useState } from "react";
@@ -79,9 +70,7 @@ export const useBatchEvaluationResults = ({
 
   // Retrocompatibility with old evaluations
   const isItJustEndNode = !Object.values(datasetByIndex ?? {}).every((value: any) =>
-    Object.values(value?.predicted ?? {}).every(
-      (v) => typeof v === "object" && !Array.isArray(v),
-    ),
+    Object.values(value?.predicted ?? {}).every((v) => typeof v === "object" && !Array.isArray(v)),
   );
   let entriesPredictions = Object.values(datasetByIndex ?? {})
     .map((value: any) => value.predicted!)
@@ -136,10 +125,7 @@ export const useBatchEvaluationResults = ({
     Object.entries(resultsByEvaluator ?? {}).sort((a, b) => a[0].localeCompare(b[0])),
   );
 
-  if (
-    Object.keys(resultsByEvaluator ?? {}).length === 0 &&
-    (run.data?.dataset.length ?? 0) > 0
-  ) {
+  if (Object.keys(resultsByEvaluator ?? {}).length === 0 && (run.data?.dataset.length ?? 0) > 0) {
     resultsByEvaluator = {
       Predictions: [],
     };
@@ -212,8 +198,8 @@ export const useBatchEvaluationDownloadCSV = ({
     const totalRows = Math.max(...Object.values(datasetByIndex).map((d: any) => d.index + 1));
 
     const datasetHeaderList = Array.from(datasetColumns);
-    const predictedHeaderList = Object.entries(predictedColumns).flatMap(
-      ([node, columns]) => Array.from(columns).map((c) => `${node}.${c}`),
+    const predictedHeaderList = Object.entries(predictedColumns).flatMap(([node, columns]) =>
+      Array.from(columns).map((c) => `${node}.${c}`),
     );
     const evaluationHeaderTuples = Object.entries(evaluationColumns);
 
@@ -302,9 +288,7 @@ export const useBatchEvaluationDownloadCSV = ({
     // get here). `getRun` returns `ExperimentRunWithItems | null` since
     // PR #3483 to handle the cold-start window where the row hasn't
     // been folded into ClickHouse yet — see service comment.
-    const formattedDate = new Date(run.data!.timestamps.createdAt)
-      .toISOString()
-      .split("T")[0];
+    const formattedDate = new Date(run.data!.timestamps.createdAt).toISOString().split("T")[0];
     const fileName = `${formattedDate}_${experiment.name}_${runId}.csv`;
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
@@ -523,29 +507,31 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
           )}
         </HStack>
 
-        {Object.entries(resultsByEvaluator).map(([evaluator, results]: [string, any], index: number) => {
-          return tabIndex === index ? (
-            <Tabs.Content
-              key={evaluator}
-              value={evaluator}
-              padding={0}
-              minWidth="full"
-              minHeight="0"
-              overflow="auto"
-            >
-              <BatchEvaluationV2EvaluationResult
-                evaluator={evaluator}
-                results={results}
-                datasetByIndex={datasetByIndex}
-                datasetColumns={datasetColumns}
-                predictedColumns={predictedColumns}
-                isFinished={isFinished}
-                size={size}
-                workflowId={experiment.workflowId}
-              />
-            </Tabs.Content>
-          ) : null;
-        })}
+        {Object.entries(resultsByEvaluator).map(
+          ([evaluator, results]: [string, any], index: number) => {
+            return tabIndex === index ? (
+              <Tabs.Content
+                key={evaluator}
+                value={evaluator}
+                padding={0}
+                minWidth="full"
+                minHeight="0"
+                overflow="auto"
+              >
+                <BatchEvaluationV2EvaluationResult
+                  evaluator={evaluator}
+                  results={results}
+                  datasetByIndex={datasetByIndex}
+                  datasetColumns={datasetColumns}
+                  predictedColumns={predictedColumns}
+                  isFinished={isFinished}
+                  size={size}
+                  workflowId={experiment.workflowId}
+                />
+              </Tabs.Content>
+            ) : null;
+          },
+        )}
       </Tabs.Root>
     );
   },

@@ -31,10 +31,9 @@ const logger = createLogger("langwatch:billing:webhookService");
 const VALID_CURRENCIES_FOR_CHECKOUT = new Set<string>(Object.values(Currency));
 const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
-type ItemCalculator = Pick<
-  SubscriptionItemCalculatorService,
-  "calculateQuantityForPrice"
-> & { readonly prices: StripePriceMap };
+type ItemCalculator = Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
+  readonly prices: StripePriceMap;
+};
 
 type InviteApprover = {
   approvePaymentPendingInvites(params: {
@@ -307,10 +306,7 @@ export class EEWebhookService implements WebhookService {
 
   private async routeCheckoutOrInvoice(
     event: Stripe.Event & {
-      type:
-        | "checkout.session.completed"
-        | "invoice.payment_succeeded"
-        | "invoice.payment_failed";
+      type: "checkout.session.completed" | "invoice.payment_succeeded" | "invoice.payment_failed";
     },
   ): Promise<HandleEventResult> {
     const paymentIntent = event.data.object as Stripe.Checkout.Session | Stripe.Invoice;
@@ -485,10 +481,7 @@ export class EEWebhookService implements WebhookService {
     clientReferenceId: string | null;
     selectedCurrency?: string | null;
   }): Promise<{ earlyReturn: boolean }> {
-    const subscriptionClientReferenceId = clientReferenceId?.replace(
-      "subscription_setup_",
-      "",
-    );
+    const subscriptionClientReferenceId = clientReferenceId?.replace("subscription_setup_", "");
 
     if (!subscriptionClientReferenceId) {
       return { earlyReturn: true };
@@ -512,8 +505,7 @@ export class EEWebhookService implements WebhookService {
       throwOnMissing: true,
     });
 
-    const subscriptionRecord =
-      await this.subscriptionRepository.findByStripeId(subscriptionId);
+    const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
 
     const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
     if (normalizedCurrency && subscriptionRecord) {
@@ -547,9 +539,7 @@ export class EEWebhookService implements WebhookService {
 
     // Cancel any active trial subscriptions for this org
     if (subscriptionRecord) {
-      await this.subscriptionRepository.cancelTrialSubscriptions(
-        subscriptionRecord.organizationId,
-      );
+      await this.subscriptionRepository.cancelTrialSubscriptions(subscriptionRecord.organizationId);
     }
 
     await this.trySetAnnualEventsBillingThreshold(subscriptionId);
@@ -573,9 +563,7 @@ export class EEWebhookService implements WebhookService {
    * The alert is itself best-effort and separately guarded: a broken Slack
    * webhook must never be what fails a checkout that otherwise succeeded.
    */
-  private async trySetAnnualEventsBillingThreshold(
-    subscriptionId: string,
-  ): Promise<void> {
+  private async trySetAnnualEventsBillingThreshold(subscriptionId: string): Promise<void> {
     try {
       const thresholdResult = await this.annualThreshold.apply({
         stripeSubscriptionId: subscriptionId,
@@ -613,15 +601,10 @@ export class EEWebhookService implements WebhookService {
     await this.syncInvoicePaymentSuccess({ subscriptionId, throwOnMissing });
   }
 
-  async handleInvoicePaymentFailed({
-    subscriptionId,
-  }: {
-    subscriptionId: string;
-  }): Promise<void> {
+  async handleInvoicePaymentFailed({ subscriptionId }: { subscriptionId: string }): Promise<void> {
     await waitForStripeConsistency();
 
-    const currentSubscription =
-      await this.subscriptionRepository.findByStripeId(subscriptionId);
+    const currentSubscription = await this.subscriptionRepository.findByStripeId(subscriptionId);
 
     if (!currentSubscription) {
       logger.warn(
@@ -703,9 +686,7 @@ export class EEWebhookService implements WebhookService {
   }): Promise<void> {
     await waitForStripeConsistency();
 
-    const existingSubForUpdate = await this.subscriptionRepository.findByStripeId(
-      subscription.id,
-    );
+    const existingSubForUpdate = await this.subscriptionRepository.findByStripeId(subscription.id);
 
     if (!existingSubForUpdate) {
       logger.warn(
@@ -781,10 +762,7 @@ export class EEWebhookService implements WebhookService {
         return;
       }
 
-      await this.clearTrialLicenseIfPresent(
-        updatedSubscription,
-        "subscription updated to active",
-      );
+      await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
 
       if (shouldNotify) {
         await this.bestEffort.run({
@@ -817,8 +795,7 @@ export class EEWebhookService implements WebhookService {
   }) {
     await waitForStripeConsistency();
 
-    const previousSubscription =
-      await this.subscriptionRepository.findByStripeId(subscriptionId);
+    const previousSubscription = await this.subscriptionRepository.findByStripeId(subscriptionId);
 
     if (!previousSubscription) {
       if (throwOnMissing) {
@@ -870,10 +847,7 @@ export class EEWebhookService implements WebhookService {
     }
 
     if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
-      await this.clearTrialLicenseIfPresent(
-        updatedSubscription,
-        "subscription activated",
-      );
+      await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
 
       if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
         const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
@@ -961,9 +935,7 @@ export class EEWebhookService implements WebhookService {
       });
       covered = new Set(
         existing
-          .filter(
-            (row) => row.scopeType === "ORGANIZATION" && row.scopeId === organizationId,
-          )
+          .filter((row) => row.scopeType === "ORGANIZATION" && row.scopeId === organizationId)
           .map((row) => row.category),
       );
     } catch (err) {
@@ -1003,9 +975,7 @@ export class EEWebhookService implements WebhookService {
       { organizationId: updatedSubscription.organizationId },
       `[stripeWebhook] Clearing trial license — ${reason}`,
     );
-    await this.organizationRepository.clearTrialLicense(
-      updatedSubscription.organizationId,
-    );
+    await this.organizationRepository.clearTrialLicense(updatedSubscription.organizationId);
   }
 
   private normalizeSelectedCurrency(value?: string | null): Currency | null {

@@ -14,34 +14,34 @@ The branch deleted `platform/app` and moved everything into `apps/{ui,api,worker
 
 ## Numbers (dry run with `git merge-tree`, 2026-09-03)
 
-| | main | branch |
-| --- | --- | --- |
-| commits since base `5a9cd02001` (27 Aug) | 83 | 1,393 |
-| files touched | 3,131 | 18,327 |
-| `platform/app` files touched | 861 (311 added, 519 modified, 31 deleted) | all deleted |
+|                                          | main                                      | branch      |
+| ---------------------------------------- | ----------------------------------------- | ----------- |
+| commits since base `5a9cd02001` (27 Aug) | 83                                        | 1,393       |
+| files touched                            | 3,131                                     | 18,327      |
+| `platform/app` files touched             | 861 (311 added, 519 modified, 31 deleted) | all deleted |
 
 Conflicted paths: **740**
 
-| kind | count | what it is |
-| --- | --- | --- |
-| modify/delete | 284 | main edited a platform file the branch deleted |
-| content | 255 | both sides edited, mostly files git carried over via directory-rename detection |
-| file location | 205 | main ADDED a platform file inside a dir the branch renamed, git guesses the new home |
-| directory rename split | 38 | git can't pick a destination, file lands under `platform/` |
-| rename/delete | 33 | |
+| kind                   | count | what it is                                                                           |
+| ---------------------- | ----- | ------------------------------------------------------------------------------------ |
+| modify/delete          | 284   | main edited a platform file the branch deleted                                       |
+| content                | 255   | both sides edited, mostly files git carried over via directory-rename detection      |
+| file location          | 205   | main ADDED a platform file inside a dir the branch renamed, git guesses the new home |
+| directory rename split | 38    | git can't pick a destination, file lands under `platform/`                           |
+| rename/delete          | 33    |                                                                                      |
 
 By area: 368 `packages/features` (246 scenario, 18 experiment, 16 suite, 13 navigation, 11 coding-agent, 9 trace/ops/analytics), 235 `platform/app`, 21 `sdks/typescript`, 13 `mcp/typescript`, 11 `skills/_tests`, 11 `packages/api`, 6 `apps/api`, 3 `apps/ui`.
 
 The conflict markers are not the work. The work is the 6 big PRs:
 
-| PR | platform files | other | lands in |
-| --- | --- | --- | --- |
-| #7590 agent-testing v2 polish round 6 | 287 | 1,647 | scenario/web, suite/web, docs |
-| #7655 connected agents, decorated fn is a target | 282 | 317 | scenario, agent, sdks |
-| #7638 legacy answer fields, one vocabulary for suites/run plans | 174 | 177 | scenario, suite, sdks |
-| #7654 compare agents in one run | 109 | 84 | scenario/web |
-| #7597 drop legacy chrome and the mode flag | 58 | 18 | navigation/web, apps/ui |
-| #7696 finished connected-agent run reaches its verdict | 53 | 77 | scenario/server |
+| PR                                                              | platform files | other | lands in                      |
+| --------------------------------------------------------------- | -------------- | ----- | ----------------------------- |
+| #7590 agent-testing v2 polish round 6                           | 287            | 1,647 | scenario/web, suite/web, docs |
+| #7655 connected agents, decorated fn is a target                | 282            | 317   | scenario, agent, sdks         |
+| #7638 legacy answer fields, one vocabulary for suites/run plans | 174            | 177   | scenario, suite, sdks         |
+| #7654 compare agents in one run                                 | 109            | 84    | scenario/web                  |
+| #7597 drop legacy chrome and the mode flag                      | 58             | 18    | navigation/web, apps/ui       |
+| #7696 finished connected-agent run reaches its verdict          | 53             | 77    | scenario/server               |
 
 Plus ~20 small ones (ops flags rollout #7699, coding-agent cost splits #7757/#7680/#7697/#7690, nlpgo knobs #7647/#7614/#7705, LWQL door #7611, annotations inbox #7774, re-fold guard #7725, rollup read #7691, clickhouse #7720/#7630/#7816). Full list with counts: `git log 5a9cd02001..origin/main --first-parent`.
 
@@ -86,13 +86,13 @@ branch  ───●───●───●───●─── ... ───�
 
 lanes, one Opus agent each, files partitioned by feature dir, agents never stage or commit:
 
-| lane | PRs | packages |
-| --- | --- | --- |
-| scenario-web | #7590 #7654 #7770 #7742 #7573 | scenario/web, suite/web |
-| scenario-server + agent | #7655 #7638 #7696 #7714 #7715 #7639 | scenario/server, scenario/contract, agent, api-key |
-| navigation + ops + ui shell | #7597 #7699 #7157 #7541 #7760 | navigation/web, ops, apps/ui |
-| coding-agent + experiments | #7757 #7680 #7697 #7690 #7445 #7629 #7537 #7763 | coding-agent, experiment |
-| server misc | #7611 #7647 #7614 #7705 #7725 #7691 #7720 #7630 #7816 #7774 #7626 #7651 #7704 #7703 | analytics, nlpgo wiring, eventing, metric, clickhouse tasks, annotation, governance, model-provider, feature-flag, authz |
+| lane                        | PRs                                                                                 | packages                                                                                                                 |
+| --------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| scenario-web                | #7590 #7654 #7770 #7742 #7573                                                       | scenario/web, suite/web                                                                                                  |
+| scenario-server + agent     | #7655 #7638 #7696 #7714 #7715 #7639                                                 | scenario/server, scenario/contract, agent, api-key                                                                       |
+| navigation + ops + ui shell | #7597 #7699 #7157 #7541 #7760                                                       | navigation/web, ops, apps/ui                                                                                             |
+| coding-agent + experiments  | #7757 #7680 #7697 #7690 #7445 #7629 #7537 #7763                                     | coding-agent, experiment                                                                                                 |
+| server misc                 | #7611 #7647 #7614 #7705 #7725 #7691 #7720 #7630 #7816 #7774 #7626 #7651 #7704 #7703 | analytics, nlpgo wiring, eventing, metric, clickhouse tasks, annotation, governance, model-provider, feature-flag, authz |
 
 each lane reads the main PR diff (`git show <sha> -- platform/`), finds where each platform file lives now (`git log --follow` on the branch, or the family manifests in `dev/docs/plans/ui-family-move-manifests.md`), applies the change there, rewires `~/` imports to package imports, keeps the strict layout grammar, runs only the suites its slice touches
 

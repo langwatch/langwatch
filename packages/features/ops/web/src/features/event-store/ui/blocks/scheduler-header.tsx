@@ -40,8 +40,8 @@ export function SchedulerHeader({
         </Badge>
       )}
       <Text textStyle="xs" color="fg.muted">
-        {counts.dueWithinHour} due in the next hour · {counts.active} active ·{" "}
-        {counts.paused} paused
+        {counts.dueWithinHour} due in the next hour · {counts.active} active · {counts.paused}{" "}
+        paused
       </Text>
       <Text textStyle="xs" color="fg.muted">
         {lastFiredAt === null

@@ -85,8 +85,7 @@ export function anyBornInThisRequest(): boolean {
  * Outside a marked request this is the gate, unchanged.
  */
 export function birthAwareGate(gate: IdentityUserGate): IdentityUserGate {
-  return async ({ userId }) =>
-    wasBornInThisRequest({ userId }) || gate({ userId });
+  return async ({ userId }) => wasBornInThisRequest({ userId }) || gate({ userId });
 }
 
 /**
@@ -142,10 +141,7 @@ export class IdentityEngineUnavailableError extends HandledError {
     super("identity_engine_unavailable", "identity_engine_unavailable", {
       httpStatus: 503,
       fault: "platform",
-      reasons: [
-        new Error(detail),
-        ...(cause instanceof Error ? [cause] : []),
-      ],
+      reasons: [new Error(detail), ...(cause instanceof Error ? [cause] : [])],
       tips: ["Try creating the account again in a moment."],
     });
     this.name = "IdentityEngineUnavailableError";

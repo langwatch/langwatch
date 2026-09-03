@@ -18,9 +18,7 @@ describe("onboardingStore drawer spotlights", () => {
     describe("when markDrawerSpotlightSeen is called", () => {
       it("flags the id in store state", () => {
         useOnboardingStore.getState().markDrawerSpotlightSeen("drawer-io");
-        expect(useOnboardingStore.getState().seenDrawerSpotlights["drawer-io"]).toBe(
-          true,
-        );
+        expect(useOnboardingStore.getState().seenDrawerSpotlights["drawer-io"]).toBe(true);
       });
 
       it("persists the map to localStorage", () => {

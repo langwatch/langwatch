@@ -28,9 +28,6 @@ export function useWidenWindowForPlan({
     if (!planSlug || !lastRunTimestamp) return;
     if (lastRunTimestamp >= period.startDate.getTime()) return;
     const now = Date.now();
-    setPeriod(
-      subDays(new Date(now), widenedWindowDays(lastRunTimestamp, now)),
-      new Date(now),
-    );
+    setPeriod(subDays(new Date(now), widenedWindowDays(lastRunTimestamp, now)), new Date(now));
   }, [planSlug, lastRunTimestamp]); // eslint-disable-line react-hooks/exhaustive-deps
 }

@@ -110,8 +110,7 @@ function session(
   };
 }
 
-const ids = (row: CodingAgentSessionDisplay) =>
-  deriveSessionSignals(row).map((s) => s.id);
+const ids = (row: CodingAgentSessionDisplay) => deriveSessionSignals(row).map((s) => s.id);
 
 describe("deriveSessionSignals", () => {
   describe("given a session that went fine", () => {
@@ -158,9 +157,9 @@ describe("deriveSessionSignals", () => {
   describe("given a trivial amount of cache rebuilding", () => {
     it("stays quiet even though the ratio is high", () => {
       // 900 of 1000 is 90% — but 900 tokens is not a story.
-      expect(
-        ids(session({ cacheReadTokens: 1_000, cacheCreationTokens: 900 })),
-      ).not.toContain("cache-churn");
+      expect(ids(session({ cacheReadTokens: 1_000, cacheCreationTokens: 900 }))).not.toContain(
+        "cache-churn",
+      );
     });
   });
 
@@ -207,9 +206,7 @@ describe("deriveSessionSignals", () => {
     // in the entire trace does.
     it("reports it, since it leaves no other trace", () => {
       const signals = deriveSessionSignals(session({ toolsDenied: 1 }));
-      expect(signals.find((s) => s.id === "tools-denied")!.title).toBe(
-        "1 action was declined",
-      );
+      expect(signals.find((s) => s.id === "tools-denied")!.title).toBe("1 action was declined");
     });
   });
 

@@ -75,8 +75,7 @@ export function commitRange({
   const lo = Math.max(min, Math.min(rawFrom, rawTo));
   const hi = Math.min(max, Math.max(rawFrom, rawTo));
   const isFullRange =
-    Math.abs(lo - min) < span * CLEAR_EPSILON &&
-    Math.abs(hi - max) < span * CLEAR_EPSILON;
+    Math.abs(lo - min) < span * CLEAR_EPSILON && Math.abs(hi - max) < span * CLEAR_EPSILON;
   if (isFullRange) {
     onClear();
   } else {

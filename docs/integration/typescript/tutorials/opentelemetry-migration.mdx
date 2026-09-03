@@ -22,14 +22,14 @@ You can migrate an existing OpenTelemetry setup to LangWatch and keep your custo
 The LangWatch observability SDK is built on OpenTelemetry and passes through all NodeSDK configuration options, making it easy to migrate from existing OpenTelemetry setups while maintaining all your custom configuration.
 
 <Info>
-  LangWatch supports all OpenTelemetry NodeSDK configuration options, so you can migrate
-  without losing any functionality or custom settings.
+  LangWatch supports all OpenTelemetry NodeSDK configuration options, so you can migrate without
+  losing any functionality or custom settings.
 </Info>
 
 <Note>
   For consistent attribute naming and semantic conventions, see our [Semantic
-  Conventions](/integration/typescript/tutorials/semantic-conventions) guide which covers
-  both OpenTelemetry standards and LangWatch's custom attributes.
+  Conventions](/integration/typescript/tutorials/semantic-conventions) guide which covers both
+  OpenTelemetry standards and LangWatch's custom attributes.
 </Note>
 
 ## Complete NodeSDK Configuration
@@ -139,10 +139,7 @@ process.on('SIGTERM', async () => {
 Implement sophisticated sampling strategies for different use cases:
 
 ```typescript
-import {
-  TraceIdRatioBasedSampler,
-  ParentBasedSampler,
-} from "@opentelemetry/sdk-trace-base";
+import { TraceIdRatioBasedSampler, ParentBasedSampler } from "@opentelemetry/sdk-trace-base";
 
 // Sample based on trace ID ratio
 const ratioSampler = new TraceIdRatioBasedSampler(0.1); // 10% sampling
@@ -191,8 +188,8 @@ const handle = setupObservability({
 ```
 
 <Tip>
-  For consistent attribute naming and TypeScript autocomplete support, consider using
-  LangWatch's semantic conventions. See our [Semantic
+  For consistent attribute naming and TypeScript autocomplete support, consider using LangWatch's
+  semantic conventions. See our [Semantic
   Conventions](/integration/typescript/tutorials/semantic-conventions) guide for details.
 </Tip>
 
@@ -356,13 +353,11 @@ const handle = setupObservability({
 </Step>
 
 <Step title="Verify Data Flow">
-  Ensure traces are appearing in LangWatch dashboard with correct attributes and
-  structure.
+  Ensure traces are appearing in LangWatch dashboard with correct attributes and structure.
 </Step>
 
 <Step title="Performance Testing">
-  Monitor application performance impact and adjust sampling/processing settings as
-  needed.
+  Monitor application performance impact and adjust sampling/processing settings as needed.
 </Step>
 
 <Step title="Gradual Rollout">
@@ -391,20 +386,18 @@ const handle = setupObservability({
 
 <Accordion title="Missing Traces">
   **Problem**: No traces appearing in LangWatch dashboard. **Solution**: Verify API key
-  configuration, check network connectivity to LangWatch endpoints, and ensure spans are
-  being created and ended properly.
+  configuration, check network connectivity to LangWatch endpoints, and ensure spans are being
+  created and ended properly.
 </Accordion>
 
 <Accordion title="Performance Degradation">
-  **Problem**: Application performance impacted after migration. **Solution**: Adjust
-  sampling rates, optimize batch processing settings, and monitor memory usage of span
-  processors.
+  **Problem**: Application performance impacted after migration. **Solution**: Adjust sampling
+  rates, optimize batch processing settings, and monitor memory usage of span processors.
 </Accordion>
 
 <Accordion title="Context Loss">
-  **Problem**: Span context not propagating across async boundaries. **Solution**: Verify
-  context propagation configuration and ensure proper async context management in your
-  code.
+  **Problem**: Span context not propagating across async boundaries. **Solution**: Verify context
+  propagation configuration and ensure proper async context management in your code.
 </Accordion>
 
 <Accordion title="Instrumentation Conflicts">
@@ -444,13 +437,12 @@ const handle = setupObservability({
 </Card>
 
 <Card title="Enhanced Features" icon="features">
-  Gain access to LangWatch's specialized LLM observability features while keeping your
-  existing setup.
+  Gain access to LangWatch's specialized LLM observability features while keeping your existing
+  setup.
 </Card>
 
 <Card title="Gradual Migration" icon="gradual">
-  Migrate at your own pace with the ability to run both systems in parallel during
-  transition.
+  Migrate at your own pace with the ability to run both systems in parallel during transition.
 </Card>
 
 <Card title="Production Ready" icon="production">
@@ -459,7 +451,6 @@ const handle = setupObservability({
 </CardGroup>
 
 <Info>
-  The migration process is designed to be non-disruptive. You can run your existing
-  OpenTelemetry setup alongside LangWatch during the transition period to ensure
-  everything works correctly.
+  The migration process is designed to be non-disruptive. You can run your existing OpenTelemetry
+  setup alongside LangWatch during the transition period to ensure everything works correctly.
 </Info>

@@ -133,9 +133,7 @@ describe("Experiment origin and span parenting", () => {
       expect(childSpan!.spanContext().traceId).toBe(iterationSpan!.spanContext().traceId);
 
       // Child span's parent is the iteration span
-      expect((childSpan as any).parentSpanContext.spanId).toBe(
-        iterationSpan!.spanContext().spanId,
-      );
+      expect((childSpan as any).parentSpanContext.spanId).toBe(iterationSpan!.spanContext().spanId);
     });
   });
 
@@ -213,9 +211,7 @@ describe("Experiment origin and span parenting", () => {
       expect(childSpan).toBeDefined();
 
       expect(childSpan!.spanContext().traceId).toBe(targetSpan!.spanContext().traceId);
-      expect((childSpan as any).parentSpanContext.spanId).toBe(
-        targetSpan!.spanContext().spanId,
-      );
+      expect((childSpan as any).parentSpanContext.spanId).toBe(targetSpan!.spanContext().spanId);
     });
   });
 });

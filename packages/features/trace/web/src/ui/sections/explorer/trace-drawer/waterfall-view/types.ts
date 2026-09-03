@@ -62,9 +62,7 @@ export const GROUP_ROW_HEIGHT = 36;
  * estimator and `TreeRow`'s rendering must agree on this predicate or
  * rows overlap.
  */
-export function isTwoLineSpan(
-  span: Pick<SpanTreeNode, "type" | "model" | "toolName">,
-): boolean {
+export function isTwoLineSpan(span: Pick<SpanTreeNode, "type" | "model" | "toolName">): boolean {
   return (span.type === "llm" && span.model != null) || span.toolName != null;
 }
 

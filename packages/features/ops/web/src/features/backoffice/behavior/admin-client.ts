@@ -146,17 +146,11 @@ export class AdminClient {
     return this.adminFetch<DataResult<T>>(resource, "update", { id, data });
   }
 
-  create<T>(
-    resource: ResourceName,
-    data: Record<string, unknown>,
-  ): Promise<DataResult<T>> {
+  create<T>(resource: ResourceName, data: Record<string, unknown>): Promise<DataResult<T>> {
     return this.adminFetch<DataResult<T>>(resource, "create", { data });
   }
 
-  async impersonateUser(input: {
-    userIdToImpersonate: string;
-    reason: string;
-  }): Promise<void> {
+  async impersonateUser(input: { userIdToImpersonate: string; reason: string }): Promise<void> {
     const res = await this.fetcher(`${this.basePath}/impersonate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

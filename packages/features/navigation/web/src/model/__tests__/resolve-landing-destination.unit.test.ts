@@ -10,9 +10,7 @@ import {
 
 const ALL_PRODUCTS: readonly ProductId[] = ["me", "llm-ops", "gateway", "governance"];
 
-function input(
-  overrides: Partial<LandingDestinationInput> = {},
-): LandingDestinationInput {
+function input(overrides: Partial<LandingDestinationInput> = {}): LandingDestinationInput {
   return {
     pinnedPath: null,
     rememberedProduct: null,
@@ -94,9 +92,9 @@ describe("resolveLandingDestination", () => {
   describe("when nothing is remembered", () => {
     /** @scenario A first visit follows the organization intent */
     it("follows the server home resolver", () => {
-      expect(
-        resolveLandingDestination(input({ serverHomeDestination: "/governance" })),
-      ).toBe("/governance");
+      expect(resolveLandingDestination(input({ serverHomeDestination: "/governance" }))).toBe(
+        "/governance",
+      );
     });
 
     /** @scenario With nothing to go on the safety nets decide */

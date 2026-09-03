@@ -204,9 +204,8 @@ describe("MCP server dataset tool registration", () => {
       const { createMcpServer } = await import("../create-mcp-server.js");
       const server = createMcpServer();
       // Access registered tools via the internal _registeredTools object
-      const registeredTools = (
-        server as unknown as { _registeredTools: Record<string, unknown> }
-      )._registeredTools;
+      const registeredTools = (server as unknown as { _registeredTools: Record<string, unknown> })
+        ._registeredTools;
       const toolNames = Object.keys(registeredTools);
 
       expect(toolNames).toContain("platform_list_datasets");

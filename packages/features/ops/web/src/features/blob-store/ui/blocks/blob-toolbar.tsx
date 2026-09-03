@@ -37,12 +37,7 @@ export function BlobToolbar({
       <Spacer />
       {canManage && (
         <>
-          <Button
-            size="2xs"
-            variant="outline"
-            loading={previewLoading}
-            onClick={onPreviewCleanup}
-          >
+          <Button size="2xs" variant="outline" loading={previewLoading} onClick={onPreviewCleanup}>
             Preview cleanup
           </Button>
           <Button size="2xs" variant="outline" colorPalette="red" onClick={onRunCleanup}>

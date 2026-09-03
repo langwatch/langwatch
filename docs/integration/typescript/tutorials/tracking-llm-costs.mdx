@@ -77,10 +77,7 @@ async function myLLMCallWithTracking(prompt: string) {
       span.setAttribute("gen_ai.usage.input_tokens", response.usage.inputTokens);
       span.setAttribute("gen_ai.usage.output_tokens", response.usage.outputTokens);
       // Optional breakdowns
-      span.setAttribute(
-        "gen_ai.usage.cache_read.input_tokens",
-        response.usage.cachedTokens,
-      );
+      span.setAttribute("gen_ai.usage.cache_read.input_tokens", response.usage.cachedTokens);
       span.setAttribute("gen_ai.usage.reasoning_tokens", response.usage.reasoningTokens);
     }
 

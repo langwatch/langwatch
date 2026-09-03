@@ -34,9 +34,7 @@ export function resolveLlmOpsProjectSlug({
 }): string | null {
   if (ambientProject && !ambientProject.isPersonal) return ambientProject.slug;
 
-  const candidates = openableTeams.filter(
-    (team) => !team.isPersonal && team.projects.length > 0,
-  );
+  const candidates = openableTeams.filter((team) => !team.isPersonal && team.projects.length > 0);
 
   const remembered = candidates
     .flatMap((team) => team.projects)

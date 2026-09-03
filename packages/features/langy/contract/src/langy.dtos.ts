@@ -36,18 +36,14 @@ export const langyConversationListItemSchema = z.object({
   messageCount: z.number().int().nonnegative().default(0),
   lastActivityAtMs: z.number().default(0),
 });
-export type LangyConversationListItemDto = z.infer<
-  typeof langyConversationListItemSchema
->;
+export type LangyConversationListItemDto = z.infer<typeof langyConversationListItemSchema>;
 
 /** Opaque keyset cursor for fetching the next recent-conversations page. */
 export const langyConversationListCursorSchema = z.object({
   lastActivityAtMs: z.number().nullable(),
   id: z.string(),
 });
-export type LangyConversationListCursorDto = z.infer<
-  typeof langyConversationListCursorSchema
->;
+export type LangyConversationListCursorDto = z.infer<typeof langyConversationListCursorSchema>;
 
 /** Detail read for an opened conversation. Adds lifecycle status. */
 export const langyConversationDetailSchema = langyConversationListItemSchema.extend({
@@ -119,6 +115,4 @@ export const langyConversationUpdateSignalSchema = z.object({
     })
     .optional(),
 });
-export type LangyConversationUpdateSignal = z.infer<
-  typeof langyConversationUpdateSignalSchema
->;
+export type LangyConversationUpdateSignal = z.infer<typeof langyConversationUpdateSignalSchema>;

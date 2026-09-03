@@ -6,15 +6,7 @@
  * reflection via `Object.assign` on an Object.create'd Experiment prototype to populate
  * the cumulative arrays without going through the network.
  */
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type MockInstance,
-} from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import { Experiment } from "../experiment";
 import type { BatchEntry, EvaluationResult } from "../types";
 
@@ -80,10 +72,7 @@ describe("Experiment.printSummary", () => {
     /** @scenario printSummary does not exit when all evaluations passed */
     it("prints the run id, 100% pass rate, and does not exit", () => {
       const exp = buildExperimentFixture({
-        evaluations: [
-          evaluation({ passed: true }),
-          evaluation({ passed: true, index: 1 }),
-        ],
+        evaluations: [evaluation({ passed: true }), evaluation({ passed: true, index: 1 })],
       });
 
       exp.printSummary();
@@ -101,10 +90,7 @@ describe("Experiment.printSummary", () => {
     /** @scenario printSummary exits with code 1 when any evaluation failed and exitOnFailure is true */
     it("prints the failure count and calls process.exit(1)", () => {
       const exp = buildExperimentFixture({
-        evaluations: [
-          evaluation({ passed: true }),
-          evaluation({ passed: false, index: 1 }),
-        ],
+        evaluations: [evaluation({ passed: true }), evaluation({ passed: false, index: 1 })],
       });
 
       exp.printSummary();
@@ -185,10 +171,7 @@ describe("Experiment.printSummary", () => {
   describe("when the run has failures", () => {
     it("reports Status: FAILED (not COMPLETED)", () => {
       const exp = buildExperimentFixture({
-        evaluations: [
-          evaluation({ passed: true }),
-          evaluation({ passed: false, index: 1 }),
-        ],
+        evaluations: [evaluation({ passed: true }), evaluation({ passed: false, index: 1 })],
       });
 
       exp.printSummary(false);

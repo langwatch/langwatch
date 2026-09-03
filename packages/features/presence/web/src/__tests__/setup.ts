@@ -1,8 +1,5 @@
 class IntersectionObserverStub {
-  constructor(
-    _callback: IntersectionObserverCallback,
-    _options?: IntersectionObserverInit,
-  ) {}
+  constructor(_callback: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
   observe(): void {}
   unobserve(): void {}
   disconnect(): void {}

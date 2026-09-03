@@ -29,9 +29,9 @@ vi.mock("../../../../../../behavior/use-organization-team-project", () => ({
 }));
 
 vi.mock("../../../hooks/use-anchored-annotations", async () => {
-  const actual = await vi.importActual<
-    typeof import("../../../hooks/use-anchored-annotations")
-  >("../../../hooks/use-anchored-annotations");
+  const actual = await vi.importActual<typeof import("../../../hooks/use-anchored-annotations")>(
+    "../../../hooks/use-anchored-annotations",
+  );
   return {
     ...actual,
     useAnchoredAnnotations: () => ({
@@ -113,8 +113,7 @@ function renderTranscript({ inTrace = true } = {}) {
   );
 }
 
-const commentActions = () =>
-  screen.queryAllByRole("button", { name: /comment on this message/i });
+const commentActions = () => screen.queryAllByRole("button", { name: /comment on this message/i });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -138,10 +137,7 @@ describe("given a transcript of several messages inside a trace", () => {
       renderTranscript();
 
       await user.click(commentActions()[1]!);
-      await user.type(
-        await screen.findByPlaceholderText("Optional"),
-        "this one went off",
-      );
+      await user.type(await screen.findByPlaceholderText("Optional"), "this one went off");
       await user.click(screen.getByRole("button", { name: "Save" }));
 
       const [payload] = mocks.create.mock.calls[0] as [Record<string, unknown>];

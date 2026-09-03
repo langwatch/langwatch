@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  createPromptCommandSchema,
-  promptConfigDataSchema,
-  promptHandleSchema,
-} from "../index";
+import { createPromptCommandSchema, promptConfigDataSchema, promptHandleSchema } from "../index";
 
 describe("Prompt contract", () => {
   it("accepts the portable prompt configuration shape", () => {
@@ -26,12 +22,10 @@ describe("Prompt contract", () => {
 
   it("requires a project and handle for creation", () => {
     expect(
-      createPromptCommandSchema.safeParse({ projectId: "p1", handle: "support-bot" })
-        .success,
+      createPromptCommandSchema.safeParse({ projectId: "p1", handle: "support-bot" }).success,
     ).toBe(true);
     expect(
-      createPromptCommandSchema.safeParse({ projectId: "", handle: "support-bot" })
-        .success,
+      createPromptCommandSchema.safeParse({ projectId: "", handle: "support-bot" }).success,
     ).toBe(false);
   });
 });

@@ -230,8 +230,7 @@ function partToCall(part: ToolPartLike, name: string): CapabilityToolCall {
  * own lines at the head of a line too. So this only ever runs against the CLI's
  * own console — see {@link cliConsoleTextOf}.
  */
-const CLI_FAILURE_LINE =
-  /^[\s>]*(?:✖|failed to\b|request failed\b|self_signed_cert_in_chain\b)/im;
+const CLI_FAILURE_LINE = /^[\s>]*(?:✖|failed to\b|request failed\b|self_signed_cert_in_chain\b)/im;
 
 /** The raw text an output carries, bare or in the `{ text }` envelope. */
 function outputText(output: unknown): string | undefined {
@@ -273,9 +272,7 @@ function cliConsoleTextOf(document: unknown): string | null {
     return null;
   }
   const envelope = document as { kind?: unknown; text?: unknown };
-  return envelope.kind === "text" && typeof envelope.text === "string"
-    ? envelope.text
-    : null;
+  return envelope.kind === "text" && typeof envelope.text === "string" ? envelope.text : null;
 }
 
 /**
@@ -391,9 +388,7 @@ function traceRowCount(output: unknown): number {
     input: {},
     output,
   });
-  return result?.kind === "card" && result.card === "traces"
-    ? result.payload.traces.length
-    : 0;
+  return result?.kind === "card" && result.card === "traces" ? result.payload.traces.length : 0;
 }
 
 /**
@@ -410,19 +405,14 @@ function traceRowCount(output: unknown): number {
  * "nothing matched" still earns one clear answer, never a wall of four. Only
  * trace searches multiply this way, so every other capability card is untouched.
  */
-function selectTraceCards<T extends { id: string; call: CapabilityToolCall }>(
-  entries: T[],
-): T[] {
-  const isTrace = (call: CapabilityToolCall) =>
-    resolveCapability(call.name)?.render === "traces";
+function selectTraceCards<T extends { id: string; call: CapabilityToolCall }>(entries: T[]): T[] {
+  const isTrace = (call: CapabilityToolCall) => resolveCapability(call.name)?.render === "traces";
 
   const traceEntries = entries.filter((e) => isTrace(e.call));
   if (traceEntries.length <= 1) return entries;
 
   const answered = new Set(
-    traceEntries
-      .filter((e) => traceRowCount(e.call.result ?? e.call.output) > 0)
-      .map((e) => e.id),
+    traceEntries.filter((e) => traceRowCount(e.call.result ?? e.call.output) > 0).map((e) => e.id),
   );
   const anyAnswered = answered.size > 0;
 
@@ -632,13 +622,7 @@ export function LangyToolActivity({
   /** @see LangyActivityParts */
   live?: boolean;
 }) {
-  return (
-    <LangyActivityParts
-      parts={message.parts}
-      reasoningTitles={reasoningTitles}
-      live={live}
-    />
-  );
+  return <LangyActivityParts parts={message.parts} reasoningTitles={reasoningTitles} live={live} />;
 }
 
 /**
@@ -712,9 +696,7 @@ export function LangyActivityParts({
     ...failures.map(({ id, call, presentation, order }) => ({
       key: `failure:${id}`,
       order,
-      node: (
-        <FailedToolCallRow call={call} presentation={presentation} devMode={devMode} />
-      ),
+      node: <FailedToolCallRow call={call} presentation={presentation} devMode={devMode} />,
     })),
     ...runningGroups.map((group) => ({
       key: `running:${group.key}`,
@@ -932,13 +914,7 @@ function CompletedActivityBatch({
  * design the moment a second action lands — would otherwise have quietly taken
  * away the only way to read a call's JSON.
  */
-function CompletedActivityRow({
-  group,
-  devMode,
-}: {
-  group: ActivityGroup;
-  devMode: boolean;
-}) {
+function CompletedActivityRow({ group, devMode }: { group: ActivityGroup; devMode: boolean }) {
   const [jsonOpen, setJsonOpen] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
   // The receipt names what ran; the result is what the model actually read,
@@ -1000,10 +976,7 @@ function CompletedActivityRow({
           </>
         )}
         {devMode ? (
-          <RawDataToggle
-            isOpen={jsonOpen}
-            onToggle={() => setJsonOpen((value) => !value)}
-          />
+          <RawDataToggle isOpen={jsonOpen} onToggle={() => setJsonOpen((value) => !value)} />
         ) : null}
       </HStack>
       {resultOpen ? (
@@ -1251,13 +1224,7 @@ function capabilityBatchLabel(
   }
 }
 
-function CapabilityBatchRow({
-  batch,
-  devMode,
-}: {
-  batch: CapabilityBatch;
-  devMode: boolean;
-}) {
+function CapabilityBatchRow({ batch, devMode }: { batch: CapabilityBatch; devMode: boolean }) {
   const isBatched = batch.entries.length > 1;
   const [open, setOpen] = useState(true);
   const userToggled = useRef(false);
@@ -1376,13 +1343,7 @@ function FailedToolCallRow({
  * tool payload behind it — the same inspect affordance the generic activity
  * rows offer, so the whole event stream stays inspectable.
  */
-function CapabilityCardRow({
-  call,
-  devMode,
-}: {
-  call: CapabilityToolCall;
-  devMode: boolean;
-}) {
+function CapabilityCardRow({ call, devMode }: { call: CapabilityToolCall; devMode: boolean }) {
   // Closed by default. Developer mode turning ON is not a request to see
   // every payload at once — it is a request for the AFFORDANCE. Defaulting
   // open buried each card under its own JSON dump.
@@ -1514,13 +1475,7 @@ function lastAnswerTextIndex(view: PartsView): number {
  * {@link RunningActivityCard}: a green check for the pulse, the past-tense
  * label for the shimmer.
  */
-function LatestSettledActivityCard({
-  group,
-  devMode,
-}: {
-  group: ActivityGroup;
-  devMode: boolean;
-}) {
+function LatestSettledActivityCard({ group, devMode }: { group: ActivityGroup; devMode: boolean }) {
   const [jsonOpen, setJsonOpen] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
   const detail = group.detail;
@@ -1560,10 +1515,7 @@ function LatestSettledActivityCard({
           {groupCategory(group)}
         </Text>
         {devMode ? (
-          <RawDataToggle
-            isOpen={jsonOpen}
-            onToggle={() => setJsonOpen((value) => !value)}
-          />
+          <RawDataToggle isOpen={jsonOpen} onToggle={() => setJsonOpen((value) => !value)} />
         ) : null}
       </HStack>
 
@@ -1573,10 +1525,7 @@ function LatestSettledActivityCard({
           onToggle={() => setResultOpen((value) => !value)}
         >
           {/* The truncated command gives way to the full one below it. */}
-          <SettledActivityLabel
-            label={group.label}
-            detail={resultOpen ? undefined : detail}
-          />
+          <SettledActivityLabel label={group.label} detail={resultOpen ? undefined : detail} />
         </ResultDisclosureButton>
       ) : (
         <SettledActivityLabel label={group.label} detail={detail} />
@@ -1829,8 +1778,6 @@ function stringifyCall(call: ToolCall): string {
   try {
     return JSON.stringify(payload, null, 2);
   } catch {
-    return `{ "tool": ${JSON.stringify(call.name)}, "state": ${JSON.stringify(
-      call.state,
-    )} }`;
+    return `{ "tool": ${JSON.stringify(call.name)}, "state": ${JSON.stringify(call.state)} }`;
   }
 }

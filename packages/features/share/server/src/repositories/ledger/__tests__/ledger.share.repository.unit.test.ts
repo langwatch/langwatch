@@ -45,8 +45,7 @@ const shareRow = (overrides: Partial<ShareLink> = {}): ShareLink =>
   }) as ShareLink;
 
 /** What a conditioned `update` raises when its filter matches no row. */
-const recordNotFound = () =>
-  Object.assign(new Error("record not found"), { code: "P2025" });
+const recordNotFound = () => Object.assign(new Error("record not found"), { code: "P2025" });
 
 const spyLegacy = (): ShareRepository =>
   ({
@@ -101,15 +100,11 @@ function buildRepository({
   const transaction = vi.fn(async (run: (tx: unknown) => Promise<unknown>) =>
     run({ grantUsage, shareLink: { update: compatMirror } }),
   );
-  const cutoverFindUnique = vi
-    .fn()
-    .mockResolvedValue(onEngine ? { status: "finalized" } : null);
+  const cutoverFindUnique = vi.fn().mockResolvedValue(onEngine ? { status: "finalized" } : null);
   const prisma = {
     systemMigrationTenantState: { findUnique: cutoverFindUnique },
     project: {
-      findUnique: vi
-        .fn()
-        .mockResolvedValue({ team: { organizationId: ORGANIZATION_ID } }),
+      findUnique: vi.fn().mockResolvedValue({ team: { organizationId: ORGANIZATION_ID } }),
     },
     grant: { findMany: grantFindMany },
     grantUsage: rootGrantUsage,
@@ -309,9 +304,9 @@ describe("LedgerShareRepository", () => {
         // The order is load-bearing: the fact must be on the ledger before
         // the compat row goes, or a crash between the two leaves a deleted
         // link with no revocation for the fold to converge on.
-        expect(
-          vi.mocked(writer.revokeResourceGrants).mock.invocationCallOrder[0],
-        ).toBeLessThan(vi.mocked(legacy.deleteById).mock.invocationCallOrder[0]!);
+        expect(vi.mocked(writer.revokeResourceGrants).mock.invocationCallOrder[0]).toBeLessThan(
+          vi.mocked(legacy.deleteById).mock.invocationCallOrder[0]!,
+        );
       });
 
       /** @scenario "Revoking a link whose grant row has not landed still records the fact" */
@@ -453,9 +448,7 @@ describe("LedgerShareRepository", () => {
           onEngine: true,
           grantIds: ["share_1"],
           compat: {
-            findMany: vi
-              .fn()
-              .mockResolvedValue([{ id: "share_1" }, { id: "share_parked" }]),
+            findMany: vi.fn().mockResolvedValue([{ id: "share_1" }, { id: "share_parked" }]),
           },
         });
 
@@ -510,21 +503,15 @@ describe("LedgerShareRepository", () => {
       /** @scenario "A consumed view and its compat mirror commit together" */
       it("creates the usage row on the first view and mirrors the count in the same transaction", async () => {
         const create = vi.fn().mockResolvedValue(void 0);
-        const {
-          repository,
-          legacy,
-          compatMirror,
-          transaction,
-          rootGrantUsage,
-          shareLink,
-        } = buildRepository({
-          onEngine: true,
-          grantIds: ["share_1"],
-          usage: {
-            update: vi.fn().mockRejectedValue(recordNotFound()),
-            create,
-          },
-        });
+        const { repository, legacy, compatMirror, transaction, rootGrantUsage, shareLink } =
+          buildRepository({
+            onEngine: true,
+            grantIds: ["share_1"],
+            usage: {
+              update: vi.fn().mockRejectedValue(recordNotFound()),
+              create,
+            },
+          });
 
         const consumed = await repository.consumeView({
           id: "share_1",
@@ -600,9 +587,7 @@ describe("LedgerShareRepository", () => {
           .mockResolvedValueOnce(void 0);
         const create = vi
           .fn()
-          .mockRejectedValue(
-            Object.assign(new Error("unique violation"), { code: "P2002" }),
-          );
+          .mockRejectedValue(Object.assign(new Error("unique violation"), { code: "P2002" }));
         const { repository, transaction, compatMirror } = buildRepository({
           onEngine: true,
           grantIds: ["share_1"],
@@ -625,9 +610,7 @@ describe("LedgerShareRepository", () => {
         const update = vi.fn().mockRejectedValue(recordNotFound());
         const create = vi
           .fn()
-          .mockRejectedValue(
-            Object.assign(new Error("unique violation"), { code: "P2002" }),
-          );
+          .mockRejectedValue(Object.assign(new Error("unique violation"), { code: "P2002" }));
         const { repository, compatMirror } = buildRepository({
           onEngine: true,
           grantIds: ["share_1"],

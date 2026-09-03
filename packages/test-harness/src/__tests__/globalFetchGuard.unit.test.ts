@@ -47,9 +47,7 @@ describe("guardAgainstGlobalFetch", () => {
 
     describe("when a test reads a global the guard does not own", () => {
       it("still finds the value the other suite installed", () => {
-        expect(
-          (globalThis as { langwatchGuardProbe?: symbol }).langwatchGuardProbe,
-        ).toBe(probe);
+        expect((globalThis as { langwatchGuardProbe?: symbol }).langwatchGuardProbe).toBe(probe);
       });
     });
   });
@@ -67,9 +65,7 @@ describe("guardAgainstGlobalFetch", () => {
     // depend on the order the tests above it are written in.
     describe("when an unguarded test reads a global the guard does not own", () => {
       it("still finds the value the other suite installed", () => {
-        expect(
-          (globalThis as { langwatchGuardProbe?: symbol }).langwatchGuardProbe,
-        ).toBe(probe);
+        expect((globalThis as { langwatchGuardProbe?: symbol }).langwatchGuardProbe).toBe(probe);
       });
     });
   });

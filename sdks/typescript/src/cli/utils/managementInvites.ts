@@ -15,12 +15,7 @@
 import { ORGANIZATION_ROLES } from "@/client-sdk/services/_shared/management-types";
 import type { ManagementRole } from "@/client-sdk/services/_shared/management-types";
 import type { InviteInput } from "@/client-sdk/services/organization/organization-api.service";
-import {
-  ManagementFlagError,
-  oneOf,
-  parseOrganizationRole,
-  parseRoleIn,
-} from "./managementFlags";
+import { ManagementFlagError, oneOf, parseOrganizationRole, parseRoleIn } from "./managementFlags";
 
 type TeamAssignment = InviteInput["teams"][number];
 
@@ -163,13 +158,7 @@ const parseTeamAssignment = ({
 };
 
 /** One invite out of a JSON batch, numbered so a refusal says which one. */
-const parseInviteEntry = ({
-  entry,
-  index,
-}: {
-  entry: unknown;
-  index: number;
-}): InviteInput => {
+const parseInviteEntry = ({ entry, index }: { entry: unknown; index: number }): InviteInput => {
   const invite = entry as Partial<InviteInput> | null;
   const position = `Invite ${index + 1}`;
   if (!invite || typeof invite.email !== "string" || !invite.email.trim()) {

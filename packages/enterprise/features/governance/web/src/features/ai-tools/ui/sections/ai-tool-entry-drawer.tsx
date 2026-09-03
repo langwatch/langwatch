@@ -22,8 +22,16 @@ import {
   type AssistantKind,
 } from "@langwatch/coding-agent-web";
 import { type AiToolEntry, type AiToolTileType } from "../../model/ai-tool-tile";
-import { isToolPresetAsset, TOOL_KINDS, TOOL_PRESETS, toolPresetAsset } from "../elements/tool-icons";
-import { ScopeChipPicker, type ScopeChipPickerEntry } from "@langwatch/authz-web/surfaces/scope-picker";
+import {
+  isToolPresetAsset,
+  TOOL_KINDS,
+  TOOL_PRESETS,
+  toolPresetAsset,
+} from "../elements/tool-icons";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerEntry,
+} from "@langwatch/authz-web/surfaces/scope-picker";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Link } from "../../../../ui/elements/governance-link";
 import { Switch } from "@langwatch/design-system/switch";
@@ -208,19 +216,13 @@ function deriveDefaultIconAsset(form: FormState): string | null {
 
 interface Props {
   organizationId: string;
-  state:
-    | { mode: "create"; type: AiToolTileType }
-    | { mode: "edit"; entry: AiToolEntry }
-    | null;
+  state: { mode: "create"; type: AiToolTileType } | { mode: "edit"; entry: AiToolEntry } | null;
   onClose: () => void;
 }
 
 /** Map a tile's department bindings into ScopeChipPicker entries. Empty
  *  bindings = org-wide → a single ORGANIZATION entry. */
-function scopesFromEntry(
-  entry: AiToolEntry,
-  organizationId: string,
-): ScopeChipPickerEntry[] {
+function scopesFromEntry(entry: AiToolEntry, organizationId: string): ScopeChipPickerEntry[] {
   const departmentIds = entry.departmentIds ?? [];
   if (departmentIds.length === 0) {
     return [{ scopeType: "ORGANIZATION", scopeId: organizationId }];
@@ -264,8 +266,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   // Reset state when drawer opens for a different entry/type
   useEffect(() => {
     if (!state) return;
-    const nextForm =
-      state.mode === "edit" ? formFromEntry(state.entry) : blankForm(state.type);
+    const nextForm = state.mode === "edit" ? formFromEntry(state.entry) : blankForm(state.type);
     setForm(nextForm);
     setScopes(
       state.mode === "edit"
@@ -273,9 +274,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
         : [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
     );
     setIconAsset(
-      state.mode === "edit"
-        ? (state.entry.iconAsset ?? null)
-        : deriveDefaultIconAsset(nextForm),
+      state.mode === "edit" ? (state.entry.iconAsset ?? null) : deriveDefaultIconAsset(nextForm),
     );
   }, [state, organizationId]);
 
@@ -410,8 +409,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
             <FormSection label="Type">
               {isEdit ? (
                 <Text fontSize="sm" color="fg.muted">
-                  {TILE_TYPE_OPTIONS.find((o) => o.value === form.type)?.label} (locked on
-                  edit)
+                  {TILE_TYPE_OPTIONS.find((o) => o.value === form.type)?.label} (locked on edit)
                 </Text>
               ) : (
                 <HStack gap={3}>
@@ -451,8 +449,8 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
               />
               {departments.length === 0 && (
                 <Text fontSize="xs" color="fg.muted">
-                  No departments yet. The tile stays visible to every member. Create
-                  departments under{" "}
+                  No departments yet. The tile stays visible to every member. Create departments
+                  under{" "}
                   <Link href="/governance/departments" color="blue.600">
                     Governance → Departments
                   </Link>{" "}
@@ -568,9 +566,7 @@ function IconPreview({
   fallback: React.ReactNode;
 }) {
   if (iconAsset && isToolPresetAsset(iconAsset)) {
-    const key = iconAsset.slice("preset:tool:".length) as
-      | (typeof TOOL_KINDS)[number]
-      | string;
+    const key = iconAsset.slice("preset:tool:".length) as (typeof TOOL_KINDS)[number] | string;
     const preset = TOOL_PRESETS[key as (typeof TOOL_KINDS)[number]];
     if (preset) {
       const Icon = preset.Icon;
@@ -600,9 +596,7 @@ function IconPreview({
     }
   }
   if (iconAsset?.startsWith(DATA_URL_PREFIX)) {
-    return (
-      <Image src={iconAsset} alt="" width="32px" height="32px" objectFit="contain" />
-    );
+    return <Image src={iconAsset} alt="" width="32px" height="32px" objectFit="contain" />;
   }
   return <>{fallback}</>;
 }
@@ -768,8 +762,8 @@ function CostAttributionSection({
         <VStack align="start" gap={0}>
           <Text fontSize="sm">Bundled subscription (not billed per token)</Text>
           <Text fontSize="xs" color="fg.muted">
-            Direct-OTLP usage is included in a flat plan, so its cost is shown as
-            theoretical rather than counted as real spend.
+            Direct-OTLP usage is included in a flat plan, so its cost is shown as theoretical rather
+            than counted as real spend.
           </Text>
         </VStack>
         <Switch
@@ -826,9 +820,7 @@ function CliPathsSection({
           <Switch
             checked={cursorOnly ? false : form.allowOtelDirect}
             disabled={cursorOnly}
-            onCheckedChange={({ checked }) =>
-              setForm({ ...form, allowOtelDirect: checked })
-            }
+            onCheckedChange={({ checked }) => setForm({ ...form, allowOtelDirect: checked })}
           />
         </HStack>
       </VStack>
@@ -853,9 +845,7 @@ function ModelProviderFields({
   routingPolicyOptions: Array<{ id: string; name: string }> | undefined;
   routingPolicyOptionsLoading: boolean;
 }) {
-  const selectedProvider = providerOptions?.find(
-    (p) => p.providerKey === form.providerKey,
-  );
+  const selectedProvider = providerOptions?.find((p) => p.providerKey === form.providerKey);
 
   return (
     <>
@@ -886,8 +876,8 @@ function ModelProviderFields({
             <Alert.Content>
               <Alert.Title>Provider not configured</Alert.Title>
               <Alert.Description fontSize="xs">
-                This provider has no enabled credential yet. Tiles will publish but VK
-                issuance will 502 until you{" "}
+                This provider has no enabled credential yet. Tiles will publish but VK issuance will
+                502 until you{" "}
                 <Link href="/settings/model-providers" color="orange.600">
                   configure it
                 </Link>
@@ -912,14 +902,10 @@ function ModelProviderFields({
         <NativeSelect.Root size="sm">
           <NativeSelect.Field
             value={form.suggestedRoutingPolicyId}
-            onChange={(e) =>
-              setForm({ ...form, suggestedRoutingPolicyId: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, suggestedRoutingPolicyId: e.target.value })}
           >
             <option value="">
-              {routingPolicyOptionsLoading
-                ? "Loading policies…"
-                : "- use organization default -"}
+              {routingPolicyOptionsLoading ? "Loading policies…" : "- use organization default -"}
             </option>
             {(routingPolicyOptions ?? []).map((p) => (
               <option key={p.id} value={p.id}>

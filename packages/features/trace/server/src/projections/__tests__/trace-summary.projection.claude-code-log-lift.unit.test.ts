@@ -303,9 +303,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
       expect(after.attributes["langwatch.cache_read_tokens"]).toBe("7");
       expect(after.attributes["langwatch.thread.id"]).toBe("conv_g");
       expect(after.attributes["langwatch.input"]).toBe('[{"role":"user","content":"Hi"}]');
-      expect(after.attributes["langwatch.output"]).toBe(
-        '[{"role":"assistant","content":"Hello"}]',
-      );
+      expect(after.attributes["langwatch.output"]).toBe('[{"role":"assistant","content":"Hello"}]');
     });
 
     it("leaves langwatch.* untouched when zero gen_ai.* fields are present", () => {

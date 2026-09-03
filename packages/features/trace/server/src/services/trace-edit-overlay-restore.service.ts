@@ -27,8 +27,7 @@ function withheldSpanFields({
   readableSpan: TraceEditSpanPatch | undefined;
 }): TraceEditSpanField[] {
   return TRACE_EDIT_SPAN_FIELDS.filter(
-    (field) =>
-      storedSpan[field] !== undefined && readableSpan?.[field] !== storedSpan[field],
+    (field) => storedSpan[field] !== undefined && readableSpan?.[field] !== storedSpan[field],
   );
 }
 

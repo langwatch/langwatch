@@ -97,13 +97,7 @@ export function CommandBarLangyMode({
             transition="border-color 150ms ease, box-shadow 150ms ease"
           >
             {mark ? (
-              <Box
-                flexShrink={0}
-                display="grid"
-                placeItems="center"
-                width="24px"
-                aria-hidden
-              >
+              <Box flexShrink={0} display="grid" placeItems="center" width="24px" aria-hidden>
                 {mark}
               </Box>
             ) : null}

@@ -54,15 +54,10 @@ export type FilterResult =
 
 const indentOf = (line: string): number => line.length - line.trimStart().length;
 
-const isBlank = (line: string): boolean =>
-  line.trim() === "" || line.trim().startsWith("#");
+const isBlank = (line: string): boolean => line.trim() === "" || line.trim().startsWith("#");
 
 /** Lines of the block introduced at `startIndex`, excluding the key line. */
-export const blockUnder = (
-  lines: string[],
-  startIndex: number,
-  indent: number,
-): string[] => {
+export const blockUnder = (lines: string[], startIndex: number, indent: number): string[] => {
   const out: string[] = [];
   for (let i = startIndex + 1; i < lines.length; i++) {
     const line = lines[i]!;
@@ -283,10 +278,7 @@ export const aggregatorJobs = (source: string): string[] => {
   const jobIndent = indentOf(first);
 
   return block
-    .filter(
-      (l) =>
-        !isBlank(l) && indentOf(l) === jobIndent && /^[a-z0-9_-]+:\s*$/i.test(l.trim()),
-    )
+    .filter((l) => !isBlank(l) && indentOf(l) === jobIndent && /^[a-z0-9_-]+:\s*$/i.test(l.trim()))
     .map((l) => l.trim().slice(0, -1))
     .filter((name) => name.endsWith("-complete"));
 };
@@ -423,8 +415,7 @@ export const main = (dir = ".github/workflows"): number => {
 };
 
 const isEntrypoint = (): boolean =>
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntrypoint()) {
   // The workflows directory is an argument so CI can point a trusted copy of

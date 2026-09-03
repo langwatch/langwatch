@@ -114,11 +114,7 @@ export async function runCli(argv: string[]): Promise<void> {
     // correct one. We do not spawn a replacement here, because the old daemon
     // may still be unlinking its socket and the two would race for the bind.
     await requestStop(identity.socketPath);
-  } else if (
-    isAutoSpawnEnabled(process.env) &&
-    argv[1] &&
-    recordMissAndDecideToSpawn(identity)
-  ) {
+  } else if (isAutoSpawnEnabled(process.env) && argv[1] && recordMissAndDecideToSpawn(identity)) {
     spawnDaemon({ cliPath: argv[1], env, identity });
   }
 

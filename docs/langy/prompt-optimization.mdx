@@ -12,7 +12,11 @@ keywords:
 
 Prompt optimization is a Langy skill that measures your prompt's current score, writes a better version, and proves the improvement with your evaluator and dataset. Open it from the **Optimize this prompt** menu item on any prompt column in the Experiments Workbench.
 
-<Info>**Also check:** [Ask Langy](/langy/chat) (other things you can ask), [Experiments overview](/evaluations/experiments/overview) (what the workbench is), [Evaluators](/evaluations/evaluators/overview) (the scoring functions Langy uses).</Info>
+<Info>
+  **Also check:** [Ask Langy](/langy/chat) (other things you can ask), [Experiments
+  overview](/evaluations/experiments/overview) (what the workbench is),
+  [Evaluators](/evaluations/evaluators/overview) (the scoring functions Langy uses).
+</Info>
 
 <video
   controls
@@ -29,16 +33,22 @@ Prompt optimization is a Langy skill that measures your prompt's current score, 
 
 <Steps>
   <Step title="Langy scores the baseline">
-    Langy attaches your evaluator to the prompt column, maps the evaluator's fields to the dataset columns, and runs the baseline prompt against a subset of rows. The pass rate and cost land as the baseline score.
+    Langy attaches your evaluator to the prompt column, maps the evaluator's fields to the dataset
+    columns, and runs the baseline prompt against a subset of rows. The pass rate and cost land as
+    the baseline score.
   </Step>
   <Step title="It duplicates and rewrites">
-    Langy duplicates the prompt column into a candidate and edits the candidate's template. The evaluator and its field mappings carry over from the baseline, so both columns are scored by the same criterion.
+    Langy duplicates the prompt column into a candidate and edits the candidate's template. The
+    evaluator and its field mappings carry over from the baseline, so both columns are scored by the
+    same criterion.
   </Step>
   <Step title="It runs the candidate">
-    Langy runs the candidate column against the same dataset rows and compares the results side by side.
+    Langy runs the candidate column against the same dataset rows and compares the results side by
+    side.
   </Step>
   <Step title="It reports the result">
-    The closing message states both figures: the pass rate (or score) before and after, and what happened to cost. For example, "pass rate improved from 30% to 100%, total cost $0.12."
+    The closing message states both figures: the pass rate (or score) before and after, and what
+    happened to cost. For example, "pass rate improved from 30% to 100%, total cost $0.12."
   </Step>
 </Steps>
 
@@ -65,7 +75,8 @@ The Langy panel streams each step as a tool-call activity card. In the workbench
 - Score chips on both column headers showing the aggregate pass rate.
 
 <Frame caption="Langy's closing report: the winning candidate, the pass rate before and after, and the cost per row.">
-  ![Langy's final report with pass rate and cost](/images/langy/prompt-optimization/final-report.png)
+  ![Langy's final report with pass rate and
+  cost](/images/langy/prompt-optimization/final-report.png)
 </Frame>
 
 ## After the run

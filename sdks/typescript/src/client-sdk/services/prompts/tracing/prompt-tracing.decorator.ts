@@ -52,8 +52,6 @@ export class PromptTracingDecorator {
   }
 
   compileStrict(span: LangWatchSpan, variables: TemplateVariables): CompiledPrompt {
-    return this.traceCompilation(span, variables, () =>
-      this.target.compileStrict(variables),
-    );
+    return this.traceCompilation(span, variables, () => this.target.compileStrict(variables));
   }
 }

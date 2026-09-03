@@ -4,13 +4,13 @@ Status: live one now tested; dead one still standing, with the map to remove it.
 
 ## What is there
 
-| | `platform/app/src/server/analytics/saved-workbench-charts/` | `packages/features/dashboard/server/src/services/` |
-|---|---|---|
-| File | `savedWorkbenchChart.service.ts` (604 lines) | `saved-workbench-chart.service.ts` (268) |
-| Class | `SavedWorkbenchChartService` | `SavedWorkbenchChartService` |
-| Methods | `createChart` `updateChart` `runChart` `placeChart` `unplaceChart` `deleteChart` `getAll` `getById` | `create` `update` `run` `place` `unplace` `delete` `getAll` `getById` |
-| Reached at runtime | **no** — outside its own three test files, nothing in the repo names the class | **yes** |
-| Tests | 3 files, 44 cases | 18, all added 2026-08-31 |
+|                    | `platform/app/src/server/analytics/saved-workbench-charts/`                                         | `packages/features/dashboard/server/src/services/`                    |
+| ------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| File               | `savedWorkbenchChart.service.ts` (604 lines)                                                        | `saved-workbench-chart.service.ts` (268)                              |
+| Class              | `SavedWorkbenchChartService`                                                                        | `SavedWorkbenchChartService`                                          |
+| Methods            | `createChart` `updateChart` `runChart` `placeChart` `unplaceChart` `deleteChart` `getAll` `getById` | `create` `update` `run` `place` `unplace` `delete` `getAll` `getById` |
+| Reached at runtime | **no** — outside its own three test files, nothing in the repo names the class                      | **yes**                                                               |
+| Tests              | 3 files, 44 cases                                                                                   | 18, all added 2026-08-31                                              |
 
 The live chain:
 

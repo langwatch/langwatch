@@ -84,9 +84,7 @@ describe("ProjectionRouter", () => {
       it("only sends matching events to the fold queue", async () => {
         const mockSendBatch = vi.fn().mockResolvedValue(undefined);
         const queueManager = createMockQueueManager();
-        (queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>).mockReturnValue(
-          true,
-        );
+        (queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>).mockReturnValue(true);
         (queueManager.getProjectionQueue as ReturnType<typeof vi.fn>).mockReturnValue({
           sendBatch: mockSendBatch,
         });
@@ -129,9 +127,7 @@ describe("ProjectionRouter", () => {
       it("skips fold queue entirely when no events match", async () => {
         const mockSendBatch = vi.fn().mockResolvedValue(undefined);
         const queueManager = createMockQueueManager();
-        (queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>).mockReturnValue(
-          true,
-        );
+        (queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>).mockReturnValue(true);
         (queueManager.getProjectionQueue as ReturnType<typeof vi.fn>).mockReturnValue({
           sendBatch: mockSendBatch,
         });
@@ -203,9 +199,7 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
-          AggregateError,
-        );
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
 
         // The succeeding projection should still have been attempted
         expect(successStore.get).toHaveBeenCalled();
@@ -248,9 +242,7 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
-          AggregateError,
-        );
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
 
         // Map projection should still have been dispatched
         expect(mapStore.append).toHaveBeenCalled();
@@ -267,9 +259,7 @@ describe("ProjectionRouter", () => {
         );
 
         const foldStore = createMockFoldProjectionStore<{ count: number }>();
-        (foldStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("fold failure"),
-        );
+        (foldStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("fold failure"));
 
         const failingFold = createMockFoldProjectionDefinition("failing-fold", {
           store: foldStore,
@@ -278,9 +268,7 @@ describe("ProjectionRouter", () => {
         });
 
         const mapStore = createMockAppendStore<Record<string, unknown>>();
-        (mapStore.append as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("map failure"),
-        );
+        (mapStore.append as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("map failure"));
 
         const failingMap = createMockMapProjectionDefinition("failing-map", {
           store: mapStore,
@@ -344,9 +332,7 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
-          AggregateError,
-        );
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
 
         expect(subscriberHandle).not.toHaveBeenCalled();
       });
@@ -387,9 +373,7 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
-          AggregateError,
-        );
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
 
         // The succeeding projection should still have been attempted
         expect(successStore.append).toHaveBeenCalled();
@@ -429,18 +413,14 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
-          AggregateError,
-        );
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
 
         expect(subscriberHandle).toHaveBeenCalled();
       });
     });
 
     describe("when a subscriber declares a shouldDispatch predicate", () => {
-      const setupRouterWithFold = (
-        queueManager: ReturnType<typeof createMockQueueManager>,
-      ) => {
+      const setupRouterWithFold = (queueManager: ReturnType<typeof createMockQueueManager>) => {
         const router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -628,9 +608,7 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
-          AggregateError,
-        );
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
       });
     });
 
@@ -699,9 +677,7 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        const subscriberHandle = vi
-          .fn()
-          .mockRejectedValue(new Error("inline fallback boom"));
+        const subscriberHandle = vi.fn().mockRejectedValue(new Error("inline fallback boom"));
         const subscriber: SubscriberDispatchDefinition<Event> = {
           name: "fallback-failing-subscriber",
           handle: subscriberHandle,
@@ -714,9 +690,7 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
-          AggregateError,
-        );
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
 
         expect(subscriberHandle).toHaveBeenCalled();
       });
@@ -796,9 +770,7 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(
-          AggregateError,
-        );
+        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
 
         expect(subscriberHandle).not.toHaveBeenCalled();
       });
@@ -1171,9 +1143,7 @@ describe("ProjectionRouter", () => {
 
         expect(rejection).toBeInstanceOf(AggregateError);
         const aggregateError = rejection as AggregateError;
-        expect(aggregateError.message).toContain(
-          "1 projection(s) failed during dispatch",
-        );
+        expect(aggregateError.message).toContain("1 projection(s) failed during dispatch");
         expect(aggregateError.errors).toHaveLength(1);
         expect(aggregateError.errors[0]).toBeInstanceOf(ReplayDeferralError);
         expect(aggregateError.errors[0]).toBe(deferError);

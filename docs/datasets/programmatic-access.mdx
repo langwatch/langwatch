@@ -30,10 +30,9 @@ const langwatch = new LangWatch();
 </Tabs>
 
 <Note>
-  If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you
-  must also set the `LANGWATCH_PROJECT_ID` environment variable (or pass
-  `project_id`/`projectId` to the SDK) so the SDK knows which project to access. You can
-  find the project ID in your project settings.
+  If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set
+  the `LANGWATCH_PROJECT_ID` environment variable (or pass `project_id`/`projectId` to the SDK) so
+  the SDK knows which project to access. You can find the project ID in your project settings.
 </Note>
 
 ## List Datasets
@@ -199,9 +198,7 @@ Archive a dataset by slug or ID.
 
 <Tabs>
   <Tab title="Python">```python langwatch.dataset.delete_dataset("my-dataset") ```</Tab>
-  <Tab title="TypeScript">
-    ```typescript await langwatch.datasets.delete("my-dataset"); ```
-  </Tab>
+  <Tab title="TypeScript">```typescript await langwatch.datasets.delete("my-dataset"); ```</Tab>
 </Tabs>
 
 ## List Records
@@ -308,12 +305,12 @@ Batch-delete records by their IDs.
 
 <Tabs>
   <Tab title="Python">
-    ```python deleted_count = langwatch.dataset.delete_records( "my-dataset",
-    record_ids=["rec-1", "rec-2"], ) print(f"Deleted {deleted_count} records") ```
+    ```python deleted_count = langwatch.dataset.delete_records( "my-dataset", record_ids=["rec-1",
+    "rec-2"], ) print(f"Deleted {deleted_count} records") ```
   </Tab>
   <Tab title="TypeScript">
-    ```typescript const result = await langwatch.datasets.deleteRecords("my-dataset",
-    ["rec-1", "rec-2"]); console.log(`Deleted ${result.deletedCount} records`); ```
+    ```typescript const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1",
+    "rec-2"]); console.log(`Deleted ${result.deletedCount} records`); ```
   </Tab>
 </Tabs>
 

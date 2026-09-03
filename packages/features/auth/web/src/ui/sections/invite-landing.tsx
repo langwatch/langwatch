@@ -50,10 +50,7 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
   }
 
   return session ? (
-    <ConfirmAndJoin
-      inviteCode={inviteCode}
-      organizationName={landing.data.organizationName}
-    />
+    <ConfirmAndJoin inviteCode={inviteCode} organizationName={landing.data.organizationName} />
   ) : (
     <SignedOutInvite
       inviteCode={inviteCode}
@@ -69,13 +66,7 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
  * purpose — a refusal that explained itself would be a way to learn which
  * organizations exist by guessing at codes.
  */
-function InviteDeadEnd({
-  error,
-  inviteCode,
-}: {
-  error: unknown;
-  inviteCode: string;
-}) {
+function InviteDeadEnd({ error, inviteCode }: { error: unknown; inviteCode: string }) {
   const code = readHandledError(error)?.code;
 
   if (code === "invite_expired") {
@@ -84,9 +75,7 @@ function InviteDeadEnd({
 
   return (
     <AuthCard title="Invitation">
-      <Text data-testid="invite-dead-end">
-        This invitation is no longer available.
-      </Text>
+      <Text data-testid="invite-dead-end">This invitation is no longer available.</Text>
     </AuthCard>
   );
 }
@@ -99,26 +88,17 @@ function InviteDeadEnd({
  * screen then says so. It deliberately never names who was asked: who runs
  * an organization is not something an expired link should teach.
  */
-function ExpiredInvite({
-  error,
-  inviteCode,
-}: {
-  error: unknown;
-  inviteCode: string;
-}) {
+function ExpiredInvite({ error, inviteCode }: { error: unknown; inviteCode: string }) {
   const ask = api.frontDoor.requestFreshInvite.useMutation();
 
   return (
     <AuthCard title="Invitation">
       <VStack width="full" align="stretch" gap={4}>
-        <HandledErrorAlert
-          error={error}
-          fallbackTitle="This invitation has expired"
-        />
+        <HandledErrorAlert error={error} fallbackTitle="This invitation has expired" />
         {ask.isSuccess ? (
           <Text data-testid="invite-refresh-asked" color="fg.muted">
-            We let the organization know. You will get a fresh invitation by
-            email once somebody there sends it.
+            We let the organization know. You will get a fresh invitation by email once somebody
+            there sends it.
           </Text>
         ) : (
           <>
@@ -191,9 +171,7 @@ function SignedOutInvite({
           reasonCode={routing.decision.reasonCode}
           callbackUrl={callbackUrl}
           onPasskeyError={setPasskeyError}
-          onFederatedMethodChosen={(method) =>
-            void signIn(method.id, { callbackUrl })
-          }
+          onFederatedMethodChosen={(method) => void signIn(method.id, { callbackUrl })}
           renderLocalMethod={() => (
             <HStack gap={4}>
               <Box asChild>
@@ -239,23 +217,18 @@ function ConfirmAndJoin({
   // Signed in as somebody else is the one failure with a way out rather than
   // a retry, so it replaces the join button instead of sitting above it:
   // clicking Join again would fail the same way every time.
-  const wrongAccount =
-    readHandledError(accept.error)?.code === "invite_wrong_account";
+  const wrongAccount = readHandledError(accept.error)?.code === "invite_wrong_account";
 
   return (
     <AuthCard title={`Join ${organizationName}`}>
       <VStack width="full" align="stretch" gap={4}>
         {wrongAccount ? null : (
           <Text data-testid="invite-confirm">
-            You have been invited to {organizationName}. Joining adds your
-            account to it.
+            You have been invited to {organizationName}. Joining adds your account to it.
           </Text>
         )}
         {accept.error ? (
-          <HandledErrorAlert
-            error={accept.error}
-            fallbackTitle="Couldn't accept the invitation"
-          />
+          <HandledErrorAlert error={accept.error} fallbackTitle="Couldn't accept the invitation" />
         ) : null}
         <HStack>
           {wrongAccount ? (

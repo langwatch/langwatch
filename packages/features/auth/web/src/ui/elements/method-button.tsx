@@ -61,9 +61,7 @@ export function MethodButton({
         {icon}
       </Box>
       <Text>{label}</Text>
-      {badge ? (
-        <span className="lw-front-door-badge-float">{badge}</span>
-      ) : null}
+      {badge ? <span className="lw-front-door-badge-float">{badge}</span> : null}
     </Button>
   );
 }

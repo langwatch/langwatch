@@ -34,9 +34,7 @@ export function EvalGroup({
   return (
     <VStack align="stretch" gap={0}>
       <EvalCard eval_={headWithHistory} onSelectSpan={onSelectSpan} />
-      {history.length > 0 && (
-        <EvalHistoryStack entries={history} onSelectSpan={onSelectSpan} />
-      )}
+      {history.length > 0 && <EvalHistoryStack entries={history} onSelectSpan={onSelectSpan} />}
     </VStack>
   );
 }

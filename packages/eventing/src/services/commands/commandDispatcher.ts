@@ -32,10 +32,7 @@ export interface ProcessCommandParams<EventType extends Event> {
   commandSchema: CommandSchema<any, CommandType>;
   handler: CommandHandler<Command<any>, EventType>;
   getAggregateId: (payload: any) => string;
-  storeEventsFn: (
-    events: EventType[],
-    context: EventStoreReadContext<EventType>,
-  ) => Promise<void>;
+  storeEventsFn: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>;
   aggregateType: AggregateType;
   commandName: string;
   pipelineName: string;
@@ -96,9 +93,7 @@ function validateHandlerEvents(events: unknown, commandType: CommandType): void 
           commandType,
           index: i,
           zodIssues:
-            parseResult.success === false
-              ? mapValidationIssues(parseResult.error.issues)
-              : void 0,
+            parseResult.success === false ? mapValidationIssues(parseResult.error.issues) : void 0,
         },
       );
     }
@@ -425,9 +420,7 @@ export async function processCommandBatch<EventType extends Event>(
 /**
  * Options for configuring a command handler.
  */
-export interface CommandHandlerOptions<
-  Payload,
-> extends CommandSerializationOptions<Payload> {
+export interface CommandHandlerOptions<Payload> extends CommandSerializationOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
   delay?: number;

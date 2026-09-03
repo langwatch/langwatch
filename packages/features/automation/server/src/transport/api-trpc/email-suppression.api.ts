@@ -82,8 +82,7 @@ export type EmailSuppressionTrpcPorts = Readonly<{
 
 const UNSUBSCRIBE_TOKEN_IS_THE_AUTHORIZATION: AuthzDeclaration = {
   kind: "no-permission",
-  reason:
-    "unsubscribe flows are gated by the single-purpose token in the link, not by a role",
+  reason: "unsubscribe flows are gated by the single-purpose token in the link, not by a role",
 };
 
 const resolveInputSchema = z.object({ token: z.string().min(1) });

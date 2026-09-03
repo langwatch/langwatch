@@ -33,12 +33,7 @@ interface LensTabProps {
   hidden?: boolean;
 }
 
-export const LensTab: React.FC<LensTabProps> = ({
-  lens,
-  isDraft,
-  errorCount,
-  hidden,
-}) => {
+export const LensTab: React.FC<LensTabProps> = ({ lens, isDraft, errorCount, hidden }) => {
   const renameLens = useViewStore((s) => s.renameLens);
   const revertLens = useViewStore((s) => s.revertLens);
   const canDelete = useViewStore((s) => s.allLenses.length > 1);
@@ -69,9 +64,7 @@ export const LensTab: React.FC<LensTabProps> = ({
   // is offset with margin, broken for screen readers and any DOM-text
   // consumer (test assertions, analytics).
   const ariaLabel =
-    errorCount > 0
-      ? `${lens.name}, ${errorCount} error${errorCount === 1 ? "" : "s"}`
-      : undefined;
+    errorCount > 0 ? `${lens.name}, ${errorCount} error${errorCount === 1 ? "" : "s"}` : undefined;
 
   const trigger = (
     <Tabs.Trigger
@@ -146,10 +139,7 @@ const BuiltInTooltip: React.FC<BuiltInTooltipProps> = ({ enabled, children }) =>
  * signal but no affordance, leaving users guessing what it meant or
  * how to resolve it.
  */
-const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
-  lensId,
-  lensName,
-}) => {
+const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({ lensId, lensName }) => {
   const revertLens = useViewStore((s) => s.revertLens);
   const createLens = useViewStore((s) => s.createLens);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -218,8 +208,8 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
                     <Text as="span" color="fg" fontWeight="semibold">
                       {lensName}
                     </Text>
-                    . These edits live in your browser only. Save them as a new lens to
-                    keep them, or discard to snap back.
+                    . These edits live in your browser only. Save them as a new lens to keep them,
+                    or discard to snap back.
                   </Text>
                   <HStack gap={2} justify="flex-end">
                     <Button
@@ -328,9 +318,7 @@ const BuiltInLensMenuItems: React.FC<{
   canDelete: boolean;
 }> = ({ lensId, canDelete }) => {
   const isDraft = useViewStore((s) => s.isDraft(lensId));
-  const lensName = useViewStore(
-    (s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "",
-  );
+  const lensName = useViewStore((s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "");
   const revertLens = useViewStore((s) => s.revertLens);
   const createLens = useViewStore((s) => s.createLens);
   const deleteLens = useViewStore((s) => s.deleteLens);
@@ -383,9 +371,7 @@ const UserLensMenuItems: React.FC<{
   isDraft: boolean;
   onRename: () => void;
 }> = ({ lensId, isDraft, onRename }) => {
-  const lensName = useViewStore(
-    (s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "",
-  );
+  const lensName = useViewStore((s) => s.allLenses.find((l) => l.id === lensId)?.name ?? "");
   const revertLens = useViewStore((s) => s.revertLens);
   const createLens = useViewStore((s) => s.createLens);
   const duplicateLens = useViewStore((s) => s.duplicateLens);

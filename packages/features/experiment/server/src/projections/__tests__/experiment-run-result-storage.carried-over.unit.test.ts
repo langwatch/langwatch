@@ -68,16 +68,12 @@ describe("given a result carried into the run from the board", () => {
   describe("when it is stored", () => {
     /** @scenario "A carried-over row is marked as carried over" */
     it("marks the target row as carried over", () => {
-      expect(
-        projection.mapExperimentRunTargetResult(targetResult(true)).CarriedOver,
-      ).toBe(1);
+      expect(projection.mapExperimentRunTargetResult(targetResult(true)).CarriedOver).toBe(1);
     });
 
     /** @scenario "A carried-over verdict is marked as carried over" */
     it("marks the verdict row as carried over", () => {
-      expect(
-        projection.mapExperimentRunEvaluatorResult(verdict(true)).CarriedOver,
-      ).toBe(1);
+      expect(projection.mapExperimentRunEvaluatorResult(verdict(true)).CarriedOver).toBe(1);
     });
   });
 });
@@ -86,22 +82,15 @@ describe("given a result the run produced itself", () => {
   describe("when it is stored", () => {
     /** @scenario "A row the run produced is not marked as carried over" */
     it("leaves the target row unmarked", () => {
-      expect(
-        projection.mapExperimentRunTargetResult(targetResult(false))
-          .CarriedOver,
-      ).toBe(0);
+      expect(projection.mapExperimentRunTargetResult(targetResult(false)).CarriedOver).toBe(0);
     });
 
     /** @scenario "A row the run produced is not marked as carried over" */
     it("leaves a row that says nothing about it unmarked", () => {
       // Rows written before the field existed, and every path that does not
       // carry anything, read back as the run's own work.
-      expect(
-        projection.mapExperimentRunTargetResult(targetResult()).CarriedOver,
-      ).toBe(0);
-      expect(
-        projection.mapExperimentRunEvaluatorResult(verdict()).CarriedOver,
-      ).toBe(0);
+      expect(projection.mapExperimentRunTargetResult(targetResult()).CarriedOver).toBe(0);
+      expect(projection.mapExperimentRunEvaluatorResult(verdict()).CarriedOver).toBe(0);
     });
   });
 });

@@ -3,18 +3,12 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  resolve(
-    import.meta.dirname,
-    "../../../migrations",
-    "00050_create_canonical_logs.sql",
-  ),
+  resolve(import.meta.dirname, "../../../migrations", "00050_create_canonical_logs.sql"),
   "utf8",
 );
 
 function tableDefinition(table: string): string {
-  const start = migration.indexOf(
-    `CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.${table}`,
-  );
+  const start = migration.indexOf(`CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.${table}`);
   const end = migration.indexOf("-- +goose StatementEnd", start);
   if (start < 0 || end < 0) throw new Error(`missing ${table} definition`);
   return migration.slice(start, end);

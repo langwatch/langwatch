@@ -53,8 +53,7 @@ async function waitForApp(): Promise<void> {
 // race a not-yet-ready backend. Wait for that exact endpoint to serve 200.
 async function waitForApi(): Promise<void> {
   const url =
-    `${BASE_URL}/api/trpc/publicEnv?batch=1` +
-    `&input=${encodeURIComponent('{"0":{"json":{}}}')}`;
+    `${BASE_URL}/api/trpc/publicEnv?batch=1` + `&input=${encodeURIComponent('{"0":{"json":{}}}')}`;
   console.log(`\n🔍 Checking API readiness at ${url}...`);
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {

@@ -153,13 +153,7 @@ const { default: MyQueuePage } = await import("../my-queue.screen");
 
 const TRACE_STARTED_AT = 1_700_000_000_000;
 
-const trace = ({
-  threadId,
-  traceId = "trace-1",
-}: {
-  threadId?: string;
-  traceId?: string;
-}) => ({
+const trace = ({ threadId, traceId = "trace-1" }: { threadId?: string; traceId?: string }) => ({
   trace_id: traceId,
   project_id: "project-1",
   metadata: threadId ? { thread_id: threadId } : {},
@@ -216,11 +210,13 @@ const setThreadQueue = ({ threadId }: { threadId: string }) => {
  */
 const page = () => (
   <AnnotationTestHarness
-    host={new StubAnnotationHost({
-      project: { id: "project-1", slug: "acme", name: "Acme" },
-      currentUser: { id: "user-1", name: "Ada", image: null },
-      permissions: ["annotations:update", "annotations:manage"],
-    })}
+    host={
+      new StubAnnotationHost({
+        project: { id: "project-1", slug: "acme", name: "Acme" },
+        currentUser: { id: "user-1", name: "Ada", image: null },
+        permissions: ["annotations:update", "annotations:manage"],
+      })
+    }
   >
     <MyQueuePage />
   </AnnotationTestHarness>
@@ -379,9 +375,7 @@ describe("given a reviewer walking their annotation queue", () => {
     it("interrupts the reading with no integration hint about thread ids", () => {
       renderPage();
 
-      expect(
-        screen.queryByText(/Pass the thread_id on your integration/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Pass the thread_id on your integration/)).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "docs" })).not.toBeInTheDocument();
     });
   });

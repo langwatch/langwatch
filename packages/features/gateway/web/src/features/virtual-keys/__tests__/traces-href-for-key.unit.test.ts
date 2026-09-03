@@ -28,9 +28,7 @@ describe("tracesHrefForKey", () => {
     });
 
     it("carries the key filter through intact", () => {
-      expect(parsed?.overrides.query).toBe(
-        'trace.attribute.langwatch.virtual_key_id:"vk_01HTEST"',
-      );
+      expect(parsed?.overrides.query).toBe('trace.attribute.langwatch.virtual_key_id:"vk_01HTEST"');
     });
   });
 
@@ -133,9 +131,9 @@ describe("tracesHrefForKey narrowed to one model", () => {
         virtualKeyId: "vk_01HTEST",
         model: null,
       });
-      expect(
-        parseFragment(unfiltered.slice(unfiltered.indexOf("#")))?.overrides.query,
-      ).toBe('trace.attribute.langwatch.virtual_key_id:"vk_01HTEST"');
+      expect(parseFragment(unfiltered.slice(unfiltered.indexOf("#")))?.overrides.query).toBe(
+        'trace.attribute.langwatch.virtual_key_id:"vk_01HTEST"',
+      );
     });
   });
 });

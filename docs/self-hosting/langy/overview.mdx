@@ -20,16 +20,14 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 <Info>
   **Also check:** [Setup](/self-hosting/langy/setup), [Environment
   variables](/self-hosting/langy/environment-variables), [Networking and
-  egress](/self-hosting/langy/networking-and-egress), [The
-  sandbox](/langy/security/sandbox).
+  egress](/self-hosting/langy/networking-and-egress), [The sandbox](/langy/security/sandbox).
 </Info>
 
 <Note>
-  **Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every
-  reference to it are removed on the next upgrade, and nothing else in the install
-  changes. For opening Langy to a few projects before everyone, see [staged
-  rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is
-  managed for you.
+  **Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to
+  it are removed on the next upgrade, and nothing else in the install changes. For opening Langy to
+  a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On
+  LangWatch Cloud, availability is managed for you.
 </Note>
 
 ## At a glance
@@ -79,16 +77,11 @@ The control plane reaches the agent over cluster DNS at `http://<release>-langya
 
 <CardGroup cols={2}>
   <Card title="Setup" icon="ship" href="/self-hosting/langy/setup">
-    Deployed by default; the sandboxed runtime per cloud, egress, mirror, and staged
-    rollout.
+    Deployed by default; the sandboxed runtime per cloud, egress, mirror, and staged rollout.
   </Card>
-  <Card
-    title="Register the GitHub App"
-    icon="github"
-    href="/self-hosting/langy/github-app"
-  >
-    Register the app, set the `GITHUB_LANGY_*` env vars, and install it on the repos Langy
-    may touch.
+  <Card title="Register the GitHub App" icon="github" href="/self-hosting/langy/github-app">
+    Register the app, set the `GITHUB_LANGY_*` env vars, and install it on the repos Langy may
+    touch.
   </Card>
   <Card
     title="Environment variables"

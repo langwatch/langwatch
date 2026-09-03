@@ -84,9 +84,7 @@ describe("DataRetentionService pin lifecycle", () => {
 
     await service.pin({ projectId: "project", traceId: "trace" });
 
-    await expect(
-      service.isPinned({ projectId: "project", traceId: "trace" }),
-    ).resolves.toBe(true);
+    await expect(service.isPinned({ projectId: "project", traceId: "trace" })).resolves.toBe(true);
     expect(retroactive.calls).toEqual([]);
   });
 
@@ -96,8 +94,6 @@ describe("DataRetentionService pin lifecycle", () => {
     await service.autoPin({ projectId: "project", traceId: "trace" });
     await service.pin({ projectId: "project", traceId: "trace" });
     await service.autoUnpin({ projectId: "project", traceId: "trace" });
-    await expect(
-      service.isPinned({ projectId: "project", traceId: "trace" }),
-    ).resolves.toBe(true);
+    await expect(service.isPinned({ projectId: "project", traceId: "trace" })).resolves.toBe(true);
   });
 });

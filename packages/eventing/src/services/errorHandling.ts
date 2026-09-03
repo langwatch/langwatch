@@ -138,9 +138,7 @@ export class ValidationError extends CriticalError {
     value?: unknown,
     context: Record<string, unknown> = {},
   ) {
-    const message = field
-      ? `[VALIDATION] ${reason} (field: ${field})`
-      : `[VALIDATION] ${reason}`;
+    const message = field ? `[VALIDATION] ${reason} (field: ${field})` : `[VALIDATION] ${reason}`;
     super(message, {
       ...context,
       field,
@@ -157,11 +155,7 @@ export class ValidationError extends CriticalError {
 export class EventNotFoundError extends CriticalError {
   override readonly name = "EventNotFoundError";
 
-  constructor(context: {
-    eventId: string;
-    aggregateId: string;
-    aggregateType: string;
-  }) {
+  constructor(context: { eventId: string; aggregateId: string; aggregateType: string }) {
     super("Event was not found in the requested tenant-bound aggregate stream", context);
   }
 }
@@ -338,10 +332,7 @@ export function handleError(
       case ErrorCategory.NON_CRITICAL:
         // Non-critical errors are logged but don't throw
         if (logger) {
-          logger.error(
-            mergedContext,
-            "Non-critical error occurred, continuing operation",
-          );
+          logger.error(mergedContext, "Non-critical error occurred, continuing operation");
         }
         break;
 
@@ -513,9 +504,7 @@ export function classifyClickHouseError(error: unknown): ErrorCategory {
   // shell. Single shallow pass: the translation wraps the driver error
   // directly, no deep recursion needed.
   const candidates =
-    HandledError.isHandled(error) && (error.reasons ?? []).length > 0
-      ? error.reasons
-      : [error];
+    HandledError.isHandled(error) && (error.reasons ?? []).length > 0 ? error.reasons : [error];
 
   for (const candidate of candidates) {
     if (isTransientClickHouseError(candidate)) {

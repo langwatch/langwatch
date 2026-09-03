@@ -36,9 +36,7 @@ export function LangyMakeDefaultDialog({
   const shown = plan ?? lastPlanRef.current;
   // The model half of the reference, which is how the picker itself words a
   // model (custom aggregator ids keep their inner slashes).
-  const modelLabel = shown
-    ? shown.model.split("/").slice(1).join("/") || shown.model
-    : "";
+  const modelLabel = shown ? shown.model.split("/").slice(1).join("/") || shown.model : "";
 
   return (
     <Dialog.Root

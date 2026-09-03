@@ -11,11 +11,7 @@
  * touch.
  */
 
-import {
-  findPhoneNumbersInText,
-  getCountries,
-  getExampleNumber,
-} from "libphonenumber-js";
+import { findPhoneNumbersInText, getCountries, getExampleNumber } from "libphonenumber-js";
 import examples from "libphonenumber-js/examples.mobile.json" with { type: "json" };
 import { describe, expect, it } from "vitest";
 
@@ -27,16 +23,12 @@ describe("given a recognizer that is skipped unless the text holds its literal",
   describe("when the literal is present", () => {
     /** @scenario "Skipped detectors still find their own kind of personal data" */
     it("still redacts an email address", () => {
-      expect(redact("write to ada@example.com today")).toBe(
-        "write to [EMAIL_ADDRESS] today",
-      );
+      expect(redact("write to ada@example.com today")).toBe("write to [EMAIL_ADDRESS] today");
     });
 
     /** @scenario "Skipped detectors still find their own kind of personal data" */
     it("still redacts an Ethereum address", () => {
-      expect(redact("paid 0x52908400098527886E0F7030069857D2E4169EE7 out")).toContain(
-        "[CRYPTO]",
-      );
+      expect(redact("paid 0x52908400098527886E0F7030069857D2E4169EE7 out")).toContain("[CRYPTO]");
     });
 
     /** @scenario "Skipped detectors still find their own kind of personal data" */

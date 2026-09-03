@@ -67,7 +67,11 @@ function renderScreen(token: string) {
 }
 
 beforeEach(() => {
-  state.view = { projectName: "Acme Support", triggerName: "Bad answer alert", email: "a***@acme.io" };
+  state.view = {
+    projectName: "Acme Support",
+    triggerName: "Bad answer alert",
+    email: "a***@acme.io",
+  };
   state.isLoading = false;
   state.isError = false;
   calls.resolve.mockClear();
@@ -95,9 +99,7 @@ describe("given a link the server recognises", () => {
     await user.click(screen.getByRole("button", { name: "Stop receiving Bad answer alert" }));
 
     expect(calls.confirm).toHaveBeenCalledWith({ token: "tok_1", scope: "trigger" });
-    expect(
-      screen.getByText("a***@acme.io will no longer receive Bad answer alert."),
-    ).toBeDefined();
+    expect(screen.getByText("a***@acme.io will no longer receive Bad answer alert.")).toBeDefined();
   });
 
   /** @scenario Stopping the project silences every notification from it */

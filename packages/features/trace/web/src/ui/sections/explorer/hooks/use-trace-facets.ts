@@ -5,11 +5,7 @@ import { api } from "../../trace-api";
 import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sample-descriptors";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active";
 import { useFilterStore } from "../../../../index";
-import {
-  type DiscoverDescriptors,
-  getCachedDiscover,
-  setCachedDiscover,
-} from "./discover-cache";
+import { type DiscoverDescriptors, getCachedDiscover, setCachedDiscover } from "./discover-cache";
 
 const EMPTY: never[] = [];
 const EMPTY_RESULT: { facets: never[]; pending: boolean } = {

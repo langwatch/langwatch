@@ -33,10 +33,8 @@ const entry = (
   isDegenerate: false,
 });
 
-const intervalsOverlap = (
-  a: [number, number] | null,
-  b: [number, number] | null,
-): boolean => a !== null && b !== null && a[0] <= b[1] && b[0] <= a[1];
+const intervalsOverlap = (a: [number, number] | null, b: [number, number] | null): boolean =>
+  a !== null && b !== null && a[0] <= b[1] && b[0] <= a[1];
 
 describe("areDistinguishable", () => {
   describe("given overlapping intervals but a difference that excludes zero", () => {

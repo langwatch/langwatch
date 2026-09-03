@@ -64,13 +64,7 @@ export const useWorkflowExecution = () => {
   }, [triggerTimeout, setWorkflowExecutionState, getWorkflow]);
 
   const startWorkflowExecution = useCallback(
-    ({
-      untilNodeId,
-      inputs,
-    }: {
-      untilNodeId?: string;
-      inputs?: Array<Record<string, string>>;
-    }) => {
+    ({ untilNodeId, inputs }: { untilNodeId?: string; inputs?: Array<Record<string, string>> }) => {
       if (!socketAvailable()) {
         return;
       }

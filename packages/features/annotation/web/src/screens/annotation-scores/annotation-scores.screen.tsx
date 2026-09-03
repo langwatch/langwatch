@@ -71,8 +71,7 @@ export default function AnnotationScoresScreen() {
         onSuccess: () => {
           void getAllAnnotationScores.refetch();
         },
-        onError: (error) =>
-          host.failed({ error, fallbackTitle: "Failed to update score" }),
+        onError: (error) => host.failed({ error, fallbackTitle: "Failed to update score" }),
       },
     );
   };
@@ -94,8 +93,7 @@ export default function AnnotationScoresScreen() {
               description: "Score deleted successfully",
             });
           },
-          onError: (error) =>
-            host.failed({ error, fallbackTitle: "Failed to delete score" }),
+          onError: (error) => host.failed({ error, fallbackTitle: "Failed to delete score" }),
         },
       );
     }
@@ -228,12 +226,7 @@ export default function AnnotationScoresScreen() {
                                     handleDeleteScore(score.id);
                                   }}
                                 >
-                                  <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    gap={2}
-                                    color="red.600"
-                                  >
+                                  <Box display="flex" alignItems="center" gap={2} color="red.600">
                                     <Trash size={14} />
                                     Delete
                                   </Box>

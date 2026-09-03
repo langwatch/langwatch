@@ -34,8 +34,7 @@ class InMemoryEnrollments implements MfaEnrollmentRepository {
 
   fold(facts: MfaFactInput[], occurredAt = T0): void {
     this.state = facts.reduce(
-      (state, fact) =>
-        reduceMfaEnrollment({ state, fact: { ...fact, occurredAt } as MfaFact }),
+      (state, fact) => reduceMfaEnrollment({ state, fact: { ...fact, occurredAt } as MfaFact }),
       this.state,
     );
   }
@@ -388,10 +387,7 @@ describe("the two-step verification guards", () => {
         occurredAtMs: T0 + 360_000,
       });
 
-      expect(Object.keys(fact!.data).sort()).toEqual([
-        "enrollmentId",
-        "failedCount",
-      ]);
+      expect(Object.keys(fact!.data).sort()).toEqual(["enrollmentId", "failedCount"]);
     });
 
     it("writes nothing for somebody who never set one up", async () => {

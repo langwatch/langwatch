@@ -12,9 +12,7 @@ describe("the grants-ledger actor of an organization-authenticated request", () 
   describe("when the key acts for a person", () => {
     it("names the person", () => {
       expect(
-        orgRequestLedgerActor(
-          contextWith({ apiKeyUserId: "user_1", apiKeyId: "apikey_1" }),
-        ),
+        orgRequestLedgerActor(contextWith({ apiKeyUserId: "user_1", apiKeyId: "apikey_1" })),
       ).toEqual({ type: "user", id: "user_1" });
     });
   });
@@ -36,9 +34,10 @@ describe("the grants-ledger actor of an organization-authenticated request", () 
     });
 
     it("treats an empty key id the same way", () => {
-      expect(
-        orgRequestLedgerActor(contextWith({ apiKeyUserId: null, apiKeyId: "" })),
-      ).toEqual({ type: "system", id: "system:management-api" });
+      expect(orgRequestLedgerActor(contextWith({ apiKeyUserId: null, apiKeyId: "" }))).toEqual({
+        type: "system",
+        id: "system:management-api",
+      });
     });
   });
 });

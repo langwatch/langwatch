@@ -11,10 +11,7 @@ import { useOpenTraceDrawer } from "../hooks/use-open-trace-drawer";
 import type { Density } from "../../../../index";
 import { useUIStore } from "../../../../index";
 import { findStageDef } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config";
-import {
-  ARRIVAL_PREVIEW_TRACES,
-  RICH_ARRIVAL_TRACE_ID,
-} from "./data/sample-preview-traces";
+import { ARRIVAL_PREVIEW_TRACES, RICH_ARRIVAL_TRACE_ID } from "./data/sample-preview-traces";
 import {
   hasCompletedJourney,
   hasDensityBeenConfirmed,
@@ -64,12 +61,8 @@ export function TracesEmptyOnboarding(): React.ReactElement {
    * place of `Selected ✓`) advances the journey. Resets whenever
    * we leave the spotlight stage.
    */
-  const [pickedDensityThisStage, setPickedDensityThisStage] = useState<Density | null>(
-    null,
-  );
-  const setSetupDismissedForProject = useOnboardingStore(
-    (s) => s.setSetupDismissedForProject,
-  );
+  const [pickedDensityThisStage, setPickedDensityThisStage] = useState<Density | null>(null);
+  const setSetupDismissedForProject = useOnboardingStore((s) => s.setSetupDismissedForProject);
   const setSetupDisengaged = useOnboardingStore((s) => s.setSetupDisengaged);
   const setTourActive = useOnboardingStore((s) => s.setTourActive);
   const stage = useOnboardingStore((s) => s.stage);
@@ -176,9 +169,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
     // underneath would be jarring and they'd miss the moment we're
     // trying to land.
     if (drawerOpen) return;
-    const richTrace = ARRIVAL_PREVIEW_TRACES.find(
-      (t) => t.traceId === RICH_ARRIVAL_TRACE_ID,
-    );
+    const richTrace = ARRIVAL_PREVIEW_TRACES.find((t) => t.traceId === RICH_ARRIVAL_TRACE_ID);
     if (!richTrace) return;
     const t = setTimeout(() => openTraceDrawer(richTrace), POST_ARRIVAL_AUTO_OPEN_MS);
     return () => clearTimeout(t);
@@ -362,11 +353,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
                   paused={drawerOpen}
                 />
               ) : (
-                <StaticHero
-                  stage={stage}
-                  heading={stageDef.heading}
-                  subhead={stageDef.subhead}
-                />
+                <StaticHero stage={stage} heading={stageDef.heading} subhead={stageDef.subhead} />
               )}
             </motion.div>
           ) : null}
@@ -521,35 +508,32 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             cards do double-duty as the advance affordance) and the
             outro chapter (the OutroPanel owns its own CTAs). */}
         <AnimatePresence>
-          {stageDef.cta &&
-            stageDef.next &&
-            !stageDef.showDensitySpotlight &&
-            stage !== "outro" && (
-              <motion.div
-                key={`stage-cta-${stage}`}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{
-                  duration: 0.35,
-                  delay: 0.22,
-                  ease: [0.16, 1, 0.3, 1],
-                }}
+          {stageDef.cta && stageDef.next && !stageDef.showDensitySpotlight && stage !== "outro" && (
+            <motion.div
+              key={`stage-cta-${stage}`}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{
+                duration: 0.35,
+                delay: 0.22,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+            >
+              <Button
+                size="md"
+                variant="solid"
+                colorPalette="orange"
+                onClick={handleAdvanceManual}
+                paddingX={5}
               >
-                <Button
-                  size="md"
-                  variant="solid"
-                  colorPalette="orange"
-                  onClick={handleAdvanceManual}
-                  paddingX={5}
-                >
-                  <Text>{stageDef.cta}</Text>
-                  <Text aria-hidden as="span">
-                    →
-                  </Text>
-                </Button>
-              </motion.div>
-            )}
+                <Text>{stageDef.cta}</Text>
+                <Text aria-hidden as="span">
+                  →
+                </Text>
+              </Button>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* Single footer row — manual advance CTA (when the stage
@@ -570,13 +554,7 @@ export function TracesEmptyOnboarding(): React.ReactElement {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4, delay: 0.32 }}
           >
-            <HStack
-              gap={3}
-              color="fg.muted"
-              textStyle="xs"
-              flexWrap="wrap"
-              justify="center"
-            >
+            <HStack gap={3} color="fg.muted" textStyle="xs" flexWrap="wrap" justify="center">
               {/* Back + Replay sit before Continue / docs / skip — they
                 give the user a way out of "I missed that beat" without
                 forcing them to restart the whole tour. Hidden on the

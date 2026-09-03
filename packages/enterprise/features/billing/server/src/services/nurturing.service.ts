@@ -5,10 +5,7 @@ import type {
   CioOrgTraits,
   CioPersonTraits,
 } from "@langwatch/enterprise-billing-contract";
-import {
-  NullBillingErrorReporter,
-  type BillingErrorReporter,
-} from "../ports/error-reporter.port";
+import { NullBillingErrorReporter, type BillingErrorReporter } from "../ports/error-reporter.port";
 
 const logger = createLogger("ee:nurturing-service");
 
@@ -178,9 +175,7 @@ export class NurturingService {
       }
     } catch (error) {
       logger.error({ error, path }, `[CIO] <<< ${path} EXCEPTION`);
-      this.errorReporter.capture(
-        error instanceof Error ? error : new Error(String(error)),
-      );
+      this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
     } finally {
       clearTimeout(timeoutId);
     }

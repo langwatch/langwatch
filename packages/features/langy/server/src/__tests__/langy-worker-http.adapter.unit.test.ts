@@ -74,9 +74,7 @@ describe("createLangyWorkerPort", () => {
     [500, "unavailable"],
     [503, "unavailable"],
   ] as const)("maps manager status %s to %s", async (status, outcome) => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(new Response(null, { status }));
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status }));
     vi.stubGlobal("fetch", fetchMock);
     const metrics = { recordDispatch: vi.fn() };
 
@@ -93,9 +91,7 @@ describe("createLangyWorkerPort", () => {
   });
 
   it("sends all optional dispatch fields without changing their names", async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(new Response(null, { status: 202 }));
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await createWorker().dispatch({
@@ -143,14 +139,8 @@ describe("createLangyWorkerPort", () => {
   it.each([
     ["non-success response", new Response(null, { status: 503 })],
     ["invalid JSON", new Response("{", { status: 200 })],
-    [
-      "invalid response shape",
-      new Response(JSON.stringify({ alive: "yes" }), { status: 200 }),
-    ],
-    [
-      "explicitly cold worker",
-      new Response(JSON.stringify({ alive: false }), { status: 200 }),
-    ],
+    ["invalid response shape", new Response(JSON.stringify({ alive: "yes" }), { status: 200 })],
+    ["explicitly cold worker", new Response(JSON.stringify({ alive: false }), { status: 200 })],
   ])("fails open for a probe with %s", async (_case, response) => {
     vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(response));
 
@@ -248,33 +238,28 @@ describe("createLangyWorkerPort", () => {
     await expect(operation).resolves.toBeUndefined();
   });
 
-  it.each(["dispatch", "cancel"] as const)(
-    "cancels the %s response body",
-    async (method) => {
-      const response = new Response("ignored", { status: 202 });
-      const cancel = vi.spyOn(response.body!, "cancel");
-      vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(response));
-      const worker = createWorker();
+  it.each(["dispatch", "cancel"] as const)("cancels the %s response body", async (method) => {
+    const response = new Response("ignored", { status: 202 });
+    const cancel = vi.spyOn(response.body!, "cancel");
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockResolvedValue(response));
+    const worker = createWorker();
 
-      if (method === "dispatch") {
-        await worker.dispatch(dispatchInput);
-      } else {
-        await worker.cancel({
-          projectId: "project-1",
-          conversationId: "conversation-1",
-          turnId: "turn-1",
-        });
-      }
+    if (method === "dispatch") {
+      await worker.dispatch(dispatchInput);
+    } else {
+      await worker.cancel({
+        projectId: "project-1",
+        conversationId: "conversation-1",
+        turnId: "turn-1",
+      });
+    }
 
-      expect(cancel).toHaveBeenCalledOnce();
-    },
-  );
+    expect(cancel).toHaveBeenCalledOnce();
+  });
 
   it("injects the active trace context into manager requests", async () => {
     const inject = vi.spyOn(propagation, "inject");
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(new Response(null, { status: 202 }));
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await createWorker().dispatch(dispatchInput);
@@ -283,9 +268,7 @@ describe("createLangyWorkerPort", () => {
     const traceCarrier = inject.mock.calls[0]?.[1];
     const request = fetchMock.mock.calls[0]?.[1];
     expect(request?.headers).toBe(traceCarrier);
-    expect(traceCarrier).toEqual(
-      expect.objectContaining({ Authorization: "Bearer secret" }),
-    );
+    expect(traceCarrier).toEqual(expect.objectContaining({ Authorization: "Bearer secret" }));
   });
 
   it("delegates span origin and status lifecycle to the LangWatch tracer", async () => {
@@ -309,25 +292,17 @@ describe("createLangyWorkerPort", () => {
       },
       expect.any(Function),
     );
-    expect(tracing.span.setAttribute).toHaveBeenCalledWith(
-      "langy.dispatch.outcome",
-      "accepted",
-    );
+    expect(tracing.span.setAttribute).toHaveBeenCalledWith("langy.dispatch.outcome", "accepted");
   });
 
   it("fails open and records an error when dispatch cannot reach the manager", async () => {
     vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockRejectedValue(new Error("offline")));
     const metrics = { recordDispatch: vi.fn() };
 
-    await expect(createWorker(metrics).dispatch(dispatchInput)).resolves.toBe(
-      "unavailable",
-    );
+    await expect(createWorker(metrics).dispatch(dispatchInput)).resolves.toBe("unavailable");
 
     expect(metrics.recordDispatch).toHaveBeenCalledWith({ outcome: "error" });
-    expect(tracing.span.setAttribute).toHaveBeenCalledWith(
-      "langy.dispatch.outcome",
-      "error",
-    );
+    expect(tracing.span.setAttribute).toHaveBeenCalledWith("langy.dispatch.outcome", "error");
   });
 });
 

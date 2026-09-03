@@ -58,9 +58,7 @@ describe("installCopilotAppAgent", () => {
       expect(files.get(p)).toContain("<key>RunAtLoad</key>");
       // Modern verbs only: legacy `launchctl load` exits 0 even on failure,
       // which is exactly the silent-success this module must never report.
-      expect(runs.some((r) => r.cmd === "launchctl" && r.args[0] === "bootstrap")).toBe(
-        true,
-      );
+      expect(runs.some((r) => r.cmd === "launchctl" && r.args[0] === "bootstrap")).toBe(true);
       expect(runs.some((r) => r.cmd === "launchctl" && r.args[0] === "load")).toBe(false);
     });
   });
@@ -70,21 +68,14 @@ describe("installCopilotAppAgent", () => {
     it("writes the unit and enables it with systemctl --user", () => {
       const { io, files, runs } = fakeIo();
 
-      const p = installCopilotAppAgent(
-        { ...macSpec, platform: "linux", home: "/home/dev" },
-        io,
-      );
+      const p = installCopilotAppAgent({ ...macSpec, platform: "linux", home: "/home/dev" }, io);
 
       expect(p).toContain(".config/systemd/user");
       expect(files.get(p)).toContain("ExecStart=");
-      expect(runs.some((r) => r.cmd === "systemctl" && r.args.includes("enable"))).toBe(
-        true,
-      );
+      expect(runs.some((r) => r.cmd === "systemctl" && r.args.includes("enable"))).toBe(true);
       // restart, not `enable --now`: `--now` is a no-op on an already-active
       // unit, which would leave a running app holding the revoked prior key.
-      expect(runs.some((r) => r.cmd === "systemctl" && r.args.includes("restart"))).toBe(
-        true,
-      );
+      expect(runs.some((r) => r.cmd === "systemctl" && r.args.includes("restart"))).toBe(true);
       expect(runs.every((r) => !r.args.includes("--now"))).toBe(true);
     });
   });
@@ -106,18 +97,12 @@ describe("installCopilotAppAgent", () => {
       const wrapperPath = [...files.keys()].find((f) => f.endsWith(".cmd"))!;
       expect(files.get(wrapperPath)).toContain('set "COPILOT_OTEL_ENABLED=true"');
       expect(xml).toContain(".cmd");
-      expect(runs.some((r) => r.cmd === "schtasks" && r.args.includes("/Create"))).toBe(
-        true,
-      );
+      expect(runs.some((r) => r.cmd === "schtasks" && r.args.includes("/Create"))).toBe(true);
       // /Create registers for the NEXT logon only; /Run starts capture now.
-      expect(runs.some((r) => r.cmd === "schtasks" && r.args.includes("/Run"))).toBe(
-        true,
-      );
+      expect(runs.some((r) => r.cmd === "schtasks" && r.args.includes("/Run"))).toBe(true);
       // Schema default DisallowStartIfOnBatteries=true would silently keep
       // laptops-on-battery from ever starting capture.
-      expect(xml).toContain(
-        "<DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>",
-      );
+      expect(xml).toContain("<DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>");
     });
   });
 
@@ -147,9 +132,7 @@ describe("removeCopilotAppAgent", () => {
 
       expect(removed).toBe(true);
       expect(files.has(p)).toBe(false);
-      expect(runs.some((r) => r.cmd === "launchctl" && r.args[0] === "bootout")).toBe(
-        true,
-      );
+      expect(runs.some((r) => r.cmd === "launchctl" && r.args[0] === "bootout")).toBe(true);
     });
   });
 
@@ -189,10 +172,7 @@ describe("installCopilotAppAgent registration-failure handling", () => {
       const { io } = fakeIo(new Set(), (cmd) => cmd === "schtasks");
 
       expect(() =>
-        installCopilotAppAgent(
-          { ...macSpec, platform: "win32", home: "C:\\Users\\dev" },
-          io,
-        ),
+        installCopilotAppAgent({ ...macSpec, platform: "win32", home: "C:\\Users\\dev" }, io),
       ).toThrow(CopilotAppAgentError);
     });
   });
@@ -226,9 +206,7 @@ describe("removeCopilotAppAgent unregister-failure handling", () => {
       },
     };
 
-    expect(() => removeCopilotAppAgent("darwin", "/Users/dev", io2)).toThrow(
-      CopilotAppAgentError,
-    );
+    expect(() => removeCopilotAppAgent("darwin", "/Users/dev", io2)).toThrow(CopilotAppAgentError);
     // descriptor preserved for retry — NOT deleted
     expect(files.has(p)).toBe(true);
   });

@@ -103,9 +103,7 @@ describe("GroupQueue metrics", () => {
     it("records retry backoff with routing labels", async () => {
       gqRetryBackoffMilliseconds.observe(routingLabels, 2000);
 
-      const lines = await register.getSingleMetricAsString(
-        "gq_retry_backoff_milliseconds",
-      );
+      const lines = await register.getSingleMetricAsString("gq_retry_backoff_milliseconds");
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_name="traceSummary"');
     });
@@ -115,9 +113,7 @@ describe("GroupQueue metrics", () => {
     it("records duration with all routing labels", async () => {
       gqJobDurationMilliseconds.observe(routingLabels, 150.5);
 
-      const lines = await register.getSingleMetricAsString(
-        "gq_job_duration_milliseconds",
-      );
+      const lines = await register.getSingleMetricAsString("gq_job_duration_milliseconds");
       expect(lines).toContain('queue_name="test-queue"');
       expect(lines).toContain('pipeline_name="test-pipeline"');
       expect(lines).toContain('job_type="fold"');

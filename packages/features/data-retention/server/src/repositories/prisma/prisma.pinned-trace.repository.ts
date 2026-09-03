@@ -14,9 +14,7 @@ function mapPinnedTrace(row: unknown): PinnedTrace {
 
 /** Private persistence for trace pin annotations owned by Data Retention. */
 export class PrismaPinnedTraceRepository extends PinnedTraceRepository {
-  static create(options: {
-    database: DataRetentionDatabasePort;
-  }): PrismaPinnedTraceRepository {
+  static create(options: { database: DataRetentionDatabasePort }): PrismaPinnedTraceRepository {
     return new PrismaPinnedTraceRepository(options.database);
   }
 
@@ -44,9 +42,7 @@ export class PrismaPinnedTraceRepository extends PinnedTraceRepository {
       where: { projectId },
       select: { traceId: true },
     });
-    return pins.map(
-      (pin) => pinnedTraceSchema.pick({ traceId: true }).parse(pin).traceId,
-    );
+    return pins.map((pin) => pinnedTraceSchema.pick({ traceId: true }).parse(pin).traceId);
   }
 
   async create(params: PinTraceInput & { source: PinSource }): Promise<PinnedTrace> {

@@ -119,7 +119,6 @@ vi.mock("../../../../behavior/studio-host/api", () => {
   };
 });
 
-
 vi.mock("../../../../behavior/optimization_studio/use-model-provider-keys", () => ({
   useModelProviderKeys: () => ({
     hasProvidersWithoutCustomKeys: false,
@@ -182,9 +181,7 @@ vi.mock("../../../elements/dialog", () => ({
 
 vi.mock("@langwatch/design-system/tooltip", () => ({
   Tooltip: ({ content, children }: { content?: ReactNode; children?: ReactNode }) => (
-    <span data-tooltip-content={typeof content === "string" ? content : ""}>
-      {children}
-    </span>
+    <span data-tooltip-content={typeof content === "string" ? content : ""}>{children}</span>
   ),
 }));
 
@@ -235,9 +232,7 @@ describe("given the studio Publish menu is rendered", () => {
       renderPublish();
       const tooltips = document.querySelectorAll("[data-tooltip-content]");
       const lockTooltips = Array.from(tooltips).filter((el) =>
-        (el.getAttribute("data-tooltip-content") ?? "").includes(
-          "Subscribe to unlock publishing",
-        ),
+        (el.getAttribute("data-tooltip-content") ?? "").includes("Subscribe to unlock publishing"),
       );
       expect(lockTooltips).toHaveLength(0);
     });
@@ -284,9 +279,7 @@ describe("given the studio Publish menu is rendered", () => {
       expect(screen.getByText(/Publish workflow/i)).toBeDefined();
       const tooltips = document.querySelectorAll("[data-tooltip-content]");
       const lockTooltips = Array.from(tooltips).filter((el) =>
-        (el.getAttribute("data-tooltip-content") ?? "").includes(
-          "Subscribe to unlock publishing",
-        ),
+        (el.getAttribute("data-tooltip-content") ?? "").includes("Subscribe to unlock publishing"),
       );
       expect(lockTooltips).toHaveLength(0);
     });

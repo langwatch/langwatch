@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { EarlierTurnsExpander, CollapseEarlierToggle } from "../../elements/transcript/conversation-turn-list-controls";
+import {
+  EarlierTurnsExpander,
+  CollapseEarlierToggle,
+} from "../../elements/transcript/conversation-turn-list-controls";
 import { InlineTurnList, VirtualizedTurnList } from "./conversation-turn-list-virtualized";
 import {
   type ChatLayout,

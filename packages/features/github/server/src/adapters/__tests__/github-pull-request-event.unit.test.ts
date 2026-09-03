@@ -62,9 +62,7 @@ describe("GitHub pull-request webhook parsing", () => {
       updated_at: "yesterday",
     };
 
-    expect(
-      parseGithubPullRequestEvent(delivery({ pull_request: withoutUpdatedAt })),
-    ).toBeNull();
+    expect(parseGithubPullRequestEvent(delivery({ pull_request: withoutUpdatedAt }))).toBeNull();
     expect(parseGithubPullRequestEvent(delivery({ pull_request: malformed }))).toBeNull();
   });
 
@@ -94,9 +92,7 @@ describe("GitHub pull-request webhook parsing", () => {
     };
 
     expect(parseGithubPullRequestEvent(delivery({ pull_request: forked }))).toBeNull();
-    expect(
-      parseGithubPullRequestEvent(delivery({ pull_request: deletedHead })),
-    ).toBeNull();
+    expect(parseGithubPullRequestEvent(delivery({ pull_request: deletedHead }))).toBeNull();
   });
 
   it("rejects an unrecognizable payload or one without an installation", () => {

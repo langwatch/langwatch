@@ -1,4 +1,3 @@
-
 import { useProjectHomeHost } from "../../../model/project-home-host";
 /**
  * The rollout flag the signal-focused home hangs off, and the only lever

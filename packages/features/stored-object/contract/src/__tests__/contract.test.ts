@@ -22,9 +22,7 @@ import {
 } from "../index";
 
 const SHA256 = "a".repeat(64);
-function reference(
-  overrides: Partial<StoredObjectReference> = {},
-): StoredObjectReference {
+function reference(overrides: Partial<StoredObjectReference> = {}): StoredObjectReference {
   return {
     projectId: "project_1",
     id: "prod_so_1",
@@ -130,9 +128,7 @@ describe("Stored Objects IDs and references", () => {
         id: "prod_so_1",
       }),
     ).toEqual({ projectId: "project_1", id: "prod_so_1" });
-    expect(() =>
-      storedObjectIdentitySchema.parse({ projectId: "project_1", id: "" }),
-    ).toThrow();
+    expect(() => storedObjectIdentitySchema.parse({ projectId: "project_1", id: "" })).toThrow();
   });
 
   it("keeps presentation metadata and audience but rejects persisted URLs", () => {
@@ -148,9 +144,7 @@ describe("Stored Objects IDs and references", () => {
   it("maps only recognized legacy purposes to their closed audience", () => {
     expect(audienceForLegacyStoredObjectPurpose("scenario_event")).toBe("scenarios:view");
     expect(audienceForLegacyStoredObjectPurpose("trace_content")).toBe("traces:view");
-    expect(audienceForLegacyStoredObjectPurpose("evaluation_inputs")).toBe(
-      "evaluations:view",
-    );
+    expect(audienceForLegacyStoredObjectPurpose("evaluation_inputs")).toBe("evaluations:view");
     expect(audienceForLegacyStoredObjectPurpose("unknown")).toBeUndefined();
   });
 });
@@ -170,11 +164,7 @@ describe("Stored Objects command and query contracts", () => {
       audienceProof: true,
     });
     expect(storedObjectsPublicRpc.delete.permission).toBe("project:manage");
-    expect(Object.keys(storedObjectsInternalRpc)).toEqual([
-      "metadata",
-      "availability",
-      "delivery",
-    ]);
+    expect(Object.keys(storedObjectsInternalRpc)).toEqual(["metadata", "availability", "delivery"]);
   });
 });
 
@@ -182,17 +172,9 @@ describe("Stored Objects errors and portable service capability", () => {
   it.each([
     [new DirectUploadUnavailableError(), 503, "direct_upload_unavailable"],
     [new UploadTooLargeError(11, 10), 413, "upload_too_large"],
-    [
-      new StoredObjectDeletedError("project_1", "prod_so_1"),
-      410,
-      "stored_object_deleted",
-    ],
+    [new StoredObjectDeletedError("project_1", "prod_so_1"), 410, "stored_object_deleted"],
     [new StoredObjectNotFoundError(), 404, "stored_object_not_found"],
-    [
-      new StoredObjectBytesMissingError("project_1", "prod_so_1"),
-      404,
-      "stored_object_missing",
-    ],
+    [new StoredObjectBytesMissingError("project_1", "prod_so_1"), 404, "stored_object_missing"],
     [new StorageUnavailableError(), 502, "storage_unavailable"],
     [new IdempotencyConflictError(), 409, "idempotency_conflict"],
   ] as const)("serializes %s as a handled problem", (error, status, code) => {
@@ -244,9 +226,7 @@ describe("Stored Objects errors and portable service capability", () => {
   });
 
   it("exposes only portable byte primitives", () => {
-    expectTypeOf<StoredObjectByteSource>().toEqualTypeOf<
-      Uint8Array | AsyncIterable<Uint8Array>
-    >();
+    expectTypeOf<StoredObjectByteSource>().toEqualTypeOf<Uint8Array | AsyncIterable<Uint8Array>>();
     expectTypeOf<
       Awaited<ReturnType<StoredObjectService["storeFromBytes"]>>["reference"]
     >().toEqualTypeOf<StoredObjectReference>();

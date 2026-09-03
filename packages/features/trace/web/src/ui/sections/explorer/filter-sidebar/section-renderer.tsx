@@ -10,7 +10,11 @@ import { AttributesSection } from "./attributes-section";
 import { EvaluatorDrilldown } from "./evaluator-drilldown";
 import { FacetSection } from "./facet-section";
 import { RangeSection } from "./range-section";
-import type { FacetItem, FacetValueState, Section } from "../../../../behavior/explorer/filter-sidebar/types";
+import type {
+  FacetItem,
+  FacetValueState,
+  Section,
+} from "../../../../behavior/explorer/filter-sidebar/types";
 import { getFacetIcon, getRangeFormatter } from "./utils";
 
 interface SectionRendererProps {
@@ -27,16 +31,8 @@ interface SectionRendererProps {
   /** Evaluator-scoped group mutations — passed straight to the evaluator
    * drilldown so its verdict / score / label picks land inside
    * `(evaluator:X AND …)` rather than as flat top-level clauses. */
-  toggleEvaluatorSubFilter: (args: {
-    evaluatorId: string;
-    field: string;
-    value: string;
-  }) => void;
-  setEvaluatorScoreRange: (args: {
-    evaluatorId: string;
-    from: string;
-    to: string;
-  }) => void;
+  toggleEvaluatorSubFilter: (args: { evaluatorId: string; field: string; value: string }) => void;
+  setEvaluatorScoreRange: (args: { evaluatorId: string; from: string; to: string }) => void;
   removeEvaluatorScoreRange: (args: { evaluatorId: string }) => void;
   onShiftToggle: (nextOpen: boolean) => void;
   /** Called when the user clicks the X to remove this section from
@@ -114,9 +110,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
                     to,
                   })
                 }
-                removeScoreRange={() =>
-                  removeEvaluatorScoreRange({ evaluatorId: item.value })
-                }
+                removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
               />
             ) : null
         : undefined;
@@ -140,9 +134,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
               trailing: (
                 <Box
                   as="button"
-                  aria-label={
-                    isExpanded ? "Hide evaluator breakdown" : "Show evaluator breakdown"
-                  }
+                  aria-label={isExpanded ? "Hide evaluator breakdown" : "Show evaluator breakdown"}
                   aria-expanded={isExpanded}
                   display="flex"
                   alignItems="center"
@@ -164,11 +156,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
                   }}
                   _hover={{ color: "fg.muted", background: "bg.muted" }}
                 >
-                  <Box
-                    as={isExpanded ? ChevronDown : ChevronRight}
-                    width="12px"
-                    height="12px"
-                  />
+                  <Box as={isExpanded ? ChevronDown : ChevronRight} width="12px" height="12px" />
                 </Box>
               ),
               below: isExpanded ? (
@@ -189,9 +177,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
                       to,
                     })
                   }
-                  removeScoreRange={() =>
-                    removeEvaluatorScoreRange({ evaluatorId: item.value })
-                  }
+                  removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
                 />
               ) : null,
             };
@@ -255,9 +241,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
           icon={icon}
           field={section.key}
           items={facetItemsByKey.get(section.key) ?? []}
-          getValueState={
-            valueStateGetters.get(section.key) ?? ((): FacetValueState => "neutral")
-          }
+          getValueState={valueStateGetters.get(section.key) ?? ((): FacetValueState => "neutral")}
           onToggle={(field, value) => toggleFacet({ field, value })}
           onExclude={(field, value) => excludeFacet({ field, value })}
           onShiftToggle={onShiftToggle}
@@ -309,12 +293,8 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
       keys={keys}
       displayStripPrefix={displayStripPrefix}
       emptyDocsHref={emptyDocsHref}
-      getValueState={(attrKey, value) =>
-        getFacetValueState(ast, fieldFor(attrKey), value)
-      }
-      getNoneActive={(attrKey) =>
-        getFacetValueState(ast, "none", fieldFor(attrKey)) === "include"
-      }
+      getValueState={(attrKey, value) => getFacetValueState(ast, fieldFor(attrKey), value)}
+      getNoneActive={(attrKey) => getFacetValueState(ast, "none", fieldFor(attrKey)) === "include"}
       onToggleValue={(attrKey, value) => toggleFacet({ field: fieldFor(attrKey), value })}
       onToggleNone={(attrKey) => toggleFacet({ field: "none", value: fieldFor(attrKey) })}
       onShiftToggle={onShiftToggle}

@@ -125,6 +125,10 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import {
   AgentTestService,
   PrismaScenarioAdapter,
+  ResultAtomsClickHouseAdapter,
+  ResultAtomsReadPort,
+  RunConfigurationsClickHouseAdapter,
+  RunConfigurationsReadPort,
   ScenarioApp,
   ScenarioClockPort,
   ScenarioExecutionPrefetcherService,
@@ -141,6 +145,8 @@ import {
   RedisScenarioTabStoreAdapter,
   UnavailableCancellationPublisherAdapter,
   UnavailableScenarioExecutionPoolService,
+  type ResultAtomsService,
+  type RunConfigurationsService,
   type ScenarioExecutionPrefetchConfig,
   type ScenarioTrpcPorts,
   type SimulationReadClient,
@@ -566,7 +572,6 @@ export function composeApiAgentGroupCollaborators(
   };
 }
 
-
 // ---------------------------------------------------------------------------
 // Scenario and Suite
 // ---------------------------------------------------------------------------
@@ -591,6 +596,81 @@ function composeSimulations(
     resolveClient: options.resolveClickHouseClient,
     windowedRead: new UnwindowedApiSimulationRead(),
     execution,
+  });
+}
+
+/**
+ * The Results tab reads, refused by name rather than answered empty.
+ *
+ * Unlike `composeSimulations`, an empty answer here would be misleading: the
+ * stat strip and the group rows are what tells an operator whether a
+ * deployment with no ClickHouse endpoint is failing or merely quiet, so this
+ * refuses instead of quietly reporting zero runs.
+ */
+class UnavailableApiResultAtomsRepository extends ResultAtomsReadPort {
+  private refuse<T>(): Promise<T> {
+    return Promise.reject(new ApiAgentGroupUnavailableError("Reading the Results tab"));
+  }
+  findAtoms(): ReturnType<ResultAtomsReadPort["findAtoms"]> {
+    return this.refuse();
+  }
+  findRunOrdinals(): ReturnType<ResultAtomsReadPort["findRunOrdinals"]> {
+    return this.refuse();
+  }
+  aggregateTotals(): ReturnType<ResultAtomsReadPort["aggregateTotals"]> {
+    return this.refuse();
+  }
+  aggregateGroups(): ReturnType<ResultAtomsReadPort["aggregateGroups"]> {
+    return this.refuse();
+  }
+  findCodeScenarios(): ReturnType<ResultAtomsReadPort["findCodeScenarios"]> {
+    return this.refuse();
+  }
+  findRunTargets(): ReturnType<ResultAtomsReadPort["findRunTargets"]> {
+    return this.refuse();
+  }
+  aggregateTrend(): ReturnType<ResultAtomsReadPort["aggregateTrend"]> {
+    return this.refuse();
+  }
+  aggregateSeries(): ReturnType<ResultAtomsReadPort["aggregateSeries"]> {
+    return this.refuse();
+  }
+}
+
+/** The run dialog's configuration history, refused by name for the same reason. */
+class UnavailableApiRunConfigurationsRepository extends RunConfigurationsReadPort {
+  findConfigurations(): ReturnType<RunConfigurationsReadPort["findConfigurations"]> {
+    return Promise.reject(
+      new ApiAgentGroupUnavailableError("Reading the run configuration history"),
+    );
+  }
+}
+
+function composeResultAtoms(options: ApiAgentGroupCollaboratorsOptions): ResultAtomsService {
+  if (!options.resolveClickHouseClient) {
+    return ResultAtomsService.create(
+      new UnavailableApiResultAtomsRepository(),
+      PrismaScenarioRepository.create(options.prisma),
+    );
+  }
+  return ResultAtomsClickHouseAdapter.create({
+    resolveClient: options.resolveClickHouseClient,
+    prisma: options.prisma,
+  });
+}
+
+function composeRunConfigurations(
+  options: ApiAgentGroupCollaboratorsOptions,
+): RunConfigurationsService {
+  if (!options.resolveClickHouseClient) {
+    return RunConfigurationsService.create(
+      new UnavailableApiRunConfigurationsRepository(),
+      PrismaScenarioRepository.create(options.prisma),
+    );
+  }
+  return RunConfigurationsClickHouseAdapter.create({
+    resolveClient: options.resolveClickHouseClient,
+    prisma: options.prisma,
   });
 }
 

@@ -12,13 +12,7 @@ import {
  * slower fall than rise so fast state changes do not pop.
  */
 
-export type LangyWaveActivity =
-  | "idle"
-  | "waiting"
-  | "thinking"
-  | "streaming"
-  | "tool"
-  | "settling";
+export type LangyWaveActivity = "idle" | "waiting" | "thinking" | "streaming" | "tool" | "settling";
 
 /**
  * The smoothed parameter vector the renderer folds into the rope every frame.
@@ -187,10 +181,7 @@ export function stepWaveMotion({
  * fires the one gentle wake ripple. Working→working flips (tool→streaming)
  * never ripple, and neither does easing back to rest.
  */
-export function isWakeTransition(
-  previous: LangyWaveActivity,
-  next: LangyWaveActivity,
-): boolean {
+export function isWakeTransition(previous: LangyWaveActivity, next: LangyWaveActivity): boolean {
   const wasResting = previous === "idle" || previous === "settling";
   const isWorking =
     next === "waiting" || next === "thinking" || next === "streaming" || next === "tool";
@@ -211,10 +202,7 @@ function isWorkingActivity(activity: LangyWaveActivity): boolean {
  * Did the turn just FAIL? Entering `settling` from anywhere else fires the one
  * nervous shake. Staying in settling (a recovery that drags on) never re-shakes.
  */
-export function isErrorTransition(
-  previous: LangyWaveActivity,
-  next: LangyWaveActivity,
-): boolean {
+export function isErrorTransition(previous: LangyWaveActivity, next: LangyWaveActivity): boolean {
   return previous !== "settling" && next === "settling";
 }
 
@@ -223,9 +211,6 @@ export function isErrorTransition(
  * fires the happy wag. A `settling → idle` wind-down is NOT a success (the shake
  * already spoke for that turn), and idle→idle noise never celebrates.
  */
-export function isSuccessTransition(
-  previous: LangyWaveActivity,
-  next: LangyWaveActivity,
-): boolean {
+export function isSuccessTransition(previous: LangyWaveActivity, next: LangyWaveActivity): boolean {
   return isWorkingActivity(previous) && next === "idle";
 }

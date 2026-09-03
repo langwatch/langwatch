@@ -12,16 +12,10 @@
 
 import type { IncomingMessage, Server } from "node:http";
 import type { Duplex } from "node:stream";
-import type {
-  ConnectUpgradeRouterPort,
-  UpgradeHandler,
-} from "@langwatch/agent-server";
+import type { ConnectUpgradeRouterPort, UpgradeHandler } from "@langwatch/agent-server";
 import { ApiUpgradeSurfacePort } from "./api-http.listener";
 
-export class ApiUpgradeRouter
-  extends ApiUpgradeSurfacePort
-  implements ConnectUpgradeRouterPort
-{
+export class ApiUpgradeRouter extends ApiUpgradeSurfacePort implements ConnectUpgradeRouterPort {
   static create(): ApiUpgradeRouter {
     return new ApiUpgradeRouter();
   }

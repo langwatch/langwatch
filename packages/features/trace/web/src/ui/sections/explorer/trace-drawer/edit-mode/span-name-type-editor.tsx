@@ -1,10 +1,7 @@
 import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useMemo } from "react";
 import { type SpanTypes, spanTypesSchema } from "@langwatch/trace-contract";
-import {
-  selectSpanEditBaseline,
-  useTraceEditStore,
-} from "../../../../../index";
+import { selectSpanEditBaseline, useTraceEditStore } from "../../../../../index";
 
 const SPAN_TYPES: SpanTypes[] = spanTypesSchema.options.map((option) => option.value);
 
@@ -73,23 +70,14 @@ export function SpanNameTypeEditor({
         <Text textStyle="2xs" color="fg.muted" fontWeight="semibold">
           Span name
         </Text>
-        <Input
-          size="xs"
-          aria-label="Span name"
-          value={name}
-          onChange={handleNameChange}
-        />
+        <Input size="xs" aria-label="Span name" value={name} onChange={handleNameChange} />
       </VStack>
       <VStack align="stretch" gap={1} width="180px" flexShrink={0}>
         <Text textStyle="2xs" color="fg.muted" fontWeight="semibold">
           Span type
         </Text>
         <NativeSelect.Root size="xs">
-          <NativeSelect.Field
-            aria-label="Span type"
-            value={type}
-            onChange={handleTypeChange}
-          >
+          <NativeSelect.Field aria-label="Span type" value={type} onChange={handleTypeChange}>
             {/* A span recorded with a type this build does not know still has
                 to show what it is, so the captured value joins the list. */}
             {!isSpanType(type) && <option value={type}>{type}</option>}

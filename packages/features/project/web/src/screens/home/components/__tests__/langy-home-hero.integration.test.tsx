@@ -23,8 +23,7 @@ vi.mock("@langwatch/navigation-web/command-bar", () => ({
 
 const askLangy = vi.fn();
 vi.mock("@langwatch/langy-web", () => ({
-  useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) =>
-    selector({ askLangy }),
+  useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) => selector({ askLangy }),
   selectLangySuggestions: ({ reach }: { reach: { hasTraces: boolean } }) =>
     reach.hasTraces
       ? [{ label: "Compare two runs", icon: () => null, prompt: "compare two runs" }]
@@ -165,9 +164,7 @@ describe("LangyHomeHero ask row", () => {
       reachMock.mockReturnValue(NEW_PROJECT_REACH);
       renderHero(false);
 
-      expect(
-        screen.getByText(/ask whoever manages your account for access/i),
-      ).toBeDefined();
+      expect(screen.getByText(/ask whoever manages your account for access/i)).toBeDefined();
       expect(screen.queryByText("Show me around")).toBeNull();
     });
   });

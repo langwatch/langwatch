@@ -116,7 +116,13 @@ export interface ConnectedAgent<P> {
   disconnect: () => Promise<void>;
 }
 
-type Widen<V> = V extends string ? string : V extends number ? number : V extends boolean ? boolean : V;
+type Widen<V> = V extends string
+  ? string
+  : V extends number
+    ? number
+    : V extends boolean
+      ? boolean
+      : V;
 
 type ParameterValueOf<D extends ParameterDefinition> = D extends {
   options: readonly (infer O extends string)[];
@@ -138,7 +144,10 @@ export type InferParameters<P extends ParameterDefinitions> = {
 };
 
 const isMessage = (value: unknown): value is AgentMessage =>
-  typeof value === "object" && value !== null && !Array.isArray(value) && typeof (value as AgentMessage).role === "string";
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  typeof (value as AgentMessage).role === "string";
 
 /** One of the four reply shapes as the `{ output, session }` the result frame carries. */
 export function normalizeReply(reply: unknown): AgentResult {
@@ -155,11 +164,21 @@ export function normalizeReply(reply: unknown): AgentResult {
   );
 }
 
-const clampTimeout = ({ timeoutMs, logger, name }: { timeoutMs: number | undefined; logger: Logger; name: string }): number => {
+const clampTimeout = ({
+  timeoutMs,
+  logger,
+  name,
+}: {
+  timeoutMs: number | undefined;
+  logger: Logger;
+  name: string;
+}): number => {
   if (timeoutMs === undefined) return DEFAULT_TIMEOUT_MS;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return DEFAULT_TIMEOUT_MS;
   if (timeoutMs > MAX_TIMEOUT_MS) {
-    logger.warn(`agent "${name}": timeoutMs ${timeoutMs} is above the ${MAX_TIMEOUT_MS} cap, using the cap`);
+    logger.warn(
+      `agent "${name}": timeoutMs ${timeoutMs} is above the ${MAX_TIMEOUT_MS} cap, using the cap`,
+    );
     return MAX_TIMEOUT_MS;
   }
   return Math.floor(timeoutMs);
@@ -209,12 +228,15 @@ export function connectAgent(
     Math.floor(options.concurrency ?? (environment === DEFAULT_ENVIRONMENT ? 1 : 4)),
   );
 
-  const runHandler = async (call: AgentCall<Record<string, AgentParameterValue>>): Promise<AgentResult> =>
-    normalizeReply(await handler(call));
+  const runHandler = async (
+    call: AgentCall<Record<string, AgentParameterValue>>,
+  ): Promise<AgentResult> => normalizeReply(await handler(call));
 
   const readParams = createParameterReader({ input: options.parameters, specs });
 
-  const invoke = async (call: DirectAgentCall<Record<string, AgentParameterValue>>): Promise<AgentResult> => {
+  const invoke = async (
+    call: DirectAgentCall<Record<string, AgentParameterValue>>,
+  ): Promise<AgentResult> => {
     const params = await readParams(call.params as Record<string, AgentParameterValue> | undefined);
     return runHandler({
       messages: call.messages,

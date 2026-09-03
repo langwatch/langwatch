@@ -49,11 +49,7 @@ export function ConfirmDialog({
         <Dialog.Footer>
           <HStack width="full">
             <Spacer />
-            <Button
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
+            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
               Cancel
             </Button>
             <Button colorPalette={palette} onClick={onConfirm} loading={loading}>

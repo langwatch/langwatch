@@ -21,9 +21,7 @@ export type GithubStep = {
 const networkGitSubcommands = new Set(["clone", "push", "fetch", "pull", "ls-remote"]);
 
 export function needsGithubAuth(command: string): boolean {
-  return commandSegments(command).some(
-    (segment) => isGhCli(segment) || isNetworkGit(segment),
-  );
+  return commandSegments(command).some((segment) => isGhCli(segment) || isNetworkGit(segment));
 }
 
 export function githubStepOf(command: string): GithubStep | null {
@@ -62,10 +60,7 @@ export function githubProgressFromToolParts(
   return events;
 }
 
-function eventOf(
-  stage: GithubProgressStage,
-  detail: string | undefined,
-): GithubProgressEvent {
+function eventOf(stage: GithubProgressStage, detail: string | undefined): GithubProgressEvent {
   return detail ? { stage, detail } : { stage };
 }
 

@@ -77,9 +77,7 @@ async function flushMicrotasks(): Promise<void> {
 function childAt(index: number): FakeChild {
   const child = spawnedChildren[index];
   if (!child) {
-    throw new Error(
-      `expected a child at index ${index}, only ${spawnedChildren.length} spawned`,
-    );
+    throw new Error(`expected a child at index ${index}, only ${spawnedChildren.length} spawned`);
   }
   return child;
 }

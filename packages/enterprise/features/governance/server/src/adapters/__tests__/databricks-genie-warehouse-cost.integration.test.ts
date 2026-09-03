@@ -146,8 +146,7 @@ beforeEach(async () => {
       });
     }
     if (
-      url.pathname ===
-      `/api/2.0/genie/spaces/${SPACE_ID}/conversations/${CONVERSATION_ID}/messages`
+      url.pathname === `/api/2.0/genie/spaces/${SPACE_ID}/conversations/${CONVERSATION_ID}/messages`
     ) {
       return send({
         messages: [
@@ -213,9 +212,7 @@ beforeEach(async () => {
           status: { state: plan?.state ?? "SUCCEEDED" },
           manifest: {
             schema: { columns: columns.map((name) => ({ name })) },
-            ...(plan?.totalRowCount === undefined
-              ? {}
-              : { total_row_count: plan.totalRowCount }),
+            ...(plan?.totalRowCount === undefined ? {} : { total_row_count: plan.totalRowCount }),
           },
           result: {
             data_array: served,
@@ -242,13 +239,7 @@ afterEach(async () => {
   });
 });
 
-async function pull({
-  warehouseId,
-  deadlineMs,
-}: {
-  warehouseId?: string;
-  deadlineMs?: number;
-}) {
+async function pull({ warehouseId, deadlineMs }: { warehouseId?: string; deadlineMs?: number }) {
   const puller = makePuller();
   return await puller.runOnce(
     {
@@ -400,9 +391,9 @@ describe("a source that names a warehouse", () => {
       servedRows.filter((rows) => rows.some((row) => row[1] === hour)).length;
     expect(callsCarrying(earlierHour)).toBe(1);
     expect(callsCarrying(USAGE_HOUR)).toBe(1);
-    expect(
-      servedRows.findIndex((rows) => rows.some((row) => row[1] === earlierHour)),
-    ).not.toBe(servedRows.findIndex((rows) => rows.some((row) => row[1] === USAGE_HOUR)));
+    expect(servedRows.findIndex((rows) => rows.some((row) => row[1] === earlierHour))).not.toBe(
+      servedRows.findIndex((rows) => rows.some((row) => row[1] === USAGE_HOUR)),
+    );
 
     // $6 from the earlier hour and $1 from the later one, exactly.
     expect(hintOf(result).costUsd).toBe("7");
@@ -997,8 +988,7 @@ describe("a source that names a warehouse", () => {
     // Chunks are hour-aligned, so this only reaches a question asked exactly on
     // the hour — rare, and permanent every time it lands.
     const oneHourMs = 60 * 60 * 1000;
-    const watermark =
-      Math.floor((Date.now() - 3 * 24 * oneHourMs) / oneHourMs) * oneHourMs;
+    const watermark = Math.floor((Date.now() - 3 * 24 * oneHourMs) / oneHourMs) * oneHourMs;
     // The second day is the one that cannot be priced, so the ceiling lands
     // ahead of the old watermark and the seam is actually load-bearing. A
     // first-day refusal would hold at the old watermark and prove nothing.
@@ -1476,9 +1466,7 @@ describe("a period with more statements than one answer can carry", () => {
     //
     // Deep enough into the window to land in the refused first chunk, and half
     // a day off the piece boundaries so both hours sit in the same piece.
-    const billedHour = usageHourOf(
-      Date.now() - 29 * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000,
-    );
+    const billedHour = usageHourOf(Date.now() - 29 * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000);
     const owedHour = usageHourOf(Date.parse(billedHour) + 60 * 60 * 1000);
     costPlanQueue = [{ rows: [], nextChunkIndex: 1 }];
     costPlan = {

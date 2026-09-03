@@ -207,9 +207,7 @@ function wireChildTermination(
     settled = true;
     safeUnlink(state.pidPath);
     clearSteadyTimer(state);
-    void Promise.all(pipesDrained).then(() =>
-      handleExit(state, { code, signal, logStream }),
-    );
+    void Promise.all(pipesDrained).then(() => handleExit(state, { code, signal, logStream }));
   };
 
   child.on("error", (err) => {
@@ -252,16 +250,12 @@ function handleExit(state: SupervisionState, info: ExitInfo): void {
 }
 
 /** Announce the crash, back off, then relaunch, budget permitting. */
-function scheduleRestart(
-  state: SupervisionState,
-  { code, signal, logStream }: ExitInfo,
-): void {
+function scheduleRestart(state: SupervisionState, { code, signal, logStream }: ExitInfo): void {
   state.restartCount += 1;
   const attempt = state.restartCount;
   const delayMs =
-    state.restartPolicy.backoffMs[
-      Math.min(attempt, state.restartPolicy.backoffMs.length) - 1
-    ] ?? 1_000;
+    state.restartPolicy.backoffMs[Math.min(attempt, state.restartPolicy.backoffMs.length) - 1] ??
+    1_000;
   logStream.write(
     `[supervisor] ${state.spec.name} exited (${exitCause({ code, signal })}), restarting in ${delayMs}ms (attempt ${attempt}/${state.restartPolicy.maxRestarts})\n`,
   );
@@ -283,13 +277,8 @@ function scheduleRestart(
 }
 
 /** Restart budget exhausted (or the service never reached healthy): today's terminal behavior. */
-function emitCrashed(
-  state: SupervisionState,
-  { code, signal, logStream }: ExitInfo,
-): void {
-  const reason = state.hasBeenHealthy
-    ? "restart budget exhausted"
-    : "died before first healthy";
+function emitCrashed(state: SupervisionState, { code, signal, logStream }: ExitInfo): void {
+  const reason = state.hasBeenHealthy ? "restart budget exhausted" : "died before first healthy";
   logStream.write(
     `[supervisor] ${state.spec.name} exited (${exitCause({ code, signal })}), ${reason}, not restarting\n`,
   );

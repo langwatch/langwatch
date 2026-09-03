@@ -41,10 +41,7 @@ export class ScenarioRoleModelAdapter {
   private constructor() {}
 
   static select(
-    jobData: Pick<
-      ChildProcessJobData,
-      "modelParams" | "simulatorModelParams" | "judgeModelParams"
-    >,
+    jobData: Pick<ChildProcessJobData, "modelParams" | "simulatorModelParams" | "judgeModelParams">,
   ): RoleModelParams {
     const simulator = jobData.simulatorModelParams ?? jobData.modelParams;
     const judge = jobData.judgeModelParams ?? jobData.modelParams;

@@ -22,9 +22,10 @@ function displaySpanType(spanType: string): string {
  * theme (dark blue text on dark blue bg). The palette scope picks the
  * right light/dark pair automatically.
  */
-export const SpanTypeBadge: React.FC<
-  { spanType: string } & Omit<TextProps, "children">
-> = ({ spanType, ...rest }) => {
+export const SpanTypeBadge: React.FC<{ spanType: string } & Omit<TextProps, "children">> = ({
+  spanType,
+  ...rest
+}) => {
   const display = displaySpanType(spanType);
   const palette = PALETTE_BY_TYPE[display] ?? "gray";
   return (

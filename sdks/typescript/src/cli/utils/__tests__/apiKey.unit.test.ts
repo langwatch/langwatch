@@ -176,9 +176,7 @@ describe("resolveCredentials()", () => {
 
       expect(resolved.source).toBe("session");
       expect(resolved.apiKey).toBe("pkey_personal");
-      expect(mockedNotice).toHaveBeenCalledWith(
-        expect.objectContaining({ mode: "device" }),
-      );
+      expect(mockedNotice).toHaveBeenCalledWith(expect.objectContaining({ mode: "device" }));
     });
 
     it("lazily exchanges the personal key once and persists it for old sessions", async () => {
@@ -293,9 +291,7 @@ describe("resolveCredentials()", () => {
         ),
       );
 
-      await expect(resolveCredentials({ project: "ghost" })).rejects.toThrow(
-        "process.exit called",
-      );
+      await expect(resolveCredentials({ project: "ghost" })).rejects.toThrow("process.exit called");
       // No silent fallback: the personal project must not become the target.
       expect(scopedProjectId()).not.toBe("proj_1");
     });
@@ -486,9 +482,7 @@ describe("resolveCredentials()", () => {
         await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
         const stderr = errorSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-        expect(stderr).toContain(
-          "Create an API key at https://langwatch.acme.internal/authorize",
-        );
+        expect(stderr).toContain("Create an API key at https://langwatch.acme.internal/authorize");
         expect(stderr).not.toContain("<endpoint>");
       });
     });

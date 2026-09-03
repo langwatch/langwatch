@@ -25,11 +25,7 @@ import {
   ExperimentTimeoutError,
   ExperimentRunFailedError,
 } from "./platformErrors";
-import {
-  pollExperimentRun,
-  rebaseUrlToEndpoint,
-  fetchResultsWithRetry,
-} from "./run-status";
+import { pollExperimentRun, rebaseUrlToEndpoint, fetchResultsWithRetry } from "./run-status";
 import { mapRunResultsToRows } from "./mapResults";
 import { printSummary } from "./printSummary";
 
@@ -274,19 +270,14 @@ export class ExperimentsFacade {
   /**
    * Start an experiment run
    */
-  private async startRun(
-    slug: string,
-  ): Promise<{ runId: string; total: number; runUrl?: string }> {
+  private async startRun(slug: string): Promise<{ runId: string; total: number; runUrl?: string }> {
     let response;
     try {
-      response = await this.config.langwatchApiClient.POST(
-        "/api/experiments/{slug}/run",
-        {
-          params: {
-            path: { slug },
-          },
+      response = await this.config.langwatchApiClient.POST("/api/experiments/{slug}/run", {
+        params: {
+          path: { slug },
         },
-      );
+      });
     } catch (error) {
       if (isLangWatchHandledError(error)) {
         this.handleStartRunError(slug, error.body, error.httpStatus);
@@ -313,14 +304,11 @@ export class ExperimentsFacade {
   }> {
     let response;
     try {
-      response = await this.config.langwatchApiClient.GET(
-        "/api/experiments/runs/{runId}",
-        {
-          params: {
-            path: { runId },
-          },
+      response = await this.config.langwatchApiClient.GET("/api/experiments/runs/{runId}", {
+        params: {
+          path: { runId },
         },
-      );
+      });
     } catch (error) {
       if (isLangWatchHandledError(error)) {
         this.handleRunStatusError(runId, error.body, error.httpStatus);
@@ -427,9 +415,8 @@ export class ExperimentsFacade {
     };
 
     // Custom Node.js inspect for console.log
-    (result as Record<string | symbol, unknown>)[
-      Symbol.for("nodejs.util.inspect.custom")
-    ] = () => result.toString();
+    (result as Record<string | symbol, unknown>)[Symbol.for("nodejs.util.inspect.custom")] = () =>
+      result.toString();
 
     return result;
   }

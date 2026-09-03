@@ -16,9 +16,9 @@ import {
 describe("langyRestingFloorPx", () => {
   describe("given a genuinely empty, settled thread", () => {
     it("rests on the compact floor", () => {
-      expect(
-        langyRestingFloorPx({ emptyAndSettled: true, expectedMessageCount: 0 }),
-      ).toBe(LANGY_FLOATING_FLOOR_EMPTY_PX);
+      expect(langyRestingFloorPx({ emptyAndSettled: true, expectedMessageCount: 0 })).toBe(
+        LANGY_FLOATING_FLOOR_EMPTY_PX,
+      );
     });
   });
 

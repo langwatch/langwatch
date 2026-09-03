@@ -14,11 +14,7 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
 
-  async function copyApiKey({
-    withBashPrefix,
-  }: {
-    withBashPrefix?: boolean;
-  }): Promise<void> {
+  async function copyApiKey({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
     // The clipboard is a browser singleton and the confirmation is the
     // application's, so the host owns both ends: it writes, confirms, and
     // reports a refusal through the same feedback capability every other
@@ -29,11 +25,7 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
     });
   }
 
-  async function copyEndpoint({
-    withBashPrefix,
-  }: {
-    withBashPrefix?: boolean;
-  }): Promise<void> {
+  async function copyEndpoint({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
     await host.copyToClipboard({
       text: withBashPrefix ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}` : effectiveEndpoint,
       succeeded: { title: "Copied", description: "Endpoint copied to clipboard" },

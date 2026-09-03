@@ -186,9 +186,7 @@ describe("Content Parsing E2E", () => {
 
       const functionOutput = {
         message: { role: "assistant", content: "It's sunny in Tokyo, 22°C." },
-        function_calls: [
-          { name: "get_weather", result: { temperature: 22, condition: "sunny" } },
-        ],
+        function_calls: [{ name: "get_weather", result: { temperature: 22, condition: "sunny" } }],
       };
 
       await tracer.withActiveSpan("function-calling", async (span) => {

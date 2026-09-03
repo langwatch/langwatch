@@ -247,9 +247,7 @@ describe("publishSocket", () => {
         fs.writeFileSync(socketPath, "theirs");
         const theirs = identify(socketPath);
 
-        expect(() => publishSocket(stagingPath, socketPath)).toThrow(
-          DaemonAlreadyRunningError,
-        );
+        expect(() => publishSocket(stagingPath, socketPath)).toThrow(DaemonAlreadyRunningError);
 
         expect(identify(socketPath)).toEqual(theirs);
         expect(fs.readFileSync(socketPath, "utf8")).toBe("theirs");
@@ -280,9 +278,7 @@ describe("publishSocket", () => {
         fs.writeFileSync(socketPath, "theirs");
         const theirs = identify(socketPath);
 
-        expect(() => publishSocket(stagingPath, socketPath)).toThrow(
-          DaemonAlreadyRunningError,
-        );
+        expect(() => publishSocket(stagingPath, socketPath)).toThrow(DaemonAlreadyRunningError);
 
         // The winner still answers to the shared name. A rename here would
         // have left it running, holding resolved credentials, on an inode no

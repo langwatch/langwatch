@@ -95,9 +95,7 @@ describe("context/core", () => {
 
     describe("when no context is set", () => {
       it("does not throw", () => {
-        expect(() =>
-          updateCurrentContext({ organizationId: "no-context" }),
-        ).not.toThrow();
+        expect(() => updateCurrentContext({ organizationId: "no-context" })).not.toThrow();
       });
     });
   });

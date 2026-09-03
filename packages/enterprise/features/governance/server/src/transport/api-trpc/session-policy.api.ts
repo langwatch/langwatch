@@ -9,11 +9,7 @@
  * Spec: specs/ai-governance/sessions/personal-sessions.feature
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { OrganizationSessionPolicyService } from "#services/organization-session-policy.service";
 import { SESSION_POLICY_MAX_DAYS } from "#services/organization-session-policy.service";
@@ -61,15 +57,15 @@ export class SessionPolicyTrpcApi {
       ),
 
       /** Set `maxSessionDurationDays`; 0 = unbounded, capped at 365. */
-      setMaxDuration: policy("organization:manage")(
-        procedure.input(setMaxDurationSchema),
-      ).mutation(async ({ ctx, input }) => {
-        await ctx.app.sessionPolicy.setMaxDurationDays(
-          input.organizationId,
-          input.maxSessionDurationDays,
-        );
-        return { ok: true };
-      }),
+      setMaxDuration: policy("organization:manage")(procedure.input(setMaxDurationSchema)).mutation(
+        async ({ ctx, input }) => {
+          await ctx.app.sessionPolicy.setMaxDurationDays(
+            input.organizationId,
+            input.maxSessionDurationDays,
+          );
+          return { ok: true };
+        },
+      ),
     });
   }
 }

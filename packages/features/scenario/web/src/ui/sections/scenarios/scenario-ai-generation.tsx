@@ -142,9 +142,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
     // Warn if form has content and no history (first generation)
     if (hasExistingContent && !hasHistory) {
-      const confirmed = window.confirm(
-        "This will replace the current scenario content. Continue?",
-      );
+      const confirmed = window.confirm("This will replace the current scenario content. Continue?");
       if (!confirmed) return;
     }
 
@@ -271,9 +269,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                   {hasHistory ? "Refine with AI" : "Draft with AI"}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
-                  {hasHistory
-                    ? "Your draft is ready to shape."
-                    : "Start from an idea, not a form."}
+                  {hasHistory ? "Your draft is ready to shape." : "Start from an idea, not a form."}
                 </Text>
               </Box>
             </HStack>
@@ -341,39 +337,37 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
               : "Describe what your agent does and the behavior you want to test."}
           </Text>
 
-          {defaultModelState.ok === false &&
-            defaultModelState.reason === "no-default" && (
-              <DefaultModelErrorBanner>
-                No default model set. Configure one in{" "}
-                <Link
-                  href="/settings/model-providers"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  color="blue.500"
-                  fontWeight="medium"
-                >
-                  Settings → Model Providers
-                </Link>
-                .
-              </DefaultModelErrorBanner>
-            )}
+          {defaultModelState.ok === false && defaultModelState.reason === "no-default" && (
+            <DefaultModelErrorBanner>
+              No default model set. Configure one in{" "}
+              <Link
+                href="/settings/model-providers"
+                target="_blank"
+                rel="noopener noreferrer"
+                color="blue.500"
+                fontWeight="medium"
+              >
+                Settings → Model Providers
+              </Link>
+              .
+            </DefaultModelErrorBanner>
+          )}
 
-          {defaultModelState.ok === false &&
-            defaultModelState.reason === "stale-default" && (
-              <DefaultModelErrorBanner>
-                Your default model&apos;s provider is disabled. Configure a new default in{" "}
-                <Link
-                  href="/settings/model-providers"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  color="blue.500"
-                  fontWeight="medium"
-                >
-                  Settings → Model Providers
-                </Link>
-                .
-              </DefaultModelErrorBanner>
-            )}
+          {defaultModelState.ok === false && defaultModelState.reason === "stale-default" && (
+            <DefaultModelErrorBanner>
+              Your default model&apos;s provider is disabled. Configure a new default in{" "}
+              <Link
+                href="/settings/model-providers"
+                target="_blank"
+                rel="noopener noreferrer"
+                color="blue.500"
+                fontWeight="medium"
+              >
+                Settings → Model Providers
+              </Link>
+              .
+            </DefaultModelErrorBanner>
+          )}
 
           {status === "done" && hasHistory && (
             <HStack
@@ -406,8 +400,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                 textTransform="uppercase"
                 marginBottom={1}
               >
-                Latest request · {history.length}{" "}
-                {history.length === 1 ? "turn" : "turns"}
+                Latest request · {history.length} {history.length === 1 ? "turn" : "turns"}
               </Text>
               <Text fontSize="xs" color="fg.muted" lineClamp={2}>
                 {history.at(-1)}
@@ -429,12 +422,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             fontSize="sm"
           />
 
-          <Button
-            colorPalette="orange"
-            size="sm"
-            onClick={handleGenerate}
-            disabled={!canGenerate}
-          >
+          <Button colorPalette="orange" size="sm" onClick={handleGenerate} disabled={!canGenerate}>
             {status === "generating" ? (
               <>
                 <Spinner size="sm" />
@@ -467,13 +455,7 @@ function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
       </Alert.Indicator>
       <Alert.Content gap={2}>
         <Alert.Description>{children}</Alert.Description>
-        <Button
-          colorPalette="blue"
-          color="white"
-          asChild
-          size="sm"
-          alignSelf="flex-start"
-        >
+        <Button colorPalette="blue" color="white" asChild size="sm" alignSelf="flex-start">
           <a
             data-testid="scenario-ai-configure-default-model-button"
             href="/settings/model-providers"

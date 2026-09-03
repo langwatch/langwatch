@@ -19,10 +19,14 @@ only thing that speaks to a datastore.
 
 ```ts
 // WRONG
-class ThingService { constructor(private readonly prisma: PrismaClient) {} }
+class ThingService {
+  constructor(private readonly prisma: PrismaClient) {}
+}
 
 // RIGHT
-class ThingService { constructor(private readonly things: ThingRepository) {} }
+class ThingService {
+  constructor(private readonly things: ThingRepository) {}
+}
 ```
 
 A service that needs a transaction takes a repository method that owns the

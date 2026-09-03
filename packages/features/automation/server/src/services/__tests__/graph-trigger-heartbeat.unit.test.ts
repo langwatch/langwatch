@@ -6,7 +6,10 @@ import {
 } from "../graph-trigger-heartbeat.service";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { GraphTriggerSentRepository } from "../../repositories/graph-trigger-sent.repository";
-import { HeartbeatTriggerRepository, SilentAutomationLogger } from "../../repositories/__tests__/support/heartbeat.fakes";
+import {
+  HeartbeatTriggerRepository,
+  SilentAutomationLogger,
+} from "../../repositories/__tests__/support/heartbeat.fakes";
 
 const TriggerAction = { SEND_EMAIL: "SEND_EMAIL" } as const;
 const TriggerKind = { ALERT: "ALERT" } as const;

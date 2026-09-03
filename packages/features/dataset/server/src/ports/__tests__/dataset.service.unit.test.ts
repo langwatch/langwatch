@@ -9,15 +9,8 @@ import {
 } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 import { DatasetService } from "../../services/dataset.service";
-import {
-  DatasetContentPort,
-  DatasetNormalizeQueuePort,
-  DatasetUploadPort,
-} from "../dataset.port";
-import type {
-  FinalizeUploadInput,
-  RetryNormalizeInput,
-} from "@langwatch/dataset-contract";
+import { DatasetContentPort, DatasetNormalizeQueuePort, DatasetUploadPort } from "../dataset.port";
+import type { FinalizeUploadInput, RetryNormalizeInput } from "@langwatch/dataset-contract";
 
 const makeDataset = (overrides: Partial<Dataset> = {}): Dataset =>
   datasetSchema.parse({
@@ -51,10 +44,7 @@ class MemoryDatasetRepository extends DatasetRepository {
       ? this.dataset
       : null;
   }
-  async tryFindBySlug(input: {
-    slug: string;
-    projectId: string;
-  }): Promise<Dataset | null> {
+  async tryFindBySlug(input: { slug: string; projectId: string }): Promise<Dataset | null> {
     return this.dataset.slug === input.slug && this.dataset.projectId === input.projectId
       ? this.dataset
       : null;
@@ -96,11 +86,7 @@ class MemoryDatasetRepository extends DatasetRepository {
     this.dataset = makeDataset({ ...this.dataset, ...input });
     return this.dataset;
   }
-  async restore(input: {
-    id: string;
-    projectId: string;
-    slug: string;
-  }): Promise<Dataset> {
+  async restore(input: { id: string; projectId: string; slug: string }): Promise<Dataset> {
     this.dataset = makeDataset({ ...this.dataset, ...input, archivedAt: null });
     return this.dataset;
   }
@@ -212,9 +198,7 @@ describe("DatasetService", () => {
         calls.push("page");
         throw new Error("not used");
       }
-      async getDatasetWithRecords(input: {
-        dataset: Dataset;
-      }): Promise<DatasetWithRecords> {
+      async getDatasetWithRecords(input: { dataset: Dataset }): Promise<DatasetWithRecords> {
         calls.push(`read:${input.dataset.id}`);
         return { dataset: input.dataset, records: [], truncated: false };
       }
@@ -294,10 +278,7 @@ describe("DatasetService", () => {
       }
     }
     class Queue extends DatasetNormalizeQueuePort {
-      async enqueueNormalize(input: {
-        projectId: string;
-        datasetId: string;
-      }): Promise<void> {
+      async enqueueNormalize(input: { projectId: string; datasetId: string }): Promise<void> {
         queueCalls.push(input);
       }
     }

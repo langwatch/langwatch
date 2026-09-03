@@ -46,9 +46,7 @@ export function isInternalHref(href: string): boolean {
  * ONLY a plain left click on an in-app link, and `router.push`es it instead of
  * full-reloading — an external href is left entirely to the browser.
  */
-export function useSpaLinkClick(
-  href: string,
-): (event: MouseEvent<HTMLAnchorElement>) => void {
+export function useSpaLinkClick(href: string): (event: MouseEvent<HTMLAnchorElement>) => void {
   const router = useRouter();
   return (event) => {
     if (!isInternalHref(href)) return;

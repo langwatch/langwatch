@@ -133,9 +133,7 @@ function responseFor(
  * "reject-not-json" answers a 400 whose body is not JSON.
  * "accept" takes anything and exists only to record the wire body.
  */
-export async function startEndpoint(
-  rule: EndpointRule = "accept",
-): Promise<StubEndpoint> {
+export async function startEndpoint(rule: EndpointRule = "accept"): Promise<StubEndpoint> {
   const bodies: Array<Record<string, unknown>> = [];
 
   const server: Server = createServer((req, res) => {

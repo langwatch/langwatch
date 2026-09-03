@@ -448,12 +448,7 @@ function McpTab({
           Config path:
         </Text>
         {EDITOR_PATHS.map((ep) => (
-          <Tooltip
-            key={ep.editor}
-            content={`Click to copy: ${ep.path}`}
-            showArrow
-            openDelay={0}
-          >
+          <Tooltip key={ep.editor} content={`Click to copy: ${ep.path}`} showArrow openDelay={0}>
             <HStack
               asChild
               gap={1}
@@ -615,11 +610,7 @@ export function ViaClaudeCodeScreen({
             onClick={() => selectTab("skill")}
           />
           {showMcpTab && (
-            <TabButton
-              label="MCP"
-              active={activeTab === "mcp"}
-              onClick={() => selectTab("mcp")}
-            />
+            <TabButton label="MCP" active={activeTab === "mcp"} onClick={() => selectTab("mcp")} />
           )}
         </HStack>
 
@@ -637,8 +628,8 @@ export function ViaClaudeCodeScreen({
                 <Text as="span" fontWeight="semibold" color="fg">
                   Zero setup.
                 </Text>{" "}
-                Copy a prompt, paste it into your coding agent, and it handles everything
-                from there.
+                Copy a prompt, paste it into your coding agent, and it handles everything from
+                there.
               </Text>
             )}
             {activeTab === "skill" && (

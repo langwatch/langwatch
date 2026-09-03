@@ -87,11 +87,7 @@ describe("detecting comparison columns", () => {
 
         const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
 
-        expect(column.variants.map((v) => v.id)).toEqual([
-          "target-a",
-          "target-b",
-          "target-c",
-        ]);
+        expect(column.variants.map((v) => v.id)).toEqual(["target-a", "target-b", "target-c"]);
         expect(column.verdictsByRow[1]?.winnerId).toBe("target-c");
         expect(column.verdictsByRow[2]?.winnerId).toBe("target-c");
       });
@@ -185,11 +181,7 @@ describe("detecting comparison columns", () => {
 
         const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
 
-        expect(column.verdictsByRow[0]?.candidateIds).toEqual([
-          "target-a",
-          "target-b",
-          "target-c",
-        ]);
+        expect(column.verdictsByRow[0]?.candidateIds).toEqual(["target-a", "target-b", "target-c"]);
         expect(column.verdictsByRow[1]?.candidateIds).toEqual(["target-a", "target-b"]);
       });
     });

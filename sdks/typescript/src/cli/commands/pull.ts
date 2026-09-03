@@ -38,9 +38,7 @@ export const pullPrompts = async ({
   });
 
   if (remoteDeps.length > 0) {
-    const fetchSpinner = createSpinner(
-      `Checking ${remoteDeps.length} remote prompts...`,
-    ).start();
+    const fetchSpinner = createSpinner(`Checking ${remoteDeps.length} remote prompts...`).start();
 
     for (const [name, dependency] of remoteDeps) {
       try {
@@ -64,10 +62,7 @@ export const pullPrompts = async ({
           if (needsUpdate) {
             const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
 
-            const savedPath = FileManager.saveMaterializedPrompt(
-              name,
-              materializedPrompt,
-            );
+            const savedPath = FileManager.saveMaterializedPrompt(name, materializedPrompt);
             const relativePath = path.relative(process.cwd(), savedPath);
             result.fetched.push({
               name,
@@ -79,9 +74,7 @@ export const pullPrompts = async ({
 
             fetchSpinner.text = `Fetched ${chalk.cyan(
               `${name}@${displaySpec}`,
-            )} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(
-              relativePath,
-            )}`;
+            )} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(relativePath)}`;
           } else {
             result.unchanged.push(name);
           }
@@ -146,9 +139,7 @@ const printPullResults = ({
 
   if (result.cleaned.length > 0) {
     for (const name of result.cleaned) {
-      console.log(
-        chalk.yellow(`✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`),
-      );
+      console.log(chalk.yellow(`✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`));
     }
   }
 

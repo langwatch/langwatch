@@ -18,11 +18,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { RunRow, ScenarioGridCard } from "@langwatch/suite-web";
-import {
-  makeBatchRun,
-  makeScenarioRunData,
-  makeSummary,
-} from "@langwatch/suite-web/testing";
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "@langwatch/suite-web/testing";
 
 vi.mock("../use-prefetch-run-state", () => ({
   usePrefetchRunState: () => vi.fn(),

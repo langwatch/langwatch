@@ -269,9 +269,7 @@ describe("LangWatchExporter", () => {
 
       // URL constructor behavior: new URL("/api/otel/v1/traces", "https://subdomain.example.com:8080/path")
       // results in "https://subdomain.example.com:8080/api/otel/v1/traces" (path gets replaced, not appended)
-      expect((exporter as any).url).toBe(
-        "https://subdomain.example.com:8080/api/otel/v1/traces",
-      );
+      expect((exporter as any).url).toBe("https://subdomain.example.com:8080/api/otel/v1/traces");
     });
   });
 
@@ -433,9 +431,7 @@ describe("LangWatchExporter", () => {
 
     it("include name equals with ignoreCase true", () => {
       const exporter = new LangWatchTraceExporter({
-        filters: [
-          { include: { name: [{ equals: "CHAT.completion", ignoreCase: true }] } },
-        ],
+        filters: [{ include: { name: [{ equals: "CHAT.completion", ignoreCase: true }] } }],
       });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
@@ -445,9 +441,7 @@ describe("LangWatchExporter", () => {
 
     it("include name with OR semantics across array of Match", () => {
       const exporter = new LangWatchTraceExporter({
-        filters: [
-          { include: { name: [{ startsWith: "chat." }, { equals: "custom op" }] } },
-        ],
+        filters: [{ include: { name: [{ startsWith: "chat." }, { equals: "custom op" }] } }],
       });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);

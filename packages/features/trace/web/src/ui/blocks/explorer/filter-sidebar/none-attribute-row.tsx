@@ -23,9 +23,7 @@ export const NoneAttributeRow: React.FC<{
     onClick={onToggle}
     _hover={{
       background: active ? "gray.solid" : "gray.subtle",
-      "& [data-facet-label]": active
-        ? { fontWeight: 700 }
-        : { color: "fg", fontWeight: 500 },
+      "& [data-facet-label]": active ? { fontWeight: 700 } : { color: "fg", fontWeight: 500 },
     }}
     _focusVisible={{
       outline: "2px solid",

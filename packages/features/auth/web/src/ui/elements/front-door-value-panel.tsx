@@ -63,11 +63,7 @@ export function FrontDoorValuePanel({
             is the thing saying the sentence underneath it, which is what a
             wordmark is for. The card drops its own copy whenever this panel is
             on screen (`lw-front-door--split`), so it is never said twice. */}
-        <Box
-          data-testid="front-door-panel-logo"
-          display="flex"
-          marginBottom={{ base: 1, md: 2 }}
-        >
+        <Box data-testid="front-door-panel-logo" display="flex" marginBottom={{ base: 1, md: 2 }}>
           <FullLogo width={176} height={43.2} />
         </Box>
         <Heading
@@ -94,8 +90,7 @@ export function FrontDoorValuePanel({
           css={{
             textWrap: "balance",
             scale: "1 1.1",
-            fontVariantLigatures:
-              "common-ligatures discretionary-ligatures contextual",
+            fontVariantLigatures: "common-ligatures discretionary-ligatures contextual",
             fontKerning: "normal",
           }}
           data-testid="front-door-headline"

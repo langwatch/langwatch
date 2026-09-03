@@ -177,8 +177,7 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     // rationale.
     id: "serviceSegue",
     heading: "Two ways to cut through.",
-    subhead:
-      "Lens tabs above reshape the whole table. Facets in the sidebar narrow what you see.",
+    subhead: "Lens tabs above reshape the whole table. Facets in the sidebar narrow what you see.",
     typewriter: true,
     cta: "Show me",
     next: "facetsReveal",
@@ -279,8 +278,7 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
     // The drawer is the densest information surface in the product.
     // "Take your time" frames lingering as the default; Continue
     // sits there for users who want to press on.
-    subhead:
-      "Conversation, spans, evals — it's all in here. Take your time, then we'll wrap up.",
+    subhead: "Conversation, spans, evals — it's all in here. Take your time, then we'll wrap up.",
     typewriter: true,
     cta: "Wrap up",
     next: "outro",

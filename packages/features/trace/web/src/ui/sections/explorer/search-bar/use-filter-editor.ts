@@ -133,10 +133,7 @@ export interface DynamicSuggestionItems {
   labels?: Record<string, string>;
 }
 
-export type ValueResolver = (
-  field: string,
-  query: string,
-) => DynamicSuggestionItems | null;
+export type ValueResolver = (field: string, query: string) => DynamicSuggestionItems | null;
 
 interface UseFilterEditorParams {
   queryText: string;
@@ -499,9 +496,7 @@ export function useFilterEditor({
         // A few px of slack so a click right at the content's edge still
         // counts as "on the content", not the trailing void.
         if (event.clientX <= endCoords.right + 2) return false;
-        const tr = view.state.tr.setSelection(
-          TextSelection.create(view.state.doc, endPos),
-        );
+        const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, endPos));
         view.dispatch(tr);
         view.focus();
         return true;
@@ -515,11 +510,7 @@ export function useFilterEditor({
         // modifier always wins, even mid-autocomplete. Without content
         // the shortcut still opens AI mode but with an empty seed (same
         // as clicking the Ask AI button).
-        if (
-          event.key === "Enter" &&
-          (event.metaKey || event.ctrlKey) &&
-          onAiShortcutRef.current
-        ) {
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && onAiShortcutRef.current) {
           event.preventDefault();
           onAiShortcutRef.current(text);
           return true;
@@ -597,9 +588,7 @@ export function useFilterEditor({
             // editor keeps focus, so the store→editor sync (skipped while
             // focused, trim-normalised anyway) won't clobber the boundary.
             isProgrammaticRef.current = true;
-            let submitTr = view.state.tr.setSelection(
-              TextSelection.atEnd(view.state.doc),
-            );
+            let submitTr = view.state.tr.setSelection(TextSelection.atEnd(view.state.doc));
             if (!/\s$/.test(view.state.doc.textContent)) {
               submitTr = submitTr.insertText("\u00A0");
             }
@@ -620,9 +609,7 @@ export function useFilterEditor({
             return true;
           case "navigate":
             event.preventDefault();
-            setSuggestion((prev) =>
-              navigateSuggestion({ ui: prev, direction: action.direction }),
-            );
+            setSuggestion((prev) => navigateSuggestion({ ui: prev, direction: action.direction }));
             return true;
           case "accept": {
             event.preventDefault();

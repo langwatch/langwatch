@@ -9,10 +9,7 @@ import {
   type StoredObjectId,
   type StoredObjectProjectId,
 } from "@langwatch/stored-object-contract";
-import type {
-  SystemMigration,
-  TenantMigrationOutcome,
-} from "@langwatch/system-migrations";
+import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
 import {
   StoredObjectLegacyLocationPort,
   StoredObjectLegacySourcePort,
@@ -20,10 +17,7 @@ import {
   StoredObjectProjectSourcePort,
   type LegacyStoredObjectRow,
 } from "../ports/stored-object.port";
-import {
-  StoredObjectStore,
-  type StoredObjectRecord,
-} from "../stores/stored-object.store";
+import { StoredObjectStore, type StoredObjectRecord } from "../stores/stored-object.store";
 
 export const STORED_OBJECTS_CLICKHOUSE_IMPORT_MIGRATION_NAME =
   "stored-objects-clickhouse-import-v0" as const;
@@ -66,9 +60,7 @@ export class ClickHouseImportStoredObjectMigration implements SystemMigration {
 
   private readonly now: () => Date;
 
-  private constructor(
-    private readonly options: ClickHouseImportStoredObjectMigrationOptions,
-  ) {
+  private constructor(private readonly options: ClickHouseImportStoredObjectMigrationOptions) {
     this.now = options.now ?? (() => new Date());
   }
 

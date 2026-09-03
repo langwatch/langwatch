@@ -1,14 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  renderHook,
-  screen,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DejaView, useDejaViewState } from "../../../index";
 
@@ -162,9 +155,7 @@ describe("DejaView", () => {
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
     fireEvent.keyDown(window, { key: "e" });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Select event 2: SessionCompleted" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Select event 2: SessionCompleted" }));
     fireEvent.click(screen.getByRole("button", { name: /SessionProjection/ }));
 
     expect(onSelectEvent).toHaveBeenNthCalledWith(1, 1);
@@ -195,9 +186,7 @@ describe("DejaView", () => {
 
   it("hydrates a deep-linked aggregate and keeps event navigation in the URL", () => {
     const url = "/ops/dejaview#a=aggregate-1&at=tenant-1&e=2";
-    const replaceState = vi
-      .spyOn(window.history, "replaceState")
-      .mockImplementation(() => void 0);
+    const replaceState = vi.spyOn(window.history, "replaceState").mockImplementation(() => void 0);
 
     const { result } = renderHook(() => useDejaViewState(url));
 

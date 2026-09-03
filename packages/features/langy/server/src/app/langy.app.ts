@@ -241,11 +241,7 @@ export class LangyApp {
   // -- conversation writes ---------------------------------------------------
 
   /** Archives a conversation the caller owns. A shared one reports `false`. */
-  deleteConversation(input: {
-    id: string;
-    projectId: string;
-    userId: string;
-  }): Promise<boolean> {
+  deleteConversation(input: { id: string; projectId: string; userId: string }): Promise<boolean> {
     return this.dependencies.langy.deleteById(input);
   }
 

@@ -4,15 +4,9 @@ import chalk from "chalk";
 import prompts from "prompts";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { rememberProjectName } from "@/cli/utils/identityNotice";
-import {
-  runDeviceFlowLogin,
-  runUnifiedLoginFlow,
-} from "@/cli/utils/governance/login-flow";
+import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/login-flow";
 import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
-import {
-  fetchProjectKeyBySlug,
-  SessionApiError,
-} from "@/cli/utils/governance/session-api";
+import { fetchProjectKeyBySlug, SessionApiError } from "@/cli/utils/governance/session-api";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
@@ -33,9 +27,7 @@ function printAgentHintBanner(): void {
     ),
   );
   console.log(
-    chalk.gray(
-      "  --device                   AI tools / SSO (claude, codex, gemini, opencode)",
-    ),
+    chalk.gray("  --device                   AI tools / SSO (claude, codex, gemini, opencode)"),
   );
   console.log(
     chalk.gray(
@@ -43,9 +35,7 @@ function printAgentHintBanner(): void {
     ),
   );
   console.log(
-    chalk.gray(
-      "  --api-key <KEY>            project SDK key you already have, into .env",
-    ),
+    chalk.gray("  --api-key <KEY>            project SDK key you already have, into .env"),
   );
   console.log(
     chalk.gray(
@@ -56,9 +46,7 @@ function printAgentHintBanner(): void {
   console.log();
 }
 
-const updateEnvFile = (
-  apiKey: string,
-): { created: boolean; updated: boolean; path: string } => {
+const updateEnvFile = (apiKey: string): { created: boolean; updated: boolean; path: string } => {
   const envPath = path.join(process.cwd(), ".env");
 
   // Check if .env exists
@@ -104,9 +92,7 @@ const updateEnvFile = (
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 const failFastHeadlessProjectLogin = (): never => {
-  console.error(
-    chalk.red("Error: project login needs a browser, and this terminal has no TTY."),
-  );
+  console.error(chalk.red("Error: project login needs a browser, and this terminal has no TTY."));
   console.error(chalk.gray("Non-interactive options:"));
   console.error(
     chalk.cyan("  langwatch login --project <slug>") +
@@ -117,8 +103,7 @@ const failFastHeadlessProjectLogin = (): never => {
       chalk.gray("    writes a key you already have to .env"),
   );
   console.error(
-    chalk.cyan("  export LANGWATCH_API_KEY=<key>") +
-      chalk.gray("     or put it in .env yourself"),
+    chalk.cyan("  export LANGWATCH_API_KEY=<key>") + chalk.gray("     or put it in .env yourself"),
   );
   console.error(
     chalk.gray(
@@ -137,9 +122,7 @@ const failFastHeadlessProjectLogin = (): never => {
 const loginToProjectBySlug = async (slug: string): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    console.error(
-      chalk.red("Error: `--project <slug>` needs a device login to authenticate you."),
-    );
+    console.error(chalk.red("Error: `--project <slug>` needs a device login to authenticate you."));
     console.error(
       chalk.gray("Run ") +
         chalk.cyan("langwatch login") +
@@ -153,9 +136,7 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
     rememberProjectName(result.api_key, result.project.name);
     const envResult = updateEnvFile(result.api_key);
     console.log(
-      chalk.green(
-        `✓ API key for project ${chalk.bold(result.project.name)} saved to .env`,
-      ),
+      chalk.green(`✓ API key for project ${chalk.bold(result.project.name)} saved to .env`),
     );
     if (envResult.created) {
       console.log(chalk.gray(`  • Created .env file at ${envResult.path}`));
@@ -217,9 +198,7 @@ export const loginCommand = async (options?: {
     if (options?.token) {
       const token = options.token.trim();
       if (token.length < 10) {
-        console.error(
-          chalk.red("Error: token seems too short. Please check and try again."),
-        );
+        console.error(chalk.red("Error: token seems too short. Please check and try again."));
         process.exit(1);
       }
       const cfg = loadConfig();
@@ -268,9 +247,7 @@ export const loginCommand = async (options?: {
     if (options?.apiKey) {
       const apiKey = options.apiKey.trim();
       if (apiKey.length < 10) {
-        console.error(
-          chalk.red("Error: API key seems too short. Please check and try again."),
-        );
+        console.error(chalk.red("Error: API key seems too short. Please check and try again."));
         process.exit(1);
       }
 
@@ -419,8 +396,7 @@ export const loginCommand = async (options?: {
         },
         {
           title: "Project / SDK API key",
-          description:
-            "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
+          description: "langwatch eval, sync, prompts, SDK auto-instrumentation - writes .env",
           value: "api-key",
         },
         {

@@ -1,10 +1,4 @@
-import type {
-  Component,
-  Entry,
-  StudioEdge,
-  StudioNode,
-  StudioWorkflow,
-} from "./studio-workflow";
+import type { Component, Entry, StudioEdge, StudioNode, StudioWorkflow } from "./studio-workflow";
 import { checkIsEvaluator } from "./studio-workflow-node-utils";
 import type { WorkflowField } from "./workflow";
 
@@ -126,9 +120,7 @@ export function canAutoMapAllFields(fields: WorkflowField[]): boolean {
  * @param workflow - The workflow DSL object
  * @returns Array of field definitions from the end node inputs
  */
-export function getWorkflowEndInputs(
-  workflow: StudioWorkflow | null | undefined,
-): WorkflowField[] {
+export function getWorkflowEndInputs(workflow: StudioWorkflow | null | undefined): WorkflowField[] {
   if (!workflow?.nodes) {
     return [];
   }

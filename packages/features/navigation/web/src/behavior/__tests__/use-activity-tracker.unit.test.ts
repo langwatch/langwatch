@@ -42,10 +42,7 @@ describe("useActivityTracker URL parsing", () => {
 
   describe("span detection", () => {
     it("detects span page URL", () => {
-      const result = parseEntityUrl(
-        "/my-project/messages/trace_abc/spans/span_xyz",
-        "my-project",
-      );
+      const result = parseEntityUrl("/my-project/messages/trace_abc/spans/span_xyz", "my-project");
       expect(result).toMatchObject({
         type: "span",
         id: "span_xyz",
@@ -56,10 +53,7 @@ describe("useActivityTracker URL parsing", () => {
 
   describe("workflow detection", () => {
     it("detects workflow page URL", () => {
-      const result = parseEntityUrl(
-        "/my-project/workflows/workflow_abc123",
-        "my-project",
-      );
+      const result = parseEntityUrl("/my-project/workflows/workflow_abc123", "my-project");
       expect(result).toMatchObject({
         type: "entity",
         id: "workflow_abc123",
@@ -97,16 +91,11 @@ describe("useActivityTracker URL parsing", () => {
     it("returns null for non-entity pages", () => {
       expect(parseEntityUrl("/my-project/analytics", "my-project")).toBeNull();
       expect(parseEntityUrl("/my-project/settings", "my-project")).toBeNull();
-      expect(
-        parseEntityUrl("/other-project/messages/trace_abc", "my-project"),
-      ).toBeNull();
+      expect(parseEntityUrl("/other-project/messages/trace_abc", "my-project")).toBeNull();
     });
 
     it("handles URLs with query params", () => {
-      const result = parseEntityUrl(
-        "/my-project/messages/trace_abc?tab=details",
-        "my-project",
-      );
+      const result = parseEntityUrl("/my-project/messages/trace_abc?tab=details", "my-project");
       expect(result).toMatchObject({
         type: "trace",
         id: "trace_abc",

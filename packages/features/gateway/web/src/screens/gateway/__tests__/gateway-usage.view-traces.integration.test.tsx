@@ -109,10 +109,7 @@ function renderUsagePage(initialUrl: string) {
 }
 
 function hrefOfButton(): string {
-  const href = screen
-    .getByTestId("usage-view-all-traces")
-    .closest("a")
-    ?.getAttribute("href");
+  const href = screen.getByTestId("usage-view-all-traces").closest("a")?.getAttribute("href");
   if (!href) throw new Error("the traces button carries no link");
   return href;
 }

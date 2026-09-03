@@ -112,8 +112,7 @@ export function CredentialSignInForm({
   // The same request the sign-up door makes, because from here on it IS the
   // sign-up door: no password travels with it, and the one that was typed
   // above is not kept.
-  const requestSignUpVerification =
-    api.frontDoor.requestSignUpVerification.useMutation();
+  const requestSignUpVerification = api.frontDoor.requestSignUpVerification.useMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const passwordField = useFocusWhenSettled();
@@ -130,9 +129,7 @@ export function CredentialSignInForm({
       email: address,
       password: values.password,
       callbackUrl,
-      convertToSignUp: onSignUpStarted
-        ? requestSignUpVerification.mutateAsync
-        : undefined,
+      convertToSignUp: onSignUpStarted ? requestSignUpVerification.mutateAsync : undefined,
     });
     setIsSubmitting(false);
 
@@ -195,13 +192,7 @@ export function CredentialSignInForm({
           // password manager can save and fill the pair. Read-only above,
           // carried here. (The break-glass field above IS the form field, so
           // it needs no shadow copy.)
-          <input
-            type="hidden"
-            name="email"
-            value={email}
-            autoComplete="username"
-            readOnly
-          />
+          <input type="hidden" name="email" value={email} autoComplete="username" readOnly />
         ) : null}
         <FrontDoorField
           label="Password"

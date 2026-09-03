@@ -20,7 +20,9 @@ describe("OrganizationService contract", () => {
     // never `string | null`. It used to be checked by passing "team" to a
     // helper and then asserting `true` is `true`, so the runtime expectation
     // held whatever the type said.
-    expectTypeOf<Awaited<ReturnType<OrganizationService["getOldestTeamId"]>>>().toEqualTypeOf<string>();
+    expectTypeOf<
+      Awaited<ReturnType<OrganizationService["getOldestTeamId"]>>
+    >().toEqualTypeOf<string>();
   });
 
   it("validates portable billing profile values and claims", () => {

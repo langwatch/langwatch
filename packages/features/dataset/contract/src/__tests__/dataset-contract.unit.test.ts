@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  datasetColumnsSchema,
-  datasetRecordInputSchema,
-  upsertDatasetInputSchema,
-} from "../index";
+import { datasetColumnsSchema, datasetRecordInputSchema, upsertDatasetInputSchema } from "../index";
 
 describe("Dataset contract", () => {
   it("accepts the legacy column vocabulary", () => {

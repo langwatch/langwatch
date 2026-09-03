@@ -30,9 +30,7 @@ vi.mock("node:fs", () => ({
 
 import { runScenarioAndLog } from "./scenario-logger";
 
-const CONFIG = { name: "a scenario" } as Parameters<
-  typeof runScenarioAndLog
->[0]["config"];
+const CONFIG = { name: "a scenario" } as Parameters<typeof runScenarioAndLog>[0]["config"];
 
 describe("runScenarioAndLog", () => {
   beforeEach(() => {
@@ -104,9 +102,7 @@ describe("runScenarioAndLog", () => {
     isTransient.mockReturnValue(false);
     scenarioRun.mockRejectedValueOnce(new Error("real bug"));
 
-    await expect(
-      runScenarioAndLog({ config: CONFIG, beforeRetry }),
-    ).rejects.toThrow("real bug");
+    await expect(runScenarioAndLog({ config: CONFIG, beforeRetry })).rejects.toThrow("real bug");
 
     expect(beforeRetry).not.toHaveBeenCalled();
     expect(scenarioRun).toHaveBeenCalledTimes(1);

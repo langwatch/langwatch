@@ -15,9 +15,7 @@ function CostsPage() {
     <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full">
         <Heading size="md">Costs</Heading>
-        <Text color="fg.muted">
-          Cost views are on their way. Nothing to see here yet.
-        </Text>
+        <Text color="fg.muted">Cost views are on their way. Nothing to see here yet.</Text>
       </VStack>
     </GovernanceLayout>
   );

@@ -321,13 +321,7 @@ const STRING_FUNCTIONS = [
 ] as const;
 
 /** Conditionals and null handling, for bucketing and safe division. */
-const CONDITIONAL_FUNCTIONS = [
-  "multiIf",
-  "coalesce",
-  "nullIf",
-  "ifNull",
-  "assumeNotNull",
-] as const;
+const CONDITIONAL_FUNCTIONS = ["multiIf", "coalesce", "nullIf", "ifNull", "assumeNotNull"] as const;
 
 /**
  * Arrays, maps and tuples, because the LangWatchQL views expose those types.

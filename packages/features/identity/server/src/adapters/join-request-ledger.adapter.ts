@@ -87,9 +87,7 @@ export interface JoinRequestLedgerWriterDeps {
 
 export class JoinRequestLedgerWriter implements JoinRequestLedger {
   private readonly projectionStore: StateProjectionStore<JoinRequestFoldState>;
-  private readonly stagedSender: (
-    name: string,
-  ) => Promise<JoinRequestStagedSender | null>;
+  private readonly stagedSender: (name: string) => Promise<JoinRequestStagedSender | null>;
   private readonly convergence: { timeoutMs: number; pollMs: number };
 
   constructor(deps: JoinRequestLedgerWriterDeps) {
@@ -143,11 +141,7 @@ export class JoinRequestLedgerWriter implements JoinRequestLedger {
    * `join-requests` dropped the command silently and told the person their
    * request was in — the failure mode the identity ledger has never had.
    */
-  private async stage({
-    command,
-  }: {
-    command: JoinRequestCommand;
-  }): Promise<void> {
+  private async stage({ command }: { command: JoinRequestCommand }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
     const sender = await this.stagedSender(senderName);
     if (!sender) {
@@ -187,9 +181,7 @@ export class JoinRequestLedgerWriter implements JoinRequestLedger {
         );
         return;
       }
-      await new Promise((resolve) =>
-        setTimeout(resolve, this.convergence.pollMs),
-      );
+      await new Promise((resolve) => setTimeout(resolve, this.convergence.pollMs));
     }
   }
 

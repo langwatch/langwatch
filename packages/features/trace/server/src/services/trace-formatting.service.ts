@@ -72,11 +72,7 @@ export const generateAsciiTree = (spans: Span[]): string => {
   let result = ".\n";
 
   // Recursively build the tree
-  const buildAsciiTree = (
-    span: SpanWithChildren,
-    prefix: string,
-    isLast: boolean,
-  ): void => {
+  const buildAsciiTree = (span: SpanWithChildren, prefix: string, isLast: boolean): void => {
     // Add current span to result
     const connector = isLast ? "└── " : "├── ";
     const displayName = `${span.type || "unknown"}${

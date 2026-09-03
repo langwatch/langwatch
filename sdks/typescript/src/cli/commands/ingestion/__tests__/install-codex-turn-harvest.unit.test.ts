@@ -27,9 +27,7 @@ const { mintIngestionKeyMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/cli/utils/governance/cli-api", async () => {
-  const actual = await vi.importActual<typeof CliApiModule>(
-    "@/cli/utils/governance/cli-api",
-  );
+  const actual = await vi.importActual<typeof CliApiModule>("@/cli/utils/governance/cli-api");
   return { ...actual, mintIngestionKey: mintIngestionKeyMock };
 });
 
@@ -62,9 +60,7 @@ const stdout = (): string =>
 
 const readConfigToml = (): string => fs.readFileSync(codexConfigPath, "utf8");
 
-const runCodexInstall = async (
-  overrides: Record<string, unknown> = {},
-): Promise<void> => {
+const runCodexInstall = async (overrides: Record<string, unknown> = {}): Promise<void> => {
   const { installCommand } = await import("../install.js");
   await installCommand("codex", {
     codexConfigPath,
@@ -121,9 +117,7 @@ describe("the codex ingestion install", () => {
       it("reports what it did to the codex configuration", async () => {
         await runCodexInstall();
 
-        expect(stdout()).toContain(
-          "Codex will record each turn's conversation as it completes",
-        );
+        expect(stdout()).toContain("Codex will record each turn's conversation as it completes");
       });
 
       it("carries the harvest action in the json report", async () => {

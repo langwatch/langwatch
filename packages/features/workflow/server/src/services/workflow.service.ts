@@ -152,12 +152,8 @@ export class WorkflowService extends WorkflowServiceContract {
       ...(record.id === workflow.currentVersionId
         ? { isCurrentVersion: true as const, parent: record.parent }
         : {}),
-      ...(record.id === workflow.latestVersionId
-        ? { isLatestVersion: true as const }
-        : {}),
-      ...(record.id === workflow.publishedId
-        ? { isPublishedVersion: true as const }
-        : {}),
+      ...(record.id === workflow.latestVersionId ? { isLatestVersion: true as const } : {}),
+      ...(record.id === workflow.publishedId ? { isPublishedVersion: true as const } : {}),
       ...(record.id === previousVersionId
         ? {
             isPreviousVersion: true as const,
@@ -168,10 +164,7 @@ export class WorkflowService extends WorkflowServiceContract {
     }));
   }
 
-  async restoreVersion(input: {
-    versionId: string;
-    projectId: string;
-  }): Promise<WorkflowVersion> {
+  async restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
     const version = await this.options.repository.tryFindVersionById({
       id: input.versionId,
       projectId: input.projectId,
@@ -217,9 +210,7 @@ export class WorkflowService extends WorkflowServiceContract {
         throw new WorkflowNotPublishedError(input.workflowId);
       }
 
-      throw new WorkflowVersionNotFoundError(
-        input.versionId ?? workflow.publishedId ?? "",
-      );
+      throw new WorkflowVersionNotFoundError(input.versionId ?? workflow.publishedId ?? "");
     }
     return version;
   }
@@ -263,8 +254,7 @@ export class WorkflowService extends WorkflowServiceContract {
     const data = this.dsl.metadata({
       name: command.name ?? existing.name,
       icon: command.icon !== undefined ? command.icon : existing.icon,
-      description:
-        command.description !== undefined ? command.description : existing.description,
+      description: command.description !== undefined ? command.description : existing.description,
     });
     return this.options.repository.updateWorkflow({
       id: command.id,
@@ -456,13 +446,8 @@ export class WorkflowService extends WorkflowServiceContract {
     return this.options.execution.execute({ ...command, version });
   }
 
-  private async latestVersion(
-    workflowId: string,
-    projectId: string,
-  ): Promise<WorkflowVersion> {
-    const version = (
-      await this.options.repository.findVersions({ workflowId, projectId })
-    )[0];
+  private async latestVersion(workflowId: string, projectId: string): Promise<WorkflowVersion> {
+    const version = (await this.options.repository.findVersions({ workflowId, projectId }))[0];
     if (!version) {
       throw new WorkflowVersionRequiredError();
     }
@@ -477,9 +462,7 @@ export class WorkflowService extends WorkflowServiceContract {
     schema: {
       safeParse(
         value: unknown,
-      ):
-        | { success: true; data: T }
-        | { success: false; error: { issues: readonly unknown[] } };
+      ): { success: true; data: T } | { success: false; error: { issues: readonly unknown[] } };
     },
     value: unknown,
   ): T {

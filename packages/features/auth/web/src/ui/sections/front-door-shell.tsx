@@ -53,11 +53,7 @@ export function FrontDoorShell({
       // The modifier says the value panel is on screen, which is the one thing
       // the card needs to know without being told: it drops its own wordmark
       // so the page says it once, above the headline.
-      className={
-        isHosted && headline
-          ? "lw-front-door lw-front-door--split"
-          : "lw-front-door"
-      }
+      className={isHosted && headline ? "lw-front-door lw-front-door--split" : "lw-front-door"}
       position="relative"
       backgroundColor="frontDoor.ground"
       minHeight="100vh"
@@ -69,9 +65,7 @@ export function FrontDoorShell({
           so it exists exactly where the front door exists — same flag, same
           screens — and nowhere else. */}
       <CastleSnake />
-      {isHosted ? (
-        <FrontDoorGround protect={headline ? "left" : "center"} />
-      ) : null}
+      {isHosted ? <FrontDoorGround protect={headline ? "left" : "center"} /> : null}
       {isHosted && headline ? (
         // Capped at the site's content width and centred, so a big monitor
         // widens the field around the conversation rather than flinging the

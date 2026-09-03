@@ -37,11 +37,7 @@ import type {
   LangWatchQLProtections,
   LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
-import type {
-  AnyTRPCRootTypes,
-  TRPCRootObject,
-  TRPCRuntimeConfigOptions,
-} from "@trpc/server";
+import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { DashboardApp } from "#app/dashboard.app";
 
@@ -192,9 +188,7 @@ export class SavedWorkbenchChartTrpcApi {
 
       create: requireWorkbenchEnabled(
         policy("analytics:create")(
-          procedure.input(
-            projectScopeSchema.extend({ name: nameSchema, definition: z.unknown() }),
-          ),
+          procedure.input(projectScopeSchema.extend({ name: nameSchema, definition: z.unknown() })),
         ),
       ).mutation(async ({ ctx, input }) => {
         const protections = await ports.resolveProtections(ctx, {
@@ -297,9 +291,7 @@ export class SavedWorkbenchChartTrpcApi {
               ...(input.granularitySeconds === undefined
                 ? {}
                 : { granularitySeconds: input.granularitySeconds }),
-              ...(input.onBudgetOverflow
-                ? { onBudgetOverflow: input.onBudgetOverflow }
-                : {}),
+              ...(input.onBudgetOverflow ? { onBudgetOverflow: input.onBudgetOverflow } : {}),
             },
           }),
         );

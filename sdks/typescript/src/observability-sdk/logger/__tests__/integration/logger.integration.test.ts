@@ -163,9 +163,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       // Verify LangWatch-specific attributes
       expect(exportedLogRecord.attributes?.["langwatch.service"]).toBe("test-service");
       expect(exportedLogRecord.attributes?.["langwatch.environment"]).toBe("test");
-      expect(exportedLogRecord.attributes?.["langwatch.operation"]).toBe(
-        "test-operation",
-      );
+      expect(exportedLogRecord.attributes?.["langwatch.operation"]).toBe("test-operation");
       expect(exportedLogRecord.attributes?.["langwatch.user_id"]).toBe("user-123");
       expect(exportedLogRecord.attributes?.["custom.attribute"]).toBe("custom-value");
       expect(exportedLogRecord.attributes?.["performance.latency_ms"]).toBe(150);
@@ -520,9 +518,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       // Verify each log record has the correct version attributes
       exportedLogRecords.forEach((record, index) => {
         expect(record.body).toBe(`Message from version ${index}`);
-        expect(record.attributes?.["logger.version"]).toBe(
-          ["1.0.0", "2.0.0", "latest"][index],
-        );
+        expect(record.attributes?.["logger.version"]).toBe(["1.0.0", "2.0.0", "latest"][index]);
       });
     });
   });
@@ -557,9 +553,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       expect(exportedLogRecord.attributes?.["gen_ai.request.model"]).toBe("gpt-4");
       expect(exportedLogRecord.attributes?.["gen_ai.request.temperature"]).toBe(0.7);
       expect(exportedLogRecord.attributes?.["gen_ai.request.max_tokens"]).toBe(150);
-      expect(exportedLogRecord.attributes?.["gen_ai.response.finish_reason"]).toBe(
-        "stop",
-      );
+      expect(exportedLogRecord.attributes?.["gen_ai.response.finish_reason"]).toBe("stop");
       expect(exportedLogRecord.attributes?.["gen_ai.usage.prompt_tokens"]).toBe(15);
       expect(exportedLogRecord.attributes?.["gen_ai.usage.completion_tokens"]).toBe(25);
       expect(exportedLogRecord.attributes?.["gen_ai.usage.total_tokens"]).toBe(40);
@@ -597,12 +591,8 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
       expect(exportedLogRecord.severityText).toBe("ERROR");
       expect(exportedLogRecord.severityNumber).toBe(17);
       expect(exportedLogRecord.body).toBe("GenAI API call failed");
-      expect(exportedLogRecord.attributes?.["gen_ai.error.code"]).toBe(
-        "rate_limit_exceeded",
-      );
-      expect(exportedLogRecord.attributes?.["gen_ai.error.message"]).toBe(
-        "Rate limit exceeded",
-      );
+      expect(exportedLogRecord.attributes?.["gen_ai.error.code"]).toBe("rate_limit_exceeded");
+      expect(exportedLogRecord.attributes?.["gen_ai.error.message"]).toBe("Rate limit exceeded");
       expect(exportedLogRecord.attributes?.["gen_ai.error.retry_after"]).toBe(60);
     });
   });
@@ -712,9 +702,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
 
       // Verify large data was handled correctly
       expect(exportedLogRecord.body).toBe("Large data log message");
-      expect(exportedLogRecord.attributes?.["data.size"]).toBe(
-        JSON.stringify(largeData).length,
-      );
+      expect(exportedLogRecord.attributes?.["data.size"]).toBe(JSON.stringify(largeData).length);
     });
   });
 

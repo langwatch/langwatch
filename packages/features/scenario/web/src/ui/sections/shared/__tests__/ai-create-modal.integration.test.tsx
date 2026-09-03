@@ -3,15 +3,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioGenerationError } from "../../../../model/scenario-generation";
 import { AICreateModal } from "../ai-create-modal";
@@ -76,9 +68,7 @@ describe("<AICreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      expect(
-        within(dialog).getByText("Create new scenario"),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByText("Create new scenario")).toBeInTheDocument();
     });
 
     it("displays custom title", () => {
@@ -134,9 +124,7 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       expect(within(dialog).getByText("Customer Support")).toBeInTheDocument();
       expect(within(dialog).getByText("RAG Q&A")).toBeInTheDocument();
-      expect(
-        within(dialog).getByText("Tool-calling Agent"),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByText("Tool-calling Agent")).toBeInTheDocument();
     });
 
     it("displays Generate with AI button", () => {
@@ -153,9 +141,7 @@ describe("<AICreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      expect(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
     });
 
     it("displays Skip button", () => {
@@ -191,9 +177,7 @@ describe("<AICreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      expect(
-        within(dialog).getByRole("button", { name: /close/i }),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: /close/i })).toBeInTheDocument();
     });
   });
 
@@ -261,9 +245,7 @@ describe("<AICreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /i'll write it myself/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /i'll write it myself/i }));
 
       expect(onSkip).toHaveBeenCalledTimes(1);
     });
@@ -288,9 +270,7 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
         expect(onGenerate).toHaveBeenCalledWith("Test description");
@@ -298,9 +278,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays generating state with spinner", async () => {
-      const onGenerate = vi
-        .fn()
-        .mockImplementation(() => new Promise(() => {}));
+      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
       render(
         <AICreateModal
@@ -317,9 +295,7 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
         expect(within(dialog).getByText("Generating...")).toBeInTheDocument();
@@ -327,9 +303,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays custom generating text", async () => {
-      const onGenerate = vi
-        .fn()
-        .mockImplementation(() => new Promise(() => {}));
+      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
       render(
         <AICreateModal
@@ -347,21 +321,15 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
-        expect(
-          within(dialog).getByText("Generating prompt..."),
-        ).toBeInTheDocument();
+        expect(within(dialog).getByText("Generating prompt...")).toBeInTheDocument();
       });
     });
 
     it("hides close button during generation", async () => {
-      const onGenerate = vi
-        .fn()
-        .mockImplementation(() => new Promise(() => {}));
+      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
       render(
         <AICreateModal
@@ -378,23 +346,17 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
-        expect(
-          within(dialog).queryByRole("button", { name: /close/i }),
-        ).not.toBeInTheDocument();
+        expect(within(dialog).queryByRole("button", { name: /close/i })).not.toBeInTheDocument();
       });
     });
   });
 
   describe("when generation fails", () => {
     it("displays the registry's copy, never the failure's own message", async () => {
-      const onGenerate = vi
-        .fn()
-        .mockRejectedValue(new Error("API connection failed"));
+      const onGenerate = vi.fn().mockRejectedValue(new Error("API connection failed"));
 
       render(
         <AICreateModal
@@ -411,21 +373,15 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
-        expect(
-          within(dialog).getByText("Something went wrong"),
-        ).toBeInTheDocument();
+        expect(within(dialog).getByText("Something went wrong")).toBeInTheDocument();
       });
       expect(
         within(dialog).getByText("We've been notified. Try again in a moment."),
       ).toBeInTheDocument();
-      expect(
-        within(dialog).queryByText("API connection failed"),
-      ).not.toBeInTheDocument();
+      expect(within(dialog).queryByText("API connection failed")).not.toBeInTheDocument();
     });
 
     it("displays Try again button", async () => {
@@ -446,14 +402,10 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
-        expect(
-          within(dialog).getByRole("button", { name: /try again/i }),
-        ).toBeInTheDocument();
+        expect(within(dialog).getByRole("button", { name: /try again/i })).toBeInTheDocument();
       });
     });
 
@@ -475,9 +427,7 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
         expect(
@@ -505,14 +455,10 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
-        expect(
-          within(dialog).getByRole("button", { name: /close/i }),
-        ).toBeInTheDocument();
+        expect(within(dialog).getByRole("button", { name: /close/i })).toBeInTheDocument();
       });
     });
   });
@@ -539,9 +485,7 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await waitFor(() => {
         expect(
@@ -551,9 +495,7 @@ describe("<AICreateModal/>", () => {
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /try again/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /try again/i }));
 
       await waitFor(() => {
         expect(onGenerate).toHaveBeenCalledTimes(2);
@@ -572,9 +514,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays timeout error after 60 seconds", async () => {
-      const onGenerate = vi
-        .fn()
-        .mockImplementation(() => new Promise(() => {}));
+      const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
       render(
         <AICreateModal
@@ -591,18 +531,14 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       const textarea = within(dialog).getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "Test description" } });
-      fireEvent.click(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      );
+      fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
       await act(async () => {
         vi.advanceTimersByTime(60000);
         await vi.runAllTimersAsync();
       });
 
-      expect(
-        within(dialog).getByText("Something went wrong"),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByText("Something went wrong")).toBeInTheDocument();
       expect(
         within(dialog).getByText("We've been notified. Try again in a moment."),
       ).toBeInTheDocument();
@@ -660,9 +596,7 @@ describe("<AICreateModal/>", () => {
       it("shows the Configure model provider button", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(
-            new ScenarioGenerationError("invalid_api_key", "invalid_api_key"),
-          );
+          .mockRejectedValue(new ScenarioGenerationError("invalid_api_key", "invalid_api_key"));
 
         render(
           <AICreateModal
@@ -679,9 +613,7 @@ describe("<AICreateModal/>", () => {
         const dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
-        fireEvent.click(
-          within(dialog).getByRole("button", { name: /generate with ai/i }),
-        );
+        fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
         await waitFor(() => {
           expect(
@@ -693,9 +625,7 @@ describe("<AICreateModal/>", () => {
       it("shows the registry's copy about the API key", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(
-            new ScenarioGenerationError("invalid_api_key", "invalid_api_key"),
-          );
+          .mockRejectedValue(new ScenarioGenerationError("invalid_api_key", "invalid_api_key"));
 
         render(
           <AICreateModal
@@ -712,14 +642,10 @@ describe("<AICreateModal/>", () => {
         const dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
-        fireEvent.click(
-          within(dialog).getByRole("button", { name: /generate with ai/i }),
-        );
+        fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
         await waitFor(() => {
-          expect(
-            within(dialog).getByText("That API key isn't valid"),
-          ).toBeInTheDocument();
+          expect(within(dialog).getByText("That API key isn't valid")).toBeInTheDocument();
         });
       });
     });
@@ -733,9 +659,7 @@ describe("<AICreateModal/>", () => {
       it("never shows the raw error message", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(
-            new Error("Completely unexpected server meltdown 42"),
-          );
+          .mockRejectedValue(new Error("Completely unexpected server meltdown 42"));
 
         render(
           <AICreateModal
@@ -752,28 +676,20 @@ describe("<AICreateModal/>", () => {
         const dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
-        fireEvent.click(
-          within(dialog).getByRole("button", { name: /generate with ai/i }),
-        );
+        fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
         await waitFor(() => {
-          expect(
-            within(dialog).getByText("Something went wrong"),
-          ).toBeInTheDocument();
+          expect(within(dialog).getByText("Something went wrong")).toBeInTheDocument();
         });
         expect(
-          within(dialog).queryByText(
-            "Completely unexpected server meltdown 42",
-          ),
+          within(dialog).queryByText("Completely unexpected server meltdown 42"),
         ).not.toBeInTheDocument();
       });
 
       it("does not show Configure model provider button", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(
-            new Error("Completely unexpected server meltdown 42"),
-          );
+          .mockRejectedValue(new Error("Completely unexpected server meltdown 42"));
 
         render(
           <AICreateModal
@@ -790,15 +706,11 @@ describe("<AICreateModal/>", () => {
         const dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
-        fireEvent.click(
-          within(dialog).getByRole("button", { name: /generate with ai/i }),
-        );
+        fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
         await waitFor(() => {
           expect(
-            within(dialog).queryByTestId(
-              "error-configure-model-provider-button",
-            ),
+            within(dialog).queryByTestId("error-configure-model-provider-button"),
           ).not.toBeInTheDocument();
         });
       });
@@ -811,10 +723,7 @@ describe("<AICreateModal/>", () => {
         const onGenerate = vi
           .fn()
           .mockRejectedValue(
-            new ScenarioGenerationError(
-              "no_provider_configured",
-              "no_provider_configured",
-            ),
+            new ScenarioGenerationError("no_provider_configured", "no_provider_configured"),
           );
 
         render(
@@ -832,18 +741,11 @@ describe("<AICreateModal/>", () => {
         const dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
-        fireEvent.click(
-          within(dialog).getByRole("button", { name: /generate with ai/i }),
-        );
+        fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
 
         await waitFor(() => {
-          const configureBtn = within(dialog).getByTestId(
-            "error-configure-model-provider-button",
-          );
-          expect(configureBtn).toHaveAttribute(
-            "href",
-            "/settings/model-providers",
-          );
+          const configureBtn = within(dialog).getByTestId("error-configure-model-provider-button");
+          expect(configureBtn).toHaveAttribute("href", "/settings/model-providers");
           expect(configureBtn).toHaveAttribute("target", "_blank");
         });
       });
@@ -870,9 +772,7 @@ describe("<AICreateModal/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.queryAllByRole("dialog", { hidden: true }).length,
-      ).toBeGreaterThan(0);
+      expect(screen.queryAllByRole("dialog", { hidden: true }).length).toBeGreaterThan(0);
     });
 
     /** @scenario "A new test starts with a clean DOM after the previous dialog is unmounted" */
@@ -913,9 +813,7 @@ describe("<AICreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      expect(
-        within(dialog).getByRole("button", { name: /generate with ai/i }),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
     });
 
     it("renders example template pills", () => {
@@ -934,9 +832,7 @@ describe("<AICreateModal/>", () => {
       const dialog = getDialogContent();
       expect(within(dialog).getByText("Customer Support")).toBeInTheDocument();
       expect(within(dialog).getByText("RAG Q&A")).toBeInTheDocument();
-      expect(
-        within(dialog).getByText("Tool-calling Agent"),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByText("Tool-calling Agent")).toBeInTheDocument();
     });
   });
 });

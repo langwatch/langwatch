@@ -3,10 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { AnthropicAdminPuller } from "../anthropic-admin-puller.adapter";
-import {
-  GovernanceHttpPort,
-  type GovernanceHttpResponse,
-} from "../../ports/governance-http.port";
+import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../ports/governance-http.port";
 
 const options = { cursor: null, credentials: { token: "admin-key" } };
 const usageConfig = {
@@ -263,15 +260,10 @@ describe("Anthropic Admin puller", () => {
       options,
       hourlyAdapter.validateConfig({ ...costConfig, bucketWidth: "1h" }),
     );
-    const dailyRun = await dailyAdapter.runOnce(
-      options,
-      dailyAdapter.validateConfig(costConfig),
-    );
+    const dailyRun = await dailyAdapter.runOnce(options, dailyAdapter.validateConfig(costConfig));
 
     expect(hourly.calls[0]?.url).toContain("bucket_width=1d");
-    expect(hourlyRun.events[0]?.source_event_id).toBe(
-      dailyRun.events[0]?.source_event_id,
-    );
+    expect(hourlyRun.events[0]?.source_event_id).toBe(dailyRun.events[0]?.source_event_id);
   });
 
   it("encodes dimensions so delimiter movement cannot collapse identities", async () => {
@@ -304,18 +296,13 @@ describe("Anthropic Admin puller", () => {
     const firstAdapter = puller(first);
     const secondAdapter = puller(second);
 
-    const firstRun = await firstAdapter.runOnce(
-      options,
-      firstAdapter.validateConfig(costConfig),
-    );
+    const firstRun = await firstAdapter.runOnce(options, firstAdapter.validateConfig(costConfig));
     const secondRun = await secondAdapter.runOnce(
       options,
       secondAdapter.validateConfig(costConfig),
     );
 
-    expect(firstRun.events[0]?.source_event_id).not.toBe(
-      secondRun.events[0]?.source_event_id,
-    );
+    expect(firstRun.events[0]?.source_event_id).not.toBe(secondRun.events[0]?.source_event_id);
   });
 
   it("reuses an unchanged page token and retains its latest watermark across a deadline", async () => {

@@ -209,10 +209,7 @@ describe("combined contributor runtime", () => {
       "tools/dev-runtime/src/index.ts",
       'import "@langwatch/platform-api/runtime"; import "@langwatch/worker/runtime";',
     );
-    write(
-      "tools/dev-runtime/src/services/product.service.ts",
-      "export class ProductService {}",
-    );
+    write("tools/dev-runtime/src/services/product.service.ts", "export class ProductService {}");
 
     expect(policy("application-layout")).toHaveLength(1);
     expect(policy("composition-source")).toHaveLength(1);
@@ -306,17 +303,11 @@ describe("Enterprise aggregate boundaries", () => {
       license: "SEE LICENSE IN LICENSE.md",
       dependencies: { react: "19.2.4" },
     });
-    write(
-      "packages/enterprise/src/index.ts",
-      'import React from "react"; export { React };',
-    );
+    write("packages/enterprise/src/index.ts", 'import React from "react"; export { React };');
     writeManifest("packages/enterprise/composition/api/package.json", {
       name: "@langwatch/enterprise-api",
     });
-    write(
-      "packages/enterprise/composition/api/src/index.ts",
-      "export const create = () => ({});",
-    );
+    write("packages/enterprise/composition/api/src/index.ts", "export const create = () => ({});");
 
     expect(policy("enterprise-composition")).toHaveLength(2);
     expect(policy("composition-source")).toHaveLength(1);
@@ -324,8 +315,7 @@ describe("Enterprise aggregate boundaries", () => {
 });
 
 describe("shrinking legacy application boundary baseline", () => {
-  const baselinePath =
-    "packages/architecture-lint/src/legacy-application-boundary-baseline.json";
+  const baselinePath = "packages/architecture-lint/src/legacy-application-boundary-baseline.json";
 
   function legacyBrowserEdge(): void {
     write(

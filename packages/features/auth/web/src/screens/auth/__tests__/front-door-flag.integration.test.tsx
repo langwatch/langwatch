@@ -112,14 +112,7 @@ vi.mock("../../../behavior/use-route", () => ({
 }));
 
 vi.mock("../../../ui/elements/router-link", () => ({
-  default: ({
-    href,
-    children,
-    ...props
-  }: {
-    href: string;
-    children: ReactNode;
-  }) => (
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -165,9 +158,7 @@ describe("given the identifier-first front door is not enforced", () => {
       // exactly what it rendered before any of this existed.
       expect(container.querySelector('input[type="email"]')).not.toBeNull();
       expect(container.querySelector('input[type="password"]')).not.toBeNull();
-      expect(
-        screen.getByRole("link", { name: /forgot password/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("link", { name: /forgot password/i })).toBeTruthy();
       expect(screen.queryByTestId("method-picker")).toBeNull();
       expect(routeMock).not.toHaveBeenCalled();
     });
@@ -178,9 +169,7 @@ describe("given the identifier-first front door is not enforced", () => {
     it("answers with the legacy screen, which asks for a password up front", () => {
       const { container } = renderPage(<SignUp />);
 
-      expect(container.querySelectorAll('input[type="password"]').length).toBe(
-        2,
-      );
+      expect(container.querySelectorAll('input[type="password"]').length).toBe(2);
       expect(screen.getByRole("button", { name: /sign up/i })).toBeTruthy();
       expect(requestVerificationMock).not.toHaveBeenCalled();
     });
@@ -198,9 +187,7 @@ describe("given the identifier-first front door is not enforced", () => {
 
       const { container } = renderPage(<ForgotPassword />);
 
-      expect(
-        screen.getByText(/password is managed by your identity provider/i),
-      ).toBeTruthy();
+      expect(screen.getByText(/password is managed by your identity provider/i)).toBeTruthy();
       expect(container.querySelector('input[type="email"]')).toBeNull();
     });
   });
@@ -232,17 +219,10 @@ describe("given the identifier-first front door is enforced", () => {
       const { container } = renderPage(<ForgotPassword />);
 
       expect(container.querySelector('input[type="email"]')).not.toBeNull();
-      expect(
-        screen.queryByText(/password is managed by your identity provider/i),
-      ).toBeNull();
+      expect(screen.queryByText(/password is managed by your identity provider/i)).toBeNull();
 
-      await userEvent.type(
-        container.querySelector('input[type="email"]')!,
-        "sam@acme.com",
-      );
-      await userEvent.click(
-        screen.getByRole("button", { name: /send reset link/i }),
-      );
+      await userEvent.type(container.querySelector('input[type="email"]')!, "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: /send reset link/i }));
 
       // The same neutral sentence either way: the screen never learns, and
       // never says, whether the address has an account or holds a password.
@@ -262,9 +242,7 @@ describe("given the identifier-first front door is enforced", () => {
 
       const { container } = renderPage(<ForgotPassword />);
 
-      expect(
-        screen.getByText(/password is managed by your identity provider/i),
-      ).toBeTruthy();
+      expect(screen.getByText(/password is managed by your identity provider/i)).toBeTruthy();
       expect(container.querySelector('input[type="email"]')).toBeNull();
     });
   });
@@ -292,19 +270,12 @@ describe("given the identifier-first front door is enforced", () => {
       // as a method, and offering it must still not put a hosted page in
       // reach.
       const { container } = renderPage(<SignIn />);
-      await userEvent.type(
-        await screen.findByLabelText(/email/i),
-        "sam@acme.com",
-      );
-      await userEvent.click(
-        screen.getByRole("button", { name: /^continue$/i }),
-      );
+      await userEvent.type(await screen.findByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: /^continue$/i }));
       await screen.findByTestId("method-picker");
       expectNothingHosted(container);
 
-      await userEvent.click(
-        screen.getByRole("button", { name: /continue with single sign-on/i }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: /continue with single sign-on/i }));
       await waitFor(() => {
         expect(signInMock).toHaveBeenCalledWith("auth0", {
           callbackUrl: undefined,

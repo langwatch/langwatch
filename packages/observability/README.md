@@ -48,10 +48,7 @@ Queue producers and consumers can use `getJobContextMetadata` and `createContext
 OpenTelemetry helpers are also isolated from the browser-safe package root:
 
 ```ts
-import {
-  getActiveTraceId,
-  injectTraceContextHeaders,
-} from "@langwatch/observability/tracing";
+import { getActiveTraceId, injectTraceContextHeaders } from "@langwatch/observability/tracing";
 
 const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
 ```

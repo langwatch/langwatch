@@ -23,9 +23,7 @@ describe("OverSeatsCallout", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.getByText(/15 members are over the seats your license covers/i),
-      ).toBeDefined();
+      expect(screen.getByText(/15 members are over the seats your license covers/i)).toBeDefined();
       expect(screen.getByText(/Choose who to disable/i)).toBeDefined();
     });
 
@@ -34,19 +32,16 @@ describe("OverSeatsCallout", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.getByText(/One member is over the seats your license covers/i),
-      ).toBeDefined();
+      expect(screen.getByText(/One member is over the seats your license covers/i)).toBeDefined();
     });
   });
 
   describe("given the organization is within its seats", () => {
     /** @scenario An organization within its seats is not told anything */
     it("renders nothing at all", () => {
-      const { container } = render(
-        <OverSeatsCallout currentMembers={10} maxMembers={10} />,
-        { wrapper: Wrapper },
-      );
+      const { container } = render(<OverSeatsCallout currentMembers={10} maxMembers={10} />, {
+        wrapper: Wrapper,
+      });
 
       expect(container.querySelector('[data-testid="over-seats-callout"]')).toBeNull();
     });

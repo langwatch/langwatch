@@ -14,8 +14,7 @@ describe("otelWiringLooksLangwatchAuthored", () => {
     it("treats ik-lw- and sk-lw- bearers as langwatch-authored", () => {
       expect(
         otelWiringLooksLangwatchAuthored({
-          OTEL_EXPORTER_OTLP_HEADERS:
-            "Authorization=Bearer ik-lw-stalelogin000000_oldsecret",
+          OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ik-lw-stalelogin000000_oldsecret",
         }),
       ).toBe(true);
       expect(
@@ -49,9 +48,7 @@ describe("otelWiringLooksLangwatchAuthored", () => {
 
   describe("when no identity-bearing key is present", () => {
     it("treats the env as refreshable", () => {
-      expect(
-        otelWiringLooksLangwatchAuthored({ CLAUDE_CODE_ENABLE_TELEMETRY: "1" }),
-      ).toBe(true);
+      expect(otelWiringLooksLangwatchAuthored({ CLAUDE_CODE_ENABLE_TELEMETRY: "1" })).toBe(true);
     });
   });
 });

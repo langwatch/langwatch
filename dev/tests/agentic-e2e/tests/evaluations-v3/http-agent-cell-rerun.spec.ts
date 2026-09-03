@@ -91,10 +91,7 @@ test.describe("Single Cell Re-execution", () => {
     await whenIWaitForEvaluationComplete(page, 1);
 
     // And rows 0 and 2 remain unchanged
-    await thenOtherRowsRemainUnchanged(page, [0, 2], "Echo API Agent", [
-      "hello",
-      "test123",
-    ]);
+    await thenOtherRowsRemainUnchanged(page, [0, 2], "Echo API Agent", ["hello", "test123"]);
 
     // And row 1 target cell now shows "modified"
     await thenCellShowsOutput(page, 1, "Echo API Agent", "modified");

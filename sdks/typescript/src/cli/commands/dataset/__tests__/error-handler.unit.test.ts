@@ -1,12 +1,4 @@
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type MockInstance,
-} from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import type { Ora } from "ora";
 import {
   DatasetApiError,
@@ -56,10 +48,7 @@ describe("handleDatasetCommandError", () => {
 
   describe("when the error is a DatasetNotFoundError", () => {
     it("prefixes the spinner fail with 'Not found:'", () => {
-      const { spinnerCalls } = callHandler(
-        new DatasetNotFoundError("my-ds"),
-        "fetch dataset",
-      );
+      const { spinnerCalls } = callHandler(new DatasetNotFoundError("my-ds"), "fetch dataset");
       expect(spinnerCalls.join("\n")).toContain("Not found");
       expect(spinnerCalls.join("\n")).toContain("my-ds");
     });
@@ -69,9 +58,7 @@ describe("handleDatasetCommandError", () => {
     /** @scenario "A missing dataset is reported as not found, not as a network error" */
     it("carries not_found at 404, never network_error", () => {
       setOutputFormat("json");
-      const consoleLogSpy = vi
-        .spyOn(console, "log")
-        .mockImplementation(() => undefined);
+      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
       try {
         callHandler(new DatasetNotFoundError("my-ds"), "fetch dataset");
       } finally {
@@ -87,9 +74,7 @@ describe("handleDatasetCommandError", () => {
     /** @scenario "A dataset plan limit is reported with its own code" */
     it("carries plan_limit_reached at 403 with the usage in meta", () => {
       setOutputFormat("json");
-      const consoleLogSpy = vi
-        .spyOn(console, "log")
-        .mockImplementation(() => undefined);
+      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
       try {
         callHandler(
           new DatasetPlanLimitError("Dataset limit reached for FREE plan", {
@@ -116,10 +101,11 @@ describe("handleDatasetCommandError", () => {
 
   describe("when the error is a DatasetPlanLimitError", () => {
     it("shows the 'Plan limit reached' prefix with current and max usage", () => {
-      const err = new DatasetPlanLimitError(
-        "Dataset limit reached for FREE plan (max 3)",
-        { limitType: "datasets", current: 3, max: 3 },
-      );
+      const err = new DatasetPlanLimitError("Dataset limit reached for FREE plan (max 3)", {
+        limitType: "datasets",
+        current: 3,
+        max: 3,
+      });
       const { spinnerCalls, errorCalls } = callHandler(err, "create dataset");
       expect(spinnerCalls.join("\n")).toContain("Plan limit reached");
       const combined = [...spinnerCalls, ...errorCalls].join("\n");
@@ -129,9 +115,7 @@ describe("handleDatasetCommandError", () => {
     });
 
     it("works without current/max fields", () => {
-      const err = new DatasetPlanLimitError(
-        "Dataset limit reached for FREE plan (max 3)",
-      );
+      const err = new DatasetPlanLimitError("Dataset limit reached for FREE plan (max 3)");
       const { spinnerCalls } = callHandler(err, "create dataset");
       expect(spinnerCalls.join("\n")).toContain("Plan limit reached");
     });
@@ -139,11 +123,7 @@ describe("handleDatasetCommandError", () => {
 
   describe("when the error is a generic DatasetApiError", () => {
     it("renders the error message on the spinner fail line", () => {
-      const err = new DatasetApiError(
-        "Failed to fetch dataset: unexpected payload",
-        500,
-        "fetch",
-      );
+      const err = new DatasetApiError("Failed to fetch dataset: unexpected payload", 500, "fetch");
       const { spinnerCalls } = callHandler(err, "fetch dataset");
       expect(spinnerCalls.join("\n")).toContain("unexpected payload");
     });
@@ -151,10 +131,7 @@ describe("handleDatasetCommandError", () => {
 
   describe("when the error is unknown", () => {
     it("includes the operation context in the spinner fail message", () => {
-      const { spinnerCalls } = callHandler(
-        new Error("something broke"),
-        "delete dataset",
-      );
+      const { spinnerCalls } = callHandler(new Error("something broke"), "delete dataset");
       expect(spinnerCalls.join("\n")).toContain("delete dataset");
       expect(spinnerCalls.join("\n")).toContain("something broke");
     });

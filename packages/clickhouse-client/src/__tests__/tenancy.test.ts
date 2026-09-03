@@ -85,9 +85,7 @@ describe("parseRoutingTable", () => {
 
     describe("when the name has a single separator", () => {
       it("does not flag it", () => {
-        expect(
-          parseRoutingTable({ CLICKHOUSE_URL__org_1: "http://x:8123" }).ambiguous,
-        ).toEqual([]);
+        expect(parseRoutingTable({ CLICKHOUSE_URL__org_1: "http://x:8123" }).ambiguous).toEqual([]);
       });
     });
   });
@@ -169,9 +167,7 @@ describe("createTenantRouter", () => {
           directory: directoryOf({}),
         });
 
-        await expect(router.route("project_unknown")).rejects.toBeInstanceOf(
-          UnknownTenantError,
-        );
+        await expect(router.route("project_unknown")).rejects.toBeInstanceOf(UnknownTenantError);
       });
     });
 
@@ -236,9 +232,7 @@ describe("createTenantRouter", () => {
           },
         });
 
-        await expect(router.route("project_new")).rejects.toBeInstanceOf(
-          UnknownTenantError,
-        );
+        await expect(router.route("project_new")).rejects.toBeInstanceOf(UnknownTenantError);
         known = true;
 
         await expect(router.route("project_new")).resolves.toEqual({

@@ -680,9 +680,7 @@ export const allStaticCommands: Command[] = [
  * Values of the release flags the command list reads, as resolved for the
  * person using it. A flag missing from the map has not answered yet.
  */
-export type CommandFeatureFlagValues = Partial<
-  Record<FrontendFeatureFlag, boolean>
->;
+export type CommandFeatureFlagValues = Partial<Record<FrontendFeatureFlag, boolean>>;
 
 /**
  * Drops the commands whose release flag does not hold the value they need.

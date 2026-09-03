@@ -62,9 +62,7 @@ describe("emptyStateMetrics", () => {
       it("falls back to the roomy metrics rather than the compact ones", () => {
         // The panel resolver never yields a real width below 340, but the parent
         // seeds 432 on the server; an accidental NaN must not collapse the hero.
-        expect(
-          emptyStateMetrics({ variant: "floating", width: Number.NaN }).markSize,
-        ).toBe(51);
+        expect(emptyStateMetrics({ variant: "floating", width: Number.NaN }).markSize).toBe(51);
       });
     });
   });

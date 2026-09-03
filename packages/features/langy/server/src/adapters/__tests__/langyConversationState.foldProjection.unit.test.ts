@@ -141,10 +141,7 @@ describe("LangyConversationStateFoldProjection", () => {
   });
 
   describe("given a conversation already owned by alice", () => {
-    const owned = fold.apply(
-      fold.init(),
-      messageSent({ userId: "alice", title: "first" }, 1000),
-    );
+    const owned = fold.apply(fold.init(), messageSent({ userId: "alice", title: "first" }, 1000));
 
     describe("when a later message arrives from a different user", () => {
       it("keeps the original owner and title but still counts the message", () => {
@@ -407,10 +404,7 @@ describe("LangyConversationStateFoldProjection", () => {
 
     describe("when a title is generated over a derived placeholder", () => {
       it("replaces the title and marks the source auto", () => {
-        const derived = fold.apply(
-          fold.init(),
-          messageSent({ title: "placeholder" }, 1000),
-        );
+        const derived = fold.apply(fold.init(), messageSent({ title: "placeholder" }, 1000));
         const state = fold.apply(derived, titleGenerated({}, 2000));
         expect(state.Title).toBe("Generated Title");
         expect(state.TitleSource).toBe(LANGY_TITLE_SOURCE.AUTO);
@@ -460,10 +454,7 @@ describe("LangyConversationStateFoldProjection", () => {
           fold.apply(fold.init(), messageSent({ title: "placeholder" }, 1000)),
           titleGenerated({}, 2000),
         );
-        const state = fold.apply(
-          auto,
-          messageSent({ messageId: "m2", title: "another" }, 3000),
-        );
+        const state = fold.apply(auto, messageSent({ messageId: "m2", title: "another" }, 3000));
         expect(state.Title).toBe("Generated Title");
         expect(state.TitleSource).toBe(LANGY_TITLE_SOURCE.AUTO);
       });

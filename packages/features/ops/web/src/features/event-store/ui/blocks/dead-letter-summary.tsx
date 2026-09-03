@@ -30,8 +30,8 @@ export function DeadLetterSummary({
             <Skull size={16} />
           </Box>
           <Text textStyle="sm" fontWeight="medium" data-testid="dead-total">
-            {fleetTotal} dead {fleetTotal === 1 ? "message" : "messages"} across{" "}
-            {byProcess.length} {byProcess.length === 1 ? "process" : "processes"}
+            {fleetTotal} dead {fleetTotal === 1 ? "message" : "messages"} across {byProcess.length}{" "}
+            {byProcess.length === 1 ? "process" : "processes"}
           </Text>
         </HStack>
         <HStack gap={2} flexWrap="wrap">

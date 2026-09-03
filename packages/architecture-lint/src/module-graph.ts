@@ -131,11 +131,7 @@ function parseSource(file: string): ParsedSource {
   };
 
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isJsxElement(node) ||
-      ts.isJsxSelfClosingElement(node) ||
-      ts.isJsxFragment(node)
-    ) {
+    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)) {
       rendersJsx = true;
     }
 
@@ -271,9 +267,7 @@ function subpathTarget(options: {
   return subpath === "." ? manifest.main : void 0;
 }
 
-function readManifestRecord(options: {
-  manifestPath: string;
-}): PackageManifestRecord | undefined {
+function readManifestRecord(options: { manifestPath: string }): PackageManifestRecord | undefined {
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(options.manifestPath, "utf8"));
@@ -339,11 +333,7 @@ function collectManifests(options: {
  * `#`-prefixed subpath imports in the feature packages are real edges that a
  * resolver ignorant of `imports` would silently drop.
  */
-export function createWorkspaceModuleResolver({
-  root,
-}: {
-  root: string;
-}): WorkspaceModuleResolver {
+export function createWorkspaceModuleResolver({ root }: { root: string }): WorkspaceModuleResolver {
   const found: PackageManifestRecord[] = [];
   for (const workspaceRoot of WORKSPACE_ROOTS) {
     const directory = join(root, workspaceRoot);
@@ -396,7 +386,10 @@ export function createWorkspaceModuleResolver({
       const prefix = pattern.slice(0, star);
       const suffix = pattern.slice(star + 1);
       if (!options.specifier.startsWith(prefix) || !options.specifier.endsWith(suffix)) continue;
-      const filled = options.specifier.slice(prefix.length, options.specifier.length - suffix.length);
+      const filled = options.specifier.slice(
+        prefix.length,
+        options.specifier.length - suffix.length,
+      );
       const target = conditionTarget(value);
       if (!target) continue;
       return resolveSourceCandidate({

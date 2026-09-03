@@ -119,9 +119,7 @@ describe("SpendEventsApiService cursor paging", () => {
 
   describe("listPage()", () => {
     it("takes exactly one page and hands back the cursor for the next", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse(eventsPage(["req_a", "req_b"], "cursor-1")),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse(eventsPage(["req_a", "req_b"], "cursor-1")));
 
       const page = await new SpendEventsApiService().listPage({
         ...WINDOW,
@@ -230,17 +228,15 @@ describe("SpendEventsApiService cursor paging", () => {
         Promise.resolve(jsonResponse(eventsPage(["req_a"], "stuck"))),
       );
 
-      await expect(
-        drain(new SpendEventsApiService().iterate(WINDOW)),
-      ).rejects.toBeInstanceOf(SpendEventsApiError);
+      await expect(drain(new SpendEventsApiService().iterate(WINDOW))).rejects.toBeInstanceOf(
+        SpendEventsApiError,
+      );
     });
   });
 
   describe("summariesPage()", () => {
     it("takes exactly one page of rollups and hands back the cursor", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse(summariesPage(["vk_a", "vk_b"], "cursor-1")),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse(summariesPage(["vk_a", "vk_b"], "cursor-1")));
 
       const page = await new SpendEventsApiService().summariesPage({
         groupBy: "virtual_key",

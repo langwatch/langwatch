@@ -1,12 +1,4 @@
-import {
-  Box,
-  Link as ChakraLink,
-  HStack,
-  Icon,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Link as ChakraLink, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { keepPreviousData } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { LuCircleX } from "react-icons/lu";
@@ -46,9 +38,7 @@ const getLabelForType = (type: RecentItemType): string => {
  * Group items by type — kept for consumers/tests even though the section now
  * renders one flat list (each row carries its own type label instead).
  */
-export const groupItemsByType = (
-  items: RecentItem[],
-): Map<RecentItemType, RecentItem[]> => {
+export const groupItemsByType = (items: RecentItem[]): Map<RecentItemType, RecentItem[]> => {
   const grouped = new Map<RecentItemType, RecentItem[]>();
   for (const item of items) {
     const existing = grouped.get(item.type) ?? [];
@@ -90,14 +80,7 @@ function RecentItemRow({ item }: { item: RecentItem }) {
           >
             {getIconForType(item.type)}
           </Box>
-          <Text
-            fontSize="13px"
-            color="fg"
-            flex={1}
-            minWidth={0}
-            lineClamp={1}
-            title={item.name}
-          >
+          <Text fontSize="13px" color="fg" flex={1} minWidth={0} lineClamp={1} title={item.name}>
             {item.name}
           </Text>
           <Text fontFamily="mono" fontSize="11px" color="fg.subtle" flexShrink={0}>

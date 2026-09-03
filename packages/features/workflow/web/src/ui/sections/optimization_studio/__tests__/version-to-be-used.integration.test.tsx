@@ -23,7 +23,6 @@ vi.mock("../../../../behavior/studio-host/use-organization-team-project", () => 
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-
 vi.mock("../history", () => ({
   useVersionState: () => ({
     previousVersion: { dsl: { nodes: [], edges: [] }, version: "2" },

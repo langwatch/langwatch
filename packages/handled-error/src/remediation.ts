@@ -65,9 +65,7 @@ const registry = {
     docsPath: "/platform/data-retention",
   },
   span_not_found: {
-    tips: [
-      "Check the span id; spans are deleted with their trace after the retention window",
-    ],
+    tips: ["Check the span id; spans are deleted with their trace after the retention window"],
     docsPath: "/platform/data-retention",
   },
   query_timeout: {
@@ -93,10 +91,7 @@ const registry = {
     ],
   },
   filter_field_unknown: {
-    tips: [
-      "Use one of the fields listed in meta.knownFields",
-      "Field names are case-sensitive",
-    ],
+    tips: ["Use one of the fields listed in meta.knownFields", "Field names are case-sensitive"],
   },
   time_range_too_wide: {
     tips: ["Query in smaller windows and paginate through the results"],
@@ -238,9 +233,7 @@ const registry = {
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   api_key_permission_denied: {
-    tips: [
-      "Re-create the API key with the required scope, or ask an admin to raise your role",
-    ],
+    tips: ["Re-create the API key with the required scope, or ask an admin to raise your role"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   api_key_permission_not_delegable: {
@@ -256,9 +249,7 @@ const registry = {
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   project_visibility_too_wide: {
-    tips: [
-      "Bind the key to the teams or projects it works with instead of the whole organization",
-    ],
+    tips: ["Bind the key to the teams or projects it works with instead of the whole organization"],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
   api_key_reserved_name: {
@@ -398,9 +389,7 @@ const registry = {
     ],
   },
   agent_call_failed: {
-    tips: [
-      "Fix the error the function raised, then test again; the process logs carry the stack",
-    ],
+    tips: ["Fix the error the function raised, then test again; the process logs carry the stack"],
   },
   agent_disconnected: {
     tips: [
@@ -572,9 +561,7 @@ const registry = {
     ],
   },
   langy_ui_action_unknown: {
-    tips: [
-      "Run `langwatch ui actions` to list the actions the current page accepts",
-    ],
+    tips: ["Run `langwatch ui actions` to list the actions the current page accepts"],
   },
   langy_ui_payload_invalid: {
     tips: [
@@ -674,9 +661,7 @@ const registry = {
     ],
   },
   langy_api_actor_missing: {
-    tips: [
-      "The user who owns this key no longer exists; mint a new key under a current user",
-    ],
+    tips: ["The user who owns this key no longer exists; mint a new key under a current user"],
   },
   langy_api_request_invalid: {
     tips: ["Read the `issues` array in `meta` — it names the field that failed and why"],
@@ -687,9 +672,7 @@ const registry = {
     ],
   },
   langy_worker_spawn_failed: {
-    tips: [
-      "The agent failed to start for this turn; nothing was lost, retry in a moment",
-    ],
+    tips: ["The agent failed to start for this turn; nothing was lost, retry in a moment"],
   },
   langy_worker_stopped: {
     tips: [

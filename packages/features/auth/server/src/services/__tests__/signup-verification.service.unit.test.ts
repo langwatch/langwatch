@@ -15,8 +15,7 @@ const NOW = new Date("2026-08-24T12:00:00.000Z");
 const FAKE_PASSWORD_HASH = "$2b$10$notthepassword";
 
 function makeService({ registered = false }: { registered?: boolean } = {}) {
-  const issued: Array<{ identifier: string; token: string; expires: Date }> =
-    [];
+  const issued: Array<{ identifier: string; token: string; expires: Date }> = [];
   const sent: Array<{ email: string; verificationUrl: string }> = [];
   const created: Array<{ email: string; passwordHash: string }> = [];
   /** Addresses a spent link proved. The whole job of a link now. */
@@ -51,8 +50,7 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
         confirmed.push(email);
       },
     },
-    buildVerificationUrl: ({ token }) =>
-      `https://app.test/auth/signup?verify=${token}`,
+    buildVerificationUrl: ({ token }) => `https://app.test/auth/signup?verify=${token}`,
     now: () => NOW,
     mintToken: vi.fn(() => "token-1"),
   });
@@ -102,9 +100,7 @@ describe("given a sign-up address to confirm", () => {
     it("confirms the address once and never again", async () => {
       await harness.service.requestVerification({ email: "sam@acme.com" });
 
-      await expect(
-        harness.service.completeVerification({ token: "token-1" }),
-      ).resolves.toEqual({
+      await expect(harness.service.completeVerification({ token: "token-1" })).resolves.toEqual({
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
@@ -140,9 +136,9 @@ describe("given a sign-up address to confirm", () => {
     it("says so, which is the door back into a half-created account", async () => {
       const registered = makeService({ registered: true });
 
-      await expect(
-        registered.service.addressIsRegistered({ email: "sam@acme.com" }),
-      ).resolves.toBe(true);
+      await expect(registered.service.addressIsRegistered({ email: "sam@acme.com" })).resolves.toBe(
+        true,
+      );
     });
   });
 
@@ -161,9 +157,7 @@ describe("given a sign-up address to confirm", () => {
     it("leaves the account to be finished, never creating one itself", async () => {
       await harness.service.requestVerification({ email: "sam@acme.com" });
 
-      await expect(
-        harness.service.completeVerification({ token: "token-1" }),
-      ).resolves.toEqual({
+      await expect(harness.service.completeVerification({ token: "token-1" })).resolves.toEqual({
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,

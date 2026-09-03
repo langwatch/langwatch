@@ -30,9 +30,7 @@ export const printBindings = (apiKey: ApiKeyDetail): void => {
   if (apiKey.roleBindings.length === 0) {
     console.log(chalk.gray("  No bindings: this key grants no access anywhere."));
     console.log(
-      chalk.cyan(
-        `  langwatch api-keys update ${apiKey.id} --binding role:scopeType:scopeId`,
-      ),
+      chalk.cyan(`  langwatch api-keys update ${apiKey.id} --binding role:scopeType:scopeId`),
     );
     console.log();
     return;

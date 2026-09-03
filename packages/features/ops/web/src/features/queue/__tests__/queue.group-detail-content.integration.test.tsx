@@ -61,9 +61,7 @@ function makeJob(overrides: Partial<JobEntry> = {}): JobEntry {
   };
 }
 
-function renderContent(
-  props: Partial<React.ComponentProps<typeof GroupDetailContent>> = {},
-) {
+function renderContent(props: Partial<React.ComponentProps<typeof GroupDetailContent>> = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <GroupDetailContent

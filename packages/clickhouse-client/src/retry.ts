@@ -11,11 +11,7 @@
  */
 
 import type { AbortSignalLike, QueryRequest } from "./query";
-import {
-  isTransientClickHouseError,
-  jitteredBackoffMs,
-  retryNoticeLevel,
-} from "./resilience";
+import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from "./resilience";
 
 export interface RetryNotice {
   /**
@@ -212,8 +208,7 @@ export class RetryPolicy {
       ...(onRetry === undefined
         ? {}
         : {
-            onRetry: (notice: Omit<RetryNotice, "request">) =>
-              onRetry({ ...notice, request }),
+            onRetry: (notice: Omit<RetryNotice, "request">) => onRetry({ ...notice, request }),
           }),
     });
   }

@@ -4,11 +4,7 @@ import { TracesApiService } from "@/client-sdk/services/traces/traces-api.servic
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
-import {
-  printResult,
-  resolveOutputOptions,
-  type RawOutputFlags,
-} from "../../utils/output";
+import { printResult, resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
 import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
 import { parseOriginOption } from "./origin-filter";
 
@@ -49,9 +45,7 @@ export const searchTracesCommand = async (
     const now = Date.now();
     const oneDayAgo = now - 24 * 60 * 60 * 1000;
 
-    const startDate = options.startDate
-      ? new Date(options.startDate).getTime()
-      : oneDayAgo;
+    const startDate = options.startDate ? new Date(options.startDate).getTime() : oneDayAgo;
     const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
     const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
     const originFilter = parseOriginOption(options.origin);
@@ -211,9 +205,7 @@ const printTable = ({
   console.log();
   if (matched > traces.length) {
     console.log(
-      chalk.gray(
-        `Showing ${traces.length} of ${matched} total. Use --limit to see more.`,
-      ),
+      chalk.gray(`Showing ${traces.length} of ${matched} total. Use --limit to see more.`),
     );
   }
   console.log(
@@ -225,19 +217,14 @@ function toRow(trace: Record<string, unknown>): Record<string, string> {
   const traceId = (trace.traceId ?? trace.trace_id ?? trace.id ?? "—") as string;
   const rawInput = trace.input ?? trace.ComputedInput ?? "—";
   const rawOutput = trace.output ?? trace.ComputedOutput ?? "—";
-  const input = truncate(
-    typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput),
-    60,
-  );
+  const input = truncate(typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput), 60);
   const output = truncate(
     typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput),
     40,
   );
   const timestamps = trace.timestamps as Record<string, unknown> | undefined;
   const startedAt = timestamps?.started_at ?? trace.StartedAt ?? trace.startedAt;
-  const timeStr = startedAt
-    ? formatRelativeTime(new Date(startedAt as number).toISOString())
-    : "—";
+  const timeStr = startedAt ? formatRelativeTime(new Date(startedAt as number).toISOString()) : "—";
 
   return {
     "Trace ID": traceId.substring(0, 20),

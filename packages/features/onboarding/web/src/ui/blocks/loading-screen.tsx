@@ -11,8 +11,7 @@ const FADE_OUT_MS = 320;
 const FADE_OUT_EASING = "cubic-bezier(0.4, 0, 0.2, 1)";
 
 /** `useLayoutEffect` warns when it runs on the server; this never does. */
-const useIsomorphicLayoutEffect =
-  typeof window === "undefined" ? useEffect : useLayoutEffect;
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /**
  * The wait, and its way out.
@@ -142,11 +141,7 @@ export const LoadingScreen = () => {
           {!logoVisibleOnce ? (
             <AnimatePresence>
               {showLogo && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   {fullLogo}
                 </motion.div>
               )}

@@ -48,9 +48,7 @@ function cellContext(row: ConversationGroup): CellRenderContext<ConversationGrou
   };
 }
 
-function serverSession(
-  overrides: Partial<SessionGroupPayloadItem> = {},
-): ConversationGroup {
+function serverSession(overrides: Partial<SessionGroupPayloadItem> = {}): ConversationGroup {
   return mapSessionGroupToConversationGroup({
     conversationId: "sess-rollup",
     traceCount: 128,

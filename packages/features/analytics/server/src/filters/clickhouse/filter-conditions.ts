@@ -1,4 +1,7 @@
-import type { AnalyticsFilterValue as FilterParam, FilterField } from "@langwatch/analytics-contract";
+import type {
+  AnalyticsFilterValue as FilterParam,
+  FilterField,
+} from "@langwatch/analytics-contract";
 import type {
   FilterConditionBuilder,
   FilterConditionOptions,
@@ -36,10 +39,7 @@ function buildEvaluatorExistsCondition(additionalWhere: string): FilterCondition
  * Returns null if the filter is not supported in ClickHouse.
  * All builders use parameterized queries for SQL injection safety.
  */
-export const clickHouseFilterConditions: Record<
-  FilterField,
-  FilterConditionBuilder | null
-> = {
+export const clickHouseFilterConditions: Record<FilterField, FilterConditionBuilder | null> = {
   // Topics
   "topics.topics": (values, paramId) => ({
     sql: `ts.TopicId IN ({${paramId}_values:Array(String)})`,
@@ -169,17 +169,12 @@ export const clickHouseFilterConditions: Record<
   // Evaluations - using evaluation_runs table with EXISTS subquery
   "evaluations.evaluator_id": buildEvaluatorExistsCondition(""),
 
-  "evaluations.evaluator_id.guardrails_only": buildEvaluatorExistsCondition(
-    "AND es.IsGuardrail = 1",
-  ),
+  "evaluations.evaluator_id.guardrails_only":
+    buildEvaluatorExistsCondition("AND es.IsGuardrail = 1"),
 
-  "evaluations.evaluator_id.has_passed": buildEvaluatorExistsCondition(
-    "AND es.Passed IS NOT NULL",
-  ),
+  "evaluations.evaluator_id.has_passed": buildEvaluatorExistsCondition("AND es.Passed IS NOT NULL"),
 
-  "evaluations.evaluator_id.has_score": buildEvaluatorExistsCondition(
-    "AND es.Score IS NOT NULL",
-  ),
+  "evaluations.evaluator_id.has_score": buildEvaluatorExistsCondition("AND es.Score IS NOT NULL"),
 
   "evaluations.evaluator_id.has_label": buildEvaluatorExistsCondition(
     `AND es.Label IS NOT NULL AND es.Label != '' AND es.Label NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')`,

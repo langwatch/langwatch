@@ -11,11 +11,7 @@
  */
 import { buildProgram } from "../program";
 import { buildCatalog, renderHelpTree } from "../utils/commandCatalog";
-import {
-  hasExplicitFormatRequest,
-  type CommandResult,
-  type RawOutputFlags,
-} from "../utils/output";
+import { hasExplicitFormatRequest, type CommandResult, type RawOutputFlags } from "../utils/output";
 
 export const helpTreeCommand = (options?: RawOutputFlags): CommandResult | void => {
   const catalog = buildCatalog(buildProgram());

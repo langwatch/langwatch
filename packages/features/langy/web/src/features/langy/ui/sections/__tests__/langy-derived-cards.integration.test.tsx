@@ -35,9 +35,8 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
 }));
 
 vi.mock("../../../../../behavior/langy-api", async () => {
-  const { withFallback, idleQuery, noopMutation } = await import(
-    "../../../__tests__/support/langy-api-mock"
-  );
+  const { withFallback, idleQuery, noopMutation } =
+    await import("../../../__tests__/support/langy-api-mock");
   return {
     api: withFallback({
       useUtils: () => ({}),

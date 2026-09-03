@@ -7,16 +7,7 @@
  * subject is gone.
  */
 
-import {
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Separator,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Card, Heading, HStack, Separator, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { isEqual } from "lodash-es";
 import { useCallback, useEffect, useState } from "react";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
@@ -26,10 +17,7 @@ import { PermissionAlert } from "../../ui/elements/permission-alert";
 import type { TeamUserRole } from "../../model/prisma-types";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { TeamForm, type TeamFormData } from "../../ui/blocks/team-form";
-import {
-  type RoleOption,
-  teamRolesOptions,
-} from "../../ui/elements/team-user-role-field";
+import { type RoleOption, teamRolesOptions } from "../../ui/elements/team-user-role-field";
 import { useOrganizationHost } from "../../model/organization-host";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { api, type RouterOutputs } from "../../behavior/organization-api";
@@ -40,10 +28,7 @@ import { api, type RouterOutputs } from "../../behavior/organization-api";
  * serves a browser-shaped team (no accounting columns) plus its projects.
  */
 type TeamWithProjectsAndMembers = RouterOutputs["team"]["getTeamWithMembers"];
-import {
-  useOrganizationToaster,
-  useShowErrorToast,
-} from "../../behavior/organization-feedback";
+import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback";
 
 // Type guards for safe access to custom role data
 function isValidCustomRole(role: unknown): role is {
@@ -67,10 +52,7 @@ function isValidPermissions(permissions: unknown): permissions is string[] {
 }
 
 // Helper function to convert a member's role to form data
-function memberToRoleFormOption(
-  assignedRole: unknown,
-  builtInRole: TeamUserRole,
-): RoleOption {
+function memberToRoleFormOption(assignedRole: unknown, builtInRole: TeamUserRole): RoleOption {
   if (assignedRole && isValidCustomRole(assignedRole)) {
     return {
       label: assignedRole.name,
@@ -88,9 +70,7 @@ function memberToRoleFormOption(
 }
 
 // Helper function to convert team member to form member
-function teamMemberToFormMember(
-  member: TeamWithProjectsAndMembers["members"][number],
-) {
+function teamMemberToFormMember(member: TeamWithProjectsAndMembers["members"][number]) {
   return {
     userId: {
       label: `${member.user.name} (${member.user.email})`,
@@ -134,14 +114,7 @@ export default function TeamDetailScreen() {
   // Handle loading state
   if (team.isLoading || !team.data) {
     return (
-      <VStack
-        paddingX={4}
-        paddingY={6}
-        gap={6}
-        width="full"
-        maxWidth="920px"
-        align="start"
-      >
+      <VStack paddingX={4} paddingY={6} gap={6} width="full" maxWidth="920px" align="start">
         <HStack gap="8px">
           <Skeleton height="20px" width="60px" />
           <Skeleton height="20px" width="12px" />
@@ -180,9 +153,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
     [],
   );
 
-  const [defaultValues, setDefaultValues] = useState<TeamFormData>(
-    getInitialValues(team),
-  );
+  const [defaultValues, setDefaultValues] = useState<TeamFormData>(getInitialValues(team));
 
   const form = useForm({
     defaultValues,
@@ -252,37 +223,34 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
     showErrorToast({ error, fallbackTitle: "Couldn't update this team" });
   }
 
-  const onSubmit: SubmitHandler<TeamFormData> = useDebouncedCallback(
-    (data: TeamFormData) => {
-      if (isEqual(data, defaultValues)) return;
+  const onSubmit: SubmitHandler<TeamFormData> = useDebouncedCallback((data: TeamFormData) => {
+    if (isEqual(data, defaultValues)) return;
 
-      setDefaultValues(data);
+    setDefaultValues(data);
 
-      updateTeam.mutate(
-        {
-          teamId: team.id,
-          name: data.name,
-          members: data.members.map((member) => ({
-            userId: member.userId?.value ?? "",
-            role: member.role.value,
-            customRoleId: member.role.customRoleId,
-          })),
+    updateTeam.mutate(
+      {
+        teamId: team.id,
+        name: data.name,
+        members: data.members.map((member) => ({
+          userId: member.userId?.value ?? "",
+          role: member.role.value,
+          customRoleId: member.role.customRoleId,
+        })),
+      },
+      {
+        onSuccess: () => {
+          toaster.create({
+            title: "Team updated successfully",
+            type: "success",
+            duration: 2000,
+          });
+          void apiContext.organization.getAll.refetch();
         },
-        {
-          onSuccess: () => {
-            toaster.create({
-              title: "Team updated successfully",
-              type: "success",
-              duration: 2000,
-            });
-            void apiContext.organization.getAll.refetch();
-          },
-          onError: reportTeamSaveFailure,
-        },
-      );
-    },
-    250,
-  );
+        onError: reportTeamSaveFailure,
+      },
+    );
+  }, 250);
 
   useEffect(() => {
     void handleSubmit(onSubmit)();
@@ -338,8 +306,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
                 <VStack align="start" gap={0}>
                   <Text fontWeight="medium">Archive this team</Text>
                   <Text fontSize="sm" color="fg.muted">
-                    Hides the team and all its projects. Contact LangWatch support to
-                    restore it.
+                    Hides the team and all its projects. Contact LangWatch support to restore it.
                   </Text>
                 </VStack>
                 <Button

@@ -36,10 +36,7 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import { enrichTracesWithEvaluations } from "#services/trace-evaluation-enrichment.rules";
-import {
-  formatTraceSummaryDigest,
-  generateAsciiTree,
-} from "#services/trace-formatting.service";
+import { formatTraceSummaryDigest, generateAsciiTree } from "#services/trace-formatting.service";
 import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
 import { compileProjection } from "#services/trace-projection-compile.service";
 import {
@@ -73,9 +70,7 @@ export const traceSearchBodyExtensions = {
   format: z
     .enum(["digest", "json"])
     .optional()
-    .describe(
-      "Output format: 'digest' (AI-readable trace digest) or 'json' (full raw data)",
-    ),
+    .describe("Output format: 'digest' (AI-readable trace digest) or 'json' (full raw data)"),
   includeSpans: z
     .boolean()
     .optional()
@@ -412,16 +407,12 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
         scrollId: results.scrollId,
         ...(skippedCount > 0 ? { skipped: skippedCount } : {}),
         // Updated axis only, and the value a CDC client should resume from.
-        ...(results.updatedThrough !== undefined
-          ? { updatedThrough: results.updatedThrough }
-          : {}),
+        ...(results.updatedThrough !== undefined ? { updatedThrough: results.updatedThrough } : {}),
       });
 
       // When a projection is active the envelope gains a `schema` field describing
       // the resolved columns so callers can pre-allocate a typed reader.
-      const schemaSuffix = projection
-        ? `,"schema":${JSON.stringify(projection.schema)}`
-        : "";
+      const schemaSuffix = projection ? `,"schema":${JSON.stringify(projection.schema)}` : "";
 
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -433,9 +424,7 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
             controller.enqueue(encoder.encode(prefix + serializedTraces[i]!));
           }
 
-          controller.enqueue(
-            encoder.encode(`],"pagination":${pagination}${schemaSuffix}}`),
-          );
+          controller.enqueue(encoder.encode(`],"pagination":${pagination}${schemaSuffix}}`));
           controller.close();
         },
       });
@@ -500,8 +489,7 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
             },
           },
           409: {
-            description:
-              "Ambiguous trace ID prefix — the prefix matches more than one trace",
+            description: "Ambiguous trace ID prefix — the prefix matches more than one trace",
             content: {
               "application/json": {
                 schema: resolver(
@@ -621,8 +609,7 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
         {
           name: "format",
           in: "query",
-          description:
-            "Output format: 'digest' (AI-readable) or 'json' (full raw data, default)",
+          description: "Output format: 'digest' (AI-readable) or 'json' (full raw data, default)",
           required: false,
           schema: { type: "string", enum: ["digest", "json"] },
         },
@@ -653,8 +640,7 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
           },
         },
         409: {
-          description:
-            "Ambiguous trace ID prefix — the prefix matches more than one trace",
+          description: "Ambiguous trace ID prefix — the prefix matches more than one trace",
           content: {
             "application/json": {
               schema: resolver(
@@ -674,8 +660,7 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
       const formatParam = c.req.query("format");
       const llmModeParam = c.req.query("llmMode");
       const format =
-        formatParam ??
-        (llmModeParam === "true" || llmModeParam === "1" ? "digest" : "json");
+        formatParam ?? (llmModeParam === "true" || llmModeParam === "1" ? "digest" : "json");
 
       logger.info({ projectId: project.id, traceId }, "Getting trace by ID");
 

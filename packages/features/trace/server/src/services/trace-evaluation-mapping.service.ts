@@ -90,9 +90,7 @@ export function mapClickHouseEvaluationToTraceEvaluation(
       scheduledAt: record.ScheduledAt
         ? new Date(appendUtcSuffix(record.ScheduledAt)).getTime()
         : null,
-      startedAt: record.StartedAt
-        ? new Date(appendUtcSuffix(record.StartedAt)).getTime()
-        : null,
+      startedAt: record.StartedAt ? new Date(appendUtcSuffix(record.StartedAt)).getTime() : null,
       completedAt: record.CompletedAt
         ? new Date(appendUtcSuffix(record.CompletedAt)).getTime()
         : null,
@@ -159,9 +157,7 @@ export function mapTraceEvaluationsToLegacyEvaluations(
       score: te.score,
       label: te.label,
       details: te.details,
-      error: te.error
-        ? { has_error: true as const, message: te.error, stacktrace: [] }
-        : null,
+      error: te.error ? { has_error: true as const, message: te.error, stacktrace: [] } : null,
       inputs: te.inputs,
       timestamps: {
         inserted_at: te.timestamps.scheduledAt,

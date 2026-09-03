@@ -16,9 +16,7 @@ const projectId = "project-123";
 class FakeProjectEnvironment extends WorkflowProjectEnvironmentPort {
   readonly projectIds: string[] = [];
 
-  constructor(
-    private readonly secrets: Record<string, string> = { OPENAI_API_KEY: "sk-abc123" },
-  ) {
+  constructor(private readonly secrets: Record<string, string> = { OPENAI_API_KEY: "sk-abc123" }) {
     super();
   }
 

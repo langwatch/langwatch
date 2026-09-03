@@ -68,9 +68,7 @@ export class JoinRequestService {
     );
   }
 
-  async withdrawJoin(
-    input: WithdrawJoinCommandData,
-  ): Promise<JoinRequestFact[]> {
+  async withdrawJoin(input: WithdrawJoinCommandData): Promise<JoinRequestFact[]> {
     const data = withdrawJoinCommandDataSchema.parse(input);
     return this.commit(
       { type: WITHDRAW_JOIN_COMMAND_TYPE, data },

@@ -1,10 +1,7 @@
 import { Card, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { ParkedTenant } from "@langwatch/ops-contract";
 import type { ReactNode } from "react";
-import {
-  ParkedTenantsSection,
-  type ParkedGroupsRender,
-} from "../blocks/parked-tenants-section";
+import { ParkedTenantsSection, type ParkedGroupsRender } from "../blocks/parked-tenants-section";
 import type { PausedSchedule } from "../elements/paused-schedules-section";
 import { PausedSchedulesSection } from "../elements/paused-schedules-section";
 import { PausedSubscribersSection } from "../elements/paused-subscribers-section";

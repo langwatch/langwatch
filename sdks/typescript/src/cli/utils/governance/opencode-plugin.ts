@@ -72,13 +72,7 @@ export function opencodePluginTarget(dirPath?: string): OpencodePluginTarget {
     return { path: file, displayPath: file };
   }
   return {
-    path: path.join(
-      os.homedir(),
-      ".config",
-      "opencode",
-      "plugins",
-      OPENCODE_PLUGIN_FILE_NAME,
-    ),
+    path: path.join(os.homedir(), ".config", "opencode", "plugins", OPENCODE_PLUGIN_FILE_NAME),
     displayPath: `~/.config/opencode/plugins/${OPENCODE_PLUGIN_FILE_NAME}`,
   };
 }
@@ -108,9 +102,7 @@ export function installOpencodeSessionContextPlugin({
 }
 
 /** Whether our plugin is currently on disk, for the logout scan. */
-export function hasOpencodeSessionContextPlugin({
-  dirPath,
-}: { dirPath?: string } = {}): boolean {
+export function hasOpencodeSessionContextPlugin({ dirPath }: { dirPath?: string } = {}): boolean {
   const contents = readFileOrNull(opencodePluginTarget(dirPath).path);
   return contents !== null && isLangwatchPlugin(contents);
 }

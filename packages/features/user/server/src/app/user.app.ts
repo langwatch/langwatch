@@ -98,10 +98,7 @@ export interface UserAppDependencies {
   users: UserService;
   auth: Pick<AuthService, "revokeOtherBrowserSessions" | "revokeAllBrowserSessions">;
   ops: Pick<OpsService, "isAdmin">;
-  organizations: Pick<
-    OrganizationService,
-    "ensurePersonalWorkspace" | "tryFindPersonalWorkspace"
-  >;
+  organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "tryFindPersonalWorkspace">;
 }
 
 export class UserApp {
@@ -233,10 +230,7 @@ export class UserApp {
    * write must end are a property of the write, not of the transport it
    * arrived over.
    */
-  revokeOtherBrowserSessions(input: {
-    userId: string;
-    keepSessionId: string;
-  }): Promise<void> {
+  revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void> {
     return this.dependencies.auth.revokeOtherBrowserSessions(input);
   }
 

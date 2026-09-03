@@ -67,7 +67,9 @@ export function WorkflowCreateDialogHost({
           description: error.description,
         })
       }
-      renderContentBoundary={(children) => <WorkflowErrorBoundary>{children}</WorkflowErrorBoundary>}
+      renderContentBoundary={(children) => (
+        <WorkflowErrorBoundary>{children}</WorkflowErrorBoundary>
+      )}
       renderForm={({ template }) => <NewWorkflowForm template={template} onClose={onClose} />}
       renderTemplateCard={(props) => <WorkflowTemplateCard {...props} />}
     />
@@ -86,13 +88,7 @@ function WorkflowTemplateCard({ testId, dragging, children, ...props }: Workflow
   );
 }
 
-function NewWorkflowForm({
-  template,
-  onClose,
-}: {
-  template: StudioWorkflow;
-  onClose: () => void;
-}) {
+function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onClose: () => void }) {
   const host = useWorkflowHost();
   const { projectId, projectSlug } = host.scope();
   const emojiPicker = useDisclosure();

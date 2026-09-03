@@ -4,10 +4,7 @@ type ScenarioSectionHeaderProps = {
   children: React.ReactNode;
 } & TextProps;
 
-export function ScenarioSectionHeader({
-  children,
-  ...props
-}: ScenarioSectionHeaderProps) {
+export function ScenarioSectionHeader({ children, ...props }: ScenarioSectionHeaderProps) {
   return (
     <Text
       fontSize="11px"

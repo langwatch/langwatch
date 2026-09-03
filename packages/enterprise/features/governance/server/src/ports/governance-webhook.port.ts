@@ -42,10 +42,7 @@ export abstract class GovernanceWebhookPort {
     organizationId: string;
     eventType: string;
   }): Promise<string[]>;
-  abstract sendBatch(
-    payload: GovernanceWebhookSendBatch,
-    context: IntentContext,
-  ): Promise<void>;
+  abstract sendBatch(payload: GovernanceWebhookSendBatch, context: IntentContext): Promise<void>;
   abstract retryDelayMs(input: { attempt: number }): number;
   abstract now(): number;
 }

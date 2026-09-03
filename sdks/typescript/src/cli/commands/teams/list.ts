@@ -3,13 +3,7 @@ import { TeamsApiService } from "@/client-sdk/services/teams/teams-api.service";
 import { formatTable } from "../../utils/formatting";
 import { parseCount } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import {
-  asDate,
-  counted,
-  printEmpty,
-  runManagement,
-  withParsedFlags,
-} from "../management/_shared";
+import { asDate, counted, printEmpty, runManagement, withParsedFlags } from "../management/_shared";
 
 export const listTeamsCommand = async (
   options: { page?: string; limit?: string } = {},

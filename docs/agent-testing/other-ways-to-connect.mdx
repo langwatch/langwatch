@@ -9,11 +9,11 @@ description: Register an agent by its HTTP endpoint, front a local process with 
 
 [Connecting from code](/agent-testing/connect-your-agent) is the recommended path: the process that already runs your agent connects itself, and there is no URL, no request template and no credential in the agent configuration. Use one of the paths below when that is not possible.
 
-| Path | Use it when |
-|---|---|
-| **HTTP agent** | The agent is written in a language with no LangWatch SDK, or you cannot change its code and only have a URL. |
-| **`langwatch agent dev`** | An HTTP agent runs on your own machine and the platform needs a reachable URL for the session. |
-| **Code agent** | The target is a few lines of glue: a credential exchange, or a call into an API that needs no repository of its own. |
+| Path                      | Use it when                                                                                                          |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **HTTP agent**            | The agent is written in a language with no LangWatch SDK, or you cannot change its code and only have a URL.         |
+| **`langwatch agent dev`** | An HTTP agent runs on your own machine and the platform needs a reachable URL for the session.                       |
+| **Code agent**            | The target is a few lines of glue: a credential exchange, or a call into an API that needs no repository of its own. |
 
 ## HTTP agents
 
@@ -32,7 +32,8 @@ Your endpoint's existing authentication passes through the HTTP agent's header r
 When the normal authentication is built for human users (sessions, OAuth redirects), add a dedicated API key for scenario traffic instead: your server reads the expected key from an environment variable and checks it on each request, and the HTTP agent sends it from a secret. A dedicated key is also the one you revoke to close the testing path.
 
 <Note>
-  **Also check:** [Testing agents behind authentication](/agent-testing/authenticated-agents) lists exactly which fields resolve secret references, and covers an OAuth2 client-credentials exchange.
+  **Also check:** [Testing agents behind authentication](/agent-testing/authenticated-agents) lists
+  exactly which fields resolve secret references, and covers an OAuth2 client-credentials exchange.
 </Note>
 
 ### 3. Define the request and the response contract
@@ -46,14 +47,14 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 }
 ```
 
-| Variable | Value |
-|---|---|
-| `{{ messages }}` | The whole conversation as a raw JSON array of `{role, content}` messages |
-| `{{ input }}` | The text of the last user message |
-| `{{ threadId }}` | A conversation id, the same on every turn of a run |
-| `{{ session }}` | What the endpoint returned at `sessionPath` on the previous turn of the conversation, empty on the first turn |
-| `{{ params.NAME }}` | A [run parameter](/agent-testing/run-parameters) |
-| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-testing/linking-your-traces) |
+| Variable                             | Value                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `{{ messages }}`                     | The whole conversation as a raw JSON array of `{role, content}` messages                                      |
+| `{{ input }}`                        | The text of the last user message                                                                             |
+| `{{ threadId }}`                     | A conversation id, the same on every turn of a run                                                            |
+| `{{ session }}`                      | What the endpoint returned at `sessionPath` on the previous turn of the conversation, empty on the first turn |
+| `{{ params.NAME }}`                  | A [run parameter](/agent-testing/run-parameters)                                                              |
+| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-testing/linking-your-traces)                   |
 
 The URL and the header values render the same variables.
 
@@ -107,6 +108,7 @@ With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens 
     ```
 
     For Flask, attach in `before_request` (keep the token on `g`) and detach in `teardown_request`.
+
   </Tab>
   <Tab title="TypeScript">
     ```typescript
@@ -119,6 +121,7 @@ With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens 
     ```
 
     The middleware needs an initialized OpenTelemetry runtime: a registered context manager and propagator. The LangWatch SDK's `setupObservability()` and the OpenTelemetry `NodeSDK` both register them at startup; without one of them, `context.with` and `propagation.extract` are no-ops.
+
   </Tab>
 </Tabs>
 
@@ -129,13 +132,21 @@ The agent must report its traces to the same LangWatch project that runs the sce
 In the platform, create the agent on the **Agents** page: type **HTTP**, then the URL, authentication, body template and output path from the steps above.
 
 <Frame>
-<img className="block" src="/images/agent-testing/register-http-agent.png" alt="The HTTP agent editor with the endpoint URL, request body template and output path" />
+  <img
+    className="block"
+    src="/images/agent-testing/register-http-agent.png"
+    alt="The HTTP agent editor with the endpoint URL, request body template and output path"
+  />
 </Frame>
 
 The **Test** tab sends one real request with the current configuration. Use it to confirm the endpoint answers and the output path extracts the reply text before you run any scenario:
 
 <Frame>
-<img className="block" src="/images/agent-testing/agent-test-request.png" alt="The Test tab showing a 200 response from the agent endpoint and the extracted reply" />
+  <img
+    className="block"
+    src="/images/agent-testing/agent-test-request.png"
+    alt="The Test tab showing a 200 response from the agent endpoint and the extracted reply"
+  />
 </Frame>
 
 With the CLI:
@@ -156,12 +167,12 @@ langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 
 ### Common failures
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use `langwatch agent dev` below for a local process. |
-| Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference points at a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings > Secrets**. |
-| The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response. |
-| Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in step 4, and point the agent's tracing at the same project's API key. |
+| Symptom                                                                       | Cause                                                                                                                                                  | Fix                                                                                                    |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| The run fails with a connection error                                         | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service.                                           | Deploy the endpoint to a reachable URL, or use `langwatch agent dev` below for a local process.        |
+| Every turn fails with 401 or 403                                              | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference points at a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings > Secrets**. |
+| The transcript shows empty replies or raw JSON                                | `outputPath` does not match the response shape, so no reply text is found.                                                                             | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response.                   |
+| Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project.                                           | Adopt the context as in step 4, and point the agent's tracing at the same project's API key.           |
 
 ## A local HTTP agent: `langwatch agent dev`
 
@@ -182,14 +193,14 @@ Ctrl-C restores the previous URL.
 
 With no `--agent` flag, the command lists the project's HTTP agents to pick from, and remembers the choice per project directory in `~/.langwatch/config.json`. `langwatch agent tunnel` is an alias for the same command.
 
-| Flag | Effect |
-|---|---|
-| `--port <port>` | Tunnel `localhost:<port>`. |
-| `--url <url>` | Tunnel a full local URL, path included, for example `http://localhost:8010/agent/chat`. |
-| `--agent <id or name>` | Which registered HTTP agent to repoint. A picker opens when omitted. |
-| `--tunnel-url <url>` | Use a tunnel you already run, for example a named Cloudflare tunnel or ngrok, and skip provisioning one. This also skips the session secret proxy. |
-| `--no-update-url` | Print the tunnel URL and leave the agent configuration as it is. |
-| `--no-auth` | Skip the session secret protection described below. |
+| Flag                   | Effect                                                                                                                                             |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--port <port>`        | Tunnel `localhost:<port>`.                                                                                                                         |
+| `--url <url>`          | Tunnel a full local URL, path included, for example `http://localhost:8010/agent/chat`.                                                            |
+| `--agent <id or name>` | Which registered HTTP agent to repoint. A picker opens when omitted.                                                                               |
+| `--tunnel-url <url>`   | Use a tunnel you already run, for example a named Cloudflare tunnel or ngrok, and skip provisioning one. This also skips the session secret proxy. |
+| `--no-update-url`      | Print the tunnel URL and leave the agent configuration as it is.                                                                                   |
+| `--no-auth`            | Skip the session secret protection described below.                                                                                                |
 
 ### How the tunnel is protected
 
@@ -273,7 +284,11 @@ The mapped input is `None` on the first turn of a conversation, and afterwards e
   <Card title="Authenticated agents" icon="key" href="/agent-testing/authenticated-agents">
     Reference project secrets, and exchange OAuth2 credentials
   </Card>
-  <Card title="Linking your traces" icon="diagram-project" href="/agent-testing/linking-your-traces">
+  <Card
+    title="Linking your traces"
+    icon="diagram-project"
+    href="/agent-testing/linking-your-traces"
+  >
     What the judge reads from your agent's own spans
   </Card>
   <Card title="Command line interface" icon="terminal" href="/integration/cli">

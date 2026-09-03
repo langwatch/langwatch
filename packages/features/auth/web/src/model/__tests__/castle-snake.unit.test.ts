@@ -40,11 +40,9 @@ describe("given a snake running along the grid lines", () => {
       expect(after.eaten).toBe(1);
       // Somewhere free means somewhere the snake is not: a token under the
       // snake is one the player can never reach.
-      expect(
-        after.snake.some(
-          (node) => node.x === after.token.x && node.y === after.token.y,
-        ),
-      ).toBe(false);
+      expect(after.snake.some((node) => node.x === after.token.x && node.y === after.token.y)).toBe(
+        false,
+      );
     });
   });
 
@@ -140,10 +138,7 @@ describe("given a snake travelling right", () => {
       // Both turns are judged against the direction actually being travelled,
       // never against the one queued a moment ago — so no pair of keystrokes
       // between two ticks can add up to a reversal.
-      const after = queueTurn(
-        queueTurn(board({ direction: "right" }), "up"),
-        "left",
-      );
+      const after = queueTurn(queueTurn(board({ direction: "right" }), "up"), "left");
 
       expect(after.queued).toBe("up");
     });

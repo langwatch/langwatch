@@ -1,9 +1,4 @@
-export type LangyModelGroup =
-  | "quick"
-  | "balanced"
-  | "reasoning"
-  | "multimodal"
-  | "custom";
+export type LangyModelGroup = "quick" | "balanced" | "reasoning" | "multimodal" | "custom";
 
 export interface LangyModelProfileSource {
   description?: string;

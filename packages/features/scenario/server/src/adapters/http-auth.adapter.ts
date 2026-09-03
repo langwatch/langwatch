@@ -17,8 +17,7 @@ export const AUTH_STRATEGIES: Record<AuthStrategyType, AuthStrategy> = {
   none: () => NO_HEADERS,
   bearer: (auth) =>
     auth.type === "bearer" ? { Authorization: `Bearer ${auth.token}` } : NO_HEADERS,
-  api_key: (auth) =>
-    auth.type === "api_key" ? { [auth.header]: auth.value } : NO_HEADERS,
+  api_key: (auth) => (auth.type === "api_key" ? { [auth.header]: auth.value } : NO_HEADERS),
   basic: (auth) =>
     auth.type === "basic"
       ? {

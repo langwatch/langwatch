@@ -35,8 +35,8 @@ export function ModelNameMappingSection({
         />
       </HStack>
       <Text fontSize="xs" color="fg.muted">
-        The model a mapping points at is checked against everything this policy allows, so
-        a mapping can never reach a model the key may not use.
+        The model a mapping points at is checked against everything this policy allows, so a mapping
+        can never reach a model the key may not use.
       </Text>
 
       {fields.length === 0 && (

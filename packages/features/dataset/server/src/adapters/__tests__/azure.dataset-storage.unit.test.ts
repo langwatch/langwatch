@@ -241,7 +241,10 @@ describe("AzureDatasetStorageAdapter", () => {
 
   describe("deleteChunksFrom()", () => {
     it("deletes contiguous chunks starting at fromIndex and stops at the first gap", async () => {
-      driverExists.mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      driverExists
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
       driverDelete.mockResolvedValue(undefined);
 
       await makeStorage().deleteChunksFrom({

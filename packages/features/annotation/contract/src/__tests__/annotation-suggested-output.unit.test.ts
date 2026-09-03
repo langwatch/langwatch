@@ -10,9 +10,7 @@ const suggestionOf = (annotation: AnnotationSuggestionSource = {}) =>
 describe("the expected output an annotation suggests", () => {
   describe("given a comment about the whole trace", () => {
     it("reads the suggestion as the trace's expected output", () => {
-      expect(suggestionOf({ expectedOutput: "the right answer" })).toBe(
-        "the right answer",
-      );
+      expect(suggestionOf({ expectedOutput: "the right answer" })).toBe("the right answer");
     });
 
     it("reads nothing when the reviewer suggested nothing", () => {

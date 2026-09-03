@@ -31,12 +31,7 @@ export class RedisJobBlobStore implements JobBlobStore {
     data: Buffer;
     ttlSeconds?: number;
   }): Promise<void> {
-    await this.redis.set(
-      this.keyPrefix + id,
-      data,
-      "EX",
-      ttlSeconds ?? BLOB_BACKSTOP_TTL_SECONDS,
-    );
+    await this.redis.set(this.keyPrefix + id, data, "EX", ttlSeconds ?? BLOB_BACKSTOP_TTL_SECONDS);
   }
 
   /**
@@ -44,13 +39,7 @@ export class RedisJobBlobStore implements JobBlobStore {
    * {@link peek} for the inspection path that must NOT extend the backstop TTL.
    * A missing key returns null.
    */
-  async get({
-    id,
-    ttlSeconds,
-  }: {
-    id: string;
-    ttlSeconds?: number;
-  }): Promise<Buffer | null> {
+  async get({ id, ttlSeconds }: { id: string; ttlSeconds?: number }): Promise<Buffer | null> {
     return await this.redis.getexBuffer(
       this.keyPrefix + id,
       "EX",

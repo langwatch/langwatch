@@ -160,8 +160,7 @@ Every CH repository for the 11 managed tables takes a
 
 ```ts
 const retentionDays =
-  (await resolver?.getRetentionDays(tenantId, "traces")) ??
-  PLATFORM_DEFAULT_RETENTION_DAYS;
+  (await resolver?.getRetentionDays(tenantId, "traces")) ?? PLATFORM_DEFAULT_RETENTION_DAYS;
 ```
 
 `_size_bytes` is `MATERIALIZED` — CH computes it server-side at insert

@@ -31,8 +31,7 @@ export function warnIfGeminiOAuthSelected(
   options: GeminiSettingsPreflightOptions = {},
 ): GeminiSettingsPreflightResult {
   const filePath = options.filePath ?? defaultGeminiSettingsPath();
-  const writeLine =
-    options.writeLine ?? ((line: string) => process.stderr.write(line + "\n"));
+  const writeLine = options.writeLine ?? ((line: string) => process.stderr.write(line + "\n"));
 
   if (!fs.existsSync(filePath)) {
     return { action: "no-settings", warned: false };

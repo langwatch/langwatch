@@ -126,11 +126,7 @@ describe("subscriptionItemCalculator", () => {
 
     it("returns no add-ons for plans without add-on prices", () => {
       expect(
-        calculator.createItemsToAdd(
-          PlanTypes.GROWTH,
-          { quantity: 200_000 },
-          { quantity: 50 },
-        ),
+        calculator.createItemsToAdd(PlanTypes.GROWTH, { quantity: 200_000 }, { quantity: 50 }),
       ).toEqual([]);
     });
   });

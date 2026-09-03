@@ -376,9 +376,7 @@ describe("transformBatchEvaluationData", () => {
       const target = result.rows[0]!.targets["target-1"]!;
       expect(target.evaluatorResults).toHaveLength(2);
 
-      const exactMatch = target.evaluatorResults.find(
-        (e) => e.evaluatorId === "exact_match",
-      );
+      const exactMatch = target.evaluatorResults.find((e) => e.evaluatorId === "exact_match");
       expect(exactMatch?.passed).toBe(true);
       expect(exactMatch?.score).toBe(1.0);
 
@@ -722,18 +720,10 @@ describe("transformBatchEvaluationData", () => {
       });
 
       // Each target should have only its own evaluator result
-      expect(result.rows[0]?.targets._eval_sample_metric?.evaluatorResults).toHaveLength(
-        1,
-      );
-      expect(
-        result.rows[0]?.targets._eval_sample_metric?.evaluatorResults[0]?.score,
-      ).toBe(0.95);
-      expect(result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults).toHaveLength(
-        1,
-      );
-      expect(
-        result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults[0]?.passed,
-      ).toBe(true);
+      expect(result.rows[0]?.targets._eval_sample_metric?.evaluatorResults).toHaveLength(1);
+      expect(result.rows[0]?.targets._eval_sample_metric?.evaluatorResults[0]?.score).toBe(0.95);
+      expect(result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults).toHaveLength(1);
+      expect(result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults[0]?.passed).toBe(true);
     });
 
     it("displays arbitrary data as JSON when no common output field exists", () => {
@@ -966,11 +956,7 @@ describe("transformBatchEvaluationData", () => {
 
       // Should have 3 target columns
       expect(result.targetColumns).toHaveLength(3);
-      expect(result.targetColumns.map((t) => t.id)).toEqual([
-        "gpt-4",
-        "gpt-3.5",
-        "claude-3",
-      ]);
+      expect(result.targetColumns.map((t) => t.id)).toEqual(["gpt-4", "gpt-3.5", "claude-3"]);
 
       // Should have 2 rows
       expect(result.rows).toHaveLength(2);
@@ -1054,25 +1040,19 @@ describe("transformBatchEvaluationData", () => {
       // GPT-4 should have 2 evaluator results
       expect(row0.targets["gpt-4"]?.evaluatorResults).toHaveLength(2);
       expect(
-        row0.targets["gpt-4"]?.evaluatorResults.find((e) => e.evaluatorId === "latency")
-          ?.score,
+        row0.targets["gpt-4"]?.evaluatorResults.find((e) => e.evaluatorId === "latency")?.score,
       ).toBe(100);
       expect(
-        row0.targets["gpt-4"]?.evaluatorResults.find((e) => e.evaluatorId === "quality")
-          ?.score,
+        row0.targets["gpt-4"]?.evaluatorResults.find((e) => e.evaluatorId === "quality")?.score,
       ).toBe(0.9);
 
       // Claude-3 should have 2 evaluator results
       expect(row0.targets["claude-3"]?.evaluatorResults).toHaveLength(2);
       expect(
-        row0.targets["claude-3"]?.evaluatorResults.find(
-          (e) => e.evaluatorId === "latency",
-        )?.score,
+        row0.targets["claude-3"]?.evaluatorResults.find((e) => e.evaluatorId === "latency")?.score,
       ).toBe(200);
       expect(
-        row0.targets["claude-3"]?.evaluatorResults.find(
-          (e) => e.evaluatorId === "quality",
-        )?.score,
+        row0.targets["claude-3"]?.evaluatorResults.find((e) => e.evaluatorId === "quality")?.score,
       ).toBe(0.8);
     });
 

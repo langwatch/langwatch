@@ -1,8 +1,5 @@
 import { useCallback, useMemo } from "react";
-import {
-  selectSpanEditBaseline,
-  useTraceEditStore,
-} from "../../../../../index";
+import { selectSpanEditBaseline, useTraceEditStore } from "../../../../../index";
 import { EditableIOField } from "./editable-io-field";
 import { capturedInputForEditing } from "../../../../../model/explorer/trace-drawer/edit-mode/span-input-seed";
 

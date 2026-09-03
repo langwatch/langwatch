@@ -10,10 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { ScenarioExecutionPrefetcherService } from "@langwatch/scenario-server";
-import {
-  ChildProcessJobDataSchema,
-  ScenarioConfigSchema,
-} from "@langwatch/scenario-contract";
+import { ChildProcessJobDataSchema, ScenarioConfigSchema } from "@langwatch/scenario-contract";
 import {
   createTestScenarioExecutionPrefetcherService,
   type ScenarioPrefetchFixture,
@@ -159,8 +156,7 @@ describe("ChildProcessJobDataSchema turn config threading", () => {
 
 describe("fetchScenario turn config mapping", () => {
   it("maps maxTurns and minTurns from DB row to ScenarioConfig", async () => {
-    const { createMockDepsForTurnConfig } =
-      await import("./support/scenario-turn-config.fixture");
+    const { createMockDepsForTurnConfig } = await import("./support/scenario-turn-config.fixture");
 
     const deps = createMockDepsForTurnConfig({
       scenario: {
@@ -194,8 +190,7 @@ describe("fetchScenario turn config mapping", () => {
   });
 
   it("maps null turn fields as undefined", async () => {
-    const { createMockDepsForTurnConfig } =
-      await import("./support/scenario-turn-config.fixture");
+    const { createMockDepsForTurnConfig } = await import("./support/scenario-turn-config.fixture");
 
     const deps = createMockDepsForTurnConfig({
       scenario: {

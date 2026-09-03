@@ -35,13 +35,7 @@ export function LangySpaAnchor({
     if (event.defaultPrevented) return;
     // A modified click is a request for the browser's own behaviour: a new tab,
     // a new window, a download. Honour it.
-    if (
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey
-    ) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
       return;
     }
     if (!isInternalHref(href)) return;

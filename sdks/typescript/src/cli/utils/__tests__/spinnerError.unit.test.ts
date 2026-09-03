@@ -28,9 +28,7 @@ describe("failSpinner", () => {
           this.name = "AgentsApiError";
         }
       }
-      const err = new AgentsApiError(
-        "Failed to list agents: Unauthorized: Invalid API key",
-      );
+      const err = new AgentsApiError("Failed to list agents: Unauthorized: Invalid API key");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "fetch agents" });
       expect(stripAnsi(String(calls[0]))).toBe(
@@ -93,9 +91,7 @@ describe("failSpinner", () => {
       const err = new PromptsError("Failed to sync prompt: Internal server error");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "sync prompt" });
-      expect(stripAnsi(String(calls[0]))).toBe(
-        "Failed to sync prompt: Internal server error",
-      );
+      expect(stripAnsi(String(calls[0]))).toBe("Failed to sync prompt: Internal server error");
     });
   });
 });

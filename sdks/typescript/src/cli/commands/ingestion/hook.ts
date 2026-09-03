@@ -87,10 +87,7 @@ import {
  * with no `cwd`. Codex and opencode publish no such variable, and their
  * payload `cwd` is already the session's own directory.
  */
-const TOOLS: Record<
-  string,
-  { agent: string; sessionIdVar?: string; projectDirVar?: string }
-> = {
+const TOOLS: Record<string, { agent: string; sessionIdVar?: string; projectDirVar?: string }> = {
   claude_code: {
     agent: "claude_code",
     sessionIdVar: "CLAUDE_CODE_SESSION_ID",

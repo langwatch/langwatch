@@ -51,11 +51,7 @@ function familyLabel(family: string): string {
 }
 
 /** Mirrors the server bounds; NaN from a cleared field fails these too. */
-function controlsWithinBounds(
-  maxBatchSize: number,
-  maxBatchDelayMs: number,
-  maxInFlight: number,
-) {
+function controlsWithinBounds(maxBatchSize: number, maxBatchDelayMs: number, maxInFlight: number) {
   return (
     Number.isInteger(maxBatchSize) &&
     maxBatchSize >= 1 &&
@@ -73,11 +69,7 @@ function controlsWithinBounds(
  * The selection after toggling a family header, which is the `<family>.*`
  * wildcard.
  */
-function withFamilyToggled(
-  selected: Set<string>,
-  family: string,
-  on: boolean,
-): Set<string> {
+function withFamilyToggled(selected: Set<string>, family: string, on: boolean): Set<string> {
   const wildcard = `${family}.*`;
   const next = new Set(selected);
   if (!on) {
@@ -134,8 +126,7 @@ function useDestinationFields(isOpen: boolean, endpoint: EndpointView | null) {
     setAccessKeyId,
     secretAccessKey,
     setSecretAccessKey,
-    isAddressFilled:
-      destinationKind === "sqs" ? queueUrl.trim().length > 0 : url.trim().length > 0,
+    isAddressFilled: destinationKind === "sqs" ? queueUrl.trim().length > 0 : url.trim().length > 0,
     toDestinationInput: (): DestinationInput =>
       destinationKind === "sqs"
         ? {
@@ -399,13 +390,7 @@ function SqsDestinationFields({ form }: { form: EndpointForm }) {
  * against the old transport are in flight, so moving means a new endpoint
  * beside this one until the old one has drained.
  */
-function DestinationSection({
-  form,
-  isEditing,
-}: {
-  form: EndpointForm;
-  isEditing: boolean;
-}) {
+function DestinationSection({ form, isEditing }: { form: EndpointForm; isEditing: boolean }) {
   return (
     <VStack gap={4} align="start" width="full">
       <VStack gap={2} align="start" width="full">
@@ -425,9 +410,7 @@ function DestinationSection({
         <SegmentedControl
           value={form.destinationKind}
           disabled={isEditing}
-          onValueChange={({ value }) =>
-            form.setDestinationKind(value as WebhookDestinationKind)
-          }
+          onValueChange={({ value }) => form.setDestinationKind(value as WebhookDestinationKind)}
           items={[
             { value: "http", label: WEBHOOK_DESTINATION_LABELS.http },
             { value: "sqs", label: WEBHOOK_DESTINATION_LABELS.sqs },
@@ -689,17 +672,11 @@ export function WebhookEndpointDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">
-            {endpoint ? "Edit webhook endpoint" : "New webhook endpoint"}
-          </Heading>
+          <Heading size="md">{endpoint ? "Edit webhook endpoint" : "New webhook endpoint"}</Heading>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          <EndpointFormFields
-            form={form}
-            eventTypes={eventTypes}
-            isEditing={endpoint !== null}
-          />
+          <EndpointFormFields form={form} eventTypes={eventTypes} isEditing={endpoint !== null} />
         </Drawer.Body>
         <Drawer.Footer>
           <HStack gap={2}>

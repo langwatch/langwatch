@@ -164,10 +164,7 @@ describe("LangySessionKeyService", () => {
     const apiKeys: ApiKeyService = Object.create(ApiKeyService.prototype);
     apiKeys.create = apiKeyCreate;
     const authz: AuthzService = Object.create(AuthzService.prototype);
-    authz.effectivePermissions = vi.fn(async () => [
-      "project:view",
-      "experiments:delete",
-    ]);
+    authz.effectivePermissions = vi.fn(async () => ["project:view", "experiments:delete"]);
 
     await createService({
       repository,

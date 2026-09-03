@@ -22,12 +22,7 @@ import {
 import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog";
 import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate";
 import { Kbd } from "@langwatch/ops-web";
-import {
-  MenuContent,
-  MenuContextTrigger,
-  MenuItem,
-  MenuRoot,
-} from "@langwatch/design-system/menu";
+import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { toaster } from "@langwatch/design-system/toaster";
 import { showErrorToast } from "../../../errors";
@@ -75,7 +70,11 @@ import { ShareTraceDialog } from "./share-trace-dialog";
 import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/drawer-header/synthetic-trace-badge";
 import { TraceOverflowMenu } from "./trace-overflow-menu";
 import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header";
-import { formatPinValue, readNumberAttribute, resolveAttributeValue } from "../../../../../model/explorer/trace-drawer/drawer-header/utils";
+import {
+  formatPinValue,
+  readNumberAttribute,
+  resolveAttributeValue,
+} from "../../../../../model/explorer/trace-drawer/drawer-header/utils";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;
@@ -156,14 +155,7 @@ function TraceIdChip({ traceId }: { traceId: string }) {
       <Text as="span" data-collapsed textStyle="xs" color="fg" fontWeight="medium">
         {short}
       </Text>
-      <Text
-        as="span"
-        data-expanded
-        textStyle="xs"
-        color="fg"
-        fontWeight="medium"
-        display="none"
-      >
+      <Text as="span" data-expanded textStyle="xs" color="fg" fontWeight="medium" display="none">
         {traceId}
       </Text>
       <Icon as={LuCopy} boxSize={3} color="fg.muted" data-hover-only />
@@ -194,10 +186,7 @@ function StatusChip({ trace, statusColor }: { trace: TraceHeader; statusColor: s
   const setViewMode = useDrawerStore((s) => s.setViewMode);
   const requestFocus = useFocusSectionStore((s) => s.request);
   const spanTree = useSpanTree();
-  const errorSpans = useMemo(
-    () => rankedErrorSpans(spanTree.data ?? []),
-    [spanTree.data],
-  );
+  const errorSpans = useMemo(() => rankedErrorSpans(spanTree.data ?? []), [spanTree.data]);
 
   const isError = trace.status === "error";
   const hasErrorContent = isError && (!!trace.error || errorSpans.length > 0);
@@ -271,12 +260,7 @@ function StatusChip({ trace, statusColor }: { trace: TraceHeader; statusColor: s
       transition="background 0.15s ease"
     >
       <Circle size="8px" bg={statusColor} flexShrink={0} />
-      <Text
-        textStyle="xs"
-        fontWeight="medium"
-        color={statusColor}
-        textTransform="capitalize"
-      >
+      <Text textStyle="xs" fontWeight="medium" color={statusColor} textTransform="capitalize">
         {trace.status}
       </Text>
     </HStack>
@@ -362,13 +346,7 @@ const SAFE_METADATA_KEY_RE = /^[A-Za-z0-9_.-]+$/;
  * key can't be safely round-tripped as a bare Liqe field, or the value
  * collapses to empty after escape.
  */
-function formatMetadataFilterQuery({
-  key,
-  value,
-}: {
-  key: string;
-  value: string;
-}): string | null {
+function formatMetadataFilterQuery({ key, value }: { key: string; value: string }): string | null {
   if (!SAFE_METADATA_KEY_RE.test(key)) return null;
   const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   if (!escaped) return null;
@@ -406,8 +384,7 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
     key: "gen_ai.conversation.id",
     label: "Conversation",
     category: "identity",
-    resolve: (trace) =>
-      trace.conversationId ?? trace.attributes["gen_ai.conversation.id"],
+    resolve: (trace) => trace.conversationId ?? trace.attributes["gen_ai.conversation.id"],
   },
   {
     key: "langwatch.user_id",
@@ -497,8 +474,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   };
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
 
-  const { canGoBack, goBack, goBackTo, backStackDepth, backStack } =
-    useTraceDrawerNavigation();
+  const { canGoBack, goBack, goBackTo, backStackDepth, backStack } = useTraceDrawerNavigation();
 
   const statusColor = STATUS_COLORS[trace.status] as string;
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -547,8 +523,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   // The reasoning EFFORT request setting (low/medium/high/...), lifted onto
   // the trace summary by the fold. Distinct from the reasoning TOKEN count
   // above; shown next to the model since it is a per-request model setting.
-  const reasoningEffort =
-    trace.attributes?.["gen_ai.request.reasoning_effort"]?.trim() ?? null;
+  const reasoningEffort = trace.attributes?.["gen_ai.request.reasoning_effort"]?.trim() ?? null;
 
   // How full the window already was when this trace's first model call ran.
   // Sits before Tokens because it is the number a reader checks first: the
@@ -587,10 +562,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   const isBundledCost = nonBilledCost > 0;
 
   const resources = useTraceResources(trace.traceId);
-  const conversationContext = useConversationContext(
-    trace.conversationId ?? null,
-    trace.traceId,
-  );
+  const conversationContext = useConversationContext(trace.conversationId ?? null, trace.traceId);
   const { pins, removePin } = usePinnedAttributes(project?.id);
   const toggleFacet = useFilterStore((s) => s.toggleFacet);
   // `applyQueryTextFromPin` is used by the auto-pinned metadata filter
@@ -738,8 +710,7 @@ export const DrawerHeader = memo(function DrawerHeader({
     }
 
     for (const p of pins) {
-      const valueSource =
-        p.source === "resource" ? resources.resourceAttributes : trace.attributes;
+      const valueSource = p.source === "resource" ? resources.resourceAttributes : trace.attributes;
       const value = formatPinValue({
         key: p.key,
         value: resolveAttributeValue(valueSource, p.key),
@@ -798,11 +769,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      )
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
         return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === "\\") {
@@ -952,12 +919,7 @@ export const DrawerHeader = memo(function DrawerHeader({
                         </Text>
                         <Text textStyle="xs" flex={1} truncate>
                           {entry.traceId.slice(0, 16)}
-                          <Text
-                            as="span"
-                            textStyle="2xs"
-                            color="fg.subtle"
-                            marginLeft={2}
-                          >
+                          <Text as="span" textStyle="2xs" color="fg.subtle" marginLeft={2}>
                             {entry.viewMode}
                           </Text>
                         </Text>
@@ -1081,13 +1043,7 @@ export const DrawerHeader = memo(function DrawerHeader({
               onTogglePinned={togglePinned}
               readOnly={readOnly}
             />
-            <Box
-              width="1px"
-              height="16px"
-              bg="border.muted"
-              marginX={0.5}
-              flexShrink={0}
-            />
+            <Box width="1px" height="16px" bg="border.muted" marginX={0.5} flexShrink={0} />
             <Tooltip
               content={
                 <HStack gap={1}>
@@ -1229,9 +1185,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           ) : (
             <MetricPill label="Model" value={trace.models[0]!} />
           ))}
-        {reasoningEffort && (
-          <MetricPill label="Reasoning effort" value={reasoningEffort} />
-        )}
+        {reasoningEffort && <MetricPill label="Reasoning effort" value={reasoningEffort} />}
 
         {/* Section 2: Source / tools chips (service, origin, scenario, sdk,
             prompts, annotations). Capped at 6 inline; surplus rolls into

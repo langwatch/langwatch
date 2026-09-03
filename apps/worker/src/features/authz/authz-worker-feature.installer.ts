@@ -1,8 +1,5 @@
 import type { AuthzPipeline } from "@langwatch/authz-server";
-import type {
-  WorkerFeatureCloser,
-  WorkerFeatureInstallerPort,
-} from "../worker-feature.installer";
+import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
 /** AuthZ's worker-facing capability: the built grants-ledger definition. */

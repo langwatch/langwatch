@@ -11,8 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { failSpinnerFromResponse } from "../failFromResponse";
 
-const spinner = () =>
-  ({ fail: vi.fn(), succeed: vi.fn(), stop: vi.fn() }) as unknown as Ora;
+const spinner = () => ({ fail: vi.fn(), succeed: vi.fn(), stop: vi.fn() }) as unknown as Ora;
 
 const responseOf = (status: number, body: unknown, contentType = "application/json") =>
   new Response(typeof body === "string" ? body : JSON.stringify(body), {

@@ -176,11 +176,7 @@ export async function processContentPart({
         return noOp;
       }
 
-      if (
-        binPart.data === undefined ||
-        binPart.id !== undefined ||
-        binPart.url !== undefined
-      ) {
+      if (binPart.data === undefined || binPart.id !== undefined || binPart.url !== undefined) {
         return noOp;
       }
 
@@ -220,9 +216,7 @@ export async function processContentPart({
             id: stored.id,
             url: `/api/files/${projectId}/${stored.id}`,
             data: undefined,
-            ...(typeof binPart.filename === "string"
-              ? { filename: binPart.filename }
-              : {}),
+            ...(typeof binPart.filename === "string" ? { filename: binPart.filename } : {}),
           }
         : {
             ...original,
@@ -575,10 +569,7 @@ export async function extractInlineMediaFromEvent({
 
       // Shape B: `event.messages` is an array of message objects.
       if (Array.isArray(eventObj.messages)) {
-        const { messages, refs, changed } = await rewriteMessageArray(
-          eventObj.messages,
-          params,
-        );
+        const { messages, refs, changed } = await rewriteMessageArray(eventObj.messages, params);
         span.setAttribute("stored_objects.refs_extracted", refs.length);
         if (!changed) return { rewrittenEvent: event, refs };
         return { rewrittenEvent: { ...eventObj, messages }, refs };

@@ -40,9 +40,9 @@ const { apiNode } = vi.hoisted(() => {
 });
 
 vi.mock("@langwatch/github-web/screens/integrations", async () => {
-  const actual = await vi.importActual<
-    typeof import("@langwatch/github-web/screens/integrations")
-  >("@langwatch/github-web/screens/integrations");
+  const actual = await vi.importActual<typeof import("@langwatch/github-web/screens/integrations")>(
+    "@langwatch/github-web/screens/integrations",
+  );
   const Screen = () => <div>the integrations page</div>;
   return {
     ...actual,

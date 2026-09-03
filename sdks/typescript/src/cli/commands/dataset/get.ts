@@ -79,14 +79,10 @@ export const getCommand = async (slugOrId: string): Promise<CommandResult | void
         console.log(`  ${chalk.bold("Records:")}    ${dataset.entries.length}`);
 
         if (dataset.createdAt) {
-          console.log(
-            `  ${chalk.bold("Created:")}    ${formatRelativeTime(dataset.createdAt)}`,
-          );
+          console.log(`  ${chalk.bold("Created:")}    ${formatRelativeTime(dataset.createdAt)}`);
         }
         if (dataset.updatedAt) {
-          console.log(
-            `  ${chalk.bold("Updated:")}    ${formatRelativeTime(dataset.updatedAt)}`,
-          );
+          console.log(`  ${chalk.bold("Updated:")}    ${formatRelativeTime(dataset.updatedAt)}`);
         }
         const viewUrl = dataset.platformUrl;
         if (viewUrl) {
@@ -102,9 +98,7 @@ export const getCommand = async (slugOrId: string): Promise<CommandResult | void
 
           if (dataset.entries.length > PREVIEW_LIMIT) {
             console.log(
-              chalk.gray(
-                `  ... and ${dataset.entries.length - PREVIEW_LIMIT} more record(s)`,
-              ),
+              chalk.gray(`  ... and ${dataset.entries.length - PREVIEW_LIMIT} more record(s)`),
             );
           }
         }

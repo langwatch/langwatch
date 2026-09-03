@@ -24,16 +24,7 @@ export const PHASE_LABELS: Record<string, string> = {
   complete: "Complete",
 };
 
-const PHASES = [
-  "discover",
-  "mark",
-  "pause",
-  "drain",
-  "cutoff",
-  "replay",
-  "write",
-  "unmark",
-];
+const PHASES = ["discover", "mark", "pause", "drain", "cutoff", "replay", "write", "unmark"];
 
 export function PhaseTimeline({
   currentPhase,

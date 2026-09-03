@@ -1,8 +1,5 @@
 import { isAtOrBeforeCutoff } from "./replayConstants";
-import {
-  discoverProjectionAggregates,
-  filterDiscoveredByAggregateIds,
-} from "./replayDiscovery";
+import { discoverProjectionAggregates, filterDiscoveredByAggregateIds } from "./replayDiscovery";
 import { pauseProjection, unpauseProjection, waitForActiveJobs } from "./replayDrain";
 import {
   type DiscoveredAggregate,
@@ -148,10 +145,7 @@ export async function replayStateProjection({
         const batchNum = Math.floor(i / aggregateBatchSize) + 1;
         const batchStartTime = Date.now();
 
-        const emit = (
-          batchPhase: ReplayProgress["batchPhase"],
-          batchEventsProcessed: number,
-        ) => {
+        const emit = (batchPhase: ReplayProgress["batchPhase"], batchEventsProcessed: number) => {
           const progress: ReplayProgress = {
             phase: "replaying",
             currentProjectionName: projection.projectionName,
@@ -278,9 +272,7 @@ async function replayStateBatch({
   if (cutoffs.size === 0) return 0;
 
   const maxCutoff = maxEventPosition(cutoffs.values());
-  const aggregateIds = batch
-    .filter((a) => cutoffs.has(aggregateKey(a)))
-    .map((a) => a.aggregateId);
+  const aggregateIds = batch.filter((a) => cutoffs.has(aggregateKey(a))).map((a) => a.aggregateId);
 
   let cursor: { timestamp: number; eventId: string } | undefined;
   let eventsApplied = 0;

@@ -319,9 +319,7 @@ describe("given a page that is current with the server", () => {
       );
 
       const duplicate = captured.handlers?.["workbench.duplicateTarget"];
-      await expect(
-        duplicate!.run({ targetId: "t1" } as never),
-      ).resolves.toBeTruthy();
+      await expect(duplicate!.run({ targetId: "t1" } as never)).resolves.toBeTruthy();
       expect(applyWorkbenchAction).toHaveBeenCalledTimes(1);
     });
   });

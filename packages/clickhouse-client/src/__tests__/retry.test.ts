@@ -25,17 +25,14 @@ const fakeSleep = () => {
 describe("runWithRetry", () => {
   describe("given a degenerate attempt budget", () => {
     describe("when the operation is run", () => {
-      it.each([0, -1, 2.5])(
-        "refuses %s rather than throwing an undefined",
-        async (maxAttempts) => {
-          // The loop would never run and `throw lastError` would throw
-          // `undefined` - no message, no stack, and every instanceof handler
-          // upstream misses it.
-          await expect(
-            runWithRetry(async () => "ok", { maxAttempts }),
-          ).rejects.toBeInstanceOf(RangeError);
-        },
-      );
+      it.each([0, -1, 2.5])("refuses %s rather than throwing an undefined", async (maxAttempts) => {
+        // The loop would never run and `throw lastError` would throw
+        // `undefined` - no message, no stack, and every instanceof handler
+        // upstream misses it.
+        await expect(runWithRetry(async () => "ok", { maxAttempts })).rejects.toBeInstanceOf(
+          RangeError,
+        );
+      });
     });
   });
 });
@@ -201,10 +198,9 @@ describe("retry", () => {
         const next = vi.fn().mockRejectedValue(transient());
 
         await expect(
-          new RetryPolicy({ maxAttempts: 2, sleep, onRetry }).run(
-            () => (next as never)(request),
-            { request: request },
-          ),
+          new RetryPolicy({ maxAttempts: 2, sleep, onRetry }).run(() => (next as never)(request), {
+            request: request,
+          }),
         ).rejects.toThrow();
 
         expect(onRetry).toHaveBeenCalledWith(

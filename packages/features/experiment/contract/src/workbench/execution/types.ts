@@ -84,13 +84,9 @@ export const carriedOverCellSchema = z.object({
   traceId: z.string().optional(),
   error: z.string().optional(),
   domainError: z
-    .custom<SerializedHandledError>(
-      (value) => typeof value === "object" && value !== null,
-    )
+    .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
     .optional(),
-  evaluatorResults: z.array(
-    z.object({ evaluatorId: z.string(), result: z.unknown() }),
-  ),
+  evaluatorResults: z.array(z.object({ evaluatorId: z.string(), result: z.unknown() })),
 });
 
 /**
@@ -114,10 +110,7 @@ export type ExecutionRequest = {
    * variantA / variantB outputs from a prior run without forcing them to
    * re-execute. Keyed by `${rowIndex}:${targetId}`.
    */
-  seedTargetOutputs?: Record<
-    string,
-    { output: unknown; cost?: number; duration?: number }
-  >;
+  seedTargetOutputs?: Record<string, { output: unknown; cost?: number; duration?: number }>;
   /**
    * Board cells the run carries rather than produces, so the run holds the
    * whole board and not only the column that was clicked. Sent by the page,
@@ -144,9 +137,7 @@ export const executionRequestSchema = z
       type: z.enum(["inline", "saved"]),
       inline: z
         .object({
-          columns: z.array(
-            z.object({ id: z.string(), name: z.string(), type: z.string() }),
-          ),
+          columns: z.array(z.object({ id: z.string(), name: z.string(), type: z.string() })),
           records: z.record(z.string(), z.array(z.string())),
         })
         .optional(),
@@ -197,9 +188,7 @@ export const executionRequestSchema = z
     /** Saved platform dataset id to load and evaluate. Mutually exclusive with data. */
     dataset_id: z.string().optional(),
     /** Constant inputs applied to every row, overriding entry fields. */
-    parameters: z
-      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
-      .optional(),
+    parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
     // Row subsetting on /execute is expressed through `scope` ({ type: "rows" });
     // a separate row_indices here would be redundant and is intentionally absent.
     // The CI run path (/:slug/run) carries its own row_indices in runInputsBodySchema.
@@ -230,9 +219,7 @@ export const runInputsBodySchema = z
   .object({
     data: z.array(z.record(z.string(), z.unknown())).optional(),
     dataset_id: z.string().optional(),
-    parameters: z
-      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
-      .optional(),
+    parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
     row_indices: z.array(z.number().int().nonnegative()).optional(),
   })
   .refine((b) => !(b.data && b.dataset_id), {
@@ -482,8 +469,7 @@ export type ExecutionState = {
 /**
  * Generate a unique key for a cell (row + target combination).
  */
-export const getCellKey = (rowIndex: number, targetId: string): string =>
-  `${rowIndex}-${targetId}`;
+export const getCellKey = (rowIndex: number, targetId: string): string => `${rowIndex}-${targetId}`;
 
 /**
  * Parse a cell key back to its components.
@@ -499,10 +485,7 @@ export const parseCellKey = (key: string): { rowIndex: number; targetId: string 
 /**
  * Create an initial cell execution state.
  */
-export const createInitialCellState = (
-  rowIndex: number,
-  targetId: string,
-): CellExecutionState => ({
+export const createInitialCellState = (rowIndex: number, targetId: string): CellExecutionState => ({
   rowIndex,
   targetId,
   status: "pending",

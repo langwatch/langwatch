@@ -51,10 +51,7 @@ export interface LangyCredentialRuntimeService {
 }
 
 export interface LangyCredentialErrorReporter {
-  report(
-    error: unknown,
-    input: { projectId: string; userId: string; context: string },
-  ): void;
+  report(error: unknown, input: { projectId: string; userId: string; context: string }): void;
 }
 
 export type LangyCredentialServiceOptions = {
@@ -198,22 +195,14 @@ export class LangyCredentialService {
     return allowed && allowed.length > 0 ? allowed : null;
   }
 
-  async resolveMirrorTier({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<LangyMirrorTier> {
+  async resolveMirrorTier({ projectId }: { projectId: string }): Promise<LangyMirrorTier> {
     return resolveLangyMirrorTier(
       { projectId },
       { LANGY_MIRROR_PROJECT_ID: this.deps.runtime.mirrorProjectId },
     );
   }
 
-  async tryGetEgressAllowlist({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<string[] | null> {
+  async tryGetEgressAllowlist({ projectId }: { projectId: string }): Promise<string[] | null> {
     const value = await this.deps.repository.tryFindEgressAllowlist(projectId);
     if (value == null) return null;
     const parsed = langyEgressAllowlistSchema.parse(value);

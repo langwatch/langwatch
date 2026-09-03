@@ -62,11 +62,7 @@ export interface CreateEventParams<
  */
 // Overload for full Event type
 function createEvent<TEvent extends Event>(
-  params: CreateEventParams<
-    TEvent["data"],
-    NonNullable<TEvent["metadata"]>,
-    TEvent["type"]
-  >,
+  params: CreateEventParams<TEvent["data"], NonNullable<TEvent["metadata"]>, TEvent["type"]>,
 ): TEvent;
 
 // Implementation
@@ -93,8 +89,7 @@ function createEvent<
 
   let finalMetadata = metadata;
   if (includeTraceContext === true) {
-    finalMetadata =
-      buildEventMetadataWithCurrentProcessingTraceparent<Metadata>(metadata);
+    finalMetadata = buildEventMetadataWithCurrentProcessingTraceparent<Metadata>(metadata);
   }
 
   const hasMetadata =
@@ -250,10 +245,7 @@ function isValidProjection(projection: unknown): projection is Projection {
  * }
  * ```
  */
-function validateTenantId(
-  context: { tenantId?: string } | undefined,
-  operation: string,
-): void {
+function validateTenantId(context: { tenantId?: string } | undefined, operation: string): void {
   if (!context) {
     throw new SecurityError(
       operation,
@@ -262,18 +254,14 @@ function validateTenantId(
   }
 
   if (!context.tenantId) {
-    throw new SecurityError(
-      operation,
-      `${operation} requires a tenantId for tenant isolation`,
-    );
+    throw new SecurityError(operation, `${operation} requires a tenantId for tenant isolation`);
   }
 
   // Use TenantIdSchema for consistent validation (handles empty strings, whitespace, etc.)
   const result = TenantIdSchema.safeParse(context.tenantId);
   if (!result.success) {
     const errorMessage =
-      result.error.issues[0]?.message ??
-      "TenantId must be a non-empty string for tenant isolation";
+      result.error.issues[0]?.message ?? "TenantId must be a non-empty string for tenant isolation";
     throw new SecurityError(operation, errorMessage);
   }
 }

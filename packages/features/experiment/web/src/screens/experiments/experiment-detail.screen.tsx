@@ -41,8 +41,8 @@ export default function ExperimentPage() {
             <Alert.Indicator />
             <Alert.Title>Experiment not found</Alert.Title>
             <Alert.Description>
-              The experiment you&apos;re looking for doesn&apos;t exist or you don&apos;t
-              have access to it.
+              The experiment you&apos;re looking for doesn&apos;t exist or you don&apos;t have
+              access to it.
             </Alert.Description>
           </Alert.Root>
         </Box>

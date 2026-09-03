@@ -37,9 +37,7 @@ class RecordedClickHouseResolver extends GovernanceClickHouseResolverPort {
     super();
   }
 
-  async tryResolve(
-    organizationId: string,
-  ): Promise<GovernanceClickHouseClientPort | null> {
+  async tryResolve(organizationId: string): Promise<GovernanceClickHouseClientPort | null> {
     this.organizationIds.push(organizationId);
     return this.client;
   }
@@ -74,9 +72,7 @@ const userSortCases: Array<[SpendSortField, SortDir, string]> = [
   ["lastActivity", "desc", "max(occurredAt) DESC"],
 ];
 
-const timeSeriesGroupCases: Array<
-  [Extract<SpendOverTimeGroupBy, "user" | "model">, string]
-> = [
+const timeSeriesGroupCases: Array<[Extract<SpendOverTimeGroupBy, "user" | "model">, string]> = [
   ["user", "ts.Attributes[{userKey:String}] AS groupKey"],
   ["model", "arrayElement(ts.Models, 1) AS groupKey"],
 ];
@@ -283,9 +279,7 @@ describe("PrismaActivityMonitorRepository rollups", () => {
     expect(lowestSpend[0]).toEqual(
       expect.objectContaining({ teamId: null, teamName: "Org-wide", spendUsd: "1" }),
     );
-    expect(mostRequests[0]).toEqual(
-      expect.objectContaining({ teamId: null, requestCount: 4 }),
-    );
+    expect(mostRequests[0]).toEqual(expect.objectContaining({ teamId: null, requestCount: 4 }));
     expect(mostRecent[0]).toEqual(expect.objectContaining({ teamId: "team-a" }));
     expect(prisma.ingestionSource.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

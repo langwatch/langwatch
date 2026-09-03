@@ -4,11 +4,7 @@
  * the rule of thumb. See packages/features/annotation/specs/annotation-queue-workflow.feature.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  isSessionMarked,
-  sessionTraceIds,
-  useAnnotationQueueSessionStore,
-} from "../../../index";
+import { isSessionMarked, sessionTraceIds, useAnnotationQueueSessionStore } from "../../../index";
 
 const state = () => useAnnotationQueueSessionStore.getState();
 

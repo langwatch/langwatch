@@ -89,14 +89,7 @@ vi.mock("../../../behavior/auth-client", async (importOriginal) => {
 vi.mock("../../../behavior/hard-redirect", () => ({ hardRedirect: hardRedirectMock }));
 
 vi.mock("../../elements/router-link", () => ({
-  default: ({
-    href,
-    children,
-    ...props
-  }: {
-    href: string;
-    children: ReactNode;
-  }) => (
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -114,11 +107,7 @@ const localPicker: RoutingDecision = {
   reasonCode: "no_domain_match",
 };
 
-const handled = (
-  code: string,
-  httpStatus: number,
-  meta: Record<string, unknown> = {},
-) => ({
+const handled = (code: string, httpStatus: number, meta: Record<string, unknown> = {}) => ({
   data: { error: { code, httpStatus, fault: "customer", meta } },
 });
 
@@ -173,12 +162,8 @@ describe("given an invitation link", () => {
         name: /create an account/i,
       });
 
-      expect(signInLink.getAttribute("href")).toBe(
-        `/auth/signin?callbackUrl=${CARRIED}`,
-      );
-      expect(signUpLink.getAttribute("href")).toBe(
-        `/auth/signup?callbackUrl=${CARRIED}`,
-      );
+      expect(signInLink.getAttribute("href")).toBe(`/auth/signin?callbackUrl=${CARRIED}`);
+      expect(signUpLink.getAttribute("href")).toBe(`/auth/signup?callbackUrl=${CARRIED}`);
     });
 
     /** @scenario A visitor with no account is guided through sign-up first */
@@ -188,9 +173,7 @@ describe("given an invitation link", () => {
       const signUpLink = await screen.findByRole("link", {
         name: /create an account/i,
       });
-      expect(signUpLink.getAttribute("href")).toBe(
-        `/auth/signup?callbackUrl=${CARRIED}`,
-      );
+      expect(signUpLink.getAttribute("href")).toBe(`/auth/signup?callbackUrl=${CARRIED}`);
 
       // Coming back from sign-up with a confirmed address, the same link
       // applies the invitation: the code was never altered on the way.
@@ -198,9 +181,7 @@ describe("given an invitation link", () => {
       sessionRef.current = { data: { user: { id: "u1" } } };
       renderLanding();
 
-      await userEvent.click(
-        await screen.findByRole("button", { name: /join acme/i }),
-      );
+      await userEvent.click(await screen.findByRole("button", { name: /join acme/i }));
       expect(acceptMock).toHaveBeenCalledWith({ inviteCode: INVITE_CODE });
     });
   });
@@ -234,9 +215,7 @@ describe("given an invitation link", () => {
 
       renderLanding();
 
-      expect(
-        await screen.findByText(/this invitation has expired/i),
-      ).toBeTruthy();
+      expect(await screen.findByText(/this invitation has expired/i)).toBeTruthy();
       expect(screen.getByTestId("invite-ask-again")).toBeTruthy();
     });
 
@@ -293,9 +272,7 @@ describe("given an invitation link", () => {
     it("names the account it wants, masked, and never the whole address", async () => {
       renderLanding();
 
-      expect(
-        await screen.findByText(/you're signed in as a different account/i),
-      ).toBeTruthy();
+      expect(await screen.findByText(/you're signed in as a different account/i)).toBeTruthy();
       expect(screen.getByText(/s•••@acme\.com/)).toBeTruthy();
     });
 
@@ -316,9 +293,7 @@ describe("given an invitation link", () => {
 
       expect(signOutMock).toHaveBeenCalledWith({ redirect: false });
       await vi.waitFor(() =>
-        expect(hardRedirectMock).toHaveBeenCalledWith(
-          `/invite/accept?inviteCode=${INVITE_CODE}`,
-        ),
+        expect(hardRedirectMock).toHaveBeenCalledWith(`/invite/accept?inviteCode=${INVITE_CODE}`),
       );
     });
   });

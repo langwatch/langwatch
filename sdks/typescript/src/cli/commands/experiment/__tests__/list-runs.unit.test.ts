@@ -1,16 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type * as EvaluationsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
-vi.mock(
-  "@/client-sdk/services/experiments/experiments-api.service",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof EvaluationsApiModule>();
-    return {
-      ...actual,
-      ExperimentsApiService: vi.fn(),
-    };
-  },
-);
+vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof EvaluationsApiModule>();
+  return {
+    ...actual,
+    ExperimentsApiService: vi.fn(),
+  };
+});
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -74,9 +71,7 @@ describe("experimentListRunsCommand()", () => {
     describe("when invoked", () => {
       /** @scenario "Listing runs requires --experiment" */
       it("exits with non-zero code", async () => {
-        await expect(experimentListRunsCommand({})).rejects.toBeInstanceOf(
-          ProcessExitError,
-        );
+        await expect(experimentListRunsCommand({})).rejects.toBeInstanceOf(ProcessExitError);
       });
     });
   });

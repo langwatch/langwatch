@@ -1,11 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 
-import {
-  forgetCarriedEmail,
-  readCarriedEmail,
-  signUpHref,
-} from "../carried-email";
+import { forgetCarriedEmail, readCarriedEmail, signUpHref } from "../carried-email";
 
 /**
  * The address is carried between the two doors in the URL FRAGMENT, and the
@@ -46,11 +42,7 @@ describe("given an address carried between the front door's two screens", () => 
 
     it("survives a plus-tagged address, which reads as a space unescaped", () => {
       const email = "alex+hu7guh@langwatch.ai";
-      window.history.replaceState(
-        null,
-        "",
-        signUpHref({ callbackUrl: "/", email }),
-      );
+      window.history.replaceState(null, "", signUpHref({ callbackUrl: "/", email }));
 
       expect(readCarriedEmail()).toBe(email);
     });
@@ -70,11 +62,7 @@ describe("given an address carried between the front door's two screens", () => 
 
   describe("when the screen has read it", () => {
     it("takes the address back out of the address bar", () => {
-      window.history.replaceState(
-        null,
-        "",
-        "/auth/signup?callbackUrl=%2F#email=a%40b.com",
-      );
+      window.history.replaceState(null, "", "/auth/signup?callbackUrl=%2F#email=a%40b.com");
 
       forgetCarriedEmail();
 
@@ -83,11 +71,7 @@ describe("given an address carried between the front door's two screens", () => 
     });
 
     it("leaves the rest of the URL where it was", () => {
-      window.history.replaceState(
-        null,
-        "",
-        "/auth/signup?callbackUrl=%2F#email=a%40b.com",
-      );
+      window.history.replaceState(null, "", "/auth/signup?callbackUrl=%2F#email=a%40b.com");
 
       forgetCarriedEmail();
 

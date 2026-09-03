@@ -75,9 +75,7 @@ describe("serialized handled-error schemas", () => {
       meta: {},
       httpStatus: 500,
       fault: "platform",
-      reasons: [
-        { code: "provider_unavailable", kind: "provider_unavailable", reasons: [1] },
-      ],
+      reasons: [{ code: "provider_unavailable", kind: "provider_unavailable", reasons: [1] }],
     });
 
     expect(parsed.success).toBe(false);

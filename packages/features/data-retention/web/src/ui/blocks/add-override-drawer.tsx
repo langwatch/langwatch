@@ -265,10 +265,7 @@ export function AddOverrideDrawer({
               {isEditing && editTarget ? (
                 // Scope is fixed when editing — changing it would mean deleting
                 // this rule and creating another, which is what "Add" is for.
-                <ScopeReadout
-                  scopeType={editTarget.scope.scopeType}
-                  name={editTarget.scopeName}
-                />
+                <ScopeReadout scopeType={editTarget.scope.scopeType} name={editTarget.scopeName} />
               ) : (
                 scopePicker({ value: scopes, onChange: setScopes })
               )}
@@ -372,9 +369,7 @@ export function AddOverrideDrawer({
               colorPalette="blue"
               disabled={!canSave}
               loading={isSaving}
-              onClick={() =>
-                onSave({ scopes, retentionDays: resolvedDays, applyToExisting })
-              }
+              onClick={() => onSave({ scopes, retentionDays: resolvedDays, applyToExisting })}
             >
               {isEditing ? "Save changes" : "Create"}
             </Button>

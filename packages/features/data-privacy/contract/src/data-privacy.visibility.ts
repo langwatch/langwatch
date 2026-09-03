@@ -12,10 +12,7 @@ export interface EffectiveRestriction {
   disposition: Disposition;
   audience: ResolvedAudience;
 }
-export function isContentVisible(
-  eff: EffectiveRestriction,
-  viewer: ViewerFacts,
-): boolean {
+export function isContentVisible(eff: EffectiveRestriction, viewer: ViewerFacts): boolean {
   if (!viewer.isMember && !viewer.isProjectOwner) return false;
   if (eff.disposition === "drop") return false;
   if (eff.disposition === "capture") return viewer.isMember;

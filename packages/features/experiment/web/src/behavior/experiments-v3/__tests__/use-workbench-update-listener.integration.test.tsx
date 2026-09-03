@@ -38,11 +38,7 @@ vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
 import { useEvaluationsV3Store } from "../use-evaluations-v3-store";
 import { useWorkbenchUpdateListener } from "../use-workbench-update-listener";
 
-function emitSignal(
-  version: number,
-  slug = "my-exp",
-  extra: { runId?: string } = {},
-) {
+function emitSignal(version: number, slug = "my-exp", extra: { runId?: string } = {}) {
   const call = sseCalls.at(-1)!;
   act(() => {
     call.options.onData({
@@ -121,9 +117,7 @@ describe("useWorkbenchUpdateListener", () => {
       // The refused save already stood autosave down; this is the state a tab
       // is left in when the server rejected its write.
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setStaleWorkbench({ serverVersion: 5 });
+        useEvaluationsV3Store.getState().setStaleWorkbench({ serverVersion: 5 });
       });
       renderHook(() =>
         useWorkbenchUpdateListener({
@@ -152,9 +146,7 @@ describe("useWorkbenchUpdateListener", () => {
       // workbench dirty and schedules no retry. Waiting for an answer that is
       // not coming would keep the tab silent until the reader edits again.
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setAutosaveStatus("evaluation", "error", "Network error");
+        useEvaluationsV3Store.getState().setAutosaveStatus("evaluation", "error", "Network error");
       });
       renderHook(() =>
         useWorkbenchUpdateListener({
@@ -185,9 +177,7 @@ describe("useWorkbenchUpdateListener", () => {
       // reader to reload over edits the run had nothing to do with.
       const reloadFromServer = vi.fn(async () => undefined);
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .rememberRunStartedHere("bold-jolly-bee");
+        useEvaluationsV3Store.getState().rememberRunStartedHere("bold-jolly-bee");
       });
       renderHook(() =>
         useWorkbenchUpdateListener({
@@ -200,9 +190,7 @@ describe("useWorkbenchUpdateListener", () => {
 
       emitSignal(7, "my-exp", { runId: "bold-jolly-bee" });
 
-      await waitFor(() =>
-        expect(useEvaluationsV3Store.getState().workbenchVersion).toBe(7),
-      );
+      await waitFor(() => expect(useEvaluationsV3Store.getState().workbenchVersion).toBe(7));
       expect(useEvaluationsV3Store.getState().staleWorkbench).toBeUndefined();
       expect(reloadFromServer).not.toHaveBeenCalled();
     });
@@ -211,13 +199,9 @@ describe("useWorkbenchUpdateListener", () => {
     it("still stands down for a run it did not start", async () => {
       const reloadFromServer = vi.fn(async () => undefined);
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .rememberRunStartedHere("bold-jolly-bee");
+        useEvaluationsV3Store.getState().rememberRunStartedHere("bold-jolly-bee");
         // Autosave already stood down, so nothing of this page's own is coming.
-        useEvaluationsV3Store
-          .getState()
-          .setAutosaveStatus("evaluation", "error", "Network error");
+        useEvaluationsV3Store.getState().setAutosaveStatus("evaluation", "error", "Network error");
       });
       renderHook(() =>
         useWorkbenchUpdateListener({
@@ -341,9 +325,7 @@ describe("useWorkbenchUpdateListener", () => {
       // Dirty with autosave already stood down: the one state where the probe
       // is the only word there is, so its banner is the one the reader sees.
       act(() => {
-        useEvaluationsV3Store
-          .getState()
-          .setStaleWorkbench({ serverVersion: 5 });
+        useEvaluationsV3Store.getState().setStaleWorkbench({ serverVersion: 5 });
       });
       renderHook(() =>
         useWorkbenchUpdateListener({

@@ -51,12 +51,7 @@ const LOCKFILES: readonly string[] = [
 ];
 
 /** Hand-edited dependency manifests: a version bump, or something more. */
-const MANIFESTS: readonly string[] = [
-  "pyproject.toml",
-  "package.json",
-  "go.mod",
-  "Cargo.toml",
-];
+const MANIFESTS: readonly string[] = ["pyproject.toml", "package.json", "go.mod", "Cargo.toml"];
 
 const basename = (path: string): string => path.split("/").pop() ?? path;
 
@@ -124,16 +119,13 @@ export const parseChangedFiles = (json: string): string[] => {
   return entries.map((entry) => {
     const filename = (entry as { filename?: unknown } | null)?.filename;
     if (typeof filename !== "string" || filename === "") {
-      throw new Error(
-        `changed-files entry has no usable filename: ${JSON.stringify(entry)}`,
-      );
+      throw new Error(`changed-files entry has no usable filename: ${JSON.stringify(entry)}`);
     }
     return filename;
   });
 };
 
-export const isDependencyBot = (author: string): boolean =>
-  DEPENDENCY_BOTS.includes(author);
+export const isDependencyBot = (author: string): boolean => DEPENDENCY_BOTS.includes(author);
 
 /** Whether this pull request must carry a `## Deployment Impact` section. */
 export const requiresWriteup = ({
@@ -149,13 +141,7 @@ export const requiresWriteup = ({
   return true;
 };
 
-export const main = ({
-  files,
-  author,
-}: {
-  files: readonly string[];
-  author: string;
-}): string[] => {
+export const main = ({ files, author }: { files: readonly string[]; author: string }): string[] => {
   const { onlyLockfiles, onlyManifests } = classify(files);
   return [
     `only_lockfiles=${onlyLockfiles}`,
@@ -165,15 +151,12 @@ export const main = ({
 };
 
 const isEntrypoint = (): boolean =>
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntrypoint()) {
   const path = process.argv[2];
   if (path === undefined) {
-    throw new Error(
-      "usage: guard-deployment-impact.ts <changed-files.json>  (PR_AUTHOR in env)",
-    );
+    throw new Error("usage: guard-deployment-impact.ts <changed-files.json>  (PR_AUTHOR in env)");
   }
   const files = parseChangedFiles(readFileSync(path, "utf8"));
   const outputs = main({ files, author: process.env.PR_AUTHOR ?? "" });

@@ -10,12 +10,7 @@ import {
   TRACES_PATH,
 } from "../../internal/constants";
 import { buildAuthHeaders } from "../../internal/api/auth";
-import {
-  type TraceFilter,
-  type Criteria,
-  type Match,
-  applyFilters,
-} from "./trace-filters";
+import { type TraceFilter, type Criteria, type Match, applyFilters } from "./trace-filters";
 
 /**
  * Configuration options for the LangWatchTraceExporter.
@@ -200,10 +195,7 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
     });
 
     // Handle filters: null or [] = no filtering, undefined = default, array = use provided
-    if (
-      opts?.filters === null ||
-      (Array.isArray(opts?.filters) && opts.filters.length === 0)
-    ) {
+    if (opts?.filters === null || (Array.isArray(opts?.filters) && opts.filters.length === 0)) {
       this.filters = [];
     } else if (Array.isArray(opts?.filters)) {
       this.filters = opts.filters;

@@ -81,9 +81,7 @@ export function selectionToAudience(values: string[]): AudienceFormState {
     admins: values.includes(ROLE_VALUES.admins),
     members: values.includes(ROLE_VALUES.members),
     viewers: values.includes(ROLE_VALUES.viewers),
-    groupIds: values
-      .filter((v) => v.startsWith("group:"))
-      .map((v) => v.slice("group:".length)),
+    groupIds: values.filter((v) => v.startsWith("group:")).map((v) => v.slice("group:".length)),
   };
 }
 
@@ -96,9 +94,7 @@ export function applyAudienceSelection(previous: string[], next: string[]): stri
   const pickedAllMembers =
     next.includes(ALL_MEMBERS_VALUE) && !previous.includes(ALL_MEMBERS_VALUE);
   if (pickedAllMembers) return [ALL_MEMBERS_VALUE];
-  const addedNarrower = next.some(
-    (v) => v !== ALL_MEMBERS_VALUE && !previous.includes(v),
-  );
+  const addedNarrower = next.some((v) => v !== ALL_MEMBERS_VALUE && !previous.includes(v));
   if (addedNarrower) return next.filter((v) => v !== ALL_MEMBERS_VALUE);
   return next;
 }
@@ -120,9 +116,7 @@ export function audienceConfig(audience: AudienceFormState): Audience {
   return out;
 }
 
-function audienceToFormState(
-  audience: Audience | ResolvedAudience | undefined,
-): AudienceFormState {
+function audienceToFormState(audience: Audience | ResolvedAudience | undefined): AudienceFormState {
   return {
     admins: audience?.admins ?? false,
     allMembers: audience?.allMembers ?? false,
@@ -134,14 +128,10 @@ function audienceToFormState(
 }
 
 /** Trimmed, non-empty rows with at least one literal (non-`*`) character. */
-export function validCustomAttributeRows(
-  rows: CustomAttributeFormRow[],
-): CustomAttributeFormRow[] {
+export function validCustomAttributeRows(rows: CustomAttributeFormRow[]): CustomAttributeFormRow[] {
   return rows
     .map((row) => ({ ...row, pattern: row.pattern.trim() }))
-    .filter(
-      (row) => row.pattern.length > 0 && row.pattern.replaceAll("*", "").length > 0,
-    );
+    .filter((row) => row.pattern.length > 0 && row.pattern.replaceAll("*", "").length > 0);
 }
 
 export function buildRuleConfig({
@@ -181,9 +171,7 @@ export function buildRuleConfig({
   if (Object.keys(categories).length > 0) config.categories = categories;
   if (piiChoice !== "inherit") {
     const exceptions =
-      piiChoice === "disabled"
-        ? []
-        : piiExceptPatterns.map((p) => p.trim()).filter(Boolean);
+      piiChoice === "disabled" ? [] : piiExceptPatterns.map((p) => p.trim()).filter(Boolean);
     config.pii = {
       level: piiChoice,
       ...(piiChoice === "custom" ? { entities: [...piiEntities].sort() } : {}),
@@ -194,9 +182,7 @@ export function buildRuleConfig({
     const patterns = secretsPatterns.map((p) => p.trim()).filter(Boolean);
     config.secrets = {
       enabled: secretsChoice === "on",
-      ...(secretsChoice === "on" && patterns.length > 0
-        ? { customPatterns: patterns }
-        : {}),
+      ...(secretsChoice === "on" && patterns.length > 0 ? { customPatterns: patterns } : {}),
     };
   }
   const attributeRows = validCustomAttributeRows(customAttributes);
@@ -351,16 +337,12 @@ export function ruleSummary(config: DataPrivacyConfig): string {
   for (const category of CONTENT_CATEGORIES) {
     const disposition = config.categories?.[category]?.disposition;
     if (disposition) {
-      parts.push(
-        `${CATEGORY_SUMMARY_LABELS[category]} ${DISPOSITION_SUMMARY_LABELS[disposition]}`,
-      );
+      parts.push(`${CATEGORY_SUMMARY_LABELS[category]} ${DISPOSITION_SUMMARY_LABELS[disposition]}`);
     }
   }
   const attributeRules = config.customAttributes?.length ?? 0;
   if (attributeRules > 0) {
-    parts.push(
-      attributeRules === 1 ? "1 attribute rule" : `${attributeRules} attribute rules`,
-    );
+    parts.push(attributeRules === 1 ? "1 attribute rule" : `${attributeRules} attribute rules`);
   }
   if (config.pii) {
     if (config.pii.level === "custom") {

@@ -1,7 +1,4 @@
-export {
-  FilterableBatchSpanProcessor,
-  type SpanProcessingExcludeRule,
-} from "./processors";
+export { FilterableBatchSpanProcessor, type SpanProcessingExcludeRule } from "./processors";
 export {
   LangWatchExporter,
   type LangWatchExporterOptions,
@@ -41,16 +38,8 @@ export {
   type EvaluationTimestamps,
 } from "./evaluation";
 
-export {
-  getLangWatchLogger,
-  getLangWatchLoggerFromProvider,
-  type LangWatchLogger,
-} from "./logger";
-export {
-  getLangWatchTracer,
-  getLangWatchTracerFromProvider,
-  type LangWatchTracer,
-} from "./tracer";
+export { getLangWatchLogger, getLangWatchLoggerFromProvider, type LangWatchLogger } from "./logger";
+export { getLangWatchTracer, getLangWatchTracerFromProvider, type LangWatchTracer } from "./tracer";
 
 export { getDataCaptureMode, shouldCaptureInput, shouldCaptureOutput } from "./config.js";
 

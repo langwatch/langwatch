@@ -16,9 +16,7 @@ export class WebhookEndpointConfiguration {
     readonly allowAmbientAwsCredentials: boolean,
   ) {}
 
-  static create(
-    input: WebhookEndpointConfigurationInput = {},
-  ): WebhookEndpointConfiguration {
+  static create(input: WebhookEndpointConfigurationInput = {}): WebhookEndpointConfiguration {
     return new WebhookEndpointConfiguration(
       input.allowInsecureLocalUrls ?? false,
       input.allowAmbientAwsCredentials ?? false,
@@ -54,11 +52,7 @@ export class WebhookEndpointPolicyService {
 
   assertValidDeliveryControls(controls: Partial<WebhookDeliveryControls>): void {
     if (controls.maxBatchSize !== undefined) {
-      assertControlInBounds(
-        "max_batch_size",
-        controls.maxBatchSize,
-        WEBHOOK_MAX_BATCH_SIZE_BOUNDS,
-      );
+      assertControlInBounds("max_batch_size", controls.maxBatchSize, WEBHOOK_MAX_BATCH_SIZE_BOUNDS);
     }
     if (controls.maxBatchDelayMs !== undefined) {
       assertControlInBounds(
@@ -68,11 +62,7 @@ export class WebhookEndpointPolicyService {
       );
     }
     if (controls.maxInFlight !== undefined) {
-      assertControlInBounds(
-        "max_in_flight",
-        controls.maxInFlight,
-        WEBHOOK_IN_FLIGHT_BOUNDS,
-      );
+      assertControlInBounds("max_in_flight", controls.maxInFlight, WEBHOOK_IN_FLIGHT_BOUNDS);
     }
   }
 

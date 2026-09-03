@@ -7,11 +7,7 @@ Define the transport contract once, then construct only the capability a
 process needs:
 
 ```ts
-import {
-  defineGroupQueue,
-  GroupQueueConsumer,
-  GroupQueueProducer,
-} from "@langwatch/group-queue";
+import { defineGroupQueue, GroupQueueConsumer, GroupQueueProducer } from "@langwatch/group-queue";
 
 const work = defineGroupQueue({
   name: "projection-work",
@@ -23,12 +19,10 @@ const work = defineGroupQueue({
 const producer = new GroupQueueProducer(work, dependencies);
 await producer.send(job);
 
-const consumer = new GroupQueueConsumer(work, dependencies).handle(
-  async (job, context) => {
-    if (context.signal.aborted) return;
-    await project(job);
-  },
-);
+const consumer = new GroupQueueConsumer(work, dependencies).handle(async (job, context) => {
+  if (context.signal.aborted) return;
+  await project(job);
+});
 ```
 
 The payload object may be any schema exposing `parse(value)`, including a Zod

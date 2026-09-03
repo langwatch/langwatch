@@ -205,11 +205,10 @@ export class MigrationEnrollmentCloudOnlyError extends HandledError {
   declare readonly code: "migration_enrollment_cloud_only";
 
   constructor() {
-    super(
-      "migration_enrollment_cloud_only",
-      "Enrollment does not apply to this installation",
-      { httpStatus: 400, fault: "customer" },
-    );
+    super("migration_enrollment_cloud_only", "Enrollment does not apply to this installation", {
+      httpStatus: 400,
+      fault: "customer",
+    });
     this.name = "MigrationEnrollmentCloudOnlyError";
   }
 }
@@ -238,11 +237,10 @@ export class MigrationStateNotFoundError extends HandledError {
   declare readonly code: "migration_state_not_found";
 
   constructor() {
-    super(
-      "migration_state_not_found",
-      "No migration state exists for that organization",
-      { httpStatus: 404, fault: "customer" },
-    );
+    super("migration_state_not_found", "No migration state exists for that organization", {
+      httpStatus: 404,
+      fault: "customer",
+    });
     this.name = "MigrationStateNotFoundError";
   }
 }

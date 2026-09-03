@@ -60,8 +60,7 @@ const writeSession = (extra: Record<string, unknown> = {}) => {
   );
 };
 
-const readSession = () =>
-  JSON.parse(fs.readFileSync(configPath(), "utf8")) as Record<string, any>;
+const readSession = () => JSON.parse(fs.readFileSync(configPath(), "utf8")) as Record<string, any>;
 
 const run = (
   args: string[],
@@ -204,9 +203,7 @@ beforeAll(async () => {
       json(404, { error: "not_found" });
     });
   });
-  await new Promise<void>((resolveListen) =>
-    server.listen(0, "127.0.0.1", resolveListen),
-  );
+  await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
   endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }, 30_000);
 

@@ -228,9 +228,7 @@ export function TraceOverflowMenu({
           >
             <HStack gap={2}>
               <Icon as={isPinned ? LuPinOff : LuPin} boxSize={3.5} />
-              <Text>
-                {isSharePin ? "Pinned by share" : isPinned ? "Unpin trace" : "Pin trace"}
-              </Text>
+              <Text>{isSharePin ? "Pinned by share" : isPinned ? "Unpin trace" : "Pin trace"}</Text>
             </HStack>
           </Menu.Item>
         )}

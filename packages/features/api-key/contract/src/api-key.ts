@@ -4,9 +4,7 @@ export const apiKeyRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type ApiKeyRole = z.infer<typeof apiKeyRoleSchema>;
 export const apiKeyScopeTypeSchema = z.enum(["ORGANIZATION", "TEAM", "PROJECT"]);
 export type ApiKeyScopeType = z.infer<typeof apiKeyScopeTypeSchema>;
-export const apiKeyPermissionSchema = z
-  .string()
-  .regex(/^[a-z][a-zA-Z0-9_-]*:[a-z][a-zA-Z0-9_-]*$/);
+export const apiKeyPermissionSchema = z.string().regex(/^[a-z][a-zA-Z0-9_-]*:[a-z][a-zA-Z0-9_-]*$/);
 export const apiKeyScopeSchema = z
   .object({
     scopeType: apiKeyScopeTypeSchema,
@@ -16,9 +14,7 @@ export const apiKeyScopeSchema = z
   })
   .strict();
 export type ApiKeyScope = z.infer<typeof apiKeyScopeSchema>;
-export const apiKeyBindingSchema = apiKeyScopeSchema
-  .extend({ id: z.string().min(1) })
-  .strict();
+export const apiKeyBindingSchema = apiKeyScopeSchema.extend({ id: z.string().min(1) }).strict();
 export type ApiKeyBinding = Omit<z.infer<typeof apiKeyBindingSchema>, "customRoleId"> & {
   customRoleId: string | null;
 };

@@ -51,9 +51,7 @@ export function ownershipToScopes(
 ): ScopeTriadEntry[] | null {
   switch (value.kind) {
     case "PROJECT":
-      return value.projectId
-        ? [{ scopeType: "PROJECT", scopeId: value.projectId }]
-        : null;
+      return value.projectId ? [{ scopeType: "PROJECT", scopeId: value.projectId }] : null;
     case "PERSONAL":
       return ctx.personalProjectId
         ? [{ scopeType: "PROJECT", scopeId: ctx.personalProjectId }]
@@ -98,13 +96,9 @@ export function ownershipIncompleteReason(
       return ctx.personalProjectId ? null : "Resolving your personal workspace…";
     case "TEAM":
       if (!value.teamId) return "Pick the team this key belongs to.";
-      return value.traceProjectId
-        ? null
-        : "Pick the project where traces and costs land.";
+      return value.traceProjectId ? null : "Pick the project where traces and costs land.";
     case "ORGANIZATION":
-      return value.traceProjectId
-        ? null
-        : "Pick the project where traces and costs land.";
+      return value.traceProjectId ? null : "Pick the project where traces and costs land.";
   }
 }
 
@@ -159,9 +153,7 @@ export function VirtualKeyOwnershipSection({
 }) {
   const kinds = useMemo(
     () =>
-      KIND_OPTIONS.filter(
-        (o) => canCreateShared || o.kind === "PROJECT" || o.kind === "PERSONAL",
-      ),
+      KIND_OPTIONS.filter((o) => canCreateShared || o.kind === "PROJECT" || o.kind === "PERSONAL"),
     [canCreateShared],
   );
 
@@ -229,9 +221,7 @@ export function VirtualKeyOwnershipSection({
       {value.kind === "PROJECT" && (
         <>
           {ctx.availableProjects.length > 1 &&
-            projectPicker("", value.projectId, (projectId) =>
-              onChange({ ...value, projectId }),
-            )}
+            projectPicker("", value.projectId, (projectId) => onChange({ ...value, projectId }))}
           {landsIn(projectName(value.projectId, ctx))}
         </>
       )}
@@ -246,14 +236,8 @@ export function VirtualKeyOwnershipSection({
         <>
           {ctx.availableTeams.length > 1 && (
             <ScopeChipPicker
-              value={
-                value.teamId
-                  ? [{ scopeType: "TEAM" as const, scopeId: value.teamId }]
-                  : []
-              }
-              onChange={(next) =>
-                onChange({ ...value, teamId: next[0]?.scopeId ?? null })
-              }
+              value={value.teamId ? [{ scopeType: "TEAM" as const, scopeId: value.teamId }] : []}
+              onChange={(next) => onChange({ ...value, teamId: next[0]?.scopeId ?? null })}
               organizationId={ctx.organizationId}
               organizationName={ctx.organizationName}
               availableTeams={ctx.availableTeams}
@@ -265,19 +249,15 @@ export function VirtualKeyOwnershipSection({
               showSummary={false}
             />
           )}
-          {projectPicker(
-            "Traces and costs land in",
-            value.traceProjectId,
-            (traceProjectId) => onChange({ ...value, traceProjectId }),
+          {projectPicker("Traces and costs land in", value.traceProjectId, (traceProjectId) =>
+            onChange({ ...value, traceProjectId }),
           )}
         </>
       )}
 
       {value.kind === "ORGANIZATION" &&
-        projectPicker(
-          "Traces and costs land in",
-          value.traceProjectId,
-          (traceProjectId) => onChange({ ...value, traceProjectId }),
+        projectPicker("Traces and costs land in", value.traceProjectId, (traceProjectId) =>
+          onChange({ ...value, traceProjectId }),
         )}
     </VStack>
   );
@@ -315,10 +295,7 @@ export function VirtualKeyOwnershipReadOnly({
    * or outside the viewer's teams.
    */
   viewTracesHref?: string;
-  ctx: Pick<
-    OwnershipContext,
-    "organizationName" | "availableTeams" | "availableProjects"
-  >;
+  ctx: Pick<OwnershipContext, "organizationName" | "availableTeams" | "availableProjects">;
 }) {
   const named = scopes.map((s) => ({
     scopeType: s.scopeType,
@@ -354,8 +331,8 @@ export function VirtualKeyOwnershipReadOnly({
             <>Traces and costs land in {destination}.</>
           ) : (
             <>
-              This key has no trace destination, so its traces and costs are not filed
-              into any project. Give it a trace project through the management API.
+              This key has no trace destination, so its traces and costs are not filed into any
+              project. Give it a trace project through the management API.
             </>
           )}
         </Text>
@@ -369,14 +346,12 @@ export function VirtualKeyOwnershipReadOnly({
             Deleted
           </Badge>
         )}
-        {viewTracesHref && !traceProjectArchived && (
-          <ViewTracesButton href={viewTracesHref} />
-        )}
+        {viewTracesHref && !traceProjectArchived && <ViewTracesButton href={viewTracesHref} />}
       </HStack>
       {traceProjectArchived && (
         <Text fontSize="xs" color="fg.muted">
-          This key keeps sending its traces and costs there. Restore the project to see
-          them again, or point the key at another project through the management API.
+          This key keeps sending its traces and costs there. Restore the project to see them again,
+          or point the key at another project through the management API.
         </Text>
       )}
     </VStack>

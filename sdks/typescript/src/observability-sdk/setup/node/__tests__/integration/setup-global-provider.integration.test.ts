@@ -44,8 +44,7 @@ describe("setupObservability Integration - attachToExistingProvider", () => {
   });
 
   it("attaches LangWatch processor to real NodeTracerProvider", async () => {
-    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors
-      .length;
+    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 
     const handle = setupObservability({
@@ -57,17 +56,14 @@ describe("setupObservability Integration - attachToExistingProvider", () => {
     const processorsAfter = (provider as any)._activeSpanProcessor._spanProcessors.length;
     expect(processorsAfter).toBe(processorsBefore + 1);
     expect(logger.info).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "Attached LangWatch span processor to existing global provider",
-      ),
+      expect.stringContaining("Attached LangWatch span processor to existing global provider"),
     );
     expect(logger.error).not.toHaveBeenCalled();
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
   it("returns no-op when attachToExistingProvider is false (default)", async () => {
-    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors
-      .length;
+    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 
     setupObservability({
@@ -83,8 +79,7 @@ describe("setupObservability Integration - attachToExistingProvider", () => {
   });
 
   it("does not attach when LangWatch is disabled", async () => {
-    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors
-      .length;
+    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 
     setupObservability({
@@ -98,8 +93,7 @@ describe("setupObservability Integration - attachToExistingProvider", () => {
   });
 
   it("attaches user-provided span processors to real provider", async () => {
-    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors
-      .length;
+    const processorsBefore = (provider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
     const customProcessor = {
       onStart: vi.fn(),
@@ -125,12 +119,10 @@ describe("setupObservability Integration - Dedicated TracerProvider", () => {
   it("attaches LangWatch exporter to dedicated provider without touching global", async () => {
     const sentry = new NodeTracerProvider();
     sentry.register();
-    const sentryProcessorsBefore = (sentry as any)._activeSpanProcessor._spanProcessors
-      .length;
+    const sentryProcessorsBefore = (sentry as any)._activeSpanProcessor._spanProcessors.length;
 
     const lwProvider = new NodeTracerProvider();
-    const lwProcessorsBefore = (lwProvider as any)._activeSpanProcessor._spanProcessors
-      .length;
+    const lwProcessorsBefore = (lwProvider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 
     const handle = setupObservability({
@@ -139,16 +131,12 @@ describe("setupObservability Integration - Dedicated TracerProvider", () => {
       debug: { logger },
     });
 
-    const lwProcessorsAfter = (lwProvider as any)._activeSpanProcessor._spanProcessors
-      .length;
-    const sentryProcessorsAfter = (sentry as any)._activeSpanProcessor._spanProcessors
-      .length;
+    const lwProcessorsAfter = (lwProvider as any)._activeSpanProcessor._spanProcessors.length;
+    const sentryProcessorsAfter = (sentry as any)._activeSpanProcessor._spanProcessors.length;
 
     expect(lwProcessorsAfter).toBe(lwProcessorsBefore + 1);
     expect(sentryProcessorsAfter).toBe(sentryProcessorsBefore);
-    expect(logger.info).toHaveBeenCalledWith(
-      expect.stringContaining("dedicated provider"),
-    );
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("dedicated provider"));
     await expect(handle.shutdown()).resolves.toBeUndefined();
     await sentry.shutdown();
     trace.disable();
@@ -174,8 +162,7 @@ describe("setupObservability Integration - Dedicated TracerProvider", () => {
 
   it("honors advanced.disabled even when dedicated provider is passed", async () => {
     const lwProvider = new NodeTracerProvider();
-    const processorsBefore = (lwProvider as any)._activeSpanProcessor._spanProcessors
-      .length;
+    const processorsBefore = (lwProvider as any)._activeSpanProcessor._spanProcessors.length;
     const logger = createMockLogger();
 
     setupObservability({
@@ -185,8 +172,7 @@ describe("setupObservability Integration - Dedicated TracerProvider", () => {
       advanced: { disabled: true },
     });
 
-    const processorsAfter = (lwProvider as any)._activeSpanProcessor._spanProcessors
-      .length;
+    const processorsAfter = (lwProvider as any)._activeSpanProcessor._spanProcessors.length;
     expect(processorsAfter).toBe(processorsBefore);
   });
 });

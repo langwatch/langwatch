@@ -40,22 +40,17 @@ function firstProjectSlug(organization: NavigationOrganization): string | null {
  *
  * Spec: specs/navigation/product-switcher-navigation.feature
  */
-export function OrganizationSelect({
-  activeProductId,
-}: {
-  activeProductId: ProductId | null;
-}) {
+export function OrganizationSelect({ activeProductId }: { activeProductId: ProductId | null }) {
   const host = useNavigationHost();
   const organization = host.organization();
   const organizations = host.organizations();
 
   const organizationIds = organizations.map((org) => org.id);
   const isMultiOrg = organizationIds.length > 1;
-  const { reachableProductsIn, isLoading: isReachabilityLoading } =
-    useProductFlagsByOrganization({
-      organizationIds,
-      enabled: isMultiOrg,
-    });
+  const { reachableProductsIn, isLoading: isReachabilityLoading } = useProductFlagsByOrganization({
+    organizationIds,
+    enabled: isMultiOrg,
+  });
 
   if (!organization) return null;
 
@@ -130,12 +125,7 @@ function OrganizationMenu({
         <Menu.Content minWidth="220px">
           <Menu.ItemGroup title="Organizations">
             {organizations.map((org) => (
-              <Menu.Item
-                key={org.id}
-                value={org.id}
-                onClick={() => onSelect(org)}
-                fontSize="13px"
-              >
+              <Menu.Item key={org.id} value={org.id} onClick={() => onSelect(org)} fontSize="13px">
                 <Text flex={1}>{org.name}</Text>
                 {org.id === currentOrganizationId && (
                   <Check size={13} aria-label="Current organization" />

@@ -60,11 +60,7 @@ describe("parseCliJson", () => {
     });
 
     it("lifts the document under a log line that starts like a JSON literal", () => {
-      const lines = [
-        "[notice] using the cache",
-        "[failed to reach the api",
-        "[trying again",
-      ];
+      const lines = ["[notice] using the cache", "[failed to reach the api", "[trying again"];
 
       for (const line of lines) {
         expect(parseCliJson(`${line}\n{"total": 2}\n`)).toEqual({ total: 2 });
@@ -143,9 +139,7 @@ describe("parseCliJson", () => {
 
   describe("given stdout that holds no JSON", () => {
     it("returns null for a human table", () => {
-      expect(
-        parseCliJson("Trace ID   Input   Output\ntrace_1    hi      hello"),
-      ).toBeNull();
+      expect(parseCliJson("Trace ID   Input   Output\ntrace_1    hi      hello")).toBeNull();
     });
 
     it("returns null for an unterminated document", () => {

@@ -22,10 +22,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { ExperimentService } from "@langwatch/experiment-contract";
-import {
-  buildGatewayCanonicalString,
-  computeGatewaySignature,
-} from "@langwatch/gateway-server";
+import { buildGatewayCanonicalString, computeGatewaySignature } from "@langwatch/gateway-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -261,16 +258,13 @@ function recordingLangevals(verdict: { passed: boolean; score: number }): {
   calls: LangevalsCall[];
 } {
   const calls: LangevalsCall[] = [];
-  vi.stubGlobal(
-    "fetch",
-    async (url: string, init: { body: string }): Promise<Response> => {
-      calls.push({ url: String(url), body: JSON.parse(init.body) as LangevalsCall["body"] });
-      return new Response(
-        JSON.stringify([{ status: "processed", passed: verdict.passed, score: verdict.score }]),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
-    },
-  );
+  vi.stubGlobal("fetch", async (url: string, init: { body: string }): Promise<Response> => {
+    calls.push({ url: String(url), body: JSON.parse(init.body) as LangevalsCall["body"] });
+    return new Response(
+      JSON.stringify([{ status: "processed", passed: verdict.passed, score: verdict.score }]),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  });
   return { calls };
 }
 

@@ -150,11 +150,7 @@ export function useDrawer() {
 
   /** Writes one overlay's address, clearing whatever `drawer.*` keys stood before it. */
   const writeDrawer = useCallback(
-    (
-      drawer: DrawerType,
-      params: Record<string, unknown>,
-      options: { replace?: boolean } = {},
-    ) => {
+    (drawer: DrawerType, params: Record<string, unknown>, options: { replace?: boolean } = {}) => {
       const { path, query } = readAddress(router.asPath);
       for (const key of [...query.keys()]) {
         if (key.startsWith("drawer.")) query.delete(key);

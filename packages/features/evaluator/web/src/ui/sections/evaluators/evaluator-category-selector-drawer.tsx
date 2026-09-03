@@ -1,8 +1,5 @@
 import { Button, Heading, HStack } from "@chakra-ui/react";
-import {
-  EvaluatorCategoryPicker,
-  type EvaluatorCategoryId,
-} from "@langwatch/evaluator-web";
+import { EvaluatorCategoryPicker, type EvaluatorCategoryId } from "@langwatch/evaluator-web";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
@@ -78,9 +75,7 @@ const PANEL_STYLE = {
  * Hosts all three steps (category → type → editor) inside a single
  * Drawer.Root with a shared direction-aware slide animation between them.
  */
-export function EvaluatorCategorySelectorDrawer(
-  props: EvaluatorCategorySelectorDrawerProps,
-) {
+export function EvaluatorCategorySelectorDrawer(props: EvaluatorCategorySelectorDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
 
@@ -125,10 +120,9 @@ export function EvaluatorCategorySelectorDrawer(
     setView({ step: "type", category: categoryId });
   };
 
-  const handleSelectEvaluator =
-    (category: EvaluatorCategoryId) => (evaluatorType: string) => {
-      setView({ step: "editor", category, evaluatorType });
-    };
+  const handleSelectEvaluator = (category: EvaluatorCategoryId) => (evaluatorType: string) => {
+    setView({ step: "editor", category, evaluatorType });
+  };
 
   const handleBack = () => {
     if (view.step === "editor") {
@@ -151,9 +145,7 @@ export function EvaluatorCategorySelectorDrawer(
       <EvaluatorEditorHeading controller={editorController} />
     ) : (
       <Heading>
-        {view.step === "type"
-          ? categoryNames[view.category]
-          : "Choose Evaluator Category"}
+        {view.step === "type" ? categoryNames[view.category] : "Choose Evaluator Category"}
       </Heading>
     );
 

@@ -21,11 +21,7 @@ export abstract class CliDeviceSessionStorePort {
   abstract tryGet(key: string): Promise<string | null>;
 
   /** Writes one value with a lifetime, replacing whatever was there. */
-  abstract set(input: {
-    key: string;
-    value: string;
-    ttlSeconds: number;
-  }): Promise<void>;
+  abstract set(input: { key: string; value: string; ttlSeconds: number }): Promise<void>;
 
   /**
    * Writes one value with a lifetime ONLY when the key is free, answering
@@ -34,11 +30,7 @@ export abstract class CliDeviceSessionStorePort {
    * The poll throttle's whole mechanism: `false` means someone already claimed
    * this window.
    */
-  abstract setIfAbsent(input: {
-    key: string;
-    value: string;
-    ttlSeconds: number;
-  }): Promise<boolean>;
+  abstract setIfAbsent(input: { key: string; value: string; ttlSeconds: number }): Promise<boolean>;
 
   /** Drops one key. Absent is not an error — every caller here is idempotent. */
   abstract delete(key: string): Promise<void>;
@@ -57,8 +49,5 @@ export abstract class CliDeviceSessionStorePort {
   }): Promise<void>;
 
   /** Removes one token key from a user's index. */
-  abstract removeFromIndex(input: {
-    indexKey: string;
-    memberKey: string;
-  }): Promise<void>;
+  abstract removeFromIndex(input: { indexKey: string; memberKey: string }): Promise<void>;
 }

@@ -153,11 +153,8 @@ function describeResource(chip: LangyResourceContext): string | null {
 }
 
 function describeSkill(skill: LangySkillContext): string | null {
-  const label =
-    sanitizeLangyPromptValue(skill.label, MAX_LANGY_CONTEXT_LABEL_LENGTH) || skill.id;
-  const on = skill.on
-    ? sanitizeLangyPromptValue(skill.on, MAX_LANGY_CONTEXT_LABEL_LENGTH)
-    : "";
+  const label = sanitizeLangyPromptValue(skill.label, MAX_LANGY_CONTEXT_LABEL_LENGTH) || skill.id;
+  const on = skill.on ? sanitizeLangyPromptValue(skill.on, MAX_LANGY_CONTEXT_LABEL_LENGTH) : "";
   return on ? `- ${label} — applied to: ${on}` : `- ${label}`;
 }
 

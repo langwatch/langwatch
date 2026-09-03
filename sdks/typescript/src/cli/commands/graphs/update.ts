@@ -25,9 +25,7 @@ export const updateGraphCommand = async (
 
   if (!options.name && !options.graph && !options.filters) {
     reportCommandError({
-      error: commandValidationError(
-        "At least one of --name, --graph, or --filters is required",
-      ),
+      error: commandValidationError("At least one of --name, --graph, or --filters is required"),
     });
     process.exit(1);
   }

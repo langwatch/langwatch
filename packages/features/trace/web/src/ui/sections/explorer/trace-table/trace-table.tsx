@@ -143,12 +143,7 @@ export const TraceTable: React.FC = () => {
         <GroupLensBody traces={traces} lens={activeLens} isLoading={isLoading} />
       )}
       {rowKind === "trace" && (
-        <TraceLensBody
-          traces={traces}
-          lens={activeLens}
-          newIds={newIds}
-          isLoading={isLoading}
-        />
+        <TraceLensBody traces={traces} lens={activeLens} newIds={newIds} isLoading={isLoading} />
       )}
     </TraceTableLayout>
   );

@@ -1,7 +1,4 @@
-import {
-  type CustomLLMModelCost,
-  PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import { type CustomLLMModelCost, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   modelCostSchema,
   type ModelCost,

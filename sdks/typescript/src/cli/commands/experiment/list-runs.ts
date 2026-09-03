@@ -32,12 +32,10 @@ const summarizePassRate = (
     const scoreEntries = entries.filter((e) => typeof e.averageScore === "number");
     if (scoreEntries.length === 0) return chalk.gray("—");
     const avg =
-      scoreEntries.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) /
-      scoreEntries.length;
+      scoreEntries.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) / scoreEntries.length;
     return `${avg.toFixed(2)} avg`;
   }
-  const avg =
-    passEntries.reduce((sum, e) => sum + (e.averagePassed ?? 0), 0) / passEntries.length;
+  const avg = passEntries.reduce((sum, e) => sum + (e.averagePassed ?? 0), 0) / passEntries.length;
   return `${(avg * 100).toFixed(0)}% pass`;
 };
 

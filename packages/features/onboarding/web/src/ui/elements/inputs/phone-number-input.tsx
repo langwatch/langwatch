@@ -136,9 +136,7 @@ export function PhoneNumberInput(props: PhoneNumberInputProps): React.JSX.Elemen
 
     // 1) Try meta tag hint injected by server/edge
     try {
-      const meta = document.querySelector(
-        'meta[name="x-country"]',
-      ) as HTMLMetaElement | null;
+      const meta = document.querySelector('meta[name="x-country"]') as HTMLMetaElement | null;
       if (meta?.content) {
         choose(meta.content);
         return () => {
@@ -201,8 +199,7 @@ export function PhoneNumberInput(props: PhoneNumberInputProps): React.JSX.Elemen
               const renderOption = (code: CountryCode) => {
                 const calling = getCountryCallingCode(code);
                 const flag = countryCodeToFlagEmoji(code);
-                const countryName =
-                  countryCodeToName[code as keyof typeof countryCodeToName];
+                const countryName = countryCodeToName[code as keyof typeof countryCodeToName];
                 return (
                   <option key={code} value={code}>
                     {`${countryName} ${flag} (+${calling})`}

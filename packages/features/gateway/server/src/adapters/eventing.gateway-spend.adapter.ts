@@ -97,9 +97,7 @@ export interface EventingGatewaySpendAdapterOptions {
  * it once, straight after registration, moves that failure to boot.
  */
 export class EventingGatewaySpendAdapter {
-  static create(
-    options: EventingGatewaySpendAdapterOptions,
-  ): EventingGatewaySpendAdapter {
+  static create(options: EventingGatewaySpendAdapterOptions): EventingGatewaySpendAdapter {
     return new EventingGatewaySpendAdapter(options);
   }
 
@@ -120,9 +118,7 @@ export class EventingGatewaySpendAdapter {
         events: defineEvents(GATEWAY_SPEND_PROCESSING_EVENT_TYPES),
       }),
     })
-      .withClickHouseFoldProjection(
-        createGatewaySpendFoldProjection(this.foldStore()),
-      )
+      .withClickHouseFoldProjection(createGatewaySpendFoldProjection(this.foldStore()))
       .withCommand("admitSpend", AdmitSpendCommand)
       .withCommand("confirmSpend", ConfirmSpendCommand)
       .withCommand("failSpend", FailSpendCommand)
@@ -146,9 +142,7 @@ export class EventingGatewaySpendAdapter {
           ...this.options.settlement,
           sendSettleSpend: (data) => {
             if (!this.send) {
-              throw new Error(
-                "Gateway spend cannot settle before its pipeline is registered.",
-              );
+              throw new Error("Gateway spend cannot settle before its pipeline is registered.");
             }
             return this.send(data);
           },
@@ -158,9 +152,7 @@ export class EventingGatewaySpendAdapter {
     return pipeline.build();
   }
 
-  connectSettlement(
-    sendSettleSpend: (data: SettleSpendCommandData) => Promise<void>,
-  ): void {
+  connectSettlement(sendSettleSpend: (data: SettleSpendCommandData) => Promise<void>): void {
     this.send = sendSettleSpend;
   }
 }

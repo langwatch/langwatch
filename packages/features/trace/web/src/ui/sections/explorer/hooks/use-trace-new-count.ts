@@ -133,9 +133,7 @@ export function useTraceNewCount(): TraceNewCountResult {
     if (!dataUpdatedAt || !countData) return;
     if (countData.count === 0) {
       consecutiveZerosRef.current += 1;
-      setIntervalMs((current) =>
-        nextBackoffInterval(consecutiveZerosRef.current, current),
-      );
+      setIntervalMs((current) => nextBackoffInterval(consecutiveZerosRef.current, current));
     } else {
       consecutiveZerosRef.current = 0;
       setIntervalMs(FAST_MS);

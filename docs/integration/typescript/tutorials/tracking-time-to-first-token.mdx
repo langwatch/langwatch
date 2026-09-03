@@ -31,8 +31,8 @@ If your instrumentation already emits any of the signals below, TTFT shows up wi
 When more than one LLM span in a trace reports a TTFT, the trace-level value is the smallest one, the first token the user could have seen.
 
 <Note>
-  If you stream through the Vercel AI SDK with `experimental_telemetry` enabled, TTFT is
-  captured automatically from `ai.response.msToFirstChunk`, nothing to do.
+  If you stream through the Vercel AI SDK with `experimental_telemetry` enabled, TTFT is captured
+  automatically from `ai.response.msToFirstChunk`, nothing to do.
 </Note>
 
 ## Setting TTFT manually
@@ -111,10 +111,7 @@ If you send spans through the [REST API](/integration/rest-api) instead of the S
 On the Traces page, open the columns picker (the columns icon in the toolbar) and enable **TTFT**. The column behaves like the Duration column: each cell shows the value plus an inline bar scaled to the 95th percentile of the visible page, so one slow outlier doesn't flatten every other row. Rows at or above the page's TTFT p95 render a full red bar.
 
 <Frame>
-  <img
-    src="/images/ttft/ttft-enable-column.png"
-    alt="Columns picker with the TTFT column"
-  />
+  <img src="/images/ttft/ttft-enable-column.png" alt="Columns picker with the TTFT column" />
 </Frame>
 
 Hovering a cell shows how that trace compares against the page's TTFT p95:
@@ -133,10 +130,7 @@ The column is sortable, so you can order by TTFT to chase your slowest streaming
 The trace drawer shows a TTFT pill in the header next to duration, cost, and tokens:
 
 <Frame>
-  <img
-    src="/images/ttft/ttft-drawer.png"
-    alt="Trace drawer header showing the TTFT pill"
-  />
+  <img src="/images/ttft/ttft-drawer.png" alt="Trace drawer header showing the TTFT pill" />
 </Frame>
 
 ### Analytics

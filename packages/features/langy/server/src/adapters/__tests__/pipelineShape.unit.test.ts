@@ -11,11 +11,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import { LANGY_CONVERSATION_PROCESS_NAME } from "@langwatch/langy-server/eventing/langy-conversation-processing/process-manager";
 import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
-import {
-  agentRespondedEvent,
-  CONVERSATION_ID,
-  PROJECT_ID,
-} from "./helpers/langyEventFixtures";
+import { agentRespondedEvent, CONVERSATION_ID, PROJECT_ID } from "./helpers/langyEventFixtures";
 import {
   createLangyConversationProcessingPipeline,
   type LangyAnalyticsEventProjectionRecord,
@@ -48,10 +44,7 @@ function stateStore<T>(): StateProjectionStore<T> {
 // `langyConversationProcess` is deliberately absent: the process is declared
 // on the pipeline now, so ProcessRuntime generates its `pm:langyConversation`
 // subscriber. These are the hand-written live consumers only.
-const SUBSCRIBER_NAMES = [
-  "agentTurnLiveness",
-  "langyConversationUpdateBroadcast",
-] as const;
+const SUBSCRIBER_NAMES = ["agentTurnLiveness", "langyConversationUpdateBroadcast"] as const;
 
 function buildPipeline(overrides: Partial<LangyConversationProcessingPipelineDeps> = {}) {
   const analyticsAppend = vi.fn().mockResolvedValue(undefined);
@@ -157,9 +150,7 @@ describe("langy-conversation-processing pipeline shape", () => {
       it("keeps subscribers independent of projections and subscribers", () => {
         const { pipeline, subscribers } = buildPipeline();
 
-        expect([...pipeline.eventSubscribers.keys()].sort()).toEqual(
-          [...SUBSCRIBER_NAMES].sort(),
-        );
+        expect([...pipeline.eventSubscribers.keys()].sort()).toEqual([...SUBSCRIBER_NAMES].sort());
         for (const subscriber of subscribers) {
           expect(pipeline.eventSubscribers.get(subscriber.name)).toBe(subscriber);
         }
@@ -183,9 +174,7 @@ describe("langy-conversation-processing pipeline shape", () => {
         const names = pipeline.commands.map((c) => c.name).sort();
         expect(names).toEqual([...EXPECTED_COMMANDS].sort());
         // One handler per durable command in the vocabulary.
-        expect(pipeline.commands).toHaveLength(
-          LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES.length,
-        );
+        expect(pipeline.commands).toHaveLength(LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES.length);
       });
     });
   });

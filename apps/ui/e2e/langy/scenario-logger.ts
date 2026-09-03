@@ -167,8 +167,7 @@ function formatAsMarkdown({
   out.push("");
   out.push("## Conversation");
   out.push("");
-  const messages =
-    (result as { messages?: Array<Record<string, unknown>> }).messages ?? [];
+  const messages = (result as { messages?: Array<Record<string, unknown>> }).messages ?? [];
   for (const msg of messages) {
     const role = String(msg.role ?? "?");
     out.push(`### ${role}`);

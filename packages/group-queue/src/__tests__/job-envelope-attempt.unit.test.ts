@@ -103,18 +103,13 @@ describe("job envelope retry attempt", () => {
         const encoded = await encodeGq2(jobData(3));
         const advanced = withJobAttempt({ value: encoded, attempt: 4 });
 
-        expect(await decodeJobEnvelope({ value: advanced })).toEqual(
-          jobData(4),
-        );
+        expect(await decodeJobEnvelope({ value: advanced })).toEqual(jobData(4));
       });
 
       /** @scenario Advancing a job's attempt does not split the body it shares with identical jobs */
       it("keeps the pointer to the shared stored body", async () => {
         const blobs = blobStore();
-        const first = await encodeGq2(
-          { ...jobData(1), bulk: "x".repeat(200_000) },
-          blobs,
-        );
+        const first = await encodeGq2({ ...jobData(1), bulk: "x".repeat(200_000) }, blobs);
         const advanced = withJobAttempt({ value: first, attempt: 2 });
 
         // Same body reference, so the shared blob is neither split nor re-written.
@@ -160,9 +155,7 @@ describe("job envelope retry attempt", () => {
       it("survives a value it cannot parse at all", () => {
         expect(readJobAttempt("GQ2|not-an-envelope")).toBeNull();
         expect(readJobAttempt("{ broken json")).toBeNull();
-        expect(withJobAttempt({ value: "GQ2|nope", attempt: 2 })).toBe(
-          "GQ2|nope",
-        );
+        expect(withJobAttempt({ value: "GQ2|nope", attempt: 2 })).toBe("GQ2|nope");
       });
     });
   });

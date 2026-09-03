@@ -1,9 +1,6 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import {
-  QueueRedisRepository,
-  RECONCILE_WRITE_LUA,
-} from "../queue.repository";
+import { QueueRedisRepository, RECONCILE_WRITE_LUA } from "../queue.repository";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;
@@ -198,15 +195,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         await redis.zadd(`${queueName}:gq:group:tenant-a/blocked:jobs`, 1, "j2", 2, "j3");
         await redis.sadd(`${queueName}:gq:blocked`, "tenant-a/blocked");
 
-        await redis.zadd(
-          `${queueName}:gq:group:tenant-b/parked:jobs`,
-          1,
-          "j4",
-          2,
-          "j5",
-          3,
-          "j6",
-        );
+        await redis.zadd(`${queueName}:gq:group:tenant-b/parked:jobs`, 1, "j4", 2, "j5", 3, "j6");
         await redis.zadd(`${queueName}:gq:parked:tenant-b`, 1, "tenant-b/parked");
         await redis.sadd(`${queueName}:gq:parked-tenants`, "tenant-b");
 
@@ -354,15 +343,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
 
         // Holding jobs, in neither the pending index nor any lifecycle index —
         // the state a group passes through while it moves between them.
-        await redis.zadd(
-          `${queueName}:gq:group:orphan-mover:jobs`,
-          1,
-          "j1",
-          2,
-          "j2",
-          3,
-          "j3",
-        );
+        await redis.zadd(`${queueName}:gq:group:orphan-mover:jobs`, 1, "j1", 2, "j2", 3, "j3");
         await redis.set(`${queueName}:gq:stats:total-pending`, "0");
 
         const result = await repo.tryReconcileTotalPending(queueName);
@@ -516,9 +497,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         await redis.del(`${neverReconciled}:gq:stats:pending-drift`);
         await reconcileWithDrift({ queue: queueName, jobs: 2, drift: 7 });
 
-        expect(await repo.readPublishedPendingDrift([neverReconciled, queueName])).toBe(
-          7,
-        );
+        expect(await repo.readPublishedPendingDrift([neverReconciled, queueName])).toBe(7);
       });
 
       it("survives a figure that is not a number at all", async () => {

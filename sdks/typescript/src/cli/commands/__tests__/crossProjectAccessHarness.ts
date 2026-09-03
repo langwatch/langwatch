@@ -179,9 +179,7 @@ export function installCrossProjectHarness(): CrossProjectHarness {
         json(404, { error: "not_found" });
       });
     });
-    await new Promise<void>((resolveListen) =>
-      server.listen(0, "127.0.0.1", resolveListen),
-    );
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
     endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   }, 30_000);
 
@@ -272,13 +270,7 @@ export function installCrossProjectHarness(): CrossProjectHarness {
       child.on("close", (exitCode) => resolve({ stdout, stderr, exitCode }));
     });
 
-  const basicFor = ({
-    projectId,
-    apiKey,
-  }: {
-    projectId: string;
-    apiKey: string;
-  }): string =>
+  const basicFor = ({ projectId, apiKey }: { projectId: string; apiKey: string }): string =>
     `Basic ${Buffer.from(`${projectId}:${apiKey}`, "utf-8").toString("base64")}`;
 
   return { writeSession, run, basicFor, recorded };

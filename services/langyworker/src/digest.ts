@@ -65,8 +65,7 @@ export function renderMessageLine(message: DigestibleMessage): string | undefine
   if (Buffer.byteLength(line, "utf8") <= DIGEST_MESSAGE_MAX_BYTES) return line;
   // The marker is part of the per-message budget, not an addition to it: the
   // per-message cap is what buildHandoffDigest counts against the whole digest.
-  const budget =
-    DIGEST_MESSAGE_MAX_BYTES - Buffer.byteLength(MESSAGE_TRUNCATION_MARKER, "utf8");
+  const budget = DIGEST_MESSAGE_MAX_BYTES - Buffer.byteLength(MESSAGE_TRUNCATION_MARKER, "utf8");
   return `${truncateToBytes({ text: line, maxBytes: budget })}${MESSAGE_TRUNCATION_MARKER}`;
 }
 

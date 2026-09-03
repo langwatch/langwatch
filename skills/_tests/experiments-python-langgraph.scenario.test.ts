@@ -31,8 +31,7 @@ describe("Experiments Skill for a Python LangGraph agent", () => {
           const result = await scenario.run({
             setId: SKILL_TESTS_SET_ID,
             name: "Python LangGraph evaluation experiment",
-            description:
-              "Creating an evaluation experiment for a Python LangGraph agent.",
+            description: "Creating an evaluation experiment for a Python LangGraph agent.",
             agents: [
               createClaudeCodeAgent({
                 workingDirectory,

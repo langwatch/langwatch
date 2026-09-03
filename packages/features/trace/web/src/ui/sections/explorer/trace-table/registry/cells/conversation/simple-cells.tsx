@@ -8,11 +8,7 @@ import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-c
 import { StatusDot, StatusIndicator } from "../../../status-row";
 import type { CellDef } from "../../types";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder";
-import {
-  createCostCell,
-  createDurationCell,
-  createTokensCell,
-} from "../shared-summary-cells";
+import { createCostCell, createDurationCell, createTokensCell } from "../shared-summary-cells";
 
 const STATUS_HEALTH_LABELS: Record<TraceStatus, string> = {
   ok: "Healthy",

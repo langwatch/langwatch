@@ -25,9 +25,7 @@ export interface ActiveProjectContextValue {
   onFreshToken?: (token: string) => void;
 }
 
-const ActiveProjectContext = createContext<ActiveProjectContextValue | undefined>(
-  undefined,
-);
+const ActiveProjectContext = createContext<ActiveProjectContextValue | undefined>(undefined);
 
 export function ActiveProjectProvider({
   value,
@@ -36,11 +34,7 @@ export function ActiveProjectProvider({
   value: ActiveProjectContextValue;
   children: React.ReactNode;
 }): React.ReactElement {
-  return (
-    <ActiveProjectContext.Provider value={value}>
-      {children}
-    </ActiveProjectContext.Provider>
-  );
+  return <ActiveProjectContext.Provider value={value}>{children}</ActiveProjectContext.Provider>;
 }
 
 export function useActiveProject(): ActiveProjectContextValue {

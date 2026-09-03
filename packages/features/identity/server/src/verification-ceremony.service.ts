@@ -7,12 +7,7 @@ import {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import {
-  mintVerificationToken,
-  s256Challenge,
-  safeEqual,
-  sha256Hex,
-} from "./crypto/pkce";
+import { mintVerificationToken, s256Challenge, safeEqual, sha256Hex } from "./crypto/pkce";
 import { newIdentityCommandId } from "./identity-command-id";
 import type { IdentityHeadsRepository } from "./identity-heads.repository";
 import type { IdentityVerificationRepository } from "./identity-verification.repository";
@@ -26,8 +21,7 @@ export const IDENTITY_VERIFICATION_TTL_MS = 15 * 60 * 1000;
 function lostTheUniquenessRace(facts: readonly IdentityFact[]): boolean {
   return facts.some(
     (fact) =>
-      fact.type === IDENTIFIER_DEAD_ENDED_EVENT_TYPE &&
-      fact.data.reason === "uniqueness_race_lost",
+      fact.type === IDENTIFIER_DEAD_ENDED_EVENT_TYPE && fact.data.reason === "uniqueness_race_lost",
   );
 }
 

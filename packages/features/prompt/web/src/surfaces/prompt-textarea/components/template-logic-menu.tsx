@@ -143,9 +143,7 @@ export const TemplateLogicMenu = ({
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
                   setIsKeyboardNav(true);
-                  onHighlightChange(
-                    Math.min(highlightedIndex + 1, filteredConstructs.length - 1),
-                  );
+                  onHighlightChange(Math.min(highlightedIndex + 1, filteredConstructs.length - 1));
                 } else if (e.key === "ArrowUp") {
                   e.preventDefault();
                   setIsKeyboardNav(true);
@@ -209,12 +207,7 @@ export const TemplateLogicMenu = ({
                     onClick={() => handleSelect(index)}
                     data-testid={`logic-construct-${construct.keyword}`}
                   >
-                    <Text
-                      fontSize="13px"
-                      fontFamily="mono"
-                      fontWeight="600"
-                      minWidth="60px"
-                    >
+                    <Text fontSize="13px" fontFamily="mono" fontWeight="600" minWidth="60px">
                       {construct.keyword}
                     </Text>
                     <Text fontSize="xs" color="fg.muted">
@@ -228,12 +221,7 @@ export const TemplateLogicMenu = ({
         </Box>
 
         {/* Footer with docs link */}
-        <Box
-          padding={2}
-          borderTop="1px solid"
-          borderColor="border.muted"
-          background="bg.subtle"
-        >
+        <Box padding={2} borderTop="1px solid" borderColor="border.muted" background="bg.subtle">
           <Link
             href={TEMPLATE_SYNTAX_DOCS_URL}
             target="_blank"

@@ -86,13 +86,7 @@ export function writeFingerprint({
  * the directory is small, this runs on a hook that is already doing IO, and
  * every failure is beneath mentioning.
  */
-export function pruneStaleState({
-  stateDir,
-  now,
-}: {
-  stateDir: string;
-  now: () => number;
-}): void {
+export function pruneStaleState({ stateDir, now }: { stateDir: string; now: () => number }): void {
   try {
     for (const entry of fs.readdirSync(stateDir)) {
       if (!entry.endsWith(".json")) continue;

@@ -183,11 +183,7 @@ vi.mock("../../blocks/group-binding-input-row", async () => {
     return (
       <>
         <span data-testid="stub-organization-role">{organizationRole}</span>
-        <button
-          type="button"
-          data-testid="stub-add-binding"
-          onClick={() => onAdd(STUB_BINDING)}
-        >
+        <button type="button" data-testid="stub-add-binding" onClick={() => onAdd(STUB_BINDING)}>
           Stage binding
         </button>
         <button
@@ -229,9 +225,7 @@ const baseMember = {
   user: { name: "Sergio", email: "sergio@example.com" },
 };
 
-function renderDialog(
-  overrides: Partial<React.ComponentProps<typeof MemberDetailDialog>> = {},
-) {
+function renderDialog(overrides: Partial<React.ComponentProps<typeof MemberDetailDialog>> = {}) {
   return render(
     <MemberDetailDialog
       member={baseMember}
@@ -516,9 +510,7 @@ describe("<MemberDetailDialog/>", () => {
 
         // Only the off-seat VIEWER row is removable; the MEMBER row mirrors
         // the member's seat and is managed by the seat selector.
-        expect(screen.getAllByRole("button", { name: /remove binding/i })).toHaveLength(
-          1,
-        );
+        expect(screen.getAllByRole("button", { name: /remove binding/i })).toHaveLength(1);
       });
     });
   });
@@ -690,24 +682,18 @@ describe("<MemberDetailDialog/>", () => {
       });
 
       expect(screen.getByText("ADMIN")).toBeTruthy();
-      expect(
-        screen.getByText("Applies as Viewer while on a Lite Member seat"),
-      ).toBeTruthy();
+      expect(screen.getByText("Applies as Viewer while on a Lite Member seat")).toBeTruthy();
     });
 
     /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
     it("adds the note the moment a Lite Member seat is picked", () => {
       renderDialog();
 
-      expect(
-        screen.queryByText("Applies as Viewer while on a Lite Member seat"),
-      ).toBeNull();
+      expect(screen.queryByText("Applies as Viewer while on a Lite Member seat")).toBeNull();
 
       fireEvent.click(screen.getByTestId("org-role-field"));
 
-      expect(
-        screen.getByText("Applies as Viewer while on a Lite Member seat"),
-      ).toBeTruthy();
+      expect(screen.getByText("Applies as Viewer while on a Lite Member seat")).toBeTruthy();
     });
 
     /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
@@ -735,9 +721,7 @@ describe("<MemberDetailDialog/>", () => {
       });
 
       expect(screen.getByText("Data Scientist")).toBeTruthy();
-      expect(
-        screen.queryByText("Applies as Viewer while on a Lite Member seat"),
-      ).toBeNull();
+      expect(screen.queryByText("Applies as Viewer while on a Lite Member seat")).toBeNull();
     });
   });
 

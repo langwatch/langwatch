@@ -9,7 +9,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clampRangeToBounds, RangeSection } from "../../../../sections/explorer/filter-sidebar/range-section";
+import {
+  clampRangeToBounds,
+  RangeSection,
+} from "../../../../sections/explorer/filter-sidebar/range-section";
 import { stepForSpan } from "../range-controls";
 
 describe("RangeSection", () => {
@@ -92,29 +95,21 @@ describe("clampRangeToBounds", () => {
   // them representable.
   describe("when a stale value disagrees with freshly-arrived bounds", () => {
     it("clamps a range entirely below the bounds up to min", () => {
-      expect(clampRangeToBounds([0, 0.00001], 0.000032, 0.019895)).toEqual([
-        0.000032, 0.000032,
-      ]);
+      expect(clampRangeToBounds([0, 0.00001], 0.000032, 0.019895)).toEqual([0.000032, 0.000032]);
     });
 
     it("clamps a range entirely above the bounds down to max", () => {
-      expect(clampRangeToBounds([0.5, 0.9], 0.000032, 0.019895)).toEqual([
-        0.019895, 0.019895,
-      ]);
+      expect(clampRangeToBounds([0.5, 0.9], 0.000032, 0.019895)).toEqual([0.019895, 0.019895]);
     });
 
     it("clamps out-of-order thumbs into the bounds", () => {
-      expect(clampRangeToBounds([0.9, 0.1], 0.000032, 0.019895)).toEqual([
-        0.019895, 0.019895,
-      ]);
+      expect(clampRangeToBounds([0.9, 0.1], 0.000032, 0.019895)).toEqual([0.019895, 0.019895]);
     });
   });
 
   describe("when the value already fits the bounds", () => {
     it("passes it through unchanged", () => {
-      expect(clampRangeToBounds([0.001, 0.01], 0.000032, 0.019895)).toEqual([
-        0.001, 0.01,
-      ]);
+      expect(clampRangeToBounds([0.001, 0.01], 0.000032, 0.019895)).toEqual([0.001, 0.01]);
     });
   });
 

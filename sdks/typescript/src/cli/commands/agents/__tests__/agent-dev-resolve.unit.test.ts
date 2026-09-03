@@ -53,9 +53,7 @@ function makeService({ agents }: { agents: ReturnType<typeof makeAgent>[] }): {
   const create = vi
     .fn()
     .mockImplementation((params: { name: string; config: unknown }) =>
-      Promise.resolve(
-        makeAgent({ id: "agent_new", name: params.name, config: params.config }),
-      ),
+      Promise.resolve(makeAgent({ id: "agent_new", name: params.name, config: params.config })),
     );
   const service = {
     list: vi.fn().mockResolvedValue({ data: agents }),
@@ -152,9 +150,7 @@ describe("agent dev target resolution", () => {
           localUrl: "http://localhost:8010/agent/chat",
         });
 
-        expect(mockPrompts).toHaveBeenCalledWith(
-          expect.objectContaining({ initial: "my-agent" }),
-        );
+        expect(mockPrompts).toHaveBeenCalledWith(expect.objectContaining({ initial: "my-agent" }));
       });
 
       /** @scenario "Declining the offered agent name ends the session with instructions" */
@@ -172,9 +168,7 @@ describe("agent dev target resolution", () => {
         ).rejects.toThrow(ProcessExitError);
 
         expect(create).not.toHaveBeenCalled();
-        expect(String(consoleError.mock.calls.flat())).toContain(
-          "langwatch agent create",
-        );
+        expect(String(consoleError.mock.calls.flat())).toContain("langwatch agent create");
       });
     });
 
@@ -193,9 +187,7 @@ describe("agent dev target resolution", () => {
 
         expect(mockPrompts).not.toHaveBeenCalled();
         expect(create).not.toHaveBeenCalled();
-        expect(String(consoleError.mock.calls.flat())).toContain(
-          "langwatch agent create",
-        );
+        expect(String(consoleError.mock.calls.flat())).toContain("langwatch agent create");
       });
     });
   });

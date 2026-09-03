@@ -18,7 +18,10 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { OrganizationTrpcApi, type OrganizationTrpcPorts } from "../../transport/api-trpc/organization.api";
+import {
+  OrganizationTrpcApi,
+  type OrganizationTrpcPorts,
+} from "../../transport/api-trpc/organization.api";
 import { OrganizationApp, type OrganizationAppDependencies } from "../organization.app";
 
 type TestContext = {
@@ -137,7 +140,9 @@ function harness({ canUpdateProject }: { canUpdateProject: boolean }) {
   );
 
   const caller = router.createCaller({
-    app: { organizations: application({ getAllForUser: vi.fn(async () => organizationPayload()) }) },
+    app: {
+      organizations: application({ getAllForUser: vi.fn(async () => organizationPayload()) }),
+    },
     session: { user: { id: "user-1" } },
   });
 

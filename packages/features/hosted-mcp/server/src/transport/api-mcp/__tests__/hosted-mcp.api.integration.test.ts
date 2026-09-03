@@ -59,9 +59,10 @@ const mockRedis = {
  */
 class FakeProjectLookup extends McpProjectLookupPort {
   findLiveProjectByApiKey({ apiKey }: { apiKey: string }) {
-    return mockPrisma.project.findUnique({ where: { apiKey, archivedAt: null } }) as Promise<
-      { id: string; teamId: string } | null
-    >;
+    return mockPrisma.project.findUnique({ where: { apiKey, archivedAt: null } }) as Promise<{
+      id: string;
+      teamId: string;
+    } | null>;
   }
 }
 
@@ -74,7 +75,6 @@ class ReversibleTestCipher extends McpApiKeyCipherPort {
     return text.startsWith("encrypted:") ? text.slice(10) : text;
   }
 }
-
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -277,11 +277,7 @@ async function sendRequest({
     fetchHeaders["content-type"] = "application/json";
   }
   // MCP Streamable HTTP requires Accept header for POST/GET on /mcp
-  if (
-    path === "/mcp" &&
-    (method === "POST" || method === "GET") &&
-    !fetchHeaders.accept
-  ) {
+  if (path === "/mcp" && (method === "POST" || method === "GET") && !fetchHeaders.accept) {
     fetchHeaders.accept = "text/event-stream, application/json";
   }
 
@@ -789,19 +785,14 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
     describe("when the protected resource metadata is fetched at the resource path", () => {
       /** @scenario Protected resource metadata is served for the path-suffixed form */
-      it.each(["/sse", "/mcp"])(
-        "describes %s and its authorization server",
-        async (resource) => {
-          const res = await getDiscovery(
-            `/.well-known/oauth-protected-resource${resource}`,
-          );
+      it.each(["/sse", "/mcp"])("describes %s and its authorization server", async (resource) => {
+        const res = await getDiscovery(`/.well-known/oauth-protected-resource${resource}`);
 
-          expect(res.status).toBe(200);
-          expect(res.contentType).toContain("application/json");
-          expect(res.body.resource).toContain(resource);
-          expect(res.body.authorization_servers.length).toBeGreaterThan(0);
-        },
-      );
+        expect(res.status).toBe(200);
+        expect(res.contentType).toContain("application/json");
+        expect(res.body.resource).toContain(resource);
+        expect(res.body.authorization_servers.length).toBeGreaterThan(0);
+      });
     });
 
     describe("when the authorization server metadata is fetched at the resource path", () => {
@@ -809,9 +800,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       it.each(["/sse", "/mcp"])(
         "advertises the authorization, token and registration endpoints for %s",
         async (resource) => {
-          const res = await getDiscovery(
-            `/.well-known/oauth-authorization-server${resource}`,
-          );
+          const res = await getDiscovery(`/.well-known/oauth-authorization-server${resource}`);
 
           expect(res.status).toBe(200);
           expect(res.contentType).toContain("application/json");
@@ -825,9 +814,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     describe("when a discovery document that does not exist is fetched", () => {
       /** @scenario An unknown OAuth discovery document answers with JSON rather than the web app */
       it("answers 404 as JSON so the client can fall back", async () => {
-        const res = await getDiscovery(
-          "/.well-known/oauth-protected-resource/nothing-here",
-        );
+        const res = await getDiscovery("/.well-known/oauth-protected-resource/nothing-here");
 
         expect(res.status).toBe(404);
         expect(res.contentType).toContain("application/json");
@@ -1352,11 +1339,12 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     it("does not import any main app modules", async () => {
       // The mcp-server package's create-mcp-server.ts should not import
       // from the main app (~/server/db, ~/server/app-layer, etc.)
-      const mcpServerDir = resolve(import.meta.dirname, "../../../../../../../..", "mcp/typescript/src");
-      const createMcpServerSrc = readFileSync(
-        join(mcpServerDir, "create-mcp-server.ts"),
-        "utf-8",
+      const mcpServerDir = resolve(
+        import.meta.dirname,
+        "../../../../../../../..",
+        "mcp/typescript/src",
       );
+      const createMcpServerSrc = readFileSync(join(mcpServerDir, "create-mcp-server.ts"), "utf-8");
       // Should not import from the main app
       expect(createMcpServerSrc).not.toContain("~/server/");
       expect(createMcpServerSrc).not.toContain("../server/");

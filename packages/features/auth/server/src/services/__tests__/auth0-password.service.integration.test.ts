@@ -478,9 +478,7 @@ describe("changeAuth0Password", () => {
       // 1) ROPG verify, 2) client_credentials, 3) PATCH
       expect(captured).toHaveLength(3);
       expect((captured[0]?.body as { grant_type?: string }).grant_type).toBe("password");
-      expect((captured[1]?.body as { grant_type?: string }).grant_type).toBe(
-        "client_credentials",
-      );
+      expect((captured[1]?.body as { grant_type?: string }).grant_type).toBe("client_credentials");
       expect(captured[2]?.method).toBe("PATCH");
       expect(captured[2]?.headers.authorization).toBe("Bearer mgmt-tok");
       expect(captured[2]?.body).toEqual({

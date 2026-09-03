@@ -60,9 +60,7 @@ export function computeLineDiff(oldText: string, newText: string): DiffLine[] {
       });
       oldIndex++;
       newIndex++;
-    } else if (
-      lcsValue(lcs, oldIndex + 1, newIndex) >= lcsValue(lcs, oldIndex, newIndex + 1)
-    ) {
+    } else if (lcsValue(lcs, oldIndex + 1, newIndex) >= lcsValue(lcs, oldIndex, newIndex + 1)) {
       result.push({
         kind: "remove",
         text: lineAt(oldLines, oldIndex),
@@ -124,8 +122,6 @@ function splitLines(text: string): string[] {
     return [];
   }
   const normalized = text.replace(/\r\n/g, "\n");
-  const withoutTrailingNewline = normalized.endsWith("\n")
-    ? normalized.slice(0, -1)
-    : normalized;
+  const withoutTrailingNewline = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized;
   return withoutTrailingNewline.split("\n");
 }

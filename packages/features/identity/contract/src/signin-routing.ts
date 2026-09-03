@@ -49,19 +49,14 @@ export const SIGNIN_ROUTING_REASON_CODES = [
    *  without a human (ADR-117 §3). */
   "link_proposed",
 ] as const;
-export type SignInRoutingReasonCode =
-  (typeof SIGNIN_ROUTING_REASON_CODES)[number];
+export type SignInRoutingReasonCode = (typeof SIGNIN_ROUTING_REASON_CODES)[number];
 
 /**
  * What a method IS, to a screen. `password` and `passkey` are local — the
  * deployment itself authenticates. `federated` is an identity provider, named
  * by the id the sign-in surface dials.
  */
-export const SIGNIN_METHOD_KINDS = [
-  "password",
-  "passkey",
-  "federated",
-] as const;
+export const SIGNIN_METHOD_KINDS = ["password", "passkey", "federated"] as const;
 export type SignInMethodKind = (typeof SIGNIN_METHOD_KINDS)[number];
 
 export interface SignInMethod {
@@ -83,13 +78,8 @@ export function isLocalSignInMethod(method: SignInMethod): boolean {
  * to know whether a connection is serving traffic, has been paused by a human
  * (which the guidance screens name), or is neither.
  */
-export const SSO_CONNECTION_ROUTING_STATES = [
-  "ACTIVE",
-  "SUSPENDED",
-  "INACTIVE",
-] as const;
-export type SsoConnectionRoutingState =
-  (typeof SSO_CONNECTION_ROUTING_STATES)[number];
+export const SSO_CONNECTION_ROUTING_STATES = ["ACTIVE", "SUSPENDED", "INACTIVE"] as const;
+export type SsoConnectionRoutingState = (typeof SSO_CONNECTION_ROUTING_STATES)[number];
 
 /** A connection as the domain-lookup port answers it. */
 export interface RoutableConnection {
@@ -139,10 +129,7 @@ export function routingIdentifierOf(raw: string): RoutingIdentifier {
   return { normalized, domain: identifierDomain(normalized) };
 }
 
-export const SIGNIN_ROUTING_OUTCOMES = [
-  "redirect_to_connection",
-  "method_picker",
-] as const;
+export const SIGNIN_ROUTING_OUTCOMES = ["redirect_to_connection", "method_picker"] as const;
 export type SignInRoutingOutcome = (typeof SIGNIN_ROUTING_OUTCOMES)[number];
 
 export interface RoutingDecision {
@@ -214,13 +201,7 @@ function redirectOrFall({
  *   policy refuses the method  → picker (local)       method_not_*
  */
 export function routeSignIn(input: RoutingInput): RoutingDecision {
-  const {
-    identifier,
-    breakGlass,
-    policy,
-    domainConnection,
-    activeConnections,
-  } = input;
+  const { identifier, breakGlass, policy, domainConnection, activeConnections } = input;
 
   // Checked first, and unconditionally: break-glass exists precisely for the
   // cases below going wrong, so no state they can be in may skip it.
@@ -228,9 +209,7 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
 
   if (identifier === null || identifier.domain === null) {
     const sole =
-      policy.selfHosted && activeConnections.length === 1
-        ? activeConnections[0]
-        : undefined;
+      policy.selfHosted && activeConnections.length === 1 ? activeConnections[0] : undefined;
     if (!sole) return picker(policy.defaultMethods, "no_domain_match");
     return redirectOrFall({
       connection: sole,
@@ -270,9 +249,7 @@ export function legacyProviderOf(decision: RoutingDecision): string {
   // legacy page does in email mode. Only a set of exactly one federated method
   // has a legacy twin: the auto-redirect a single `NEXTAUTH_PROVIDER` gave.
   const only = decision.methodSet[0];
-  return decision.methodSet.length === 1 && only && !isLocalSignInMethod(only)
-    ? only.id
-    : "email";
+  return decision.methodSet.length === 1 && only && !isLocalSignInMethod(only) ? only.id : "email";
 }
 
 export interface ShadowComparison {

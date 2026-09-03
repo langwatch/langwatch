@@ -46,15 +46,14 @@ import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 export const useOpenComparisonEditor = () => {
   const { openDrawer } = useDrawer();
 
-  const { datasets, activeDatasetId, targets, updateEvaluator } =
-    useEvaluationsV3Store(
-      useShallow((state) => ({
-        datasets: state.datasets,
-        activeDatasetId: state.activeDatasetId,
-        targets: state.targets,
-        updateEvaluator: state.updateEvaluator,
-      })),
-    );
+  const { datasets, activeDatasetId, targets, updateEvaluator } = useEvaluationsV3Store(
+    useShallow((state) => ({
+      datasets: state.datasets,
+      activeDatasetId: state.activeDatasetId,
+      targets: state.targets,
+      updateEvaluator: state.updateEvaluator,
+    })),
+  );
 
   return useCallback(
     (evaluator: EvaluatorConfig) => {
@@ -82,9 +81,7 @@ export const useOpenComparisonEditor = () => {
           // `dbAgentId`, `targetEvaluatorId` — stripping to `{id}` would
           // force the dropdown to show raw `target_NNNN` ids).
           targets,
-          datasetColumns:
-            activeDataset?.columns.map((c) => ({ id: c.id, name: c.name })) ??
-            [],
+          datasetColumns: activeDataset?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [],
         },
       });
     },
@@ -129,8 +126,7 @@ export const useOpenEvaluatorEditor = () => {
       // ahead of dataset columns, mirroring how inputs prefer the dataset.
       const activeDataset = datasets.find((d) => d.id === activeDatasetId);
       // Use local config outputs if available (unsaved changes), fallback to saved.
-      const effectiveOutputs =
-        target.localPromptConfig?.outputs ?? target.outputs;
+      const effectiveOutputs = target.localPromptConfig?.outputs ?? target.outputs;
       const availableSources: AvailableSource[] = [
         {
           id: target.id,
@@ -155,8 +151,7 @@ export const useOpenEvaluatorEditor = () => {
       }
 
       // Current mappings in UI format (initial state for the drawer).
-      const storeMappings =
-        evaluator.mappings[activeDatasetId]?.[target.id] ?? {};
+      const storeMappings = evaluator.mappings[activeDatasetId]?.[target.id] ?? {};
       const initialMappings: Record<string, UIFieldMapping> = {};
       for (const [key, mapping] of Object.entries(storeMappings)) {
         initialMappings[key] = convertToUIMapping(mapping);
@@ -165,10 +160,7 @@ export const useOpenEvaluatorEditor = () => {
 
       const datasetIds = new Set(datasets.map((d) => d.id));
       const isDatasetSource = (sourceId: string) => datasetIds.has(sourceId);
-      const onMappingChange = (
-        identifier: string,
-        mapping: UIFieldMapping | undefined,
-      ) => {
+      const onMappingChange = (identifier: string, mapping: UIFieldMapping | undefined) => {
         if (mapping) {
           setEvaluatorMapping(
             evaluator.id,
@@ -178,12 +170,7 @@ export const useOpenEvaluatorEditor = () => {
             convertFromUIMapping(mapping, isDatasetSource),
           );
         } else {
-          removeEvaluatorMapping(
-            evaluator.id,
-            activeDatasetId,
-            target.id,
-            identifier,
-          );
+          removeEvaluatorMapping(evaluator.id, activeDatasetId, target.id, identifier);
         }
       };
 

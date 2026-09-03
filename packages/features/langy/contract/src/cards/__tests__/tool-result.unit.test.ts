@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  parseCliToolResult,
-  toCliTextResult,
-  toCliToolResult,
-} from "../tool-result.js";
+import { parseCliToolResult, toCliTextResult, toCliToolResult } from "../tool-result.js";
 
 describe("CLI tool result contract", () => {
   it("creates a typed trace-search payload", () => {

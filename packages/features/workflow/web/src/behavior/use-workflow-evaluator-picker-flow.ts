@@ -2,11 +2,7 @@ import { useCallback, useRef } from "react";
 
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import type {
-  Component,
-  Field,
-  NodeWithOptionalPosition,
-} from "@langwatch/workflow-contract";
+import type { Component, Field, NodeWithOptionalPosition } from "@langwatch/workflow-contract";
 import { fieldSchema } from "@langwatch/workflow-contract";
 
 import { useWorkflowStore } from "./use-workflow-store";

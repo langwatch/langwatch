@@ -92,7 +92,10 @@ describe("given an instance with the GitHub App configured", () => {
   describe("when nothing is installed yet", () => {
     /** @scenario An organization manager is offered the GitHub install */
     it("offers to connect, and asks the status for the organization in scope", () => {
-      renderWithGithubHost(<IntegrationsScreen />, new FakeGithubHost({ scope: { organizationId: "org-7" } }));
+      renderWithGithubHost(
+        <IntegrationsScreen />,
+        new FakeGithubHost({ scope: { organizationId: "org-7" } }),
+      );
 
       expect(screen.getByRole("button", { name: "Connect GitHub" })).toBeEnabled();
       expect(calls.statusQuery).toHaveBeenCalledWith({ organizationId: "org-7" });
@@ -156,7 +159,9 @@ describe("given an instance with the GitHub App configured", () => {
       expect(host.externals).toEqual(["https://github.com/settings/installations/42"]);
       expect(calls.refetch).toHaveBeenCalled();
       expect(
-        await screen.findByText("Finish uninstalling on GitHub — this updates once GitHub confirms."),
+        await screen.findByText(
+          "Finish uninstalling on GitHub — this updates once GitHub confirms.",
+        ),
       ).toBeInTheDocument();
     });
   });

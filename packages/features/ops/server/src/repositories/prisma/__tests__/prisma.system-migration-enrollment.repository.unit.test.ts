@@ -314,9 +314,7 @@ describe("PrismaSystemMigrationEnrollmentRepository", () => {
   describe("when an operator searches organizations", () => {
     /** @scenario "An operator finds an organization by name to act on it" */
     it("matches by name fragment or exact id, a short list", async () => {
-      const findMany = vi
-        .fn()
-        .mockResolvedValue([{ id: "org_acme", name: "Acme Corporation" }]);
+      const findMany = vi.fn().mockResolvedValue([{ id: "org_acme", name: "Acme Corporation" }]);
       const { repository } = repositoryWith({
         organization: { findMany },
       });

@@ -43,8 +43,7 @@ describe("routeToggleViaOrGroups", () => {
         // `status` appears in two OR groups. The helper picks the
         // first one (`fieldToGroupIds.get(field)?.[0]`) — which is
         // the one that appears earlier in the AST walk.
-        const query =
-          "(status:error OR status:warning) AND (status:info OR origin:application)";
+        const query = "(status:error OR status:warning) AND (status:info OR origin:application)";
         const analysis = analyzeOrGroups(parse(query));
         const groupIds = analysis.fieldToGroupIds.get("status");
         expect(groupIds).toBeDefined();

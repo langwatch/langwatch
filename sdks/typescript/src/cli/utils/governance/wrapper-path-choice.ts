@@ -43,10 +43,7 @@ import { lwTag } from "./brand";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
 import { copilotSeatBypassSuffix, type WrapperMode } from "./wrapper-mode";
-import {
-  resolvePlatformToolPolicy,
-  type PlatformToolPolicyMap,
-} from "./platform-tool-policy";
+import { resolvePlatformToolPolicy, type PlatformToolPolicyMap } from "./platform-tool-policy";
 
 /** Wrapper-only flag name. */
 const TOOL_MODE_FLAG = "--tool-mode";
@@ -284,8 +281,7 @@ export async function resolveWrapperPath(
     writeImpl = (s: string) => void process.stderr.write(s),
     env = process.env,
   } = opts;
-  const isTTY =
-    opts.isTTY ?? (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
+  const isTTY = opts.isTTY ?? (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
 
   // 1. Explicit override (flag or env) wins outright - no prompt, no persist.
   if (override) {
@@ -293,10 +289,7 @@ export async function resolveWrapperPath(
     // Copilot seat — every route that lands there names the shift (ADR-039
     // D3): here, the pinned branch below, the policy branches, and
     // resolveWrapperMode's downgrade.
-    if (
-      override === "gateway" &&
-      resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk
-    ) {
+    if (override === "gateway" && resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk) {
       // Policy gate: when the org disables the gateway, resolveWrapperMode
       // downgrades this run to ingestion with its own notice — warning about
       // a billing shift that then doesn't happen would be false.
@@ -311,15 +304,10 @@ export async function resolveWrapperPath(
   // 2. Remembered answer pinned in cfg.tool_mode[tool].
   const pinned = cfg.tool_mode?.[tool];
   if (pinned === "gateway" || pinned === "ingestion") {
-    if (
-      pinned === "gateway" &&
-      resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk
-    ) {
+    if (pinned === "gateway" && resolvePlatformToolPolicy(tool, cfg.tool_policies).allowVk) {
       const suffix = copilotSeatBypassSuffix(tool);
       if (suffix) {
-        writeImpl(
-          `${lwTag()} using your saved gateway preference for ${tool}.${suffix}\n`,
-        );
+        writeImpl(`${lwTag()} using your saved gateway preference for ${tool}.${suffix}\n`);
       }
     }
     return { mode: pinned, prompted: false };

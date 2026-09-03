@@ -24,9 +24,7 @@ describe("OptimizationStudioCanvas", () => {
 
       // ReactFlow defaults deleteKeyCode to "Backspace" only, so the Delete
       // key alone would not remove a selected node or connection. Bind both.
-      expect(source).toMatch(
-        /deleteKeyCode=\{\[\s*["']Backspace["']\s*,\s*["']Delete["']\s*\]\}/,
-      );
+      expect(source).toMatch(/deleteKeyCode=\{\[\s*["']Backspace["']\s*,\s*["']Delete["']\s*\]\}/);
     });
   });
 });

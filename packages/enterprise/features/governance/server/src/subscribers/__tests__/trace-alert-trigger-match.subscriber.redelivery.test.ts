@@ -28,10 +28,7 @@ class FixedTriggers extends TraceAlertTriggerPort {
 }
 
 class DeduplicatingMatchCommands extends TraceAlertTriggerMatchPort {
-  readonly commands = new Map<
-    string,
-    Parameters<TraceAlertTriggerMatchPort["send"]>[0]
-  >();
+  readonly commands = new Map<string, Parameters<TraceAlertTriggerMatchPort["send"]>[0]>();
 
   send(input: Parameters<TraceAlertTriggerMatchPort["send"]>[0]): Promise<void> {
     const key = `${input.triggerId}:${input.traceId}:${input.occurredAt}`;

@@ -12,12 +12,11 @@ A platform whose customers consume LLMs through it can meter and rebill that usa
   icon="github"
   href="https://github.com/langwatch/agent-billing-demo"
 >
-  A tiny open-source agent-platform SaaS implementing every step below: sign-up provisions
-  a real tenant key and real caps, chat rides the gateway, and the meters on screen are
-  driven by the signed events its own receiver ingests. The webhook receiver, ledger,
-  reconciliation loop, and provisioning exist in **both TypeScript and Python**. Point
-  your coding agent at that repo as the canonical integration example; every file is
-  written to be copied from.
+  A tiny open-source agent-platform SaaS implementing every step below: sign-up provisions a real
+  tenant key and real caps, chat rides the gateway, and the meters on screen are driven by the
+  signed events its own receiver ingests. The webhook receiver, ledger, reconciliation loop, and
+  provisioning exist in **both TypeScript and Python**. Point your coding agent at that repo as the
+  canonical integration example; every file is written to be copied from.
 </Card>
 
 ## What you need
@@ -119,9 +118,9 @@ response = client.chat.completions.create(
 That is the whole integration on the request side. The `user` field (or the `x-langwatch-end-user-id` header, which wins over the body) is what the per-user template enforces on and what `end_user_id` carries on every spend event. The metadata echo is how your billing joins events back to your own records without lookups.
 
 <Warning>
-  With an attributed-user template active, a request that carries **no** end-user id is
-  rejected with `error.code = "end_user_required"` rather than passing uncapped. A cap
-  evadable by omitting a field is not a cap. Send the id from day one.
+  With an attributed-user template active, a request that carries **no** end-user id is rejected
+  with `error.code = "end_user_required"` rather than passing uncapped. A cap evadable by omitting a
+  field is not a cap. Send the id from day one.
 </Warning>
 
 ## 4. Receive, verify, ingest

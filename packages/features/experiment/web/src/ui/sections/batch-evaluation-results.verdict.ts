@@ -20,10 +20,7 @@ import type {
   BTLeaderboardEntry,
 } from "../../model/batch-evaluation-results.bt-leaderboard";
 import { isIncomparable } from "../../model/batch-evaluation-results.comparability";
-import {
-  MIN_PRICED_ROWS,
-  type VariantMetrics,
-} from "./batch-evaluation-results.variant-metrics";
+import { MIN_PRICED_ROWS, type VariantMetrics } from "./batch-evaluation-results.variant-metrics";
 import { areDistinguishable } from "../../model/batch-evaluation-results.score-separation";
 
 export type LeaderboardVerdict = {
@@ -44,9 +41,7 @@ export type LeaderboardVerdict = {
   tiedIds: string[];
 };
 
-export const computeLeaderboardVerdict = (
-  leaderboard: BTLeaderboard,
-): LeaderboardVerdict => {
+export const computeLeaderboardVerdict = (leaderboard: BTLeaderboard): LeaderboardVerdict => {
   const differenceCI = leaderboard.scoreDifferenceCI;
   // Degenerate variants (no wins or no losses at all) have no meaningful
   // MLE score, so they cannot be crowned or used to unseat anyone.
@@ -228,9 +223,7 @@ export const findCheaperTiedAlternative = ({
     }))
     .filter(
       (entry): entry is { variantId: string; cost: number; rows: number } =>
-        entry.cost !== null &&
-        Number.isFinite(entry.cost) &&
-        entry.rows >= MIN_PRICED_ROWS,
+        entry.cost !== null && Number.isFinite(entry.cost) && entry.rows >= MIN_PRICED_ROWS,
     );
   if (priced.length < 2) return null;
 

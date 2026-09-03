@@ -49,11 +49,7 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
   // resolving against the LangWatch workspace.
   writeFileSync(
     join(cliRoot, "package.json"),
-    JSON.stringify(
-      { name: "langwatch-cli-host", private: true, version: "0.0.0" },
-      null,
-      2,
-    ) + "\n",
+    JSON.stringify({ name: "langwatch-cli-host", private: true, version: "0.0.0" }, null, 2) + "\n",
   );
 
   const pnpm = await resolvePnpm(ctx.paths);
@@ -63,9 +59,7 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
   });
 
   if (!existsSync(entry)) {
-    throw new Error(
-      `langwatch CLI ${LANGY_CLI_VERSION} installed but ${entry} is missing`,
-    );
+    throw new Error(`langwatch CLI ${LANGY_CLI_VERSION} installed but ${entry} is missing`);
   }
 
   // A shell shim rather than a symlink into node_modules/.bin: the workers get

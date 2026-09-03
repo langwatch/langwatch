@@ -110,9 +110,7 @@ export interface ExperimentRunProcessingPipelineDeps {
  * - recordEvaluatorResult: Emits EvaluatorResultEvent per row/evaluator
  * - completeExperimentRun: Emits ExperimentRunCompletedEvent when run finishes
  */
-export function createExperimentRunProcessingPipeline(
-  deps: ExperimentRunProcessingPipelineDeps,
-) {
+export function createExperimentRunProcessingPipeline(deps: ExperimentRunProcessingPipelineDeps) {
   const builder = definePipeline<ExperimentRunProcessingEvent>({
     name: "experiment_run_processing",
     aggregate: defineAggregate({

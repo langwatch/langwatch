@@ -37,9 +37,7 @@ const EMPTY_SECRETS = {
  * `Account` rows are the memory adapter's own, which is what makes the
  * bridge mirror observable.
  */
-export class InMemoryIdentityStorage
-  implements IdentityAccountsPort, IdentityResolutionPort
-{
+export class InMemoryIdentityStorage implements IdentityAccountsPort, IdentityResolutionPort {
   readonly credentials = new Map<string, StoredCredential>();
 
   constructor(
@@ -49,11 +47,7 @@ export class InMemoryIdentityStorage
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  async findByUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<IdentityAccountRow[]> {
+  async findByUser({ userId }: { userId: string }): Promise<IdentityAccountRow[]> {
     return this.linkedIdentifiers()
       .filter((identifier) => identifier.userId === userId)
       .map((identifier) => this.assemble(identifier));
@@ -128,11 +122,7 @@ export class InMemoryIdentityStorage
     }
   }
 
-  async deleteCredentials({
-    accountIds,
-  }: {
-    accountIds: readonly string[];
-  }): Promise<number> {
+  async deleteCredentials({ accountIds }: { accountIds: readonly string[] }): Promise<number> {
     let deleted = 0;
     for (const accountId of accountIds) {
       if (this.credentials.delete(accountId)) deleted += 1;
@@ -140,11 +130,7 @@ export class InMemoryIdentityStorage
     return deleted;
   }
 
-  async deleteBridgeAccounts({
-    accountIds,
-  }: {
-    accountIds: readonly string[];
-  }): Promise<number> {
+  async deleteBridgeAccounts({ accountIds }: { accountIds: readonly string[] }): Promise<number> {
     let deleted = 0;
     for (let index = this.accountRows.length - 1; index >= 0; index -= 1) {
       const row = this.accountRows[index];
@@ -197,9 +183,7 @@ export class InMemoryIdentityStorage
     );
   }
 
-  private resolve(
-    matches: (identifier: IdentifierFact) => boolean,
-  ): IdentityResolution | null {
+  private resolve(matches: (identifier: IdentifierFact) => boolean): IdentityResolution | null {
     for (const heads of this.heads.heads.values()) {
       for (const identifier of Object.values(heads.identifiers)) {
         if (!matches(identifier)) continue;
@@ -217,8 +201,7 @@ export class InMemoryIdentityStorage
       .flatMap((heads) => Object.values(heads.identifiers))
       .filter(
         (identifier) =>
-          typeof identifier.accountId === "string" &&
-          isLiveIdentifierState(identifier.state),
+          typeof identifier.accountId === "string" && isLiveIdentifierState(identifier.state),
       );
   }
 
@@ -231,8 +214,7 @@ export class InMemoryIdentityStorage
       userId: identifier.userId,
       // better-auth's own provider id when the credential row carries it;
       // the identifier's vocabulary is lossy for generic OAuth.
-      providerId:
-        credential?.providerId ?? identifier.providerId ?? identifier.provider,
+      providerId: credential?.providerId ?? identifier.providerId ?? identifier.provider,
       // Stated on the attach, never derived — the Prisma repository serves
       // it the same way, and a double that computed it here would hide the
       // one behaviour these rows exist to prove.
@@ -246,9 +228,7 @@ export class InMemoryIdentityStorage
 }
 
 const refuses = (method: string) => () => {
-  throw new Error(
-    `the identity branch wrote through ${method} with the gate closed`,
-  );
+  throw new Error(`the identity branch wrote through ${method} with the gate closed`);
 };
 
 /**

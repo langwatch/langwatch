@@ -36,9 +36,7 @@ describe("buildSmtpTransportOptions", () => {
 
     it("prefers the URL over discrete settings", () => {
       expect(
-        buildSmtpTransportOptions(
-          smtpConfig({ url: "smtp://localhost:1025", host: "other.host" }),
-        ),
+        buildSmtpTransportOptions(smtpConfig({ url: "smtp://localhost:1025", host: "other.host" })),
       ).toMatchObject({
         url: "smtp://localhost:1025",
       });
@@ -65,9 +63,7 @@ describe("buildSmtpTransportOptions", () => {
 
     it("lets SMTP_SECURE override the port-based default", () => {
       expect(
-        buildSmtpTransportOptions(
-          smtpConfig({ host: "relay.corp", port: "465", secure: "false" }),
-        ),
+        buildSmtpTransportOptions(smtpConfig({ host: "relay.corp", port: "465", secure: "false" })),
       ).toMatchObject({ secure: false });
     });
 
@@ -115,8 +111,7 @@ describe("SmtpEmailProvider.send", () => {
     });
   });
 
-  const makeProvider = () =>
-    SmtpEmailProvider.create(smtpConfig({ url: "smtp://localhost:1025" }));
+  const makeProvider = () => SmtpEmailProvider.create(smtpConfig({ url: "smtp://localhost:1025" }));
 
   describe("given a plain message", () => {
     /** @scenario "Every supported gateway can be selected" */

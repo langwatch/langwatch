@@ -20,11 +20,7 @@ import { publicEndpoint } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import type { Context } from "hono";
 
-import {
-  ingestBrowserTraces,
-  readCappedBody,
-  type RumRateLimiter,
-} from "./rum-ingest.service";
+import { ingestBrowserTraces, readCappedBody, type RumRateLimiter } from "./rum-ingest.service";
 
 /**
  * Names the caller for the per-caller rate-limit bucket.

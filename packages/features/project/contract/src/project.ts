@@ -34,9 +34,7 @@ export const internalProjectQuerySchema = z
   .strict();
 export type InternalProjectQuery = z.infer<typeof internalProjectQuerySchema>;
 
-export const projectPresenceInputSchema = z
-  .object({ projectId: z.string().min(1) })
-  .strict();
+export const projectPresenceInputSchema = z.object({ projectId: z.string().min(1) }).strict();
 export type ProjectPresenceInput = z.infer<typeof projectPresenceInputSchema>;
 
 export const projectJsonValueSchema = z.json();
@@ -157,9 +155,7 @@ export const activeProjectsByScopesInputSchema = z
     limit: z.number().int().positive(),
   })
   .strict();
-export type ActiveProjectsByScopesInput = z.infer<
-  typeof activeProjectsByScopesInputSchema
->;
+export type ActiveProjectsByScopesInput = z.infer<typeof activeProjectsByScopesInputSchema>;
 
 export interface ActiveProjectsByScopes {
   data: Project[];
@@ -206,9 +202,7 @@ export type ProjectNamesByIdsInput = z.infer<typeof projectNamesByIdsInputSchema
 export const projectIdsByOrganizationInputSchema = z
   .object({ organizationId: z.string().min(1) })
   .strict();
-export type ProjectIdsByOrganizationInput = z.infer<
-  typeof projectIdsByOrganizationInputSchema
->;
+export type ProjectIdsByOrganizationInput = z.infer<typeof projectIdsByOrganizationInputSchema>;
 
 export interface TraceSharingConfig {
   orgEnabled: boolean;
@@ -239,9 +233,7 @@ export const traceDestinationInputSchema = z
 export type TraceDestinationInput = z.infer<typeof traceDestinationInputSchema>;
 
 export const traceDestinationDecisionSchema = z.discriminatedUnion("outcome", [
-  z
-    .object({ outcome: z.literal("resolved"), project: traceDestinationProjectSchema })
-    .strict(),
+  z.object({ outcome: z.literal("resolved"), project: traceDestinationProjectSchema }).strict(),
   z.object({ outcome: z.literal("unknown") }).strict(),
   z
     .object({

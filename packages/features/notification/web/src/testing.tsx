@@ -41,9 +41,7 @@ export class FakeNotificationHost extends NotificationHostPort {
   }
 
   hasPermission(permission: string): boolean {
-    return (this.options.permissions ?? ["triggers:view", "triggers:manage"]).includes(
-      permission,
-    );
+    return (this.options.permissions ?? ["triggers:view", "triggers:manage"]).includes(permission);
   }
 
   succeeded(notice: NotificationSuccessNotice): void {

@@ -1,15 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type {
-  EventHandler,
-  IntentSpec,
-  WakeHandler,
-} from "@langwatch/eventing";
+import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing";
 
 const logger = createLogger("langwatch:identity:join-request-lifecycle");
 
-export const JOIN_REQUEST_LIFECYCLE_PROCESS_NAME =
-  "joinRequestLifecycle" as const;
+export const JOIN_REQUEST_LIFECYCLE_PROCESS_NAME = "joinRequestLifecycle" as const;
 
 /**
  * How long a request waits for an answer.
@@ -77,10 +72,7 @@ export type JoinRequestLifecycleIntents = {
  * re-reads the folded deadline, so a wake that fires early expires nothing.
  */
 export interface JoinRequestLifecyclePort {
-  remindAdmins(args: {
-    joinRequestId: string;
-    organizationId: string;
-  }): Promise<void>;
+  remindAdmins(args: { joinRequestId: string; organizationId: string }): Promise<void>;
   expireRequest(args: {
     joinRequestId: string;
     organizationId: string;
@@ -185,9 +177,7 @@ export const joinRequestLifecycleWake: WakeHandler<
 };
 
 export function runRemindAdmins(deps: { port: JoinRequestLifecyclePort }) {
-  return async (
-    payload: z.infer<typeof remindAdminsIntentSchema>,
-  ): Promise<void> => {
+  return async (payload: z.infer<typeof remindAdminsIntentSchema>): Promise<void> => {
     await deps.port.remindAdmins({
       joinRequestId: payload.joinRequestId,
       organizationId: payload.organizationId,
@@ -200,9 +190,7 @@ export function runRemindAdmins(deps: { port: JoinRequestLifecyclePort }) {
 }
 
 export function runExpireRequest(deps: { port: JoinRequestLifecyclePort }) {
-  return async (
-    payload: z.infer<typeof expireRequestIntentSchema>,
-  ): Promise<void> => {
+  return async (payload: z.infer<typeof expireRequestIntentSchema>): Promise<void> => {
     await deps.port.expireRequest({
       joinRequestId: payload.joinRequestId,
       organizationId: payload.organizationId,

@@ -29,9 +29,7 @@ export abstract class AnnotationService {
   abstract listForProjection(
     input: ListProjectionAnnotationsInput,
   ): Promise<ProjectionAnnotation[]>;
-  abstract listScoreNames(
-    input: ListAnnotationScoreNamesInput,
-  ): Promise<AnnotationScoreName[]>;
+  abstract listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]>;
   abstract upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore>;
   abstract listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]>;
   abstract getScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore>;
@@ -42,7 +40,5 @@ export abstract class AnnotationService {
   abstract assertQueueConfigurationReferences(
     input: AssertQueueConfigurationReferencesInput,
   ): Promise<void>;
-  abstract assertAnnotatorReferences(
-    input: AssertAnnotatorReferencesInput,
-  ): Promise<void>;
+  abstract assertAnnotatorReferences(input: AssertAnnotatorReferencesInput): Promise<void>;
 }

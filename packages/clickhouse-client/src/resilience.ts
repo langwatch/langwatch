@@ -61,9 +61,7 @@ function statusOf(error: object): number | undefined {
 const DRIVER_TIMEOUT_MESSAGE = /^timeout error\.?$/i;
 
 function isDriverTimeout(error: Error): boolean {
-  return (
-    error.name === "TimeoutError" || DRIVER_TIMEOUT_MESSAGE.test(error.message.trim())
-  );
+  return error.name === "TimeoutError" || DRIVER_TIMEOUT_MESSAGE.test(error.message.trim());
 }
 
 /**

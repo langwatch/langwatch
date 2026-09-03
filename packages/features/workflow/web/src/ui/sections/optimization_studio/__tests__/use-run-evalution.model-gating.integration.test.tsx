@@ -11,17 +11,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const {
-  mockResolvedDefault,
-  mockGenerateMutateAsync,
-  mockCommitMutateAsync,
-  mockPostEvent,
-} = vi.hoisted(() => ({
-  mockResolvedDefault: { current: null as { model: string } | null },
-  mockGenerateMutateAsync: vi.fn().mockResolvedValue("generated message"),
-  mockCommitMutateAsync: vi.fn().mockResolvedValue({ id: "v-2" }),
-  mockPostEvent: vi.fn(),
-}));
+const { mockResolvedDefault, mockGenerateMutateAsync, mockCommitMutateAsync, mockPostEvent } =
+  vi.hoisted(() => ({
+    mockResolvedDefault: { current: null as { model: string } | null },
+    mockGenerateMutateAsync: vi.fn().mockResolvedValue("generated message"),
+    mockCommitMutateAsync: vi.fn().mockResolvedValue({ id: "v-2" }),
+    mockPostEvent: vi.fn(),
+  }));
 
 vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) => selector(storeState),
@@ -73,7 +69,6 @@ const storeState = {
     state: {},
   }),
 };
-
 
 vi.mock("../history", () => ({
   useVersionState: () => ({

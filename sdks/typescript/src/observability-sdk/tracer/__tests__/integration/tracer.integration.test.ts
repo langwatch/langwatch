@@ -113,26 +113,18 @@ describe("Tracer Integration Tests", () => {
       expect(span.attributes["gen_ai.request.model"]).toBe("gpt-4");
 
       // Verify input/output data format
-      const inputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string,
-      );
+      const inputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string);
       expect(inputData.type).toBe("json");
       expect(inputData.value.messages).toHaveLength(2);
-      expect(inputData.value.messages[0].content).toBe(
-        "Generate a haiku about TypeScript",
-      );
+      expect(inputData.value.messages[0].content).toBe("Generate a haiku about TypeScript");
       expect(inputData.value.config.model).toBe("gpt-4");
 
-      const outputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_OUTPUT] as string,
-      );
+      const outputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_OUTPUT] as string);
       expect(outputData.type).toBe("json");
       expect(outputData.value.response.text).toContain("Types flow like code");
 
       // Verify metrics data format (note: corrected property names)
-      const metricsData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_METRICS] as string,
-      );
+      const metricsData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_METRICS] as string);
       expect(metricsData.type).toBe("json");
       expect(metricsData.value.promptTokens).toBe(15);
       expect(metricsData.value.completionTokens).toBe(25);
@@ -158,10 +150,7 @@ describe("Tracer Integration Tests", () => {
 
         // Child span 1
         await tracer.withActiveSpan("llm-generation", async (child1) => {
-          child1
-            .setType("llm")
-            .setInput("Generate content")
-            .setOutput("Generated content");
+          child1.setType("llm").setInput("Generate content").setOutput("Generated content");
         });
 
         // Child span 2
@@ -234,9 +223,7 @@ describe("Tracer Integration Tests", () => {
       expect(span.status.message).toBe("Integration test error");
 
       // Verify input was recorded before error
-      const inputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string,
-      );
+      const inputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string);
       expect(inputData.value).toBe("This will fail");
 
       // Verify events were recorded before error
@@ -426,9 +413,7 @@ describe("Tracer Integration Tests", () => {
       }
 
       // Verify large data was serialized correctly
-      const inputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string,
-      );
+      const inputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string);
       expect(inputData.type).toBe("json");
       expect(inputData.value.data).toHaveLength(50_000);
       expect(inputData.value.numbers).toHaveLength(1000);
@@ -553,9 +538,7 @@ describe("Tracer Integration Tests", () => {
       expect(span.attributes["recovery.test"]).toBe(true);
 
       // Input should be preserved
-      const inputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string,
-      );
+      const inputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string);
       expect(inputData.value).toBe("Valid input data");
     });
 
@@ -591,10 +574,7 @@ describe("Tracer Integration Tests", () => {
 
         // Another child after the first child completes
         await tracer.withActiveSpan("child-span-2", async (child2) => {
-          child2
-            .setType("rag")
-            .setInput("Child 2 operation")
-            .setOutput("Child 2 completed");
+          child2.setType("rag").setInput("Child 2 operation").setOutput("Child 2 completed");
         });
 
         parentSpan.setOutput("Parent workflow completed");

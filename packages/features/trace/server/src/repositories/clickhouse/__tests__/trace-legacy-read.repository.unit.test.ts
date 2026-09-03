@@ -20,8 +20,7 @@ const { mockClickHouseQuery, mockPrismaFindUnique } = vi.hoisted(() => ({
  * repository takes the resolver instead, so the fake is stated where every
  * other dependency of the read is.
  */
-const testResolveClickHouseClient = () =>
-  Promise.resolve({ query: mockClickHouseQuery } as never);
+const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -184,10 +183,7 @@ describe("ClickHouseTraceService", () => {
           traceIds: ["trace-A", "trace-B"],
         } as GetAllTracesForProjectInput;
 
-        const result = await service.getAllTracesForProject(
-          inputWithTraceIds,
-          protections,
-        );
+        const result = await service.getAllTracesForProject(inputWithTraceIds, protections);
 
         expect(result).not.toBeNull();
 
@@ -218,10 +214,7 @@ describe("ClickHouseTraceService", () => {
           traceIds: ["trace-A"],
         } as GetAllTracesForProjectInput;
 
-        const result = await service.getAllTracesForProject(
-          inputWithTraceIds,
-          protections,
-        );
+        const result = await service.getAllTracesForProject(inputWithTraceIds, protections);
 
         expect(result).not.toBeNull();
         const traces = result!.groups.flat();
@@ -248,14 +241,10 @@ describe("ClickHouseTraceService", () => {
 
         // Verify neither the count nor data query contains the TraceId IN clause
         const countCall = mockClickHouseQuery.mock.calls[0]!;
-        expect(countCall[0].query).not.toContain(
-          "ts.TraceId IN ({traceIds:Array(String)})",
-        );
+        expect(countCall[0].query).not.toContain("ts.TraceId IN ({traceIds:Array(String)})");
 
         const dataCall = mockClickHouseQuery.mock.calls[1]!;
-        expect(dataCall[0].query).not.toContain(
-          "ts.TraceId IN ({traceIds:Array(String)})",
-        );
+        expect(dataCall[0].query).not.toContain("ts.TraceId IN ({traceIds:Array(String)})");
       });
     });
 
@@ -285,7 +274,7 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId();
 
           const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+            resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
@@ -314,7 +303,7 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId();
 
           const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+            resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
@@ -326,10 +315,7 @@ describe("ClickHouseTraceService", () => {
             scrollId,
           } as GetAllTracesForProjectInput;
 
-          const result = await service.getAllTracesForProject(
-            inputWithScrollId,
-            protections,
-          );
+          const result = await service.getAllTracesForProject(inputWithScrollId, protections);
 
           expect(result).not.toBeNull();
 
@@ -349,7 +335,7 @@ describe("ClickHouseTraceService", () => {
           setupMocksForCursorTest();
 
           const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+            resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
@@ -376,7 +362,7 @@ describe("ClickHouseTraceService", () => {
           setupMocksForCursorTest();
 
           const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+            resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
@@ -408,7 +394,7 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId({ sortDirection: "asc" });
 
           const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+            resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
@@ -438,7 +424,7 @@ describe("ClickHouseTraceService", () => {
           const scrollId = makeScrollId({ pageSize: 10 });
 
           const service = new ClickHouseTraceService({
-          resolveClickHouseClient: testResolveClickHouseClient,
+            resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
               project: { findUnique: mockPrismaFindUnique },
@@ -613,9 +599,7 @@ describe("ClickHouseTraceService", () => {
         // Correlated on the outer row and bounded, so it prunes partitions
         // instead of cold-scanning every weekly partition.
         expect(sql).toContain("sp.TraceId = ts.TraceId");
-        expect(sql).toContain(
-          "sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})",
-        );
+        expect(sql).toContain("sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})");
       });
 
       it("ORs the name branches with the IO branches rather than replacing them", async () => {
@@ -956,9 +940,9 @@ describe("ClickHouseTraceService", () => {
           } as never,
         });
 
-        await expect(
-          service.getAllTracesForProject(baseInput, protections),
-        ).rejects.toThrow("SYNTAX_ERROR");
+        await expect(service.getAllTracesForProject(baseInput, protections)).rejects.toThrow(
+          "SYNTAX_ERROR",
+        );
       });
     });
 
@@ -1101,11 +1085,7 @@ describe("ClickHouseTraceService", () => {
           } as never,
         });
 
-        const traces = await service.getTracesWithSpans(
-          "proj_123",
-          traceIds,
-          protections,
-        );
+        const traces = await service.getTracesWithSpans("proj_123", traceIds, protections);
 
         expect(traces).not.toBeNull();
         expect(traces!.map((t) => t.trace_id).sort()).toEqual(traceIds);
@@ -1126,23 +1106,18 @@ describe("ClickHouseTraceService", () => {
           .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
           // batch 1: summary (0-24) then spans
           .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve(traceIds.slice(0, 25).map((id) => makeSummaryRow(id))),
+            json: () => Promise.resolve(traceIds.slice(0, 25).map((id) => makeSummaryRow(id))),
           })
           .mockResolvedValueOnce({
             json: () =>
-              Promise.resolve(
-                traceIds.slice(0, 25).map((id) => makeSpanRow(id, `${id}-s`)),
-              ),
+              Promise.resolve(traceIds.slice(0, 25).map((id) => makeSpanRow(id, `${id}-s`))),
           })
           // batch 2: summary (25-29) then spans
           .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve(traceIds.slice(25).map((id) => makeSummaryRow(id))),
+            json: () => Promise.resolve(traceIds.slice(25).map((id) => makeSummaryRow(id))),
           })
           .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve(traceIds.slice(25).map((id) => makeSpanRow(id, `${id}-s`))),
+            json: () => Promise.resolve(traceIds.slice(25).map((id) => makeSpanRow(id, `${id}-s`))),
           });
 
         const service = new ClickHouseTraceService({
@@ -1153,11 +1128,7 @@ describe("ClickHouseTraceService", () => {
           } as never,
         });
 
-        const traces = await service.getTracesWithSpans(
-          "proj_123",
-          traceIds,
-          protections,
-        );
+        const traces = await service.getTracesWithSpans("proj_123", traceIds, protections);
 
         expect(traces).toHaveLength(30);
         // call 0 = resolve, 1 = OOM full summary, 2 = summary batch1,
@@ -1315,11 +1286,7 @@ describe("ClickHouseTraceService", () => {
           } as never,
         });
 
-        const traces = await service.getTracesWithSpans(
-          "proj_123",
-          ["trace-0"],
-          protections,
-        );
+        const traces = await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
 
         // The read still succeeds; the summary just stays unbounded (the
         // pre-optimization behaviour) rather than propagating the resolve error.

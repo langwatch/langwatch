@@ -1,7 +1,10 @@
 import { BookOpen, Search, Sparkles } from "lucide-react";
 import { useMemo } from "react";
 import { topLevelNavigationCommands } from "../model/command-catalogue";
-import { MIN_SEARCH_QUERY_LENGTH, RECENT_ITEMS_DISPLAY_LIMIT } from "../model/command-bar-constants";
+import {
+  MIN_SEARCH_QUERY_LENGTH,
+  RECENT_ITEMS_DISPLAY_LIMIT,
+} from "../model/command-bar-constants";
 import { findEasterEgg } from "../model/command-easter-eggs";
 import type { ListItem } from "../model/command-icon-info";
 import type { Command, RecentItem, SearchResult } from "../model/command-bar-types";

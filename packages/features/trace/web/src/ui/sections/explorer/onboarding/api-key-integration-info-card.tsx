@@ -135,8 +135,7 @@ export function ApiKeyIntegrationInfoCard({
         onSuccess: (result) => {
           onTokenGenerated(result.token);
         },
-        onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't create API key" }),
+        onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create API key" }),
       },
     );
   };
@@ -182,9 +181,7 @@ export function ApiKeyIntegrationInfoCard({
     showEndpoint,
   });
   const code = renderEnv(realLines);
-  const highlightLines = realLines
-    .map((l, i) => (l.highlight ? i + 1 : -1))
-    .filter((n) => n > 0);
+  const highlightLines = realLines.map((l, i) => (l.highlight ? i + 1 : -1)).filter((n) => n > 0);
 
   return (
     <VStack align="stretch" gap={3}>

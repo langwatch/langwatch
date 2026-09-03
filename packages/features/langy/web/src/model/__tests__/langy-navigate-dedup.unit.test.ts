@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  navigateDedupKey,
-  reserveNavigate,
-} from "../langy-navigate-dedup";
+import { navigateDedupKey, reserveNavigate } from "../langy-navigate-dedup";
 
 describe("navigateDedupKey", () => {
   describe("given a turn id and a resolved destination", () => {

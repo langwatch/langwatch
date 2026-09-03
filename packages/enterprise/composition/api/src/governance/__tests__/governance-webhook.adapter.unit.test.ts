@@ -5,7 +5,9 @@ import type { WebhookEndpointView } from "@langwatch/enterprise-webhook-contract
 import type { WebhookDeliveryProcessDeps } from "@langwatch/enterprise-webhook-server";
 import { AppGovernanceWebhookPort } from "../governance-webhook.adapter";
 
-function endpoint(overrides: Partial<WebhookEndpointView> & { id: string; enabledEvents: string[] }): WebhookEndpointView {
+function endpoint(
+  overrides: Partial<WebhookEndpointView> & { id: string; enabledEvents: string[] },
+): WebhookEndpointView {
   return {
     organizationId: "org_1",
     destinationKind: "url",

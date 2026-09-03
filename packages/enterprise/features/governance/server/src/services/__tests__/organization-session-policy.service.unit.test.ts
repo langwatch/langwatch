@@ -45,9 +45,9 @@ describe("OrganizationSessionPolicyService", () => {
       await expect(service.setMaxDurationDays("org-1", 0)).resolves.toEqual({
         maxSessionDurationDays: 0,
       });
-      await expect(
-        service.setMaxDurationDays("org-1", SESSION_POLICY_MAX_DAYS),
-      ).resolves.toEqual({ maxSessionDurationDays: SESSION_POLICY_MAX_DAYS });
+      await expect(service.setMaxDurationDays("org-1", SESSION_POLICY_MAX_DAYS)).resolves.toEqual({
+        maxSessionDurationDays: SESSION_POLICY_MAX_DAYS,
+      });
     });
   });
 

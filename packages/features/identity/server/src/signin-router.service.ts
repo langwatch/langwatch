@@ -26,9 +26,7 @@ const logger = createLogger("langwatch:identity:signin-router");
 export interface SignInDomainRoutingPort {
   /** The connection owning an email domain, or null when none does — the
    *  same null a domain nobody ever configured produces. */
-  tryFindConnectionForDomain(input: {
-    domain: string;
-  }): Promise<RoutableConnection | null>;
+  tryFindConnectionForDomain(input: { domain: string }): Promise<RoutableConnection | null>;
   /** Every connection this instance could auto-redirect to with no address
    *  in hand (the self-hosted sole-connection rule). */
   listActiveConnections(): Promise<readonly RoutableConnection[]>;
@@ -113,13 +111,9 @@ export class SignInRouterService {
     this.recorder = deps.recorder ?? defaultRecorder;
   }
 
-  async route({
-    identifier,
-    breakGlass = false,
-  }: SignInRouteRequest): Promise<RoutingDecision> {
+  async route({ identifier, breakGlass = false }: SignInRouteRequest): Promise<RoutingDecision> {
     const granted = breakGlass ? await this.breakGlass.allow() : false;
-    const routingIdentifier =
-      identifier === null ? null : routingIdentifierOf(identifier);
+    const routingIdentifier = identifier === null ? null : routingIdentifierOf(identifier);
     const domain = routingIdentifier?.domain ?? null;
 
     const { domainConnection, activeConnections } = granted

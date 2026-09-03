@@ -60,12 +60,9 @@ export class SimulationRunsApiService {
   }
 
   async get(scenarioRunId: string): Promise<SimulationRunResponse> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/simulation-runs/{scenarioRunId}",
-      {
-        params: { path: { scenarioRunId } },
-      },
-    );
+    const { data, error } = await this.apiClient.GET("/api/simulation-runs/{scenarioRunId}", {
+      params: { path: { scenarioRunId } },
+    });
     if (error) this.handleApiError(`get simulation run "${scenarioRunId}"`, error);
     return data;
   }
@@ -73,12 +70,9 @@ export class SimulationRunsApiService {
   async listBatches(
     params: SimulationRunsBatchesListParams,
   ): Promise<SimulationRunsBatchesListResponse> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/simulation-runs/batches/list",
-      {
-        params: { query: params },
-      },
-    );
+    const { data, error } = await this.apiClient.GET("/api/simulation-runs/batches/list", {
+      params: { query: params },
+    });
     if (error) this.handleApiError("list simulation run batches", error);
     return data;
   }

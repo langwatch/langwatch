@@ -23,9 +23,7 @@ const payloadSchema = z.object({
   occurredAt: z.number(),
 });
 
-function createMockCommandHandlerClass(
-  name: string,
-): CommandHandlerClass<any, CommandType, Event> {
+function createMockCommandHandlerClass(name: string): CommandHandlerClass<any, CommandType, Event> {
   class MockCommandHandler implements CommandHandler<Command<any, any>, Event> {
     static readonly schema = defineCommandSchema(
       `test.command.${name}` as CommandType,
@@ -47,10 +45,7 @@ function createMockCommandHandlerClass(
 function createMockCommandHandlerClassWithGroupKey(
   name: string,
 ): CommandHandlerClass<any, CommandType, Event> {
-  class MockCommandHandlerWithGroupKey implements CommandHandler<
-    Command<any, any>,
-    Event
-  > {
+  class MockCommandHandlerWithGroupKey implements CommandHandler<Command<any, any>, Event> {
     static readonly schema = defineCommandSchema(
       `test.command.${name}` as CommandType,
       payloadSchema,
@@ -131,9 +126,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       };
 
       const groupKey = entry?.groupKeyFn(payload);
-      expect(groupKey).toBe(
-        `${tenantId}/command/recordResult/${aggregateType}:exp1:run1:item:42`,
-      );
+      expect(groupKey).toBe(`${tenantId}/command/recordResult/${aggregateType}:exp1:run1:item:42`);
     });
   });
 
@@ -212,9 +205,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       };
 
       const groupKey = entry?.groupKeyFn(payload);
-      expect(groupKey).toBe(
-        `${tenantId}/command/recordResult/${aggregateType}:custom:exp1:run1`,
-      );
+      expect(groupKey).toBe(`${tenantId}/command/recordResult/${aggregateType}:custom:exp1:run1`);
     });
   });
 });
@@ -353,10 +344,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).not.toHaveBeenCalledWith(
-          expect.anything(),
-          UNCOALESCED_PRODUCER_MESSAGE,
-        );
+        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), UNCOALESCED_PRODUCER_MESSAGE);
       });
     });
   });
@@ -435,10 +423,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).not.toHaveBeenCalledWith(
-          expect.anything(),
-          UNCOALESCED_PRODUCER_MESSAGE,
-        );
+        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), UNCOALESCED_PRODUCER_MESSAGE);
       });
     });
   });
@@ -460,10 +445,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).not.toHaveBeenCalledWith(
-          expect.anything(),
-          UNCOALESCED_PRODUCER_MESSAGE,
-        );
+        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), UNCOALESCED_PRODUCER_MESSAGE);
       });
     });
   });
@@ -513,10 +495,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).not.toHaveBeenCalledWith(
-          expect.anything(),
-          UNCOALESCED_PRODUCER_MESSAGE,
-        );
+        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), UNCOALESCED_PRODUCER_MESSAGE);
       });
 
       // recordSpan's own shape: sharded onto a group key, and folding only the
@@ -537,10 +516,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).not.toHaveBeenCalledWith(
-          expect.anything(),
-          UNCOALESCED_PRODUCER_MESSAGE,
-        );
+        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), UNCOALESCED_PRODUCER_MESSAGE);
       });
     });
   });
@@ -562,9 +538,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(
-          globalJobRegistry.get("test-pipeline:command:cold")?.processBatch,
-        ).toBeUndefined();
+        expect(globalJobRegistry.get("test-pipeline:command:cold")?.processBatch).toBeUndefined();
       });
     });
   });

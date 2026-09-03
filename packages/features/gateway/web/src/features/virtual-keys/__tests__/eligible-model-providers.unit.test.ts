@@ -12,23 +12,13 @@ describe("resolveProviderDefaultModel", () => {
   describe("when the provider is a self-hosted custom endpoint", () => {
     it("uses the first custom model in resolver-safe vendor/model form", () => {
       expect(
-        resolveProviderDefaultModel(
-          "custom",
-          "Custom",
-          [],
-          [{ modelId: "Qwen2.5-0.5B-Instruct" }],
-        ),
+        resolveProviderDefaultModel("custom", "Custom", [], [{ modelId: "Qwen2.5-0.5B-Instruct" }]),
       ).toBe("custom/Qwen2.5-0.5B-Instruct");
     });
 
     it("does not fall back to the OpenAI-only gpt-5-mini", () => {
       expect(
-        resolveProviderDefaultModel(
-          "custom",
-          "Custom",
-          [],
-          [{ modelId: "Qwen2.5-0.5B-Instruct" }],
-        ),
+        resolveProviderDefaultModel("custom", "Custom", [], [{ modelId: "Qwen2.5-0.5B-Instruct" }]),
       ).not.toContain("gpt-5-mini");
     });
 
@@ -326,12 +316,7 @@ describe("resolveEligible", () => {
         hierarchy,
       });
 
-      expect(rows.map((r) => r.label)).toEqual([
-        "Alpha Org",
-        "Zeta Org",
-        "Mid Team",
-        "Proj",
-      ]);
+      expect(rows.map((r) => r.label)).toEqual(["Alpha Org", "Zeta Org", "Mid Team", "Proj"]);
       expect(rows.map((r) => r.definedAt.scopeType)).toEqual([
         "ORGANIZATION",
         "ORGANIZATION",

@@ -1832,8 +1832,7 @@ export class GroupStagingScripts {
     this.queueName = queueName;
     this.keyPrefix = `${queueName}:gq:`;
     this.tenantConcurrencyCap = policy.tenantConcurrencyCap ?? DEFAULT_TENANT_CAP;
-    this.globalConcurrencyBudget =
-      policy.globalConcurrencyBudget ?? DEFAULT_GLOBAL_BUDGET;
+    this.globalConcurrencyBudget = policy.globalConcurrencyBudget ?? DEFAULT_GLOBAL_BUDGET;
   }
 
   /**
@@ -1887,9 +1886,7 @@ export class GroupStagingScripts {
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
     const dedupKey =
-      dedupId !== ""
-        ? `${this.keyPrefix}dedup:${dedupId}`
-        : `${this.keyPrefix}dedup:__none__`;
+      dedupId !== "" ? `${this.keyPrefix}dedup:${dedupId}` : `${this.keyPrefix}dedup:__none__`;
 
     const dataKey = `${this.keyPrefix}group:${groupId}:data`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
@@ -2095,10 +2092,7 @@ export class GroupStagingScripts {
       overrideDispatched > 0 &&
       overrideDispatched <= flat.length / 4
     ) {
-      gqJobsDispatchedOverrideTotal.inc(
-        { queue_name: this.queueName },
-        overrideDispatched,
-      );
+      gqJobsDispatchedOverrideTotal.inc({ queue_name: this.queueName }, overrideDispatched);
     }
 
     if (flat.length === 0) {
@@ -2485,13 +2479,7 @@ export class GroupStagingScripts {
    * Deleting it when we are NOT the owner is not harmless, which is why this is
    * a compare-and-delete — see {@link RELEASE_CLAIM_LUA}.
    */
-  async releaseClaim({
-    groupId,
-    workerId,
-  }: {
-    groupId: string;
-    workerId: string;
-  }): Promise<void> {
+  async releaseClaim({ groupId, workerId }: { groupId: string; workerId: string }): Promise<void> {
     await releaseClaimScript.run(this.redis, 1, this.claimMarkerKey(groupId), workerId);
   }
 

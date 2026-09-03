@@ -126,10 +126,7 @@ describe("LegacyApiKeyGrantService", () => {
 
   it.each([
     ["created at cutover", apiKey({ createdAt: CUTOVER_AT })],
-    [
-      "already bound",
-      apiKey({ roleBindings: [{ id: "binding-1" }] as ApiKey["roleBindings"] }),
-    ],
+    ["already bound", apiKey({ roleBindings: [{ id: "binding-1" }] as ApiKey["roleBindings"] })],
     ["user owned", apiKey({ userId: "user-1" })],
     ["ingestion", apiKey({ ingestSourceType: "claude_code" })],
   ])("does not widen a %s key", async (_label, key) => {
@@ -174,9 +171,9 @@ describe("legacy API-key grant facts", () => {
 
   it("derives a stable identity from the fact", () => {
     const derive = vi.fn(() => "grant-derived");
-    expect(
-      LegacyApiKeyGrantService.tryLegacyGrantForApiKey(apiKey(), derive)?.bindingId,
-    ).toBe("grant-derived");
+    expect(LegacyApiKeyGrantService.tryLegacyGrantForApiKey(apiKey(), derive)?.bindingId).toBe(
+      "grant-derived",
+    );
     expect(derive).toHaveBeenCalledWith({
       organizationId: "org-1",
       principal: { type: "apiKey", id: "key-1" },

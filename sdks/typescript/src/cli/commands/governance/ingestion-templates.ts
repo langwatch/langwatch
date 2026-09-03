@@ -161,10 +161,7 @@ export async function updateOttlRulesCommand(
   console.log(chalk.green("✓ OTTL rules updated"));
 }
 
-export async function archiveCommand(
-  id: string,
-  options: { json?: boolean },
-): Promise<void> {
+export async function archiveCommand(id: string, options: { json?: boolean }): Promise<void> {
   const cfg = requireLogin();
   try {
     await archiveIngestionTemplate(cfg, id);

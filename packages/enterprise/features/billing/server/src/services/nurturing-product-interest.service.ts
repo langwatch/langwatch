@@ -21,9 +21,7 @@ export type IntegrationMethodValue = "coding_agent" | "platform" | "mcp" | "manu
  * - "via-claude-desktop" -> "mcp"
  * - "manually"           -> "manual_sdk"
  */
-export function mapProductSelectionToIntegrationMethod(
-  selection: string,
-): IntegrationMethodValue {
+export function mapProductSelectionToIntegrationMethod(selection: string): IntegrationMethodValue {
   const mapping: Record<string, IntegrationMethodValue> = {
     "via-claude-code": "coding_agent",
     "via-platform": "platform",

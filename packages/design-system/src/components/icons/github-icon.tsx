@@ -1,11 +1,6 @@
 export function GitHubIcon({ size = 32 }: { size?: number }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 98 96"
-      width={size}
-      height={size}
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 98 96" width={size} height={size}>
       <path
         fill="currentColor"
         fillRule="evenodd"

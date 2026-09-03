@@ -43,9 +43,7 @@ export function resolveLocalUrl(options: { port?: string; url?: string }): strin
     // The URL is stored in the agent's platform config and printed by the
     // session, so credentials embedded in it would leak both ways.
     if (parsed.username || parsed.password) {
-      fail(
-        "--url must not carry a username or password. Pass the URL without credentials.",
-      );
+      fail("--url must not carry a username or password. Pass the URL without credentials.");
     }
     return options.url;
   }
@@ -117,9 +115,7 @@ function agentFromFlag({
   httpAgents: AgentResponse[];
 }): AgentResponse {
   const byId = all.find((agent) => agent.id === agentFlag);
-  const byName = httpAgents.filter(
-    (agent) => agent.name.toLowerCase() === agentFlag.toLowerCase(),
-  );
+  const byName = httpAgents.filter((agent) => agent.name.toLowerCase() === agentFlag.toLowerCase());
   const match = byId ?? byName[0];
   if (!match) {
     fail(

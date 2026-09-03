@@ -134,9 +134,7 @@ export function useAutoExpansion({
       if (unseenIds.length === 0) return;
       const firstSeenIndex = currentIds.findIndex((id) => cached.seen.has(id));
       const newArrivals =
-        firstSeenIndex === -1
-          ? currentIds.slice(0, 1)
-          : currentIds.slice(0, firstSeenIndex);
+        firstSeenIndex === -1 ? currentIds.slice(0, 1) : currentIds.slice(0, firstSeenIndex);
       for (const id of unseenIds) cached.seen.add(id);
       for (const id of newArrivals) cached.expanded.add(id);
       setExpandedIds(new Set(cached.expanded));

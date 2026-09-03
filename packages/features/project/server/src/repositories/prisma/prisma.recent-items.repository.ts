@@ -145,10 +145,7 @@ export class PrismaRecentItemsRepository {
   /**
    * Get annotation queue by ID and projectId (required for multi-tenancy)
    */
-  async tryGetAnnotationQueueById(
-    id: string,
-    projectId: string,
-  ): Promise<RecentSluggedRow | null> {
+  async tryGetAnnotationQueueById(id: string, projectId: string): Promise<RecentSluggedRow | null> {
     return this.prisma.annotationQueue.findFirst({
       where: { id, projectId },
       select: {

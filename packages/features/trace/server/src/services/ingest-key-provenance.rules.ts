@@ -186,9 +186,7 @@ export function dropForeignScopesForVscodeKey(
       rs.scopeSpans = r.kept;
       dropped += r.dropped;
     }
-    request.resourceSpans = request.resourceSpans.filter(
-      (rs) => (rs.scopeSpans?.length ?? 0) > 0,
-    );
+    request.resourceSpans = request.resourceSpans.filter((rs) => (rs.scopeSpans?.length ?? 0) > 0);
   }
   if (request.resourceMetrics) {
     for (const rm of request.resourceMetrics) {
@@ -382,9 +380,7 @@ function writeApiKeyIdOnResource(
 
 function dropApiKeyId(holder: OtlpAttributeHolder): void {
   if (!holder.attributes) return;
-  holder.attributes = holder.attributes.filter(
-    (a) => a.key !== PROVENANCE_ATTR_API_KEY_ID,
-  );
+  holder.attributes = holder.attributes.filter((a) => a.key !== PROVENANCE_ATTR_API_KEY_ID);
 }
 
 function dropApiKeyIdFromSpan(span: OtlpSpanLike): void {

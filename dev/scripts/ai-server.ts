@@ -14,9 +14,7 @@ async function initObservability() {
   const apiKey = process.env.LANGWATCH_API_KEY;
   const endpoint = process.env.LANGWATCH_ENDPOINT;
 
-  console.log(
-    `[ai-server] LANGWATCH_API_KEY: ${apiKey ? `${apiKey.slice(0, 8)}...` : "NOT SET"}`,
-  );
+  console.log(`[ai-server] LANGWATCH_API_KEY: ${apiKey ? `${apiKey.slice(0, 8)}...` : "NOT SET"}`);
   console.log(`[ai-server] LANGWATCH_ENDPOINT: ${endpoint ?? "NOT SET"}`);
 
   if (apiKey) {
@@ -32,9 +30,7 @@ async function initObservability() {
     tracer = getLangWatchTracer("ai-server");
     console.log("[ai-server] LangWatch observability initialized (debug mode)");
   } else {
-    console.warn(
-      "[ai-server] WARNING: No LANGWATCH_API_KEY — traces will NOT be exported",
-    );
+    console.warn("[ai-server] WARNING: No LANGWATCH_API_KEY — traces will NOT be exported");
   }
 }
 void initObservability();
@@ -110,11 +106,7 @@ type RequestBody = {
   messages?: Array<{ role: string; content: string }>;
 };
 
-function jsonResponse(
-  res: import("node:http").ServerResponse,
-  status: number,
-  data: unknown,
-) {
+function jsonResponse(res: import("node:http").ServerResponse, status: number, data: unknown) {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify(data));
 }
@@ -231,9 +223,7 @@ const server = createServer(async (req, res) => {
             return generateText({
               model: openai(model),
               system: SYSTEM_PROMPT,
-              messages: messages as NonNullable<
-                Parameters<typeof generateText>[0]["messages"]
-              >,
+              messages: messages as NonNullable<Parameters<typeof generateText>[0]["messages"]>,
               tools: { get_weather: weatherTool },
               stopWhen: stepCountIs(3),
               experimental_telemetry: { isEnabled: true },
@@ -243,9 +233,7 @@ const server = createServer(async (req, res) => {
         return generateText({
           model: openai(model),
           system: SYSTEM_PROMPT,
-          messages: messages as NonNullable<
-            Parameters<typeof generateText>[0]["messages"]
-          >,
+          messages: messages as NonNullable<Parameters<typeof generateText>[0]["messages"]>,
           tools: { get_weather: weatherTool },
           stopWhen: stepCountIs(3),
           experimental_telemetry: { isEnabled: true },
@@ -260,9 +248,7 @@ const server = createServer(async (req, res) => {
       );
       if (toolCalls.length > 0) {
         for (const tc of toolCalls) {
-          console.log(
-            `[${timestamp}]   tool_call: ${tc.toolName}(${JSON.stringify(tc.input)})`,
-          );
+          console.log(`[${timestamp}]   tool_call: ${tc.toolName}(${JSON.stringify(tc.input)})`);
         }
       }
       // Log active span after generation to verify OTEL context

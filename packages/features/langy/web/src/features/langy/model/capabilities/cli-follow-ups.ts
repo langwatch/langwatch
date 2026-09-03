@@ -4,7 +4,10 @@ import {
   SUGGESTION_LABEL,
 } from "../../../../index";
 import type { FollowUpSuggestion, SettledToolResult } from "../../../../index";
-import { featureForCliToolName, featuresConsuming } from "../../../../model/shared/langy/feature-map";
+import {
+  featureForCliToolName,
+  featuresConsuming,
+} from "../../../../model/shared/langy/feature-map";
 
 const featureMap = { featureForCliToolName, featuresConsuming };
 

@@ -29,10 +29,7 @@
  *
  * Spec: packages/features/project/specs/project-service.feature.
  */
-import {
-  ProjectPermissionDeniedError,
-  type AuthzPermission,
-} from "@langwatch/authz-contract";
+import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   CannotArchiveCurrentProjectError,

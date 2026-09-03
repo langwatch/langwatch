@@ -36,10 +36,7 @@ import type { PlanInfo } from "./license-plan";
 export function floorAtOssBaseline(plan: PlanInfo): PlanInfo {
   return {
     ...plan,
-    maxMessagesPerMonth: Math.max(
-      plan.maxMessagesPerMonth,
-      UNLIMITED_PLAN.maxMessagesPerMonth,
-    ),
+    maxMessagesPerMonth: Math.max(plan.maxMessagesPerMonth, UNLIMITED_PLAN.maxMessagesPerMonth),
     canPublish: plan.canPublish || UNLIMITED_PLAN.canPublish,
   };
 }

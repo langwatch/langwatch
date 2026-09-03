@@ -13,9 +13,7 @@ export const IMAGE_EXAMPLE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
  * parameter values, so structured inputs (lists, dicts, json schemas, chat
  * messages) come from the dataset and are not offered as constant parameters.
  */
-export function exampleParameterValue(
-  type: string,
-): string | number | boolean | undefined {
+export function exampleParameterValue(type: string): string | number | boolean | undefined {
   switch (type) {
     case "str":
       return "example";

@@ -20,9 +20,7 @@ export class PrismaCostAttributionPolicyRepository extends CostAttributionPolicy
   }
 
   static create(client: unknown): PrismaCostAttributionPolicyRepository {
-    return new PrismaCostAttributionPolicyRepository(
-      client as CostAttributionPrismaClient,
-    );
+    return new PrismaCostAttributionPolicyRepository(client as CostAttributionPrismaClient);
   }
 
   async enabledCodingAssistantConfigs(organizationId: string): Promise<unknown[]> {

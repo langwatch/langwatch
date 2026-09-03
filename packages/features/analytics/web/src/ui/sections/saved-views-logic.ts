@@ -58,9 +58,7 @@ export const DEFAULT_VIEWS: DefaultView[] = [
  * - undefined/null/empty arrays are treated as absent
  * - Nested objects have their arrays sorted recursively
  */
-export function normalizeFilterValue(
-  value: FilterParam | undefined,
-): FilterParam | undefined {
+export function normalizeFilterValue(value: FilterParam | undefined): FilterParam | undefined {
   if (value === undefined || value === null) return undefined;
 
   if (Array.isArray(value)) {
@@ -84,17 +82,12 @@ export function normalizeFilterValue(
         .filter(Boolean) as [string, string[]][];
 
       if (innerEntries.length === 0) return null;
-      return [
-        k,
-        Object.fromEntries(innerEntries.sort(([a], [b]) => a.localeCompare(b))),
-      ] as const;
+      return [k, Object.fromEntries(innerEntries.sort(([a], [b]) => a.localeCompare(b)))] as const;
     })
     .filter(Boolean) as [string, FilterParam][];
 
   if (entries.length === 0) return undefined;
-  return Object.fromEntries(
-    entries.sort(([a], [b]) => a.localeCompare(b)),
-  ) as FilterParam;
+  return Object.fromEntries(entries.sort(([a], [b]) => a.localeCompare(b))) as FilterParam;
 }
 
 /**

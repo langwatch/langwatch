@@ -115,10 +115,7 @@ describe.skipIf(!databaseUrl)("outbox backlog drain under slow deliveries", () =
           leaseDurationMs: 1_500,
           handlers: {
             "test.persist": async ({ message }) => {
-              invocations.set(
-                message.messageKey,
-                (invocations.get(message.messageKey) ?? 0) + 1,
-              );
+              invocations.set(message.messageKey, (invocations.get(message.messageKey) ?? 0) + 1);
               await sleep(handlerMs);
             },
           },
@@ -148,9 +145,7 @@ describe.skipIf(!databaseUrl)("outbox backlog drain under slow deliveries", () =
       expect(released).toBeGreaterThan(0);
       expect(fenced).toBe(0);
       expect(invocations.size).toBe(total);
-      expect([...invocations.values()].every((count) => count === 1)).toBe(
-        true,
-      );
+      expect([...invocations.values()].every((count) => count === 1)).toBe(true);
     });
   });
 

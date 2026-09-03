@@ -144,8 +144,7 @@ async function enqueueOutcomeCount(outcome: string): Promise<number> {
   return snapshot.values
     .filter(
       (value) =>
-        value.labels.projection_name === PROJECTION_NAME &&
-        value.labels.outcome === outcome,
+        value.labels.projection_name === PROJECTION_NAME && value.labels.outcome === outcome,
     )
     .reduce((sum, value) => sum + value.value, 0);
 }
@@ -195,8 +194,7 @@ describe("map projection enqueue-time contract", () => {
         );
         const projection = makeProjection({
           appended,
-          filter: (event) =>
-            String((event.data as { marker?: string }).marker).startsWith("keep"),
+          filter: (event) => String((event.data as { marker?: string }).marker).startsWith("keep"),
         });
         const router = makeInlineRouter({ ...projection, map });
 
@@ -230,9 +228,7 @@ describe("map projection enqueue-time contract", () => {
           }),
         );
 
-        await expect(
-          router.dispatch([makeEvent("keep-1")], readContext),
-        ).resolves.toBeUndefined();
+        await expect(router.dispatch([makeEvent("keep-1")], readContext)).resolves.toBeUndefined();
         expect(queued().map((event) => event.id)).toEqual(["evt-keep-1"]);
       });
     });

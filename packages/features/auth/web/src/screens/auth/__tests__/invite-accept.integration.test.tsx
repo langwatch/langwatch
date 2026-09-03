@@ -107,12 +107,8 @@ describe("Accept invite page", () => {
       it("offers both a dashboard escape hatch and a re-login action", () => {
         renderAccept();
 
-        expect(
-          screen.getByRole("button", { name: "Go to Dashboard" }),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByRole("button", { name: "Log Out and Try Again" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Go to Dashboard" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Log Out and Try Again" })).toBeInTheDocument();
       });
     });
 

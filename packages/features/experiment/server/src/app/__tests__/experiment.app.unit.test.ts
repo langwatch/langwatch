@@ -72,7 +72,11 @@ function harness({
     tryGetById: vi.fn(async () => experiment),
     archive: vi.fn(async () => ({ success: true as const })),
     getRunAggregates: vi.fn(async () => ({})),
-    saveWorkbenchState: vi.fn(async () => ({ experimentId: "experiment-1", slug: "s", version: 1 })),
+    saveWorkbenchState: vi.fn(async () => ({
+      experimentId: "experiment-1",
+      slug: "s",
+      version: 1,
+    })),
     createEvaluationsV3: vi.fn(async () => ({
       experimentId: "experiment-1",
       slug: "s",
@@ -222,7 +226,10 @@ describe("ExperimentApp", () => {
 
       await app.saveWorkbenchState(
         { projectId: "project-1", id: "experiment-1", state: {} },
-        { kind: "credential", resolved: apiKeyToken({ userId: "user-2", isLangySessionKey: false }) },
+        {
+          kind: "credential",
+          resolved: apiKeyToken({ userId: "user-2", isLangySessionKey: false }),
+        },
       );
 
       expect(firstCall(experiments.saveWorkbenchState).actor).toEqual({
@@ -247,7 +254,10 @@ describe("ExperimentApp", () => {
 
       await app.saveWorkbenchState(
         { projectId: "project-1", id: "experiment-1", state: {} },
-        { kind: "credential", resolved: apiKeyToken({ userId: "user-2", isLangySessionKey: true }) },
+        {
+          kind: "credential",
+          resolved: apiKeyToken({ userId: "user-2", isLangySessionKey: true }),
+        },
       );
 
       expect(firstCall(experiments.saveWorkbenchState).actor).toEqual({

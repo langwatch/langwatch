@@ -143,8 +143,7 @@ async function assertSessionTraces(opts: {
             costUsd: acc.costUsd + (t.metrics?.total_cost ?? 0),
             inputTokens: acc.inputTokens + (t.metrics?.prompt_tokens ?? 0),
             outputTokens: acc.outputTokens + (t.metrics?.completion_tokens ?? 0),
-            cacheReadTokens:
-              acc.cacheReadTokens + (t.metrics?.cache_read_input_tokens ?? 0),
+            cacheReadTokens: acc.cacheReadTokens + (t.metrics?.cache_read_input_tokens ?? 0),
             traceCount: acc.traceCount + 1,
           }),
           {
@@ -214,9 +213,7 @@ function checkReactViteArtifacts(workDir: string, cliName: string): void {
   const deps = { ...pkgJson.dependencies, ...pkgJson.devDependencies };
   if (!deps.react && !deps["react-dom"] && !deps.vite) {
     // eslint-disable-next-line no-console
-    console.warn(
-      `[matrix] ${cliName} · package.json present but missing react/vite deps`,
-    );
+    console.warn(`[matrix] ${cliName} · package.json present but missing react/vite deps`);
   }
 }
 
@@ -243,9 +240,7 @@ describe("AI Gateway — coding-agent matrix", () => {
     "claude-code · React vite hello world · trace + cost + cache captured",
     async () => {
       const vk = vkFor("anthropic")!;
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "lw-cmatrix-claude-vite-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "lw-cmatrix-claude-vite-"));
       const since = new Date();
       const start = Date.now();
 
@@ -422,9 +417,7 @@ describe("AI Gateway — coding-agent matrix", () => {
     "gemini-cli · React vite hello world · trace + cost + cache captured",
     async () => {
       const vk = vkFor("gemini")!;
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "lw-cmatrix-gemini-vite-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "lw-cmatrix-gemini-vite-"));
       const since = new Date();
       const start = Date.now();
 
@@ -518,9 +511,7 @@ describe("AI Gateway — coding-agent matrix", () => {
     "opencode · React vite hello world · trace + cost + cache captured",
     async () => {
       const vk = vkFor("openai")!;
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "lw-cmatrix-opencode-vite-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "lw-cmatrix-opencode-vite-"));
       const configDir = path.join(tempFolder, "opencode-config");
       fs.mkdirSync(configDir, { recursive: true });
       fs.writeFileSync(

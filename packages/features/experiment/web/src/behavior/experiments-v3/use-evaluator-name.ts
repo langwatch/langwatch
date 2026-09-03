@@ -1,9 +1,6 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
+import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import type { EvaluatorConfig } from "../../model/experiments-v3/types";
 
@@ -16,8 +13,7 @@ import type { EvaluatorConfig } from "../../model/experiments-v3/types";
  * agent read one name for one evaluator.
  */
 const typeName = (evaluator: EvaluatorConfig): string =>
-  AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes]?.name ??
-  evaluator.evaluatorType;
+  AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes]?.name ?? evaluator.evaluatorType;
 
 /**
  * What one evaluator is called, in order:
@@ -41,19 +37,14 @@ export const resolveEvaluatorName = ({
 }: {
   evaluator: EvaluatorConfig;
   dbName?: string | null;
-}): string =>
-  evaluator.localEvaluatorConfig?.name?.trim() ||
-  dbName?.trim() ||
-  typeName(evaluator);
+}): string => evaluator.localEvaluatorConfig?.name?.trim() || dbName?.trim() || typeName(evaluator);
 
 /**
  * Batch-fetch display names for multiple evaluators.
  *
  * Returns a stable Map<evaluatorConfigId, displayName>.
  */
-export const useEvaluatorNames = (
-  evaluators: EvaluatorConfig[],
-): Map<string, string> => {
+export const useEvaluatorNames = (evaluators: EvaluatorConfig[]): Map<string, string> => {
   const { project } = useOrganizationTeamProject();
 
   const queries = api.useQueries((t) =>
@@ -112,9 +103,7 @@ export const useEvaluatorName = (evaluator: EvaluatorConfig): string => {
  * cache), so detection adds no extra requests and is ready by the time the
  * chip has rendered its name.
  */
-export const useCodeEvaluatorIds = (
-  evaluators: EvaluatorConfig[],
-): Set<string> => {
+export const useCodeEvaluatorIds = (evaluators: EvaluatorConfig[]): Set<string> => {
   const { project } = useOrganizationTeamProject();
 
   const queries = api.useQueries((t) =>
@@ -138,9 +127,7 @@ export const useCodeEvaluatorIds = (
 
   return useMemo(() => {
     return new Set(
-      evaluators
-        .filter((_ev, index) => queries[index]?.data?.type === "code")
-        .map((ev) => ev.id),
+      evaluators.filter((_ev, index) => queries[index]?.data?.type === "code").map((ev) => ev.id),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codeKey]);

@@ -1,13 +1,4 @@
-import {
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Input,
-  RadioGroup,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Card, Heading, HStack, Input, RadioGroup, Text, VStack } from "@chakra-ui/react";
 import type { DomainJoinSetting } from "@langwatch/identity-contract";
 import { useState } from "react";
 
@@ -60,9 +51,7 @@ export function DomainJoinCard({
     .split(",")
     .map((domain) => domain.trim())
     .filter(Boolean);
-  const unchanged =
-    selected === domainJoin &&
-    parsedDomains.join(",") === joinDomains.join(",");
+  const unchanged = selected === domainJoin && parsedDomains.join(",") === joinDomains.join(",");
 
   return (
     <Card.Root width="full" data-testid="domain-join-card">
@@ -73,16 +62,14 @@ export function DomainJoinCard({
               Who can join your organization
             </Heading>
             <Text color="fg.muted" fontSize="sm">
-              Colleagues who verify an address on your company domain can find
-              you instead of starting a workspace of their own.
+              Colleagues who verify an address on your company domain can find you instead of
+              starting a workspace of their own.
             </Text>
           </VStack>
 
           <RadioGroup.Root
             value={selected}
-            onValueChange={(event) =>
-              setSelected((event.value ?? "request") as DomainJoinSetting)
-            }
+            onValueChange={(event) => setSelected((event.value ?? "request") as DomainJoinSetting)}
           >
             <VStack align="stretch" gap={3}>
               {OPTIONS.map((option) => (
@@ -112,8 +99,8 @@ export function DomainJoinCard({
                 data-testid="domain-join-domains"
               />
               <Text color="fg.muted" fontSize="sm">
-                Company domains only, and at least two of your members must have
-                verified an address on one before it can be used.
+                Company domains only, and at least two of your members must have verified an address
+                on one before it can be used.
               </Text>
             </VStack>
           )}
@@ -123,9 +110,7 @@ export function DomainJoinCard({
               colorPalette="orange"
               loading={saving}
               disabled={unchanged}
-              onClick={() =>
-                onSave({ domainJoin: selected, domains: parsedDomains })
-              }
+              onClick={() => onSave({ domainJoin: selected, domains: parsedDomains })}
             >
               Save
             </Button>

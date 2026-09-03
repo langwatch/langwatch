@@ -15,9 +15,7 @@ import { useEffect, useRef, useState } from "react";
  * list takes over the panel body and remounts on the way back, and a
  * mount-time-only listener would be left holding the dead element.
  */
-export function useScrolledFromTop(
-  scrollRef: React.RefObject<HTMLElement | null>,
-): boolean {
+export function useScrolledFromTop(scrollRef: React.RefObject<HTMLElement | null>): boolean {
   const [isScrolledFromTop, setIsScrolledFromTop] = useState(false);
   const subscribedRef = useRef<HTMLElement | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);

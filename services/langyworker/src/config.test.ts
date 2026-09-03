@@ -77,13 +77,9 @@ describe("parseConfig", () => {
           }),
         ),
       ).toThrow(/model\.api/);
-      expect(() => parseConfig(JSON.stringify({ personaPrompt: "x" }))).toThrow(
-        /invalid/,
-      );
+      expect(() => parseConfig(JSON.stringify({ personaPrompt: "x" }))).toThrow(/invalid/);
       // A corrupt file names itself, so the boot log points at the path.
-      expect(() => parseConfig("not json")).toThrow(
-        /\.langy-worker\.json: not valid JSON/,
-      );
+      expect(() => parseConfig("not json")).toThrow(/\.langy-worker\.json: not valid JSON/);
     });
   });
 });

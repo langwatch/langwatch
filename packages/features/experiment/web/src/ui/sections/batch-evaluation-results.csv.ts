@@ -80,10 +80,7 @@ const NO_VERDICT_WINNER = "no_verdict";
  * it: the variant's display name, falling back to the raw identifier for a
  * candidate the run has dropped since it was judged.
  */
-const comparisonVariantName = (
-  column: BatchComparisonColumn,
-  variantId: string,
-): string =>
+const comparisonVariantName = (column: BatchComparisonColumn, variantId: string): string =>
   column.variants.find((variant) => variant.id === variantId)?.name ?? variantId;
 
 /**
@@ -277,9 +274,7 @@ const buildCsvRow = (row: BatchResultRow, data: BatchEvaluationData): string[] =
     }
 
     for (const evalId of evaluatorIds) {
-      const evalResult = targetOutput?.evaluatorResults.find(
-        (e) => e.evaluatorId === evalId,
-      );
+      const evalResult = targetOutput?.evaluatorResults.find((e) => e.evaluatorId === evalId);
 
       if (!evalResult) {
         // Empty values for: score, passed, label, details, cost, duration

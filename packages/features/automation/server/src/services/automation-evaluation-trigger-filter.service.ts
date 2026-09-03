@@ -7,7 +7,9 @@ import { AutomationEvaluationTriggerFilterPort } from "../ports/automation-evalu
  * app filter implementation cannot drift from the feature's trigger contract.
  */
 export class AutomationEvaluationTriggerFilterService extends AutomationEvaluationTriggerFilterPort {
-  static create(traces: AutomationEvaluationQueryClassificationPort): AutomationEvaluationTriggerFilterService {
+  static create(
+    traces: AutomationEvaluationQueryClassificationPort,
+  ): AutomationEvaluationTriggerFilterService {
     return new AutomationEvaluationTriggerFilterService(traces);
   }
 

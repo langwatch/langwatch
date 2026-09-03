@@ -12,10 +12,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { trace as otelTrace } from "@opentelemetry/api";
 
-import {
-  nodeErrorToDomainError,
-  type StudioServerEvent,
-} from "@langwatch/workflow-contract";
+import { nodeErrorToDomainError, type StudioServerEvent } from "@langwatch/workflow-contract";
 import { EvaluatorExecutionError } from "@langwatch/evaluation-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import {
@@ -48,9 +45,7 @@ export type ResultMapperConfig = {
  * - "target-1" -> { targetId: "target-1", evaluatorId: undefined }
  * - "target-1.eval-1" -> { targetId: "target-1", evaluatorId: "eval-1" }
  */
-export const parseNodeId = (
-  nodeId: string,
-): { targetId: string; evaluatorId?: string } => {
+export const parseNodeId = (nodeId: string): { targetId: string; evaluatorId?: string } => {
   const dotIndex = nodeId.indexOf(".");
   if (dotIndex === -1) {
     return { targetId: nodeId };
@@ -255,9 +250,7 @@ const persistableInputs = (
   return {
     candidates: candidates.map((candidate) => ({
       id:
-        candidate && typeof candidate === "object"
-          ? (candidate as { id?: unknown }).id
-          : undefined,
+        candidate && typeof candidate === "object" ? (candidate as { id?: unknown }).id : undefined,
     })),
   };
 };
@@ -321,16 +314,12 @@ export const mapEvaluatorResult = (
           error_type: "EvaluatorError",
           details: rawErrorDetails,
           traceback: [],
-          ...(classifiedDomainError
-            ? { domainError: classifiedDomainError.serialize() }
-            : {}),
+          ...(classifiedDomainError ? { domainError: classifiedDomainError.serialize() } : {}),
         }
       : {
           status: "processed",
           // Strip score for guardrail-type evaluators where score is just 0 or 1
-          score: options?.stripScore
-            ? undefined
-            : coerceScore(executionState.outputs?.score),
+          score: options?.stripScore ? undefined : coerceScore(executionState.outputs?.score),
           passed: coercePassed(executionState.outputs?.passed),
           label:
             typeof executionState.outputs?.label === "string"
@@ -341,13 +330,10 @@ export const mapEvaluatorResult = (
           // (default None -> null), so we filter out null/undefined to prevent
           // the "sticky details" bug where details appears even after removal.
           details:
-            typeof executionState.outputs?.details === "string" &&
-            executionState.outputs.details
+            typeof executionState.outputs?.details === "string" && executionState.outputs.details
               ? executionState.outputs.details
               : undefined,
-          cost: executionState.cost
-            ? { currency: "USD", amount: executionState.cost }
-            : undefined,
+          cost: executionState.cost ? { currency: "USD", amount: executionState.cost } : undefined,
         };
 
   return {
@@ -408,8 +394,7 @@ export const mapNlpEvent = ({
   // Determine if this is a target or evaluator node
   if (targetNodes.has(component_id)) {
     // Target node
-    const isEvaluatorAsTarget =
-      config?.evaluatorTargetNodeIds?.has(component_id) ?? false;
+    const isEvaluatorAsTarget = config?.evaluatorTargetNodeIds?.has(component_id) ?? false;
     return mapTargetResult(
       component_id,
       rowIndex,
@@ -427,9 +412,7 @@ export const mapNlpEvent = ({
   } else if (isEvaluatorNode(component_id)) {
     // Evaluator node - check if score should be stripped
     const { evaluatorId } = parseNodeId(component_id);
-    const stripScore = evaluatorId
-      ? config?.stripScoreEvaluatorIds?.has(evaluatorId)
-      : false;
+    const stripScore = evaluatorId ? config?.stripScoreEvaluatorIds?.has(evaluatorId) : false;
 
     return mapEvaluatorResult(
       component_id,
@@ -573,13 +556,10 @@ export const mapWorkflowEvaluatorResult = (
               ? executionState.outputs.label
               : undefined,
           details:
-            typeof executionState.outputs?.details === "string" &&
-            executionState.outputs.details
+            typeof executionState.outputs?.details === "string" && executionState.outputs.details
               ? executionState.outputs.details
               : undefined,
-          cost: executionState.cost
-            ? { currency: "USD", amount: executionState.cost }
-            : undefined,
+          cost: executionState.cost ? { currency: "USD", amount: executionState.cost } : undefined,
         };
 
   return {

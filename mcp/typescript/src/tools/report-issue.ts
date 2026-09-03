@@ -68,10 +68,7 @@ function redactReport(params: ReportIssueParams): RedactedReport {
   };
 }
 
-async function deliverReport(
-  report: RedactedReport,
-  params: ReportIssueParams,
-): Promise<string> {
+async function deliverReport(report: RedactedReport, params: ReportIssueParams): Promise<string> {
   const config = getConfig();
   const endpoint = config.endpoint.replace(/\/+$/, "");
 
@@ -141,9 +138,7 @@ export async function handleReportIssue(params: ReportIssueParams): Promise<stri
     `Report sent to the LangWatch team (${id}). Thank you!`,
     `Redacted ${report.redactedCount} sensitive value${report.redactedCount === 1 ? "" : "s"} locally before sending.`,
     ...(report.sessionTruncated
-      ? [
-          "The session content was truncated to the most recent activity to fit the upload limit.",
-        ]
+      ? ["The session content was truncated to the most recent activity to fit the upload limit."]
       : []),
     "Reports like this directly shape what gets fixed next.",
   ].join(" ");

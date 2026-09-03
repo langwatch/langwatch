@@ -67,27 +67,19 @@ export const getTriggerCommand = async (id: string): Promise<CommandResult | voi
         console.log(
           `    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`,
         );
-        console.log(
-          `    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`,
-        );
-        console.log(
-          `    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`,
-        );
+        console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
+        console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
         console.log(
           `    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`,
         );
         if (trigger.platformUrl) {
-          console.log(
-            `    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`,
-          );
+          console.log(`    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`);
         }
 
         if (Object.keys(trigger.filters).length > 0) {
           console.log();
           console.log(chalk.bold("  Filters:"));
-          console.log(
-            `    ${JSON.stringify(trigger.filters, null, 2).split("\n").join("\n    ")}`,
-          );
+          console.log(`    ${JSON.stringify(trigger.filters, null, 2).split("\n").join("\n    ")}`);
         }
 
         console.log();

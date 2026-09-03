@@ -31,17 +31,14 @@ export function RedisStatTile({ data }: { data: RedisData }) {
       ? (data.redisMemoryUsedBytes / data.redisMemoryMaxBytes) * 100
       : null;
 
-  const memoryWarning =
-    memoryPercentRaw !== null && memoryPercentRaw >= MEMORY_WARN_PERCENT;
+  const memoryWarning = memoryPercentRaw !== null && memoryPercentRaw >= MEMORY_WARN_PERCENT;
   const cpuWarning =
     data.redisEngineCpuPercent !== null && data.redisEngineCpuPercent >= CPU_WARN_PERCENT;
 
   const memoryCaption =
     memoryPercentRaw === null
       ? "memory"
-      : `${Math.round(memoryPercentRaw * 10) / 10}% of ${formatBytes(
-          data.redisMemoryMaxBytes,
-        )}`;
+      : `${Math.round(memoryPercentRaw * 10) / 10}% of ${formatBytes(data.redisMemoryMaxBytes)}`;
 
   return (
     <Stat.Root
@@ -59,9 +56,7 @@ export function RedisStatTile({ data }: { data: RedisData }) {
           testId="redis-memory-stat"
         />
         <RedisFigure
-          value={
-            data.redisEngineCpuPercent === null ? "—" : `${data.redisEngineCpuPercent}%`
-          }
+          value={data.redisEngineCpuPercent === null ? "—" : `${data.redisEngineCpuPercent}%`}
           caption={data.redisEngineCpuPercent === null ? "sampling" : "processor"}
           warning={cpuWarning}
           testId="redis-engine-cpu-stat"

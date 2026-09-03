@@ -24,13 +24,9 @@ describe("PageLayout", () => {
 
   describe("given a header", () => {
     it("rules off the page below itself by default", () => {
-      renderWithDesignSystem(
-        <PageLayout.Header data-testid="header">Datasets</PageLayout.Header>,
-      );
+      renderWithDesignSystem(<PageLayout.Header data-testid="header">Datasets</PageLayout.Header>);
 
-      expect(getComputedStyle(screen.getByTestId("header")).borderBottomStyle).toBe(
-        "solid",
-      );
+      expect(getComputedStyle(screen.getByTestId("header")).borderBottomStyle).toBe("solid");
     });
 
     it("drops the rule when the page draws its own", () => {
@@ -40,9 +36,7 @@ describe("PageLayout", () => {
         </PageLayout.Header>,
       );
 
-      expect(getComputedStyle(screen.getByTestId("header")).borderBottomStyle).toBe(
-        "none",
-      );
+      expect(getComputedStyle(screen.getByTestId("header")).borderBottomStyle).toBe("none");
     });
   });
 
@@ -62,9 +56,7 @@ describe("PageLayout", () => {
 
       // The generated class is the layout: two containers sharing a sidebar
       // width must land on the same one, and a different width must not.
-      expect(screen.getByTestId("same").className).toBe(
-        screen.getByTestId("default").className,
-      );
+      expect(screen.getByTestId("same").className).toBe(screen.getByTestId("default").className);
       expect(screen.getByTestId("narrow").className).not.toBe(
         screen.getByTestId("default").className,
       );

@@ -138,9 +138,7 @@ describe("IOViewer translate action", () => {
       expect(screen.getByText(/Hej två/)).toBeInTheDocument();
       expect(screen.queryByText(/TRANSLATED::/)).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: /translate/i })).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /show original/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /show original/i })).not.toBeInTheDocument();
     });
   });
 

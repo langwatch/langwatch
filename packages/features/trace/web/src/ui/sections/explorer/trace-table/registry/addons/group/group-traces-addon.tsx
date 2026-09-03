@@ -44,16 +44,10 @@ interface GroupedTraceRowProps {
   density: DensityTokens;
 }
 
-const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({
-  trace,
-  groupBy,
-  colCount,
-  density,
-}) => {
+const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({ trace, groupBy, colCount, density }) => {
   const { openDrawer, currentDrawer } = useDrawer();
   const params = useDrawerParams();
-  const selectedTraceId =
-    currentDrawer === "traceV2Details" ? (params.traceId ?? null) : null;
+  const selectedTraceId = currentDrawer === "traceV2Details" ? (params.traceId ?? null) : null;
   const isSelected = selectedTraceId === trace.traceId;
   const variant = rowVariantFor({ isSelected, status: trace.status });
   const style = ROW_STYLES[variant];
@@ -71,26 +65,14 @@ const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({
       cursor="pointer"
       onClick={() => openDrawer("traceV2Details", { traceId: trace.traceId })}
     >
-      <Td
-        padding={0}
-        borderLeftWidth="2px"
-        borderLeftColor={style.borderColor}
-        colSpan={colCount}
-      >
+      <Td padding={0} borderLeftWidth="2px" borderLeftColor={style.borderColor} colSpan={colCount}>
         <VStack gap={0} align="stretch">
           <HStack gap={2} paddingX={2} paddingLeft={6} paddingY={density.rowPaddingY}>
             <StatusDot status={trace.status} size="6px" />
             <MonoCell color="fg.subtle" flexShrink={0}>
               {formatRelativeTime(trace.timestamp)}
             </MonoCell>
-            <Text
-              textStyle="sm"
-              fontWeight="500"
-              color="fg"
-              truncate
-              flex={1}
-              minWidth={0}
-            >
+            <Text textStyle="sm" fontWeight="500" color="fg" truncate flex={1} minWidth={0}>
               {trace.name}
             </Text>
             {groupBy !== "service" && trace.serviceName && (
@@ -99,9 +81,7 @@ const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({
               </MonoCell>
             )}
             <MonoCell flexShrink={0}>{formatDuration(trace.durationMs)}</MonoCell>
-            <MonoCell flexShrink={0}>
-              {formatCost(trace.totalCost, trace.tokensEstimated)}
-            </MonoCell>
+            <MonoCell flexShrink={0}>{formatCost(trace.totalCost, trace.tokensEstimated)}</MonoCell>
             {groupBy !== "model" && trace.models[0] && (
               <MonoCell truncate maxW="16rem" title={trace.models[0]}>
                 {trace.models[0]}

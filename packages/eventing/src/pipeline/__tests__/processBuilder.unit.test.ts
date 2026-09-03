@@ -94,10 +94,7 @@ describe("ProcessManagerBuilder", () => {
     describe("when onWake declares future intent factories", () => {
       it("builds the schedule-onWake-intent chain", () => {
         type SweepIntents = { evaluateGraph: IntentSpec<typeof payloadSchema> };
-        const sweep: WakeHandler<{ lastWakeAt: number | null }, SweepIntents> = (
-          state,
-          ctx,
-        ) => ({
+        const sweep: WakeHandler<{ lastWakeAt: number | null }, SweepIntents> = (state, ctx) => ({
           state: { lastWakeAt: ctx.at },
           intents: [
             ctx.intents.evaluateGraph(`sweep:${ctx.at}`, {
@@ -121,24 +118,19 @@ describe("ProcessManagerBuilder", () => {
     });
 
     describe("when the interval cannot advance time", () => {
-      it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
-        "rejects everyMs=%s",
-        (everyMs) => {
-          expect(() =>
-            buildProcessManager<ProcessTestEvent>({
-              name: "invalidSweep",
-              applier: (pm) =>
-                pm
-                  .state({ lastWakeAt: null as number | null })
-                  .schedule({ everyMs })
-                  .onWake<{ evaluateGraph: IntentSpec<typeof payloadSchema> }>(
-                    (state) => ({ state }),
-                  )
-                  .intent("evaluateGraph", payloadSchema, async () => {}),
-            }),
-          ).toThrow(/positive finite number/);
-        },
-      );
+      it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])("rejects everyMs=%s", (everyMs) => {
+        expect(() =>
+          buildProcessManager<ProcessTestEvent>({
+            name: "invalidSweep",
+            applier: (pm) =>
+              pm
+                .state({ lastWakeAt: null as number | null })
+                .schedule({ everyMs })
+                .onWake<{ evaluateGraph: IntentSpec<typeof payloadSchema> }>((state) => ({ state }))
+                .intent("evaluateGraph", payloadSchema, async () => {}),
+          }),
+        ).toThrow(/positive finite number/);
+      });
     });
   });
 
@@ -150,18 +142,14 @@ describe("ProcessManagerBuilder", () => {
           pm
             .state({ count: 0 })
             .intent("recordCount", z.object({ count: z.number() }), async () => {})
-            .onSignal(
-              "increment",
-              z.object({ by: z.number().int() }),
-              (state, data, ctx) => ({
-                state: { count: state.count + data.by },
-                intents: [
-                  ctx.intents.recordCount(`count:${state.count + data.by}`, {
-                    count: state.count + data.by,
-                  }),
-                ],
-              }),
-            ),
+            .onSignal("increment", z.object({ by: z.number().int() }), (state, data, ctx) => ({
+              state: { count: state.count + data.by },
+              intents: [
+                ctx.intents.recordCount(`count:${state.count + data.by}`, {
+                  count: state.count + data.by,
+                }),
+              ],
+            })),
       });
 
       expect(definition.config.eventTypes).toEqual([]);

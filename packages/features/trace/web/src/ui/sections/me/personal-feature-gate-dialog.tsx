@@ -50,24 +50,18 @@ export function PersonalFeatureGateDialog({
         <Dialog.Body>
           <VStack align="start" gap={3}>
             <Text fontSize="sm">
-              {label} is part of the advanced-features bundle for your personal workspace.
-              Turning it on enables Evaluations, Datasets, Annotations, and Automations
-              together.
+              {label} is part of the advanced-features bundle for your personal workspace. Turning
+              it on enables Evaluations, Datasets, Annotations, and Automations together.
             </Text>
             <Text fontSize="xs" color="fg.muted">
-              You can disable them later in /me/configure, your data is preserved and
-              reappears on re-enable.
+              You can disable them later in /me/configure, your data is preserved and reappears on
+              re-enable.
             </Text>
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
           <HStack gap={2}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={state.onCancel}
-              disabled={state.isEnabling}
-            >
+            <Button variant="ghost" size="sm" onClick={state.onCancel} disabled={state.isEnabling}>
               Cancel
             </Button>
             <Button

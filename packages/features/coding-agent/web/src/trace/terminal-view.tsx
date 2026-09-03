@@ -19,11 +19,7 @@ import {
 import { formatDurationSeconds } from "../duration";
 import { type CacheRebuildEvent, findCacheRebuilds } from "./token-timeline";
 import { toolResultBodyToString } from "./tool-result-body";
-import {
-  CLAUDE_MARK_GRADIENT,
-  TERMINAL_FONT_STACK,
-  TERMINAL_TOKENS,
-} from "./terminal-palette";
+import { CLAUDE_MARK_GRADIENT, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette";
 import { SyntaxHighlightedCode } from "./terminal-syntax-highlighted-code";
 import type { SessionBanner } from "./terminal-session-banner";
 import type { TurnDivider } from "./terminal-session-scrollback";
@@ -107,9 +103,7 @@ const CONTEXT_HEAT_BANDS = [
   { minTokens: 50_000, color: TERMINAL_TOKENS.yellow, label: "growing" },
 ] as const;
 
-function contextHeatBand(
-  contextTokens: number,
-): (typeof CONTEXT_HEAT_BANDS)[number] | null {
+function contextHeatBand(contextTokens: number): (typeof CONTEXT_HEAT_BANDS)[number] | null {
   return CONTEXT_HEAT_BANDS.find((band) => contextTokens >= band.minTokens) ?? null;
 }
 
@@ -414,9 +408,7 @@ export const TerminalView = memo(function TerminalView({
   // all mean calls exist above the window that the markers cannot see.
   const scrollbackStatus = scrollback?.status;
   const historyComplete =
-    scrollbackStatus === undefined ||
-    scrollbackStatus === "hidden" ||
-    scrollbackStatus === "start";
+    scrollbackStatus === undefined || scrollbackStatus === "hidden" || scrollbackStatus === "start";
   const contextMarkers = useMemo(
     () => buildContextMarkers({ entries, visibleIndices, historyComplete }),
     [entries, visibleIndices, historyComplete],
@@ -524,9 +516,7 @@ export const TerminalView = memo(function TerminalView({
     const previousFirst = prevFirstEntryRef.current;
     const nextFirst = entries[0];
     const prepended =
-      previousFirst !== undefined &&
-      nextFirst !== previousFirst &&
-      entries.includes(previousFirst);
+      previousFirst !== undefined && nextFirst !== previousFirst && entries.includes(previousFirst);
     prependedThisCommitRef.current = prepended;
     prevFirstEntryRef.current = nextFirst;
     const statusChanged = prevStatusRef.current !== scrollbackStatus;
@@ -625,9 +615,7 @@ export const TerminalView = memo(function TerminalView({
   // An agent that reported usage but no content has entries and no beats to
   // walk, which read as "step 1/0" while standing on nothing.
   const trackedStep =
-    visibleIndices.length === 0
-      ? 0
-      : Math.max(0, visibleIndices.indexOf(trackedFullIndex)) + 1;
+    visibleIndices.length === 0 ? 0 : Math.max(0, visibleIndices.indexOf(trackedFullIndex)) + 1;
 
   if (entries.length === 0) {
     return (
@@ -670,8 +658,8 @@ export const TerminalView = memo(function TerminalView({
           />
           {visibleIndices.length === 0 && entries.length > 0 && (
             <Text {...CELL} color={TERMINAL_TOKENS.faint}>
-              This agent reported tokens and timing only: its telemetry carries no
-              conversation content to replay. The totals below are real.
+              This agent reported tokens and timing only: its telemetry carries no conversation
+              content to replay. The totals below are real.
             </Text>
           )}
           {visibleIndices.map((fullIndex) => {
@@ -763,13 +751,7 @@ function modelAt({
  */
 function JumpToBottomPill({ onClick }: { onClick: () => void }) {
   return (
-    <Box
-      position="absolute"
-      bottom="44px"
-      left="50%"
-      transform="translateX(-50%)"
-      zIndex={1}
-    >
+    <Box position="absolute" bottom="44px" left="50%" transform="translateX(-50%)" zIndex={1}>
       <Text
         asChild
         {...CELL}
@@ -812,10 +794,7 @@ function flatMark(rows: readonly string[], color: string): MarkSpec {
 }
 
 /** Per-character-column colors — how gemini's chevron shades left to right. */
-function columnColoredMark(
-  rows: readonly string[],
-  columnColors: readonly string[],
-): MarkSpec {
+function columnColoredMark(rows: readonly string[], columnColors: readonly string[]): MarkSpec {
   return {
     rows: rows.map((row) =>
       [...row].map((char, column) => ({
@@ -1007,13 +986,7 @@ function ScrollbackTop({
   }
 
   if (status === "loading") {
-    return (
-      <ScrollbackLine
-        glyph="⋯"
-        color={TERMINAL_TOKENS.faint}
-        text="loading earlier turn"
-      />
-    );
+    return <ScrollbackLine glyph="⋯" color={TERMINAL_TOKENS.faint} text="loading earlier turn" />;
   }
 
   if (status === "error") {
@@ -1049,15 +1022,7 @@ function ScrollbackTop({
 }
 
 /** A single faint row, the same shape the session's other notes use. */
-function ScrollbackLine({
-  glyph,
-  color,
-  text,
-}: {
-  glyph: string;
-  color: string;
-  text: string;
-}) {
+function ScrollbackLine({ glyph, color, text }: { glyph: string; color: string; text: string }) {
   return (
     <HStack align="flex-start" gap={2}>
       <Glyph char={glyph} color={color} />
@@ -1103,9 +1068,7 @@ function ScrollbackButton({
 function TurnDividerLine({ divider }: { divider: TurnDivider }) {
   return (
     <RuleLine
-      label={`turn ${divider.turnNumber}/${divider.turnCount} · ${clockTime(
-        divider.atMs,
-      )}`}
+      label={`turn ${divider.turnNumber}/${divider.turnCount} · ${clockTime(divider.atMs)}`}
     />
   );
 }
@@ -1173,13 +1136,7 @@ function gradientColorAt(index: number, length: number): string {
   return stops[stopIndex] ?? stops[stops.length - 1]!;
 }
 
-function EntryLine({
-  entry,
-  toolSpans,
-}: {
-  entry: TranscriptEntry;
-  toolSpans: ToolSpanIndex;
-}) {
+function EntryLine({ entry, toolSpans }: { entry: TranscriptEntry; toolSpans: ToolSpanIndex }) {
   switch (entry.kind) {
     case "system_prompt":
       return <SystemContextLine text={entry.text} chars={entry.chars} />;
@@ -1212,21 +1169,11 @@ function SystemContextLine({ text, chars }: { text: string; chars: number }) {
         {/* A real button rather than an aria-labelled row: the header has to
             answer Enter and Space, not just a pointer. Typed explicitly so a
             surrounding form cannot make it a submit. */}
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-        >
+        <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
           <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
-          <Text
-            {...CELL}
-            color={TERMINAL_TOKENS.faint}
-            flex={1}
-            minWidth={0}
-            textAlign="start"
-          >
-            session context: {chars.toLocaleString("en-US")} chars of system prompt and
-            tools {expanded ? "(click to collapse)" : "(click to expand)"}
+          <Text {...CELL} color={TERMINAL_TOKENS.faint} flex={1} minWidth={0} textAlign="start">
+            session context: {chars.toLocaleString("en-US")} chars of system prompt and tools{" "}
+            {expanded ? "(click to collapse)" : "(click to expand)"}
           </Text>
         </button>
       </HStack>
@@ -1285,19 +1232,9 @@ function NotificationLine({ label, body }: { label: string; body: string }) {
       <HStack asChild align="flex-start" gap={2} cursor="pointer" width="100%">
         {/* A real button, typed explicitly: inside a form, the default `type`
             would be submit. */}
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-        >
+        <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
           <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
-          <Text
-            {...CELL}
-            color={TERMINAL_TOKENS.faint}
-            flex={1}
-            minWidth={0}
-            textAlign="start"
-          >
+          <Text {...CELL} color={TERMINAL_TOKENS.faint} flex={1} minWidth={0} textAlign="start">
             {label} {expanded ? "(click to collapse)" : "(click to expand)"}
           </Text>
         </button>
@@ -1394,17 +1331,12 @@ function ToolCall({
   // echo the model was handed. Falls back to the transcript's own output.
   const ranOutput = ran?.output ?? ran?.content ?? null;
   const transcriptOutput =
-    ranOutput === null && entry.output !== null
-      ? toolResultBodyToString(entry.output)
-      : null;
+    ranOutput === null && entry.output !== null ? toolResultBodyToString(entry.output) : null;
 
   return (
     <VStack align="stretch" gap={0.5}>
       <HStack align="flex-start" gap={2}>
-        <Glyph
-          char={GLYPH.bullet}
-          color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.faint}
-        />
+        <Glyph char={GLYPH.bullet} color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.faint} />
         {/* One flowing block, not nested spans with their own box — nesting
             `fontWeight="bold"` on an inline child was giving a wrapped
             second line extra indent from its own inline-block layout. */}
@@ -1477,13 +1409,7 @@ function RejectedLine({ name, reason }: { name: string | null; reason: string | 
  * mid-session context compaction. These live only in the logs, so without them
  * the session reads as if they never happened.
  */
-function NoteLine({
-  level,
-  text,
-}: {
-  level: "info" | "warning" | "error";
-  text: string;
-}) {
+function NoteLine({ level, text }: { level: "info" | "warning" | "error"; text: string }) {
   const color =
     level === "error"
       ? TERMINAL_TOKENS.red
@@ -1513,10 +1439,7 @@ function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
           TERMINAL_TOKENS.red,
           `Cache rebuilt: ${formatTokens(marker.cacheCreationTokens)} tokens re-sent instead of reusing ${formatTokens(marker.previousContextTokens)} tokens cached`,
         ]
-      : [
-          marker.color,
-          `Context ${marker.label}: ${formatTokens(marker.contextTokens)} tokens`,
-        ];
+      : [marker.color, `Context ${marker.label}: ${formatTokens(marker.contextTokens)} tokens`];
   return (
     <HStack align="flex-start" gap={2}>
       <Glyph char={GLYPH.note} color={color} />
@@ -1664,13 +1587,7 @@ function StatusLine({
     >
       <AsciiBox>
         <HStack gap={2}>
-          <Text
-            {...CELL}
-            color={TERMINAL_TOKENS.blue}
-            fontWeight="bold"
-            flexShrink={0}
-            aria-hidden
-          >
+          <Text {...CELL} color={TERMINAL_TOKENS.blue} fontWeight="bold" flexShrink={0} aria-hidden>
             ❯
           </Text>
           <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate minWidth={0} flex={1}>
@@ -1693,9 +1610,7 @@ function StatusLine({
           {/* Session-scale time: the clock is anchored at the session's first
               turn, so it runs into hours and reads as a person says it. */}
           {elapsedMs > 0 && <Stat label={formatDurationSeconds(elapsedMs / 1000)} />}
-          {tokens !== null && tokens > 0 && (
-            <Stat label={`${formatTokens(tokens)} tokens`} />
-          )}
+          {tokens !== null && tokens > 0 && <Stat label={`${formatTokens(tokens)} tokens`} />}
           {costLabel !== null && <Stat label={costLabel} accent />}
         </HStack>
       </HStack>

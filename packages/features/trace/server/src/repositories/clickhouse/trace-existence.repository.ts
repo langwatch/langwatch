@@ -11,7 +11,9 @@ import type { TraceClickHouseResolver } from "../../ports/clickhouse.port";
 import { TraceExistencePort } from "../../ports/trace-existence.port";
 
 export class ClickHouseTraceExistenceRepository extends TraceExistencePort {
-  static create(options: { resolveClient: TraceClickHouseResolver }): ClickHouseTraceExistenceRepository {
+  static create(options: {
+    resolveClient: TraceClickHouseResolver;
+  }): ClickHouseTraceExistenceRepository {
     return new ClickHouseTraceExistenceRepository(options.resolveClient);
   }
 

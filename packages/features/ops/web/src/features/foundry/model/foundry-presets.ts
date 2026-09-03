@@ -64,8 +64,7 @@ export const builtInPresets: Preset[] = [
   {
     id: "rag-pipeline",
     name: "RAG Pipeline",
-    description:
-      "Retrieval-Augmented Generation: retrieve documents then generate with context",
+    description: "Retrieval-Augmented Generation: retrieve documents then generate with context",
     builtIn: true,
     config: {
       id: "rag-pipeline",
@@ -181,8 +180,7 @@ export const builtInPresets: Preset[] = [
                   },
                   {
                     role: "assistant",
-                    content:
-                      "I need to use two tools: weather_lookup and currency_convert.",
+                    content: "I need to use two tools: weather_lookup and currency_convert.",
                   },
                 ],
                 metrics: { promptTokens: 45, completionTokens: 30 },
@@ -481,8 +479,7 @@ export const builtInPresets: Preset[] = [
                     messages: [
                       {
                         role: "user",
-                        content:
-                          "Analyze this sales data: 1250 transactions, $4.5M revenue...",
+                        content: "Analyze this sales data: 1250 transactions, $4.5M revenue...",
                       },
                       {
                         role: "assistant",
@@ -776,8 +773,7 @@ export const builtInPresets: Preset[] = [
                   },
                   {
                     role: "assistant",
-                    content:
-                      "I'll search for that information using the web_search tool.",
+                    content: "I'll search for that information using the web_search tool.",
                   },
                 ],
                 temperature: 0.7,
@@ -947,8 +943,7 @@ export const builtInPresets: Preset[] = [
   {
     id: "langchain-rag",
     name: "LangChain RAG",
-    description:
-      "LangChain-style RAG chain with retriever and LLM using langchain callback spans",
+    description: "LangChain-style RAG chain with retriever and LLM using langchain callback spans",
     builtIn: true,
     config: {
       id: "langchain-rag",
@@ -1170,8 +1165,7 @@ export const builtInPresets: Preset[] = [
   {
     id: "crewai-crew",
     name: "CrewAI Crew",
-    description:
-      "A CrewAI multi-agent crew with researcher and writer agents collaborating",
+    description: "A CrewAI multi-agent crew with researcher and writer agents collaborating",
     builtIn: true,
     config: {
       id: "crewai-crew",
@@ -1560,8 +1554,7 @@ export const builtInPresets: Preset[] = [
   {
     id: "user-feedback-events",
     name: "User Feedback (Thumbs Up/Down)",
-    description:
-      "A chatbot trace with thumbs up, thumbs down, and custom feedback events",
+    description: "A chatbot trace with thumbs up, thumbs down, and custom feedback events",
     builtIn: true,
     config: {
       id: "user-feedback-events",
@@ -1735,8 +1728,7 @@ export const builtInPresets: Preset[] = [
                 messages: [
                   {
                     role: "system",
-                    content:
-                      "Answer based on the provided context about return policies.",
+                    content: "Answer based on the provided context about return policies.",
                   },
                   { role: "user", content: "What is the return policy?" },
                   {
@@ -1847,8 +1839,7 @@ export const builtInPresets: Preset[] = [
               },
               output: {
                 type: "text",
-                value:
-                  "Classify the intent of: I want to cancel my subscription and get a refund",
+                value: "Classify the intent of: I want to cancel my subscription and get a refund",
               },
             }),
             span({
@@ -1948,8 +1939,7 @@ export const builtInPresets: Preset[] = [
               input: {
                 type: "json",
                 value: {
-                  template:
-                    "Generate empathetic follow-up given sentiment: {{customer_sentiment}}",
+                  template: "Generate empathetic follow-up given sentiment: {{customer_sentiment}}",
                 },
               },
               output: {
@@ -1974,8 +1964,7 @@ export const builtInPresets: Preset[] = [
               input: {
                 type: "json",
                 value: {
-                  template:
-                    "Summarize conversation in {{format}} format:\n{{conversation}}",
+                  template: "Summarize conversation in {{format}} format:\n{{conversation}}",
                 },
               },
               output: {
@@ -2009,8 +1998,7 @@ export const builtInPresets: Preset[] = [
   {
     id: "data-format-showcase",
     name: "Data Format Showcase",
-    description:
-      "Demonstrates all input/output formats: text, JSON, chat_messages, raw, and list",
+    description: "Demonstrates all input/output formats: text, JSON, chat_messages, raw, and list",
     builtIn: true,
     config: {
       id: "data-format-showcase",
@@ -2154,8 +2142,7 @@ export const builtInPresets: Preset[] = [
                   },
                   {
                     role: "tool",
-                    content:
-                      '{"temperature": 15, "condition": "partly cloudy", "humidity": 72}',
+                    content: '{"temperature": 15, "condition": "partly cloudy", "humidity": 72}',
                   },
                   {
                     role: "assistant",
@@ -2246,8 +2233,7 @@ export const builtInPresets: Preset[] = [
                   },
                   {
                     role: "user",
-                    content:
-                      "Create a support ticket for order #12345 with priority high",
+                    content: "Create a support ticket for order #12345 with priority high",
                   },
                   {
                     role: "assistant",
@@ -2277,8 +2263,7 @@ export const builtInPresets: Preset[] = [
                   },
                   {
                     role: "user",
-                    content:
-                      "Create a support ticket for order #12345 with priority high",
+                    content: "Create a support ticket for order #12345 with priority high",
                   },
                 ],
               },

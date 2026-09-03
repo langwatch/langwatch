@@ -12,10 +12,7 @@
 import type { EvaluatorConfig } from "@langwatch/experiment-contract";
 import type { StudioServerEvent, WorkflowService } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  executeCell,
-  type ExperimentRunPorts,
-} from "../experiment-run-orchestrator.service";
+import { executeCell, type ExperimentRunPorts } from "../experiment-run-orchestrator.service";
 import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
 
 const scripted: {
@@ -133,9 +130,7 @@ describe("given an evaluator attached to a target column", () => {
       const results = events.filter((e) => e.type === "evaluator_result");
       expect(results).toHaveLength(1);
       expect(results[0]?.result.status).toBe("error");
-      expect((results[0]?.result as { error_type?: string }).error_type).toBe(
-        "NoInputsResolved",
-      );
+      expect((results[0]?.result as { error_type?: string }).error_type).toBe("NoInputsResolved");
       expect(scripted.dispatched).toHaveLength(0);
     });
 
@@ -144,9 +139,7 @@ describe("given an evaluator attached to a target column", () => {
       const events = await runCell(makeCell(gradingEvaluator(false)));
 
       const result = events.find((e) => e.type === "evaluator_result");
-      expect((result?.result as { details?: string }).details).toContain(
-        "Exact Match Evaluator",
-      );
+      expect((result?.result as { details?: string }).details).toContain("Exact Match Evaluator");
       expect((result?.result as { details?: string }).details).toContain(
         "Map its fields in the evaluator settings",
       );

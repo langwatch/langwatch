@@ -30,10 +30,7 @@ import { Badge, Button, Card, Heading, HStack, Spinner, Text, VStack } from "@ch
 import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
 import { githubApi } from "../../behavior/github-api";
-import {
-  GITHUB_ERROR_QUERY_KEY,
-  githubInstallAddress,
-} from "../../model/github-install-address";
+import { GITHUB_ERROR_QUERY_KEY, githubInstallAddress } from "../../model/github-install-address";
 import { useGithubHost } from "../../model/github-host";
 import { GithubInstallationRow } from "../../ui/elements/github-installation-row";
 
@@ -122,9 +119,9 @@ function GithubConnectionCard({ organizationId }: { organizationId: string }) {
             ) : null}
           </HStack>
           <Text fontSize="sm" color="fg.muted">
-            Lets LangWatch open pull requests on the repositories you choose, and link coding
-            agent sessions to the pull requests they produced. Pull requests are made by the
-            LangWatch app and credit you as the requester.
+            Lets LangWatch open pull requests on the repositories you choose, and link coding agent
+            sessions to the pull requests they produced. Pull requests are made by the LangWatch app
+            and credit you as the requester.
           </Text>
 
           {!configured ? (

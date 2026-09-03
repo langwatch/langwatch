@@ -46,9 +46,7 @@ export const rewriteCodeSignature = (
     /def (__call__|forward)\([\s\S]*?\)(\s*->\s*[^:\n]+)?:/,
     (_match, methodName: string, returnType: string | undefined) =>
       `def ${methodName}(self, ${inputs
-        .map(
-          (i) => `${i.identifier}: ${typesMap[i.type as Field["type"]] ?? "Any"} = None`,
-        )
+        .map((i) => `${i.identifier}: ${typesMap[i.type as Field["type"]] ?? "Any"} = None`)
         .join(", ")})${returnType ?? ""}:`,
   );
   if (next.includes(": Any") && !next.includes("from typing import Any")) {

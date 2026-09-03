@@ -15,8 +15,7 @@ function checkPipelineErrors(
 ): void {
   if (!results) throw new Error(`Pipeline returned null during ${operation}`);
   for (const [err] of results) {
-    if (err)
-      throw new Error(`Pipeline command failed during ${operation}: ${err.message}`);
+    if (err) throw new Error(`Pipeline command failed during ${operation}: ${err.message}`);
   }
 }
 

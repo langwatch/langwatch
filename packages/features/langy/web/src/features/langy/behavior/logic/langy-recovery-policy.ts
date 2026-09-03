@@ -264,8 +264,7 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
 };
 
 /** The kinds with an explicit, deliberate policy. Pinned by the unit test. */
-export const LANGY_RECOVERY_POLICIES: Readonly<Record<string, LangyRecoveryPolicy>> =
-  POLICIES;
+export const LANGY_RECOVERY_POLICIES: Readonly<Record<string, LangyRecoveryPolicy>> = POLICIES;
 
 /**
  * The policy for an error kind. Anything unrecognised — including a kind the

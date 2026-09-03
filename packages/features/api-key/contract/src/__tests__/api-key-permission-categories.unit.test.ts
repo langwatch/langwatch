@@ -34,16 +34,11 @@ describe("PERMISSION_CATEGORIES", () => {
         ...category.readPermissions,
         ...category.writePermissions,
       ])) {
-        owners.set(permission, [
-          ...(owners.get(permission) ?? []),
-          category.key,
-        ]);
+        owners.set(permission, [...(owners.get(permission) ?? []), category.key]);
       }
     }
 
-    const uncovered = categorizablePermissions().filter(
-      (permission) => !owners.has(permission),
-    );
+    const uncovered = categorizablePermissions().filter((permission) => !owners.has(permission));
     expect(
       uncovered,
       "Registry permissions missing from PERMISSION_CATEGORIES — add them to a category",
@@ -51,10 +46,7 @@ describe("PERMISSION_CATEGORIES", () => {
 
     const claimedTwice = [...owners.entries()]
       .filter(([, categoryKeys]) => categoryKeys.length > 1)
-      .map(
-        ([permission, categoryKeys]) =>
-          `${permission}: ${categoryKeys.join(", ")}`,
-      );
+      .map(([permission, categoryKeys]) => `${permission}: ${categoryKeys.join(", ")}`);
     expect(
       claimedTwice,
       "Permissions claimed by more than one category — granting one category would hand over the other's resources",
@@ -63,14 +55,10 @@ describe("PERMISSION_CATEGORIES", () => {
     // The only permissions outside the categories are the platform tier,
     // which can never ride on an API key — so no category may name one.
     const categorizable = new Set<string>(categorizablePermissions());
-    const platformOnly = ALL_PERMISSIONS.filter(
-      (permission) => !categorizable.has(permission),
-    );
+    const platformOnly = ALL_PERMISSIONS.filter((permission) => !categorizable.has(permission));
     expect(platformOnly).toEqual(["ops:view", "ops:manage"]);
 
-    const platformInCategory = platformOnly.filter((permission) =>
-      owners.has(permission),
-    );
+    const platformInCategory = platformOnly.filter((permission) => owners.has(permission));
     expect(
       platformInCategory,
       "Platform-tier permissions cannot ride on an API key — remove them from the categories",
@@ -131,12 +119,8 @@ describe("PERMISSION_CATEGORIES", () => {
     // Why they cannot be offered separately: the request path answers a
     // create or delete check with the category's own manage grant, so a
     // narrower category would describe a separation that does not exist.
-    expect(
-      hasPermissionWithHierarchy(["project:manage"], "project:create"),
-    ).toBe(true);
-    expect(
-      hasPermissionWithHierarchy(["project:manage"], "project:delete"),
-    ).toBe(true);
+    expect(hasPermissionWithHierarchy(["project:manage"], "project:create")).toBe(true);
+    expect(hasPermissionWithHierarchy(["project:manage"], "project:delete")).toBe(true);
   });
 
   /** @scenario "write" access includes all mutating permissions for that resource */
@@ -178,9 +162,7 @@ describe("categoryPermissions()", () => {
   describe("when level is read", () => {
     /** @scenario "read" access maps to view permission */
     it("returns view permission for Traces", () => {
-      expect(categoryPermissions({ key: "traces", level: "read" })).toEqual([
-        "traces:view",
-      ]);
+      expect(categoryPermissions({ key: "traces", level: "read" })).toEqual(["traces:view"]);
     });
 
     it("returns every view permission for multi-resource categories", () => {
@@ -201,9 +183,7 @@ describe("categoryPermissions()", () => {
 
   describe("when key is unknown", () => {
     it("returns empty array", () => {
-      expect(
-        categoryPermissions({ key: "nonexistent", level: "read" }),
-      ).toEqual([]);
+      expect(categoryPermissions({ key: "nonexistent", level: "read" })).toEqual([]);
     });
   });
 });
@@ -212,9 +192,7 @@ describe("computePermissionsFromSelections()", () => {
   describe("when all categories are none", () => {
     /** @scenario Selecting no categories produces an empty permission set */
     it("returns an empty array", () => {
-      expect(
-        computePermissionsFromSelections({ traces: "none", cost: "none" }),
-      ).toEqual([]);
+      expect(computePermissionsFromSelections({ traces: "none", cost: "none" })).toEqual([]);
     });
   });
 
@@ -257,10 +235,7 @@ describe("selectionsFromPermissions()", () => {
   describe("when permissions come from a key stored before the expanded write lists", () => {
     /** @scenario Older stored keys keep reading as write via the manage hierarchy */
     it("maps [view, manage] to write through the hierarchy", () => {
-      const result = selectionsFromPermissions([
-        "datasets:view",
-        "datasets:manage",
-      ]);
+      const result = selectionsFromPermissions(["datasets:view", "datasets:manage"]);
 
       expect(result.datasets).toBe("write");
     });
@@ -275,9 +250,7 @@ describe("selectionsFromPermissions()", () => {
   describe("when a category is read-only", () => {
     it("never invents a write selection for it", () => {
       expect(selectionsFromPermissions(["cost:view"]).cost).toBe("read");
-      expect(selectionsFromPermissions(["auditLog:view"]).auditLog).toBe(
-        "read",
-      );
+      expect(selectionsFromPermissions(["auditLog:view"]).auditLog).toBe("read");
     });
   });
 
@@ -338,16 +311,12 @@ describe("the CLI login key default", () => {
     expect(defaults).toContain("project:manage");
     expect(defaults).toContain("project:create");
     expect(defaults).toContain("project:delete");
-    expect(
-      hasPermissionWithHierarchy(["project:manage"], "project:create"),
-    ).toBe(true);
+    expect(hasPermissionWithHierarchy(["project:manage"], "project:create")).toBe(true);
   });
 
   it("leaves out every platform-tier permission", () => {
     const categorizable = new Set<string>(categorizablePermissions());
-    const platformOnly = ALL_PERMISSIONS.filter(
-      (permission) => !categorizable.has(permission),
-    );
+    const platformOnly = ALL_PERMISSIONS.filter((permission) => !categorizable.has(permission));
     const defaults = new Set<string>(defaultCliKeyPermissions());
 
     expect(platformOnly.length).toBeGreaterThan(0);
@@ -399,9 +368,7 @@ describe("contract: computePermissionsFromSelections → CustomRolePermissionsSc
 
   describe("when each category is individually set to write", () => {
     it("each produces a schema-valid permission array", () => {
-      for (const cat of PERMISSION_CATEGORIES.filter((c) =>
-        c.accessLevels.includes("write"),
-      )) {
+      for (const cat of PERMISSION_CATEGORIES.filter((c) => c.accessLevels.includes("write"))) {
         const permissions = computePermissionsFromSelections({
           [cat.key]: "write",
         });

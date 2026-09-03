@@ -41,9 +41,7 @@ export function describeCellFailure({
   // The wire message for a handled failure IS its code (#5984), so the string
   // column holds the slug rather than prose — not something to show anyone.
   const raw =
-    trimmed && trimmed !== UNNAMED_FAILURE && trimmed !== domainError?.code
-      ? trimmed
-      : undefined;
+    trimmed && trimmed !== UNNAMED_FAILURE && trimmed !== domainError?.code ? trimmed : undefined;
 
   if (domainError) return { ...explainSerializedError(domainError), raw };
 

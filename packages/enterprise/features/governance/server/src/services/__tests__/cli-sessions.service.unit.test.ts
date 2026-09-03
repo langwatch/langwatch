@@ -25,10 +25,7 @@ class MemoryTokenStore extends CliTokenStorePort {
 }
 
 function seed(store: MemoryTokenStore): void {
-  store.sets.set(
-    "lwcli:user:user:tokens",
-    new Set(["lwcli:access:a", "lwcli:refresh:r", "stale"]),
-  );
+  store.sets.set("lwcli:user:user:tokens", new Set(["lwcli:access:a", "lwcli:refresh:r", "stale"]));
   store.values.set(
     "lwcli:access:a",
     JSON.stringify({

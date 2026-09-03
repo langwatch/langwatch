@@ -272,9 +272,7 @@ describe("AgentListDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("No agents yet")).toBeInTheDocument();
-        expect(
-          screen.getByText("Create your first agent to get started"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Create your first agent to get started")).toBeInTheDocument();
       });
     });
 
@@ -287,9 +285,7 @@ describe("AgentListDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("create-first-agent-button"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("create-first-agent-button")).toBeInTheDocument();
       });
     });
 
@@ -303,9 +299,7 @@ describe("AgentListDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("create-first-agent-button"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("create-first-agent-button")).toBeInTheDocument();
       });
 
       await user.click(screen.getByTestId("create-first-agent-button"));

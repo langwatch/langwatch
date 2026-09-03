@@ -49,10 +49,7 @@ describe("global app access lint", () => {
         "// getApp() and tryGetApp() are not executable references.",
       ].join("\n"),
     );
-    write(
-      "packages/example/src/usage.test.ts",
-      'import { getApp } from "./app"; getApp();',
-    );
+    write("packages/example/src/usage.test.ts", 'import { getApp } from "./app"; getApp();');
 
     const accesses = collectGlobalAppAccesses(root);
     expect(accesses.map(({ symbol, kind }) => ({ symbol, kind }))).toEqual([
@@ -118,9 +115,7 @@ describe("global app access lint", () => {
       ].join("\n"),
     );
 
-    expect(collectGlobalAppAccesses(root).map((access) => access.symbol)).toEqual([
-      "getApp",
-    ]);
+    expect(collectGlobalAppAccesses(root).map((access) => access.symbol)).toEqual(["getApp"]);
   });
 
   it("rejects a replacement even when the per-file count is unchanged", () => {

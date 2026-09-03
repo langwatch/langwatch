@@ -19,10 +19,7 @@ export interface LangyEventCursor {
 }
 
 /** Byte-wise total order over cursors: negative, zero, or positive. */
-export function compareLangyEventCursors(
-  a: LangyEventCursor,
-  b: LangyEventCursor,
-): number {
+export function compareLangyEventCursors(a: LangyEventCursor, b: LangyEventCursor): number {
   if (a.acceptedAt !== b.acceptedAt) return a.acceptedAt - b.acceptedAt;
   if (a.eventId === b.eventId) return 0;
   return a.eventId < b.eventId ? -1 : 1;

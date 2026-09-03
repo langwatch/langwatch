@@ -110,10 +110,7 @@ export function DejaView({
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement
-      ) {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return;
       }
 
@@ -169,8 +166,8 @@ export function DejaView({
                     {hotTierDays !== null && (
                       <>
                         {" "}
-                        Aggregates older than {hotTierDays} days within that window live
-                        in cold storage and load quite some slower (set by{" "}
+                        Aggregates older than {hotTierDays} days within that window live in cold
+                        storage and load quite some slower (set by{" "}
                         {hotTierEnvVar ?? "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS"}).
                       </>
                     )}
@@ -187,25 +184,21 @@ export function DejaView({
 
             {searchError}
 
-            {hasSearched &&
-              !searchLoading &&
-              searchResults &&
-              searchResults.length === 0 && (
-                <Center paddingY={10}>
-                  <EmptyState.Root>
-                    <EmptyState.Content>
-                      <EmptyState.Indicator>
-                        <Eye size={32} />
-                      </EmptyState.Indicator>
-                      <EmptyState.Title>No aggregates found</EmptyState.Title>
-                      <EmptyState.Description>
-                        No aggregates match your search criteria. Try a different query or
-                        tenant ID.
-                      </EmptyState.Description>
-                    </EmptyState.Content>
-                  </EmptyState.Root>
-                </Center>
-              )}
+            {hasSearched && !searchLoading && searchResults && searchResults.length === 0 && (
+              <Center paddingY={10}>
+                <EmptyState.Root>
+                  <EmptyState.Content>
+                    <EmptyState.Indicator>
+                      <Eye size={32} />
+                    </EmptyState.Indicator>
+                    <EmptyState.Title>No aggregates found</EmptyState.Title>
+                    <EmptyState.Description>
+                      No aggregates match your search criteria. Try a different query or tenant ID.
+                    </EmptyState.Description>
+                  </EmptyState.Content>
+                </EmptyState.Root>
+              </Center>
+            )}
 
             {!hasSearched && (
               <Center paddingY={10}>

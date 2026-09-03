@@ -138,9 +138,7 @@ describe("LicenseService retention provisioning", () => {
       });
 
       expect(result.success).toBe(true);
-      expect(retention.written).not.toContainEqual(
-        expect.objectContaining({ category: "traces" }),
-      );
+      expect(retention.written).not.toContainEqual(expect.objectContaining({ category: "traces" }));
       for (const category of ["scenarios", "experiments"]) {
         expect(retention.written).toContainEqual({
           organizationId: ORGANIZATION_ID,

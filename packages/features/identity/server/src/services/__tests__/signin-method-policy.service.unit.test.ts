@@ -106,7 +106,9 @@ describe("the instance sign-in method policy", () => {
       expect(policy.federationLicensed).toBe(false);
       expect(policy.defaultMethods).toEqual([PASSWORD_METHOD]);
       expect(policy.localMethods).toEqual(LOCAL_METHOD_SET);
-      expect(policy.defaultMethods.some((method: { kind: string }) => method.kind === "federated")).toBe(false);
+      expect(
+        policy.defaultMethods.some((method: { kind: string }) => method.kind === "federated"),
+      ).toBe(false);
     });
 
     /** @scenario "A never-licensed installation offers no federated method" */

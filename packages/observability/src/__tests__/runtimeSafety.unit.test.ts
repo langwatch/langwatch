@@ -23,17 +23,15 @@ describe("runtime safety", () => {
 
     const bundledInputs = Object.keys(result.metafile.inputs);
     expect(
-      bundledInputs.some((input) =>
-        /@opentelemetry|node:async_hooks|superjson/.test(input),
-      ),
+      bundledInputs.some((input) => /@opentelemetry|node:async_hooks|superjson/.test(input)),
     ).toBe(false);
 
     const bundle = result.outputFiles[0];
     expect(bundle).toBeDefined();
 
-    const moduleUrl = `data:text/javascript;base64,${Buffer.from(
-      bundle!.contents,
-    ).toString("base64")}`;
+    const moduleUrl = `data:text/javascript;base64,${Buffer.from(bundle!.contents).toString(
+      "base64",
+    )}`;
     const telemetry = (await import(moduleUrl)) as typeof import("../index");
 
     expect(() => {

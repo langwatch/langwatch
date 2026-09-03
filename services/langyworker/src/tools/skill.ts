@@ -39,8 +39,7 @@ export function parseSkillFrontmatter(markdown: string): {
     if (!match) continue;
     const value = match[2]?.trim().replace(/^["']|["']$/g, "") ?? "";
     if (match[1] === "name" && result.name === undefined) result.name = value;
-    if (match[1] === "description" && result.description === undefined)
-      result.description = value;
+    if (match[1] === "description" && result.description === undefined) result.description = value;
   }
   return result;
 }
@@ -80,10 +79,7 @@ export function listSkills(skillsDir: string | undefined): SkillEntry[] {
 
 export function renderSkillInventory(skills: SkillEntry[]): string {
   if (skills.length === 0) return "No skills installed.";
-  return [
-    "Installed skills:",
-    ...skills.map((s) => `- ${s.name}: ${s.description}`),
-  ].join("\n");
+  return ["Installed skills:", ...skills.map((s) => `- ${s.name}: ${s.description}`)].join("\n");
 }
 
 const skillParams = Type.Object({

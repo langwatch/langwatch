@@ -53,9 +53,7 @@ describe("gateway JWT minting", () => {
 
       expect(expiresAt).toBeGreaterThanOrEqual(nowSeconds + TTL_SECONDS - 1);
       expect(expiresAt).toBeLessThanOrEqual(nowSeconds + TTL_SECONDS + 1);
-      expect(adapter.verify(token).vk_expires_at).toBe(
-        Math.floor(notAfter.getTime() / 1000),
-      );
+      expect(adapter.verify(token).vk_expires_at).toBe(Math.floor(notAfter.getTime() / 1000));
     });
   });
 
@@ -82,9 +80,7 @@ describe("gateway JWT minting", () => {
 
       expect(expiresAt).toBeGreaterThan(nowSeconds);
       expect(expiresAt).toBeLessThanOrEqual(nowSeconds + 2);
-      expect(adapter.verify(token).vk_expires_at).toBe(
-        Math.floor(notAfter.getTime() / 1000),
-      );
+      expect(adapter.verify(token).vk_expires_at).toBe(Math.floor(notAfter.getTime() / 1000));
     });
   });
 

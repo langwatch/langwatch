@@ -36,15 +36,9 @@ describe("cardKindFor, given a CLI resource and verb", () => {
 
   describe("when the command writes", () => {
     it("draws a card tinted by the write verb, whatever the resource", () => {
-      expect(cardKindFor({ resource: "dataset", verb: "create" })).toBe(
-        "resourceCreated",
-      );
-      expect(cardKindFor({ resource: "monitor", verb: "update" })).toBe(
-        "resourceUpdated",
-      );
-      expect(cardKindFor({ resource: "trigger", verb: "delete" })).toBe(
-        "resourceRemoved",
-      );
+      expect(cardKindFor({ resource: "dataset", verb: "create" })).toBe("resourceCreated");
+      expect(cardKindFor({ resource: "monitor", verb: "update" })).toBe("resourceUpdated");
+      expect(cardKindFor({ resource: "trigger", verb: "delete" })).toBe("resourceRemoved");
     });
 
     it("draws the diff card for a prompt push or sync", () => {
@@ -90,12 +84,8 @@ describe("cliVerbTone, given a CLI verb", () => {
       // resource, so both carry the updated tone and card.
       expect(cliVerbTone("rotate")).toBe("updated");
       expect(cliVerbTone("unset")).toBe("updated");
-      expect(cardKindFor({ resource: "virtual-keys", verb: "rotate" })).toBe(
-        "resourceUpdated",
-      );
-      expect(cardKindFor({ resource: "model-default", verb: "unset" })).toBe(
-        "resourceUpdated",
-      );
+      expect(cardKindFor({ resource: "virtual-keys", verb: "rotate" })).toBe("resourceUpdated");
+      expect(cardKindFor({ resource: "model-default", verb: "unset" })).toBe("resourceUpdated");
     });
   });
 });

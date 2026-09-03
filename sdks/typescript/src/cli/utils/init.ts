@@ -13,9 +13,7 @@ export const initializeProject = async (): Promise<void> => {
     if (gitignoreResult.added) {
       if (gitignoreResult.existed) {
         console.log(
-          chalk.green(
-            `✓ Added ${chalk.gray("prompts/.materialized")} to existing .gitignore`,
-          ),
+          chalk.green(`✓ Added ${chalk.gray("prompts/.materialized")} to existing .gitignore`),
         );
       } else {
         console.log(
@@ -23,9 +21,7 @@ export const initializeProject = async (): Promise<void> => {
         );
       }
     } else {
-      console.log(
-        chalk.gray(`• ${chalk.gray("prompts/.materialized")} already in .gitignore`),
-      );
+      console.log(chalk.gray(`• ${chalk.gray("prompts/.materialized")} already in .gitignore`));
     }
   } else {
     console.log(chalk.gray(`• prompts.json already exists`));
@@ -61,15 +57,11 @@ export const ensureProjectInitialized = async (
       if (gitignoreResult.added) {
         if (gitignoreResult.existed) {
           console.log(
-            chalk.green(
-              `✓ Added ${chalk.gray("prompts/.materialized")} to existing .gitignore`,
-            ),
+            chalk.green(`✓ Added ${chalk.gray("prompts/.materialized")} to existing .gitignore`),
           );
         } else {
           console.log(
-            chalk.green(
-              `✓ Created .gitignore with ${chalk.gray("prompts/.materialized")}`,
-            ),
+            chalk.green(`✓ Created .gitignore with ${chalk.gray("prompts/.materialized")}`),
           );
         }
       }

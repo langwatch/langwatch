@@ -159,10 +159,7 @@ function dataSourceComment({
 
 function buildPythonSnippet(input: BuildRunSnippetInput): string {
   const { kind, identifier, dataSource, datasetName } = input;
-  const parametersExample = buildParametersExample(
-    input.entryFields,
-    input.datasetColumns,
-  );
+  const parametersExample = buildParametersExample(input.entryFields, input.datasetColumns);
   const inlineRow = buildInlineExampleRow(input.entryFields, input.datasetColumns);
   const arg = sdkDataSourceArg({
     lang: "python",
@@ -196,10 +193,7 @@ print(result.run_url)       # open the run in LangWatch`;
 
 function buildTypescriptSnippet(input: BuildRunSnippetInput): string {
   const { kind, identifier, dataSource, datasetName } = input;
-  const parametersExample = buildParametersExample(
-    input.entryFields,
-    input.datasetColumns,
-  );
+  const parametersExample = buildParametersExample(input.entryFields, input.datasetColumns);
   const inlineRow = buildInlineExampleRow(input.entryFields, input.datasetColumns);
   const arg = sdkDataSourceArg({
     lang: "typescript",
@@ -235,10 +229,7 @@ void main();`;
 
 function buildShellSnippet(input: BuildRunSnippetInput): string {
   const { kind, identifier, baseUrl, dataSource, datasetName } = input;
-  const parametersExample = buildParametersExample(
-    input.entryFields,
-    input.datasetColumns,
-  );
+  const parametersExample = buildParametersExample(input.entryFields, input.datasetColumns);
   const inlineRow = buildInlineExampleRow(input.entryFields, input.datasetColumns);
 
   const startUrl =

@@ -31,10 +31,7 @@ const document = specification as unknown as {
     Record<
       string,
       {
-        responses?: Record<
-          string,
-          { content?: Record<string, { schema?: Schema }> }
-        >;
+        responses?: Record<string, { content?: Record<string, { schema?: Schema }> }>;
       }
     >
   >;
@@ -56,15 +53,7 @@ function resolve(schema: Schema): Schema {
 }
 
 /** Every `required` list and every property reachable from a schema. */
-function walk({
-  schema,
-  at,
-  depth = 0,
-}: {
-  schema: Schema;
-  at: string;
-  depth?: number;
-}): Walk {
+function walk({ schema, at, depth = 0 }: { schema: Schema; at: string; depth?: number }): Walk {
   if (depth > 8) return { requiredLists: [], propertyPaths: [] };
   const node = resolve(schema);
   const requiredLists: Walk["requiredLists"] = [];
@@ -78,11 +67,7 @@ function walk({
     children.push({ schema: child, at: `${at}.${key}` });
   }
   if (node.items) children.push({ schema: node.items, at: `${at}[]` });
-  for (const branch of [
-    ...(node.anyOf ?? []),
-    ...(node.oneOf ?? []),
-    ...(node.allOf ?? []),
-  ]) {
+  for (const branch of [...(node.anyOf ?? []), ...(node.oneOf ?? []), ...(node.allOf ?? [])]) {
     children.push({ schema: branch, at });
   }
 
@@ -102,13 +87,7 @@ function walk({
  * field from their first day, so no client generated before it exists. Their
  * answers may read it as required.
  */
-function walkFamily({
-  family,
-  bornWith = [],
-}: {
-  family: string;
-  bornWith?: string[];
-}): Walk {
+function walkFamily({ family, bornWith = [] }: { family: string; bornWith?: string[] }): Walk {
   const requiredLists: Walk["requiredLists"] = [];
   const propertyPaths: string[] = [];
   for (const [path, operations] of Object.entries(document.paths)) {
@@ -116,9 +95,7 @@ function walkFamily({
     if (bornWith.some((route) => path.startsWith(route))) continue;
     for (const [method, operation] of Object.entries(operations)) {
       if (!METHODS.includes(method)) continue;
-      for (const [status, response] of Object.entries(
-        operation.responses ?? {},
-      )) {
+      for (const [status, response] of Object.entries(operation.responses ?? {})) {
         if (!status.startsWith("2")) continue;
         for (const media of Object.values(response.content ?? {})) {
           if (!media.schema) continue;
@@ -175,12 +152,7 @@ describe("given the generated OpenAPI document", () => {
   describe("when the scenario model and turn fields are read", () => {
     /** @scenario "The scenario answers read the model and turn fields as optional" */
     it("lists simulatorModel, judgeModel, maxTurns and minTurns as optional on every success answer", () => {
-      for (const field of [
-        "simulatorModel",
-        "judgeModel",
-        "maxTurns",
-        "minTurns",
-      ]) {
+      for (const field of ["simulatorModel", "judgeModel", "maxTurns", "minTurns"]) {
         // The version snapshot was published with these fields from its
         // first day, so it may read them as required.
         const reading = readingOf({

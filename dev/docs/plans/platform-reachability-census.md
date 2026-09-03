@@ -36,13 +36,13 @@ Five entry surfaces still pull platform code into a running process:
                                     server/app-layer/**  server/*
 ```
 
-| # | Root | What it is |
-| --- | --- | --- |
-| 1 | `src/runtime/ui/legacy-page-loaders.ts` | the key→module install list `@langwatch/ui` hands the browser; every routed screen still in platform hangs off one of its lazy `import()`s |
-| 2 | `src/server/api/root.ts` | the single tRPC record; still 2,236 lines at census time |
-| 3 | `src/runtime/worker/**` | the job and capability wiring the packaged worker installs |
-| 4 | `src/server/routes/**` plus the app entries (`src/server.mts`, `src/main.tsx`, `src/workers.ts`, `src/task.ts`, `src/runtime/app/**`) | the Hono/REST mounts and the composition root behind them |
-| 5 | `src/generated/**`, `prisma/**`, `vite/**`, `vite.config.ts`, `vitest.*.config.ts`, `test-setup.ts`, the build/codegen scripts | generated files and configuration |
+| #   | Root                                                                                                                                  | What it is                                                                                                                                 |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `src/runtime/ui/legacy-page-loaders.ts`                                                                                               | the key→module install list `@langwatch/ui` hands the browser; every routed screen still in platform hangs off one of its lazy `import()`s |
+| 2   | `src/server/api/root.ts`                                                                                                              | the single tRPC record; still 2,236 lines at census time                                                                                   |
+| 3   | `src/runtime/worker/**`                                                                                                               | the job and capability wiring the packaged worker installs                                                                                 |
+| 4   | `src/server/routes/**` plus the app entries (`src/server.mts`, `src/main.tsx`, `src/workers.ts`, `src/task.ts`, `src/runtime/app/**`) | the Hono/REST mounts and the composition root behind them                                                                                  |
+| 5   | `src/generated/**`, `prisma/**`, `vite/**`, `vite.config.ts`, `vitest.*.config.ts`, `test-setup.ts`, the build/codegen scripts        | generated files and configuration                                                                                                          |
 
 Config roots are seeded twice: once from their `import`s, once from every string
 literal naming a path under `src/` (`globalSetup`, alias tables, and other
@@ -61,12 +61,12 @@ Three properties of that graph decide everything downstream:
 
 - **Type-only imports are already gone.** esbuild erases `import type` before
   `onResolve` sees it, so the value graph is the graph that actually loads. That
-  also means a module referenced *only* as a type looks unreachable — see the
+  also means a module referenced _only_ as a type looks unreachable — see the
   safety net below.
 - **Edge kind is recorded.** `import-statement` and `require-call` are eager: a
   broken import anywhere in that closure kills the importer at transform time.
   `dynamic-import` is not: vite resolves the literal specifier at the importer's
-  transform time (a *missing* target breaks the importer — this is exactly how the
+  transform time (a _missing_ target breaks the importer — this is exactly how the
   `pages/index` loader key broke the whole `runtime/ui` suite) but does not
   transform the target until it is called, so breakage does not travel onward
   through it.
@@ -75,7 +75,7 @@ Three properties of that graph decide everything downstream:
   dependencies never surface.
 
 Two more edge classes were checked and found absent: `import.meta.glob` and
-non-literal `import(expr)` / `` import(`...`) ``. There are none in `platform/app/src`,
+non-literal `import(expr)` / ``import(`...`)``. There are none in `platform/app/src`,
 so the literal-specifier graph is complete.
 
 **Safety net for type-only references.** Before deleting any non-test candidate,
@@ -88,15 +88,15 @@ in the already-migrated copies, not imports.
 **Verification, not inference.** The classifier's claim — "this test cannot even
 collect" — was checked against the real runners, not argued:
 
-| Lane | Predicted red | Confirmed 0-test | False positives |
-| --- | ---: | ---: | ---: |
-| `test:unit` | 272 | 268 | 4 |
-| `test:component` | 339 | 329 | 10 |
+| Lane             | Predicted red | Confirmed 0-test | False positives |
+| ---------------- | ------------: | ---------------: | --------------: |
+| `test:unit`      |           272 |              268 |               4 |
+| `test:component` |           339 |              329 |              10 |
 
 The 14 false positives were fed back as an explicit exclusion list and their causes
 fixed in the model (a `vi.mock` of a nonexistent path is not an error when a factory
 is given; specifiers escaping `src/` into `scripts/` resolve fine). A 30-file sample
-of files classified *green* collected and passed 316 tests, with 2 failing for a
+of files classified _green_ collected and passed 316 tests, with 2 failing for a
 cause the model cannot see (a `vi.mock` factory whose hoisting still drags the
 original in) — those stay, which is the safe direction.
 
@@ -108,13 +108,13 @@ carry the residual risk of the same ~1.5% false-positive rate observed above.
 Pure `rm`, never `git rm`, never staged. `git diff --numstat -- platform/app`
 reports **0 insertions on all 2,267 rows**.
 
-| Tier | What | Files | Lines |
-| --- | --- | ---: | ---: |
-| A | pages / components / hooks / features no loader key reaches | 38 | 3,937 |
-| B | server, `app/api`, `utils` modules nothing imports | 23 | 8,190 |
-| C | orphaned tests — cannot load, subject gone | 1,090 | 356,601 |
-| C2 | test helpers no surviving test needs | 7 | 787 |
-| | **total** | **1,158** | **369,515** |
+| Tier | What                                                        |     Files |       Lines |
+| ---- | ----------------------------------------------------------- | --------: | ----------: |
+| A    | pages / components / hooks / features no loader key reaches |        38 |       3,937 |
+| B    | server, `app/api`, `utils` modules nothing imports          |        23 |       8,190 |
+| C    | orphaned tests — cannot load, subject gone                  |     1,090 |     356,601 |
+| C2   | test helpers no surviving test needs                        |         7 |         787 |
+|      | **total**                                                   | **1,158** | **369,515** |
 
 Deletion ran to a fixed point: removing tier A/B orphaned a second wave of tests
 (10 files), which orphaned a third (4 files), after which the census returns empty.
@@ -152,47 +152,47 @@ Top 30 subtrees by lines, non-test files, generated JSON excluded. `loaders` alo
 means **only** the browser route table reaches it — a UI subtree with no server
 entanglement, which is the cheapest kind of move.
 
-| Subtree | Files | Lines | Reached by |
-| --- | ---: | ---: | --- |
-| `server/app-layer` | 170 | 42,483 | loaders, trpc-root, worker, rest-routes, runtime-app, config |
-| `features/langy` | 75 | 23,162 | loaders |
-| `server/routes` | 41 | 18,220 | trpc-root, worker, rest-routes, runtime-app, config |
-| `components/agent-testing` | 108 | 14,075 | loaders |
-| `runtime/app` | 124 | 11,143 | loaders, trpc-root, worker, rest-routes, runtime-app, config |
-| `components` | 42 | 9,827 | loaders |
-| `server/traces` | 26 | 9,405 | trpc-root, worker, rest-routes, runtime-app, config |
-| `components/settings` | 32 | 9,042 | loaders |
-| `server/experiments-v3` | 16 | 7,946 | loaders, trpc-root, rest-routes, runtime-app, config |
-| `experiments-v3/components` | 28 | 7,541 | loaders |
-| `server/api` | 28 | 7,226 | loaders, trpc-root, worker, rest-routes, runtime-app, config |
-| `hooks` | 41 | 5,665 | loaders |
-| `features/errors` | 11 | 5,568 | loaders |
-| `server/gateway` | 17 | 5,226 | trpc-root, worker, rest-routes, runtime-app, config |
-| `utils` | 40 | 4,967 | loaders, trpc-root, worker, rest-routes, runtime-app, config |
-| `components/suites` | 19 | 4,840 | loaders |
-| ~~`features/onboarding`~~ | 33 | 4,694 | **MOVED to `@langwatch/onboarding-web`** — the directory is gone from `platform/app`, reunited with the 54 files the traces move had taken into `@langwatch/trace-web`. |
-| `features/command-bar` | 34 | 4,473 | loaders |
-| `app/api` | 30 | 4,167 | trpc-root, worker, rest-routes, runtime-app, config |
-| `tasks` | 17 | 4,140 | rest-routes, runtime-app, config |
-| `components/home` | 18 | 4,029 | loaders |
-| `pages/settings` | 12 | 3,964 | loaders |
-| `server/stored-objects` | 16 | 3,921 | trpc-root, worker, rest-routes, runtime-app, config |
-| `experiments-v3/hooks` | 15 | 3,487 | loaders |
-| `server` | 17 | 3,480 | loaders, trpc-root, worker, rest-routes, runtime-app, config |
-| `features/briefing` | 10 | 3,112 | loaders |
-| `server/data-privacy` | 12 | 2,984 | trpc-root, worker, rest-routes, runtime-app, config |
-| `features/navigation` | 21 | 2,939 | loaders |
-| `components/scenarios` | 15 | 2,907 | loaders |
-| `pages/[project]` | 12 | 2,715 | loaders |
+| Subtree                     | Files |  Lines | Reached by                                                                                                                                                              |
+| --------------------------- | ----: | -----: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/app-layer`          |   170 | 42,483 | loaders, trpc-root, worker, rest-routes, runtime-app, config                                                                                                            |
+| `features/langy`            |    75 | 23,162 | loaders                                                                                                                                                                 |
+| `server/routes`             |    41 | 18,220 | trpc-root, worker, rest-routes, runtime-app, config                                                                                                                     |
+| `components/agent-testing`  |   108 | 14,075 | loaders                                                                                                                                                                 |
+| `runtime/app`               |   124 | 11,143 | loaders, trpc-root, worker, rest-routes, runtime-app, config                                                                                                            |
+| `components`                |    42 |  9,827 | loaders                                                                                                                                                                 |
+| `server/traces`             |    26 |  9,405 | trpc-root, worker, rest-routes, runtime-app, config                                                                                                                     |
+| `components/settings`       |    32 |  9,042 | loaders                                                                                                                                                                 |
+| `server/experiments-v3`     |    16 |  7,946 | loaders, trpc-root, rest-routes, runtime-app, config                                                                                                                    |
+| `experiments-v3/components` |    28 |  7,541 | loaders                                                                                                                                                                 |
+| `server/api`                |    28 |  7,226 | loaders, trpc-root, worker, rest-routes, runtime-app, config                                                                                                            |
+| `hooks`                     |    41 |  5,665 | loaders                                                                                                                                                                 |
+| `features/errors`           |    11 |  5,568 | loaders                                                                                                                                                                 |
+| `server/gateway`            |    17 |  5,226 | trpc-root, worker, rest-routes, runtime-app, config                                                                                                                     |
+| `utils`                     |    40 |  4,967 | loaders, trpc-root, worker, rest-routes, runtime-app, config                                                                                                            |
+| `components/suites`         |    19 |  4,840 | loaders                                                                                                                                                                 |
+| ~~`features/onboarding`~~   |    33 |  4,694 | **MOVED to `@langwatch/onboarding-web`** — the directory is gone from `platform/app`, reunited with the 54 files the traces move had taken into `@langwatch/trace-web`. |
+| `features/command-bar`      |    34 |  4,473 | loaders                                                                                                                                                                 |
+| `app/api`                   |    30 |  4,167 | trpc-root, worker, rest-routes, runtime-app, config                                                                                                                     |
+| `tasks`                     |    17 |  4,140 | rest-routes, runtime-app, config                                                                                                                                        |
+| `components/home`           |    18 |  4,029 | loaders                                                                                                                                                                 |
+| `pages/settings`            |    12 |  3,964 | loaders                                                                                                                                                                 |
+| `server/stored-objects`     |    16 |  3,921 | trpc-root, worker, rest-routes, runtime-app, config                                                                                                                     |
+| `experiments-v3/hooks`      |    15 |  3,487 | loaders                                                                                                                                                                 |
+| `server`                    |    17 |  3,480 | loaders, trpc-root, worker, rest-routes, runtime-app, config                                                                                                            |
+| `features/briefing`         |    10 |  3,112 | loaders                                                                                                                                                                 |
+| `server/data-privacy`       |    12 |  2,984 | trpc-root, worker, rest-routes, runtime-app, config                                                                                                                     |
+| `features/navigation`       |    21 |  2,939 | loaders                                                                                                                                                                 |
+| `components/scenarios`      |    15 |  2,907 | loaders                                                                                                                                                                 |
+| `pages/[project]`           |    12 |  2,715 | loaders                                                                                                                                                                 |
 
 Split by which roots hold a file:
 
-| Held by | Files | Lines |
-| --- | ---: | ---: |
-| the loader registry alone (pure UI) | 702 | 142,109 |
-| more than one root (UI *and* server, or several server roots) | 690 | 154,805 |
-| the composition root alone | 6 | 158 |
-| configuration alone (test helpers, codegen inputs) | 55 | 8,653 |
+| Held by                                                       | Files |   Lines |
+| ------------------------------------------------------------- | ----: | ------: |
+| the loader registry alone (pure UI)                           |   702 | 142,109 |
+| more than one root (UI _and_ server, or several server roots) |   690 | 154,805 |
+| the composition root alone                                    |     6 |     158 |
+| configuration alone (test helpers, codegen inputs)            |    55 |   8,653 |
 
 ## What the map says about the next moves
 
@@ -218,7 +218,7 @@ open; `app-layer` underneath it is.
 **Re-run this before each wave.** The census is a script, not a document: rebuild
 the graph, recompute the roots, and the newly-orphaned set falls out. Every move
 out of platform orphans more than it removes — this pass deleted 1,158 files, of
-which 14 became deletable only *because* the first wave landed.
+which 14 became deletable only _because_ the first wave landed.
 
 ## Reproducing
 
@@ -278,7 +278,7 @@ in `report-chart.service.ts` dragged `CustomGraph.tsx` back, and with it
 and eleven more files that nothing loads. A reference is now classified before
 it is honoured: a **runtime** reference (esbuild's value graph, plus
 `vi.importActual` and a bare `vi.mock(spec)` with no factory) holds the target
-*and its dependencies*; a **type-only** reference holds the named file and
+_and its dependencies_; a **type-only** reference holds the named file and
 stops there, because nothing loads it.
 
 **A test dies with its subject, not with its neighbours.** Three rules,
@@ -289,7 +289,7 @@ in order:
 - A spec whose subject is in the delete set dies with it — including when it
   reaches that subject through `await import()`. `LLMModelCostDrawer.lite-member.integration.test.tsx`
   loads the drawer lazily; the drawer is gone, so the test has nothing to assert
-  on. Lazy breakage does not travel *onward*, so the edge is taken once and the
+  on. Lazy breakage does not travel _onward_, so the edge is taken once and the
   result then propagates over eager edges only.
 - A spec that is red only because a **still-to-move** file it imports has a
   broken import is **kept**. It moves with that file. 226 surviving platform
@@ -307,12 +307,12 @@ server moves.
 Pure `rm`, never `git rm`, never staged. `git diff --numstat` over the manifest
 reports **0 insertions on all 230 rows**.
 
-| Tier | What | Files | Lines |
-| --- | --- | ---: | ---: |
-| A | product modules no live root reaches (components, hooks, model-provider settings UI, the browser entry) | 121 | 20,130 |
-| B | specs whose subject is in tier A, or which name a module already gone | 92 | 19,821 |
-| C | test-support helpers no surviving spec needs | 17 | 1,954 |
-| | **total** | **230** | **41,905** |
+| Tier | What                                                                                                    |   Files |      Lines |
+| ---- | ------------------------------------------------------------------------------------------------------- | ------: | ---------: |
+| A    | product modules no live root reaches (components, hooks, model-provider settings UI, the browser entry) |     121 |     20,130 |
+| B    | specs whose subject is in tier A, or which name a module already gone                                   |      92 |     19,821 |
+| C    | test-support helpers no surviving spec needs                                                            |      17 |      1,954 |
+|      | **total**                                                                                               | **230** | **41,905** |
 
 `platform/app/src` went **1,145 → 915 code files** and **245,866 → 203,721
 lines** across the census window (the ~240-line difference from the manifest is
@@ -368,18 +368,18 @@ platform module for real**.
                                             ~/features/errors/logic/presentation
 ```
 
-| Root | Seeds | Closure |
-| --- | ---: | ---: |
-| `src/tasks/**` | 17 | 404 |
-| `src/instrumentation*.ts` | 3 | 318 |
-| `server/api-router.ts` | 1 | 336 |
-| `runtime/{app,api}/**` | 111 | 221 |
-| `server/api/root.ts` | 1 | 180 |
-| `src/app/api/**` | 30 | 93 |
-| `server/better-auth/**` | 6 | 61 |
-| `src/mcp/**` | 3 | 27 |
-| `apps/**` + `packages/**` importers | 6 | 64 |
-| configuration (`scripts/`, `e2e/`, `prisma/`, `vite*/`, `vitest*`) | 36 | 498 |
+| Root                                                               | Seeds | Closure |
+| ------------------------------------------------------------------ | ----: | ------: |
+| `src/tasks/**`                                                     |    17 |     404 |
+| `src/instrumentation*.ts`                                          |     3 |     318 |
+| `server/api-router.ts`                                             |     1 |     336 |
+| `runtime/{app,api}/**`                                             |   111 |     221 |
+| `server/api/root.ts`                                               |     1 |     180 |
+| `src/app/api/**`                                                   |    30 |      93 |
+| `server/better-auth/**`                                            |     6 |      61 |
+| `src/mcp/**`                                                       |     3 |      27 |
+| `apps/**` + `packages/**` importers                                |     6 |      64 |
+| configuration (`scripts/`, `e2e/`, `prisma/`, `vite*/`, `vitest*`) |    36 |     498 |
 
 `server/api/root.ts` is down to **532 lines** (2,236 at the first census, 1,203
 and then 1,010 as the API halves landed). It is no longer the thing holding
@@ -391,31 +391,31 @@ platform open, and neither is any single transport: `server/app-layer` is, at
 916 files. Grouped by the package or app that should end up holding them
 (full per-file manifest with its reaching root in `still-to-move.txt`):
 
-| Owner | Files | Lines |
-| --- | ---: | ---: |
-| `apps/api` — REST transport (`server/routes/**`, `src/app/api/**`, `pages/api/**`) | 87 | 22,369 |
-| `apps/api` + `apps/worker` composition root (`runtime/app/**`, `server/app-layer/*`) | 105 | 25,465 |
-| `@langwatch/trace-server` | 45 | 12,478 |
-| `@langwatch/experiment-server` (`server/experiments-v3/**`) | 19 | 9,157 |
-| `apps/api` — tRPC transport (`server/api/**`) | 40 | 8,828 |
-| `packages/ui` — client error presentation registry (`features/errors/**`) | 10 | 7,810 |
-| `@langwatch/clickhouse-client` (+ migration ownership) | 33 | 7,495 |
-| `apps/{api,worker,ui}` test harness (`test-utils/**`, root `__tests__/**`) | 41 | 7,304 |
-| `@langwatch/eventing` (`server/event-sourcing/**`) | 19 | 6,742 |
-| `@langwatch/identity-server` | 37 | 5,868 |
-| `@langwatch/system-migrations` | 17 | 5,248 |
-| `apps/worker` task lane (`src/tasks/**`) | 26 | 5,206 |
-| `@langwatch/stored-object-server` | 16 | 4,863 |
-| `@langwatch/data-privacy-server` | 20 | 4,835 |
-| `apps/api` — MCP transport (`src/mcp/**`) | 4 | 4,145 |
-| `@langwatch/analytics-server` (`server/export/**`) | 16 | 4,124 |
-| `@langwatch/organization-server` | 9 | 3,962 |
-| `@langwatch/auth-server` (incl. `server/better-auth/**`) | 17 | 6,386 |
-| `@langwatch/billing-server` (enterprise) | 19 | 2,989 |
-| `@langwatch/model-provider-server` | 16 | 2,613 |
-| `@langwatch/evaluation-server` | 11 | 2,468 |
-| `@langwatch/webhook-server` (enterprise) | 16 | 2,223 |
-| everything else (28 owners) | ~180 | ~25,000 |
+| Owner                                                                                | Files |   Lines |
+| ------------------------------------------------------------------------------------ | ----: | ------: |
+| `apps/api` — REST transport (`server/routes/**`, `src/app/api/**`, `pages/api/**`)   |    87 |  22,369 |
+| `apps/api` + `apps/worker` composition root (`runtime/app/**`, `server/app-layer/*`) |   105 |  25,465 |
+| `@langwatch/trace-server`                                                            |    45 |  12,478 |
+| `@langwatch/experiment-server` (`server/experiments-v3/**`)                          |    19 |   9,157 |
+| `apps/api` — tRPC transport (`server/api/**`)                                        |    40 |   8,828 |
+| `packages/ui` — client error presentation registry (`features/errors/**`)            |    10 |   7,810 |
+| `@langwatch/clickhouse-client` (+ migration ownership)                               |    33 |   7,495 |
+| `apps/{api,worker,ui}` test harness (`test-utils/**`, root `__tests__/**`)           |    41 |   7,304 |
+| `@langwatch/eventing` (`server/event-sourcing/**`)                                   |    19 |   6,742 |
+| `@langwatch/identity-server`                                                         |    37 |   5,868 |
+| `@langwatch/system-migrations`                                                       |    17 |   5,248 |
+| `apps/worker` task lane (`src/tasks/**`)                                             |    26 |   5,206 |
+| `@langwatch/stored-object-server`                                                    |    16 |   4,863 |
+| `@langwatch/data-privacy-server`                                                     |    20 |   4,835 |
+| `apps/api` — MCP transport (`src/mcp/**`)                                            |     4 |   4,145 |
+| `@langwatch/analytics-server` (`server/export/**`)                                   |    16 |   4,124 |
+| `@langwatch/organization-server`                                                     |     9 |   3,962 |
+| `@langwatch/auth-server` (incl. `server/better-auth/**`)                             |    17 |   6,386 |
+| `@langwatch/billing-server` (enterprise)                                             |    19 |   2,989 |
+| `@langwatch/model-provider-server`                                                   |    16 |   2,613 |
+| `@langwatch/evaluation-server`                                                       |    11 |   2,468 |
+| `@langwatch/webhook-server` (enterprise)                                             |    16 |   2,223 |
+| everything else (28 owners)                                                          |  ~180 | ~25,000 |
 
 **The 5-file knot.** `server/app-layer/{presets,app,dependencies,config,index}.ts`
 is 5,551 lines and every server root lands in it. Nothing under it moves

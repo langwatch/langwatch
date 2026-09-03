@@ -43,11 +43,7 @@ export type CreatePromptEditorCallbacksParams = {
     inputIdentifier: string,
     mapping: StoreFieldMapping,
   ) => void;
-  removeTargetMapping: (
-    targetId: string,
-    datasetId: string,
-    inputIdentifier: string,
-  ) => void;
+  removeTargetMapping: (targetId: string, datasetId: string, inputIdentifier: string) => void;
   getActiveDatasetId: () => string;
   getDatasets: () => Array<{ id: string }>;
 };
@@ -84,10 +80,7 @@ export type PromptEditorCallbacksForTarget = {
   onLocalConfigChange: (localConfig: LocalPromptConfig | undefined) => void;
   onSave: (savedPrompt: SavedPromptData) => void;
   onVersionChange: (loadedPrompt: LoadedVersionData) => void;
-  onInputMappingsChange: (
-    identifier: string,
-    mapping: UIFieldMapping | undefined,
-  ) => void;
+  onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => void;
 };
 
 /**

@@ -72,20 +72,15 @@ export function applyOverlayToSpanTreeNodes({
   // A removed row that is kept is kept as captured: a rename the same
   // correction made would dress up a row whose whole point is showing what the
   // trace had.
-  const keptNodes = shouldKeepDeleted
-    ? nodes
-    : nodes.filter((node) => !deleted.has(node.spanId));
+  const keptNodes = shouldKeepDeleted ? nodes : nodes.filter((node) => !deleted.has(node.spanId));
 
   const nextNodes = keptNodes.map((node) => {
-    const spanPatch = deleted.has(node.spanId)
-      ? undefined
-      : patchesBySpanId.get(node.spanId);
+    const spanPatch = deleted.has(node.spanId) ? undefined : patchesBySpanId.get(node.spanId);
     return spanPatch ? correctedTreeNode({ node, spanPatch }) : node;
   });
 
   const changed =
-    keptNodes.length !== nodes.length ||
-    nextNodes.some((node, index) => node !== keptNodes[index]);
+    keptNodes.length !== nodes.length || nextNodes.some((node, index) => node !== keptNodes[index]);
 
   return changed ? nextNodes : nodes;
 }

@@ -93,12 +93,7 @@ export function JsonView() {
           <Button size="2xs" variant="ghost" onClick={handleCopy} title="Copy">
             {copied ? <Check size={12} /> : <Copy size={12} />}
           </Button>
-          <Button
-            size="2xs"
-            variant="ghost"
-            onClick={resetTrace}
-            title="Reset to default"
-          >
+          <Button size="2xs" variant="ghost" onClick={resetTrace} title="Reset to default">
             <RotateCcw size={12} />
           </Button>
         </HStack>

@@ -4,9 +4,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { ClickHouseCodingAgentProcessingAdapter } from "../clickhouse.coding-agent-processing.adapter";
 import { ModelCatalogCostEstimatorAdapter } from "../model-catalog.cost-estimator.adapter";
 import type { CodingAgentProcessingPipeline } from "../eventing.coding-agent-processing.adapter";
-import {
-  type CodingAgentSessionState,
-} from "../../projections/coding-agent-session.projection";
+import { type CodingAgentSessionState } from "../../projections/coding-agent-session.projection";
 import { CodingAgentSessionStateProjection } from "../../projections/coding-agent-session-state.projection";
 import { CodingAgentProjectActivityPort } from "../../ports/coding-agent-project-activity.port";
 import { CodingAgentPullRequestMappingPort } from "../../ports/coding-agent-pull-request-mapping.port";
@@ -98,19 +96,18 @@ function compose(
   const redis = { get: vi.fn(async () => null), set };
   const projectActivity = new RecordingProjectActivity();
 
-  const pipeline: CodingAgentProcessingPipeline =
-    ClickHouseCodingAgentProcessingAdapter.create({
-      resolveClient: resolveClient as never,
-      defaultRetentionDays: 49,
-      redis: redis as never,
-      traceCanonicalisation: new TestTraceCanonicalisation(),
-      projectActivity,
-      pullRequestMapping:
-        "pullRequestMapping" in options ? options.pullRequestMapping : new MappingEverything(),
-      ...(options.foldCacheTtlSeconds === undefined
-        ? {}
-        : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
-    }).buildProcessing();
+  const pipeline: CodingAgentProcessingPipeline = ClickHouseCodingAgentProcessingAdapter.create({
+    resolveClient: resolveClient as never,
+    defaultRetentionDays: 49,
+    redis: redis as never,
+    traceCanonicalisation: new TestTraceCanonicalisation(),
+    projectActivity,
+    pullRequestMapping:
+      "pullRequestMapping" in options ? options.pullRequestMapping : new MappingEverything(),
+    ...(options.foldCacheTtlSeconds === undefined
+      ? {}
+      : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
+  }).buildProcessing();
 
   return { pipeline, insert, resolveClient, redis, set, projectActivity };
 }
@@ -120,9 +117,8 @@ function sessionFoldStore(
 ): FoldProjectionStore<CodingAgentSessionState> {
   const fold = pipeline.foldProjections.get("codingAgentSession");
   expect(fold, "the pipeline registered no codingAgentSession fold").toBeDefined();
-  return (
-    fold!.definition as unknown as { store: FoldProjectionStore<CodingAgentSessionState> }
-  ).store;
+  return (fold!.definition as unknown as { store: FoldProjectionStore<CodingAgentSessionState> })
+    .store;
 }
 
 async function storeThrough(pipeline: CodingAgentProcessingPipeline): Promise<void> {
@@ -232,9 +228,7 @@ describe("ClickHouseCodingAgentProcessingAdapter", () => {
       // The stamp is why the pipeline used to demand the whole ProjectService.
       // It is fire-and-forget behind the commit, so the assertion is that the
       // one-method seam this graph composed is the thing that receives it.
-      expect(projectActivity.touched.map((entry) => entry.projectId)).toEqual([
-        "project_alpha",
-      ]);
+      expect(projectActivity.touched.map((entry) => entry.projectId)).toEqual(["project_alpha"]);
     });
   });
 

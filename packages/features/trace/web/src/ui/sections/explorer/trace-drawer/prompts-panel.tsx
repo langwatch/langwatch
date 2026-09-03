@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Icon,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { type ReactNode, useMemo } from "react";
 import {
   LuCircleDashed,
@@ -148,10 +139,7 @@ export function PromptsPanel({
     openDrawer("promptEditor", { promptId: handle });
   };
 
-  const fallbackRefs = useMemo(
-    () => parseTracePromptIds(trace.attributes),
-    [trace.attributes],
-  );
+  const fallbackRefs = useMemo(() => parseTracePromptIds(trace.attributes), [trace.attributes]);
 
   const { data: spansFull, isLoading } = useSpansFull(true);
 
@@ -243,19 +231,11 @@ export function PromptsPanel({
  * has since been deleted. Returns null in the common healthy case so the
  * panel leads straight with the prompt cards.
  */
-function PromptDriftBanner({
-  trace,
-  hasDrift,
-}: {
-  trace: TraceHeader;
-  hasDrift: boolean;
-}) {
+function PromptDriftBanner({ trace, hasDrift }: { trace: TraceHeader; hasDrift: boolean }) {
   // Look up the latest version of the last-used prompt to detect
   // out-of-date traces — when the prompt has moved on since this trace
   // ran. Falls quietly to no-warning when the lookup errors.
-  const { latestVersion, missing: promptMissing } = usePromptByHandle(
-    trace.lastUsedPromptId,
-  );
+  const { latestVersion, missing: promptMissing } = usePromptByHandle(trace.lastUsedPromptId);
   const outOfDate =
     !!trace.lastUsedPromptVersionNumber &&
     !!latestVersion &&
@@ -277,8 +257,8 @@ function PromptDriftBanner({
     >
       {hasDrift && (
         <WarningRow tone="warning" title="Pinned prompt drifted at runtime">
-          The pin resolved to a different concrete prompt than what was recorded as last
-          used. Common when a tag like{" "}
+          The pin resolved to a different concrete prompt than what was recorded as last used.
+          Common when a tag like{" "}
           <Text as="span" fontWeight="medium" color="fg">
             production
           </Text>{" "}
@@ -288,16 +268,16 @@ function PromptDriftBanner({
 
       {outOfDate && latestVersion != null && (
         <WarningRow tone="warning" title="Trace ran an out-of-date prompt">
-          This trace used v{trace.lastUsedPromptVersionNumber}; the prompt&rsquo;s current
-          latest is v{latestVersion}. Consider re-testing against the latest version
-          before relying on this behaviour.
+          This trace used v{trace.lastUsedPromptVersionNumber}; the prompt&rsquo;s current latest is
+          v{latestVersion}. Consider re-testing against the latest version before relying on this
+          behaviour.
         </WarningRow>
       )}
 
       {promptMissing && (
         <WarningRow tone="muted" title="Prompt no longer exists in this project">
-          The trace still shows what ran at the time, but the underlying managed prompt
-          has been deleted.
+          The trace still shows what ran at the time, but the underlying managed prompt has been
+          deleted.
         </WarningRow>
       )}
     </VStack>
@@ -332,11 +312,7 @@ function WarningRow({
 
 function PromptRoleChip({ role }: { role: PromptRole }) {
   return (
-    <Badge
-      size="sm"
-      variant="surface"
-      colorPalette={role === "pinned" ? "blue" : "purple"}
-    >
+    <Badge size="sm" variant="surface" colorPalette={role === "pinned" ? "blue" : "purple"}>
       {role === "pinned" ? "pinned" : "last used"}
     </Badge>
   );
@@ -358,17 +334,13 @@ function PromptUsageCard({
   onOpenPromptEditor: (handle: string) => void;
 }) {
   const { ref, spanIds, variables } = usage;
-  const variableEntries = Object.entries(variables).sort(([a], [b]) =>
-    a.localeCompare(b),
-  );
+  const variableEntries = Object.entries(variables).sort(([a], [b]) => a.localeCompare(b));
   const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
   // Prefer the first emitting span (Prompt.compile / PromptApiService.get)
   // — the server-side playground loader walks descendants/siblings to
   // find the actual llm call for it.
   const playgroundSpanId = spanIds[0] ?? null;
-  const playgroundHref = playgroundSpanId
-    ? (buildUrl(playgroundSpanId)?.toString() ?? "")
-    : "";
+  const playgroundHref = playgroundSpanId ? (buildUrl(playgroundSpanId)?.toString() ?? "") : "";
 
   return (
     <VStack align="stretch" gap={2.5} paddingY={3}>
@@ -453,8 +425,7 @@ function PromptUsageCard({
         </VStack>
       ) : spanIds.length === 0 ? (
         <Text textStyle="xs" color="fg.subtle">
-          Recorded from trace attributes; no span on this trace exposes the prompt id
-          directly.
+          Recorded from trace attributes; no span on this trace exposes the prompt id directly.
         </Text>
       ) : (
         <VStack align="stretch" gap={0}>

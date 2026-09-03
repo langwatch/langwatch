@@ -11,12 +11,12 @@ plan `../identity-platform/delivery-plan.md`, deliverables
 to; it also settles the routing contract D05's self-service consumes.
 
 **Builds on:** ADR-101 (the identity pipeline; §6's read fork), ADR-116 (the
-identity storage adapter — resolution reads are the *adapter's* job, which is
+identity storage adapter — resolution reads are the _adapter's_ job, which is
 what lets the router stay a decision engine), ADR-110 (finishing the
 migration IS the switch), ADR-115 (where identity code lives).
 
 **Amends:** [ADR-027](./027-license-gated-sso.md) — the license gate's
-*mechanism* moves from path-blocking in the global `before` hook to
+_mechanism_ moves from path-blocking in the global `before` hook to
 per-method policy on the router; every semantic ADR-027 locked is preserved
 (§4).
 
@@ -49,7 +49,7 @@ Three constraints shape everything here:
    correct interception point." Moving the mechanism means proving the
    router sees everything the hook saw — including that rewrite.
 2. **No user-level existence oracle.** Domain-level SSO routing is
-   discoverable by design; whether an *account* exists must not be, on the
+   discoverable by design; whether an _account_ exists must not be, on the
    sign-in surface (the sign-up surface is scoped out — §6).
 3. **The front door is the highest-risk flip in the program.** Every human
    enters through it. Shadow comparison, a zero-mismatch bake, and a
@@ -104,7 +104,7 @@ social + passkey placeholder until D07), rendered identically whether or
 not an account exists for the entered email — same page, same timing.
 
 - The router's decision for an unknown email and a known email without a
-  domain match is the *same decision object*. Timing normalization is
+  domain match is the _same decision object_. Timing normalization is
   pinned by a contract test at the page level (D13), not by sleeps in the
   router.
 - Domain-level discoverability is accepted and deliberate: "acme.com
@@ -132,8 +132,8 @@ On an SSO callback (epic Q5, R8; generalizes
    non-corporate identifiers the org cannot vouch for) → `LinkProposed`:
    the sign-in is refused with guidance, and the proposal lands on the
    org-admin surface (D05; until D05 ships, the platform-ops lookup).
-   R8's "login is never gated on verification" governs *the user's own
-   identifiers*; it does not entitle a callback to claim someone else's
+   R8's "login is never gated on verification" governs _the user's own
+   identifiers_; it does not entitle a callback to claim someone else's
    row.
 4. No user match at all → JIT-provision if the connection allows it, else
    deny with guidance (reason code `jit_disabled`).
@@ -146,20 +146,20 @@ through the pipeline, never a hand-written `Account` insert.
 ADR-027 gates SSO by blocking route paths in the global `before` hook,
 because under `NEXTAUTH_PROVIDER` the provider set is fixed at boot and the
 hook was the only point that saw the legacy callback rewrite. Under the
-router, *which methods exist at all* is the router's method-set policy —
+router, _which methods exist at all_ is the router's method-set policy —
 the natural home for the same rule. What changes is mechanism; every
 decided semantic carries over:
 
-| ADR-027 decision | Where it lives now |
-|---|---|
-| Binary gate: `IS_SAAS \|\| signed instance license \|\| any signed org license`, expiry ignored | Unchanged — `platformSSOAllowed()` stays the one gate module, memoized once per process |
-| **Startup semantics** (epic Open Q11 — answered: **keep**) | The router evaluates *policy* per request but reads the *gate* from the same per-process memo; a license change still takes effect on restart, never mid-flight. Per-request policy evaluation with a frozen input is startup semantics — nothing re-decides the license |
-| Denied = email mode, exactly | On DENY the method set contains only local methods; SSO methods are absent from every picker and every routing decision — and the **callback paths still refuse** (below), because absence from a picker is not enforcement |
-| Gated-path enforcement incl. legacy `/callback/auth0\|okta` | The `before` hook survives as the **enforcement backstop**: the path classification (`ssoPathGate.ts`) and `ssoRouteTableCanary.test.ts` stay, consulting the router's policy instead of raw env. The hook is no longer where the *decision* lives, but it remains where non-UI traffic (direct POSTs, pinned IdP callbacks) is refused. ADR-027's "the hook remains the only correct interception point" holds for enforcement; the router owns decision |
-| Email-route block on ALLOW (no-password-account guarantee) | Method-set policy: an SSO-routed org's picker never offers password sign-up; the hook backstop keeps refusing the raw endpoints |
-| Credential-mutation block, reset-pair exception on DENY | Unchanged, keyed off the resolved method policy instead of `NEXTAUTH_PROVIDER` |
-| Auto-join rides the platform gate | Unchanged; D12's `domainJoin` inherits it (licensed-SSO semantics, `sso-license-gating.feature:182`) |
-| Constants table + route-table canary | Carried over. Any route better-auth adds fails the canary by name until classified — same discipline, same test |
+| ADR-027 decision                                                                                | Where it lives now                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Binary gate: `IS_SAAS \|\| signed instance license \|\| any signed org license`, expiry ignored | Unchanged — `platformSSOAllowed()` stays the one gate module, memoized once per process                                                                                                                                                                                                                                                                                                                                                                   |
+| **Startup semantics** (epic Open Q11 — answered: **keep**)                                      | The router evaluates _policy_ per request but reads the _gate_ from the same per-process memo; a license change still takes effect on restart, never mid-flight. Per-request policy evaluation with a frozen input is startup semantics — nothing re-decides the license                                                                                                                                                                                  |
+| Denied = email mode, exactly                                                                    | On DENY the method set contains only local methods; SSO methods are absent from every picker and every routing decision — and the **callback paths still refuse** (below), because absence from a picker is not enforcement                                                                                                                                                                                                                               |
+| Gated-path enforcement incl. legacy `/callback/auth0\|okta`                                     | The `before` hook survives as the **enforcement backstop**: the path classification (`ssoPathGate.ts`) and `ssoRouteTableCanary.test.ts` stay, consulting the router's policy instead of raw env. The hook is no longer where the _decision_ lives, but it remains where non-UI traffic (direct POSTs, pinned IdP callbacks) is refused. ADR-027's "the hook remains the only correct interception point" holds for enforcement; the router owns decision |
+| Email-route block on ALLOW (no-password-account guarantee)                                      | Method-set policy: an SSO-routed org's picker never offers password sign-up; the hook backstop keeps refusing the raw endpoints                                                                                                                                                                                                                                                                                                                           |
+| Credential-mutation block, reset-pair exception on DENY                                         | Unchanged, keyed off the resolved method policy instead of `NEXTAUTH_PROVIDER`                                                                                                                                                                                                                                                                                                                                                                            |
+| Auto-join rides the platform gate                                                               | Unchanged; D12's `domainJoin` inherits it (licensed-SSO semantics, `sso-license-gating.feature:182`)                                                                                                                                                                                                                                                                                                                                                      |
+| Constants table + route-table canary                                                            | Carried over. Any route better-auth adds fails the canary by name until classified — same discipline, same test                                                                                                                                                                                                                                                                                                                                           |
 
 `NEXTAUTH_PROVIDER` itself becomes the **self-hosted default method set**
 (D03 requirement): existing single-provider deployments keep their exact
@@ -173,7 +173,7 @@ configuration survives as method-set entries
 D04 as specced (`D04-sso-connection-aggregate.md`), decided here:
 
 - Aggregate `sso_connection` in the identity pipeline, `tenantId =
-  organizationId`. Lifecycle DRAFT → CLAIMED → APPROVED →
+organizationId`. Lifecycle DRAFT → CLAIMED → APPROVED →
   VERIFICATION_PENDING → VERIFIED → ACTIVE ⇄ SUSPENDED →
   TEARDOWN_PENDING → TORN_DOWN, guards evaluated against folded state
   (activation needs a verified domain + a live break-glass binding;
@@ -187,7 +187,7 @@ D04 as specced (`D04-sso-connection-aggregate.md`), decided here:
   (`identity-d04-connection-grandfather`, org-tenanted): existing
   `ssoDomain`/`ssoProvider` orgs get backfill events producing
   VERIFIED/ACTIVE connections (payloads note `source:
-  "legacy-grandfathered"`), idempotency keys `grandfather:<orgId>`. The
+"legacy-grandfathered"`), idempotency keys `grandfather:<orgId>`. The
   `finalized` proof is a routing comparison: the connection-based decision
   equals the string-based one for every domain the org carries — the same
   comparison `SSOCONN_ROUTING` shadow mode runs fleet-wide, evaluated per
@@ -195,11 +195,11 @@ D04 as specced (`D04-sso-connection-aggregate.md`), decided here:
 - The router's domain-lookup port flips to the projection behind
   `SSOCONN_ROUTING` (shadow → enforce), after which `ssoDomain` writes
   stop and the columns become derived/legacy. Grandfathered connections
-  get their state from history but every *state change* passes the live
+  get their state from history but every _state change_ passes the live
   guards — grandfathering never weakens a guard.
 - **SAML protocol engine** (epic Open Q1/Q5): deliberately **not decided
   in this spike**. The aggregate is protocol-agnostic (`type: oidc |
-  saml`; `idpMetadata` carries either). The engine choice
+saml`; `idpMetadata` carries either). The engine choice
   (`@better-auth/sso` with its `ssoProvider` table as protocol state only,
   vs genericOAuth-with-SAML) is due at D04 implementation, recorded as a
   revision here — it does not block the aggregate, the grandfathering, or
@@ -227,7 +227,7 @@ The screen set and routes are D13's spec
   whether or not the email exists or holds one. The cloud-mode rejection
   (`password-reset.feature:144-148`) is retired at the D03/D13 flip —
   ADR-027's reset semantics (open on license-DENY, blocked on ALLOW for
-  SSO-capable installs) continue to govern *self-hosted SSO* installs
+  SSO-capable installs) continue to govern _self-hosted SSO_ installs
   through the method-set policy.
 - **Epic Open Q12 — answered: the no-oracle invariant is scoped to
   sign-in.** Sign-up keeps answering `email_already_registered`
@@ -288,7 +288,7 @@ customer from the back office. That operator already approves the customer's
 domain claim, and **the approval is the trust decision** — §5's abuse boundary
 was always the manual approval, never the record. Making the same operator
 then wait on a TXT record the customer publishes buys a round-trip and no
-security. So attestation replaces the *proof* and never the *approval*: the
+security. So attestation replaces the _proof_ and never the _approval_: the
 claim is claimed, approved and audited exactly as before, and an attested
 domain is precisely as trustworthy as the approval already in the flow.
 
@@ -302,7 +302,7 @@ and activation still needs a verified domain, a recorded test login and a live
 break-glass binding.
 
 **An attestation does not expire, and there is no DNS upgrade path.** No other
-method's verification expires — DNS TXT expires the *token* before it is
+method's verification expires — DNS TXT expires the _token_ before it is
 found, never the verification — so an expiry unique to attestation would make
 it the only method able to stop routing with nobody having decided anything,
 which is the lockout class the break-glass binding exists to prevent. Suspend
@@ -368,7 +368,7 @@ confirmation queue, which is where a human belongs anyway.
 states, and the ops surface. The alternative — screens branching on ad-hoc
 error strings — is exactly what the error-handling doctrine (ADR-045)
 exists to prevent, and it would make the shadow comparison unable to say
-*why* two paths disagreed.
+_why_ two paths disagreed.
 
 ## Consequences
 

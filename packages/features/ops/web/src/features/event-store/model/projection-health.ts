@@ -30,11 +30,7 @@ export function joinProjectionHealth({
   const live = new Map<string, { pending: number; active: number; blocked: number }>();
   for (const pipeline of pipelineTree) {
     for (const typeNode of pipeline.children) {
-      if (
-        typeNode.name !== "fold" &&
-        typeNode.name !== "map" &&
-        typeNode.name !== "state"
-      )
+      if (typeNode.name !== "fold" && typeNode.name !== "map" && typeNode.name !== "state")
         continue;
       for (const nameNode of typeNode.children) {
         live.set(`${pipeline.name}/${typeNode.name}/${nameNode.name}`, {

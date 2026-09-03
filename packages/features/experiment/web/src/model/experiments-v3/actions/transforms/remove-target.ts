@@ -1,8 +1,5 @@
 import type { FieldMapping } from "../../types";
-import {
-  type RemoveTargetPayload,
-  removeTargetPayloadSchema,
-} from "../schemas";
+import { type RemoveTargetPayload, removeTargetPayloadSchema } from "../schemas";
 import { requireTarget } from "./helpers";
 import type { Transform } from "./types";
 
@@ -38,18 +35,16 @@ const dropVariant = <T extends { comparison?: { variants: string[] } }>({
  * removal, so a caller that misnamed a column learns it instead of reading
  * "the column is gone" and moving on.
  */
-export const removeTarget: Transform<
-  RemoveTargetPayload,
-  { targetId: string }
-> = ({ state, payload }) => {
+export const removeTarget: Transform<RemoveTargetPayload, { targetId: string }> = ({
+  state,
+  payload,
+}) => {
   const { targetId } = removeTargetPayloadSchema.parse(payload);
   requireTarget({ state, targetId });
 
   const evaluators = state.evaluators.map((evaluator) => {
     const mappings: typeof evaluator.mappings = {};
-    for (const [datasetId, targetMappings] of Object.entries(
-      evaluator.mappings,
-    )) {
+    for (const [datasetId, targetMappings] of Object.entries(evaluator.mappings)) {
       const remaining = { ...targetMappings };
       delete remaining[targetId];
       mappings[datasetId] = remaining;
@@ -61,9 +56,7 @@ export const removeTarget: Transform<
     .filter((target) => target.id !== targetId)
     .map((target) => {
       const mappings: typeof target.mappings = {};
-      for (const [datasetId, fieldMappings] of Object.entries(
-        target.mappings,
-      )) {
+      for (const [datasetId, fieldMappings] of Object.entries(target.mappings)) {
         const remaining: Record<string, FieldMapping> = {};
         for (const [field, mapping] of Object.entries(fieldMappings)) {
           const readsRemovedTarget =

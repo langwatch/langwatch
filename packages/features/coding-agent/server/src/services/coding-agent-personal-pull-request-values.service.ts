@@ -46,8 +46,7 @@ export class CodingAgentPersonalPullRequestValuesService {
   }): CodingAgentPersonalRepositoryGroup[] {
     const groups = new Map<string, CodingAgentPersonalRepositoryGroup>();
     for (const session of input.sessions) {
-      if (!session.repositoryOwner || !session.repositoryName || !session.gitBranch)
-        continue;
+      if (!session.repositoryOwner || !session.repositoryName || !session.gitBranch) continue;
       const repositoryHost = normalizeGithubHost(
         session.repositoryHost,
         input.configuredGithubHost,
@@ -109,10 +108,7 @@ export class CodingAgentPersonalPullRequestValuesService {
       headBranch,
       lastActivityAtMs: sessions.reduce(
         (latest, session) =>
-          Math.max(
-            latest,
-            Math.max(session.startedAtMs, session.lastEventOccurredAtMs || 0),
-          ),
+          Math.max(latest, Math.max(session.startedAtMs, session.lastEventOccurredAtMs || 0)),
         0,
       ),
       sessionsCount: sessions.length,
@@ -132,9 +128,7 @@ export class CodingAgentPersonalPullRequestValuesService {
     }));
   }
 
-  private namedModels(
-    sessions: readonly { models: string[] }[],
-  ): CodingAgentModelUsage[] {
+  private namedModels(sessions: readonly { models: string[] }[]): CodingAgentModelUsage[] {
     const models = new Set<string>();
     for (const session of sessions) {
       for (const model of session.models) if (model !== "") models.add(model);

@@ -27,7 +27,4 @@ export {
   NonRetryableGroupQueueError,
 } from "./errors";
 export type { ObjectStore, ProjectStorageDestination } from "./storage";
-export {
-  resolveGroupQueuePolicyFromEnv,
-  type GroupQueuePolicyEnvInputs,
-} from "./policy-env";
+export { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicyEnvInputs } from "./policy-env";

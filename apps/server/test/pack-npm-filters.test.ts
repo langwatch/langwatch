@@ -141,11 +141,7 @@ function runCheck({ root, extraArgs = [] }: { root: string; extraArgs?: string[]
   code: number;
   output: string;
 } {
-  const args = [
-    join(root, "dev", "scripts", "pack-npm.sh"),
-    "--check-filters",
-    ...extraArgs,
-  ];
+  const args = [join(root, "dev", "scripts", "pack-npm.sh"), "--check-filters", ...extraArgs];
   try {
     const output = execFileSync("bash", args, {
       cwd: root,
@@ -238,11 +234,7 @@ describe("npm pack staging filters", () => {
     // it has to be read before the excludes that would take it. The staged
     // tree is what says whether that ordering still holds, because the guard
     // exempts every other dotenv file and so cannot report one.
-    const root = buildFixture([
-      ".env.example",
-      ".env.staging",
-      "apps/api/src/config.ts",
-    ]);
+    const root = buildFixture([".env.example", ".env.staging", "apps/api/src/config.ts"]);
     const stageDir = join(root, "_stage");
 
     const { code } = runCheck({ root, extraArgs: ["--stage-to", stageDir] });

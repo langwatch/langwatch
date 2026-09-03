@@ -26,10 +26,7 @@ describe("computeLineDiff", () => {
   });
 
   it("handles empty input, appends, and trailing newlines", () => {
-    expect(computeLineDiff("", "one\ntwo").map((line) => line.kind)).toEqual([
-      "add",
-      "add",
-    ]);
+    expect(computeLineDiff("", "one\ntwo").map((line) => line.kind)).toEqual(["add", "add"]);
     expect(
       computeLineDiff("a\nb", "a\nb\nc\nd").map((line) => `${line.kind}:${line.text}`),
     ).toEqual(["context:a", "context:b", "add:c", "add:d"]);

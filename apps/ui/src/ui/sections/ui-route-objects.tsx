@@ -17,9 +17,7 @@ import { UiPrefixRedirect } from "../elements/ui-prefix-redirect";
 export type UiRouteHandle = { page: string };
 
 /** The page key of the deepest matched route, when it carries one. */
-export function uiMatchedPageKey(
-  matches: ReadonlyArray<{ handle?: unknown }>,
-): string | undefined {
+export function uiMatchedPageKey(matches: ReadonlyArray<{ handle?: unknown }>): string | undefined {
   for (let index = matches.length - 1; index >= 0; index -= 1) {
     const handle = matches[index]?.handle as UiRouteHandle | undefined;
     if (handle?.page) return handle.page;

@@ -5,9 +5,7 @@
 import type { PairwiseComparison } from "../../model/batch-evaluation-results.bt-leaderboard";
 import type { BatchComparisonColumn } from "./batch-evaluation-results.types";
 
-export function buildPairwiseComparisons(
-  column: BatchComparisonColumn,
-): PairwiseComparison[] {
+export function buildPairwiseComparisons(column: BatchComparisonColumn): PairwiseComparison[] {
   return Object.values(column.verdictsByRow).map((verdict) => {
     // Three different things leave winnerId === null, and only one of them is
     // evidence. A genuine tie is real 0.5/0.5 evidence; an unresolved label

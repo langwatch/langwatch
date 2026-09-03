@@ -4,9 +4,7 @@ import { tokenizeLiquidTemplate } from "@langwatch/prompt-contract";
 describe("tokenizeLiquidTemplate()", () => {
   describe("when text contains if/endif tags", () => {
     it("identifies if and endif as liquid-tag tokens with plain-text between", () => {
-      const tokens = tokenizeLiquidTemplate(
-        "{% if tone == 'formal' %}Dear user{% endif %}",
-      );
+      const tokens = tokenizeLiquidTemplate("{% if tone == 'formal' %}Dear user{% endif %}");
 
       expect(tokens).toEqual([
         { type: "liquid-tag", value: "{% if tone == 'formal' %}" },
@@ -18,9 +16,7 @@ describe("tokenizeLiquidTemplate()", () => {
 
   describe("when text contains for/endfor tags and variable expressions", () => {
     it("identifies for/endfor as liquid-tag and variable expressions as variable", () => {
-      const tokens = tokenizeLiquidTemplate(
-        "{% for item in items %}{{ item }}{% endfor %}",
-      );
+      const tokens = tokenizeLiquidTemplate("{% for item in items %}{{ item }}{% endfor %}");
 
       expect(tokens).toEqual([
         { type: "liquid-tag", value: "{% for item in items %}" },
@@ -32,9 +28,7 @@ describe("tokenizeLiquidTemplate()", () => {
 
   describe("when text contains assign tags", () => {
     it("identifies assign as liquid-tag", () => {
-      const tokens = tokenizeLiquidTemplate(
-        "{% assign greeting = 'Hello' %}{{ greeting }}",
-      );
+      const tokens = tokenizeLiquidTemplate("{% assign greeting = 'Hello' %}{{ greeting }}");
 
       expect(tokens).toEqual([
         { type: "liquid-tag", value: "{% assign greeting = 'Hello' %}" },
@@ -53,9 +47,7 @@ describe("tokenizeLiquidTemplate()", () => {
 
   describe("when text contains elsif and else tags", () => {
     it("identifies elsif and else as liquid-tag tokens", () => {
-      const tokens = tokenizeLiquidTemplate(
-        "{% if x %}A{% elsif y %}B{% else %}C{% endif %}",
-      );
+      const tokens = tokenizeLiquidTemplate("{% if x %}A{% elsif y %}B{% else %}C{% endif %}");
 
       expect(tokens).toEqual([
         { type: "liquid-tag", value: "{% if x %}" },

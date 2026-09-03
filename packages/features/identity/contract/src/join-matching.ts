@@ -272,10 +272,7 @@ export function organizationAdmitsDomain({
   if (isPublicEmailDomain(domain)) return false;
   if (organization.connectionAdmitsDomain) return false;
   if (organization.domainJoin === "off") return false;
-  return (
-    organization.verifiedMembersOnDomain >=
-    JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD
-  );
+  return organization.verifiedMembersOnDomain >= JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD;
 }
 
 /**
@@ -293,7 +290,5 @@ export function organizationAdmitsDomainAutomatically({
   if (!organizationAdmitsDomain({ organization, domain })) return false;
   if (organization.domainJoin !== "auto") return false;
   if (!organization.autoJoinDomains.includes(domain)) return false;
-  return (
-    organization.verifiedMembersOnDomain >= JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD
-  );
+  return organization.verifiedMembersOnDomain >= JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD;
 }

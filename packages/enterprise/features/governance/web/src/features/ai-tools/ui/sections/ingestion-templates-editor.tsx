@@ -66,8 +66,7 @@ export function IngestionTemplatesEditor({ organizationId }: { organizationId: s
         });
       }
     },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't clone template" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't clone template" }),
   });
 
   const archiveMutation = api.ingestionTemplates.archive.useMutation({
@@ -96,11 +95,7 @@ export function IngestionTemplatesEditor({ organizationId }: { organizationId: s
     <VStack align="stretch" gap={3} width="full">
       <HStack>
         <Spacer />
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setEditorState({ kind: "create" })}
-        >
+        <Button size="sm" variant="outline" onClick={() => setEditorState({ kind: "create" })}>
           <Plus size={14} /> New template
         </Button>
       </HStack>
@@ -118,18 +113,13 @@ export function IngestionTemplatesEditor({ organizationId }: { organizationId: s
               No ingestion templates yet
             </Text>
             <Text fontSize="xs" color="fg.muted">
-              Platform defaults seed lazily on first /me Trace Ingest visit. Click 'New
-              template' to author a custom one for this org.
+              Platform defaults seed lazily on first /me Trace Ingest visit. Click 'New template' to
+              author a custom one for this org.
             </Text>
           </VStack>
         </Box>
       ) : (
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          overflow="hidden"
-        >
+        <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" overflow="hidden">
           <Table.Root size="sm">
             <Table.Header backgroundColor="bg.subtle">
               <Table.Row>
@@ -235,8 +225,7 @@ export function IngestionTemplatesEditor({ organizationId }: { organizationId: s
                             variant="ghost"
                             colorPalette="red"
                             loading={
-                              archiveMutation.isPending &&
-                              archiveMutation.variables?.id === t.id
+                              archiveMutation.isPending && archiveMutation.variables?.id === t.id
                             }
                             onClick={() => {
                               archiveMutation.mutate({
@@ -334,8 +323,8 @@ function ViewOttlDrawer({
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
             <Text fontSize="xs" color="fg.muted">
-              Platform-authored OTTL. Read-only — clone the row from the catalog table to
-              customise it for this org.
+              Platform-authored OTTL. Read-only — clone the row from the catalog table to customise
+              it for this org.
             </Text>
             {detailQuery.isLoading ? (
               <Spinner size="sm" />
@@ -408,8 +397,7 @@ function EditOttlDrawer({
       toaster.create({ title: "OTTL saved", type: "success" });
       onClose();
     },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't save OTTL rules" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't save OTTL rules" }),
   });
 
   const handleSave = () => {
@@ -435,17 +423,15 @@ function EditOttlDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>
-            Edit OTTL — {state?.kind === "edit" ? state.slug : ""}
-          </Drawer.Title>
+          <Drawer.Title>Edit OTTL — {state?.kind === "edit" ? state.slug : ""}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
             <Text fontSize="xs" color="fg.muted">
-              Each line is one OTTL statement. Validation runs against the gateway parser
-              as you type. The receiver applies these AFTER stamping the binding's
-              authoritative principal + provenance keys, so OTTL cannot forge attribution.
+              Each line is one OTTL statement. Validation runs against the gateway parser as you
+              type. The receiver applies these AFTER stamping the binding's authoritative principal
+              + provenance keys, so OTTL cannot forge attribution.
             </Text>
             {detailQuery.isLoading ? (
               <Spinner size="sm" />
@@ -466,11 +452,7 @@ function EditOttlDrawer({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            colorPalette="orange"
-            loading={updateMutation.isPending}
-            onClick={handleSave}
-          >
+          <Button colorPalette="orange" loading={updateMutation.isPending} onClick={handleSave}>
             Save OTTL
           </Button>
         </Drawer.Footer>
@@ -517,8 +499,7 @@ function CreateTemplateDrawer({
         onClose();
       }
     },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't create template" }),
+    onError: (err) => showErrorToast({ error: err, fallbackTitle: "Couldn't create template" }),
   });
 
   const canSubmit = displayName.trim().length > 0 && /^[a-z0-9_]{1,40}$/.test(sourceType);
@@ -563,8 +544,8 @@ function CreateTemplateDrawer({
                 placeholder="e.g. codex_internal"
               />
               <Text fontSize="xs" color="fg.muted">
-                Lowercase letters / digits / underscores only. Drives the /me Trace Ingest
-                tile slug + the langwatch.source provenance attribute on emitted spans.
+                Lowercase letters / digits / underscores only. Drives the /me Trace Ingest tile slug
+                + the langwatch.source provenance attribute on emitted spans.
               </Text>
             </VStack>
             <VStack align="stretch" gap={1}>
@@ -580,8 +561,8 @@ function CreateTemplateDrawer({
               />
             </VStack>
             <Text fontSize="xs" color="fg.muted">
-              After creation, you'll edit the OTTL rules in the next step. The template
-              starts with empty rules — admin authoring continues there.
+              After creation, you'll edit the OTTL rules in the next step. The template starts with
+              empty rules — admin authoring continues there.
             </Text>
           </VStack>
         </Drawer.Body>

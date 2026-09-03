@@ -15,10 +15,7 @@
 
 import { handlerManagedAuth } from "@langwatch/api";
 import { bodyLimit, type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
-import {
-  LangyApiRequestInvalidError,
-  langyMessagePartSchema,
-} from "@langwatch/langy-contract";
+import { LangyApiRequestInvalidError, langyMessagePartSchema } from "@langwatch/langy-contract";
 import type { Context } from "hono";
 import { z } from "zod";
 

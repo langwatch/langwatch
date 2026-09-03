@@ -170,9 +170,7 @@ function CadenceFrequencyPicker({
           />
         ) : null}
 
-        {isTimeOfDayVisible ? (
-          <CadenceTimeField parts={parts} emitParts={emitParts} />
-        ) : null}
+        {isTimeOfDayVisible ? <CadenceTimeField parts={parts} emitParts={emitParts} /> : null}
       </HStack>
 
       {parts.frequency === "weekly" ? (
@@ -203,8 +201,8 @@ function CadenceSummary({ effectiveCron }: { effectiveCron: string }) {
           : `Runs on the schedule ${effectiveCron}`}
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        How often we check this source for new activity. Leave as-is to use the
-        recommended schedule.
+        How often we check this source for new activity. Leave as-is to use the recommended
+        schedule.
       </Text>
     </>
   );
@@ -273,8 +271,7 @@ export function PullCadenceField({
 
   // Blank means "the recommended schedule" and is always saveable; only a
   // typed cron can be one the scheduler would refuse.
-  const cronError =
-    isCronMode && value.trim() !== "" ? pullCadenceCronError(value) : null;
+  const cronError = isCronMode && value.trim() !== "" ? pullCadenceCronError(value) : null;
 
   return (
     <VStack align="stretch" gap={3}>
@@ -306,9 +303,7 @@ export function PullCadenceField({
         <CadenceFrequencyPicker
           parts={parts}
           emitParts={emitParts}
-          onPickChoice={(choice) =>
-            onChange(cronFromPullParts(partsFromChoice(choice, parts)))
-          }
+          onPickChoice={(choice) => onChange(cronFromPullParts(partsFromChoice(choice, parts)))}
         />
       )}
 

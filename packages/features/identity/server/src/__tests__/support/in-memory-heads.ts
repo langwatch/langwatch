@@ -30,11 +30,7 @@ export class InMemoryHeads implements IdentityHeadsRepository {
     return this.heads.get(userId) ?? emptyIdentityHeads({ userId });
   }
 
-  async findActiveIdentifierByValue({
-    normalizedValue,
-  }: {
-    normalizedValue: string;
-  }) {
+  async findActiveIdentifierByValue({ normalizedValue }: { normalizedValue: string }) {
     if (this.activeByValue.has(normalizedValue)) {
       return this.activeByValue.get(normalizedValue) ?? null;
     }

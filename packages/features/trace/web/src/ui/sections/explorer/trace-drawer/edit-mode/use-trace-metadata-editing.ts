@@ -3,10 +3,7 @@ import {
   traceAttributeKeyForMetadata,
   traceMetadataKeyForAttribute,
 } from "@langwatch/trace-contract";
-import {
-  selectTraceMetadataBaseline,
-  useTraceEditStore,
-} from "../../../../../index";
+import { selectTraceMetadataBaseline, useTraceEditStore } from "../../../../../index";
 import type { AttributeEditing } from "../attribute-table";
 
 /**
@@ -89,8 +86,7 @@ export function useTraceMetadataEditing({
   );
 
   const editing = useMemo(
-    () =>
-      enabled ? { edits, onEditAttribute, onResetAttribute, isKeyEditable } : undefined,
+    () => (enabled ? { edits, onEditAttribute, onResetAttribute, isKeyEditable } : undefined),
     [enabled, edits, onEditAttribute, onResetAttribute, isKeyEditable],
   );
 

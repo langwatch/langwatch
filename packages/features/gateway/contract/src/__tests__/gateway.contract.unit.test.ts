@@ -48,8 +48,8 @@ describe("gateway contract", () => {
       ],
     };
     expect(gatewayBudgetCheckResultSchema.parse(result)).toEqual(result);
-    expect(
-      gatewayBudgetCheckResultSchema.safeParse({ ...result, extra: true }).success,
-    ).toBe(false);
+    expect(gatewayBudgetCheckResultSchema.safeParse({ ...result, extra: true }).success).toBe(
+      false,
+    );
   });
 });

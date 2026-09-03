@@ -91,10 +91,7 @@ export const useOnboardingFlow = () => {
   };
 
   // Use generic flow hook for navigation
-  const { currentScreenIndex, direction, navigation } = useGenericOnboardingFlow(
-    flow,
-    canProceed,
-  );
+  const { currentScreenIndex, direction, navigation } = useGenericOnboardingFlow(flow, canProceed);
 
   // Snapshot first-touch attribution once per mount. `readAttribution` is a
   // pure sessionStorage read; memoizing keeps getFormData / formContextValue

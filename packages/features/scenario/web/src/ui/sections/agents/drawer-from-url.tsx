@@ -15,14 +15,8 @@
  * @see specs/features/scenarios/scenarios-editor-ui-regressions.feature
  */
 import { useDrawer } from "@langwatch/ui-drawer";
-import {
-  AgentCodeEditorDrawer,
-  type AgentCodeEditorDrawerProps,
-} from "./agent-code-editor-drawer";
-import {
-  AgentHttpEditorDrawer,
-  type AgentHttpEditorDrawerProps,
-} from "./agent-http-editor-drawer";
+import { AgentCodeEditorDrawer, type AgentCodeEditorDrawerProps } from "./agent-code-editor-drawer";
+import { AgentHttpEditorDrawer, type AgentHttpEditorDrawerProps } from "./agent-http-editor-drawer";
 import {
   WorkflowSelectorDrawer,
   type WorkflowSelectorDrawerProps,

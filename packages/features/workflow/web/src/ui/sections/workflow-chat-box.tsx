@@ -144,8 +144,19 @@ export function WorkflowChatBox({
           {chatMessages.map((message, index) => (
             <Flex key={index} flexDirection="column" width="100%" marginBottom={4}>
               {message.input.map((input, inputIndex) => (
-                <Box key={`input-${inputIndex}`} alignSelf="flex-end" maxWidth="70%" marginBottom={2}>
-                  <Text bg="blue.500" color="white" padding={2} borderRadius="lg" whiteSpace="pre-wrap">
+                <Box
+                  key={`input-${inputIndex}`}
+                  alignSelf="flex-end"
+                  maxWidth="70%"
+                  marginBottom={2}
+                >
+                  <Text
+                    bg="blue.500"
+                    color="white"
+                    padding={2}
+                    borderRadius="lg"
+                    whiteSpace="pre-wrap"
+                  >
                     {input}
                   </Text>
                 </Box>
@@ -224,7 +235,10 @@ function MultipleInput({
           required
           value={inputs[0]}
           onChange={(event) =>
-            handleInputChange(entryInputs[0]?.sourceHandle?.split(".")?.[1] ?? "", event.target.value)
+            handleInputChange(
+              entryInputs[0]?.sourceHandle?.split(".")?.[1] ?? "",
+              event.target.value,
+            )
           }
           placeholder={`Send ${entryInputs[0]?.sourceHandle?.split(".")[1]} `}
           onKeyDown={(event) => {

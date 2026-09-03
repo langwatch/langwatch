@@ -6,7 +6,9 @@ description: Test your agents through multi-turn conversations with a simulated 
 ---
 
 <Tip>
-  **Quick setup?** Paste the [Connect your agent prompt](/agent-testing/connect-your-agent) into your coding agent to connect your agent and run a first test suite, or the [scenarios prompt](/skills/code-prompts#add-scenario-tests) to add code-first scenario tests.
+  **Quick setup?** Paste the [Connect your agent prompt](/agent-testing/connect-your-agent) into
+  your coding agent to connect your agent and run a first test suite, or the [scenarios
+  prompt](/skills/code-prompts#add-scenario-tests) to add code-first scenario tests.
 </Tip>
 
 <video controls autoPlay muted loop playsInline width="100%">
@@ -27,11 +29,11 @@ Use it to:
 
 ## How a test runs
 
-| Part | What it does |
-|---|---|
-| Simulated user | Plays the user in the situation the scenario describes, with different wording on every run. |
-| Your agent | Answers each turn as it does in production. |
-| Judge | Reads the conversation and the agent's traces, then passes or fails each criterion and explains why. |
+| Part           | What it does                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------- |
+| Simulated user | Plays the user in the situation the scenario describes, with different wording on every run.         |
+| Your agent     | Answers each turn as it does in production.                                                          |
+| Judge          | Reads the conversation and the agent's traces, then passes or fails each criterion and explains why. |
 
 A scenario is one situation and its criteria. A [test suite](/agent-testing/test-suites) groups the scenarios you run together. A [run plan](/agent-testing/run-plans) is the history of one configuration, and the [Results](/agent-testing/results) tab shows its pass rate over time.
 
@@ -41,10 +43,12 @@ Both use the same simulated user, the same judge and the same results pages. The
 
 <CardGroup cols={2}>
   <Card title="Test from the platform" icon="globe" href="/agent-testing/test-from-the-platform">
-    Connect your agent from your service startup, then write, run and see scenarios in the LangWatch interface. No test code in your repository.
+    Connect your agent from your service startup, then write, run and see scenarios in the LangWatch
+    interface. No test code in your repository.
   </Card>
   <Card title="Write scenarios in code" icon="code" href="/agent-testing/scenarios-in-code">
-    Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner and in CI, and see every run in LangWatch.
+    Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner
+    and in CI, and see every run in LangWatch.
   </Card>
 </CardGroup>
 
@@ -52,13 +56,16 @@ Both use the same simulated user, the same judge and the same results pages. The
 
 <CardGroup cols={3}>
   <Card title="Conversational agents" icon="comments" href="/agent-testing/scenarios">
-    Multi-turn conversations judged on outcomes, internal actions and the things the agent must never do.
+    Multi-turn conversations judged on outcomes, internal actions and the things the agent must
+    never do.
   </Card>
   <Card title="Voice agents" icon="microphone" href="/agent-testing/voice-agents">
-    Real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat and Gemini Live, with background noise, interruptions and latency metrics.
+    Real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat and Gemini Live, with background
+    noise, interruptions and latency metrics.
   </Card>
   <Card title="Red teaming" icon="shield-halved" href="/agent-testing/red-teaming">
-    Multi-turn adversarial attacks with escalation, refusal detection and backtracking, to find security gaps before a release.
+    Multi-turn adversarial attacks with escalation, refusal detection and backtracking, to find
+    security gaps before a release.
   </Card>
 </CardGroup>
 

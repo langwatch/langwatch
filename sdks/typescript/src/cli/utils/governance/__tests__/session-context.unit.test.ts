@@ -98,19 +98,14 @@ describe("sessionContextFingerprint", () => {
 
   describe("given a detached head in the main checkout", () => {
     it("leaves the missing fields empty rather than absent", () => {
-      expect(sessionContextFingerprint({ repository })).toBe(
-        "github.com/langwatch/langwatch@#!~",
-      );
+      expect(sessionContextFingerprint({ repository })).toBe("github.com/langwatch/langwatch@#!~");
     });
   });
 
   describe("given the titles the record can carry", () => {
     it("changes when either title changes, so a rename re-posts", () => {
       const base = sessionContextFingerprint({ repository });
-      const derived = sessionContextFingerprint(
-        { repository },
-        { title: "Fix the build" },
-      );
+      const derived = sessionContextFingerprint({ repository }, { title: "Fix the build" });
       const declared = sessionContextFingerprint(
         { repository },
         { title: "Fix the build", name: "pr-reviewer" },
@@ -121,9 +116,7 @@ describe("sessionContextFingerprint", () => {
 
   describe("given a session outside any repository", () => {
     it("still names the titles it carries", () => {
-      expect(sessionContextFingerprint({}, { name: "pr-reviewer" })).toBe(
-        "@#!~pr-reviewer",
-      );
+      expect(sessionContextFingerprint({}, { name: "pr-reviewer" })).toBe("@#!~pr-reviewer");
     });
   });
 
@@ -139,9 +132,10 @@ describe("sessionContextFingerprint", () => {
 describe("parseOtlpHeaders", () => {
   describe("given a comma separated header variable", () => {
     it("splits each pair on its first equals sign", () => {
-      expect(
-        parseOtlpHeaders("Authorization=Bearer ik-lw-abc=def, x-scope=team a"),
-      ).toEqual({ Authorization: "Bearer ik-lw-abc=def", "x-scope": "team a" });
+      expect(parseOtlpHeaders("Authorization=Bearer ik-lw-abc=def, x-scope=team a")).toEqual({
+        Authorization: "Bearer ik-lw-abc=def",
+        "x-scope": "team a",
+      });
     });
   });
 
@@ -156,9 +150,7 @@ describe("parseOtlpHeaders", () => {
 describe("parseTraceparent", () => {
   describe("given a live version 00 traceparent", () => {
     it("reads the trace and span ids", () => {
-      expect(
-        parseTraceparent("00-16872e6253edb3e8748023ff172703c4-be7ce7c6bf1173f5-01"),
-      ).toEqual({
+      expect(parseTraceparent("00-16872e6253edb3e8748023ff172703c4-be7ce7c6bf1173f5-01")).toEqual({
         traceId: "16872e6253edb3e8748023ff172703c4",
         spanId: "be7ce7c6bf1173f5",
       });
@@ -205,9 +197,7 @@ describe("buildSessionContextLogPayload", () => {
     },
   });
   const record = payload.resourceLogs[0]!.scopeLogs[0]!.logRecords[0]!;
-  const attributes = Object.fromEntries(
-    record.attributes.map((a) => [a.key, a.value.stringValue]),
-  );
+  const attributes = Object.fromEntries(record.attributes.map((a) => [a.key, a.value.stringValue]));
 
   describe("given a full context and a live trace", () => {
     it("names the event on the record and in an attribute", () => {
@@ -310,9 +300,7 @@ describe("sessionTitleFromPrompt", () => {
 
   describe("given text no one typed", () => {
     it("names nothing from tags or blank text", () => {
-      expect(
-        sessionTitleFromPrompt("<environment_context>\n</environment_context>"),
-      ).toBeNull();
+      expect(sessionTitleFromPrompt("<environment_context>\n</environment_context>")).toBeNull();
       expect(sessionTitleFromPrompt("   \n  ")).toBeNull();
     });
   });

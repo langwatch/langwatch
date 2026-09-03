@@ -12,22 +12,22 @@ say so explicitly and are ordered last.
 
 **8,245 non-test lines across 66 files**, in three packages.
 
-| Package | Non-test files | Lines |
-| --- | --- | --- |
-| `server/src` | 42 | 6,287 |
-| `contract/src` | 13 | 1,370 |
-| `web/src` | 11 | 588 |
+| Package        | Non-test files | Lines |
+| -------------- | -------------- | ----- |
+| `server/src`   | 42             | 6,287 |
+| `contract/src` | 13             | 1,370 |
+| `web/src`      | 11             | 588   |
 
 `server/src` by directory:
 
-| Directory | Files | Lines | Average |
-| --- | --- | --- | --- |
-| `ports/` | 10 | 234 | 23 |
-| `adapters/` | 8 | 673 | 84 |
-| `repositories/` | 6 | 667 | 111 |
-| `services/` | 16 | 4,296 | 269 |
-| `transport/` | 1 | 328 | 328 |
-| `index.ts` | 1 | 89 | — |
+| Directory       | Files | Lines | Average |
+| --------------- | ----- | ----- | ------- |
+| `ports/`        | 10    | 234   | 23      |
+| `adapters/`     | 8     | 673   | 84      |
+| `repositories/` | 6     | 667   | 111     |
+| `services/`     | 16    | 4,296 | 269     |
+| `transport/`    | 1     | 328   | 328     |
+| `index.ts`      | 1     | 89    | —       |
 
 `server/src/index.ts` publishes **74 named symbols**. **27 have zero consumers
 outside the feature.**
@@ -149,13 +149,13 @@ Two composition roots bridge the gap with a cast rather than an adapter:
 
 Downstream, both call the names that do not exist on the object they were handed:
 
-| Call site | Method invoked | Present on `PrismaSubscriptionRepository`? |
-| --- | --- | --- |
-| `subscription.service.ts:34` (`toBillingRepository`) | `findLastNonCancelled` | no — it is `tryFindLastNonCancelled` |
-| `subscription.service.ts:39` (`toBillingRepository`) | `findByStripeId` | no — it is `tryFindByStripeId` |
-| `subscription.service.ts:154` (`getLastNonCancelledSubscription`) | `findLastNonCancelled` | no |
-| `webhook.service.ts:512,620,644,702,817` | `findByStripeId` | no |
-| `webhook.service.ts:683,722` | `findLastNonCancelled` | no |
+| Call site                                                         | Method invoked         | Present on `PrismaSubscriptionRepository`? |
+| ----------------------------------------------------------------- | ---------------------- | ------------------------------------------ |
+| `subscription.service.ts:34` (`toBillingRepository`)              | `findLastNonCancelled` | no — it is `tryFindLastNonCancelled`       |
+| `subscription.service.ts:39` (`toBillingRepository`)              | `findByStripeId`       | no — it is `tryFindByStripeId`             |
+| `subscription.service.ts:154` (`getLastNonCancelledSubscription`) | `findLastNonCancelled` | no                                         |
+| `webhook.service.ts:512,620,644,702,817`                          | `findByStripeId`       | no                                         |
+| `webhook.service.ts:683,722`                                      | `findLastNonCancelled` | no                                         |
 
 Ten call sites, `TypeError: … is not a function`, on the SaaS path only
 (`presets.ts:1670` gates the whole block on `config.isSaas`). The reachable
@@ -197,7 +197,7 @@ createSeatEventCheckout(
 ```
 
 Four of four (`:109,115,121,127`) — the only `layer-class` entry billing carries.
-The parameter and return types are *derived* from a `ReturnType<typeof …>` alias
+The parameter and return types are _derived_ from a `ReturnType<typeof …>` alias
 (`:88`) rather than stated, which is signal 2 in `overengineering.md`: the type
 reconstructs a shape a signature could say once.
 
@@ -227,8 +227,8 @@ type SeatEventDatabase = {
 `any` in the whole feature.
 
 The feature's own ADR forbids this in one sentence —
-`adrs/001-billing-package-boundary.md`, "Persistence": *"Services consume narrow
-repository classes rather than generated client types."*
+`adrs/001-billing-package-boundary.md`, "Persistence": _"Services consume narrow
+repository classes rather than generated client types."_
 
 ### P3 — `OrganizationPricingRepository` is a strict subset of `BillingOrganizationPort`, with a byte-identical implementation (breaks R4, R8)
 
@@ -276,10 +276,10 @@ it bundles four repositories into one record and earns its place.
 
 ### P5 — Two adapters have no users at all (breaks R8)
 
-| File | Lines | Internal users | External users |
-| --- | --- | --- | --- |
-| `adapters/null-organization.adapter.ts` | 28 | 0 | 0 |
-| `adapters/null-subscription-notifier.adapter.ts` | 14 | 0 | 0 |
+| File                                             | Lines | Internal users | External users |
+| ------------------------------------------------ | ----- | -------------- | -------------- |
+| `adapters/null-organization.adapter.ts`          | 28    | 0              | 0              |
+| `adapters/null-subscription-notifier.adapter.ts` | 14    | 0              | 0              |
 
 Both are exported (`index.ts:24,26`) and referenced nowhere else in the
 repository — not in a service default, not in `presets.ts`, not in a test.
@@ -297,9 +297,9 @@ exported at `index.ts:75`, and its only caller anywhere is
 `resourceCooldown` and `planCooldown` optional, and defaults each:
 
 ```ts
-this.errorReporter = errorReporter ?? { capture: () => {} };   // :181 — an inline
-this.resourceCooldown = resourceCooldown ?? resourceLimitCooldown;   // second copy of
-this.planCooldown = planCooldown ?? planLimitCooldown;               // NullBillingErrorReporter
+this.errorReporter = errorReporter ?? { capture: () => {} }; // :181 — an inline
+this.resourceCooldown = resourceCooldown ?? resourceLimitCooldown; // second copy of
+this.planCooldown = planCooldown ?? planLimitCooldown; // NullBillingErrorReporter
 ```
 
 The only production composition —
@@ -346,12 +346,12 @@ named export and eight `export *`.
 
 ### P8 — The same eight operations are declared four times (breaks R8)
 
-| Where | Form |
-| --- | --- |
-| `server/src/services/subscription.service.ts:81,87,144,214,240,261,298,328` | the implementation |
-| `platform/app/src/server/app-layer/subscription/subscription.service.ts` | app `SubscriptionService` interface |
-| `platform/app/…/billing/enterprise/subscription.service.ts:133-175` | 7 delegating methods, `Parameters<…>[0]` types |
-| `server/src/transport/api-trpc/subscription.api.ts:43-96` | structural `BillingApplication`, 54 lines |
+| Where                                                                       | Form                                           |
+| --------------------------------------------------------------------------- | ---------------------------------------------- |
+| `server/src/services/subscription.service.ts:81,87,144,214,240,261,298,328` | the implementation                             |
+| `platform/app/src/server/app-layer/subscription/subscription.service.ts`    | app `SubscriptionService` interface            |
+| `platform/app/…/billing/enterprise/subscription.service.ts:133-175`         | 7 delegating methods, `Parameters<…>[0]` types |
+| `server/src/transport/api-trpc/subscription.api.ts:43-96`                   | structural `BillingApplication`, 54 lines      |
 
 `RECENT_INVOICES_LIMIT = 4` is declared twice — `services/subscription.service.ts:33`
 and `platform/app/…/billing/enterprise/subscription.service.ts:20` — and the
@@ -552,12 +552,18 @@ export abstract class SeatEventRepository {
 
   /** Cancels abandoned PENDING checkouts and the PAYMENT_PENDING invites they
    *  stamped, in that order. Returns how many rows were cancelled. */
-  abstract cancelStalePendingCheckouts(input: { organizationId: string; plans: readonly string[] }): Promise<{ count: number }>;
+  abstract cancelStalePendingCheckouts(input: {
+    organizationId: string;
+    plans: readonly string[];
+  }): Promise<{ count: number }>;
 
   /** The PENDING subscription and its invites, committed together — a checkout
    *  that creates one without the other leaves an unpayable invite. */
   abstract createPendingWithInvites(input: {
-    organizationId: string; plan: string; maxMembers: number; invites: InviteInput[];
+    organizationId: string;
+    plan: string;
+    maxMembers: number;
+    invites: InviteInput[];
   }): Promise<{ id: string }>;
 
   abstract activateWithSeatCount(input: { id: string; maxMembers: number }): Promise<void>;

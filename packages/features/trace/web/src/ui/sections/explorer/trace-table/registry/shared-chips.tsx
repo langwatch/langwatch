@@ -1,13 +1,4 @@
-import {
-  Circle,
-  chakra,
-  HoverCard,
-  HStack,
-  Icon,
-  Portal,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Circle, chakra, HoverCard, HStack, Icon, Portal, Text, VStack } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
@@ -37,10 +28,8 @@ export function evalChipColor(ev: TraceEvalResult): string {
  * as muted-foreground numerals.
  */
 function VerdictSlot({ display }: { display: EvalChipDisplay }) {
-  if (display.status === "skipped")
-    return <NoVerdictBadge label="SKIPPED" icon={LuCircleSlash} />;
-  if (display.status === "error")
-    return <NoVerdictBadge label="ERROR" icon={LuCircleAlert} />;
+  if (display.status === "skipped") return <NoVerdictBadge label="SKIPPED" icon={LuCircleSlash} />;
+  if (display.status === "error") return <NoVerdictBadge label="ERROR" icon={LuCircleAlert} />;
   if (display.categoryLabel) {
     return (
       <Text
@@ -213,11 +202,7 @@ export const EvalChip: React.FC<{
                   <Text textStyle="2xs" color="fg.muted">
                     Result
                   </Text>
-                  <Text
-                    textStyle="2xs"
-                    fontWeight="semibold"
-                    color={display.passLabel.color}
-                  >
+                  <Text textStyle="2xs" fontWeight="semibold" color={display.passLabel.color}>
                     {display.statusLabel}
                   </Text>
                 </HStack>
@@ -292,13 +277,7 @@ export const EventBadge: React.FC<{ event: TraceListEventGroup }> = ({ event }) 
       {event.name}
     </Text>
     {event.count > 1 && (
-      <Text
-        textStyle="2xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        lineHeight="1.2"
-        flexShrink={0}
-      >
+      <Text textStyle="2xs" fontWeight="semibold" color="fg.muted" lineHeight="1.2" flexShrink={0}>
         {event.count.toLocaleString()}
       </Text>
     )}

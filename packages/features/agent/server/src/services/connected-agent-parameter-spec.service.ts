@@ -83,9 +83,7 @@ function coerceValue(
     case "string":
       return coerceString(value);
     case "number":
-      return typeof value === "number" && Number.isFinite(value)
-        ? value
-        : undefined;
+      return typeof value === "number" && Number.isFinite(value) ? value : undefined;
     case "boolean":
       return typeof value === "boolean" ? value : undefined;
   }
@@ -135,15 +133,11 @@ function assertUsableName(name: string): void {
 }
 
 /** The property entries of an object schema, within the declaration cap. */
-function propertyEntriesOf(
-  schema: Record<string, unknown>,
-): [string, unknown][] {
+function propertyEntriesOf(schema: Record<string, unknown>): [string, unknown][] {
   const properties = schema.properties;
   if (
     properties !== undefined &&
-    (typeof properties !== "object" ||
-      properties === null ||
-      Array.isArray(properties))
+    (typeof properties !== "object" || properties === null || Array.isArray(properties))
   ) {
     throw new AgentParameterInvalidError({
       name: null,
@@ -164,9 +158,7 @@ function propertyEntriesOf(
 function requiredNamesOf(schema: Record<string, unknown>): Set<string> {
   return new Set(
     Array.isArray(schema.required)
-      ? schema.required.filter(
-          (name): name is string => typeof name === "string",
-        )
+      ? schema.required.filter((name): name is string => typeof name === "string")
       : [],
   );
 }
@@ -189,8 +181,7 @@ function assertNotSecret({
   if (property.secret === true || property["x-langwatch-secret"] === true) {
     throw new AgentParameterInvalidError({
       name,
-      reason:
-        "a secret is declared on the scenario and supplied per run, never by the agent",
+      reason: "a secret is declared on the scenario and supplied per run, never by the agent",
     });
   }
 }
@@ -262,13 +253,9 @@ function assertScenarioShape(parameters: ScenarioParameterDefinition[]): void {
   const parsed = scenarioParameterDefinitionsSchema.safeParse(parameters);
   if (parsed.success) return;
   const issue = parsed.error.issues[0];
-  const rule = (issue as { params?: { rule?: unknown } } | undefined)?.params
-    ?.rule;
+  const rule = (issue as { params?: { rule?: unknown } } | undefined)?.params?.rule;
   throw new AgentParameterInvalidError({
-    name:
-      typeof issue?.path[0] === "number"
-        ? (parameters[issue.path[0]]?.name ?? null)
-        : null,
+    name: typeof issue?.path[0] === "number" ? (parameters[issue.path[0]]?.name ?? null) : null,
     reason: shapeFailureReason(rule),
   });
 }
@@ -280,9 +267,7 @@ function assertScenarioShape(parameters: ScenarioParameterDefinition[]): void {
  *   a turn field, when more than the cap are declared, or when the schema is
  *   not an object schema at all.
  */
-export function normalizeParameterSchema(
-  schema: Record<string, unknown>,
-): NormalizedParameters {
+export function normalizeParameterSchema(schema: Record<string, unknown>): NormalizedParameters {
   const entries = propertyEntriesOf(schema);
   const required = requiredNamesOf(schema);
   const notes: string[] = [];

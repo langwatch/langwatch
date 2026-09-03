@@ -9,11 +9,7 @@ import {
 
 const isTextInput = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.isContentEditable
-  );
+  return target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
 };
 
 /** `[` toggles the filter sidebar, unless the user is typing into an input. */

@@ -10,9 +10,7 @@ import { DataRetentionRepository } from "../data-retention.repository";
 import type { DataRetentionDatabasePort } from "../../ports/data-retention-database.port";
 
 export class PrismaDataRetentionRepository extends DataRetentionRepository {
-  static create(options: {
-    database: DataRetentionDatabasePort;
-  }): PrismaDataRetentionRepository {
+  static create(options: { database: DataRetentionDatabasePort }): PrismaDataRetentionRepository {
     return new PrismaDataRetentionRepository(options.database);
   }
 
@@ -34,9 +32,7 @@ export class PrismaDataRetentionRepository extends DataRetentionRepository {
     return rows.map((row) => retentionRowSchema.parse(row));
   }
 
-  async findAllInOrganization(input: {
-    organizationId: string;
-  }): Promise<RetentionPolicy[]> {
+  async findAllInOrganization(input: { organizationId: string }): Promise<RetentionPolicy[]> {
     const rows = await this.database.retentionPolicy.findMany({
       where: { organizationId: input.organizationId },
     });

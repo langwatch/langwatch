@@ -40,9 +40,7 @@ describe("SessionRatioSampler", () => {
   describe("given the ratio records everything", () => {
     describe("when a trace starts", () => {
       it("records it without consulting the session", () => {
-        expect(decide(new SessionRatioSampler(1))).toBe(
-          SamplingDecision.RECORD_AND_SAMPLED,
-        );
+        expect(decide(new SessionRatioSampler(1))).toBe(SamplingDecision.RECORD_AND_SAMPLED);
       });
     });
   });
@@ -136,9 +134,7 @@ describe("SessionRatioSampler", () => {
         expect(decide(new SessionRatioSampler(Number.NaN))).toBe(
           SamplingDecision.RECORD_AND_SAMPLED,
         );
-        expect(decide(new SessionRatioSampler(7))).toBe(
-          SamplingDecision.RECORD_AND_SAMPLED,
-        );
+        expect(decide(new SessionRatioSampler(7))).toBe(SamplingDecision.RECORD_AND_SAMPLED);
       });
     });
   });

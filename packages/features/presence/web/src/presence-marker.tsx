@@ -88,13 +88,7 @@ interface PresenceChipProps {
   enterDelayMs: number;
 }
 
-function PresenceChip({
-  session,
-  size,
-  marginLeft,
-  zIndex,
-  enterDelayMs,
-}: PresenceChipProps) {
+function PresenceChip({ session, size, marginLeft, zIndex, enterDelayMs }: PresenceChipProps) {
   const color = presenceSessionColor(session);
   const name = presenceDisplayName(session);
   const image = session.user.image ?? null;

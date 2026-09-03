@@ -14,7 +14,10 @@ import {
 export const SESSION_POLICY_MAX_DAYS = 365;
 
 export class SessionPolicyOutOfRangeError extends HandledError {
-  constructor(readonly value: number, readonly maxDays: number) {
+  constructor(
+    readonly value: number,
+    readonly maxDays: number,
+  ) {
     super(
       "governance:session_policy_out_of_range",
       `maxSessionDurationDays must be an integer between 0 and ${maxDays} (got ${value})`,
@@ -28,13 +31,9 @@ export class SessionPolicyOutOfRangeError extends HandledError {
 
 /** Read and update the organization's session-lifetime policy. */
 export class OrganizationSessionPolicyService {
-  private constructor(
-    private readonly repository: OrganizationSessionPolicyPort,
-  ) {}
+  private constructor(private readonly repository: OrganizationSessionPolicyPort) {}
 
-  static create(
-    repository: OrganizationSessionPolicyPort,
-  ): OrganizationSessionPolicyService {
+  static create(repository: OrganizationSessionPolicyPort): OrganizationSessionPolicyService {
     return new OrganizationSessionPolicyService(repository);
   }
 
@@ -51,10 +50,7 @@ export class OrganizationSessionPolicyService {
       maxSessionDurationDays < 0 ||
       maxSessionDurationDays > SESSION_POLICY_MAX_DAYS
     ) {
-      throw new SessionPolicyOutOfRangeError(
-        maxSessionDurationDays,
-        SESSION_POLICY_MAX_DAYS,
-      );
+      throw new SessionPolicyOutOfRangeError(maxSessionDurationDays, SESSION_POLICY_MAX_DAYS);
     }
     await this.repository.setMaxDurationDays(organizationId, maxSessionDurationDays);
     return { maxSessionDurationDays };

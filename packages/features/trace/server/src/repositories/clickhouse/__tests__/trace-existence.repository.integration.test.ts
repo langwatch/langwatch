@@ -90,7 +90,8 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query: "ALTER TABLE trace_summaries DELETE WHERE TenantId IN ({tenantId:String}, {otherTenantId:String})",
+      query:
+        "ALTER TABLE trace_summaries DELETE WHERE TenantId IN ({tenantId:String}, {otherTenantId:String})",
       query_params: { tenantId, otherTenantId },
     });
     await ch.close();

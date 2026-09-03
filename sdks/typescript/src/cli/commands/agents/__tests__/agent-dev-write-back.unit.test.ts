@@ -130,9 +130,7 @@ describe("restoreDevTunnel()", () => {
       expect(restored).not.toBeNull();
       expect(restored?.url).toBe("https://staging.example.com/agent");
       expect(restored?.devTunnel).toBeUndefined();
-      expect(restored?.headers).toEqual([
-        { key: "Authorization", value: "Bearer customer-token" },
-      ]);
+      expect(restored?.headers).toEqual([{ key: "Authorization", value: "Bearer customer-token" }]);
     });
   });
 

@@ -53,9 +53,7 @@ export function LatencyWindowsCard({ windows }: { windows: LatencyWindows | null
             title="Computed from bucketed completion histograms, so each figure is a slight overestimate. All time counts since latency history began recording."
           >
             bucketed estimates
-            {windows.allTime
-              ? ` · ${formatCount(windows.allTime.count)} completions all time`
-              : ""}
+            {windows.allTime ? ` · ${formatCount(windows.allTime.count)} completions all time` : ""}
           </Text>
         </HStack>
         <Table.Root size="sm" variant="line">

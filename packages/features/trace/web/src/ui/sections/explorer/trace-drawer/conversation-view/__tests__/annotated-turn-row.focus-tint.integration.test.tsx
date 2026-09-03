@@ -23,11 +23,7 @@ vi.mock("../turn-annotation-rail", () => ({
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace";
 import { AnnotatedTurnRow } from "../annotated-turn-row";
 import type { ParsedTurn, TurnLayout } from "../types";
-import {
-  RAIL_WIDTH_SLIM_PX,
-  RAIL_WIDTH_WIDE_PX,
-  type RailLayout,
-} from "../use-rail-layout";
+import { RAIL_WIDTH_SLIM_PX, RAIL_WIDTH_WIDE_PX, type RailLayout } from "../use-rail-layout";
 
 const TRACE_ID = "trace-1";
 const SIDE_LAYOUT: RailLayout = {

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  foldReasoningTitles,
-  stripReasoningTitles,
-} from "../langy-reasoning-titles";
+import { foldReasoningTitles, stripReasoningTitles } from "../langy-reasoning-titles";
 
 /**
  * The reasoning-summary fold (see logic/langyReasoningTitles.ts): a codex
@@ -160,8 +157,7 @@ describe("foldReasoningTitles", () => {
 
   describe("when the whole answer is headline paragraphs", () => {
     it("returns the original text rather than an empty reply", () => {
-      const text =
-        "**Planning task execution strategy**\n\n**Starting batch trace search**";
+      const text = "**Planning task execution strategy**\n\n**Starting batch trace search**";
       const fold = foldReasoningTitles({ parts: [], text, hasActivity: true });
       expect(fold.titles).toEqual([]);
       expect(fold.text).toBe(text);
@@ -180,9 +176,7 @@ describe("stripReasoningTitles", () => {
 
   describe("when the turn has no activity record", () => {
     it("returns the text untouched", () => {
-      expect(stripReasoningTitles({ text: LEAKED_TEXT, hasActivity: false })).toBe(
-        LEAKED_TEXT,
-      );
+      expect(stripReasoningTitles({ text: LEAKED_TEXT, hasActivity: false })).toBe(LEAKED_TEXT);
     });
   });
 });

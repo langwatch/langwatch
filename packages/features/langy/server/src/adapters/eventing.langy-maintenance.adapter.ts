@@ -1,9 +1,4 @@
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-  type Event,
-} from "@langwatch/eventing";
+import { defineAggregate, defineEvents, definePipeline, type Event } from "@langwatch/eventing";
 import {
   type LangySessionKeyReapDeps,
   runLangySessionKeyReap,
@@ -66,11 +61,7 @@ export class EventingLangyMaintenanceAdapter {
           .state<LangySessionKeyReapState>({ lastReapAt: null })
           .schedule({ everyMs: LANGY_SESSION_KEY_REAP_INTERVAL_MS })
           .onWake(langySessionKeyReapWake)
-          .intent(
-            "reap",
-            langySessionKeyReapSchema,
-            runLangySessionKeyReap(sessionKeyReap),
-          )
+          .intent("reap", langySessionKeyReapSchema, runLangySessionKeyReap(sessionKeyReap))
           // One bounded UPDATE over the (name, revokedAt, expiresAt) index added
           // in 20260728120000 — nothing like the blob sweep's keyspace walk, so
           // the default-ish lease is ample. NOTE the FIRST tick after deploy also

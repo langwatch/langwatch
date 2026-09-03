@@ -3,17 +3,10 @@ import type { IconType } from "react-icons";
 import { LuLanguages, LuLightbulb, LuMessageSquare, LuPlay } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground";
-import {
-  type TraceAnchor,
-  useAnchoredAnnotations,
-} from "../hooks/use-anchored-annotations";
+import { type TraceAnchor, useAnchoredAnnotations } from "../hooks/use-anchored-annotations";
 import type { useTextTranslation } from "../hooks/use-text-translation";
 import { FieldCommentButton } from "./anchored-comments/field-comment-button";
-import {
-  PlaygroundButton,
-  SuggestCorrectionButton,
-  TranslateButton,
-} from "./io-toolbar-buttons";
+import { PlaygroundButton, SuggestCorrectionButton, TranslateButton } from "./io-toolbar-buttons";
 
 /** One toolbar action: its inline rendering and its overflow-menu row. */
 export type IOAction = {
@@ -86,11 +79,7 @@ function buildIOActions({
       // trace's own input included. Corrections must be stored against the
       // REAL text, never the translated variant the viewer happens to show.
       render: () => (
-        <SuggestCorrectionButton
-          traceId={traceId}
-          output={originalContent}
-          anchor={fieldAnchor}
-        />
+        <SuggestCorrectionButton traceId={traceId} output={originalContent} anchor={fieldAnchor} />
       ),
     });
   }
@@ -132,16 +121,13 @@ function useIOActionGates({
   const canAnnotate = hasPermission("annotations:manage");
   return {
     showComment:
-      fieldAnchor !== null &&
-      (canAnnotate || annotations.commentsAt(fieldAnchor).length > 0),
+      fieldAnchor !== null && (canAnnotate || annotations.commentsAt(fieldAnchor).length > 0),
     showSuggest: fieldAnchor !== null && canAnnotate,
     // No explicit playground action — the loader auto-detects: opens the
     // existing managed prompt at the traced version when one is linked,
     // creates a fresh tab when not. One button, smart default.
     playgroundHref:
-      spanType === "llm" && spanId && mode === "input"
-        ? (buildUrl(spanId)?.toString() ?? "")
-        : "",
+      spanType === "llm" && spanId && mode === "input" ? (buildUrl(spanId)?.toString() ?? "") : "",
   };
 }
 
@@ -184,14 +170,6 @@ export function useIOActions({
         showSuggest,
         playgroundHref,
       }),
-    [
-      translation,
-      traceId,
-      fieldAnchor,
-      originalContent,
-      showComment,
-      showSuggest,
-      playgroundHref,
-    ],
+    [translation, traceId, fieldAnchor, originalContent, showComment, showSuggest, playgroundHref],
   );
 }

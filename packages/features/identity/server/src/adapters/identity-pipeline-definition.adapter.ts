@@ -38,10 +38,7 @@ import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch
 // reach the type — and the envelope function, still exported from the
 // projection files themselves — from the pipeline definition they compose
 // into, without each naming the projection file that actually owns them.
-export {
-  identityEventsFor,
-  type IdentityEvent,
-} from "../projections/identity-state.projection";
+export { identityEventsFor, type IdentityEvent } from "../projections/identity-state.projection";
 export { mfaEventsFor, type MfaEvent } from "../projections/mfa-enrollment-state.projection";
 
 export interface IdentityPipelineDeps {

@@ -14,9 +14,7 @@ export const ottlValidationDeferredReasonSchema = z.enum([
   "gateway_unconfigured",
   "endpoint_unavailable",
 ]);
-export type OttlValidationDeferredReason = z.infer<
-  typeof ottlValidationDeferredReasonSchema
->;
+export type OttlValidationDeferredReason = z.infer<typeof ottlValidationDeferredReasonSchema>;
 
 export const ottlValidationResultSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("valid") }).strict(),

@@ -123,14 +123,10 @@ function JobContextRows({
 }) {
   return (
     <Box>
-      {context.traceId && (
-        <ContextRow label="Trace" value={context.traceId} href={traceHref} />
-      )}
+      {context.traceId && <ContextRow label="Trace" value={context.traceId} href={traceHref} />}
       {context.projectId && <ContextRow label="Project" value={context.projectId} />}
       {context.userId && <ContextRow label="User" value={context.userId} />}
-      {context.organizationId && (
-        <ContextRow label="Organization" value={context.organizationId} />
-      )}
+      {context.organizationId && <ContextRow label="Organization" value={context.organizationId} />}
     </Box>
   );
 }
@@ -168,13 +164,7 @@ export function GroupJobCard({
         <JobChipsRow job={job} />
         {context && <JobContextRows context={context} traceHref={traceHref} />}
         {showJson && job.data && (
-          <Box
-            bg="bg.subtle"
-            borderRadius="sm"
-            padding={2}
-            maxHeight="280px"
-            overflow="auto"
-          >
+          <Box bg="bg.subtle" borderRadius="sm" padding={2} maxHeight="280px" overflow="auto">
             <JsonViewer data={job.data} maxHeight="280px" />
           </Box>
         )}

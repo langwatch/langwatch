@@ -21,10 +21,7 @@ import type { IdentityEvent } from "../../adapters/identity-pipeline-definition.
 import { IdentityBirthService } from "../identity-birth.service";
 import type { IdentityLedgerWriter } from "../../adapters/identity-ledger.adapter";
 import type { PrismaIdentityNewbornRepository } from "../../repositories/prisma/prisma.identity-newborn.repository";
-import {
-  inMemoryIdentityReservations,
-  inMemoryIdentityUsers,
-} from "../../testing";
+import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
 
 const EMAIL = "newborn@acme.com";
 const T0 = 1_690_000_000_000;
@@ -95,8 +92,9 @@ const newborn = () => ({
 });
 
 const stagedCommand = (h: ReturnType<typeof harness>) =>
-  (h.ledger.stage as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]
-    ?.command as { data: { userId: string; commandId: string } };
+  (h.ledger.stage as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.command as {
+    data: { userId: string; commandId: string };
+  };
 
 describe("the born-finalized entrance", () => {
   describe("given a flagged sign-up", () => {
@@ -114,9 +112,8 @@ describe("the born-finalized entrance", () => {
 
         const written = await service.bear(newborn());
 
-        const pinned = (
-          rows.commitNewborn as unknown as ReturnType<typeof vi.fn>
-        ).mock.calls[0]?.[0]?.userId as string;
+        const pinned = (rows.commitNewborn as unknown as ReturnType<typeof vi.fn>).mock
+          .calls[0]?.[0]?.userId as string;
         expect(written.id).toBe(pinned);
         expect(written.id).not.toBe("the-id-better-auth-minted");
       });
@@ -128,14 +125,10 @@ describe("the born-finalized entrance", () => {
         await first.service.bear(newborn());
         await second.service.bear(newborn());
 
-        expect(stagedCommand(first).data.userId).toBe(
-          stagedCommand(second).data.userId,
-        );
+        expect(stagedCommand(first).data.userId).toBe(stagedCommand(second).data.userId);
         // The command id is the event store's idempotency key, so a retry
         // dedupes rather than appending a second fact set.
-        expect(stagedCommand(first).data.commandId).toBe(
-          stagedCommand(second).data.commandId,
-        );
+        expect(stagedCommand(first).data.commandId).toBe(stagedCommand(second).data.commandId);
       });
 
       it("states the command id the backfill would use for this user's email", async () => {
@@ -166,8 +159,8 @@ describe("the born-finalized entrance", () => {
 
         await service.bear(newborn());
 
-        const events = (ledger.awaitFold as unknown as ReturnType<typeof vi.fn>)
-          .mock.calls[0]?.[0]?.events as IdentityEvent[];
+        const events = (ledger.awaitFold as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]
+          ?.events as IdentityEvent[];
         expect(events).toHaveLength(1);
         expect(events[0]?.type).toBe("lw.identity.identifier_attached");
       });

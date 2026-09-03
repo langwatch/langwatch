@@ -56,11 +56,7 @@ export function BlobRow({
         {canManage && (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button
-                variant="ghost"
-                size="2xs"
-                aria-label={`Actions for payload ${blob.hash}`}
-              >
+              <Button variant="ghost" size="2xs" aria-label={`Actions for payload ${blob.hash}`}>
                 <MoreVertical size={14} />
               </Button>
             </Menu.Trigger>

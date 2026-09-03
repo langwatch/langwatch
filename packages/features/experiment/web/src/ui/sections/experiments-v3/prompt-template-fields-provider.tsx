@@ -21,9 +21,7 @@ type ResolvedPrompt = {
  * them: the version id is the exact row, the number is the same row addressed
  * by its place in the prompt's history.
  */
-const versionSelectorOf = (
-  target: TargetConfig,
-): { versionId?: string; version?: number } => {
+const versionSelectorOf = (target: TargetConfig): { versionId?: string; version?: number } => {
   if (target.promptVersionId !== undefined) {
     return { versionId: target.promptVersionId };
   }
@@ -82,11 +80,7 @@ const fieldsUsedByTarget = ({
  * target pinned to a version other than the one loaded here resolves to
  * nothing, and validation then requires no mapping of it.
  */
-export const PromptTemplateFieldsProvider = ({
-  children,
-}: {
-  children: ReactNode;
-}) => {
+export const PromptTemplateFieldsProvider = ({ children }: { children: ReactNode }) => {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const targets = useEvaluationsV3Store((state) => state.targets);
@@ -94,10 +88,7 @@ export const PromptTemplateFieldsProvider = ({
   const promptTargets = useMemo(
     () =>
       targets.filter(
-        (target) =>
-          target.type === "prompt" &&
-          !!target.promptId &&
-          !target.localPromptConfig,
+        (target) => target.type === "prompt" && !!target.promptId && !target.localPromptConfig,
       ),
     [targets],
   );

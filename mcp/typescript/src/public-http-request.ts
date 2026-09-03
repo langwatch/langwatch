@@ -43,9 +43,7 @@ function unsafeDestinationError(): Error {
 }
 
 function hostnameWithoutBrackets(hostname: string): string {
-  return hostname.startsWith("[") && hostname.endsWith("]")
-    ? hostname.slice(1, -1)
-    : hostname;
+  return hostname.startsWith("[") && hostname.endsWith("]") ? hostname.slice(1, -1) : hostname;
 }
 
 function assertPublicAddress(address: string): void {
@@ -80,9 +78,7 @@ export function headersForRedirect(
   }
 
   const safeHeaders = Object.fromEntries(
-    Object.entries(headers).filter(
-      ([name]) => !SENSITIVE_REDIRECT_HEADERS.has(name.toLowerCase()),
-    ),
+    Object.entries(headers).filter(([name]) => !SENSITIVE_REDIRECT_HEADERS.has(name.toLowerCase())),
   );
   return Object.keys(safeHeaders).length > 0 ? safeHeaders : undefined;
 }

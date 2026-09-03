@@ -83,11 +83,11 @@ export class AnnotationQueueNameTakenError extends HandledError {
   declare readonly code: "annotation_queue_name_taken";
 
   constructor(slug: string) {
-    super(
-      "annotation_queue_name_taken",
-      "An annotation queue with this name already exists",
-      { httpStatus: 409, fault: "customer", meta: { slug } },
-    );
+    super("annotation_queue_name_taken", "An annotation queue with this name already exists", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { slug },
+    });
     this.name = "AnnotationQueueNameTakenError";
   }
 }
@@ -149,9 +149,7 @@ export class AnnotationApp {
   }
 
   /** The same query, carrying only what an avatar and a name need. */
-  async listWithUserSummaries(
-    input: ListAnnotationsInput,
-  ): Promise<AnnotationWithUserSummary[]> {
+  async listWithUserSummaries(input: ListAnnotationsInput): Promise<AnnotationWithUserSummary[]> {
     const annotations = await this.dependencies.annotations.list(input);
     const profiles = await this.profilesFor(annotations);
     return annotations.map((annotation) => {
@@ -164,10 +162,7 @@ export class AnnotationApp {
   }
 
   /** Saves one comment, attributed to the reviewer who left it. */
-  create(
-    input: Omit<CreateAnnotationInput, "userId">,
-    by: AnnotationCaller,
-  ): Promise<Annotation> {
+  create(input: Omit<CreateAnnotationInput, "userId">, by: AnnotationCaller): Promise<Annotation> {
     return this.dependencies.annotations.create({ ...input, userId: by.id });
   }
 

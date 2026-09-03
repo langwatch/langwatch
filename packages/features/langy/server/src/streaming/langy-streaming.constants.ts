@@ -60,8 +60,7 @@ export const LANGY_LIVENESS = {
    * The heartbeat key TTL = 2× the interval, so a single missed refresh does
    * not immediately expire it but a dead worker's key lapses quickly.
    */
-  heartbeatTtlSeconds: (): number =>
-    Math.ceil((2 * LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS) / 1000),
+  heartbeatTtlSeconds: (): number => Math.ceil((2 * LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS) / 1000),
   /**
    * A turn with no heartbeat for at least this long is treated as stalled by
    * the liveness subscriber. Comfortably larger than the heartbeat TTL so a

@@ -1,9 +1,6 @@
 import type { TopicClusteringRunHistoryEntry, Topic } from "@langwatch/topic-contract";
 import { TopicService } from "../../services/topic.service";
-import {
-  TopicRepository,
-  type TopicClusteringStatusRecord,
-} from "../topic.repository";
+import { TopicRepository, type TopicClusteringStatusRecord } from "../topic.repository";
 import { describe, expect, it } from "vitest";
 import { TopicClusteringSchedulePort } from "../../ports/topic-clustering-schedule.port";
 

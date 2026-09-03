@@ -15,17 +15,15 @@ import type { Node } from "@xyflow/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { mockAgentQuery, mockMutate, mockSetData, mockSetNode, footerHolder } = vi.hoisted(
-  () => ({
-    mockAgentQuery: {
-      current: { data: undefined as unknown, isLoading: false },
-    },
-    mockMutate: vi.fn(),
-    mockSetData: vi.fn(),
-    mockSetNode: vi.fn(),
-    footerHolder: { content: null as ReactNode },
-  }),
-);
+const { mockAgentQuery, mockMutate, mockSetData, mockSetNode, footerHolder } = vi.hoisted(() => ({
+  mockAgentQuery: {
+    current: { data: undefined as unknown, isLoading: false },
+  },
+  mockMutate: vi.fn(),
+  mockSetData: vi.fn(),
+  mockSetNode: vi.fn(),
+  footerHolder: { content: null as ReactNode },
+}));
 
 vi.mock("../../../../../behavior/studio-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
@@ -78,18 +76,8 @@ vi.mock("@xyflow/react", () => ({
 }));
 
 vi.mock("../../../blocks/code-block-editor", () => ({
-  CodeBlockEditor: ({
-    code,
-    onChange,
-  }: {
-    code: string;
-    onChange: (code: string) => void;
-  }) => (
-    <textarea
-      data-testid="code-textarea"
-      value={code}
-      onChange={(e) => onChange(e.target.value)}
-    />
+  CodeBlockEditor: ({ code, onChange }: { code: string; onChange: (code: string) => void }) => (
+    <textarea data-testid="code-textarea" value={code} onChange={(e) => onChange(e.target.value)} />
   ),
 }));
 
@@ -180,9 +168,7 @@ function nodeWithLastPatch(node: Node<AgentComponent>): Node<AgentComponent> {
 }
 
 function renderFooter() {
-  return render(
-    <ChakraProvider value={defaultSystem}>{footerHolder.content}</ChakraProvider>,
-  );
+  return render(<ChakraProvider value={defaultSystem}>{footerHolder.content}</ChakraProvider>);
 }
 
 describe("given a code agent node in a workflow", () => {
@@ -215,17 +201,17 @@ describe("given a code agent node in a workflow", () => {
       const mutateInput = mockMutate.mock.calls.at(-1)![0] as {
         config: { parameters: Array<{ identifier: string; value: unknown }> };
       };
-      expect(
-        mutateInput.config.parameters.find((p) => p.identifier === "code")?.value,
-      ).toBe("print('v2 edited')");
+      expect(mutateInput.config.parameters.find((p) => p.identifier === "code")?.value).toBe(
+        "print('v2 edited')",
+      );
 
       // The node snapshot got the edited code and the draft cleared.
       const setNodePatch = mockSetNode.mock.calls.at(-1)![0] as {
         data: AgentComponent;
       };
-      expect(
-        setNodePatch.data.parameters?.find((p) => p.identifier === "code")?.value,
-      ).toBe("print('v2 edited')");
+      expect(setNodePatch.data.parameters?.find((p) => p.identifier === "code")?.value).toBe(
+        "print('v2 edited')",
+      );
       expect(setNodePatch.data.localConfig).toBeUndefined();
 
       // The query cache baseline matches the save, no refetch needed.
@@ -257,10 +243,7 @@ describe("given a code agent node in a workflow", () => {
       const mutateInput = mockMutate.mock.calls.at(-1)![0] as {
         config: { inputs: Array<{ identifier: string }> };
       };
-      expect(mutateInput.config.inputs.map((i) => i.identifier)).toEqual([
-        "input",
-        "context",
-      ]);
+      expect(mutateInput.config.inputs.map((i) => i.identifier)).toEqual(["input", "context"]);
     });
   });
 
@@ -270,9 +253,7 @@ describe("given a code agent node in a workflow", () => {
       mockAgentQuery.current = { data: undefined, isLoading: true };
       renderPanel(agentNode("print('from the dsl snapshot')"));
 
-      expect(screen.getByTestId("code-textarea")).toHaveValue(
-        "print('from the dsl snapshot')",
-      );
+      expect(screen.getByTestId("code-textarea")).toHaveValue("print('from the dsl snapshot')");
       expect(screen.queryByText(/Your code goes here/)).not.toBeInTheDocument();
     });
   });
@@ -313,15 +294,13 @@ describe("given a code agent node in a workflow", () => {
       };
       rerenderPanel(node);
 
-      expect(screen.getByTestId("code-textarea")).toHaveValue(
-        "print('v2 from elsewhere')",
-      );
+      expect(screen.getByTestId("code-textarea")).toHaveValue("print('v2 from elsewhere')");
       const setNodePatch = mockSetNode.mock.calls.at(-1)![0] as {
         data: AgentComponent;
       };
-      expect(
-        setNodePatch.data.parameters?.find((p) => p.identifier === "code")?.value,
-      ).toBe("print('v2 from elsewhere')");
+      expect(setNodePatch.data.parameters?.find((p) => p.identifier === "code")?.value).toBe(
+        "print('v2 from elsewhere')",
+      );
     });
 
     /** @scenario Local edits win over a library refresh until saved or discarded */
@@ -367,9 +346,9 @@ describe("given a code agent node in a workflow", () => {
         data: AgentComponent;
       };
       expect(setNodePatch.data.localConfig).toBeUndefined();
-      expect(
-        setNodePatch.data.parameters?.find((p) => p.identifier === "code")?.value,
-      ).toBe("print('saved')");
+      expect(setNodePatch.data.parameters?.find((p) => p.identifier === "code")?.value).toBe(
+        "print('saved')",
+      );
     });
   });
 });

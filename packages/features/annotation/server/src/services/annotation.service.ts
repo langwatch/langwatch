@@ -39,10 +39,7 @@ import {
   type UpdateAnnotationInput,
   type UpsertAnnotationScoreInput,
 } from "@langwatch/annotation-contract";
-import {
-  OrganizationService,
-  UserNotInOrganizationError,
-} from "@langwatch/organization-contract";
+import { OrganizationService, UserNotInOrganizationError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError, ProjectService } from "@langwatch/project-contract";
 import { AnnotationRepository } from "../ports/annotation.port";
 
@@ -60,11 +57,7 @@ export class AnnotationService extends AnnotationServiceContract {
     projects: ProjectService;
     organizations: OrganizationService;
   }): AnnotationService {
-    return new AnnotationService(
-      options.repository,
-      options.projects,
-      options.organizations,
-    );
+    return new AnnotationService(options.repository, options.projects, options.organizations);
   }
 
   create(input: CreateAnnotationInput): Promise<Annotation> {
@@ -88,12 +81,8 @@ export class AnnotationService extends AnnotationServiceContract {
     return this.repository.list(listAnnotationsInputSchema.parse(input));
   }
 
-  listForProjection(
-    input: ListProjectionAnnotationsInput,
-  ): Promise<ProjectionAnnotation[]> {
-    return this.repository.listForProjection(
-      listProjectionAnnotationsInputSchema.parse(input),
-    );
+  listForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]> {
+    return this.repository.listForProjection(listProjectionAnnotationsInputSchema.parse(input));
   }
 
   listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {
@@ -127,9 +116,7 @@ export class AnnotationService extends AnnotationServiceContract {
   }
 
   createQueueItems(input: CreateAnnotationQueueItemsInput): Promise<void> {
-    return this.repository.createQueueItems(
-      createAnnotationQueueItemsInputSchema.parse(input),
-    );
+    return this.repository.createQueueItems(createAnnotationQueueItemsInputSchema.parse(input));
   }
 
   async getProjectOrganizationId(input: AnnotationProjectInput): Promise<string> {
@@ -154,11 +141,7 @@ export class AnnotationService extends AnnotationServiceContract {
     const userIds = [...new Set(parsed.userIds)];
     const scoreTypeIds = [...new Set(parsed.scoreTypeIds)];
     const [, scoreCount] = await Promise.all([
-      this.assertOrganizationMembers(
-        organizationId,
-        userIds,
-        AnnotationQueueMemberInvalidError,
-      ),
+      this.assertOrganizationMembers(organizationId, userIds, AnnotationQueueMemberInvalidError),
       this.repository.countAnnotationScores({
         projectId: parsed.projectId,
         scoreTypeIds,
@@ -180,11 +163,7 @@ export class AnnotationService extends AnnotationServiceContract {
     });
     const [queueCount] = await Promise.all([
       queueCountPromise,
-      this.assertOrganizationMembers(
-        organizationId,
-        userIds,
-        AnnotationAnnotatorInvalidError,
-      ),
+      this.assertOrganizationMembers(organizationId, userIds, AnnotationAnnotatorInvalidError),
     ]);
     if (queueCount !== queueIds.length) {
       throw new AnnotationAnnotatorInvalidError();

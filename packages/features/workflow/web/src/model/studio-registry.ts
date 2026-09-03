@@ -140,10 +140,7 @@ const ALLOWED_EVALUATORS = [
 const studioEvaluatorFields = (fields: string[], optional = false): Field[] =>
   fields.map((identifier) => ({
     identifier,
-    type:
-      identifier === "contexts" || identifier === "expected_contexts"
-        ? "list[str]"
-        : "str",
+    type: identifier === "contexts" || identifier === "expected_contexts" ? "list[str]" : "str",
     ...(optional ? { optional: true } : {}),
   }));
 
@@ -179,15 +176,9 @@ const convertStudioEvaluators = (evaluators: typeof AVAILABLE_EVALUATORS): Evalu
           ].indexOf(right.identifier),
       );
       const outputs: Field[] = [
-        ...(definition.result.score
-          ? [{ identifier: "score", type: "float" as const }]
-          : []),
-        ...(definition.result.passed
-          ? [{ identifier: "passed", type: "bool" as const }]
-          : []),
-        ...(definition.result.label
-          ? [{ identifier: "label", type: "str" as const }]
-          : []),
+        ...(definition.result.score ? [{ identifier: "score", type: "float" as const }] : []),
+        ...(definition.result.passed ? [{ identifier: "passed", type: "bool" as const }] : []),
+        ...(definition.result.label ? [{ identifier: "label", type: "str" as const }] : []),
       ];
       return {
         cls: "LangWatchEvaluator",
@@ -242,8 +233,7 @@ const agent: BaseComponent = {
 
 const ifElse: BaseComponent = {
   name: "If/Else",
-  description:
-    "Route execution down the true or false branch based on a condition over the inputs",
+  description: "Route execution down the true or false branch based on a condition over the inputs",
   parameters: [
     {
       identifier: "condition",

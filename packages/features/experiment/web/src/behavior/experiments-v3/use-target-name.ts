@@ -13,16 +13,15 @@ export const useTargetName = (target: TargetConfig): string => {
   const { project } = useOrganizationTeamProject();
 
   // Fetch prompt name for prompt targets
-  const { data: prompt, isLoading: promptLoading } =
-    api.prompts.getByIdOrHandle.useQuery(
-      {
-        idOrHandle: target.promptId ?? "",
-        projectId: project?.id ?? "",
-      },
-      {
-        enabled: target.type === "prompt" && !!target.promptId && !!project?.id,
-      },
-    );
+  const { data: prompt, isLoading: promptLoading } = api.prompts.getByIdOrHandle.useQuery(
+    {
+      idOrHandle: target.promptId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: target.type === "prompt" && !!target.promptId && !!project?.id,
+    },
+  );
 
   // Fetch agent name for agent targets
   const { data: agent, isLoading: agentLoading } = api.agents.getById.useQuery(
@@ -36,26 +35,18 @@ export const useTargetName = (target: TargetConfig): string => {
   );
 
   // Fetch evaluator name for evaluator targets
-  const { data: evaluator, isLoading: evaluatorLoading } =
-    api.evaluators.getById.useQuery(
-      {
-        id: target.targetEvaluatorId ?? "",
-        projectId: project?.id ?? "",
-      },
-      {
-        enabled:
-          target.type === "evaluator" &&
-          !!target.targetEvaluatorId &&
-          !!project?.id,
-      },
-    );
+  const { data: evaluator, isLoading: evaluatorLoading } = api.evaluators.getById.useQuery(
+    {
+      id: target.targetEvaluatorId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: target.type === "evaluator" && !!target.targetEvaluatorId && !!project?.id,
+    },
+  );
 
   const entity: NamedEntity | undefined =
-    (target.type === "prompt"
-      ? prompt
-      : target.type === "agent"
-        ? agent
-        : evaluator) ?? undefined;
+    (target.type === "prompt" ? prompt : target.type === "agent" ? agent : evaluator) ?? undefined;
   const isLoading =
     target.type === "prompt"
       ? promptLoading
@@ -76,9 +67,7 @@ export const useTargetName = (target: TargetConfig): string => {
  *
  * Undefined slots (a variant whose target was removed) resolve to "".
  */
-export const useTargetNames = (
-  targets: (TargetConfig | undefined)[],
-): string[] => {
+export const useTargetNames = (targets: (TargetConfig | undefined)[]): string[] => {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
@@ -87,8 +76,7 @@ export const useTargetNames = (
       t.prompts.getByIdOrHandle(
         { idOrHandle: target?.promptId ?? "", projectId },
         {
-          enabled:
-            target?.type === "prompt" && !!target.promptId && !!projectId,
+          enabled: target?.type === "prompt" && !!target.promptId && !!projectId,
           staleTime: 60_000,
         },
       ),
@@ -100,8 +88,7 @@ export const useTargetNames = (
       t.agents.getById(
         { id: target?.dbAgentId ?? "", projectId },
         {
-          enabled:
-            target?.type === "agent" && !!target.dbAgentId && !!projectId,
+          enabled: target?.type === "agent" && !!target.dbAgentId && !!projectId,
           staleTime: 60_000,
         },
       ),
@@ -113,10 +100,7 @@ export const useTargetNames = (
       t.evaluators.getById(
         { id: target?.targetEvaluatorId ?? "", projectId },
         {
-          enabled:
-            target?.type === "evaluator" &&
-            !!target.targetEvaluatorId &&
-            !!projectId,
+          enabled: target?.type === "evaluator" && !!target.targetEvaluatorId && !!projectId,
           staleTime: 60_000,
         },
       ),

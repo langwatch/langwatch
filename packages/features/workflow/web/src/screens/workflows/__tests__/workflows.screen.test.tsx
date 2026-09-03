@@ -113,7 +113,10 @@ describe("given the workflows library", () => {
 
   describe("when the project has workflows", () => {
     it("lists them", () => {
-      state.workflows = [workflowRow(), workflowRow({ id: "wf_2", name: "Route to the right team" })];
+      state.workflows = [
+        workflowRow(),
+        workflowRow({ id: "wf_2", name: "Route to the right team" }),
+      ];
 
       renderWithWorkflowHost(<WorkflowsScreen />);
 

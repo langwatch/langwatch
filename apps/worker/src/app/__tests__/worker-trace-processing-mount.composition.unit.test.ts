@@ -346,7 +346,10 @@ describe("given the trace pipeline this process composes for itself", () => {
       reset();
       const definition = composePipeline();
 
-      await dispatch(definition, "triggerMatch", spanEvent(),
+      await dispatch(
+        definition,
+        "triggerMatch",
+        spanEvent(),
         context({ ...traceState, attributes: {} }),
       );
 

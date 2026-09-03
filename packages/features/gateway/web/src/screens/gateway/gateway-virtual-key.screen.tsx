@@ -126,20 +126,16 @@ function VirtualKeyDetailPage() {
   );
   const utils = api.useUtils();
   const rotateMutation = api.virtualKeys.rotate.useMutation({
-    onSuccess: () =>
-      utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
+    onSuccess: () => utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
   });
   const revokeMutation = api.virtualKeys.revoke.useMutation({
-    onSuccess: () =>
-      utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
+    onSuccess: () => utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
   });
   const disableMutation = api.virtualKeys.disable.useMutation({
-    onSuccess: () =>
-      utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
+    onSuccess: () => utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
   });
   const enableMutation = api.virtualKeys.enable.useMutation({
-    onSuccess: () =>
-      utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
+    onSuccess: () => utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
   });
 
   const [editing, setEditing] = useState(false);
@@ -384,19 +380,13 @@ function VirtualKeyDetailPage() {
                     }
                     data-testid="vk-detail-status"
                   >
-                    {vk.status === "active" && isExpired(vk.expiresAt)
-                      ? "expired"
-                      : vk.status}
+                    {vk.status === "active" && isExpired(vk.expiresAt) ? "expired" : vk.status}
                   </Badge>
                 </DetailRow>
                 <DetailRow label="Expires">
                   {vk.expiresAt ? (
                     <Tooltip content={new Date(vk.expiresAt).toLocaleString()}>
-                      <Text
-                        fontSize="sm"
-                        color="fg.muted"
-                        data-testid="vk-detail-expires"
-                      >
+                      <Text fontSize="sm" color="fg.muted" data-testid="vk-detail-expires">
                         {formatExpiry(new Date(vk.expiresAt))} (
                         {formatDistanceToNow(new Date(vk.expiresAt), {
                           addSuffix: true,
@@ -513,12 +503,7 @@ function VirtualKeyDetailPage() {
                     providersAllowed={providersAllowed}
                   />
                   <Box>
-                    <HStack
-                      mb={1.5}
-                      alignItems="center"
-                      gap={2}
-                      justifyContent="space-between"
-                    >
+                    <HStack mb={1.5} alignItems="center" gap={2} justifyContent="space-between">
                       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                         Allowed model providers
                       </Text>
@@ -735,8 +720,8 @@ function UsageSection({
     return (
       <Section title="Usage (last 30 days)" action={action}>
         <Text fontSize="sm" color="fg.muted">
-          No usage in the last 30 days. Send a request through this virtual key and it'll
-          show up here.
+          No usage in the last 30 days. Send a request through this virtual key and it'll show up
+          here.
         </Text>
       </Section>
     );
@@ -754,11 +739,7 @@ function UsageSection({
           <VkStat label="Requests" value={data.totalRequests.toLocaleString()} />
           <VkStat label="Avg $/request" value={formatVkAvgCost(data.avgUsdPerRequest)} />
           {data.blockedRequests > 0 && (
-            <VkStat
-              label="Blocked"
-              value={data.blockedRequests.toLocaleString()}
-              tone="red"
-            />
+            <VkStat label="Blocked" value={data.blockedRequests.toLocaleString()} tone="red" />
           )}
         </HStack>
         {points.length >= 2 && (
@@ -791,9 +772,7 @@ function UsageSection({
                 />
                 <RechartsTooltip
                   formatter={(value, name) =>
-                    name === "spendUsd"
-                      ? [`$${Number(value).toFixed(4)}`, "Spend"]
-                      : [value, name]
+                    name === "spendUsd" ? [`$${Number(value).toFixed(4)}`, "Spend"] : [value, name]
                   }
                   labelFormatter={(label) => String(label ?? "")}
                   contentStyle={{ fontSize: 12 }}
@@ -881,8 +860,7 @@ function UsageSection({
                       </Table.Cell>
                       <Table.Cell>
                         <Text fontSize="xs" color="fg.muted">
-                          {d.tokensInput.toLocaleString()} →{" "}
-                          {d.tokensOutput.toLocaleString()}
+                          {d.tokensInput.toLocaleString()} → {d.tokensOutput.toLocaleString()}
                         </Text>
                       </Table.Cell>
                       <Table.Cell>
@@ -911,11 +889,7 @@ function VkStat({ label, value, tone }: { label: string; value: string; tone?: "
       <Text fontSize="2xs" color="fg.muted" textTransform="uppercase">
         {label}
       </Text>
-      <Text
-        fontSize="xl"
-        fontWeight="semibold"
-        color={tone === "red" ? "red.600" : undefined}
-      >
+      <Text fontSize="xl" fontWeight="semibold" color={tone === "red" ? "red.600" : undefined}>
         {value}
       </Text>
     </VStack>
@@ -947,21 +921,17 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
   const rpd = config.rateLimits?.rpd ?? null;
   const aliasCount = Object.keys(config.modelAliases ?? {}).length;
 
-  const blockedCount = (["tools", "mcp", "urls", "models"] as const).reduce(
-    (sum, dim) => {
-      const bp = config.policyRules?.[dim];
-      return sum + (bp?.deny?.length ?? 0);
-    },
-    0,
-  );
+  const blockedCount = (["tools", "mcp", "urls", "models"] as const).reduce((sum, dim) => {
+    const bp = config.policyRules?.[dim];
+    return sum + (bp?.deny?.length ?? 0);
+  }, 0);
 
   const guardrailCount =
     (config.guardrails?.pre?.length ?? 0) +
     (config.guardrails?.post?.length ?? 0) +
     (config.guardrails?.streamChunk?.length ?? 0);
 
-  const cacheTone =
-    cacheMode === "force" ? "orange" : cacheMode === "disable" ? "red" : "green";
+  const cacheTone = cacheMode === "force" ? "orange" : cacheMode === "disable" ? "red" : "green";
 
   return (
     <Section title="Configuration">
@@ -1040,9 +1010,7 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
                       {pattern}
                     </Code>
                   ))}
-                  {deny.length > 4 && (
-                    <Text color="fg.muted">+ {deny.length - 4} more</Text>
-                  )}
+                  {deny.length > 4 && <Text color="fg.muted">+ {deny.length - 4} more</Text>}
                 </HStack>
               );
             })}

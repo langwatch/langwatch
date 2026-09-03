@@ -47,10 +47,7 @@ export class DataPrivacyScopeAuthorizationService {
     private readonly permissions: DataPrivacyPermissionsPort,
   ) {}
 
-  async assertCanWriteScope(input: {
-    userId: string;
-    scope: DataPrivacyScope;
-  }): Promise<void> {
+  async assertCanWriteScope(input: { userId: string; scope: DataPrivacyScope }): Promise<void> {
     if (await this.canWriteScope(input)) return;
     // The transport codes the platform surface has always answered with, raised
     // here rather than as a handled error: a new `code` needs an entry in the

@@ -30,9 +30,7 @@ describe("the lwql-charts skill and the chart command family", () => {
       const cliCommands = featureMap.features.flatMap(
         (feature) => feature.surfaces?.code?.cli ?? [],
       );
-      const chartCommands = cliCommands.filter((command) =>
-        command.startsWith("chart "),
-      );
+      const chartCommands = cliCommands.filter((command) => command.startsWith("chart "));
       expect(chartCommands).toContain("chart create");
       expect(chartCommands).toContain("chart place");
       expect(chartCommands).toContain("chart schema");
@@ -40,9 +38,7 @@ describe("the lwql-charts skill and the chart command family", () => {
       // The skill instructs discovering the analytics schema before writing
       // SQL: the schema step must come before the SQL-authoring step, and
       // must forbid guessing names.
-      const skill = listNativeSkills(skillsRoot).find(
-        (s) => s.slug === "lwql-charts",
-      );
+      const skill = listNativeSkills(skillsRoot).find((s) => s.slug === "lwql-charts");
       expect(skill, "lwql-charts is a shipped native skill").toBeTruthy();
       const rendered = renderSkill(skill!);
       const schemaStep = rendered.indexOf("langwatch chart schema");

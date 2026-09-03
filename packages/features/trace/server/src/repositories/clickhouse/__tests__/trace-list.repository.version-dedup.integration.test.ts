@@ -12,7 +12,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { FACET_REGISTRY } from "../../../adapters/trace-facet-registry.clickhouse.adapter";
 import { TraceQueryClickHouse } from "../../../adapters/trace-query.clickhouse.adapter";
 import { TraceListClickHouseRepository } from "../trace-list.repository";
-import { createTestClickHouseClient, testClickHouseUrl } from "./support/clickhouse-endpoint.support";
+import {
+  createTestClickHouseClient,
+  testClickHouseUrl,
+} from "./support/clickhouse-endpoint.support";
 
 const clickHouseUrl = testClickHouseUrl();
 const integration = describe.skipIf(clickHouseUrl === null);

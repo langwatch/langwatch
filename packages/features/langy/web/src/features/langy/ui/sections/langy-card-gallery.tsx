@@ -23,15 +23,14 @@
  * on, made visible).
  */
 import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import {
-  LangyGitHubProgressCard,
-  StreamingStatusLine,
-  useLangyStore,
-} from "../../../../index";
+import { LangyGitHubProgressCard, StreamingStatusLine, useLangyStore } from "../../../../index";
 import type { UIMessage } from "ai";
 import { X } from "lucide-react";
 import { LangyCard } from "../../../asaplangy";
-import { explainLangyError, KNOWN_LANGY_ERROR_KINDS } from "../../behavior/logic/langy-error-explainer";
+import {
+  explainLangyError,
+  KNOWN_LANGY_ERROR_KINDS,
+} from "../../behavior/logic/langy-error-explainer";
 import { LangyCapabilityPendingCard } from "./capabilities/langy-capability-pending-card";
 import { LangyCapabilityRenderer } from "./capabilities/langy-capability-renderer";
 import { LangyDerivedCardsTestingGround } from "./derived-cards/langy-derived-cards-testing-ground";
@@ -169,12 +168,7 @@ export function LangyCardGallery() {
           showDot
           pulseDot
         />
-        <LangyCard
-          intent="progress"
-          overline="In progress"
-          title="Analysing 1,204 traces"
-          pulseDot
-        >
+        <LangyCard intent="progress" overline="In progress" title="Analysing 1,204 traces" pulseDot>
           <Box className="langy-pending-bar" width="full" />
         </LangyCard>
         <LangyCard
@@ -203,15 +197,11 @@ export function LangyCardGallery() {
           }
         >
           <Text textStyle="xs" color="fg.muted" lineHeight="1.45">
-            38% of last week&apos;s traces answer with context the retriever never
-            returned. A faithfulness check would catch that at ingestion.
+            38% of last week&apos;s traces answer with context the retriever never returned. A
+            faithfulness check would catch that at ingestion.
           </Text>
         </LangyCard>
-        <LangyCard
-          intent="spotlight"
-          overline="Result"
-          title="34 traces matched “checkout”"
-        >
+        <LangyCard intent="spotlight" overline="Result" title="34 traces matched “checkout”">
           <Text textStyle="xs" color="fg.muted" lineHeight="1.45">
             A readable sample sits below; the full set opens in Traces.
           </Text>
@@ -432,9 +422,7 @@ export function LangyCardGallery() {
             name: "Faithfulness (Ragas)",
           })}
         />
-        <LangyCapabilityRenderer
-          call={call("langwatch.dashboard.delete", { id: "dash_legacy" })}
-        />
+        <LangyCapabilityRenderer call={call("langwatch.dashboard.delete", { id: "dash_legacy" })} />
       </Section>
 
       <Section title="Proposals">
@@ -562,11 +550,7 @@ export function LangyCardGallery() {
       <Section title="Feedback">
         {/* "preview": a fixture must never pin over a live conversation's
             card or fire real shown-marks at the backend cadence. */}
-        <LangyFeedback
-          conversationId="gallery"
-          messageId="gallery-feedback"
-          origin="preview"
-        />
+        <LangyFeedback conversationId="gallery" messageId="gallery-feedback" origin="preview" />
       </Section>
 
       {/* A refusal the reader can DO something about — not a broken step, so

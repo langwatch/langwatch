@@ -3,11 +3,7 @@ import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Kbd } from "@langwatch/ops-web";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  PresenceMarker,
-  selectPeersMatching,
-  usePresenceStore,
-} from "@langwatch/presence-web";
+import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-web";
 import type { DrawerViewMode } from "../../../../index";
 
 interface ModeSwitchProps {
@@ -72,8 +68,7 @@ function ModePresenceDot({ traceId, mode }: { traceId: string; mode: DrawerViewM
       selectPeersMatching(
         s,
         (session) =>
-          session.location.route.traceId === traceId &&
-          session.location.view?.mode === mode,
+          session.location.route.traceId === traceId && session.location.view?.mode === mode,
       ),
     ),
   );
@@ -305,10 +300,7 @@ export function ModeSwitch({
         </Text>
       )}
       {endSlot && (
-        <HStack
-          marginLeft={turnLabel && viewMode === "trace" ? undefined : "auto"}
-          flexShrink={0}
-        >
+        <HStack marginLeft={turnLabel && viewMode === "trace" ? undefined : "auto"} flexShrink={0}>
           {endSlot}
         </HStack>
       )}

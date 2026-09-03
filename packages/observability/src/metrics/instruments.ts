@@ -33,7 +33,14 @@
  * "everything is fine" failure as the missing-`_total` incident. This is the
  * one setting the migration depends on and it lives outside this repo.
  */
-import { metrics, type Attributes, type Counter, type Gauge, type Histogram, type Meter } from "@opentelemetry/api";
+import {
+  metrics,
+  type Attributes,
+  type Counter,
+  type Gauge,
+  type Histogram,
+  type Meter,
+} from "@opentelemetry/api";
 import { HISTOGRAM_BOUNDARIES } from "./histogram-boundaries";
 
 /**

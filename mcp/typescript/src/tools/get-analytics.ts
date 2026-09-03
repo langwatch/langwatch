@@ -4,10 +4,7 @@ import { parseRelativeDate } from "../utils/date-parsing.js";
 
 type GroupedData = Record<string, Record<string, number>>;
 
-function getGroupedData(
-  bucket: AnalyticsBucket,
-  groupBy: string,
-): GroupedData | undefined {
+function getGroupedData(bucket: AnalyticsBucket, groupBy: string): GroupedData | undefined {
   const data = bucket[groupBy];
   if (typeof data === "object" && data !== null && !Array.isArray(data)) {
     return data as GroupedData;
@@ -31,9 +28,7 @@ export async function handleGetAnalytics(params: {
   filters?: Record<string, string[]>;
 }): Promise<string> {
   const now = Date.now();
-  const startDate = params.startDate
-    ? parseRelativeDate(params.startDate)
-    : now - 7 * 86400000;
+  const startDate = params.startDate ? parseRelativeDate(params.startDate) : now - 7 * 86400000;
   const endDate = params.endDate ? parseRelativeDate(params.endDate) : now;
 
   // Parse metric format "category.name"
@@ -82,16 +77,13 @@ export async function handleGetAnalytics(params: {
     lines.push("|------|-------|");
     for (const bucket of currentPeriod) {
       const value =
-        Object.entries(bucket).find(
-          ([k]) => k !== "date" && typeof bucket[k] === "number",
-        )?.[1] ?? "N/A";
+        Object.entries(bucket).find(([k]) => k !== "date" && typeof bucket[k] === "number")?.[1] ??
+        "N/A";
       lines.push(`| ${bucket.date} | ${value} |`);
     }
   }
 
-  lines.push(
-    "\n> Tip: Use `discover_schema` to see all available metrics and aggregation types.",
-  );
+  lines.push("\n> Tip: Use `discover_schema` to see all available metrics and aggregation types.");
 
   return lines.join("\n");
 }

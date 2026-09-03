@@ -84,9 +84,7 @@ export function TagList({ labels, onRemove, onAdd, tone }: TagListProps) {
           size="xs"
           placeholder="Add label..."
           value={inputValue}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            setInputValue(e.target.value)
-          }
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           width="100px"

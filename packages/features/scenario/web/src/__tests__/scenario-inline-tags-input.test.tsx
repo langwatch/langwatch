@@ -67,9 +67,7 @@ describe("InlineTagsInput", () => {
 
   it("removes tag on close click", async () => {
     const onChange = vi.fn();
-    renderWithChakra(
-      <InlineTagsInput value={["first", "second", "third"]} onChange={onChange} />,
-    );
+    renderWithChakra(<InlineTagsInput value={["first", "second", "third"]} onChange={onChange} />);
 
     await waitFor(() => {
       expect(screen.getByText("second")).toBeInTheDocument();

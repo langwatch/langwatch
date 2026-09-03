@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  annotationAnchorColumnsSchema,
-  annotationAnchorScopeSchema,
-} from "./annotation.anchor";
+import { annotationAnchorColumnsSchema, annotationAnchorScopeSchema } from "./annotation.anchor";
 import { annotationScoreOptionsSchema } from "./annotation.score";
 
 const annotationIdSchema = z.string().min(1);
@@ -96,9 +93,7 @@ export const listProjectionAnnotationsInputSchema = z
     anchor: annotationAnchorScopeSchema.default("all"),
   })
   .strict();
-export type ListProjectionAnnotationsInput = z.input<
-  typeof listProjectionAnnotationsInputSchema
->;
+export type ListProjectionAnnotationsInput = z.input<typeof listProjectionAnnotationsInputSchema>;
 
 export const projectionAnnotationSchema = annotationSchema
   .pick({
@@ -119,9 +114,7 @@ export type ProjectionAnnotation = z.infer<typeof projectionAnnotationSchema>;
 export const listAnnotationScoreNamesInputSchema = z
   .object({ projectId: annotationProjectIdSchema })
   .strict();
-export type ListAnnotationScoreNamesInput = z.infer<
-  typeof listAnnotationScoreNamesInputSchema
->;
+export type ListAnnotationScoreNamesInput = z.infer<typeof listAnnotationScoreNamesInputSchema>;
 
 export const listAnnotationScoresInputSchema = z
   .object({
@@ -150,9 +143,7 @@ export const createAnnotationQueueItemsInputSchema = z
     createdByUserId: z.string().min(1),
   })
   .strict();
-export type CreateAnnotationQueueItemsInput = z.infer<
-  typeof createAnnotationQueueItemsInputSchema
->;
+export type CreateAnnotationQueueItemsInput = z.infer<typeof createAnnotationQueueItemsInputSchema>;
 
 export const annotationProjectInputSchema = z
   .object({ projectId: annotationProjectIdSchema })
@@ -177,9 +168,7 @@ export const assertAnnotatorReferencesInputSchema = z
     userIds: z.array(z.string().min(1)),
   })
   .strict();
-export type AssertAnnotatorReferencesInput = z.infer<
-  typeof assertAnnotatorReferencesInputSchema
->;
+export type AssertAnnotatorReferencesInput = z.infer<typeof assertAnnotatorReferencesInputSchema>;
 
 /**
  * A stored annotation with the author the read path resolved for it.

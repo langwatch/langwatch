@@ -15,11 +15,7 @@ import {
   type SiblingGroup,
 } from "../types";
 
-function makeSpan(
-  spanId: string,
-  parentSpanId: string | null,
-  startTimeMs = 0,
-): SpanTreeNode {
+function makeSpan(spanId: string, parentSpanId: string | null, startTimeMs = 0): SpanTreeNode {
   return {
     spanId,
     parentSpanId,
@@ -112,9 +108,7 @@ describe("siblingGroupKey", () => {
 
   describe("given two groups differing only by tool name", () => {
     it("produces distinct keys", () => {
-      expect(siblingGroupKey(base)).not.toBe(
-        siblingGroupKey({ ...base, toolName: "WebSearch" }),
-      );
+      expect(siblingGroupKey(base)).not.toBe(siblingGroupKey({ ...base, toolName: "WebSearch" }));
     });
   });
 
@@ -203,11 +197,7 @@ describe("flattenTree", () => {
         );
         expect(groups.map((g) => g.toolName)).toEqual(["Bash", "WebSearch"]);
 
-        const expanded = flattenTree(
-          tree,
-          new Set(),
-          new Set([siblingGroupKey(groups[0]!)]),
-        );
+        const expanded = flattenTree(tree, new Set(), new Set([siblingGroupKey(groups[0]!)]));
         const spanRows = expanded.filter((r) => !("count" in r));
         const expandedIds = spanRows.map((r) => ("node" in r ? r.node.span.spanId : ""));
         expect(expandedIds).toContain("bash-0");

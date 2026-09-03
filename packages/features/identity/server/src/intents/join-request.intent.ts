@@ -18,11 +18,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { JoinRequestGuards } from "../join-request-guards";
 import type { ZodTypeAny, z } from "zod";
-import {
-  type Command,
-  type CommandHandler,
-  defineCommandSchema,
-} from "@langwatch/eventing";
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { joinRequestEventsFor } from "../projections/join-request-state.projection";
 import type { JoinRequestEvent } from "../projections/join-request-state.projection";
 
@@ -37,9 +33,7 @@ import type { JoinRequestEvent } from "../projections/join-request-state.project
  */
 
 type GuardVerb = {
-  [K in keyof JoinRequestGuards]: JoinRequestGuards[K] extends (
-    data: never,
-  ) => Promise<unknown>
+  [K in keyof JoinRequestGuards]: JoinRequestGuards[K] extends (data: never) => Promise<unknown>
     ? K
     : never;
 }[keyof JoinRequestGuards];
@@ -56,9 +50,10 @@ function joinRequestCommand<Schema extends ZodTypeAny>({
   verb: GuardVerb;
 }) {
   type Data = z.infer<Schema>;
-  return class JoinRequestCommandHandler
-    implements CommandHandler<Command<Data>, JoinRequestEvent>
-  {
+  return class JoinRequestCommandHandler implements CommandHandler<
+    Command<Data>,
+    JoinRequestEvent
+  > {
     static readonly schema = defineCommandSchema(type, schema, description);
 
     /** The REQUEST is the aggregate — never the organization and never the
@@ -71,9 +66,7 @@ function joinRequestCommand<Schema extends ZodTypeAny>({
 
     async handle(command: Command<Data>): Promise<JoinRequestEvent[]> {
       const data = command.data as never;
-      const facts = await (
-        this.guards[verb] as (input: never) => Promise<never[]>
-      )(data);
+      const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
       return joinRequestEventsFor({
         command: { type, data } as JoinRequestCommand,
         facts,

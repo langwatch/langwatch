@@ -79,9 +79,7 @@ async function createN8nLikeServer(): Promise<N8nLikeServer> {
     url: `http://127.0.0.1:${port}`,
     lastParsedBody: () => parsed,
     close: () =>
-      new Promise((resolve, reject) =>
-        server.close((err) => (err ? reject(err) : resolve())),
-      ),
+      new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve()))),
   };
 }
 
@@ -147,8 +145,7 @@ describe("HTTP agent body JSON safety (n8n regression)", () => {
       it("still posts a parseable body", async () => {
         const adapter = createNativeHttpAgentAdapter({
           config: config({
-            bodyTemplate:
-              '{\n  "thread_id": "{{threadId}}",\n  "messages": {{messages}}\n}',
+            bodyTemplate: '{\n  "thread_id": "{{threadId}}",\n  "messages": {{messages}}\n}',
           }),
         });
 

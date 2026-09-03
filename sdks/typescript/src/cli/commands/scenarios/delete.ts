@@ -5,9 +5,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
-export const deleteScenarioCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const deleteScenarioCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new ScenariosApiService();

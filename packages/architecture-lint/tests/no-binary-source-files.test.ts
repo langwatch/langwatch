@@ -33,11 +33,11 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 const trackedSourceFiles = (): string[] =>
-  execFileSync(
-    "git",
-    ["ls-files", "-z", "--", "*.ts", "*.tsx", "*.js", "*.jsx", "*.py", "*.go"],
-    { cwd: REPO_ROOT, encoding: "buffer", maxBuffer: 64 * 1024 * 1024 },
-  )
+  execFileSync("git", ["ls-files", "-z", "--", "*.ts", "*.tsx", "*.js", "*.jsx", "*.py", "*.go"], {
+    cwd: REPO_ROOT,
+    encoding: "buffer",
+    maxBuffer: 64 * 1024 * 1024,
+  })
     .toString("utf8")
     .split("\0")
     .filter(Boolean);

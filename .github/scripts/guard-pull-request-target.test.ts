@@ -32,10 +32,7 @@ describe("pull_request_target workflow guard", () => {
 
   it("reads safe gates only from a job-level if field", () => {
     const [commentSpoofedJob] = jobBlocks(
-      unsafeCheckoutJob([
-        "    # github.event.label.name == 'approved-ci'",
-        "    if: always()",
-      ]),
+      unsafeCheckoutJob(["    # github.event.label.name == 'approved-ci'", "    if: always()"]),
     );
     assert.ok(commentSpoofedJob);
     assert.equal(hasSafeGate(commentSpoofedJob), false);
@@ -76,17 +73,11 @@ describe("pull_request_target workflow guard", () => {
   });
 
   it("detects privileged pull_request_target risk signals", () => {
-    assert.equal(
-      hasSensitivePermissions(["permissions:", "  contents: write"].join("\n")),
-      true,
-    );
+    assert.equal(hasSensitivePermissions(["permissions:", "  contents: write"].join("\n")), true);
     assert.equal(hasSensitivePermissions("permissions: write-all"), true);
     assert.equal(hasSensitivePermissions("# contents: write"), false);
 
-    assert.equal(
-      usesNonGithubTokenSecret("token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"),
-      true,
-    );
+    assert.equal(usesNonGithubTokenSecret("token: ${{ secrets.RELEASE_PLEASE_TOKEN }}"), true);
     assert.equal(usesNonGithubTokenSecret("token: ${{ secrets.GITHUB_TOKEN }}"), false);
   });
 });

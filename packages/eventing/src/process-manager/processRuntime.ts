@@ -122,8 +122,7 @@ export function buildProcessDefinition(
       if (envelope.eventType === SCHEDULE_ARM_EVENT_TYPE) {
         return {
           state: previousState,
-          nextWakeAt:
-            Math.max(envelope.occurredAt, input.now) + (config.schedule?.everyMs ?? 0),
+          nextWakeAt: Math.max(envelope.occurredAt, input.now) + (config.schedule?.everyMs ?? 0),
           intents: [],
         };
       }
@@ -159,17 +158,13 @@ export function buildProcessDefinition(
             const factories = buildIntentFactories(config.intents, {
               processKey: ref.processKey,
             });
-            const evolution = spec.handle(
-              previousState,
-              spec.schema.parse(signal.payload),
-              {
-                at: signal.occurredAt,
-                now,
-                key: signal.processKey,
-                projectId: signal.projectId,
-                intents: factories,
-              },
-            );
+            const evolution = spec.handle(previousState, spec.schema.parse(signal.payload), {
+              at: signal.occurredAt,
+              now,
+              key: signal.processKey,
+              projectId: signal.projectId,
+              intents: factories,
+            });
             return {
               state: evolution.state,
               nextWakeAt: evolution.nextWakeAt ?? null,
@@ -194,11 +189,7 @@ export class ProcessRuntime {
   private readonly wakeManagers: Record<string, WakeHandlerPort> = {};
   private wakeWorker: ProcessWakeWorker | null = null;
 
-  constructor(options: {
-    store: ProcessStore;
-    consumersEnabled: boolean;
-    logger?: Logger;
-  }) {
+  constructor(options: { store: ProcessStore; consumersEnabled: boolean; logger?: Logger }) {
     this.store = options.store;
     this.consumersEnabled = options.consumersEnabled;
     this.logger = options.logger ?? defaultLogger;
@@ -295,14 +286,10 @@ export class ProcessRuntime {
     ]);
   }
 
-  private registerProcessManager(
-    definition: ProcessManagerDefinition,
-  ): RegisteredProcessManager {
+  private registerProcessManager(definition: ProcessManagerDefinition): RegisteredProcessManager {
     const config = definition.config;
     if (this.managers.has(config.name)) {
-      throw new Error(
-        `Process manager "${config.name}" is mounted by more than one pipeline`,
-      );
+      throw new Error(`Process manager "${config.name}" is mounted by more than one pipeline`);
     }
 
     const manager = new ProcessManagerService<unknown>({

@@ -44,12 +44,7 @@ import net from "node:net";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  areEventsEnabled,
-  createCommandEvents,
-  redactSecrets,
-  resolveTransport,
-} from "../events";
+import { areEventsEnabled, createCommandEvents, redactSecrets, resolveTransport } from "../events";
 import { LANGWATCH_EVENT_ATTRIBUTES as ATTR, LANGWATCH_EVENTS } from "../attributes";
 
 const ENABLED_ENV = {
@@ -64,8 +59,7 @@ const emittedRecords = (): Record<string, unknown>[] =>
     return record.attributes;
   });
 
-const eventSequence = (): unknown[] =>
-  emittedRecords().map((attributes) => attributes[ATTR.event]);
+const eventSequence = (): unknown[] => emittedRecords().map((attributes) => attributes[ATTR.event]);
 
 describe("createCommandEvents()", () => {
   beforeEach(() => {
@@ -566,9 +560,9 @@ describe("redactSecrets()", () => {
 
   describe("given a message quoting a credential this process never held", () => {
     it("still redacts it on shape alone", () => {
-      expect(
-        redactSecrets("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9", {}),
-      ).not.toContain("eyJhbGciOiJIUzI1NiJ9");
+      expect(redactSecrets("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9", {})).not.toContain(
+        "eyJhbGciOiJIUzI1NiJ9",
+      );
       expect(redactSecrets("used sk-proj-AbCdEfGh12345678", {})).not.toContain(
         "sk-proj-AbCdEfGh12345678",
       );
@@ -603,9 +597,7 @@ describe("areEventsEnabled()", () => {
       expect(areEventsEnabled(collector)).toBe(false);
       expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "" })).toBe(false);
       expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "0" })).toBe(false);
-      expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "false" })).toBe(
-        false,
-      );
+      expect(areEventsEnabled({ ...collector, LANGWATCH_OTEL_EVENTS: "false" })).toBe(false);
     });
   });
 });

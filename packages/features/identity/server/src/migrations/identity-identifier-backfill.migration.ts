@@ -1,8 +1,5 @@
 import type { IdentityBackfillService } from "../identity-backfill.service";
-import type {
-  SystemMigration,
-  TenantMigrationOutcome,
-} from "@langwatch/system-migrations";
+import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../identity-migration-names";
 
 /**
@@ -41,15 +38,9 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
   // remaining question is reaching tenants created since.
   readonly enrolledAutomatically = false;
 
-  constructor(
-    private readonly backfill: Pick<IdentityBackfillService, "migrateUser">,
-  ) {}
+  constructor(private readonly backfill: Pick<IdentityBackfillService, "migrateUser">) {}
 
-  async migrateTenant({
-    tenantId,
-  }: {
-    tenantId: string;
-  }): Promise<TenantMigrationOutcome> {
+  async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {
     // Nothing here consults `previous`: the pass re-reads the legacy rows
     // and states only what the heads do not carry, so there is no partial
     // state a failed pass could leave behind that a full pass does not redo.

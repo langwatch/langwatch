@@ -88,16 +88,16 @@ ADR-098's transport note is fulfilled by this ADR; `langwatch agent dev` stays f
 
 Frames are JSON text over the socket, every frame `{ "type": ..., "protocol": 1, ... }`.
 
-| Direction | `type` | Fields |
-|---|---|---|
-| SDK to platform | `register` | `sdk { name, version, language }`, `instance { id, hostname, username, pid, startedAt, label?, inFlightCallIds[] }`, `agents[] { name, environment, description?, parameters (JSON Schema object), concurrency?, timeoutMs?, sticky? }` |
-| platform to SDK | `registered` | `agents[] { name, environment, id, url, parameterNotes[] }`, `heartbeatIntervalMs`, `instanceId` |
-| platform to SDK | `refused` | `{ code, message, meta? }` then close; codes `api_key_invalid`, `project_required` (`meta.projects[] { id, name }`), `permission_denied`, `key_type_not_allowed`, `replica_count_unsupported`, `parameters_invalid`, `environment_invalid`, `protocol_invalid` |
-| platform to SDK | `call` | `{ callId, agentId, threadId, messages, newMessages, params, session, traceparent, deadlineAt, run { scenarioRunId?, scenarioName?, batchRunId? } }` |
-| SDK to platform | `ack` | `{ callId }` when the function starts |
-| SDK to platform | `result` | `{ callId, output, session? }` or `{ callId, error { code, message } }` |
-| platform to SDK | `cancel` | `{ callId }` |
-| SDK to platform | `deregister` | graceful shutdown |
+| Direction       | `type`       | Fields                                                                                                                                                                                                                                                         |
+| --------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SDK to platform | `register`   | `sdk { name, version, language }`, `instance { id, hostname, username, pid, startedAt, label?, inFlightCallIds[] }`, `agents[] { name, environment, description?, parameters (JSON Schema object), concurrency?, timeoutMs?, sticky? }`                        |
+| platform to SDK | `registered` | `agents[] { name, environment, id, url, parameterNotes[] }`, `heartbeatIntervalMs`, `instanceId`                                                                                                                                                               |
+| platform to SDK | `refused`    | `{ code, message, meta? }` then close; codes `api_key_invalid`, `project_required` (`meta.projects[] { id, name }`), `permission_denied`, `key_type_not_allowed`, `replica_count_unsupported`, `parameters_invalid`, `environment_invalid`, `protocol_invalid` |
+| platform to SDK | `call`       | `{ callId, agentId, threadId, messages, newMessages, params, session, traceparent, deadlineAt, run { scenarioRunId?, scenarioName?, batchRunId? } }`                                                                                                           |
+| SDK to platform | `ack`        | `{ callId }` when the function starts                                                                                                                                                                                                                          |
+| SDK to platform | `result`     | `{ callId, output, session? }` or `{ callId, error { code, message } }`                                                                                                                                                                                        |
+| platform to SDK | `cancel`     | `{ callId }`                                                                                                                                                                                                                                                   |
+| SDK to platform | `deregister` | graceful shutdown                                                                                                                                                                                                                                              |
 
 Error codes (`HandledError`, presentation entries in `features/errors/logic/presentation.ts`): `agent_offline`, `agent_owner_only`, `agent_call_timeout`, `agent_call_failed`, `agent_disconnected`, `agent_instance_lost`, `agent_busy`, `agent_parameter_invalid`, `agent_register_refused`, `agent_register_only` (REST create or update of a `connected` agent), `agent_payload_too_large`, `scenario_parameter_option_invalid`.
 

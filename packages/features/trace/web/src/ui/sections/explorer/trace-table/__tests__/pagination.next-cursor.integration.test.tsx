@@ -121,13 +121,9 @@ describe("trace table pagination", () => {
 
       // Page 2 of a 100-row data source starts at row 101, whatever the
       // shared preference says.
-      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
-        "showing 101–200",
-      );
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent("showing 101–200");
       const offered = Array.from(
-        screen
-          .getByTestId("pagination-page-size")
-          .querySelectorAll<HTMLOptionElement>("option"),
+        screen.getByTestId("pagination-page-size").querySelectorAll<HTMLOptionElement>("option"),
       ).map((option) => option.value);
       expect(offered).toEqual(["25", "50", "100"]);
     });

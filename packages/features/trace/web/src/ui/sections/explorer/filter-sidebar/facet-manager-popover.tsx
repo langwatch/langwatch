@@ -272,8 +272,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
   // width heuristic. `sidebarWidth` null means the auto default width.
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const showCount =
-    showCountOverride ??
-    (sidebarWidth !== null && sidebarWidth >= CONFIGURE_COUNT_MIN_WIDTH);
+    showCountOverride ?? (sidebarWidth !== null && sidebarWidth >= CONFIGURE_COUNT_MIN_WIDTH);
 
   const totalMatching = useMemo(
     () => Object.values(byGroup).reduce((acc, ks) => acc + ks.length, 0),
@@ -526,16 +525,11 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                               <Checkbox
                                 size="sm"
                                 checked={checked}
-                                onCheckedChange={() =>
-                                  checked ? onHide(key) : onShow(key)
-                                }
+                                onCheckedChange={() => (checked ? onHide(key) : onShow(key))}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <HStack gap={1.5}>
-                                  <Icon
-                                    boxSize={3}
-                                    color={checked ? "fg.muted" : "fg.subtle"}
-                                  >
+                                  <Icon boxSize={3} color={checked ? "fg.muted" : "fg.subtle"}>
                                     <KeyIcon />
                                   </Icon>
                                   <Text textStyle="xs" color="fg">
@@ -605,12 +599,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
               borderColor="border.subtle"
               justify="space-between"
             >
-              <Button
-                size="2xs"
-                variant="ghost"
-                color="fg.muted"
-                onClick={() => onResetAll()}
-              >
+              <Button size="2xs" variant="ghost" color="fg.muted" onClick={() => onResetAll()}>
                 Reset to defaults
               </Button>
               <Button size="2xs" variant="ghost" onClick={() => setOpen(false)}>

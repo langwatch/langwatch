@@ -50,7 +50,11 @@ class TasksNoOutboundProxy extends OutboundProxyResolverPort {
  * this task sees is treated as eligible. A private-route tenant is the API's
  * migration to run, not this process's.
  */
-export function buildObjectStorageMigrateTask({ host }: { host: TasksHost }): ObjectStorageMigrateTask {
+export function buildObjectStorageMigrateTask({
+  host,
+}: {
+  host: TasksHost;
+}): ObjectStorageMigrateTask {
   return ObjectStorageMigrateTask.create({
     migration: () => {
       const config = parseMigrationTaskConfig(process.env);

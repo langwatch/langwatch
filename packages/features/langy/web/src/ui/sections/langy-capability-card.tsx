@@ -43,10 +43,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import type {
-  CapabilityIconName,
-  CapabilitySurface,
-} from "../../model/langy-capability-catalog";
+import type { CapabilityIconName, CapabilitySurface } from "../../model/langy-capability-catalog";
 import { useReducedMotion } from "../../behavior/use-reduced-motion";
 import { langyThinkingShimmerStyles } from "../../model/values/langy-shimmer";
 

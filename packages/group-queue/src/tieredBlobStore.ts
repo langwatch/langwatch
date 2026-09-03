@@ -54,15 +54,7 @@ export type BlobRef =
 export class TransientBlobStoreError extends Error {
   readonly projectId: TenantId;
   readonly hash: string;
-  constructor({
-    projectId,
-    hash,
-    cause,
-  }: {
-    projectId: TenantId;
-    hash: string;
-    cause: unknown;
-  }) {
+  constructor({ projectId, hash, cause }: { projectId: TenantId; hash: string; cause: unknown }) {
     super(`Transient blob store error for ${projectId}/${hash}`, { cause });
     this.name = "TransientBlobStoreError";
     this.projectId = projectId;
@@ -79,11 +71,7 @@ export function contentHash(bytes: Buffer | string): string {
   // `update(string)` handles UTF-8 encoding internally without allocating a
   // full-payload Buffer — for a 4 MiB fan-out payload the caller passing the
   // string directly saves 4 MiB of throw-away allocation on the encode hot path.
-  return createHash("sha256")
-    .update(bytes)
-    .digest()
-    .subarray(0, 16)
-    .toString("base64url");
+  return createHash("sha256").update(bytes).digest().subarray(0, 16).toString("base64url");
 }
 
 function redisBlobId(params: { projectId: TenantId; hash: string }): string {
@@ -141,19 +129,14 @@ export class TieredBlobStore {
   // Per-project so the s3/file tier resolves each tenant's BYOC bucket and
   // credentials (the stored-objects S3Driver is projectId-scoped).
   private readonly objectStoreFor: (projectId: string) => ObjectStore;
-  private readonly resolveDestination: (
-    projectId: string,
-  ) => Promise<ProjectStorageDestination>;
+  private readonly resolveDestination: (projectId: string) => Promise<ProjectStorageDestination>;
   private readonly s3ThresholdBytes: number;
   private readonly queueName?: string;
   private readonly logger?: Logger;
   // Per-project storage destination, cached for the process lifetime. BYOC
   // bucket changes are rare deliberate migrations, picked up on the next worker
   // restart (deploys are frequent); a failed resolve is not cached.
-  private readonly destinationCache = new Map<
-    TenantId,
-    Promise<ProjectStorageDestination>
-  >();
+  private readonly destinationCache = new Map<TenantId, Promise<ProjectStorageDestination>>();
 
   constructor(deps: {
     redisBlobs: JobBlobStore;
@@ -183,9 +166,7 @@ export class TieredBlobStore {
     }
   }
 
-  private resolveDestinationCached(
-    projectId: TenantId,
-  ): Promise<ProjectStorageDestination> {
+  private resolveDestinationCached(projectId: TenantId): Promise<ProjectStorageDestination> {
     let cached = this.destinationCache.get(projectId);
     if (!cached) {
       cached = this.resolveDestination(projectId).catch((err: unknown) => {

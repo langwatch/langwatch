@@ -43,9 +43,7 @@ export function buildCamelToSnakeMapping(): Record<string, string> {
  * @param data - Object with potentially camelCase keys
  * @returns Object with snake_case keys
  */
-export function transformCamelToSnake(
-  data: Record<string, unknown>,
-): Record<string, unknown> {
+export function transformCamelToSnake(data: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = { ...data };
   const mapping = buildCamelToSnakeMapping();
 
@@ -74,9 +72,7 @@ export function transformCamelToSnake(
  * @param data - Object with potentially snake_case keys
  * @returns Object with camelCase keys
  */
-export function transformSnakeToCamel(
-  data: Record<string, unknown>,
-): Record<string, unknown> {
+export function transformSnakeToCamel(data: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = { ...data };
   const mapping = buildCamelToSnakeMapping();
 

@@ -24,9 +24,7 @@ export type ParsedEvaluationResult = {
   domainError?: SerializedHandledError;
 };
 
-function readSerializedDomainError(
-  candidate: unknown,
-): SerializedHandledError | undefined {
+function readSerializedDomainError(candidate: unknown): SerializedHandledError | undefined {
   const result = serializedHandledErrorSchema.safeParse(candidate);
   return result.success ? result.data : undefined;
 }
@@ -47,8 +45,7 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
   // Check for explicit running status (from execution)
   if (
     result === "running" ||
-    (typeof result === "object" &&
-      (result as Record<string, unknown>).status === "running")
+    (typeof result === "object" && (result as Record<string, unknown>).status === "running")
   ) {
     return { status: "running" };
   }
@@ -64,8 +61,7 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
     // Check for error first - either { error: "message" } or { status: "error", details: "..." }
     if ("error" in obj && obj.error) {
       parsed.status = "error";
-      parsed.details =
-        typeof obj.error === "string" ? obj.error : JSON.stringify(obj.error);
+      parsed.details = typeof obj.error === "string" ? obj.error : JSON.stringify(obj.error);
       parsed.domainError = readSerializedDomainError(obj.domainError);
       return parsed;
     }
@@ -310,9 +306,7 @@ function normalizeEvalStatus(input: EvalChipInput): ParsedEvaluationResult["stat
 
 /** Same score formatter used by the trace table EvalChip — share so the
  *  drawer chip never disagrees on rounding. */
-export function formatEvalScoreText(
-  score: number | boolean | null | undefined,
-): string | null {
+export function formatEvalScoreText(score: number | boolean | null | undefined): string | null {
   if (typeof score !== "number") return null;
   return score <= 1 ? score.toFixed(2) : score.toFixed(1);
 }
@@ -341,9 +335,7 @@ export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
     scoreText,
     noVerdict,
     passLabel:
-      scoreText == null && categoryLabel == null && !noVerdict
-        ? resolvePassLabel(status)
-        : null,
+      scoreText == null && categoryLabel == null && !noVerdict ? resolvePassLabel(status) : null,
   };
 }
 
@@ -376,9 +368,7 @@ function resolveCategoryLabel({
  * The colored Pass/Fail label, for evaluators that produced a pure boolean
  * verdict with no numeric score to show in its place.
  */
-function resolvePassLabel(
-  status: ParsedEvaluationResult["status"],
-): EvalChipDisplay["passLabel"] {
+function resolvePassLabel(status: ParsedEvaluationResult["status"]): EvalChipDisplay["passLabel"] {
   if (status === "passed") return { text: "Pass", color: "green.fg" };
   if (status === "failed") return { text: "Fail", color: "red.fg" };
   return null;

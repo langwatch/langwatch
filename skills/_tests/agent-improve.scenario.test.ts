@@ -26,9 +26,7 @@ describe("Agent Improvement Skill", () => {
   it.skipIf(isCI)(
     "proposes evidence-backed hypotheses and explains them before building anything",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-agent-improve-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-agent-improve-"));
 
       // A sample agent codebase gives the proposals something concrete to
       // change: system prompt, tool definitions, and an obvious improvement

@@ -10,12 +10,7 @@ import {
   parsePermissionMode,
 } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import {
-  orDash,
-  printFacts,
-  runManagement,
-  withParsedFlags,
-} from "../management/_shared";
+import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";
 import { permissionsCell, printBindings } from "./_shared";
 
 export interface UpdateApiKeyOptions {

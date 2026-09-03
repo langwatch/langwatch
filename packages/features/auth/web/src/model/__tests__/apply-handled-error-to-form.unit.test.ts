@@ -24,9 +24,7 @@ const registered = (name: string) => ({ _f: { name, ref: {} } });
 
 const formWithFields = (...fields: string[]): FormStub => ({
   control: {
-    _fields: Object.fromEntries(
-      fields.map((field) => [field, registered(field)]),
-    ),
+    _fields: Object.fromEntries(fields.map((field) => [field, registered(field)])),
   },
   setError: vi.fn(),
 });
@@ -77,9 +75,7 @@ describe("applyHandledErrorToForm", () => {
         form,
       );
 
-      const focused = form.setError.mock.calls.filter(
-        (call) => call[2]?.shouldFocus,
-      );
+      const focused = form.setError.mock.calls.filter((call) => call[2]?.shouldFocus);
       expect(focused).toHaveLength(1);
     });
   });
@@ -166,10 +162,7 @@ describe("applyHandledErrorToForm", () => {
         setError: vi.fn(),
       };
 
-      const isConsumed = apply(
-        validationError({ fieldErrors: { version: ["Required"] } }),
-        form,
-      );
+      const isConsumed = apply(validationError({ fieldErrors: { version: ["Required"] } }), form);
 
       expect(isConsumed).toBe(false);
       expect(form.setError).not.toHaveBeenCalled();
@@ -192,10 +185,7 @@ describe("applyHandledErrorToForm", () => {
         setError: vi.fn(),
       };
 
-      const isConsumed = apply(
-        validationError({ fieldErrors: { projectId: ["Required"] } }),
-        form,
-      );
+      const isConsumed = apply(validationError({ fieldErrors: { projectId: ["Required"] } }), form);
 
       expect(isConsumed).toBe(false);
       expect(form.setError).not.toHaveBeenCalled();
@@ -274,10 +264,7 @@ describe("applyHandledErrorToForm", () => {
     it("declines it, so it falls through to a toast instead of vanishing", () => {
       const form = formWithFields("name");
 
-      const isConsumed = apply(
-        validationError({ fieldErrors: { somethingElse: ["Nope"] } }),
-        form,
-      );
+      const isConsumed = apply(validationError({ fieldErrors: { somethingElse: ["Nope"] } }), form);
 
       expect(isConsumed).toBe(false);
       expect(form.setError).not.toHaveBeenCalled();
@@ -310,12 +297,8 @@ describe("applyHandledErrorToForm", () => {
       const form = formWithFields("name");
 
       expect(apply(validationError({}), form)).toBe(false);
-      expect(apply(validationError({ fieldErrors: { name: [] } }), form)).toBe(
-        false,
-      );
-      expect(
-        apply(validationError({ fieldErrors: "not an object" }), form),
-      ).toBe(false);
+      expect(apply(validationError({ fieldErrors: { name: [] } }), form)).toBe(false);
+      expect(apply(validationError({ fieldErrors: "not an object" }), form)).toBe(false);
       expect(form.setError).not.toHaveBeenCalled();
     });
   });

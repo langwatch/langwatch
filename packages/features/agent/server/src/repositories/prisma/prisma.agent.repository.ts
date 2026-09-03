@@ -111,10 +111,7 @@ export class PrismaAgentRepository extends AgentRepository {
     })) as AgentReferenceState[];
   }
 
-  async findNamesByIds(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<AgentName[]> {
+  async findNamesByIds(input: { ids: string[]; projectId: string }): Promise<AgentName[]> {
     return (await this.database.agent.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, name: true },
@@ -286,20 +283,14 @@ export class PrismaAgentRepository extends AgentRepository {
     return mapAgentRow(row as AgentRow);
   }
 
-  async touchLastSeenAt(input: {
-    id: string;
-    projectId: string;
-    at: Date;
-  }): Promise<void> {
+  async touchLastSeenAt(input: { id: string; projectId: string; at: Date }): Promise<void> {
     await this.database.agent.update({
       where: { id: input.id, projectId: input.projectId },
       data: { lastSeenAt: input.at },
     });
   }
 
-  async findUserNamesByIds(
-    ids: readonly string[],
-  ): Promise<Map<string, string | null>> {
+  async findUserNamesByIds(ids: readonly string[]): Promise<Map<string, string | null>> {
     if (ids.length === 0) return new Map();
     const users = (await this.database.user.findMany({
       where: { id: { in: [...ids] } },

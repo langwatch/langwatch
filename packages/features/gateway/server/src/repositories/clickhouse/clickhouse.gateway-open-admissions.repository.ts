@@ -29,9 +29,7 @@ const TABLE_NAME = "gateway_spend" as const;
  * documents.
  */
 export class ClickHouseGatewayOpenAdmissionsRepository extends GatewayOpenAdmissionsPort {
-  static create(
-    client: GatewayClickHouseClient,
-  ): ClickHouseGatewayOpenAdmissionsRepository {
+  static create(client: GatewayClickHouseClient): ClickHouseGatewayOpenAdmissionsRepository {
     return new ClickHouseGatewayOpenAdmissionsRepository(client);
   }
 

@@ -43,8 +43,7 @@ interface EvaluationRunResults {
 
 const DEFAULT_ROW_CAP = 50;
 
-const rowKey = (index: number, targetId?: string | null): string =>
-  `${index}:${targetId ?? ""}`;
+const rowKey = (index: number, targetId?: string | null): string => `${index}:${targetId ?? ""}`;
 
 const summarizeEntry = (entry: Record<string, unknown>): string => {
   const candidates = ["input", "question", "query", "prompt", "user"];
@@ -162,9 +161,7 @@ export async function handleExperimentResults(params: {
   }));
 
   if (filter === "failed") {
-    rows = rows.filter((r) =>
-      isFailedRow({ entry: r.entry, evaluations: r.evaluations }),
-    );
+    rows = rows.filter((r) => isFailedRow({ entry: r.entry, evaluations: r.evaluations }));
   }
 
   const totalMatching = rows.length;
@@ -204,9 +201,7 @@ export async function handleExperimentResults(params: {
   lines.push(`**Experiment**: ${results.experimentId}`);
   lines.push(`**Status**: ${runStatus}`);
   if (typeof results.total === "number" && results.total > 0) {
-    lines.push(
-      `**Progress**: ${results.progress ?? results.dataset.length}/${results.total} rows`,
-    );
+    lines.push(`**Progress**: ${results.progress ?? results.dataset.length}/${results.total} rows`);
   }
   lines.push(`**Total rows**: ${results.dataset.length}`);
   lines.push(`**Total evaluations**: ${results.evaluations.length}`);
@@ -233,9 +228,7 @@ export async function handleExperimentResults(params: {
     lines.push("| --- | --- | --- | --- | --- |");
     for (const [name, stats] of evaluatorAverages) {
       const avg = stats.count > 0 ? (stats.sum / stats.count).toFixed(3) : "—";
-      lines.push(
-        `| ${name} | ${avg} | ${stats.passed} | ${stats.failed} | ${stats.errored} |`,
-      );
+      lines.push(`| ${name} | ${avg} | ${stats.passed} | ${stats.failed} | ${stats.errored} |`);
     }
     lines.push("");
   }
@@ -244,9 +237,7 @@ export async function handleExperimentResults(params: {
     if (filter === "failed") {
       lines.push("_No rows matched the filter._");
     } else if (runStatus === "running") {
-      lines.push(
-        "_No rows recorded yet. The run is still in progress; call again shortly._",
-      );
+      lines.push("_No rows recorded yet. The run is still in progress; call again shortly._");
     } else if (runStatus === "interrupted") {
       lines.push("_No rows were recorded before the run was interrupted._");
     } else {

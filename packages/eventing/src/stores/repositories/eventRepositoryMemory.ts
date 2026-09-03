@@ -67,8 +67,7 @@ export class EventRepositoryMemory implements EventRepository {
     const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
     const filtered = hasLowerBound
       ? records.filter(
-          (record) =>
-            !record.EventOccurredAt || record.EventOccurredAt >= occurredAtFromMs,
+          (record) => !record.EventOccurredAt || record.EventOccurredAt >= occurredAtFromMs,
         )
       : records;
     // Return a copy to prevent mutation
@@ -83,14 +82,8 @@ export class EventRepositoryMemory implements EventRepository {
     upToEventId: string;
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
-    const {
-      tenantId,
-      aggregateType,
-      aggregateId,
-      upToTimestamp,
-      upToEventId,
-      occurredAtFromMs,
-    } = request;
+    const { tenantId, aggregateType, aggregateId, upToTimestamp, upToEventId, occurredAtFromMs } =
+      request;
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
 
@@ -181,8 +174,7 @@ export class EventRepositoryMemory implements EventRepository {
     };
 
     const filtered = records.filter(
-      (record) =>
-        withinLowerBound(record) && withinUpperBound(record) && afterCursor(record),
+      (record) => withinLowerBound(record) && withinUpperBound(record) && afterCursor(record),
     );
 
     // Plain relational comparison, not localeCompare: withinUpperBound and

@@ -19,16 +19,7 @@ interface SelectableIconCardProps {
 }
 
 export function SelectableIconCard(props: SelectableIconCardProps): React.ReactElement {
-  const {
-    label,
-    size = "md",
-    icon,
-    iconSize,
-    selected,
-    onClick,
-    ariaLabel,
-    badge,
-  } = props;
+  const { label, size = "md", icon, iconSize, selected, onClick, ariaLabel, badge } = props;
 
   const actualIcon = icon?.type === "with-label" ? icon.icon : icon;
   const iconLabel = icon?.type === "with-label" ? icon.label : undefined;
@@ -43,10 +34,7 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
     SELECTED_SURFACE_BORDER.light,
     SELECTED_SURFACE_BORDER.dark,
   );
-  const selectedBg = useColorModeValue(
-    SELECTED_SURFACE_BG.light,
-    SELECTED_SURFACE_BG.dark,
-  );
+  const selectedBg = useColorModeValue(SELECTED_SURFACE_BG.light, SELECTED_SURFACE_BG.dark);
   const isDark = useColorModeValue(false, true);
 
   const iconSrc = actualIcon?.type === "themed" ? themedIconSrc : actualIcon?.src;
@@ -55,12 +43,7 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
   const cardSize = size === "sm" ? "72px" : "96px";
 
   return (
-    <Tooltip
-      content={label}
-      positioning={{ placement: "bottom" }}
-      showArrow
-      openDelay={0}
-    >
+    <Tooltip content={label} positioning={{ placement: "bottom" }} showArrow openDelay={0}>
       <Box
         role="button"
         tabIndex={0}

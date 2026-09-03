@@ -5,10 +5,7 @@
  * shared extractor otherwise (live frames, old turns).
  */
 import { describe, expect, it } from "vitest";
-import {
-  commandOfToolCall,
-  digestOfToolCall,
-} from "../langy-capability-digest";
+import { commandOfToolCall, digestOfToolCall } from "../langy-capability-digest";
 
 describe("commandOfToolCall", () => {
   describe("given a shell call carrying a LangWatch command (start frame)", () => {
@@ -58,9 +55,7 @@ describe("commandOfToolCall", () => {
 
   describe("given a call that is not a LangWatch CLI invocation", () => {
     it("resolves to null for a plain shell command", () => {
-      expect(
-        commandOfToolCall({ name: "bash", input: { command: "pnpm test" } }),
-      ).toBeNull();
+      expect(commandOfToolCall({ name: "bash", input: { command: "pnpm test" } })).toBeNull();
     });
 
     it("resolves to null for a non-CLI tool", () => {

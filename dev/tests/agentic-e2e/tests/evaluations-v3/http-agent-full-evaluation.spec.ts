@@ -91,11 +91,7 @@ test.describe("Full Evaluation Run with HTTP Agent Target", () => {
     await whenIWaitForEvaluationComplete(page, 3);
 
     // Then all target cells show echoed output
-    await thenTargetCellsShowOutput(page, "Echo API Agent", [
-      "hello",
-      "world",
-      "test123",
-    ]);
+    await thenTargetCellsShowOutput(page, "Echo API Agent", ["hello", "world", "test123"]);
 
     // And all evaluator chips show pass (green checkmark)
     await thenEvaluatorCellsShowPass(page, "exact_match", 3);

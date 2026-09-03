@@ -5,12 +5,7 @@ import type { useTraceDrawerNavigation } from "./use-trace-drawer-navigation";
 
 type DrawerStoreState = ReturnType<typeof useDrawerStore.getState>;
 
-export type ShortcutGroupTitle =
-  | "View"
-  | "Visualisation"
-  | "Navigation"
-  | "Actions"
-  | "Help";
+export type ShortcutGroupTitle = "View" | "Visualisation" | "Navigation" | "Actions" | "Help";
 
 export interface ShortcutContext {
   event: KeyboardEvent;

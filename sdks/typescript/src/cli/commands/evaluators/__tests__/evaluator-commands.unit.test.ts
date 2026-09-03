@@ -6,8 +6,7 @@ import { EvaluatorsApiError } from "@/client-sdk/services/evaluators";
 // Mock dependencies before imports
 vi.mock("@/client-sdk/services/evaluators", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual =
-    await importOriginal<typeof import("@/client-sdk/services/evaluators")>();
+  const actual = await importOriginal<typeof import("@/client-sdk/services/evaluators")>();
   return {
     ...actual,
     EvaluatorsApiService: vi.fn(),
@@ -54,9 +53,7 @@ const mockProcessExit = () => {
   });
 };
 
-const makeEvaluator = (
-  overrides: Partial<EvaluatorResponse> = {},
-): EvaluatorResponse => ({
+const makeEvaluator = (overrides: Partial<EvaluatorResponse> = {}): EvaluatorResponse => ({
   id: "evaluator_abc123",
   projectId: "proj_1",
   name: "Test Evaluator",
@@ -115,9 +112,7 @@ describe("listEvaluatorsCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      mockGetAll.mockRejectedValue(
-        new EvaluatorsApiError("Network error", "fetch all evaluators"),
-      );
+      mockGetAll.mockRejectedValue(new EvaluatorsApiError("Network error", "fetch all evaluators"));
 
       await expect(listEvaluatorsCommand()).rejects.toThrow(ProcessExitError);
     });
@@ -242,9 +237,7 @@ describe("createEvaluatorCommand()", () => {
 
   describe("when creation fails", () => {
     it("exits with code 1", async () => {
-      mockCreate.mockRejectedValue(
-        new EvaluatorsApiError("Limit reached", "create evaluator"),
-      );
+      mockCreate.mockRejectedValue(new EvaluatorsApiError("Limit reached", "create evaluator"));
 
       await expect(
         createEvaluatorCommand("My Eval", { type: "langevals/llm_boolean" }),
@@ -278,9 +271,7 @@ describe("createEvaluatorCommand() catalog-miss shape under machine formats", ()
   });
 
   it("emits validation_error with the reason's expected/received, the shape rule 16 reads", async () => {
-    await applyOutputContext(
-      resolveOutputOptions({ output: "json", format: "table" }, {}),
-    );
+    await applyOutputContext(resolveOutputOptions({ output: "json", format: "table" }, {}));
 
     await expect(
       createEvaluatorCommand("quick-relevancy", { type: "ragas/answer_relevancy" }),
@@ -381,9 +372,7 @@ describe("deleteEvaluatorCommand()", () => {
     it("exits with code 1 without calling delete", async () => {
       mockGet.mockRejectedValue(new EvaluatorsApiError("Not found", "fetch evaluator"));
 
-      await expect(deleteEvaluatorCommand("nonexistent")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(deleteEvaluatorCommand("nonexistent")).rejects.toThrow(ProcessExitError);
       expect(mockDelete).not.toHaveBeenCalled();
     });
   });
@@ -391,13 +380,9 @@ describe("deleteEvaluatorCommand()", () => {
   describe("when delete API call fails", () => {
     it("exits with code 1", async () => {
       mockGet.mockResolvedValue(makeEvaluator());
-      mockDelete.mockRejectedValue(
-        new EvaluatorsApiError("Server error", "delete evaluator"),
-      );
+      mockDelete.mockRejectedValue(new EvaluatorsApiError("Server error", "delete evaluator"));
 
-      await expect(deleteEvaluatorCommand("test-evaluator")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(deleteEvaluatorCommand("test-evaluator")).rejects.toThrow(ProcessExitError);
     });
   });
 });
@@ -448,9 +433,7 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
   it("emits the structured JSON error document under -o json, despite the -f commander default", async () => {
     // What preAction resolves for `-o json`: the -f default "table" sits on
     // the same options object and must not win.
-    await applyOutputContext(
-      resolveOutputOptions({ output: "json", format: "table" }, {}),
-    );
+    await applyOutputContext(resolveOutputOptions({ output: "json", format: "table" }, {}));
 
     await expect(listEvaluatorsCommand()).rejects.toThrow(ProcessExitError);
 

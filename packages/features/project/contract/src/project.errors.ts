@@ -154,9 +154,7 @@ export function personalWorkspaceMoveViolation({
   return null;
 }
 
-export function personalWorkspaceArchiveViolation(
-  isProjectPersonal: boolean,
-): string | null {
+export function personalWorkspaceArchiveViolation(isProjectPersonal: boolean): string | null {
   return isProjectPersonal ? PERSONAL_PROJECT_ARCHIVE_REFUSAL : null;
 }
 

@@ -67,13 +67,7 @@ export class GatewayBudgetScopeReachService {
     });
   }
 
-  private matches({
-    budget,
-    key,
-  }: {
-    budget: GatewayBudgetScope;
-    key: KeyReach;
-  }): boolean {
+  private matches({ budget, key }: { budget: GatewayBudgetScope; key: KeyReach }): boolean {
     switch (budget.scopeType) {
       case "ORGANIZATION":
         return budget.scopeId === key.organizationId;

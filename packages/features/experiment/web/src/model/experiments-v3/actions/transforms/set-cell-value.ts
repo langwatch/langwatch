@@ -1,12 +1,5 @@
-import {
-  type SetCellValuePayload,
-  setCellValuePayloadSchema,
-} from "../schemas";
-import {
-  inlineRowCount,
-  replaceDataset,
-  requireInlineDataset,
-} from "./helpers";
+import { type SetCellValuePayload, setCellValuePayloadSchema } from "../schemas";
+import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers";
 import { type Transform, TransformError } from "./types";
 
 /**
@@ -25,8 +18,7 @@ export const setCellValue: Transform<
   SetCellValuePayload,
   { datasetId: string; rowIndex: number }
 > = ({ state, payload }) => {
-  const { datasetId, rowIndex, columnId, value } =
-    setCellValuePayloadSchema.parse(payload);
+  const { datasetId, rowIndex, columnId, value } = setCellValuePayloadSchema.parse(payload);
   const dataset = requireInlineDataset({ state, datasetId });
 
   if (!dataset.inline.columns.some((column) => column.id === columnId)) {

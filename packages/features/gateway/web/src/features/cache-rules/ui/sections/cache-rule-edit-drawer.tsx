@@ -49,9 +49,7 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
   });
 
   const [state, setState] = useState<CacheRuleFormState>(emptyFormState());
-  const [fieldComplaint, setFieldComplaint] = useState<CacheRuleFormComplaint | null>(
-    null,
-  );
+  const [fieldComplaint, setFieldComplaint] = useState<CacheRuleFormComplaint | null>(null);
 
   useEffect(() => {
     if (rule) {
@@ -108,12 +106,7 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
   };
 
   return (
-    <Drawer.Root
-      open={!!rule}
-      onOpenChange={() => handleClose()}
-      placement="end"
-      size="md"
-    >
+    <Drawer.Root open={!!rule} onOpenChange={() => handleClose()} placement="end" size="md">
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Edit cache rule</Drawer.Title>
@@ -132,11 +125,7 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
         <Drawer.Footer>
           <HStack width="full">
             <Spacer />
-            <Button
-              variant="ghost"
-              onClick={handleClose}
-              disabled={updateMutation.isPending}
-            >
+            <Button variant="ghost" onClick={handleClose} disabled={updateMutation.isPending}>
               Cancel
             </Button>
             <Button

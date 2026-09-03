@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  SimpleGrid,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Field, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
@@ -22,7 +14,10 @@ import {
 
 import { useTargetName, useTargetNames } from "../../../../behavior/experiments-v3/use-target-name";
 import { useTargetOutputs } from "../../../../behavior/experiments-v3/use-target-outputs";
-import type { ComparisonEvaluatorConfig, TargetConfig } from "../../../../model/experiments-v3/types";
+import type {
+  ComparisonEvaluatorConfig,
+  TargetConfig,
+} from "../../../../model/experiments-v3/types";
 import { balancedColumns } from "../../../../model/experiments-v3/balanced-columns";
 import { disambiguateNames } from "@langwatch/experiment-contract";
 
@@ -75,9 +70,7 @@ export function pickDefaultJudgePrompt({
   if (hasGolden) {
     return hasInput ? JUDGE_PROMPT_GOLDEN_INPUT : JUDGE_PROMPT_GOLDEN_NO_INPUT;
   }
-  return hasInput
-    ? JUDGE_PROMPT_NO_GOLDEN_INPUT
-    : JUDGE_PROMPT_NO_GOLDEN_NO_INPUT;
+  return hasInput ? JUDGE_PROMPT_NO_GOLDEN_INPUT : JUDGE_PROMPT_NO_GOLDEN_NO_INPUT;
 }
 
 /**
@@ -201,11 +194,7 @@ function VariantsMultiSelect({
   const variantOutputs = useTargetOutputs(selectedTargets);
   const variantDisplayNames = useMemo(
     () =>
-      disambiguateNames(
-        variantNames.map(
-          (name, i) => name || selected[i] || `Variant ${i + 1}`,
-        ),
-      ),
+      disambiguateNames(variantNames.map((name, i) => name || selected[i] || `Variant ${i + 1}`)),
     [variantNames, selected],
   );
 
@@ -288,9 +277,7 @@ function VariantsMultiSelect({
             disabled={remaining.length === 0}
           >
             <Plus size={14} />
-            <Text fontSize="13px">
-              {selected.length === 0 ? "Add a variant" : "Add another"}
-            </Text>
+            <Text fontSize="13px">{selected.length === 0 ? "Add a variant" : "Add another"}</Text>
           </Button>
         </Menu.Trigger>
         <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
@@ -301,9 +288,7 @@ function VariantsMultiSelect({
               </Text>
             </Menu.Item>
           ) : (
-            remaining.map((t) => (
-              <VariantMenuItem key={t.id} target={t} onAdd={() => add(t.id)} />
-            ))
+            remaining.map((t) => <VariantMenuItem key={t.id} target={t} onAdd={() => add(t.id)} />)
           )}
         </Menu.Content>
       </Menu.Root>
@@ -370,9 +355,7 @@ function VariantCard({
     }),
     [target.id, target.type, label, outputOptions],
   );
-  const selectedOption = outputOptions.find((option) =>
-    pathsEqual(option.path, path ?? []),
-  );
+  const selectedOption = outputOptions.find((option) => pathsEqual(option.path, path ?? []));
   const outputMapping: FieldMapping | undefined = selectedOption
     ? { type: "source", sourceId: target.id, path: [selectedOption.label] }
     : undefined;
@@ -418,11 +401,8 @@ function VariantCard({
                 onPathChange([]);
                 return;
               }
-              const key =
-                next.type === "source" ? next.path.at(-1) : next.value;
-              const matched = outputOptions.find(
-                (option) => option.label === key,
-              );
+              const key = next.type === "source" ? next.path.at(-1) : next.value;
+              const matched = outputOptions.find((option) => option.label === key);
               onPathChange(matched?.path ?? []);
             }}
           />
@@ -433,35 +413,25 @@ function VariantCard({
 }
 
 function pathsEqual(a: string[], b: string[]): boolean {
-  return (
-    a.length === b.length && a.every((segment, index) => segment === b[index])
-  );
+  return a.length === b.length && a.every((segment, index) => segment === b[index]);
 }
 
 function getObjectSchemaProperties(schema: unknown): string[] {
   if (!schema || typeof schema !== "object" || Array.isArray(schema)) return [];
   const properties = (schema as { properties?: unknown }).properties;
-  if (
-    !properties ||
-    typeof properties !== "object" ||
-    Array.isArray(properties)
-  ) {
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)) {
     return [];
   }
   return Object.keys(properties);
 }
 
-function getVariantOutputOptions(
-  outputs: TargetConfig["outputs"],
-): VariantOutputOption[] {
+function getVariantOutputOptions(outputs: TargetConfig["outputs"]): VariantOutputOption[] {
   const fields = outputs ?? [];
   const singleOutput = fields.length === 1;
 
   return fields.flatMap((field) => {
     const properties =
-      field.type === "json_schema"
-        ? getObjectSchemaProperties(field.json_schema)
-        : [];
+      field.type === "json_schema" ? getObjectSchemaProperties(field.json_schema) : [];
 
     if (properties.length === 0) {
       return [{ label: field.identifier, path: [field.identifier] }];
@@ -481,9 +451,7 @@ function getVariantOutputOptions(
     const nested = properties.map((property) => ({
       label: `${field.identifier}.${property}`,
       path:
-        singleOutput && field.identifier === "output"
-          ? [property]
-          : [field.identifier, property],
+        singleOutput && field.identifier === "output" ? [property] : [field.identifier, property],
     }));
 
     return singleOutput
@@ -497,13 +465,7 @@ function getVariantOutputOptions(
  * `useTargetName` runs at a stable hook position (Rules of Hooks) even as
  * the remaining-targets list shrinks with each pick.
  */
-function VariantMenuItem({
-  target,
-  onAdd,
-}: {
-  target: TargetConfig;
-  onAdd: () => void;
-}) {
+function VariantMenuItem({ target, onAdd }: { target: TargetConfig; onAdd: () => void }) {
   const name = useTargetName(target) ?? target.id;
   return (
     <Menu.Item
@@ -560,9 +522,7 @@ function GoldenAnswerSection({
   const isUntouchedDefault = useCallback(
     (value: string | undefined): boolean =>
       typeof value === "string" &&
-      ALL_DEFAULT_JUDGE_PROMPTS.some(
-        (candidate) => value.trim() === candidate.trim(),
-      ),
+      ALL_DEFAULT_JUDGE_PROMPTS.some((candidate) => value.trim() === candidate.trim()),
     [],
   );
   useEffect(() => {
@@ -661,8 +621,7 @@ function GoldenAnswerSection({
                 update({ goldenField: "" });
                 return;
               }
-              const field =
-                next.type === "source" ? next.path.at(-1) : next.value;
+              const field = next.type === "source" ? next.path.at(-1) : next.value;
               setHasGoldenAnswer(true);
               update({ goldenField: field ?? "" });
             }}
@@ -721,8 +680,7 @@ function InputContextSection({
                 update({ inputField: undefined });
                 return;
               }
-              const field =
-                next.type === "source" ? next.path.at(-1) : next.value;
+              const field = next.type === "source" ? next.path.at(-1) : next.value;
               update({ inputField: field ?? undefined });
             }}
           />
@@ -856,9 +814,7 @@ function MetricsSection({
           <Text fontSize="13px">Include cost</Text>
           <Switch
             checked={current.includes("cost")}
-            onCheckedChange={({ checked }) =>
-              toggle({ metric: "cost", on: checked })
-            }
+            onCheckedChange={({ checked }) => toggle({ metric: "cost", on: checked })}
             inputProps={{ "aria-label": "Include cost" }}
             data-testid="comparison-include-cost"
           />
@@ -867,9 +823,7 @@ function MetricsSection({
           <Text fontSize="13px">Include duration</Text>
           <Switch
             checked={current.includes("duration")}
-            onCheckedChange={({ checked }) =>
-              toggle({ metric: "duration", on: checked })
-            }
+            onCheckedChange={({ checked }) => toggle({ metric: "duration", on: checked })}
             inputProps={{ "aria-label": "Include duration" }}
             data-testid="comparison-include-duration"
           />

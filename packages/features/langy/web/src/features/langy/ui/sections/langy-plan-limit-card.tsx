@@ -33,11 +33,7 @@ import { useLangyStore } from "../../../../index";
  * anyone else is told plainly whom to ask instead. Handing them a button into a page that will refuse them is a
  * dead end dressed up as a way forward.
  */
-export function LangyPlanLimitCard({
-  presentation,
-}: {
-  presentation: LangyToolErrorPresentation;
-}) {
+export function LangyPlanLimitCard({ presentation }: { presentation: LangyToolErrorPresentation }) {
   const limit = presentation.limit!;
   const { project, hasOrgPermission } = useOrganizationTeamProject();
   const { url, buttonLabel } = usePlanManagementUrl();

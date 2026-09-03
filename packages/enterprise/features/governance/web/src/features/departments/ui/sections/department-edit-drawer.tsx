@@ -59,12 +59,7 @@ export function DepartmentEditDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={!!department}
-      onOpenChange={() => close()}
-      placement="end"
-      size="md"
-    >
+    <Drawer.Root open={!!department} onOpenChange={() => close()} placement="end" size="md">
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>Edit department</Drawer.Title>

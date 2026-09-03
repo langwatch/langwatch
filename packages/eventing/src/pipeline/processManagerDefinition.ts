@@ -1,10 +1,7 @@
 import type { ZodTypeAny, z } from "zod";
 
 import type { Event } from "../domain/types";
-import type {
-  ProcessEventEnvelope,
-  ProcessIntent,
-} from "../process-manager/processManager.types";
+import type { ProcessEventEnvelope, ProcessIntent } from "../process-manager/processManager.types";
 import type { DeduplicationConfig } from "../queues/queue.types";
 import type { ExecutionTarget } from "../runtime.types";
 
@@ -87,10 +84,7 @@ export interface IntentContext {
   attempt: number;
 }
 
-export type IntentExecutor<Payload> = (
-  payload: Payload,
-  context: IntentContext,
-) => Promise<void>;
+export type IntentExecutor<Payload> = (payload: Payload, context: IntentContext) => Promise<void>;
 
 export interface IntentSpec<Schema extends ZodTypeAny = ZodTypeAny> {
   schema: Schema;
@@ -132,11 +126,7 @@ export type WakeHandler<State, Intents extends Record<string, IntentSpec<any>>> 
   context: ProcessHandlerContext<Intents>,
 ) => ProcessEvolution<State>;
 
-export type SignalHandler<
-  State,
-  Data,
-  Intents extends Record<string, IntentSpec<any>>,
-> = (
+export type SignalHandler<State, Data, Intents extends Record<string, IntentSpec<any>>> = (
   state: State,
   data: Data,
   context: ProcessHandlerContext<Intents>,
@@ -227,9 +217,7 @@ export function defineProcessManager<
   State,
   const Intents extends Record<string, IntentSpec<any>>,
   E extends Event = Event,
->(
-  config: ProcessManagerConfig<State, Intents, E>,
-): ProcessManagerDefinition<State, Intents, E> {
+>(config: ProcessManagerConfig<State, Intents, E>): ProcessManagerDefinition<State, Intents, E> {
   if (
     config.schedule &&
     (!Number.isFinite(config.schedule.everyMs) || config.schedule.everyMs <= 0)
@@ -239,9 +227,7 @@ export function defineProcessManager<
     );
   }
   if (config.schedule && !config.onWake) {
-    throw new Error(
-      `Process manager "${config.name}" declares a schedule but no onWake handler`,
-    );
+    throw new Error(`Process manager "${config.name}" declares a schedule but no onWake handler`);
   }
   if (
     config.eventTypes.length === 0 &&

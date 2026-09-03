@@ -158,11 +158,7 @@ describe("useSpanTree with a correction", () => {
 
         const { result } = renderHook(() => useSpanTree());
 
-        expect(result.current.data?.map((s) => s.spanId)).toEqual([
-          "root",
-          "tool",
-          "child",
-        ]);
+        expect(result.current.data?.map((s) => s.spanId)).toEqual(["root", "tool", "child"]);
         expect(result.current.data?.[0]?.name).toBe("root");
       });
     });
@@ -173,11 +169,7 @@ describe("useSpanTree with a correction", () => {
 
         const { result } = renderHook(() => useSpanTree());
 
-        expect(result.current.data?.map((s) => s.spanId)).toEqual([
-          "root",
-          "tool",
-          "child",
-        ]);
+        expect(result.current.data?.map((s) => s.spanId)).toEqual(["root", "tool", "child"]);
       });
     });
   });

@@ -173,10 +173,7 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({ group }) => 
         <>
           <Separator />
           <HStack gap={1}>
-            <Circle
-              size="6px"
-              bg={group.evalsFailedCount > 0 ? "red.solid" : "green.solid"}
-            />
+            <Circle size="6px" bg={group.evalsFailedCount > 0 ? "red.solid" : "green.solid"} />
             <Text>
               {group.evalsPassedCount}/{group.totalEvals} evals
             </Text>

@@ -19,23 +19,21 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { sessionRef, publicEnvRef, searchParamsRef, registerRef, signInMock } = vi.hoisted(
-  () => ({
-    sessionRef: { current: { data: null as unknown } },
-    publicEnvRef: {
-      current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
+const { sessionRef, publicEnvRef, searchParamsRef, registerRef, signInMock } = vi.hoisted(() => ({
+  sessionRef: { current: { data: null as unknown } },
+  publicEnvRef: {
+    current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
+  },
+  searchParamsRef: { current: new URLSearchParams("") },
+  registerRef: {
+    current: {
+      mutateAsync: vi.fn(() => Promise.resolve({ id: "user_1" })),
+      error: null as unknown,
+      isLoading: false,
     },
-    searchParamsRef: { current: new URLSearchParams("") },
-    registerRef: {
-      current: {
-        mutateAsync: vi.fn(() => Promise.resolve({ id: "user_1" })),
-        error: null as unknown,
-        isLoading: false,
-      },
-    },
-    signInMock: vi.fn(),
-  }),
-);
+  },
+  signInMock: vi.fn(),
+}));
 
 vi.mock("../../../behavior/auth-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../behavior/auth-client")>();
@@ -217,9 +215,7 @@ describe("SignUp when the email already has an account", () => {
       fillAndSubmit(container);
 
       await waitFor(() => {
-        expect(screen.getAllByText(/your account was created/i).length).toBeGreaterThan(
-          0,
-        );
+        expect(screen.getAllByText(/your account was created/i).length).toBeGreaterThan(0);
       });
       expect(screen.queryByText(/failed to sign up/i)).toBeNull();
       expect(screen.queryByText(/SOME_UNMAPPED_IDENTIFIER/)).toBeNull();

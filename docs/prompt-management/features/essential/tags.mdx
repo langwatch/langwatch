@@ -87,8 +87,8 @@ LangWatch supports a shorthand syntax for specifying tags in prompt identifiers:
 This works anywhere a prompt identifier is accepted: REST API, SDK, and config files.
 
 <Warning>
-  You cannot use both shorthand syntax and the `?tag=` query parameter at the same time.
-  If both are provided, the API returns a 422 error.
+  You cannot use both shorthand syntax and the `?tag=` query parameter at the same time. If both are
+  provided, the API returns a 422 error.
 </Warning>
 
 ## Custom Tags
@@ -122,9 +122,9 @@ Use `platform_create_prompt_tag` to create a custom tag, then `platform_assign_p
 | Assign tag to version | `PUT /api/prompts/{id}/tags/{tag}` | `platform_assign_prompt_tag` |
 
 <Note>
-  Custom tag names must not be purely numeric and cannot be "latest". The `latest` tag is
-  protected and cannot be renamed or deleted. `production` and `staging` are default
-  seeded tags that can be renamed or deleted like any custom tag.
+  Custom tag names must not be purely numeric and cannot be "latest". The `latest` tag is protected
+  and cannot be renamed or deleted. `production` and `staging` are default seeded tags that can be
+  renamed or deleted like any custom tag.
 </Note>
 
 ## Tag Management via SDKs
@@ -155,8 +155,8 @@ await langwatch.prompts.tags.delete("canary");
 ```
 
 <Warning>
-  The TypeScript SDK does not currently support `tags.rename()`. Use the REST API or
-  Python SDK for renaming tags.
+  The TypeScript SDK does not currently support `tags.rename()`. Use the REST API or Python SDK for
+  renaming tags.
 </Warning>
 
 ### Python SDK

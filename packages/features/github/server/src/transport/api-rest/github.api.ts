@@ -58,10 +58,7 @@ export type GithubRestPorts = Readonly<{
    * ORGANIZATION-tier, which is the deployment's AuthZ graph rather than
    * anything GitHub knows.
    */
-  canManageOrganization: (input: {
-    userId: string;
-    organizationId: string;
-  }) => Promise<boolean>;
+  canManageOrganization: (input: { userId: string; organizationId: string }) => Promise<boolean>;
   /** Where a connection command — and a blocked rebind — is recorded. */
   audit: (entry: {
     userId: string;
@@ -77,9 +74,7 @@ export type GithubRestPorts = Readonly<{
    * only path — slower, and correct: the mapping is a cache of what GitHub
    * already knows.
    */
-  backfillPullRequestMappings?:
-    | ((input: { organizationId: string }) => Promise<void>)
-    | undefined;
+  backfillPullRequestMappings?: ((input: { organizationId: string }) => Promise<void>) | undefined;
 }>;
 
 const logger = createLogger("langwatch:api:github");
@@ -200,9 +195,7 @@ async function handleInstall(c: Context, ports: GithubRestPorts): Promise<Respon
   // Connecting GitHub grants repository access to the whole organization, so it
   // takes organization management: the same permission the tRPC surface demands
   // for every write to the connection.
-  if (
-    !(await ports.canManageOrganization({ userId: session.user.id, organizationId }))
-  ) {
+  if (!(await ports.canManageOrganization({ userId: session.user.id, organizationId }))) {
     return c.json({ error: "Forbidden" }, { status: 403 });
   }
 

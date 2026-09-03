@@ -12,9 +12,7 @@ interface TestData {
   UpdatedAt: number;
 }
 
-function makeContext(
-  overrides: Partial<ProjectionStoreContext> = {},
-): ProjectionStoreContext {
+function makeContext(overrides: Partial<ProjectionStoreContext> = {}): ProjectionStoreContext {
   return {
     aggregateId: "agg-1",
     tenantId: "tenant-1" as TenantId,

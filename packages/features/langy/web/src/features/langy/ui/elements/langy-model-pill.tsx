@@ -127,12 +127,9 @@ export const LangyModelPill = memo(function LangyModelPill({
 }) {
   // Langy is a licensed codex surface: declaring `langy.chat` re-admits
   // codex models the shared hook fail-closes everywhere else.
-  const { selectOptions, modelOption } = useModelSelectionOptions(
-    options,
-    model,
-    "chat",
-    { featureKey: LANGY_CHAT_FEATURE_KEY },
-  );
+  const { selectOptions, modelOption } = useModelSelectionOptions(options, model, "chat", {
+    featureKey: LANGY_CHAT_FEATURE_KEY,
+  });
   const currentProvider = model.split("/")[0] ?? "";
   const hasCurrentProvider = currentProvider in modelProviderIcons;
   const modelsLoading = options.length === 0 && selectOptions.length === 0;
@@ -278,9 +275,7 @@ export const LangyModelPill = memo(function LangyModelPill({
             opacity={disabled ? 0.5 : 1}
             cursor={disabled ? "not-allowed" : "pointer"}
             transition="border-color 150ms ease, color 150ms ease, opacity 150ms ease"
-            _hover={
-              disabled ? undefined : { borderColor: "orange.emphasized", color: "fg" }
-            }
+            _hover={disabled ? undefined : { borderColor: "orange.emphasized", color: "fg" }}
             _focusVisible={{
               outline: "none",
               borderColor: "orange.emphasized",
@@ -313,10 +308,7 @@ export const LangyModelPill = memo(function LangyModelPill({
           >
             {hasCurrentProvider ? (
               <Box flexShrink={0} display="grid" placeItems="center">
-                <ProviderIconGlyph
-                  provider={currentProvider as ProviderKey}
-                  size="15px"
-                />
+                <ProviderIconGlyph provider={currentProvider as ProviderKey} size="15px" />
               </Box>
             ) : (
               <Box flexShrink={0} display="grid" placeItems="center" color="fg.subtle">
@@ -350,9 +342,7 @@ export const LangyModelPill = memo(function LangyModelPill({
             {modelsLoading ? (
               <HStack paddingX={3} paddingY={3} gap={2} color="fg.muted">
                 <LoaderCircle size={14} />
-                <Text textStyle="xs">
-                  Models are still loading. Try again in a moment.
-                </Text>
+                <Text textStyle="xs">Models are still loading. Try again in a moment.</Text>
               </HStack>
             ) : (
               <>
@@ -532,15 +522,9 @@ function ModelRow({ item }: { item: ModelItem }) {
             a narrow row costs less than losing the name. */}
         <HStack gap={1} color="fg.subtle" flexShrink={1} overflow="hidden">
           {item.profile.isQuick ? <ModelTrait label="Fast" icon={Zap} /> : null}
-          {item.profile.isLongRunning ? (
-            <ModelTrait label="Long-running" icon={Clock3} />
-          ) : null}
-          {item.profile.hasReasoning ? (
-            <ModelTrait label="Reasoning" icon={Brain} />
-          ) : null}
-          {item.profile.isMultimodal ? (
-            <ModelTrait label="Multimodal" icon={Image} />
-          ) : null}
+          {item.profile.isLongRunning ? <ModelTrait label="Long-running" icon={Clock3} /> : null}
+          {item.profile.hasReasoning ? <ModelTrait label="Reasoning" icon={Brain} /> : null}
+          {item.profile.isMultimodal ? <ModelTrait label="Multimodal" icon={Image} /> : null}
         </HStack>
         {item.isLangyDefault ? (
           <Text textStyle="2xs" color="orange.fg" whiteSpace="nowrap" flexShrink={0}>

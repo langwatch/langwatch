@@ -90,9 +90,7 @@ export const isPasswordResetPath = (pathname: string): boolean =>
  */
 export const isGateDependentPath = (url: string): boolean => {
   const pathname = normalizedRequestPathname(url);
-  return (
-    isPasswordResetPath(pathname) || isEmailAuthPath(pathname) || isGatedSsoPath(url)
-  );
+  return isPasswordResetPath(pathname) || isEmailAuthPath(pathname) || isGatedSsoPath(url);
 };
 
 /**

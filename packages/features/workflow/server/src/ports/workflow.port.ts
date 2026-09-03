@@ -65,9 +65,7 @@ export type WorkflowStudioStreamInput = {
  * once in a service is what keeps a second adapter from re-deriving them.
  */
 export abstract class WorkflowStudioStreamPort {
-  abstract open(
-    input: WorkflowStudioStreamInput,
-  ): Promise<ReadableStreamDefaultReader<Uint8Array>>;
+  abstract open(input: WorkflowStudioStreamInput): Promise<ReadableStreamDefaultReader<Uint8Array>>;
 }
 
 export abstract class WorkflowIdPort {

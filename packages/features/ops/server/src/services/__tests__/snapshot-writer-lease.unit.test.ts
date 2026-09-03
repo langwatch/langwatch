@@ -162,16 +162,14 @@ describe("snapshot writer lease gate", () => {
       await collector.discoverQueues();
       await collector.collect();
 
-      const published = (snapshots.writeLive as ReturnType<typeof vi.fn>).mock
-        .calls[0]?.[0].snapshot;
+      const published = (snapshots.writeLive as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]
+        .snapshot;
       expect(published.peakCompletedPerSec).toBe(999);
       expect(published.peakLatencyP99Ms).toBe(900);
       // The restored point is still there, with this cycle's appended after it
       // — the chart continues rather than restarting.
       expect(
-        published.throughputHistory.map(
-          (point: { timestamp: number }) => point.timestamp,
-        ),
+        published.throughputHistory.map((point: { timestamp: number }) => point.timestamp),
       ).toContain(FLEET_STATE.throughputBuffer[0]!.timestamp);
     });
 
@@ -191,9 +189,7 @@ describe("snapshot writer lease gate", () => {
       await collector.collect();
       await new Promise((resolve) => setImmediate(resolve));
 
-      const written = redis.set.mock.calls.find(
-        (call) => call[0] === "ops:metrics:state",
-      );
+      const written = redis.set.mock.calls.find((call) => call[0] === "ops:metrics:state");
       expect(written).toBeDefined();
       expect(JSON.parse(written![1] as string).peakCompletedPerSec).toBe(999);
     });

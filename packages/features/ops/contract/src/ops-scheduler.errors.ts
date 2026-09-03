@@ -70,14 +70,10 @@ export class ScheduleSlotNotStaleError extends HandledError {
   declare readonly code: "schedule_slot_not_stale";
 
   constructor() {
-    super(
-      "schedule_slot_not_stale",
-      "That slot is still current, so it was not cleared.",
-      {
-        httpStatus: 409,
-        fault: "customer",
-      },
-    );
+    super("schedule_slot_not_stale", "That slot is still current, so it was not cleared.", {
+      httpStatus: 409,
+      fault: "customer",
+    });
     this.name = "ScheduleSlotNotStaleError";
   }
 }

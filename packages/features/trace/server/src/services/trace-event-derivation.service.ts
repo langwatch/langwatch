@@ -30,9 +30,7 @@ interface MemoEntry {
  * watermark is non-deterministic over time and must never be served from cache.
  */
 export class TraceEventDerivationService {
-  static create(options: {
-    spans: TraceDerivationSpanReaderPort;
-  }): TraceEventDerivationService {
+  static create(options: { spans: TraceDerivationSpanReaderPort }): TraceEventDerivationService {
     return new TraceEventDerivationService(options.spans);
   }
 

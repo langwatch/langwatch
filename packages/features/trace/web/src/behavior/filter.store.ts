@@ -146,17 +146,9 @@ interface FilterState {
    * level. Cycles neutral → include → exclude → neutral; the evaluator anchor
    * is added automatically and removed when its last sub-condition clears.
    */
-  toggleEvaluatorSubFilter: (args: {
-    evaluatorId: string;
-    field: string;
-    value: string;
-  }) => void;
+  toggleEvaluatorSubFilter: (args: { evaluatorId: string; field: string; value: string }) => void;
   /** Set the score range inside an evaluator's group (adds the anchor). */
-  setEvaluatorScoreRange: (args: {
-    evaluatorId: string;
-    from: string;
-    to: string;
-  }) => void;
+  setEvaluatorScoreRange: (args: { evaluatorId: string; from: string; to: string }) => void;
   /** Clear just the score range from an evaluator's group. */
   removeEvaluatorScoreRange: (args: { evaluatorId: string }) => void;
 
@@ -196,11 +188,7 @@ interface FilterState {
   /** Record the last AI prompt + result so the next AI mode entry can
    * surface the original natural-language prompt instead of the produced
    * query string. */
-  recordAiTranslation: (translation: {
-    projectId: string;
-    prompt: string;
-    query: string;
-  }) => void;
+  recordAiTranslation: (translation: { projectId: string; prompt: string; query: string }) => void;
 }
 
 const EMPTY_AST: LiqeQuery = {
@@ -445,21 +433,15 @@ export const useFilterStore = create<FilterState>((set, get) => ({
 
   removeEvaluatorScoreRange: ({ evaluatorId }) =>
     set((s) =>
-      applyMutation(s, (q) =>
-        removeEvaluatorScoreRangeInQuery({ currentQuery: q, evaluatorId }),
-      ),
+      applyMutation(s, (q) => removeEvaluatorScoreRangeInQuery({ currentQuery: q, evaluatorId })),
     ),
 
   swapOperator: (start, end) =>
-    set((s) =>
-      applyMutation(s, (q) => swapOperatorAtLocation({ currentQuery: q, start, end })),
-    ),
+    set((s) => applyMutation(s, (q) => swapOperatorAtLocation({ currentQuery: q, start, end }))),
 
   setFacetValueAt: (start, end, newValue) =>
     set((s) =>
-      applyMutation(s, (q) =>
-        setFacetValueAtLocation({ currentQuery: q, start, end, newValue }),
-      ),
+      applyMutation(s, (q) => setFacetValueAtLocation({ currentQuery: q, start, end, newValue })),
     ),
 
   removeFacet: (field, value) =>
@@ -471,28 +453,20 @@ export const useFilterStore = create<FilterState>((set, get) => ({
 
   removeField: (field) =>
     set((s) =>
-      applyMutation(s, (q) =>
-        removeFieldFromQuery({ currentQuery: q, fieldName: field }),
-      ),
+      applyMutation(s, (q) => removeFieldFromQuery({ currentQuery: q, fieldName: field })),
     ),
 
   removeFreeText: (value) =>
-    set((s) =>
-      applyMutation(s, (q) => removeImplicitTermFromQuery({ currentQuery: q, value })),
-    ),
+    set((s) => applyMutation(s, (q) => removeImplicitTermFromQuery({ currentQuery: q, value }))),
 
   setRange: (field, from, to) =>
     set((s) =>
-      applyMutation(s, (q) =>
-        setRangeInQuery({ currentQuery: q, fieldName: field, from, to }),
-      ),
+      applyMutation(s, (q) => setRangeInQuery({ currentQuery: q, fieldName: field, from, to })),
     ),
 
   removeRange: (field) =>
     set((s) =>
-      applyMutation(s, (q) =>
-        removeFieldFromQuery({ currentQuery: q, fieldName: field }),
-      ),
+      applyMutation(s, (q) => removeFieldFromQuery({ currentQuery: q, fieldName: field })),
     ),
 
   setTimeRange: (range) => set({ timeRange: range, page: 1, pageCursors: { 1: null } }),

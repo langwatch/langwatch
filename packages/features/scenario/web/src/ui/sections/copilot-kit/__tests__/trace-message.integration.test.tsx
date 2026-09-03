@@ -54,9 +54,7 @@ describe("TraceMessage", () => {
           data: undefined,
         });
 
-        const { container } = render(
-          <TraceMessage traceId="ff364975e79bc3c1ad48c38024928fea" />,
-        );
+        const { container } = render(<TraceMessage traceId="ff364975e79bc3c1ad48c38024928fea" />);
 
         expect(container.firstChild).toBeNull();
       });

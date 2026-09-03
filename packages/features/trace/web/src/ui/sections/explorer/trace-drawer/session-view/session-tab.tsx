@@ -60,8 +60,8 @@ export function SessionTab({ projectId, traceId, occurredAtMs }: SessionTabProps
             No usage summary for this session
           </Text>
           <Text textStyle="xs" color="fg.subtle">
-            Claude Code sessions get one shortly after the run finishes. Other coding
-            agents are not summarized yet.
+            Claude Code sessions get one shortly after the run finishes. Other coding agents are not
+            summarized yet.
           </Text>
         </VStack>
       </Centered>

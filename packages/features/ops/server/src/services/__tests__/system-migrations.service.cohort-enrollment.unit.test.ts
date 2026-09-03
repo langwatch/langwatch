@@ -91,9 +91,7 @@ describe("SystemMigrationsService.enrollCohort", () => {
         // A sample, not an echo: no repeats, and every pick from the pool.
         const pickedIds = result.enrolled.map((organization) => organization.id);
         expect(new Set(pickedIds).size).toBe(50);
-        const poolIds = new Set(
-          organizations(200).map((organization) => organization.id),
-        );
+        const poolIds = new Set(organizations(200).map((organization) => organization.id));
         for (const id of pickedIds) {
           expect(poolIds.has(id)).toBe(true);
         }

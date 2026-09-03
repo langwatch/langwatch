@@ -48,25 +48,22 @@ export const traceSelectColumnDef: ColumnDef<TraceListItem, any> = traceCol.disp
     ),
 });
 
-export const conversationSelectColumnDef: ColumnDef<ConversationGroup, any> =
-  convCol.display({
-    id: SELECT_COLUMN_ID,
-    size: SELECT_COLUMN_SIZE,
-    minSize: SELECT_COLUMN_SIZE,
-    enableSorting: false,
-    enableResizing: false,
-    header: ({ table }) => (
-      <SelectHeaderCheckbox
-        traceIds={withoutPlaceholderTraceIds(
-          table
-            .getCoreRowModel()
-            .rows.flatMap((r) =>
-              (r.original as ConversationGroup).traces.map((t) => t.traceId),
-            ),
-        )}
-      />
-    ),
-  });
+export const conversationSelectColumnDef: ColumnDef<ConversationGroup, any> = convCol.display({
+  id: SELECT_COLUMN_ID,
+  size: SELECT_COLUMN_SIZE,
+  minSize: SELECT_COLUMN_SIZE,
+  enableSorting: false,
+  enableResizing: false,
+  header: ({ table }) => (
+    <SelectHeaderCheckbox
+      traceIds={withoutPlaceholderTraceIds(
+        table
+          .getCoreRowModel()
+          .rows.flatMap((r) => (r.original as ConversationGroup).traces.map((t) => t.traceId)),
+      )}
+    />
+  ),
+});
 
 export const groupSelectColumnDef: ColumnDef<TraceGroup, any> = groupCol.display({
   id: SELECT_COLUMN_ID,

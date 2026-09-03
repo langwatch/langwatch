@@ -28,11 +28,7 @@
  */
 import { createHash } from "node:crypto";
 
-import {
-  createAppRestSecurity,
-  getRoutePolicy,
-  type AppRestSecurity,
-} from "@langwatch/api/rest";
+import { createAppRestSecurity, getRoutePolicy, type AppRestSecurity } from "@langwatch/api/rest";
 import {
   EventSourcing,
   type EventSourcedQueueDefinition,

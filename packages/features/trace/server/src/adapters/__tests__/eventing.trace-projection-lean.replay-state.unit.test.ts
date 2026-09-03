@@ -127,9 +127,7 @@ function makeFakeClickHouse(rows: Row[]) {
         const aggIds: string[] = p.aggregateIds ?? [];
         const matched = rows.filter(
           (r) =>
-            r.TenantId === p.tenantId &&
-            et.includes(r.EventType) &&
-            aggIds.includes(r.AggregateId),
+            r.TenantId === p.tenantId && et.includes(r.EventType) && aggIds.includes(r.AggregateId),
         );
         const byAgg = new Map<string, Row>();
         for (const r of matched) {
@@ -163,8 +161,7 @@ function makeFakeClickHouse(rows: Row[]) {
             et.includes(r.EventType) &&
             aggIds.includes(r.AggregateId) &&
             (r.EventTimestamp < p.maxCutoffTimestamp ||
-              (r.EventTimestamp === p.maxCutoffTimestamp &&
-                r.EventId <= p.maxCutoffEventId)),
+              (r.EventTimestamp === p.maxCutoffTimestamp && r.EventId <= p.maxCutoffEventId)),
         );
         if (p.cursorEventId) {
           matched = matched.filter(
@@ -174,8 +171,7 @@ function makeFakeClickHouse(rows: Row[]) {
           );
         }
         matched.sort(
-          (a, b) =>
-            a.EventTimestamp - b.EventTimestamp || a.EventId.localeCompare(b.EventId),
+          (a, b) => a.EventTimestamp - b.EventTimestamp || a.EventId.localeCompare(b.EventId),
         );
         matched = matched.slice(0, p.batchSize ?? 5000);
         return {
@@ -237,9 +233,7 @@ function spyStore() {
   return { store, writes };
 }
 
-function registered(
-  store: StateProjectionStore<CounterState>,
-): RegisteredStateProjection {
+function registered(store: StateProjectionStore<CounterState>): RegisteredStateProjection {
   const definition: StateProjectionDefinition<CounterState, any> = {
     name: "counter",
     version: "2026-07-16",
@@ -364,9 +358,7 @@ describe("replayStateProjection", () => {
 
     // One row per (tenant, key).
     expect(writes).toHaveLength(2);
-    const byKey = new Map(
-      writes.map((w) => [`${w.context.tenantId}/${w.context.key}`, w]),
-    );
+    const byKey = new Map(writes.map((w) => [`${w.context.tenantId}/${w.context.key}`, w]));
 
     const a = byKey.get("t-a/conv-1")!;
     // The non-declared event type was filtered out (only 2 + 3 folded).
@@ -420,9 +412,9 @@ describe("replayStateProjection", () => {
       ctx: {
         redis,
         eventSource: new EventingClickHouseReplayEventSource({
-        resolveClient: async () => client,
-        lean: leanReplayEvent,
-      }),
+          resolveClient: async () => client,
+          lean: leanReplayEvent,
+        }),
         accumulatorOpts: {},
       },
       projection: registered(store),

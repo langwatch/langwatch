@@ -1,8 +1,4 @@
-import {
-  shareLinkSchema,
-  shareWithProjectSchema,
-  type ShareLink,
-} from "@langwatch/share-contract";
+import { shareLinkSchema, shareWithProjectSchema, type ShareLink } from "@langwatch/share-contract";
 import type { ShareDatabase } from "../../ports/share-database.port";
 import {
   ShareRepository,

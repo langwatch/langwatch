@@ -10,7 +10,11 @@
  */
 
 import type { Protections } from "./trace-viewer-protections.service";
-import { type ProjectionSource, type ResolvedField, resolveField } from "./trace-projection-catalog.service";
+import {
+  type ProjectionSource,
+  type ResolvedField,
+  resolveField,
+} from "./trace-projection-catalog.service";
 import {
   type CompiledProjection,
   type CompileProjectionArgs,
@@ -103,12 +107,8 @@ function buildPlan({
     // Keyed on the scalar io paths themselves (not on `protection`, which
     // other fields — e.g. gated annotation text — now share), so each heavy
     // column is fetched only when its own field is selected and permitted.
-    needsInput: fields.some(
-      (f) => f.path === "input" && isPermitted({ field: f, protections }),
-    ),
-    needsOutput: fields.some(
-      (f) => f.path === "output" && isPermitted({ field: f, protections }),
-    ),
+    needsInput: fields.some((f) => f.path === "input" && isPermitted({ field: f, protections })),
+    needsOutput: fields.some((f) => f.path === "output" && isPermitted({ field: f, protections })),
     needsEvents: fields.some((f) => f.collection === "events"),
     eventPaths: subPaths("events"),
     needsAnnotations: fields.some((f) => f.collection === "annotations"),

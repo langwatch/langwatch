@@ -85,8 +85,7 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   // The size the data source actually pages by, which is what the range
   // copy must count by when the shared preference exceeds the lens's cap.
-  const effectivePageSize =
-    maxPageSize !== undefined ? Math.min(pageSize, maxPageSize) : pageSize;
+  const effectivePageSize = maxPageSize !== undefined ? Math.min(pageSize, maxPageSize) : pageSize;
   const sizeOptions =
     maxPageSize !== undefined
       ? PAGE_SIZE_OPTIONS.filter((size) => size <= maxPageSize)

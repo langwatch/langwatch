@@ -45,11 +45,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { SsoConnectionGuards } from "../sso-connection-guards";
 import type { ZodTypeAny, z } from "zod";
-import {
-  type Command,
-  type CommandHandler,
-  defineCommandSchema,
-} from "@langwatch/eventing";
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
 import { ssoConnectionEventsFor } from "../projections/sso-connection-state.projection";
 import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
 
@@ -65,9 +61,7 @@ import type { SsoConnectionEvent } from "../projections/sso-connection-state.pro
  */
 
 type GuardVerb = {
-  [K in keyof SsoConnectionGuards]: SsoConnectionGuards[K] extends (
-    data: never,
-  ) => Promise<unknown>
+  [K in keyof SsoConnectionGuards]: SsoConnectionGuards[K] extends (data: never) => Promise<unknown>
     ? K
     : never;
 }[keyof SsoConnectionGuards];
@@ -84,9 +78,10 @@ function connectionCommand<Schema extends ZodTypeAny>({
   verb: GuardVerb;
 }) {
   type Data = z.infer<Schema>;
-  return class SsoConnectionCommandHandler
-    implements CommandHandler<Command<Data>, SsoConnectionEvent>
-  {
+  return class SsoConnectionCommandHandler implements CommandHandler<
+    Command<Data>,
+    SsoConnectionEvent
+  > {
     static readonly schema = defineCommandSchema(type, schema, description);
 
     /** The CONNECTION is the aggregate — never the organization. One
@@ -99,9 +94,7 @@ function connectionCommand<Schema extends ZodTypeAny>({
 
     async handle(command: Command<Data>): Promise<SsoConnectionEvent[]> {
       const data = command.data as never;
-      const facts = await (
-        this.guards[verb] as (input: never) => Promise<never[]>
-      )(data);
+      const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
       return ssoConnectionEventsFor({
         command: { type, data } as SsoConnectionCommand,
         facts,
@@ -161,8 +154,7 @@ export type RequestVerificationPayload = RequestVerificationCommandData;
 export const AttestDomainCommand = connectionCommand({
   type: ATTEST_DOMAIN_COMMAND_TYPE,
   schema: attestDomainCommandDataSchema,
-  description:
-    "Record a platform operator attesting that a domain is the organization's",
+  description: "Record a platform operator attesting that a domain is the organization's",
   verb: "attestDomain",
 });
 export type AttestDomainPayload = AttestDomainCommandData;
@@ -218,8 +210,7 @@ export type CompleteTeardownPayload = CompleteTeardownCommandData;
 export const GrandfatherConnectionCommand = connectionCommand({
   type: GRANDFATHER_CONNECTION_COMMAND_TYPE,
   schema: grandfatherConnectionCommandDataSchema,
-  description:
-    "Record the history an organization's legacy SSO strings already imply",
+  description: "Record the history an organization's legacy SSO strings already imply",
   verb: "grandfatherConnection",
 });
 export type GrandfatherConnectionPayload = GrandfatherConnectionCommandData;

@@ -35,29 +35,21 @@ export const getVirtualKeyCommand = async (id: string): Promise<CommandResult | 
         console.log(`${chalk.bold("Status:")}         ${formatStatus(vk.status)}`);
         console.log(`${chalk.bold("Purpose:")}        ${vk.purpose}`);
         console.log(`${chalk.bold("Prefix:")}         ${vk.display_prefix}...`);
-        console.log(
-          `${chalk.bold("Principal:")}      ${vk.principal_user_id ?? chalk.gray("—")}`,
-        );
+        console.log(`${chalk.bold("Principal:")}      ${vk.principal_user_id ?? chalk.gray("—")}`);
         console.log(
           `${chalk.bold("Scopes:")}         ${vk.scopes.map(formatScope).join(", ") || chalk.gray("—")}`,
         );
         if (vk.trace_project_id) {
           // The key keeps tracing into a deleted project on purpose, so the
           // only way anyone finds out is if the read says so.
-          const deletedSuffix = vk.trace_project_archived
-            ? ` ${chalk.yellow("(deleted)")}`
-            : "";
-          console.log(
-            `${chalk.bold("Trace project:")}  ${vk.trace_project_id}${deletedSuffix}`,
-          );
+          const deletedSuffix = vk.trace_project_archived ? ` ${chalk.yellow("(deleted)")}` : "";
+          console.log(`${chalk.bold("Trace project:")}  ${vk.trace_project_id}${deletedSuffix}`);
         }
         console.log(`${chalk.bold("Routing mode:")}   ${vk.routing_mode}`);
         console.log(
           `${chalk.bold("Routing policy:")} ${vk.routing_policy_id ?? chalk.gray("(none)")}`,
         );
-        console.log(
-          `${chalk.bold("Created:")}        ${new Date(vk.created_at).toLocaleString()}`,
-        );
+        console.log(`${chalk.bold("Created:")}        ${new Date(vk.created_at).toLocaleString()}`);
         if (vk.last_used_at) {
           console.log(
             `${chalk.bold("Last used:")}      ${new Date(vk.last_used_at).toLocaleString()}`,

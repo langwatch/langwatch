@@ -20,9 +20,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 // Helper to create target output data
-const createTargetOutput = (
-  overrides: Partial<BatchTargetOutput> = {},
-): BatchTargetOutput => ({
+const createTargetOutput = (overrides: Partial<BatchTargetOutput> = {}): BatchTargetOutput => ({
   targetId: "target-1",
   output: { response: "Test output" },
   cost: null,
@@ -113,9 +111,7 @@ describe("BatchTargetCell", () => {
 
         await user.hover(screen.getByTestId("error-output-target-1"));
 
-        expect(await screen.findByTestId("error-tooltip-target-1")).toHaveTextContent(
-          longError,
-        );
+        expect(await screen.findByTestId("error-tooltip-target-1")).toHaveTextContent(longError);
       });
 
       /** @scenario Expand full error message on click */
@@ -320,12 +316,9 @@ describe("BatchTargetCell", () => {
     });
 
     it("hides the trace action when no trace opener is supplied", () => {
-      render(
-        <BatchTargetCell targetOutput={createTargetOutput({ traceId: "trace-123" })} />,
-        {
-          wrapper: Wrapper,
-        },
-      );
+      render(<BatchTargetCell targetOutput={createTargetOutput({ traceId: "trace-123" })} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.queryByTestId("trace-link-target-1")).not.toBeInTheDocument();
     });
@@ -379,9 +372,10 @@ describe("BatchTargetCell", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.getByText(/Test output/).closest("[data-row-height]"),
-      ).toHaveAttribute("data-row-height", "l");
+      expect(screen.getByText(/Test output/).closest("[data-row-height]")).toHaveAttribute(
+        "data-row-height",
+        "l",
+      );
     });
   });
 

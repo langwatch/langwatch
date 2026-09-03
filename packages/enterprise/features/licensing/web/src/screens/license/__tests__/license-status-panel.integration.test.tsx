@@ -112,9 +112,7 @@ describe("LicenseStatusPanel", () => {
       renderWith(lapsedStatus);
 
       expect(screen.getByTestId("over-seats-callout")).toBeDefined();
-      expect(
-        screen.getByText(/3 members are over the seats your license covers/i),
-      ).toBeDefined();
+      expect(screen.getByText(/3 members are over the seats your license covers/i)).toBeDefined();
     });
   });
 

@@ -97,8 +97,5 @@ export abstract class WorkflowRepository {
     versionId: string;
     actorId?: string;
   }): Promise<Workflow>;
-  abstract findCopies(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<Workflow[]>;
+  abstract findCopies(input: { workflowId: string; projectId: string }): Promise<Workflow[]>;
 }

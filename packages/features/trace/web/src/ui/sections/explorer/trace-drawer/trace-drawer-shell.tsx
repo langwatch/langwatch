@@ -1,10 +1,6 @@
 import { Drawer } from "../../drawer";
 import { DrawerSpotlights } from "../onboarding/spotlights/drawer-spotlights";
-import {
-  DRAWER_DEFAULT_WIDTH_PX,
-  DRAWER_MIN_WIDTH_PX,
-  useDrawerStore,
-} from "../../../../index";
+import { DRAWER_DEFAULT_WIDTH_PX, DRAWER_MIN_WIDTH_PX, useDrawerStore } from "../../../../index";
 import { KeyboardShortcutsHelp } from "./keyboard-shortcuts-help";
 import { ResizeRail } from "./panes/resize-rail";
 import { TraceDrawerContent } from "./trace-drawer-content";
@@ -72,12 +68,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   // surfaces the trace ID + retry path.
   if (!isLoading && !trace) {
     return (
-      <Drawer.Root
-        open={true}
-        placement="end"
-        size="lg"
-        onOpenChange={() => handleClose()}
-      >
+      <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => handleClose()}>
         <Drawer.Content bg="bg">
           <Drawer.Body padding={0}>
             <TraceDrawerEmptyState
@@ -193,10 +184,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           />
         </Drawer.Body>
       </Drawer.Content>
-      <KeyboardShortcutsHelp
-        open={shortcutsOpen}
-        onClose={() => setShortcutsOpen(false)}
-      />
+      <KeyboardShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       {/* Show-once feature spotlights — only meaningful once a trace has
           rendered (the anchors live in the drawer body). Keyed reads via
           the traceId prop so the queue re-evaluates per trace. */}

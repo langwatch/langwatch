@@ -35,10 +35,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { BatchEvaluationResultsTable } from "../batch-evaluation-results-table";
 import { ComparisonWinnerCell } from "../comparison-winner-cell";
-import type {
-  BatchComparisonColumn,
-  BatchComparisonVerdict,
-} from "@langwatch/experiment-web";
+import type { BatchComparisonColumn, BatchComparisonVerdict } from "@langwatch/experiment-web";
 import { transformBatchEvaluationData } from "@langwatch/experiment-web";
 import { WinRateChart } from "../win-rate-chart";
 
@@ -202,17 +199,16 @@ const COMPARISON_VERDICTS: ExperimentRunWithItems["evaluations"] = [
 ];
 
 /** A per-target scalar evaluator, the ordinary company a comparison keeps. */
-const SCALAR_EVALUATIONS: ExperimentRunWithItems["evaluations"] = ROW_INPUTS.flatMap(
-  (_, index) =>
-    TARGET_NAMES.map((name) => ({
-      evaluator: "exact_match",
-      name: "Exact Match",
-      targetId: name,
-      status: "processed" as const,
-      index,
-      score: 0.75,
-      passed: true,
-    })),
+const SCALAR_EVALUATIONS: ExperimentRunWithItems["evaluations"] = ROW_INPUTS.flatMap((_, index) =>
+  TARGET_NAMES.map((name) => ({
+    evaluator: "exact_match",
+    name: "Exact Match",
+    targetId: name,
+    status: "processed" as const,
+    index,
+    score: 0.75,
+    passed: true,
+  })),
 );
 
 const SDK_RUN: ExperimentRunWithItems = {
@@ -234,9 +230,7 @@ const comparisonColumnsOf = (run: ExperimentRunWithItems) =>
 const comparisonColumnOf = (run: ExperimentRunWithItems) => {
   const columns = comparisonColumnsOf(run);
   if (columns.length !== 1) {
-    throw new Error(
-      `the results page detected ${columns.length} comparison columns, wanted 1`,
-    );
+    throw new Error(`the results page detected ${columns.length} comparison columns, wanted 1`);
   }
   return columns[0]!;
 };
@@ -312,9 +306,7 @@ describe("an n-way comparison logged by the code-first SDK", () => {
         expect(column.rowsWithoutVerdict).toBe(1);
         // Exactly one row is a tie: row 3. Row 4 shares its null winner and
         // must not be read as a second one.
-        expect(
-          verdicts.filter((v) => v.winnerId === null && !v.isUnsettled),
-        ).toHaveLength(1);
+        expect(verdicts.filter((v) => v.winnerId === null && !v.isUnsettled)).toHaveLength(1);
         expect(verdicts.filter((v) => v.winnerId !== null)).toHaveLength(3);
       });
     });
@@ -343,16 +335,12 @@ describe("an n-way comparison logged by the code-first SDK", () => {
         expect(screen.getAllByText("Winner: claude-sonnet-5")).toHaveLength(1);
         // The candidate that never won is never announced as a winner.
         expect(screen.queryByText("Winner: gemini-flash")).toBeNull();
-        expect(
-          screen.queryAllByTestId("comparison-winner-badge-gemini-flash"),
-        ).toHaveLength(0);
+        expect(screen.queryAllByTestId("comparison-winner-badge-gemini-flash")).toHaveLength(0);
 
         // The tie reads as a tie, and the row the judge ran and could not
         // settle reads as its own outcome rather than as a tie or a win.
         expect(screen.getAllByTestId("comparison-winner-badge-tie")).toHaveLength(1);
-        expect(screen.getAllByTestId("comparison-winner-badge-no-verdict")).toHaveLength(
-          1,
-        );
+        expect(screen.getAllByTestId("comparison-winner-badge-no-verdict")).toHaveLength(1);
         // A bare dash is reserved for a row the judge never ran, and every row
         // of this run was judged.
         expect(screen.queryAllByTestId("comparison-winner-none")).toHaveLength(0);
@@ -402,9 +390,7 @@ describe("an n-way comparison logged by the code-first SDK", () => {
           wrapper: Wrapper,
         });
 
-        expect(
-          JSON.parse(screen.getByTestId("bar-chart-data").textContent ?? "[]"),
-        ).toEqual([
+        expect(JSON.parse(screen.getByTestId("bar-chart-data").textContent ?? "[]")).toEqual([
           { name: "gpt-5-mini", wins: 2 },
           { name: "claude-sonnet-5", wins: 1 },
           // Still charted, at zero. Dropping a candidate that lost every row
@@ -450,10 +436,9 @@ describe("a verdict too long to fit its cell", () => {
   const expandVerdict = async () => {
     const user = userEvent.setup();
 
-    render(
-      <ComparisonWinnerCell column={OVERFLOWING_COLUMN} verdict={OVERFLOWING_VERDICT} />,
-      { wrapper: Wrapper },
-    );
+    render(<ComparisonWinnerCell column={OVERFLOWING_COLUMN} verdict={OVERFLOWING_VERDICT} />, {
+      wrapper: Wrapper,
+    });
 
     await user.click(screen.getByTestId("comparison-winner-expand"));
 

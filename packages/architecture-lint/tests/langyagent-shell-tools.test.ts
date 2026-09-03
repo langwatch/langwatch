@@ -28,16 +28,9 @@ const DOCKERFILE = readFileSync(
  * toolchains, and a package present only there never reaches a worker.
  */
 const runtimePackages = (): string[] => {
-  const runtimeStage = DOCKERFILE.slice(
-    DOCKERFILE.indexOf("FROM debian:bookworm-slim"),
-  );
-  const install = /apt-get install -y --no-install-recommends([^&]*)/.exec(
-    runtimeStage,
-  );
-  return (install?.[1] ?? "")
-    .replaceAll("\\\n", " ")
-    .split(/\s+/)
-    .filter(Boolean);
+  const runtimeStage = DOCKERFILE.slice(DOCKERFILE.indexOf("FROM debian:bookworm-slim"));
+  const install = /apt-get install -y --no-install-recommends([^&]*)/.exec(runtimeStage);
+  return (install?.[1] ?? "").replaceAll("\\\n", " ").split(/\s+/).filter(Boolean);
 };
 
 describe("given the langyagent runtime image", () => {

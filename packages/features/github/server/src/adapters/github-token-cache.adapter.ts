@@ -15,10 +15,7 @@ function installationPrefix(installationId: string, host: GithubHostPort): strin
 }
 
 export class GithubTokenCacheAdapter extends GithubTokenCachePort {
-  static create(
-    redis: GithubRedisPort | null,
-    host: GithubHostPort,
-  ): GithubTokenCacheAdapter {
+  static create(redis: GithubRedisPort | null, host: GithubHostPort): GithubTokenCacheAdapter {
     return new GithubTokenCacheAdapter(redis, host);
   }
 
@@ -29,10 +26,7 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
     super();
   }
 
-  tryGetToken(input: {
-    installationId: string;
-    scopeKey: string;
-  }): Promise<string | null> {
+  tryGetToken(input: { installationId: string; scopeKey: string }): Promise<string | null> {
     return this.tryGet(`${this.prefix(input.installationId)}:${input.scopeKey}`);
   }
 
@@ -65,10 +59,7 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
     return this.tryAcquire(`${this.livenessKey(installationId)}:lock`);
   }
 
-  tryAcquireMintLock(input: {
-    installationId: string;
-    scopeKey: string;
-  }): Promise<string | null> {
+  tryAcquireMintLock(input: { installationId: string; scopeKey: string }): Promise<string | null> {
     return this.acquire(`${this.prefix(input.installationId)}:${input.scopeKey}:lock`);
   }
 
@@ -81,10 +72,7 @@ export class GithubTokenCacheAdapter extends GithubTokenCachePort {
     scopeKey: string;
     token: string;
   }): Promise<void> {
-    return this.release(
-      `${this.prefix(input.installationId)}:${input.scopeKey}:lock`,
-      input.token,
-    );
+    return this.release(`${this.prefix(input.installationId)}:${input.scopeKey}:lock`, input.token);
   }
 
   private prefix(installationId: string): string {

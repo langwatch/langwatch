@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type {
-  ResolvedRetention,
-  RetentionPolicy,
-} from "@langwatch/data-retention-contract";
-import {
-  TeamNotFoundError,
-  type OrganizationService,
-} from "@langwatch/organization-contract";
+import type { ResolvedRetention, RetentionPolicy } from "@langwatch/data-retention-contract";
+import { TeamNotFoundError, type OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contract";
 import { DataRetentionRepository } from "../data-retention.repository";
 import { DataRetentionService } from "../../services/data-retention.service";
@@ -127,9 +121,9 @@ describe("DataRetentionService", () => {
         newRetentionDays: 49,
       }),
     ).rejects.toThrow("ClickHouse not available");
-    await expect(
-      service.getRetroactiveMutationProgress({ projectId: "project" }),
-    ).resolves.toEqual([]);
+    await expect(service.getRetroactiveMutationProgress({ projectId: "project" })).resolves.toEqual(
+      [],
+    );
     await expect(
       service.killRetroactiveMutation({ projectId: "project", mutationId: "mutation" }),
     ).resolves.toBeUndefined();
@@ -182,9 +176,7 @@ describe("DataRetentionService", () => {
       defaultRetentionDays: 49,
       pinRepository: new PinRepository(),
     });
-    await expect(
-      service.getResolvedForProject({ projectId: "missing" }),
-    ).resolves.toEqual({
+    await expect(service.getResolvedForProject({ projectId: "missing" })).resolves.toEqual({
       traces: 49,
       scenarios: 49,
       experiments: 49,

@@ -22,18 +22,12 @@ import type { IdentifierFact, IdentityHeads } from "./facts";
  * Erasure wipes `value`, so an erased identifier answers nothing here even
  * while its tombstone row stands.
  */
-export function primaryEmailOf({
-  heads,
-}: {
-  heads: IdentityHeads;
-}): string | null {
+export function primaryEmailOf({ heads }: { heads: IdentityHeads }): string | null {
   const identifiers = Object.values(heads.identifiers).filter(
     (identifier): identifier is IdentifierFact & { value: string } =>
       identifier.provider === "email" && typeof identifier.value === "string",
   );
-  const primary = identifiers.find(
-    (identifier) => identifier.state === "PRIMARY",
-  );
+  const primary = identifiers.find((identifier) => identifier.state === "PRIMARY");
   if (primary) return primary.value;
 
   const verified = identifiers

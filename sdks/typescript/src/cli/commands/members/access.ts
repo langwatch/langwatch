@@ -5,13 +5,7 @@ import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { orDash, runManagement } from "../management/_shared";
 
-const bindingRows = ({
-  bindings,
-  source,
-}: {
-  bindings: MemberAccessBinding[];
-  source: string;
-}) =>
+const bindingRows = ({ bindings, source }: { bindings: MemberAccessBinding[]; source: string }) =>
   bindings.map((binding) => ({
     Source: source,
     Role: binding.customRoleName ?? binding.role,
@@ -24,9 +18,7 @@ const bindingRows = ({
  * groups they belong to with the bindings each group carries, and the bindings
  * granted to them directly.
  */
-export const memberAccessCommand = async (
-  userId: string,
-): Promise<CommandResult | void> =>
+export const memberAccessCommand = async (userId: string): Promise<CommandResult | void> =>
   runManagement({
     action: "fetch member access",
     pending: `Fetching access for member "${userId}"...`,
@@ -52,9 +44,7 @@ export const memberAccessCommand = async (
       ];
 
       if (rows.length === 0) {
-        console.log(
-          chalk.gray("  No group or direct bindings beyond the organization role."),
-        );
+        console.log(chalk.gray("  No group or direct bindings beyond the organization role."));
         console.log();
         return;
       }

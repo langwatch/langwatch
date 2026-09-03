@@ -1,7 +1,4 @@
-import type {
-  SchedulerAuditEntryView,
-  SchedulerControlAction,
-} from "@langwatch/ops-contract";
+import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
 import { SchedulerAuditSink } from "../../ports/scheduler-audit.sink";
 
 /** Writes scheduler controls to the shared audit log. */

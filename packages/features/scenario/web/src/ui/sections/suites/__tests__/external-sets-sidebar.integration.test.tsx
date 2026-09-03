@@ -54,9 +54,7 @@ function makeSuite(overrides: Partial<Suite> & Pick<Suite, "name">): Suite {
   } as Suite;
 }
 
-function makeExternalSet(
-  overrides: Partial<ExternalSetSummary> = {},
-): ExternalSetSummary {
+function makeExternalSet(overrides: Partial<ExternalSetSummary> = {}): ExternalSetSummary {
   return {
     scenarioSetId: "nightly-regression",
     passedCount: 10,
@@ -90,9 +88,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.queryByTestId("external-sets-header"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("external-sets-header")).not.toBeInTheDocument();
     });
   });
 
@@ -113,9 +109,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByTestId("external-sets-header")).toHaveTextContent(
-        "EXTERNAL SETS",
-      );
+      expect(screen.getByTestId("external-sets-header")).toHaveTextContent("EXTERNAL SETS");
     });
 
     /** @scenario "External set batch entry displays the set name" */
@@ -155,9 +149,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
-            externalSets={[
-              makeExternalSet({ passedCount: 10, totalCount: 10 }),
-            ]}
+            externalSets={[makeExternalSet({ passedCount: 10, totalCount: 10 })]}
           />,
           { wrapper: Wrapper },
         );
@@ -197,9 +189,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         );
 
         await user.click(screen.getByText("nightly-regression"));
-        expect(onSelectSuite).toHaveBeenCalledWith(
-          toExternalSetSelection("nightly-regression"),
-        );
+        expect(onSelectSuite).toHaveBeenCalledWith(toExternalSetSelection("nightly-regression"));
       });
     });
 
@@ -233,9 +223,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         );
 
         const listItems = screen.getAllByTestId("external-set-list-item");
-        const unselectedItem = listItems.find((item) =>
-          within(item).queryByText("ci-smoke-tests"),
-        );
+        const unselectedItem = listItems.find((item) => within(item).queryByText("ci-smoke-tests"));
         expect(unselectedItem).toBeDefined();
         expect(unselectedItem).not.toHaveAttribute("data-selected");
       });

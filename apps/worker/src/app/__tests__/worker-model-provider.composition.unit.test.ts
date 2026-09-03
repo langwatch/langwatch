@@ -58,8 +58,7 @@ class RecordingAbsence extends WorkerModelProviderAbsenceReportPort {
  */
 const cipher = {
   encrypt: (value: string) => `sealed:${value}`,
-  decrypt: (value: string) =>
-    value.startsWith("sealed:") ? value.slice("sealed:".length) : value,
+  decrypt: (value: string) => (value.startsWith("sealed:") ? value.slice("sealed:".length) : value),
 };
 
 function projectRow() {
@@ -289,7 +288,9 @@ describe("given the worker composes its own model gateway", () => {
         models,
         azureSafetyCredentials: {
           tryGetForTenant: async () => null,
-        } as unknown as Parameters<typeof createWorkerEvaluationModelEnv>[0]["azureSafetyCredentials"],
+        } as unknown as Parameters<
+          typeof createWorkerEvaluationModelEnv
+        >[0]["azureSafetyCredentials"],
         environment: {},
       });
 

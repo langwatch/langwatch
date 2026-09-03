@@ -77,8 +77,7 @@ function peelLeadingTitles(text: string): { titles: string[]; text: string } {
     const standalone = after === "" || after.startsWith("\n");
     const nextBold = LEADING_BOLD.exec(after);
     const nextTitle = nextBold?.[1];
-    const gluedToAnotherTitle =
-      nextTitle !== void 0 && looksLikeReasoningTitle(nextTitle);
+    const gluedToAnotherTitle = nextTitle !== void 0 && looksLikeReasoningTitle(nextTitle);
     // A lone bold run glued to plain prose is the model's own emphasis
     // ("**Very important** never…") — leave it be.
     if (!standalone && titles.length === 0 && !gluedToAnotherTitle) break;

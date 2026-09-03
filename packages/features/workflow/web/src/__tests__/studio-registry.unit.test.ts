@@ -25,9 +25,7 @@ describe("Optimization Studio Registry", () => {
 
     it("has instructions parameter with default system prompt", () => {
       expect(signature.parameters).toBeDefined();
-      const instructionsParam = signature.parameters?.find(
-        (p) => p.identifier === "instructions",
-      );
+      const instructionsParam = signature.parameters?.find((p) => p.identifier === "instructions");
 
       expect(instructionsParam).toBeDefined();
       expect(instructionsParam?.value).toBe("You are a helpful assistant.");
@@ -35,9 +33,7 @@ describe("Optimization Studio Registry", () => {
 
     it("has messages parameter with user message using {{input}}", () => {
       expect(signature.parameters).toBeDefined();
-      const messagesParam = signature.parameters?.find(
-        (p) => p.identifier === "messages",
-      );
+      const messagesParam = signature.parameters?.find((p) => p.identifier === "messages");
 
       expect(messagesParam).toBeDefined();
       expect(messagesParam?.value).toEqual([{ role: "user", content: "{{input}}" }]);

@@ -4,11 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  REMEDIATION_CODES,
-  REMEDIATION_DOC_PATHS,
-  remediation,
-} from "../remediation";
+import { REMEDIATION_CODES, REMEDIATION_DOC_PATHS, remediation } from "../remediation";
 
 // packages/handled-error/src/__tests__ → repo root → docs/
 const DOCS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../docs");
@@ -27,9 +23,7 @@ describe("error remediation registry", () => {
       const tips = remediation("storage_not_writable").tips ?? [];
 
       expect(tips.some((tip) => tip.includes("S3_BUCKET_NAME"))).toBe(true);
-      expect(
-        tips.some((tip) => tip.includes("LANGWATCH_LOCAL_STORAGE_PATH")),
-      ).toBe(true);
+      expect(tips.some((tip) => tip.includes("LANGWATCH_LOCAL_STORAGE_PATH"))).toBe(true);
     });
   });
 

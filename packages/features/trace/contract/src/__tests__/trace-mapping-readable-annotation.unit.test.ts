@@ -36,9 +36,7 @@ const GOODNESS: AnnotationScore = {
   name: "goodness",
 } as AnnotationScore;
 
-const SPAN_NAMES = new Map<string, string | null | undefined>([
-  [SPAN_ID, "web_search"],
-]);
+const SPAN_NAMES = new Map<string, string | null | undefined>([[SPAN_ID, "web_search"]]);
 
 describe("given an annotation left on part of a trace", () => {
   describe("when it is read into the ai_readable column", () => {
@@ -56,9 +54,7 @@ describe("given an annotation left on part of a trace", () => {
         spanNamesById: SPAN_NAMES,
       });
 
-      expect(line).toBe(
-        "Ada (on web_search span (0af31b2c) · Output): too terse",
-      );
+      expect(line).toBe("Ada (on web_search span (0af31b2c) · Output): too terse");
     });
 
     it("falls back to the span id when the trace does not carry that span", () => {

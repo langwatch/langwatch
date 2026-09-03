@@ -105,10 +105,7 @@ function renderDrawer() {
  */
 async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
   await user.selectOptions(screen.getByTestId("budget-target"), PROJECT_ID);
-  await user.type(
-    screen.getByPlaceholderText("e.g. Engineering monthly $1k cap"),
-    "Batch cap",
-  );
+  await user.type(screen.getByPlaceholderText("e.g. Engineering monthly $1k cap"), "Batch cap");
   await user.type(screen.getByPlaceholderText("1000.00"), "50");
   await user.click(screen.getByRole("button", { name: "Create budget" }));
 }

@@ -1,16 +1,9 @@
 import { describe, expect, it } from "vitest";
-import {
-  assertTotalOrder,
-  CARD_PROBES,
-  promoteCard,
-  type CardProbe,
-} from "../registry.js";
+import { assertTotalOrder, CARD_PROBES, promoteCard, type CardProbe } from "../registry.js";
 import { toCliToolResult } from "../tool-result.js";
 
-const promote = (
-  nominal: Parameters<typeof promoteCard>[0]["nominal"],
-  payload: unknown,
-) => promoteCard({ nominal, payload, probes: CARD_PROBES });
+const promote = (nominal: Parameters<typeof promoteCard>[0]["nominal"], payload: unknown) =>
+  promoteCard({ nominal, payload, probes: CARD_PROBES });
 
 describe("promoteCard", () => {
   describe("given a generic read whose payload carries cost", () => {
@@ -132,9 +125,7 @@ describe("promoteCard", () => {
     });
 
     it("still keeps it when the payload earns nothing richer", () => {
-      expect(
-        promote("metrics", { currentPeriod: [{ date: 1 }], previousPeriod: [] }),
-      ).toBeNull();
+      expect(promote("metrics", { currentPeriod: [{ date: 1 }], previousPeriod: [] })).toBeNull();
     });
   });
 

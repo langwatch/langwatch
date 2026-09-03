@@ -82,9 +82,7 @@ describe("ClickHouseExperimentDspyRepository", () => {
       OptimizerName: "MIPROv2",
       OptimizerParameters: "{}",
       Predictors: "[]",
-      Examples: JSON.stringify([
-        { hash: "example_1", example: {}, pred: {}, score: 0.4 },
-      ]),
+      Examples: JSON.stringify([{ hash: "example_1", example: {}, pred: {}, score: 0.4 }]),
       LlmCalls: JSON.stringify([
         {
           hash: "call_1",

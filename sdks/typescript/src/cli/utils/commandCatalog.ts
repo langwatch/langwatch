@@ -157,11 +157,7 @@ const renderedHelp = (entry: Omit<CatalogEntry, "tokenCost">): string => {
   return `${usage} — ${entry.description}${flagLines.join("")}`;
 };
 
-const toEntry = (
-  command: Command,
-  path: string,
-  meta: Map<string, FeatureMeta>,
-): CatalogEntry => {
+const toEntry = (command: Command, path: string, meta: Map<string, FeatureMeta>): CatalogEntry => {
   const children = command.commands
     .filter((child) => !isHidden(child))
     .map((child) => toEntry(child, `${path} ${child.name()}`, meta));
@@ -247,7 +243,5 @@ export const renderHelpTree = (entries: CatalogEntry[]): string => {
 export const renderStatusSummary = (entries: CatalogEntry[]): string[] => {
   const groups = entries.filter((entry) => !PLUMBING_COMMANDS.has(entry.path));
   const width = Math.max(...groups.map((entry) => entry.path.length));
-  return groups.map(
-    (entry) => `langwatch ${entry.path.padEnd(width)}  ${entry.description}`,
-  );
+  return groups.map((entry) => `langwatch ${entry.path.padEnd(width)}  ${entry.description}`);
 };

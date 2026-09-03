@@ -1,12 +1,6 @@
 /// <reference path="../../model/ambient.d.ts" />
 import { MeshGradient, Warp } from "@paper-design/shaders-react";
-import {
-  type CSSProperties,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useReducedMotion } from "../../behavior/use-reduced-motion";
 import "../elements/auth-front-door.css";
@@ -56,11 +50,7 @@ const PROTECT_RADIAL = {
   left: "radial-gradient(circle 50vw at 20% 45%, #ffffff 0%, #ffffff 26%, rgba(255,255,255,0.68) 54%, rgba(255,255,255,0) 90%)",
 } as const;
 
-export function FrontDoorGround({
-  protect = "center",
-}: {
-  protect?: keyof typeof PROTECT_RADIAL;
-}) {
+export function FrontDoorGround({ protect = "center" }: { protect?: keyof typeof PROTECT_RADIAL }) {
   const reduceMotion = useReducedMotion();
   const { colorMode } = useColorMode();
   const stage = useFrontDoorStage();
@@ -86,9 +76,7 @@ export function FrontDoorGround({
   return (
     <div
       className={
-        centered
-          ? "lw-front-door-ambient lw-front-door-ambient--center"
-          : "lw-front-door-ambient"
+        centered ? "lw-front-door-ambient lw-front-door-ambient--center" : "lw-front-door-ambient"
       }
       data-testid="front-door-ambient"
       aria-hidden="true"

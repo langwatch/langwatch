@@ -350,15 +350,13 @@ function mount(overrides: MountOverrides) {
     services: {
       traceReads: {
         reads,
-        platformUrl: ({ projectSlug, path }) =>
-          `https://app.langwatch.test/${projectSlug}${path}`,
+        platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
       },
       traceLegacy: {
         traces: () => traceApp,
         shares: () => shares,
         reads,
-        credential: (input) =>
-          credentialsStub(overrides.credential).authenticate(input) as never,
+        credential: (input) => credentialsStub(overrides.credential).authenticate(input) as never,
       },
     },
     ports: {

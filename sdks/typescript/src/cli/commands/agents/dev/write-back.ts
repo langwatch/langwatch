@@ -79,8 +79,7 @@ export function applyDevTunnel({
 }): Record<string, unknown> {
   const existingStash = config.devTunnel as { previousUrl?: string } | undefined;
   const previousUrl =
-    existingStash?.previousUrl ??
-    (typeof config.url === "string" ? config.url : undefined);
+    existingStash?.previousUrl ?? (typeof config.url === "string" ? config.url : undefined);
 
   const headers = withoutDevSecretHeader(readHeaderRows(config));
   if (secret) headers.push({ key: DEV_SECRET_HEADER, value: secret });
@@ -154,9 +153,7 @@ export function restoreDevTunnel({
  * renders them. Naming `/agent-testing` here would answer "this page does not
  * exist" to everyone kept on the older interface.
  */
-export function deriveSimulationsUrl(
-  platformUrl: string | undefined,
-): string | undefined {
+export function deriveSimulationsUrl(platformUrl: string | undefined): string | undefined {
   if (!platformUrl) return undefined;
   try {
     const parsed = new URL(platformUrl);

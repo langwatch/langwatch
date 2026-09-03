@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  hasLangyBlockParts,
-  langyAnswerSegments,
-} from "../langy-answer-segments";
+import { hasLangyBlockParts, langyAnswerSegments } from "../langy-answer-segments";
 
 const text = (t: string) => ({ type: "text", text: t });
 const cardPart = {

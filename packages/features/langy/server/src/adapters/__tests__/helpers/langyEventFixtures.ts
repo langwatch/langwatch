@@ -88,11 +88,7 @@ export function messageRecordedEvent(params: {
   });
 }
 
-export function agentTurnAcceptedEvent(params: {
-  id: string;
-  occurredAt: number;
-  turnId: string;
-}) {
+export function agentTurnAcceptedEvent(params: { id: string; occurredAt: number; turnId: string }) {
   return LangyAgentTurnAcceptedEventSchema.parse({
     ...base(params),
     type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
@@ -147,11 +143,7 @@ export function toolCallSucceededEvent(params: {
   });
 }
 
-export function planUpdatedEvent(params: {
-  id: string;
-  occurredAt: number;
-  turnId: string;
-}) {
+export function planUpdatedEvent(params: { id: string; occurredAt: number; turnId: string }) {
   return LangyPlanUpdatedEventSchema.parse({
     ...base(params),
     type: LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED,
@@ -224,11 +216,7 @@ export function conversationRenamedEvent(params: { id: string; occurredAt: numbe
   });
 }
 
-export function handoffPendingEvent(params: {
-  id: string;
-  occurredAt: number;
-  turnId: string;
-}) {
+export function handoffPendingEvent(params: { id: string; occurredAt: number; turnId: string }) {
   return LangyConversationHandoffPendingEventSchema.parse({
     ...base(params),
     type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
@@ -241,11 +229,7 @@ export function handoffPendingEvent(params: {
   });
 }
 
-export function handoffConsumedEvent(params: {
-  id: string;
-  occurredAt: number;
-  turnId: string;
-}) {
+export function handoffConsumedEvent(params: { id: string; occurredAt: number; turnId: string }) {
   return LangyConversationHandoffConsumedEventSchema.parse({
     ...base(params),
     type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED,
@@ -254,11 +238,7 @@ export function handoffConsumedEvent(params: {
   });
 }
 
-export function titleGeneratedEvent(params: {
-  id: string;
-  occurredAt: number;
-  turnId: string;
-}) {
+export function titleGeneratedEvent(params: { id: string; occurredAt: number; turnId: string }) {
   return LangyConversationTitleGeneratedEventSchema.parse({
     ...base(params),
     type: LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED,

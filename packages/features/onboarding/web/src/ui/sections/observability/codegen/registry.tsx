@@ -460,8 +460,7 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       go: {
-        "go get":
-          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goOpenaiSource as unknown as string),
@@ -478,8 +477,7 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/azure.svg", "Azure OpenAI"),
     install: {
       go: {
-        "go get":
-          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goAzureSource as unknown as string),
@@ -500,8 +498,7 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       go: {
-        "go get":
-          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goAnthropicSource as unknown as string),
@@ -518,8 +515,7 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/google.svg", "Gemini"),
     install: {
       go: {
-        "go get":
-          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goGeminiSource as unknown as string),
@@ -536,8 +532,7 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/groq.svg", "Groq"),
     install: {
       go: {
-        "go get":
-          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goGroqSource as unknown as string),
@@ -558,8 +553,7 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       go: {
-        "go get":
-          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goGrokSource as unknown as string),
@@ -573,8 +567,7 @@ export const registry: IntegrationRegistry = [
     icon: singleIcon("/images/external-icons/mistral.svg", "Mistral"),
     install: {
       go: {
-        "go get":
-          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goMistralSource as unknown as string),
@@ -595,8 +588,7 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       go: {
-        "go get":
-          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
+        "go get": "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goOllamaSource as unknown as string),
@@ -687,10 +679,7 @@ export function getRegistryEntry(
 export function deriveFrameworksByPlatform(
   category?: IntegrationCategory,
 ): Record<PlatformKey, { key: FrameworkKey; label: string; icon?: IconData }[]> {
-  const out: Record<
-    PlatformKey,
-    { key: FrameworkKey; label: string; icon?: IconData }[]
-  > = {
+  const out: Record<PlatformKey, { key: FrameworkKey; label: string; icon?: IconData }[]> = {
     typescript: [],
     python: [],
     go: [],
@@ -713,9 +702,7 @@ export function deriveFrameworksByPlatform(
  * platform-only entry — in the given category. Used to hide platform tabs
  * that would render an empty FrameworkGrid.
  */
-export function derivePlatformsForCategory(
-  category: IntegrationCategory,
-): Set<PlatformKey> {
+export function derivePlatformsForCategory(category: IntegrationCategory): Set<PlatformKey> {
   const out = new Set<PlatformKey>();
   for (const r of registry) {
     if (r.category === category) out.add(r.platform);

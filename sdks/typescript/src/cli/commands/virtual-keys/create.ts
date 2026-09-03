@@ -93,17 +93,13 @@ export const createVirtualKeyCommand = async (
       data: { virtual_key, secret },
       table: () => {
         console.log();
-        console.log(
-          chalk.bold.yellow("⚠  Save the secret below NOW. It will not be shown again."),
-        );
+        console.log(chalk.bold.yellow("⚠  Save the secret below NOW. It will not be shown again."));
         console.log();
         console.log(`  ${chalk.green(secret)}`);
         console.log();
         console.log(chalk.gray("Use it as the API key in OpenAI-compatible clients:"));
         console.log(chalk.cyan('  export OPENAI_API_KEY="' + secret + '"'));
-        console.log(
-          chalk.cyan('  export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"'),
-        );
+        console.log(chalk.cyan('  export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"'));
         console.log();
         console.log(chalk.gray("Virtual key id: ") + virtual_key.id);
         console.log(chalk.gray("Prefix:         ") + `${virtual_key.display_prefix}...`);

@@ -175,9 +175,7 @@ describe("given a correction with unsaved changes", () => {
 
   describe("when the reviewer walks back through the drawer's history", () => {
     beforeEach(() => {
-      useDrawerStore
-        .getState()
-        .pushTraceHistory({ traceId: EARLIER_TRACE, viewMode: "trace" });
+      useDrawerStore.getState().pushTraceHistory({ traceId: EARLIER_TRACE, viewMode: "trace" });
     });
 
     /** @scenario "Going back to an earlier trace with unsaved changes asks first" */
@@ -226,9 +224,7 @@ describe("given a correction with unsaved changes", () => {
       browserLeavesTheDrawer(followUrl);
 
       expect(useTraceEditStore.getState().editingTraceId).toBe(TRACE);
-      expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe(
-        "search the web",
-      );
+      expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe("search the web");
       expect(useDrawerStore.getState().traceId).toBe(TRACE);
       expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
     });

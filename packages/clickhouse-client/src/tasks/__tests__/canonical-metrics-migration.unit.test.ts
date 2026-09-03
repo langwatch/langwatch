@@ -3,18 +3,12 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  resolve(
-    import.meta.dirname,
-    "../../../migrations",
-    "00049_create_canonical_metrics.sql",
-  ),
+  resolve(import.meta.dirname, "../../../migrations", "00049_create_canonical_metrics.sql"),
   "utf8",
 );
 
 function tableDefinition(table: string): string {
-  const start = migration.indexOf(
-    `CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.${table}`,
-  );
+  const start = migration.indexOf(`CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.${table}`);
   const end = migration.indexOf("-- +goose StatementEnd", start);
   if (start < 0 || end < 0) throw new Error(`missing ${table} definition`);
   return migration.slice(start, end);
@@ -22,12 +16,8 @@ function tableDefinition(table: string): string {
 
 describe("canonical metric ClickHouse migration", () => {
   it("time-partitions every retention-managed metric projection", () => {
-    expect(tableDefinition("metric_data_points")).toContain(
-      "PARTITION BY toYearWeek(TimeUnixMs)",
-    );
-    expect(tableDefinition("metric_series")).toContain(
-      "PARTITION BY toYearWeek(LastSeenAt)",
-    );
+    expect(tableDefinition("metric_data_points")).toContain("PARTITION BY toYearWeek(TimeUnixMs)");
+    expect(tableDefinition("metric_series")).toContain("PARTITION BY toYearWeek(LastSeenAt)");
     expect(tableDefinition("metric_time_rollups")).toContain(
       "PARTITION BY toYearWeek(BucketStart)",
     );
@@ -43,9 +33,7 @@ describe("canonical metric ClickHouse migration", () => {
     expect(raw).toContain("OccurredAt DateTime64(3)");
     expect(raw).toContain("AcceptedAt DateTime64(3)");
     expect(raw).toContain("WrittenAt DateTime64(3) DEFAULT now64(3)");
-    expect(raw).toContain(
-      "ORDER BY (TenantId, SeriesId, TimeUnixMs, TimeUnixNano, PointId)",
-    );
+    expect(raw).toContain("ORDER BY (TenantId, SeriesId, TimeUnixMs, TimeUnixNano, PointId)");
 
     const shadow = tableDefinition("metric_usage_estimates");
     expect(shadow).toContain("OrganizationId String");

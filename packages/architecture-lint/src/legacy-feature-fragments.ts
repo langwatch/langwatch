@@ -2,11 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { walkFiles } from "./files";
 import { z } from "zod";
-import type {
-  ArchitectureViolation,
-  ClassifiedPackage,
-  FeatureCatalogueEntry,
-} from "./types";
+import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "./types";
 
 const BASELINE_PATH = join(
   "packages",
@@ -76,11 +72,7 @@ function remnantKind(file: string): LegacyFeatureFragmentKind {
   ) {
     return "transport";
   }
-  if (
-    file.includes("/components/") ||
-    file.includes("/hooks/") ||
-    file.includes("/pages/")
-  ) {
+  if (file.includes("/components/") || file.includes("/hooks/") || file.includes("/pages/")) {
     return "page-shell";
   }
   if (/\.(?:adapter|client)\.[cm]?[jt]sx?$/.test(file)) {
@@ -97,10 +89,7 @@ function fragmentFileKey(fragment: LegacyFeatureFragment): string {
   return `${fragment.feature}\0${fragment.file}`;
 }
 
-function compareFragments(
-  left: LegacyFeatureFragment,
-  right: LegacyFeatureFragment,
-): number {
+function compareFragments(left: LegacyFeatureFragment, right: LegacyFeatureFragment): number {
   return (
     left.feature.localeCompare(right.feature) ||
     left.file.localeCompare(right.file) ||
@@ -119,9 +108,7 @@ export function collectLegacyFeatureFragments(
   catalogue: readonly FeatureCatalogueEntry[],
   packages: readonly ClassifiedPackage[],
 ): LegacyFeatureFragment[] {
-  const migratedFeatures = new Set(
-    packages.flatMap((pkg) => (pkg.feature ? [pkg.feature] : [])),
-  );
+  const migratedFeatures = new Set(packages.flatMap((pkg) => (pkg.feature ? [pkg.feature] : [])));
   const subjectOwners = catalogue.flatMap((entry) =>
     migratedFeatures.has(entry.id)
       ? entry.subjects.map((subject) => ({
@@ -164,9 +151,7 @@ export function formatLegacyFeatureFragmentBaseline(
   const sorted = [...fragments].sort(compareFragments);
   const lines = ["{", '  "version": 0,', '  "fragments": ['];
   for (const [index, fragment] of sorted.entries()) {
-    lines.push(
-      `    ${JSON.stringify(fragment)}${index + 1 === sorted.length ? "" : ","}`,
-    );
+    lines.push(`    ${JSON.stringify(fragment)}${index + 1 === sorted.length ? "" : ","}`);
   }
   lines.push("  ]", "}");
   return `${lines.join("\n")}\n`;
@@ -202,8 +187,7 @@ function readBaseline(root: string): {
         {
           policy: "legacy-feature-fragment-baseline",
           file: path,
-          message:
-            "Legacy feature fragment baseline must contain version 0 and a fragments array.",
+          message: "Legacy feature fragment baseline must contain version 0 and a fragments array.",
         },
       ],
     };
@@ -212,8 +196,7 @@ function readBaseline(root: string): {
   const violations: ArchitectureViolation[] = [];
   const baseline: LegacyFeatureFragment[] = [];
   for (const [index, entry] of baselineResult.data.fragments.entries()) {
-    const isObjectEntry =
-      typeof entry === "object" && entry !== null && !Array.isArray(entry);
+    const isObjectEntry = typeof entry === "object" && entry !== null && !Array.isArray(entry);
     const keys = isObjectEntry ? Object.keys(entry) : [];
     const hasCanonicalKeys =
       isObjectEntry &&
@@ -233,9 +216,7 @@ function readBaseline(root: string): {
   }
 
   if (
-    baseline.some(
-      (entry, index) => index > 0 && compareFragments(baseline[index - 1]!, entry) > 0,
-    )
+    baseline.some((entry, index) => index > 0 && compareFragments(baseline[index - 1]!, entry) > 0)
   ) {
     violations.push({
       policy: "legacy-feature-fragment-baseline",
@@ -249,8 +230,7 @@ function readBaseline(root: string): {
     violations.push({
       policy: "legacy-feature-fragment-baseline",
       file: path,
-      message:
-        "Legacy feature fragment baseline contains duplicate feature/file entries.",
+      message: "Legacy feature fragment baseline contains duplicate feature/file entries.",
     });
   }
   return { baseline, violations };
@@ -273,12 +253,8 @@ export function lintLegacyFeatureFragments(
     });
   }
 
-  const actualByKey = new Map(
-    actual.map((fragment) => [fragmentKey(fragment), fragment]),
-  );
-  const baselineByKey = new Map(
-    baseline.map((fragment) => [fragmentKey(fragment), fragment]),
-  );
+  const actualByKey = new Map(actual.map((fragment) => [fragmentKey(fragment), fragment]));
+  const baselineByKey = new Map(baseline.map((fragment) => [fragmentKey(fragment), fragment]));
   for (const fragment of actual) {
     if (baselineByKey.has(fragmentKey(fragment))) continue;
     violations.push({

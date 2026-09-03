@@ -193,9 +193,7 @@ abstract class HandledErrorRuntime extends Error {
   }
 
   private static hasProvenance(error: unknown): error is HandledErrorRuntime {
-    return (
-      typeof error === "object" && error !== null && #issuedByHandledError in error
-    );
+    return typeof error === "object" && error !== null && #issuedByHandledError in error;
   }
 }
 
@@ -331,12 +329,7 @@ export class NotFoundError extends HandledError {
    * presentation registry must satisfy exhaustively. A code passed here
    * without copy fails that guard, not the type checker.
    */
-  constructor(
-    code: string,
-    resource: string,
-    id: string,
-    options: HandledErrorOptions = {},
-  ) {
+  constructor(code: string, resource: string, id: string, options: HandledErrorOptions = {}) {
     super(code, `${resource} not found: ${id}`, {
       ...options,
       meta: { id, ...options.meta },

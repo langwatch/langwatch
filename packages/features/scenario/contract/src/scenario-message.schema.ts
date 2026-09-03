@@ -33,9 +33,7 @@ const scenarioRichContentSchema = z.union([
     image_url: z
       .object({
         url: z.string(),
-        detail: z
-          .union([z.literal("auto"), z.literal("low"), z.literal("high")])
-          .optional(),
+        detail: z.union([z.literal("auto"), z.literal("low"), z.literal("high")]).optional(),
       })
       .optional(),
   }),

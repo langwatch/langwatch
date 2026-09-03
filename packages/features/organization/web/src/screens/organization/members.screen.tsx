@@ -56,10 +56,7 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { useInviteActions } from "../../behavior/use-invite-actions";
 import type { OrganizationWithMembersAndTheirTeams } from "../../behavior/organization-api";
-import {
-  useOrganizationHost,
-  type OrganizationTeamReading,
-} from "../../model/organization-host";
+import { useOrganizationHost, type OrganizationTeamReading } from "../../model/organization-host";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { usePublicEnv } from "../../behavior/use-public-env";
 import { useRequiredSession } from "../../behavior/use-required-session";

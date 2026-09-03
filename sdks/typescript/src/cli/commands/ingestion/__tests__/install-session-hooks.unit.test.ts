@@ -36,9 +36,7 @@ const { mintIngestionKeyMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/cli/utils/governance/cli-api", async () => {
-  const actual = await vi.importActual<typeof CliApiModule>(
-    "@/cli/utils/governance/cli-api",
-  );
+  const actual = await vi.importActual<typeof CliApiModule>("@/cli/utils/governance/cli-api");
   return { ...actual, mintIngestionKey: mintIngestionKeyMock };
 });
 
@@ -204,11 +202,7 @@ describe("the claude_code ingestion install", () => {
       fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
       fs.writeFileSync(
         settingsPath,
-        JSON.stringify(
-          { model: "claude-sonnet-5", hooks: { SessionStart: [userEntry] } },
-          null,
-          2,
-        ),
+        JSON.stringify({ model: "claude-sonnet-5", hooks: { SessionStart: [userEntry] } }, null, 2),
       );
     });
 
@@ -218,10 +212,7 @@ describe("the claude_code ingestion install", () => {
       await runInstall();
 
       const settings = readJson();
-      expect(settings.hooks.SessionStart).toEqual([
-        userEntry,
-        ourSessionStartEntry,
-      ]);
+      expect(settings.hooks.SessionStart).toEqual([userEntry, ourSessionStartEntry]);
       expect(settings.model).toBe("claude-sonnet-5");
     });
   });

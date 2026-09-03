@@ -45,10 +45,7 @@ export function OrganizationUserRoleField({
   value: OrganizationUserRole;
   onChange: (role: OrganizationUserRole) => void;
 }) {
-  const roleCollection = useMemo(
-    () => createListCollection({ items: orgRoleOptions }),
-    [],
-  );
+  const roleCollection = useMemo(() => createListCollection({ items: orgRoleOptions }), []);
 
   return (
     <VStack align="start">

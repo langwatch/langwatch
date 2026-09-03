@@ -21,9 +21,7 @@ afterEach(() => {
   cleanup();
 });
 
-const renderSection = (
-  props: Partial<React.ComponentProps<typeof SidebarSection>> = {},
-) =>
+const renderSection = (props: Partial<React.ComponentProps<typeof SidebarSection>> = {}) =>
   render(
     <ChakraProvider value={defaultSystem}>
       <SidebarSection title="STATUS" icon={Activity} open {...props}>

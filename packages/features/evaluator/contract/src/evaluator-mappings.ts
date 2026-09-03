@@ -39,10 +39,7 @@ export const migrateLegacyMappings = (mappings: Record<string, string>): Mapping
     return mappings as any as MappingState;
   }
 
-  const LEGACY_EVALUATOR_MAPPING_OPTIONS: Record<
-    string,
-    MappingState["mapping"][number]
-  > = {
+  const LEGACY_EVALUATOR_MAPPING_OPTIONS: Record<string, MappingState["mapping"][number]> = {
     spans: {
       source: "spans",
     },

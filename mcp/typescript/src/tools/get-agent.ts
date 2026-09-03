@@ -45,7 +45,9 @@ export async function handleGetAgent({ id }: { id: string }): Promise<string> {
     lines.push(`\n## Instances (${agent.instances.length})\n`);
     for (const instance of agent.instances) {
       const label = instance.label ? ` (${instance.label})` : "";
-      lines.push(`- ${instance.hostname || instance.id}${label}, connected ${instance.connectedAt}`);
+      lines.push(
+        `- ${instance.hostname || instance.id}${label}, connected ${instance.connectedAt}`,
+      );
     }
   }
 

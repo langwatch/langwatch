@@ -149,9 +149,7 @@ describe("the skills commands", () => {
     await skillsInstallCommand(["tracing"], { dir: root });
     // vitest's stdin has no TTY — the command must fail, not block.
     expect(process.stdin.isTTY).toBeFalsy();
-    await expect(
-      skillsUninstallCommand(["tracing"], { dir: root }),
-    ).rejects.toMatchObject({
+    await expect(skillsUninstallCommand(["tracing"], { dir: root })).rejects.toMatchObject({
       code: "validation_error",
       message: expect.stringContaining("-y"),
     });

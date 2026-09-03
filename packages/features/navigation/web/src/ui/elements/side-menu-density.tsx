@@ -71,9 +71,7 @@ export function SideMenuDensityProvider({
   children: ReactNode;
 }) {
   return (
-    <SideMenuDensityContext.Provider value={density}>
-      {children}
-    </SideMenuDensityContext.Provider>
+    <SideMenuDensityContext.Provider value={density}>{children}</SideMenuDensityContext.Provider>
   );
 }
 

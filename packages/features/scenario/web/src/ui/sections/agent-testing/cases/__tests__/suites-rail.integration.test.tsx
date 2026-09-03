@@ -8,13 +8,7 @@
  * @see specs/suites/test-suites.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -94,18 +88,14 @@ function makeSuite(overrides: Partial<TestSuiteEntry> = {}): TestSuiteEntry {
   };
 }
 
-function renderRail(
-  overrides: Partial<React.ComponentProps<typeof SuiteRail>> = {},
-) {
+function renderRail(overrides: Partial<React.ComponentProps<typeof SuiteRail>> = {}) {
   const props: React.ComponentProps<typeof SuiteRail> = {
     selectedSuiteId: null,
     selectedExternalSetId: null,
     suites: [makeSuite()],
     externalSets: [],
     canManage: true,
-    lastRunBySuiteId: new Map<string, SuiteLastRun>([
-      ["suite_1", makeLastRun()],
-    ]),
+    lastRunBySuiteId: new Map<string, SuiteLastRun>([["suite_1", makeLastRun()]]),
     scenarioIdsBySuiteId: new Map<string, string[]>([
       ["suite_1", ["case_1"]],
       ["suite_default", ["case_1"]],
@@ -130,9 +120,7 @@ function renderRail(
 
 async function openSuiteMenu(suiteName: string) {
   const user = userEvent.setup();
-  await user.click(
-    screen.getByRole("button", { name: `Actions for ${suiteName}` }),
-  );
+  await user.click(screen.getByRole("button", { name: `Actions for ${suiteName}` }));
   return user;
 }
 
@@ -156,9 +144,7 @@ const TWO_HOURS_AGO = Date.now() - 2 * 60 * 60 * 1000 - 60_000;
 const REFUNDS_SET = "__internal__suite_1__suite";
 const OTHER_SET = "__internal__suite_2__suite";
 
-function makeProjectRun(
-  overrides: Partial<ScenarioRunData> = {},
-): ScenarioRunData {
+function makeProjectRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {
     scenarioId: "case_1",
     batchRunId: "batch_refunds",
@@ -210,10 +196,7 @@ describe("the test suites rail", () => {
   /** @scenario "The rail lists the test suites, then the external sets" */
   it("lists the test suites, then the external sets, and no counts", () => {
     renderRail({
-      suites: [
-        makeSuite(),
-        makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" }),
-      ],
+      suites: [makeSuite(), makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" })],
       externalSets: [{ setId: "nightly-ci", lastRunTimestamp: 1 }],
     });
 
@@ -239,9 +222,7 @@ describe("the test suites rail", () => {
       externalSets: [{ setId: "nightly-ci", lastRunTimestamp: 1 }],
     });
 
-    expect(
-      screen.queryByTestId("suite-rail-item-All scenarios"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("suite-rail-item-All scenarios")).not.toBeInTheDocument();
     expect(screen.queryByText("All scenarios")).not.toBeInTheDocument();
     // The headings are plain labels: their destination is gone.
     expect(screen.getByText("Test Suites").tagName).not.toBe("BUTTON");
@@ -285,18 +266,12 @@ describe("the test suites rail", () => {
   /** @scenario "The Default suite carries the actions of an ordinary suite" */
   it("gives Default the same row menu as any other suite", async () => {
     renderRail({
-      suites: [
-        makeSuite({ id: "suite_default", name: "Default", slug: "default" }),
-      ],
-      lastRunBySuiteId: new Map<string, SuiteLastRun>([
-        ["suite_default", makeLastRun()],
-      ]),
+      suites: [makeSuite({ id: "suite_default", name: "Default", slug: "default" })],
+      lastRunBySuiteId: new Map<string, SuiteLastRun>([["suite_default", makeLastRun()]]),
     });
     await openSuiteMenu("Default");
 
-    const items = (await screen.findAllByRole("menuitem")).map(
-      (item) => item.textContent,
-    );
+    const items = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
     expect(items).toEqual([
       "New scenario",
       "Run suite",
@@ -326,9 +301,7 @@ describe("the test suites rail", () => {
 
     const row = screen.getByTestId("suite-rail-item-nightly-ci");
     expect(within(row).getByLabelText("Runs from code")).toBeInTheDocument();
-    expect(
-      within(row).queryByRole("button", { name: /Actions for/ }),
-    ).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
   });
 
   /** @scenario "A project with no external sets hides the From Code heading" */
@@ -357,9 +330,7 @@ describe("the test suites rail", () => {
     renderRail();
     await openSuiteMenu("Refunds");
 
-    const items = (await screen.findAllByRole("menuitem")).map(
-      (item) => item.textContent,
-    );
+    const items = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
     expect(items).toEqual([
       "New scenario",
       "Run suite",
@@ -384,9 +355,7 @@ describe("the test suites rail", () => {
         renderRail();
         const user = await openSuiteMenu("Refunds");
 
-        await user.click(
-          await screen.findByRole("menuitem", { name: /Open recent runs/ }),
-        );
+        await user.click(await screen.findByRole("menuitem", { name: /Open recent runs/ }));
 
         const list = await screen.findByTestId("recent-runs-submenu-list");
         const rows = within(list).getAllByTestId(/^recent-run-/);
@@ -434,9 +403,7 @@ describe("the test suites rail", () => {
         renderRail({ lastRunBySuiteId: new Map<string, SuiteLastRun>() });
         await openSuiteMenu("Refunds");
 
-        expect(
-          await screen.findByRole("menuitem", { name: "Run suite" }),
-        ).toBeInTheDocument();
+        expect(await screen.findByRole("menuitem", { name: "Run suite" })).toBeInTheDocument();
         expect(
           screen.queryByRole("menuitem", { name: /Open recent runs/ }),
         ).not.toBeInTheDocument();
@@ -450,9 +417,7 @@ describe("the test suites rail", () => {
     const { props, view } = renderRail();
     const user = await openSuiteMenu("Refunds");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Archive suite" }),
-    );
+    await user.click(await screen.findByRole("menuitem", { name: "Archive suite" }));
 
     expect(await screen.findByText("Archive test suite?")).toBeInTheDocument();
     const dialog = screen.getByRole("dialog");
@@ -467,18 +432,14 @@ describe("the test suites rail", () => {
     expect(props.onArchiveSuite).toHaveBeenCalledWith("suite_1");
 
     view.rerender(<SuiteRail {...props} suites={[]} />);
-    expect(
-      screen.queryByTestId("suite-rail-item-Refunds"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("suite-rail-item-Refunds")).not.toBeInTheDocument();
   });
 
   it("archives nothing when the archive dialog is left without confirming", async () => {
     const { props } = renderRail();
     const user = await openSuiteMenu("Refunds");
 
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Archive suite" }),
-    );
+    await user.click(await screen.findByRole("menuitem", { name: "Archive suite" }));
     const dialog = await screen.findByRole("dialog");
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
@@ -490,13 +451,9 @@ describe("the test suites rail", () => {
     renderRail({ canManage: false });
     await openSuiteMenu("Refunds");
 
-    const items = (await screen.findAllByRole("menuitem")).map(
-      (item) => item.textContent,
-    );
+    const items = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
     expect(items).toEqual(["Open recent runs"]);
-    expect(
-      screen.queryByRole("button", { name: "New Test Suite" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New Test Suite" })).not.toBeInTheDocument();
   });
 
   // --- Selection ---
@@ -504,10 +461,7 @@ describe("the test suites rail", () => {
   /** @scenario "Choosing a suite filters the scenario table to that suite" */
   it("asks for the chosen suite and marks the open one as selected", async () => {
     const user = userEvent.setup();
-    const suites = [
-      makeSuite(),
-      makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" }),
-    ];
+    const suites = [makeSuite(), makeSuite({ id: "suite_2", name: "Checkout", slug: "checkout" })];
     const { props, view } = renderRail({ suites });
 
     await user.click(screen.getByTestId("suite-rail-item-Refunds"));
@@ -516,33 +470,20 @@ describe("the test suites rail", () => {
       slug: "refunds",
     });
 
-    view.rerender(
-      <SuiteRail {...props} suites={suites} selectedSuiteId="suite_1" />,
-    );
-    expect(screen.getByTestId("suite-rail-item-Refunds")).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
-    expect(screen.getByTestId("suite-rail-item-Checkout")).not.toHaveAttribute(
-      "aria-current",
-    );
+    view.rerender(<SuiteRail {...props} suites={suites} selectedSuiteId="suite_1" />);
+    expect(screen.getByTestId("suite-rail-item-Refunds")).toHaveAttribute("aria-current", "true");
+    expect(screen.getByTestId("suite-rail-item-Checkout")).not.toHaveAttribute("aria-current");
   });
 
   it("marks the first suite while the address names none, because that is the one open", () => {
     // The address alone cannot know the rail, so the rail is told which suite
     // the tab resolved to rather than which one was asked for.
     renderRail({
-      suites: [
-        makeSuite({ id: "suite_default", name: "Default", slug: "default" }),
-        makeSuite(),
-      ],
+      suites: [makeSuite({ id: "suite_default", name: "Default", slug: "default" }), makeSuite()],
       selectedSuiteId: "suite_default",
     });
 
-    expect(screen.getByTestId("suite-rail-item-Default")).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
+    expect(screen.getByTestId("suite-rail-item-Default")).toHaveAttribute("aria-current", "true");
   });
 
   /** @scenario "Choosing an external set opens its results" */
@@ -558,17 +499,13 @@ describe("the test suites rail", () => {
       kind: "external",
       setId: "nightly-ci",
     });
-    expect(
-      screen.queryByRole("menuitem", { name: "Rename" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Rename" })).not.toBeInTheDocument();
   });
 
   // --- The suite editor ---
 
   describe("when the suite editor is opened", () => {
-    function renderEditor(
-      overrides: Partial<React.ComponentProps<typeof SuiteNameDialog>> = {},
-    ) {
+    function renderEditor(overrides: Partial<React.ComponentProps<typeof SuiteNameDialog>> = {}) {
       const props: React.ComponentProps<typeof SuiteNameDialog> = {
         open: true,
         initialName: "Refunds",
@@ -718,10 +655,7 @@ describe("the test suites rail", () => {
     // The free dates are the reason the rail took the shared control, so the
     // window has to travel, not only render.
     expect(props.setPeriod).toHaveBeenCalledTimes(1);
-    const [startDate] = vi.mocked(props.setPeriod).mock.calls[0] as [
-      Date,
-      Date,
-    ];
+    const [startDate] = vi.mocked(props.setPeriod).mock.calls[0] as [Date, Date];
     expect(startDate.getFullYear()).toBe(2026);
     expect(startDate.getMonth()).toBe(0);
   });
@@ -744,8 +678,6 @@ describe("the test suites rail", () => {
   it("carries the new-simulations announcement", () => {
     renderRail();
 
-    expect(
-      screen.getByText("Welcome to the new simulations screen"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Welcome to the new simulations screen")).toBeInTheDocument();
   });
 });

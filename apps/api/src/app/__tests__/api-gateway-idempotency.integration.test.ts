@@ -131,7 +131,10 @@ describe("the gateway application's Idempotency-Key runner", () => {
     it("executes a keyed create once and replays its stored answer", async () => {
       const receipts = testReceiptStore();
       const { gateway } = composeGatewayWith(composeLedgerOver(receipts));
-      const create = vi.fn(async () => ({ status: 201, body: { id: "vk_1", secret: "shown once" } }));
+      const create = vi.fn(async () => ({
+        status: 201,
+        body: { id: "vk_1", secret: "shown once" },
+      }));
       const request = {
         operation: "gateway.v1.virtual-keys.create",
         scopeId: PROJECT_ID,

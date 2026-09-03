@@ -199,16 +199,13 @@ export function resolvePoolSize(input: PoolSizingInput = {}): PoolSizingDecision
       size: input.override,
       source: "override",
       derivedCeiling,
-      exceedsBudget:
-        infeasible || (derivedCeiling !== null && input.override > derivedCeiling),
+      exceedsBudget: infeasible || (derivedCeiling !== null && input.override > derivedCeiling),
       rejectedOverride: undefined,
     };
   }
 
   const rejectedOverride =
-    input.override !== undefined && !isUsableInteger(input.override)
-      ? input.override
-      : undefined;
+    input.override !== undefined && !isUsableInteger(input.override) ? input.override : undefined;
 
   if (derivedCeiling !== null) {
     return {
@@ -234,9 +231,7 @@ export function resolvePoolSize(input: PoolSizingInput = {}): PoolSizingDecision
  * {@link resolvePoolSize} so the rules stay testable without touching
  * `process.env`, and so a non-Node host can supply the numbers another way.
  */
-export function poolSizingFromEnv(
-  env: Record<string, string | undefined>,
-): PoolSizingInput {
+export function poolSizingFromEnv(env: Record<string, string | undefined>): PoolSizingInput {
   const int = (name: string): number | undefined => {
     const raw = env[name];
     if (raw === undefined || raw === "") return undefined;

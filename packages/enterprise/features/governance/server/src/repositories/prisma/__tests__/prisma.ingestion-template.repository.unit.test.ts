@@ -32,10 +32,12 @@ function storedRow(overrides: Record<string, unknown> = {}) {
  * purpose: an audit trail that can be missing for a write that happened is not
  * an audit trail, and the only place that is decided is here.
  */
-function transactionalPrisma(options: {
-  template?: Record<string, unknown>;
-  existing?: Record<string, unknown> | null;
-} = {}) {
+function transactionalPrisma(
+  options: {
+    template?: Record<string, unknown>;
+    existing?: Record<string, unknown> | null;
+  } = {},
+) {
   const created = options.template ?? storedRow();
   const templateCreate = vi.fn(async () => created);
   const templateUpdate = vi.fn(async () => created);
@@ -58,8 +60,7 @@ function transactionalPrisma(options: {
     findFirst,
     database: {
       ingestionTemplate: { findFirst },
-      $transaction: async <T>(run: (client: typeof transaction) => Promise<T>) =>
-        run(transaction),
+      $transaction: async <T>(run: (client: typeof transaction) => Promise<T>) => run(transaction),
     },
   };
 }

@@ -56,8 +56,7 @@ const OPPOSITE: Record<Direction, Direction> = {
 };
 
 /** The lattice wraps: it is a ground, not a room, so it has no walls. */
-const wrap = (value: number, limit: number) =>
-  ((value % limit) + limit) % limit;
+const wrap = (value: number, limit: number) => ((value % limit) + limit) % limit;
 
 const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
 
@@ -197,9 +196,7 @@ export const advance = (game: SnakeGame, random: () => number): SnakeGame => {
 
   return {
     ...moved({ game, snake, direction }),
-    token: ate
-      ? freeNode({ cols: game.cols, rows: game.rows, taken: snake, random })
-      : game.token,
+    token: ate ? freeNode({ cols: game.cols, rows: game.rows, taken: snake, random }) : game.token,
     eaten: ate ? game.eaten + 1 : game.eaten,
   };
 };

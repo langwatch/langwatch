@@ -61,9 +61,7 @@ describe("given an invitation whose holder is signed in as somebody else", () =>
     /** @scenario The hint recognizes the address without spelling it out */
     it("keeps the domain and the first character, and hides the rest", () => {
       expect(maskInvitedAddress("sam@acme.com")).toBe("s•••@acme.com");
-      expect(maskInvitedAddress("alexander@big-company.co.uk")).toBe(
-        "a•••@big-company.co.uk",
-      );
+      expect(maskInvitedAddress("alexander@big-company.co.uk")).toBe("a•••@big-company.co.uk");
     });
 
     /** @scenario The hint recognizes the address without spelling it out */
@@ -104,9 +102,9 @@ describe("given one invitation and the two routes that mail it", () => {
       await throttleService.assertInviteSendAllowed({ inviteId });
       await throttleService.assertInviteSendAllowed({ inviteId });
 
-      await expect(
-        throttleService.assertInviteSendAllowed({ inviteId }),
-      ).rejects.toBeInstanceOf(InviteThrottledError);
+      await expect(throttleService.assertInviteSendAllowed({ inviteId })).rejects.toBeInstanceOf(
+        InviteThrottledError,
+      );
     });
 
     /** @scenario Resending is throttled per invitation */
@@ -125,17 +123,14 @@ describe("given one invitation and the two routes that mail it", () => {
 
     it("names the seconds left so the screen can say how long", async () => {
       const inviteId = `inv-retry-after-${Math.random()}`;
-      for (let i = 0; i < 3; i++)
-        await throttleService.assertInviteSendAllowed({ inviteId });
+      for (let i = 0; i < 3; i++) await throttleService.assertInviteSendAllowed({ inviteId });
 
       const refusal = await throttleService
         .assertInviteSendAllowed({ inviteId })
         .catch((error: unknown) => error);
 
       expect(refusal).toBeInstanceOf(InviteThrottledError);
-      expect(
-        (refusal as InviteThrottledError).meta.retryAfterSeconds,
-      ).toBeGreaterThan(0);
+      expect((refusal as InviteThrottledError).meta.retryAfterSeconds).toBeGreaterThan(0);
     });
   });
 });

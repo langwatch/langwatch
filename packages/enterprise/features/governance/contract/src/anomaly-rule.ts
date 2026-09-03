@@ -89,9 +89,7 @@ export const webhookDestinationSchema = z
     sharedSecret: z.string().min(1).max(512).optional(),
   })
   .strict();
-export const anomalyDestinationSchema = z.discriminatedUnion("type", [
-  webhookDestinationSchema,
-]);
+export const anomalyDestinationSchema = z.discriminatedUnion("type", [webhookDestinationSchema]);
 export const destinationConfigSchema = z
   .object({ destinations: z.array(anomalyDestinationSchema).max(10) })
   .strict();
@@ -114,9 +112,7 @@ export function safeParseDestinationConfig(
     return { ok: true, data: { destinations: [] } };
   }
   const result = destinationConfigSchema.safeParse(config);
-  return result.success
-    ? { ok: true, data: result.data }
-    : { ok: false, error: result.error };
+  return result.success ? { ok: true, data: result.data } : { ok: false, error: result.error };
 }
 
 export const SUPPORTED_RULE_TYPES = ["spend_spike"] as const;
@@ -161,9 +157,7 @@ export function safeParseSpendSpikeThresholdConfig(
   config: unknown,
 ): { ok: true; data: SpendSpikeThresholdConfig } | { ok: false; error: z.ZodError } {
   const result = spendSpikeThresholdConfigSchema.safeParse(config);
-  return result.success
-    ? { ok: true, data: result.data }
-    : { ok: false, error: result.error };
+  return result.success ? { ok: true, data: result.data } : { ok: false, error: result.error };
 }
 
 export const DEFAULT_SPEND_SPIKE_CONFIG: SpendSpikeThresholdConfig = {
@@ -246,9 +240,7 @@ export const anomalyAlertDispatchOutcomeSchema = z.discriminatedUnion("status", 
     reason: z.string(),
   }),
 ]);
-export type AnomalyAlertDispatchOutcome = z.infer<
-  typeof anomalyAlertDispatchOutcomeSchema
->;
+export type AnomalyAlertDispatchOutcome = z.infer<typeof anomalyAlertDispatchOutcomeSchema>;
 
 export const anomalyAlertDispatchResultSchema = z.object({
   dispatchTag: z.string(),
@@ -256,9 +248,7 @@ export const anomalyAlertDispatchResultSchema = z.object({
 });
 export type AnomalyAlertDispatchResult = z.infer<typeof anomalyAlertDispatchResultSchema>;
 
-export function evaluateSpendSpike(
-  input: SpendSpikeEvaluationInput,
-): SpendSpikeEvaluationResult {
+export function evaluateSpendSpike(input: SpendSpikeEvaluationInput): SpendSpikeEvaluationResult {
   const base = {
     ruleId: input.ruleId,
     organizationId: input.organizationId,
@@ -272,8 +262,7 @@ export function evaluateSpendSpike(
     return {
       ...base,
       decision: "skip_dedup",
-      reason:
-        "Existing open alert for this rule covers the current window — not re-firing.",
+      reason: "Existing open alert for this rule covers the current window — not re-firing.",
     };
   }
 

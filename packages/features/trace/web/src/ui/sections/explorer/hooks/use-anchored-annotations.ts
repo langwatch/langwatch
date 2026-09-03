@@ -32,9 +32,7 @@ export function traceAnchorKey(anchor: {
   anchorId?: string | null;
   anchorPath?: string | null;
 }): string {
-  return [anchor.anchorKind ?? "", anchor.anchorId ?? "", anchor.anchorPath ?? ""].join(
-    "\u0000",
-  );
+  return [anchor.anchorKind ?? "", anchor.anchorId ?? "", anchor.anchorPath ?? ""].join("\u0000");
 }
 
 export interface AnchoredAnnotations {
@@ -69,8 +67,7 @@ export function useAnchoredAnnotations(): AnchoredAnnotations {
   const query = useAnnotationsByTraceIds({
     projectId: project?.id ?? "",
     traceIds,
-    enabled:
-      !!project?.id && !!traceId && !isReadOnly && hasPermission("annotations:view"),
+    enabled: !!project?.id && !!traceId && !isReadOnly && hasPermission("annotations:view"),
     anchor: "all",
   });
 
@@ -90,8 +87,7 @@ export function useAnchoredAnnotations(): AnchoredAnnotations {
 
   return useMemo(
     () => ({
-      commentsAt: (anchor: TraceAnchor) =>
-        byAnchor.get(traceAnchorKey(anchor)) ?? NO_COMMENTS,
+      commentsAt: (anchor: TraceAnchor) => byAnchor.get(traceAnchorKey(anchor)) ?? NO_COMMENTS,
       all,
       isLoading: query.isLoading,
     }),

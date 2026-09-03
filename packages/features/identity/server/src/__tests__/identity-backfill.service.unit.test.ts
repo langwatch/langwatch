@@ -11,10 +11,7 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 import { deriveIdentifierId } from "../crypto/identifier-identity";
-import type {
-  BackfillAccountRow,
-  BackfillUserRow,
-} from "../identity-backfill.repository";
+import type { BackfillAccountRow, BackfillUserRow } from "../identity-backfill.repository";
 import { IdentityBackfillService } from "../identity-backfill.service";
 import { IdentitySecretCarryService } from "../identity-secret-carry.service";
 
@@ -271,7 +268,13 @@ describe("the identifier backfill pass", () => {
       const { service } = harness({
         accounts: [],
         presetRows: [
-          { id: emailId, provider: "email", value: normalizedValue, accountId: null, state: "DEAD_END" },
+          {
+            id: emailId,
+            provider: "email",
+            value: normalizedValue,
+            accountId: null,
+            state: "DEAD_END",
+          },
         ],
       });
 
@@ -310,7 +313,11 @@ describe("the identifier backfill pass", () => {
       const diffs = (outcome.report as { diffs: Array<{ kind: string; identifierId: string }> })
         .diffs;
       expect(diffs).toContainEqual(
-        expect.objectContaining({ kind: "surplus_row", identifierId: staleId, actualState: "VERIFIED" }),
+        expect.objectContaining({
+          kind: "surplus_row",
+          identifierId: staleId,
+          actualState: "VERIFIED",
+        }),
       );
     });
 

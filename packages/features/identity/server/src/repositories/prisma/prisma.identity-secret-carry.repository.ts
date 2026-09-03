@@ -1,4 +1,7 @@
-import type { AccountSecretPair, IdentitySecretCarryRepository } from "../../identity-secret-carry.service";
+import type {
+  AccountSecretPair,
+  IdentitySecretCarryRepository,
+} from "../../identity-secret-carry.service";
 import type { IdentityAccountSecrets } from "../../better-auth/storage-ports";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -47,16 +50,10 @@ interface LegacyAccountRow {
  * service where it can be read and tested; this port hands over both
  * timestamps and does what it is told.
  */
-export class PrismaIdentitySecretCarryRepository
-  implements IdentitySecretCarryRepository
-{
+export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findAccountSecretPairs({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<AccountSecretPair[]> {
+  async findAccountSecretPairs({ userId }: { userId: string }): Promise<AccountSecretPair[]> {
     const accounts = (await this.prisma.account.findMany({
       where: { userId },
       select: {
@@ -80,10 +77,7 @@ export class PrismaIdentitySecretCarryRepository
       select: { id: true, updatedAt: true },
     });
     const credentialUpdatedAt = new Map(
-      credentials.map((credential) => [
-        credential.id,
-        credential.updatedAt.getTime(),
-      ]),
+      credentials.map((credential) => [credential.id, credential.updatedAt.getTime()]),
     );
 
     return accounts.map((account) => ({

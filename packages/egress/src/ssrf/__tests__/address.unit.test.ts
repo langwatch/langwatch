@@ -25,9 +25,8 @@ interface AddressVector {
 }
 
 const corpusPath = join(repoRoot(), "pkg", "ssrf", "testdata", "address_vectors.json");
-const vectors = (
-  JSON.parse(readFileSync(corpusPath, "utf8")) as { vectors: AddressVector[] }
-).vectors;
+const vectors = (JSON.parse(readFileSync(corpusPath, "utf8")) as { vectors: AddressVector[] })
+  .vectors;
 
 describe("the shared SSRF conformance corpus", () => {
   it("loads a non-empty corpus", () => {

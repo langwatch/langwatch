@@ -69,12 +69,7 @@ const OrganizationScreen: React.FC = () => {
           </Checkbox.Control>
           <Checkbox.Label fontWeight="normal" fontSize="13px" color="fg.muted">
             {"I agree to the LangWatch "}
-            <Link
-              href={LEGAL_LINKS.terms.href}
-              isExternal
-              fontWeight="medium"
-              variant="underline"
-            >
+            <Link href={LEGAL_LINKS.terms.href} isExternal fontWeight="medium" variant="underline">
               {LEGAL_LINKS.terms.label}
               <Icon size="xs">
                 <ExternalLink />
@@ -182,9 +177,7 @@ interface IntroScreensProps {
   flow: OnboardingFlowConfig;
 }
 
-export const useCreateWelcomeScreens = ({
-  flow,
-}: IntroScreensProps): OnboardingScreen[] => {
+export const useCreateWelcomeScreens = ({ flow }: IntroScreensProps): OnboardingScreen[] => {
   const screensBase: Record<OnboardingScreenIndex, OnboardingScreen> = useMemo(
     () => ({
       [OnboardingScreenIndex.ORGANIZATION]: {

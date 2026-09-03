@@ -78,13 +78,7 @@ export class PromptTagRepository {
    * Deletes a custom tag definition.
    * PromptTagAssignment rows are removed automatically via Prisma's app-level onDelete: Cascade.
    */
-  async delete({
-    id,
-    organizationId,
-  }: {
-    id: string;
-    organizationId: string;
-  }): Promise<void> {
+  async delete({ id, organizationId }: { id: string; organizationId: string }): Promise<void> {
     const deleted = await this.prisma.promptTag.deleteMany({
       where: { id, organizationId },
     });

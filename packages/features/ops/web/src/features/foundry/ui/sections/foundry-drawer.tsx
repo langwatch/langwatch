@@ -1,14 +1,4 @@
-import {
-  Box,
-  Button,
-  Flex,
-  Heading,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Flex, Heading, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -39,8 +29,7 @@ export function FoundryDrawer({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
-        return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
         sendRef.current?.click();
@@ -151,11 +140,7 @@ export function FoundryDrawer({ onClose }: { onClose: () => void }) {
                     >
                       Spans ({countSpans(spans)})
                     </Text>
-                    <Button
-                      size="2xs"
-                      variant="ghost"
-                      onClick={() => setShowPresets(true)}
-                    >
+                    <Button size="2xs" variant="ghost" onClick={() => setShowPresets(true)}>
                       Change preset
                     </Button>
                   </HStack>
@@ -239,12 +224,7 @@ export function FoundryDrawer({ onClose }: { onClose: () => void }) {
                     >
                       <Play size={14} /> Send Trace
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={resetTrace}
-                      title="Reset (R)"
-                    >
+                    <Button size="sm" variant="outline" onClick={resetTrace} title="Reset (R)">
                       <RotateCcw size={14} />
                     </Button>
                   </HStack>

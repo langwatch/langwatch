@@ -64,11 +64,7 @@ export function CurrentDrawer({ drawers, marginTop, restriction }: CurrentDrawer
   // comment) — but callers pair a setFlowCallbacks with a following
   // setComplexProps on the same re-hydration path, so the getFlowCallbacks()
   // read below still picks up fresh callbacks on the render that triggers.
-  useSyncExternalStore(
-    subscribeDrawerProps,
-    getDrawerPropsVersion,
-    getDrawerPropsVersion,
-  );
+  useSyncExternalStore(subscribeDrawerProps, getDrawerPropsVersion, getDrawerPropsVersion);
   const queryString = router.asPath.split("?")[1] ?? "";
   // qs.parse + the `drawer.*` slice is recomputed on every render otherwise,
   // handing the rendered drawer a fresh props object each time and cascading
@@ -83,8 +79,7 @@ export function CurrentDrawer({ drawers, marginTop, restriction }: CurrentDrawer
   // Intercept restricted drawers. Instead of rendering the drawer, tell the
   // host and clear the drawer from the URL. This protects ALL entry points:
   // direct clicks, command bar, deep links, and any future call sites.
-  const restrictedResource =
-    drawerType && restriction ? restriction.blocks(drawerType) : undefined;
+  const restrictedResource = drawerType && restriction ? restriction.blocks(drawerType) : undefined;
 
   useEffect(() => {
     if (!restrictedResource) return;
@@ -96,9 +91,7 @@ export function CurrentDrawer({ drawers, marginTop, restriction }: CurrentDrawer
       "?" +
         qs.stringify(
           Object.fromEntries(
-            Object.entries(router.query).filter(
-              ([key]) => !key.startsWith("drawer."),
-            ),
+            Object.entries(router.query).filter(([key]) => !key.startsWith("drawer.")),
           ),
         ),
     );
@@ -152,20 +145,14 @@ export function CurrentDrawer({ drawers, marginTop, restriction }: CurrentDrawer
             "?" +
               qs.stringify(
                 Object.fromEntries(
-                  Object.entries(router.query).filter(
-                    ([key]) => !key.startsWith("drawer."),
-                  ),
+                  Object.entries(router.query).filter(([key]) => !key.startsWith("drawer.")),
                 ),
               ),
           );
         }}
       >
         <Suspense fallback={<DrawerLoadingFallback />}>
-          <CurrentDrawerComponent
-            {...queryDrawer}
-            {...complexProps}
-            {...flowCallbacksForDrawer}
-          />
+          <CurrentDrawerComponent {...queryDrawer} {...complexProps} {...flowCallbacksForDrawer} />
         </Suspense>
       </ErrorBoundary>
     </DrawerOffsetProvider>

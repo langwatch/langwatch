@@ -81,10 +81,7 @@ async function enqueueOutcomeCount(outcome: string): Promise<number> {
     values: Array<{ labels: Record<string, string>; value: number }>;
   };
   return snapshot.values
-    .filter(
-      (v) =>
-        v.labels.subscriber_name === "seamSubscriber" && v.labels.outcome === outcome,
-    )
+    .filter((v) => v.labels.subscriber_name === "seamSubscriber" && v.labels.outcome === outcome)
     .reduce((sum, v) => sum + v.value, 0);
 }
 

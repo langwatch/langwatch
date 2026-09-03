@@ -18,11 +18,7 @@
  */
 
 import type { CliResultDigest, CliToolResult } from "@langwatch/langy-contract";
-import {
-  LANGY_LIVENESS,
-  LANGY_STREAM,
-  LANGY_STREAMING,
-} from "./langy-streaming.constants";
+import { LANGY_LIVENESS, LANGY_STREAM, LANGY_STREAMING } from "./langy-streaming.constants";
 
 /**
  * A decoded stream entry. `delta` carries buffered tokens; `status`/`progress`
@@ -166,10 +162,7 @@ export class LangyTokenBuffer {
   private readonly flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
   /** Reasoning is live-only too, but model providers may stream it token by token. */
   private readonly pendingReasoning = new Map<string, string>();
-  private readonly reasoningFlushTimers = new Map<
-    string,
-    ReturnType<typeof setTimeout>
-  >();
+  private readonly reasoningFlushTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   private constructor(deps: { redis: LangyStreamRedis }) {
     this.redis = deps.redis;

@@ -56,8 +56,7 @@ function workspacePath(root: string, path: string): string {
 function roleOf(file: string): EventingRole | null {
   if (PROJECTION_FILE.test(file)) return "projection";
   if (SUBSCRIBER_FILE.test(file)) return "subscriber";
-  if (PROCESS_MANAGER_FILE.test(file) || PROCESS_SERVICE_MASQUERADE.test(file))
-    return "process";
+  if (PROCESS_MANAGER_FILE.test(file) || PROCESS_SERVICE_MASQUERADE.test(file)) return "process";
   return null;
 }
 

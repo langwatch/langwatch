@@ -26,12 +26,7 @@ describe("followUpsForResult", () => {
       const suggestions = followUpsForResult(traceSearch());
 
       expect(labelsOf(suggestions).sort()).toEqual(
-        [
-          "Add to a dataset",
-          "Alert me on this",
-          "Graph these",
-          "Send for annotation",
-        ].sort(),
+        ["Add to a dataset", "Alert me on this", "Graph these", "Send for annotation"].sort(),
       );
     });
 
@@ -53,9 +48,7 @@ describe("followUpsForResult", () => {
       const suggestions = followUpsForResult(traceSearch());
 
       expect(
-        suggestions.some(
-          (suggestion) => suggestion.featureId === "observability.tracing",
-        ),
+        suggestions.some((suggestion) => suggestion.featureId === "observability.tracing"),
       ).toBe(false);
     });
   });
@@ -175,9 +168,7 @@ describe("the suggestion copy, given feature-map.json is the source of structure
 
     it("words only features that consume something", () => {
       const consumers = new Set(
-        FEATURES.filter((feature) => feature.consumes.length > 0).map(
-          (feature) => feature.id,
-        ),
+        FEATURES.filter((feature) => feature.consumes.length > 0).map((feature) => feature.id),
       );
       const orphaned = Object.keys(SUGGESTION_LABEL).filter((id) => !consumers.has(id));
 

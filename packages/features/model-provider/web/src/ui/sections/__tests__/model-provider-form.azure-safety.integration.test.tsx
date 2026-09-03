@@ -43,7 +43,10 @@ vi.mock("../../../behavior/model-provider-api", () => {
     listAllForProjectForFrontend: query([]),
     update: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
     validateApiKey: {
-      useMutation: () => ({ mutateAsync: vi.fn().mockResolvedValue({ valid: true }), isPending: false }),
+      useMutation: () => ({
+        mutateAsync: vi.fn().mockResolvedValue({ valid: true }),
+        isPending: false,
+      }),
     },
     setRoleAssignmentForScope: {
       useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -96,9 +99,7 @@ describe("Feature: Azure Safety model provider form rendering", () => {
 
       it("does not render the Default Provider toggle", async () => {
         await screen.findByText("AZURE_CONTENT_SAFETY_KEY");
-        expect(
-          screen.queryByText(/use .* as the default for langwatch/i),
-        ).toBeNull();
+        expect(screen.queryByText(/use .* as the default for langwatch/i)).toBeNull();
       });
 
       it("does not render the Use API Gateway toggle", async () => {
@@ -127,9 +128,7 @@ describe("Feature: Azure Safety model provider form rendering", () => {
         // Defaults moved to the page-level DefaultModelsSection (see
         // specs/model-providers/hierarchical-default-models.feature).
         await screen.findByText("Custom Models");
-        expect(
-          screen.queryByText(/use openai as the default for langwatch/i),
-        ).toBeNull();
+        expect(screen.queryByText(/use openai as the default for langwatch/i)).toBeNull();
       });
 
       it("does not render the Use API Gateway toggle", async () => {

@@ -23,23 +23,13 @@ export abstract class AgentService {
     ids: string[];
     projectId: string;
   }): Promise<AgentReferenceState[]>;
-  abstract getNamesByIds(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<AgentName[]>;
+  abstract getNamesByIds(input: { ids: string[]; projectId: string }): Promise<AgentName[]>;
   abstract exists(input: { id: string; projectId: string }): Promise<boolean>;
-  abstract list(input: {
-    projectId: string;
-    page: number;
-    limit: number;
-  }): Promise<AgentPage>;
+  abstract list(input: { projectId: string; page: number; limit: number }): Promise<AgentPage>;
   abstract create(input: CreateAgentCommand): Promise<AgentWithFields>;
   abstract update(input: UpdateAgentCommand): Promise<AgentWithFields>;
   abstract archive(input: ArchiveAgentCommand): Promise<Agent>;
-  abstract relatedEntities(input: {
-    id: string;
-    projectId: string;
-  }): Promise<RelatedAgentEntities>;
+  abstract relatedEntities(input: { id: string; projectId: string }): Promise<RelatedAgentEntities>;
   abstract cascadeArchive(
     input: ArchiveAgentCommand,
   ): Promise<{ agent: Agent; archivedWorkflow: { id: string } | null }>;
@@ -59,14 +49,8 @@ export abstract class AgentService {
     sourceProjectId: string;
     copyIds?: string[];
   }): Promise<{ pushedTo: number; selectedCopies: number }>;
-  abstract syncFromSource(input: {
-    agentId: string;
-    projectId: string;
-  }): Promise<{ ok: true }>;
-  abstract getHistory(input: {
-    agentId: string;
-    projectId: string;
-  }): Promise<AgentHistoryEntry[]>;
+  abstract syncFromSource(input: { agentId: string; projectId: string }): Promise<{ ok: true }>;
+  abstract getHistory(input: { agentId: string; projectId: string }): Promise<AgentHistoryEntry[]>;
   /**
    * Creates or re-registers a connected agent (ADR-128) on the row its
    * identity key names. A connected agent is never created through

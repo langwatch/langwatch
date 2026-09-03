@@ -18,13 +18,7 @@ import type { ScheduledJobRecord, ScheduledJobStore } from "../../schedule/sched
 export class PrismaScheduledJobStore implements ScheduledJobStore {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findDue({
-    now,
-    limit,
-  }: {
-    now: Date;
-    limit: number;
-  }): Promise<ScheduledJobRecord[]> {
+  async findDue({ now, limit }: { now: Date; limit: number }): Promise<ScheduledJobRecord[]> {
     // Cross-tenant due-scan, indexed by (active, nextRunAt), soonest first so
     // a bounded scan drains the backlog in calendar order. The `-- @tenancy:`
     // marker is the guard's explicit opt-out for a genuinely cross-tenant
@@ -208,12 +202,7 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
         // create wins and the other hits P2002. Both wanted the same row to
         // exist, so treat the loser as a success rather than surfacing a spurious
         // boot error. Any other failure still throws.
-        if (
-          !(
-            error instanceof Prisma.PrismaClientKnownRequestError &&
-            error.code === "P2002"
-          )
-        ) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")) {
           throw error;
         }
       }

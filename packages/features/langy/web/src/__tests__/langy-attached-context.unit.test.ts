@@ -37,9 +37,7 @@ describe("attachContext", () => {
   describe("when the same id is attached again", () => {
     it("refreshes it in place rather than stacking a duplicate", () => {
       useLangyStore.getState().attachContext(traceItem);
-      useLangyStore
-        .getState()
-        .attachContext({ ...traceItem, label: "Checkout agent — 8.2s" });
+      useLangyStore.getState().attachContext({ ...traceItem, label: "Checkout agent — 8.2s" });
 
       const list = useLangyStore.getState().attachedContext;
       expect(list).toHaveLength(1);
@@ -50,9 +48,7 @@ describe("attachContext", () => {
   describe("when one of several items is detached", () => {
     it("removes only the named item", () => {
       useLangyStore.getState().attachContext(traceItem);
-      useLangyStore
-        .getState()
-        .attachContext({ type: "dataset", id: "ds-1", label: "Golden set" });
+      useLangyStore.getState().attachContext({ type: "dataset", id: "ds-1", label: "Golden set" });
 
       useLangyStore.getState().detachContext("trace-abc");
 

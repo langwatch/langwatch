@@ -42,12 +42,7 @@ describe("getGetPromptSnippets()", () => {
         label: "staging",
       });
 
-      for (const target of [
-        "shell_curl",
-        "php_curl",
-        "go_native",
-        "java_unirest",
-      ] as const) {
+      for (const target of ["shell_curl", "php_curl", "go_native", "java_unirest"] as const) {
         const snippet = snippets.find((s) => s.target === target)!;
         expect(snippet.content).toContain("/api/prompts/my-prompt:staging");
         expect(snippet.content).not.toContain("?label=");

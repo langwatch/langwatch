@@ -9,9 +9,7 @@ import {
   changedTraceMetadataKeys,
 } from "../apply-trace-edit-overlay-to-views";
 
-const patchOf = (
-  overrides: Partial<TraceEditOverlayPatch>,
-): TraceEditOverlayPatch => ({
+const patchOf = (overrides: Partial<TraceEditOverlayPatch>): TraceEditOverlayPatch => ({
   version: 1,
   spans: [],
   deletedSpanIds: [],
@@ -40,9 +38,7 @@ describe("applying a correction to the drawer header", () => {
       expect(corrected.spanCount).toBe(1);
 
       // The captured trace is counted as it was captured.
-      expect(
-        applyOverlayToTraceHeader({ header, patch: null, spans }).spanCount,
-      ).toBe(3);
+      expect(applyOverlayToTraceHeader({ header, patch: null, spans }).spanCount).toBe(3);
 
       // An id the correction lists that the trace does not have removes nothing
       // from the count.
@@ -67,9 +63,7 @@ describe("applying a correction to the drawer header", () => {
             "metadata.reviewer": "unassigned",
             "langwatch.labels": '["nightly"]',
           },
-        } as unknown as Parameters<
-          typeof applyOverlayToTraceHeader
-        >[0]["header"],
+        } as unknown as Parameters<typeof applyOverlayToTraceHeader>[0]["header"],
         patch: patchOf({
           trace: {
             metadata: {

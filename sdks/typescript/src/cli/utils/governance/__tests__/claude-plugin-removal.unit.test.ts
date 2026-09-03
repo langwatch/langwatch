@@ -52,9 +52,7 @@ describe("uninstallLangwatchClaudePlugin", () => {
       expect(uninstallLangwatchClaudePlugin()).toEqual({
         action: "uninstalled",
       });
-      expect(commandsRun()).toContain(
-        "plugin uninstall langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).toContain("plugin uninstall langwatch@langwatch --scope user");
     });
   });
 

@@ -1,9 +1,6 @@
 import type { EvaluatorService as EvaluatorServiceContract } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import type {
-  EvaluatorAuditLogPort,
-  EvaluatorCodeExecutionPort,
-} from "../ports/evaluator.port";
+import type { EvaluatorAuditLogPort, EvaluatorCodeExecutionPort } from "../ports/evaluator.port";
 import type { EvaluatorDatabase } from "../repositories/evaluator.repository";
 import { PrismaEvaluatorRepository } from "../repositories/prisma/prisma.evaluator.repository";
 import { EvaluatorService } from "../services/evaluator.service";

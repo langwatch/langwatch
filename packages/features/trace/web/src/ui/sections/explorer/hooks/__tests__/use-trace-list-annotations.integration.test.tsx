@@ -148,9 +148,7 @@ describe("useTraceListAnnotations", () => {
       it("marks rows pending, without claiming nobody reviewed them", () => {
         answerWith({ isLoading: true });
 
-        const { result } = renderHook(() =>
-          useTraceListAnnotations({ rows: [row("t1")] }),
-        );
+        const { result } = renderHook(() => useTraceListAnnotations({ rows: [row("t1")] }));
 
         expect(result.current[0]?.annotationsLoading).toBe(true);
         expect(result.current[0]?.annotations).toEqual([]);
@@ -201,9 +199,7 @@ describe("useTraceListAnnotations", () => {
         harness.view = { columnOrder: ["time", "trace", "annotations"] };
         rerender();
 
-        expect(lastArgs()).toEqual(
-          expect.objectContaining({ enabled: true, traceIds: ["t1"] }),
-        );
+        expect(lastArgs()).toEqual(expect.objectContaining({ enabled: true, traceIds: ["t1"] }));
       });
     });
   });
@@ -242,9 +238,7 @@ describe("useTraceListAnnotations", () => {
       it("looks nothing up and says the column cannot answer", () => {
         harness.permissions.annotationsView = false;
 
-        const { result } = renderHook(() =>
-          useTraceListAnnotations({ rows: [row("t1")] }),
-        );
+        const { result } = renderHook(() => useTraceListAnnotations({ rows: [row("t1")] }));
 
         expect(lastArgs()).toEqual(expect.objectContaining({ enabled: false }));
         expect(result.current[0]?.annotationsUnavailable).toBe(true);

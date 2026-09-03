@@ -12,9 +12,7 @@ import { resolveSuiteId } from "./resolveSuite";
  *
  * @see specs/features/test-suite-cli.feature
  */
-export const archiveTestSuiteCommand = async (
-  reference: string,
-): Promise<CommandResult | void> => {
+export const archiveTestSuiteCommand = async (reference: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = createCliTestSuitesService();
@@ -30,9 +28,7 @@ export const archiveTestSuiteCommand = async (
       data: result,
       table: () => {
         console.log();
-        console.log(
-          chalk.gray("  The scenarios filed in it were archived with it."),
-        );
+        console.log(chalk.gray("  The scenarios filed in it were archived with it."));
       },
     };
   } catch (error) {

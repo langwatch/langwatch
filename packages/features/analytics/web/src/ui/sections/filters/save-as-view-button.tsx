@@ -48,12 +48,7 @@ export function SaveAsViewButton() {
 
   return (
     <>
-      <Button
-        size="xs"
-        variant="outline"
-        onClick={handleOpen}
-        data-testid="save-as-view-button"
-      >
+      <Button size="xs" variant="outline" onClick={handleOpen} data-testid="save-as-view-button">
         Save as view
       </Button>
 
@@ -85,11 +80,7 @@ export function SaveAsViewButton() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  colorPalette="blue"
-                  onClick={handleConfirm}
-                  disabled={!viewName.trim()}
-                >
+                <Button colorPalette="blue" onClick={handleConfirm} disabled={!viewName.trim()}>
                   Save
                 </Button>
               </HStack>

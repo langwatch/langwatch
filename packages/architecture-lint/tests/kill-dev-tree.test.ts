@@ -149,18 +149,7 @@ function writeLane(): string {
 const readyFile = () => path.join(scratch, "lane-is-up");
 
 /** Everything kill-dev-tree.sh shells out to, minus the port lookups. */
-const SCRIPT_NEEDS = [
-  "bash",
-  "awk",
-  "cat",
-  "cut",
-  "grep",
-  "ps",
-  "seq",
-  "sleep",
-  "sort",
-  "tr",
-];
+const SCRIPT_NEEDS = ["bash", "awk", "cat", "cut", "grep", "ps", "seq", "sleep", "sort", "tr"];
 
 function realPathOf(tool: string): string {
   for (const dir of ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]) {
@@ -279,26 +268,13 @@ const strangerReadyFile = (named: string) => path.join(scratch, `${named}-is-up`
  * holds a port on plenty of machines and is nobody's dev lane, and it is
  * exactly what a "does the command line mention node" test gets wrong.
  */
-function startStranger({
-  port,
-  named = "dev-listener",
-}: {
-  port: number;
-  named?: string;
-}): number {
+function startStranger({ port, named = "dev-listener" }: { port: number; named?: string }): number {
   const asAnother = path.join(scratch, named);
   symlinkSync(process.execPath, asAnother);
-  return startInOwnGroup(asAnother, [
-    writeLane(),
-    String(port),
-    strangerReadyFile(named),
-  ]);
+  return startInOwnGroup(asAnother, [writeLane(), String(port), strangerReadyFile(named)]);
 }
 
-async function waitUntil(
-  predicate: () => boolean,
-  { timeoutMs = 15000 } = {},
-): Promise<boolean> {
+async function waitUntil(predicate: () => boolean, { timeoutMs = 15000 } = {}): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) return true;
@@ -421,9 +397,7 @@ describe("clearing the dev ports", () => {
         const stack = startInOwnGroup("bash", [writeRestartingStack(ours)]);
         expect(await laneIsUp()).toBe(true);
         const stranger = startStranger({ port: theirs });
-        expect(await waitUntil(() => existsSync(strangerReadyFile("dev-listener")))).toBe(
-          true,
-        );
+        expect(await waitUntil(() => existsSync(strangerReadyFile("dev-listener")))).toBe(true);
 
         const result = clearPorts(`${ours},${theirs}`, {
           KILL_DEV_TREE_GRACE: "2",
@@ -443,9 +417,7 @@ describe("clearing the dev ports", () => {
           port: theirs,
           named: "node_exporter",
         });
-        expect(
-          await waitUntil(() => existsSync(strangerReadyFile("node_exporter"))),
-        ).toBe(true);
+        expect(await waitUntil(() => existsSync(strangerReadyFile("node_exporter")))).toBe(true);
 
         const result = clearPorts(String(theirs), {
           KILL_DEV_TREE_GRACE: "2",
@@ -493,11 +465,7 @@ describe("clearing the dev ports", () => {
       /** @scenario "A listener that cannot be attributed is not blamed on a stranger" */
       it("refuses to call a listener someone else's when it could not attribute it", async () => {
         const port = await freePort();
-        const lane = startInOwnGroup(process.execPath, [
-          writeLane(),
-          String(port),
-          readyFile(),
-        ]);
+        const lane = startInOwnGroup(process.execPath, [writeLane(), String(port), readyFile()]);
         expect(await laneIsUp()).toBe(true);
 
         const result = clearPorts(String(port), {

@@ -49,9 +49,7 @@ describe("formatStatFigure", () => {
     /** @scenario "A unit that is a word stands off the number" */
     it("separates it from the number with a space", () => {
       expect(formatStatFigure({ value: 812, unit: "ms" })).toBe("812 ms");
-      expect(formatStatFigure({ value: 1500, unit: "tokens" })).toBe(
-        "1,500 tokens",
-      );
+      expect(formatStatFigure({ value: 1500, unit: "tokens" })).toBe("1,500 tokens");
     });
   });
 
@@ -73,12 +71,8 @@ describe("formatStatFigure", () => {
   describe("given a value smaller than a hundredth", () => {
     /** @scenario "A reading smaller than a hundredth keeps its digits" */
     it("keeps the digits rather than rounding to zero", () => {
-      expect(formatStatFigure({ value: 0.0001543, unit: "usd" })).toBe(
-        "0.0001543 usd",
-      );
-      expect(formatStatFigure({ value: -0.0001543, unit: "usd" })).toBe(
-        "-0.0001543 usd",
-      );
+      expect(formatStatFigure({ value: 0.0001543, unit: "usd" })).toBe("0.0001543 usd");
+      expect(formatStatFigure({ value: -0.0001543, unit: "usd" })).toBe("-0.0001543 usd");
       expect(formatStatFigure({ value: 0.00025 })).toBe("0.00025");
     });
 

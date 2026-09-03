@@ -63,7 +63,6 @@ export type OrganizationMemberMatch = {
   user: { id: string; name: string | null; email: string | null };
 };
 
-
 /** A team, as every team-shaped read in this family answers one. */
 export type TeamReading = {
   id: string;

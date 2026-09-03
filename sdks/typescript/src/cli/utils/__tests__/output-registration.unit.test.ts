@@ -6,19 +6,13 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
-import {
-  AGENT_MODE_ENV_VARS,
-  registerOutputOptions,
-  resolveActionOutputOptions,
-} from "../output";
+import { AGENT_MODE_ENV_VARS, registerOutputOptions, resolveActionOutputOptions } from "../output";
 
 /** Agent-mode env vars from the host (e.g. CLAUDECODE under Claude Code) must not leak into tests. */
 let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
@@ -50,17 +44,7 @@ describe("registerOutputOptions", () => {
       });
 
     registerOutputOptions(program);
-    program.parse([
-      "node",
-      "lw",
-      "trace",
-      "list",
-      "--agent",
-      "-o",
-      "yaml",
-      "--jq",
-      ".items[]",
-    ]);
+    program.parse(["node", "lw", "trace", "list", "--agent", "-o", "yaml", "--jq", ".items[]"]);
 
     expect(captured).toMatchObject({ agent: true, output: "yaml", jq: ".items[]" });
   });

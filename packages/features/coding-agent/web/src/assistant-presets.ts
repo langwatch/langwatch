@@ -33,10 +33,7 @@ interface AssistantPreset {
   darkModeInvert: boolean;
 }
 
-export const ASSISTANT_PRESETS: Record<
-  Exclude<AssistantKind, "custom">,
-  AssistantPreset
-> = {
+export const ASSISTANT_PRESETS: Record<Exclude<AssistantKind, "custom">, AssistantPreset> = {
   claude_code: {
     label: "Claude Code",
     iconUrl: "/images/external-icons/claude-code.svg",
@@ -81,9 +78,7 @@ export const ASSISTANT_OPTIONS: Array<{
   label: string;
 }> = [
   ...(
-    Object.entries(ASSISTANT_PRESETS) as Array<
-      [Exclude<AssistantKind, "custom">, AssistantPreset]
-    >
+    Object.entries(ASSISTANT_PRESETS) as Array<[Exclude<AssistantKind, "custom">, AssistantPreset]>
   ).map(([value, p]) => ({ value, label: p.label })),
   { value: "custom" as const, label: "Custom" },
 ];

@@ -80,7 +80,7 @@ type PolicyMiddlewareOptions = Readonly<{
  */
 const contextAuthorizePolicy: SecretTrpcPolicy =
   (permission) =>
-  <TProcedure,>(procedure: TProcedure): TProcedure =>
+  <TProcedure>(procedure: TProcedure): TProcedure =>
     (procedure as unknown as ChainableProcedure).use(
       async ({ ctx, input, next }: PolicyMiddlewareOptions) => {
         await ctx.authorize(permission, { projectId: input.projectId });

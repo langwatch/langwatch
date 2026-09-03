@@ -68,14 +68,14 @@ function EmailSuppressionsPage({
   });
 
   return (
-  <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
+    <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
       <VStack align="start" gap={1} width="full" marginTop={2}>
         <Heading as="h2" fontSize="xl">
           Email Suppressions
         </Heading>
         <Text color="fg.muted">
-          Recipients who unsubscribed from this project&apos;s trigger notifications.
-          Removing an entry resumes delivery to that address.
+          Recipients who unsubscribed from this project&apos;s trigger notifications. Removing an
+          entry resumes delivery to that address.
         </Text>
       </VStack>
 
@@ -87,9 +87,7 @@ function EmailSuppressionsPage({
             </HStack>
           ) : suppressions.isError ? (
             <VStack align="center" gap={3} padding={8}>
-              <Text color="fg.error">
-                Could not load suppressions. Please try again.
-              </Text>
+              <Text color="fg.error">Could not load suppressions. Please try again.</Text>
               <Button
                 size="sm"
                 variant="outline"
@@ -129,14 +127,10 @@ function EmailSuppressionsPage({
                       {row.triggerId == null ? (
                         <Badge colorPalette="red">All notifications</Badge>
                       ) : (
-                        <Badge colorPalette="gray">
-                          {row.triggerName ?? "Notification"}
-                        </Badge>
+                        <Badge colorPalette="gray">{row.triggerName ?? "Notification"}</Badge>
                       )}
                     </Table.Cell>
-                    <Table.Cell>
-                      {new Date(row.createdAt).toLocaleDateString()}
-                    </Table.Cell>
+                    <Table.Cell>{new Date(row.createdAt).toLocaleDateString()}</Table.Cell>
                     <Table.Cell textAlign="end">
                       {canManage && (
                         <Button
@@ -157,6 +151,6 @@ function EmailSuppressionsPage({
           )}
         </Card.Body>
       </Card.Root>
-  </VStack>
+    </VStack>
   );
 }

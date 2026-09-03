@@ -60,9 +60,7 @@ export const createApiKeyCommand = async (
 
   const service = new ApiKeysApiService();
   const keyType = options.keyType ?? "service";
-  const spinner = createSpinner(
-    `Creating ${keyType} API key "${options.name}"...`,
-  ).start();
+  const spinner = createSpinner(`Creating ${keyType} API key "${options.name}"...`).start();
 
   try {
     const result = await service.create({
@@ -74,9 +72,7 @@ export const createApiKeyCommand = async (
       ...(options.assignedToUserId !== undefined
         ? { assignedToUserId: options.assignedToUserId }
         : {}),
-      ...(access.permissionMode !== undefined
-        ? { permissionMode: access.permissionMode }
-        : {}),
+      ...(access.permissionMode !== undefined ? { permissionMode: access.permissionMode } : {}),
       ...(access.permissions.length > 0 ? { permissions: access.permissions } : {}),
       ...(access.bindings.length > 0 ? { bindings: access.bindings } : {}),
     });
@@ -87,9 +83,7 @@ export const createApiKeyCommand = async (
       data: result,
       table: () => {
         console.log();
-        console.log(
-          chalk.bold.yellow("⚠  Save the token below NOW. It will not be shown again."),
-        );
+        console.log(chalk.bold.yellow("⚠  Save the token below NOW. It will not be shown again."));
         console.log();
         console.log(`  ${chalk.green(result.token)}`);
         console.log();

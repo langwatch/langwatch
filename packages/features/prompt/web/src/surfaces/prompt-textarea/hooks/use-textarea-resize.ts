@@ -9,10 +9,7 @@ type UseTextareaResizeProps = {
  * Detects manual textarea resizing by the user.
  * Tracks if user has resized beyond minimum to disable auto-height.
  */
-export const useTextareaResize = ({
-  containerRef,
-  minHeightPx,
-}: UseTextareaResizeProps) => {
+export const useTextareaResize = ({ containerRef, minHeightPx }: UseTextareaResizeProps) => {
   const [userResizedHeight, setUserResizedHeight] = useState<number | null>(null);
   const isUserResizingRef = useRef(false);
   const pendingHeightRef = useRef<number | null>(null);
@@ -24,8 +21,7 @@ export const useTextareaResize = ({
     const handleMouseDown = (e: MouseEvent) => {
       // Check if mouse is near the resize handle (bottom-right corner)
       const rect = textarea.getBoundingClientRect();
-      const isNearResizeHandle =
-        e.clientX > rect.right - 20 && e.clientY > rect.bottom - 20;
+      const isNearResizeHandle = e.clientX > rect.right - 20 && e.clientY > rect.bottom - 20;
       if (isNearResizeHandle) {
         isUserResizingRef.current = true;
         pendingHeightRef.current = null;

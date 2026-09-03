@@ -131,8 +131,7 @@ describe("Langy process trace continuity", () => {
 
   describe("given the subscriber handles a queued event inside an active trace", () => {
     it("persists the ambient W3C carrier on the pending intent", async () => {
-      const { producerTraceId } =
-        await handleStartedTurnInsideProducerSpan(generatedSubscriber());
+      const { producerTraceId } = await handleStartedTurnInsideProducerSpan(generatedSubscriber());
 
       const [message] = await store.findMessagesByRef({ ref });
       expect(message).toBeDefined();
@@ -151,9 +150,7 @@ describe("Langy process trace continuity", () => {
         generatedSubscriber(ports),
       );
       const [message] = await store.findMessagesByRef({ ref });
-      const [, , carrierSpanId] = W3C_TRACEPARENT_REGEX.exec(
-        message!.traceCarrier.traceparent!,
-      )!;
+      const [, , carrierSpanId] = W3C_TRACEPARENT_REGEX.exec(message!.traceCarrier.traceparent!)!;
 
       const dispatcher = new OutboxDispatcherService({
         store,

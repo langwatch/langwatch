@@ -51,9 +51,7 @@ type SessionEvent = z.infer<typeof sessionEventSchema>;
 const parseLimitOption = (raw: string | undefined): number => {
   const limit = raw ? Number(raw) : DEFAULT_LIMIT;
   if (!Number.isSafeInteger(limit) || limit <= 0) {
-    console.error(
-      chalk.red(`Error: --limit must be a positive whole number, got "${raw}"`),
-    );
+    console.error(chalk.red(`Error: --limit must be a positive whole number, got "${raw}"`));
     process.exit(1);
   }
   return limit;
@@ -70,9 +68,7 @@ const parseTimeOption = (raw: string | undefined, flag: string): number | undefi
   const trimmed = raw.trim();
   const parsed = /^-?\d+$/.test(trimmed) ? Number(trimmed) : new Date(trimmed).getTime();
   if (!Number.isFinite(parsed)) {
-    console.error(
-      chalk.red(`Error: ${flag} must be an ISO date or epoch ms, got "${raw}"`),
-    );
+    console.error(chalk.red(`Error: ${flag} must be an ISO date or epoch ms, got "${raw}"`));
     process.exit(1);
   }
   return parsed;
@@ -235,9 +231,7 @@ const renderEvent = (event: SessionEvent): string => {
   switch (event.eventKind) {
     case "model_call": {
       const context =
-        (event.cacheReadTokens ?? 0) +
-        (event.cacheCreationTokens ?? 0) +
-        (event.inputTokens ?? 0);
+        (event.cacheReadTokens ?? 0) + (event.cacheCreationTokens ?? 0) + (event.inputTokens ?? 0);
       const lane = event.agentType ? ` [${event.agentType}]` : "";
       return `${stamp} model call${lane} ${event.model ?? ""} context=${context.toLocaleString()} output=${(event.outputTokens ?? 0).toLocaleString()}${event.costUsd != null ? ` $${event.costUsd.toFixed(4)}` : ""}`;
     }

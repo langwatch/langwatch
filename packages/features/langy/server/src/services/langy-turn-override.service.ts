@@ -1,8 +1,5 @@
 import { LANGY_PROMPT_HANDLES } from "@langwatch/langy-contract";
-import {
-  resolveLangyPrompt,
-  type LangyPromptPort,
-} from "./langy-prompt-registry.service";
+import { resolveLangyPrompt, type LangyPromptPort } from "./langy-prompt-registry.service";
 import { LANGY_OVERRIDE } from "./langy-turn.shared";
 
 export type LangyTurnOverride = {
@@ -40,10 +37,7 @@ export class LangyTurnOverrideService {
       LangyTurnOverrideService.lastRegistryOverrideText = resolved.text;
       return { text: resolved.text, source: "registry" };
     }
-    if (
-      resolved.source === "error" &&
-      LangyTurnOverrideService.lastRegistryOverrideText !== null
-    ) {
+    if (resolved.source === "error" && LangyTurnOverrideService.lastRegistryOverrideText !== null) {
       return {
         text: LangyTurnOverrideService.lastRegistryOverrideText,
         source: "cached",

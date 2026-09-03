@@ -5,10 +5,9 @@ sidebarTitle: CLI debug
 ---
 
 <Info>
-  **Pairs with:** [AI Gateway → CLI Integrations](/ai-gateway/cli/overview). The
-  `langwatch` CLI is shared between Gateway and Governance, `login` and `logout` are
-  gateway-side, `ingest` and `governance status` subcommands are governance-side, both
-  behind the same device-flow OAuth.
+  **Pairs with:** [AI Gateway → CLI Integrations](/ai-gateway/cli/overview). The `langwatch` CLI is
+  shared between Gateway and Governance, `login` and `logout` are gateway-side, `ingest` and
+  `governance status` subcommands are governance-side, both behind the same device-flow OAuth.
 </Info>
 
 A small set of read-only commands for SREs, governance admins, and on-call engineers to answer "is data flowing?" without opening the web UI. They reuse the same backend the [admin oversight dashboard](/ai-governance/control-plane) and the [per-source detail page](/ai-gateway/governance/admin-setup#ingestion-sources) already render, so what you see in the terminal and what you see in the browser are guaranteed identical (byte-for-byte on `--json`).

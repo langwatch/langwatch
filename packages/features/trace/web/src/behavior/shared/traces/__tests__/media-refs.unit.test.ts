@@ -16,8 +16,7 @@ import {
 } from "../media-refs";
 
 /** The fold's two steps in one call: walk a span payload, then serialize it. */
-const serializeMediaRefs = (value: unknown) =>
-  serializeMediaRefList(collectMediaRefs(value));
+const serializeMediaRefs = (value: unknown) => serializeMediaRefList(collectMediaRefs(value));
 
 describe("collectMediaRefs", () => {
   describe("given a winning span IO with externalized media", () => {
@@ -148,12 +147,7 @@ describe("collectMediaRefs", () => {
       ]);
 
       expect(refs).toHaveLength(MAX_TRACE_MEDIA_REFS);
-      expect(refs.map((ref) => ref.role)).toEqual([
-        "user",
-        "user",
-        "assistant",
-        "assistant",
-      ]);
+      expect(refs.map((ref) => ref.role)).toEqual(["user", "user", "assistant", "assistant"]);
     });
   });
 
@@ -225,9 +219,7 @@ describe("collectMediaRefs", () => {
       const refs = collectMediaRefs([
         {
           role: "narrator",
-          content: [
-            { type: "image_url", image_url: { url: "/api/files/p1/odd" } },
-          ],
+          content: [{ type: "image_url", image_url: { url: "/api/files/p1/odd" } }],
         },
         { type: "image_url", image_url: { url: "/api/files/p1/bare" } },
       ]);
@@ -274,10 +266,7 @@ describe("mediaRefBelongsToSide", () => {
     it("keeps a system or tool part on the input side", () => {
       for (const role of ["system", "tool", "developer", "function"] as const) {
         expect(
-          mediaRefBelongsToSide(
-            { kind: "image", url: "/api/files/p1/x", role },
-            "input",
-          ),
+          mediaRefBelongsToSide({ kind: "image", url: "/api/files/p1/x", role }, "input"),
         ).toBe(true);
       }
     });
@@ -285,8 +274,7 @@ describe("mediaRefBelongsToSide", () => {
 });
 
 describe("mergeMediaRefs", () => {
-  const imageRef = (id: string) =>
-    ({ kind: "image", url: `/api/files/p1/${id}` }) as const;
+  const imageRef = (id: string) => ({ kind: "image", url: `/api/files/p1/${id}` }) as const;
 
   describe("when the incoming span won the trace's headline input", () => {
     /** @scenario The headline span's media is preferred over a child's */
@@ -329,9 +317,7 @@ describe("mergeMediaRefs", () => {
   describe("when the merged list would exceed the cap", () => {
     /** @scenario The refs stay capped however many spans carry media */
     it("stops at the cap", () => {
-      const many = Array.from({ length: MAX_TRACE_MEDIA_REFS + 3 }, (_, i) =>
-        imageRef(`i${i}`),
-      );
+      const many = Array.from({ length: MAX_TRACE_MEDIA_REFS + 3 }, (_, i) => imageRef(`i${i}`));
 
       const merged = mergeMediaRefs({
         existing: many,
@@ -350,9 +336,7 @@ describe("serializeMediaRefs and parseMediaRefs", () => {
     const value = [
       {
         role: "user",
-        content: [
-          { type: "image_url", image_url: { url: "/api/files/p1/i1" } },
-        ],
+        content: [{ type: "image_url", image_url: { url: "/api/files/p1/i1" } }],
       },
     ];
     const serialized = serializeMediaRefs(value);
@@ -377,20 +361,16 @@ describe("serializeMediaRefs and parseMediaRefs", () => {
     const serialized = serializeMediaRefs([
       {
         role: "assistant",
-        content: [
-          { type: "image_url", image_url: { url: "/api/files/p1/i1" } },
-        ],
+        content: [{ type: "image_url", image_url: { url: "/api/files/p1/i1" } }],
       },
     ]);
     expect(parseMediaRefs(serialized)).toEqual([
       { kind: "image", url: "/api/files/p1/i1", role: "assistant" },
     ]);
 
-    expect(
-      parseMediaRefs(
-        `[{"kind":"image","url":"/api/files/p1/i1","role":"nope"}]`,
-      ),
-    ).toEqual([{ kind: "image", url: "/api/files/p1/i1" }]);
+    expect(parseMediaRefs(`[{"kind":"image","url":"/api/files/p1/i1","role":"nope"}]`)).toEqual([
+      { kind: "image", url: "/api/files/p1/i1" },
+    ]);
   });
 
   describe("given a crafted reserved attribute smuggling non-stored urls", () => {
@@ -403,9 +383,7 @@ describe("serializeMediaRefs and parseMediaRefs", () => {
         { kind: "file", url: "/api/files/../../auth/session" },
         { kind: "image", url: "/api/files/p1/legit" },
       ]);
-      expect(parseMediaRefs(crafted)).toEqual([
-        { kind: "image", url: "/api/files/p1/legit" },
-      ]);
+      expect(parseMediaRefs(crafted)).toEqual([{ kind: "image", url: "/api/files/p1/legit" }]);
     });
   });
 

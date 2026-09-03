@@ -106,9 +106,7 @@ describe("setupObservability", () => {
       debug: { logger },
     });
 
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Observability disabled via advanced.disabled",
-    );
+    expect(logger.debug).toHaveBeenCalledWith("Observability disabled via advanced.disabled");
     expect(typeof handle.shutdown).toBe("function");
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
@@ -181,9 +179,7 @@ describe("langwatch configuration", () => {
       resourceFromAttributes({}),
     );
 
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added user-provided 1 SpanProcessors to SDK",
-    );
+    expect(logger.debug).toHaveBeenCalledWith("Added user-provided 1 SpanProcessors to SDK");
     expect(sdk).toBeDefined();
   });
 
@@ -242,9 +238,7 @@ describe("langwatch configuration", () => {
     );
 
     expect(logger.error).not.toHaveBeenCalledWith(
-      expect.stringContaining(
-        "LangWatch integration is disabled but no custom span processors",
-      ),
+      expect.stringContaining("LangWatch integration is disabled but no custom span processors"),
     );
     expect(sdk).toBeDefined();
   });
@@ -265,9 +259,7 @@ describe("langwatch configuration", () => {
     );
 
     expect(logger.error).not.toHaveBeenCalledWith(
-      expect.stringContaining(
-        "LangWatch integration is disabled but no custom span processors",
-      ),
+      expect.stringContaining("LangWatch integration is disabled but no custom span processors"),
     );
     expect(sdk).toBeDefined();
   });
@@ -518,9 +510,7 @@ describe("log record processors configuration", () => {
     const sdk = createAndStartNodeSdk(options, logger, resourceFromAttributes({}));
 
     expect(sdk).toBeDefined();
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added user-provided 1 LogRecordProcessors to SDK",
-    );
+    expect(logger.debug).toHaveBeenCalledWith("Added user-provided 1 LogRecordProcessors to SDK");
   });
 
   it("adds multiple user log record processors when provided", () => {
@@ -543,9 +533,7 @@ describe("log record processors configuration", () => {
     const sdk = createAndStartNodeSdk(options, logger, resourceFromAttributes({}));
 
     expect(sdk).toBeDefined();
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added user-provided 2 LogRecordProcessors to SDK",
-    );
+    expect(logger.debug).toHaveBeenCalledWith("Added user-provided 2 LogRecordProcessors to SDK");
   });
 
   it("uses default batch log record processor when no custom processors provided", () => {
@@ -576,9 +564,7 @@ describe("log record processors configuration", () => {
     const sdk = createAndStartNodeSdk(options, logger, resourceFromAttributes({}));
 
     expect(sdk).toBeDefined();
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added user-provided 1 LogRecordProcessors to SDK",
-    );
+    expect(logger.debug).toHaveBeenCalledWith("Added user-provided 1 LogRecordProcessors to SDK");
     expect(logger.debug).toHaveBeenCalledWith(
       "Console recording of logs enabled; adding console log record processor",
     );
@@ -609,9 +595,7 @@ describe("span processors configuration", () => {
     const sdk = createAndStartNodeSdk(options, logger, resourceFromAttributes({}));
 
     expect(sdk).toBeDefined();
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added user-provided 1 SpanProcessors to SDK",
-    );
+    expect(logger.debug).toHaveBeenCalledWith("Added user-provided 1 SpanProcessors to SDK");
   });
 
   it("uses default batch span processor when no custom processors provided", () => {
@@ -643,9 +627,7 @@ describe("span processors configuration", () => {
     const sdk = createAndStartNodeSdk(options, logger, resourceFromAttributes({}));
 
     expect(sdk).toBeDefined();
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added user-provided 1 SpanProcessors to SDK",
-    );
+    expect(logger.debug).toHaveBeenCalledWith("Added user-provided 1 SpanProcessors to SDK");
     expect(logger.debug).toHaveBeenCalledWith(
       "Console tracing enabled; adding console span exporter",
     );
@@ -806,9 +788,7 @@ describe("error handling in setup", () => {
 
     // Since the setup is actually succeeding now, we need to check for the success message
     expect(logger.debug).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK",
-      ),
+      expect.stringContaining("Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK"),
     );
   });
 
@@ -846,9 +826,7 @@ describe("error handling in setup", () => {
     expect(typeof handle.shutdown).toBe("function");
     await expect(handle.shutdown()).resolves.toBeUndefined();
 
-    expect(logger.error).toHaveBeenCalledWith(
-      "Failed to initialize NodeSDK: Test error message",
-    );
+    expect(logger.error).toHaveBeenCalledWith("Failed to initialize NodeSDK: Test error message");
     expect(logger.debug).toHaveBeenCalledWith(
       "Shutdown called for LangWatch no-op. Nothing will be shutdown",
     );

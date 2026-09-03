@@ -3,7 +3,10 @@ import {
   SimulationRunStatus as ScenarioRunStatus,
   SimulationVerdict as Verdict,
 } from "@langwatch/scenario-contract";
-import { CONSOLE_COLORS, STATUS_DISPLAY_TEXT_MAP } from "../../../model/simulation-console/constants";
+import {
+  CONSOLE_COLORS,
+  STATUS_DISPLAY_TEXT_MAP,
+} from "../../../model/simulation-console/constants";
 
 interface StatusDisplayProps {
   status?: ScenarioRunStatus;

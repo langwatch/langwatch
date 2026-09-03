@@ -1,10 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  collectFilenameMigrationMappings,
-  planFilenameMigration,
-} from "../src/filename-migration";
+import { collectFilenameMigrationMappings, planFilenameMigration } from "../src/filename-migration";
 
 let root = "";
 
@@ -65,10 +62,7 @@ describe("strict filename migration", () => {
     expect(plan.collisions).toEqual([]);
     expect(plan.unresolved).toEqual([]);
     expect(
-      plan.mappings.map(({ from, to }) => [
-        from.slice(root.length + 1),
-        to.slice(root.length + 1),
-      ]),
+      plan.mappings.map(({ from, to }) => [from.slice(root.length + 1), to.slice(root.length + 1)]),
     ).toEqual([
       // `prisma.agent.repository.ts` is NOT in this list: the dotted
       // technology qualifier is the canonical spelling, so the planner leaves
@@ -82,21 +76,21 @@ describe("strict filename migration", () => {
         "packages/features/agent/web/src/agent-card.tsx",
       ],
     ]);
-    expect(
-      plan.edits.get(join(root, "packages/features/agent/server/src/index.ts")),
-    ).toContain('"./services/agent-service.service"');
-    expect(
-      plan.edits.get(join(root, "packages/features/agent/server/src/index.ts")),
-    ).toContain('"./services/agent-service.service.js"');
-    expect(
-      plan.edits.get(join(root, "packages/features/agent/server/package.json")),
-    ).toContain("./src/services/agent-service.service.ts");
-    expect(
-      plan.edits.get(join(root, "packages/features/agent/server/tsconfig.json")),
-    ).toContain("src/services/agent-service.service.ts");
-    expect(
-      plan.edits.get(join(root, "packages/features/agent/adrs/001-layout.md")),
-    ).toContain("packages/features/agent/server/src/services/agent-service.service.ts");
+    expect(plan.edits.get(join(root, "packages/features/agent/server/src/index.ts"))).toContain(
+      '"./services/agent-service.service"',
+    );
+    expect(plan.edits.get(join(root, "packages/features/agent/server/src/index.ts"))).toContain(
+      '"./services/agent-service.service.js"',
+    );
+    expect(plan.edits.get(join(root, "packages/features/agent/server/package.json"))).toContain(
+      "./src/services/agent-service.service.ts",
+    );
+    expect(plan.edits.get(join(root, "packages/features/agent/server/tsconfig.json"))).toContain(
+      "src/services/agent-service.service.ts",
+    );
+    expect(plan.edits.get(join(root, "packages/features/agent/adrs/001-layout.md"))).toContain(
+      "packages/features/agent/server/src/services/agent-service.service.ts",
+    );
     expect(plan.remainingTextualReferences).toEqual([]);
   });
 
@@ -143,9 +137,10 @@ describe("strict filename migration", () => {
       "export const anthropic = true;",
     );
 
-    const relativeMappings = collectFilenameMigrationMappings(root).map(
-      ({ from, to }) => [from.slice(root.length + 1), to.slice(root.length + 1)],
-    );
+    const relativeMappings = collectFilenameMigrationMappings(root).map(({ from, to }) => [
+      from.slice(root.length + 1),
+      to.slice(root.length + 1),
+    ]);
     expect(relativeMappings).toEqual([
       [
         "packages/features/agent/server/src/adapters/apiKeyToken.apiKeyToken.adapter.ts",
@@ -171,9 +166,7 @@ describe("strict filename migration", () => {
     );
 
     const plan = planFilenameMigration(root);
-    expect(
-      plan.edits.has(join(root, "packages/features/agent/server/src/notes.ts")),
-    ).toBe(false);
+    expect(plan.edits.has(join(root, "packages/features/agent/server/src/notes.ts"))).toBe(false);
     expect(
       readFileSync(join(root, "packages/features/agent/server/src/notes.ts"), "utf8"),
     ).toContain("agentService.service");

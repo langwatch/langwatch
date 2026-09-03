@@ -4,16 +4,7 @@
  * Adapted from BatchEvaluationV2EvaluationSummary with cleaner styling.
  */
 
-import {
-  Box,
-  Button,
-  HStack,
-  Progress,
-  Separator,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Progress, Separator, Spacer, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { formatCost } from "./presentation";
@@ -80,9 +71,7 @@ export function BatchSummaryFooter({
   const finishedAt = useMemo(() => getFinishedAt(run.timestamps), [run.timestamps]);
 
   const runtime = Math.max(
-    run.timestamps.createdAt
-      ? (finishedAt ?? currentTimestamp) - run.timestamps.createdAt
-      : 0,
+    run.timestamps.createdAt ? (finishedAt ?? currentTimestamp) - run.timestamps.createdAt : 0,
     0,
   );
 
@@ -174,13 +163,7 @@ export function BatchSummaryFooter({
 
       {/* Progress bar */}
       {showProgress && !finishedAt && (
-        <HStack
-          width="full"
-          padding={3}
-          borderTop="1px solid"
-          borderColor="border"
-          gap={2}
-        >
+        <HStack width="full" padding={3} borderTop="1px solid" borderColor="border" gap={2}>
           <Text whiteSpace="nowrap" marginTop="-1px" paddingX={2}>
             Running
           </Text>

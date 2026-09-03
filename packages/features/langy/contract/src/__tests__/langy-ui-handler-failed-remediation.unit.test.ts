@@ -28,10 +28,7 @@ describe("given a page reported a failure of its own", () => {
 
   describe("when its code has no remediation of its own", () => {
     it("does not adopt tips from an unrelated code", () => {
-      const error = new LangyUiHandlerFailedError(
-        "workbench.duplicateTarget",
-        "target_not_found",
-      );
+      const error = new LangyUiHandlerFailedError("workbench.duplicateTarget", "target_not_found");
 
       expect(error.meta?.errorCode).toBe("target_not_found");
     });

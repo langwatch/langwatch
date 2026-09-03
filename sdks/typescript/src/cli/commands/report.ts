@@ -33,8 +33,7 @@ export interface ReportCommandOptions {
   dryRun?: boolean;
 }
 
-const cliVersion = (): string =>
-  typeof __CLI_VERSION__ !== "undefined" ? __CLI_VERSION__ : "dev";
+const cliVersion = (): string => (typeof __CLI_VERSION__ !== "undefined" ? __CLI_VERSION__ : "dev");
 
 /** Whitespace-only inputs fall through to the next title candidate. */
 const nonEmptyTrimmed = (text: string | undefined): string | undefined => {

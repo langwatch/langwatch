@@ -293,9 +293,7 @@ describe("<TraceTable /> failed-read gating", () => {
         renderTable();
 
         expect(screen.queryByTestId("empty-filter-state")).not.toBeInTheDocument();
-        expect(
-          screen.getByText(/could not load your conversations/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/could not load your conversations/i)).toBeInTheDocument();
       });
 
       it("still shows the empty state when the read genuinely came back empty", () => {

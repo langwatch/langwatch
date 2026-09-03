@@ -1,4 +1,9 @@
-import { counter, histogram, type CounterHandle, type HistogramHandle } from "@langwatch/observability/metrics";
+import {
+  counter,
+  histogram,
+  type CounterHandle,
+  type HistogramHandle,
+} from "@langwatch/observability/metrics";
 import type { TopicClusteringMetricsPort } from "../intents/topic-clustering.intent";
 
 /**
@@ -33,7 +38,9 @@ export class OtelTopicClusteringMetricsAdapter implements TopicClusteringMetrics
     private readonly duration: HistogramHandle,
   ) {}
 
-  incrementPageTotal(params: Parameters<TopicClusteringMetricsPort["incrementPageTotal"]>[0]): void {
+  incrementPageTotal(
+    params: Parameters<TopicClusteringMetricsPort["incrementPageTotal"]>[0],
+  ): void {
     this.pages.inc({ outcome: params.outcome }, 1);
   }
 

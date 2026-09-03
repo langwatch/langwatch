@@ -53,12 +53,7 @@ export function FrontDoorField({
       </HStack>
       {children(id)}
       {error?.message ? (
-        <Text
-          fontSize="12.5px"
-          lineHeight="1.5"
-          marginTop="6px"
-          color={"frontDoor.danger"}
-        >
+        <Text fontSize="12.5px" lineHeight="1.5" marginTop="6px" color={"frontDoor.danger"}>
           {error.message}
         </Text>
       ) : null}

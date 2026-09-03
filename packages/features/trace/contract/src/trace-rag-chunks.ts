@@ -9,10 +9,7 @@ import {
 } from "./trace-collector-common";
 
 export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
-  const inputOutputMap: Record<
-    string,
-    { input: RAGSpan["input"]; output: RAGSpan["output"] }
-  > = {};
+  const inputOutputMap: Record<string, { input: RAGSpan["input"]; output: RAGSpan["output"] }> = {};
 
   const fillInputOutputMap = (spans: Span[]): Span[] => {
     return spans.map((span) => {
@@ -34,9 +31,7 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
         return;
       }
 
-      const flatChildren = fillInputOutputMap(
-        flattenSpanTree(span.children, "inside-out"),
-      );
+      const flatChildren = fillInputOutputMap(flattenSpanTree(span.children, "inside-out"));
       const input = getFirstInputAsText(flatChildren);
       const output = getLastOutputAsText(flatChildren);
 
@@ -84,9 +79,7 @@ export const extractChunkTextualContent = (object: any): string => {
   return "";
 };
 
-export const maybeAddIdsToContextList = (
-  contexts: (RAGChunk["content"] | null)[],
-): RAGChunk[] => {
+export const maybeAddIdsToContextList = (contexts: (RAGChunk["content"] | null)[]): RAGChunk[] => {
   const everyWithoutId =
     Array.isArray(contexts) &&
     contexts.every(
@@ -96,18 +89,10 @@ export const maybeAddIdsToContextList = (
 
   return contexts.filter(Boolean).map((content) => ({
     document_id:
-      content &&
-      typeof content === "object" &&
-      "document_id" in content &&
-      content.document_id
+      content && typeof content === "object" && "document_id" in content && content.document_id
         ? content.document_id
-        : crypto
-            .createHash("md5")
-            .update(extractChunkTextualContent(content))
-            .digest("hex"),
+        : crypto.createHash("md5").update(extractChunkTextualContent(content)).digest("hex"),
     content:
-      content && typeof content === "object" && "content" in content
-        ? content.content
-        : content,
+      content && typeof content === "object" && "content" in content ? content.content : content,
   }));
 };

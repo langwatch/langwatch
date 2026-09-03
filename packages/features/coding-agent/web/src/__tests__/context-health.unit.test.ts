@@ -10,9 +10,7 @@ describe("contextWindowCeiling", () => {
 
   describe("given a session where any call used the 1M beta", () => {
     it("returns the 1M ceiling, even if other calls used the standard window", () => {
-      expect(contextWindowCeiling(["claude-opus-4-8", "claude-opus-4-8[1m]"])).toBe(
-        1_000_000,
-      );
+      expect(contextWindowCeiling(["claude-opus-4-8", "claude-opus-4-8[1m]"])).toBe(1_000_000);
     });
   });
 

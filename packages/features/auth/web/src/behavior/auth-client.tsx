@@ -2,13 +2,7 @@
 
 import { passkeyClient } from "@better-auth/passkey/client";
 import { createAuthClient } from "better-auth/react";
-import {
-  type ReactElement,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { type ReactElement, type ReactNode, useCallback, useEffect, useState } from "react";
 
 /**
  * Client-side auth wrapper exposing a NextAuth-compatible API surface over
@@ -159,11 +153,7 @@ export const useSession = (
     };
   }, []);
 
-  const status: SessionStatus = isPending
-    ? "loading"
-    : data
-      ? "authenticated"
-      : "unauthenticated";
+  const status: SessionStatus = isPending ? "loading" : data ? "authenticated" : "unauthenticated";
 
   useEffect(() => {
     if (options?.required && status === "unauthenticated" && options.onUnauthenticated) {
@@ -209,9 +199,7 @@ export const signIn = async (
   | undefined
 > => {
   // Same-origin guard on the post-login redirect target.
-  const callbackURL = options?.callbackUrl
-    ? safeRedirectTarget(options.callbackUrl)
-    : undefined;
+  const callbackURL = options?.callbackUrl ? safeRedirectTarget(options.callbackUrl) : undefined;
   const shouldRedirect = options?.redirect !== false;
 
   if (provider === "credentials" || provider === "email") {
@@ -281,12 +269,7 @@ export const signIn = async (
   }
   // For providers where BetterAuth returned a redirect URL but didn't
   // auto-navigate (some fetch modes), follow it ourselves.
-  if (
-    shouldRedirect &&
-    result.data &&
-    typeof result.data === "object" &&
-    "url" in result.data
-  ) {
+  if (shouldRedirect && result.data && typeof result.data === "object" && "url" in result.data) {
     const url = (result.data as { url?: string }).url;
     if (url) {
       navigate(url);

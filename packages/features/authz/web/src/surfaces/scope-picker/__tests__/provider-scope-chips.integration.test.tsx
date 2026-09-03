@@ -48,9 +48,7 @@ describe("ProviderScopeChips", () => {
       renderChip(
         <ProviderScopeChips
           system
-          scopes={[
-            { scopeType: "ORGANIZATION", scopeId: "org-1", name: "Acme" },
-          ]}
+          scopes={[{ scopeType: "ORGANIZATION", scopeId: "org-1", name: "Acme" }]}
         />,
       );
       // The Acme chip wins; no System fallback.

@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import {
-  IngestionKeyIssuerPort,
-  IngestionKeyRepository,
-} from "../ingestion-source-key.port";
+import { IngestionKeyIssuerPort, IngestionKeyRepository } from "../ingestion-source-key.port";
 import { IngestionKeyService } from "../../services/ingestion-source-key.service";
 import { TestOrganizationService } from "./support/test-organization-service";
 

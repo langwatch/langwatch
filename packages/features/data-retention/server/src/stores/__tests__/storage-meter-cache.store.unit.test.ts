@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  RedisStorageMeterCacheStore,
-  type StorageMeterRedis,
-} from "../storage-meter-cache.store";
+import { RedisStorageMeterCacheStore, type StorageMeterRedis } from "../storage-meter-cache.store";
 
 function createRedis(): StorageMeterRedis {
   return {

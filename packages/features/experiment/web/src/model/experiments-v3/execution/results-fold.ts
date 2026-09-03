@@ -1,8 +1,5 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
-import {
-  type EvaluationV3Event,
-  UNNAMED_FAILURE,
-} from "@langwatch/experiment-contract";
+import { type EvaluationV3Event, UNNAMED_FAILURE } from "@langwatch/experiment-contract";
 import type { EvaluationResults, TargetRowMetadata } from "../types";
 
 /**
@@ -193,9 +190,7 @@ export const applyEvaluatorResult = ({
  * registry, which is a presentation concern and a browser module. The default
  * keeps the fold usable on its own.
  */
-export type CellErrorDescriber = (
-  event: Extract<EvaluationV3Event, { type: "error" }>,
-) => string;
+export type CellErrorDescriber = (event: Extract<EvaluationV3Event, { type: "error" }>) => string;
 
 const defaultCellErrorDescriber: CellErrorDescriber = (event) =>
   event.rowIndex === undefined

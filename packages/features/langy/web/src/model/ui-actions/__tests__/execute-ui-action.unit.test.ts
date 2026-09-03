@@ -181,9 +181,7 @@ describe("executeUiAction", () => {
 
       // The page applied the change, so the only thing lost is the report.
       expect(outcome).toBe("completion-failed");
-      expect(legs.complete).toHaveBeenCalledWith(
-        expect.objectContaining({ ok: true }),
-      );
+      expect(legs.complete).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
       expect(onHandlerError).not.toHaveBeenCalled();
     });
   });

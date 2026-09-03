@@ -46,9 +46,7 @@ export class PostgresGovernancePolicyService {
 
     let nonBillable = true;
     try {
-      const configs = await this.repository.enabledCodingAssistantConfigs(
-        input.organizationId,
-      );
+      const configs = await this.repository.enabledCodingAssistantConfigs(input.organizationId);
       nonBillable = !configs.some((candidate) => {
         const parsed = codingAssistantConfigSchema.safeParse(candidate);
         return (
@@ -59,14 +57,11 @@ export class PostgresGovernancePolicyService {
       });
     } catch (error) {
       const diagnostics = this.options.diagnostics ?? new NullGovernanceDiagnosticsPort();
-      diagnostics.warn(
-        "failed to resolve bundled-plan policy; defaulting to non-billable",
-        {
-          error,
-          organizationId: input.organizationId,
-          sourceType: input.sourceType,
-        },
-      );
+      diagnostics.warn("failed to resolve bundled-plan policy; defaulting to non-billable", {
+        error,
+        organizationId: input.organizationId,
+        sourceType: input.sourceType,
+      });
     }
     this.cache.set(key, {
       nonBillable,

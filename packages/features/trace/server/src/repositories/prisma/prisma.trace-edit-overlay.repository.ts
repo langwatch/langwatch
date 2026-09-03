@@ -37,9 +37,7 @@ const WITH_AUTHORS = {
  *  client instance boundary. */
 function isUniqueConstraintViolation(error: unknown): boolean {
   return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { code?: unknown }).code === "P2002"
+    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
   );
 }
 
@@ -121,13 +119,7 @@ export class TraceEditOverlayRepository {
     }
   }
 
-  async delete({
-    projectId,
-    traceId,
-  }: {
-    projectId: string;
-    traceId: string;
-  }): Promise<void> {
+  async delete({ projectId, traceId }: { projectId: string; traceId: string }): Promise<void> {
     await this.prisma.traceEditOverlay.deleteMany({
       where: { projectId, traceId },
     });

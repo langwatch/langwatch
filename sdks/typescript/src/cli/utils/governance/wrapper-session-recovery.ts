@@ -95,8 +95,7 @@ export async function recoverExpiredSession(
     loginImpl = runDeviceFlowLogin,
     writeImpl = (s: string) => void process.stderr.write(s),
   } = opts;
-  const isTTY =
-    opts.isTTY ?? (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
+  const isTTY = opts.isTTY ?? (Boolean(process.stdin.isTTY) && Boolean(process.stdout.isTTY));
 
   if (!isTTY) {
     return { status: "abort", message: expiredSessionHelp(tool), exitCode: 1 };

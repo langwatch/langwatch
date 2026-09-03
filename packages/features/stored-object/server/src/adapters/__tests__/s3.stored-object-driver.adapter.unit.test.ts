@@ -16,10 +16,13 @@ import { S3StoredObjectDriver } from "../s3.stored-object-driver.adapter";
 const { sent } = vi.hoisted(() => ({ sent: { send: vi.fn() } }));
 
 vi.mock("@aws-sdk/client-s3", async () => {
-  const actual = await vi.importActual<typeof import("@aws-sdk/client-s3")>(
-    "@aws-sdk/client-s3",
-  );
-  return { ...actual, S3Client: class { send = sent.send } };
+  const actual = await vi.importActual<typeof import("@aws-sdk/client-s3")>("@aws-sdk/client-s3");
+  return {
+    ...actual,
+    S3Client: class {
+      send = sent.send;
+    },
+  };
 });
 
 function makeMockS3Client() {
@@ -181,9 +184,7 @@ describe("S3StoredObjectDriver", () => {
 
   describe("when get is called with a non-s3 URI", () => {
     it("throws", async () => {
-      await expect(
-        driver.get("file:///var/lib/langwatch/objects/proj/sha"),
-      ).rejects.toThrow();
+      await expect(driver.get("file:///var/lib/langwatch/objects/proj/sha")).rejects.toThrow();
     });
   });
 });

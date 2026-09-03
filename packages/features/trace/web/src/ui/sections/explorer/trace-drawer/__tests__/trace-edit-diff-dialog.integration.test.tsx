@@ -71,9 +71,7 @@ describe("TraceEditDiffDialog", () => {
           deletedSpanIds: [],
         });
 
-        expect(
-          await screen.findByText(/"output": "the answer is 41"/),
-        ).toBeInTheDocument();
+        expect(await screen.findByText(/"output": "the answer is 41"/)).toBeInTheDocument();
         expect(screen.getByText(/"output": "the answer is 42"/)).toBeInTheDocument();
       });
 

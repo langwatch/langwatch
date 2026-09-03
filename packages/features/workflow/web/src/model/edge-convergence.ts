@@ -156,9 +156,7 @@ export function canConvergeOnInput({
 }): boolean {
   if (!connection.source) return false;
   const existingSources = edges
-    .filter(
-      (e) => e.target === connection.target && e.targetHandle === connection.targetHandle,
-    )
+    .filter((e) => e.target === connection.target && e.targetHandle === connection.targetHandle)
     .map((e) => e.source)
     .filter((s): s is string => Boolean(s));
   if (existingSources.length === 0) return true;

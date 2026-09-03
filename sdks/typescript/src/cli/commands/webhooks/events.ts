@@ -29,9 +29,7 @@ export const webhookEventsCommand = async (options: {
   // whatever `to` resolved to, so `--to` alone reads the day before the
   // instant the caller named rather than a range ending before it starts.
   const to =
-    options.to !== undefined
-      ? parseInstant({ value: options.to, flag: "--to" })
-      : Date.now();
+    options.to !== undefined ? parseInstant({ value: options.to, flag: "--to" }) : Date.now();
   const from =
     options.from !== undefined
       ? parseInstant({ value: options.from, flag: "--from" })
@@ -97,9 +95,7 @@ export const webhookEventTypesCommand = async (): Promise<CommandResult | void> 
             Family: t.family,
             Emitting: t.is_emitting ? chalk.green("yes") : chalk.gray("declared"),
             Description:
-              t.description.length > 50
-                ? `${t.description.slice(0, 47)}...`
-                : t.description,
+              t.description.length > 50 ? `${t.description.slice(0, 47)}...` : t.description,
           })),
           headers: ["Type", "Family", "Emitting", "Description"],
           colorMap: { Type: chalk.cyan },

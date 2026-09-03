@@ -17,9 +17,7 @@ export function useGlobalLangyShortcut(onTrigger: () => void): void {
       const target = event.target;
       if (target instanceof HTMLElement) {
         const isTextInput =
-          target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable;
+          target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
         if (isTextInput) {
           const sel = window.getSelection?.();
           if (sel && sel.toString().length > 0) return;

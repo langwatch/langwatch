@@ -41,9 +41,7 @@ function requestWithStream(
 }
 
 /** A stream that yields one chunk and then errors, like a dropped connection. */
-function streamThatFailsMidRead(
-  error: Error = new Error("aborted"),
-): ReadableStream<Uint8Array> {
+function streamThatFailsMidRead(error: Error = new Error("aborted")): ReadableStream<Uint8Array> {
   let sent = false;
   return new ReadableStream<Uint8Array>({
     pull(controller) {
@@ -165,9 +163,7 @@ describe("readOtlpBody", () => {
           releaseFailure,
         );
 
-        await expect(readOtlpBody(requestWithStream(stream))).rejects.not.toThrow(
-          /private member/,
-        );
+        await expect(readOtlpBody(requestWithStream(stream))).rejects.not.toThrow(/private member/);
       });
     });
 
@@ -175,11 +171,7 @@ describe("readOtlpBody", () => {
       /** @scenario Releasing the reader never fails a successful read */
       it("returns the body intact", async () => {
         const payload = new Uint8Array([9, 8, 7]);
-        const stream = withThrowingReader(
-          streamOf(payload),
-          "releaseLock",
-          releaseFailure,
-        );
+        const stream = withThrowingReader(streamOf(payload), "releaseLock", releaseFailure);
 
         const body = await readOtlpBody(requestWithStream(stream));
         expect(new Uint8Array(body)).toEqual(payload);
@@ -203,18 +195,14 @@ describe("readOtlpBody", () => {
 
     /** @scenario An over-sized body is still refused as too large */
     it("is refused as too large, not merely unreadable", async () => {
-      await expect(
-        readOtlpBody(requestWithStream(oversizedStream())),
-      ).rejects.toBeInstanceOf(OtlpBodyTooLargeError);
+      await expect(readOtlpBody(requestWithStream(oversizedStream()))).rejects.toBeInstanceOf(
+        OtlpBodyTooLargeError,
+      );
     });
 
     /** @scenario A cancel that throws does not hide the size refusal */
     it("keeps its 413 when cancelling the reader throws", async () => {
-      const stream = withThrowingReader(
-        oversizedStream(),
-        "cancel",
-        new Error("cancel exploded"),
-      );
+      const stream = withThrowingReader(oversizedStream(), "cancel", new Error("cancel exploded"));
 
       await expect(readOtlpBody(requestWithStream(stream))).rejects.toMatchObject({
         code: "ERR_PAYLOAD_TOO_LARGE",
@@ -230,9 +218,7 @@ describe("readOtlpBody", () => {
         headers: { "content-encoding": "snappy" },
       });
 
-      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(
-        OtlpUnsupportedEncodingError,
-      );
+      await expect(readOtlpBody(req)).rejects.toBeInstanceOf(OtlpUnsupportedEncodingError);
     });
 
     it("answers 400 and names the encoding refused", async () => {

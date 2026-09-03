@@ -19,14 +19,7 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
       </Text>
       <Flex direction="column" gap={3}>
         {contexts.map((ctx, i) => (
-          <Box
-            key={i}
-            rounded="md"
-            border="1px solid"
-            borderColor="border"
-            bg="bg.subtle"
-            p={3}
-          >
+          <Box key={i} rounded="md" border="1px solid" borderColor="border" bg="bg.subtle" p={3}>
             <Flex justify="space-between" mb={2}>
               <Text fontSize="xs" fontWeight="medium" color="fg.subtle">
                 Context {i + 1}

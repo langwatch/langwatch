@@ -39,9 +39,7 @@ export const normaliseTagKey = (key: string): string =>
  * langwatch.worktree, which is what lets a developer filter a flame graph down
  * to their own worktree while a dozen share one Pyroscope.
  */
-export const tagsFromResourceAttributes = (
-  raw: string | undefined,
-): Record<string, string> => {
+export const tagsFromResourceAttributes = (raw: string | undefined): Record<string, string> => {
   const tags: Record<string, string> = {};
   for (const pair of (raw ?? "").split(",")) {
     const separator = pair.indexOf("=");

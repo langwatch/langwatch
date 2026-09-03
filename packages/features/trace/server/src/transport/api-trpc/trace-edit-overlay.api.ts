@@ -19,10 +19,7 @@
  * application yet.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import {
-  traceEditOverlayPatchSchema,
-  type TraceEditOverlayPatch,
-} from "@langwatch/trace-contract";
+import { traceEditOverlayPatchSchema, type TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { TraceApp } from "#app/trace.app";

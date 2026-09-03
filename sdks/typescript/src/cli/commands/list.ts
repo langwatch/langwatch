@@ -26,9 +26,7 @@ const resolveLimit = (raw: string | undefined): number | undefined => {
   if (raw === undefined) return undefined;
   const parsed = parsePositiveIntOrNull(raw);
   if (parsed === null) {
-    console.error(
-      `--limit takes a whole number of prompts, 1 or more. Got "${raw}".`,
-    );
+    console.error(`--limit takes a whole number of prompts, 1 or more. Got "${raw}".`);
     process.exit(1);
   }
   return parsed;
@@ -50,17 +48,14 @@ export const listCommand = async (
       // Fetch all prompts
       const fetched = await promptsApiService.getAll();
       const limit = resolveLimit(options.limit);
-      const allPrompts =
-        limit === undefined ? fetched : fetched.slice(0, limit);
+      const allPrompts = limit === undefined ? fetched : fetched.slice(0, limit);
       const prompts = allPrompts.filter((prompt) => prompt.version);
       const draftPrompts = allPrompts.filter((prompt) => !prompt.version);
       const cut = allPrompts.length < fetched.length;
 
       spinner.succeed(
         `Found ${prompts.length} published prompt${prompts.length !== 1 ? "s" : ""} ` +
-          chalk.gray(
-            `(+${draftPrompts.length} draft${draftPrompts.length !== 1 ? "s" : ""})`,
-          ),
+          chalk.gray(`(+${draftPrompts.length} draft${draftPrompts.length !== 1 ? "s" : ""})`),
       );
 
       return {
@@ -125,9 +120,7 @@ export const listCommand = async (
           console.log();
           console.log(
             chalk.gray(
-              `Use ${chalk.cyan(
-                "langwatch prompt add <name>",
-              )} to add a prompt to your project`,
+              `Use ${chalk.cyan("langwatch prompt add <name>")} to add a prompt to your project`,
             ),
           );
         },

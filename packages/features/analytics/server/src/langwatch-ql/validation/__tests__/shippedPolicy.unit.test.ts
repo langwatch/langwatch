@@ -30,16 +30,7 @@ const BI_PLATFORM_PATTERN =
   /(^|[/@-])(cube|cubejs|trino|presto|superset|metabase|looker|malloy)([/-]|$)/i;
 
 /** File extensions that only exist because someone wrote a grammar. */
-const GRAMMAR_EXTENSIONS = [
-  ".pegjs",
-  ".peg",
-  ".g4",
-  ".jison",
-  ".ne",
-  ".ohm",
-  ".grammar",
-  ".lark",
-];
+const GRAMMAR_EXTENSIONS = [".pegjs", ".peg", ".g4", ".jison", ".ne", ".ohm", ".grammar", ".lark"];
 
 /** Module names that would mean we had built a front end of our own. */
 const OWN_FRONT_END_PATTERN = /(grammar|lexer|tokeni[sz]|compiler|codegen|\bir\b)/i;
@@ -90,14 +81,11 @@ describe("what the LangWatchQL API ships", () => {
   describe("given the feature package's dependency manifest and source tree", () => {
     /** @scenario "No custom query language and no new BI platform dependency ships" */
     it("carries no BI platform, query engine, or semantic-layer dependency", () => {
-      const offenders = readManifest().all.filter((name) =>
-        BI_PLATFORM_PATTERN.test(name),
-      );
+      const offenders = readManifest().all.filter((name) => BI_PLATFORM_PATTERN.test(name));
 
-      expect(
-        offenders,
-        "#6480 settled on native ClickHouse SQL rather than a BI platform",
-      ).toEqual([]);
+      expect(offenders, "#6480 settled on native ClickHouse SQL rather than a BI platform").toEqual(
+        [],
+      );
     });
 
     it("holds no grammar of its own anywhere in the application source", () => {
@@ -154,13 +142,10 @@ describe("what the LangWatchQL API ships", () => {
       ).toBeDefined();
       if (!policy) throw new Error("unreachable: presence asserted above");
 
-      expect(
-        policy.text,
-        `${POLICY_ADR} no longer documents the table-function policy`,
-      ).toMatch(TABLE_FUNCTION_PATTERN);
-      expect(policy.text, `${POLICY_ADR} no longer documents the SSRF policy`).toMatch(
-        /SSRF/i,
+      expect(policy.text, `${POLICY_ADR} no longer documents the table-function policy`).toMatch(
+        TABLE_FUNCTION_PATTERN,
       );
+      expect(policy.text, `${POLICY_ADR} no longer documents the SSRF policy`).toMatch(/SSRF/i);
 
       // Both mechanisms, because the ADR's job is to stop either one being
       // mistaken for the whole boundary.

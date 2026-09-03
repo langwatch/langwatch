@@ -83,13 +83,7 @@ const MODE_CHROME: Record<
 };
 
 /** Row groups, in the order they are shown AND navigated. */
-type PaletteGroup =
-  | "Context"
-  | "On this page"
-  | "Commands"
-  | "Skills"
-  | "Recipes"
-  | "Platform";
+type PaletteGroup = "Context" | "On this page" | "Commands" | "Skills" | "Recipes" | "Platform";
 
 const GROUP_ORDER: Record<PaletteMode, PaletteGroup[]> = {
   context: ["Context", "On this page"],
@@ -214,9 +208,7 @@ export function LangyComposerPalette({
     // over an unsorted collection is how a palette ends up jumping between
     // headings as you arrow through it.
     const order = GROUP_ORDER[mode];
-    const sorted = [...filtered].sort(
-      (a, b) => order.indexOf(a.group) - order.indexOf(b.group),
-    );
+    const sorted = [...filtered].sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
     return createListCollection({
       items: sorted,
       itemToValue: (item) => item.value,
@@ -243,8 +235,7 @@ export function LangyComposerPalette({
       return;
     }
     if (value.startsWith("target:")) {
-      const target =
-        useLangyContextTargetStore.getState().targets[value.slice("target:".length)];
+      const target = useLangyContextTargetStore.getState().targets[value.slice("target:".length)];
       if (target) absorbContextTarget(target);
       onClose();
       return;
@@ -401,12 +392,7 @@ export function LangyComposerPalette({
                           </Combobox.ItemText>
                           {/* The detail line is the honest one: for a CLI skill
                               it is the verbs the feature map actually declares. */}
-                          <Text
-                            textStyle="2xs"
-                            color="fg.subtle"
-                            truncate
-                            maxWidth="100%"
-                          >
+                          <Text textStyle="2xs" color="fg.subtle" truncate maxWidth="100%">
                             {item.detail}
                           </Text>
                         </VStack>

@@ -55,9 +55,7 @@ describe("<SyntheticTraceBadge />", () => {
     it("stays general when the ingestion path could not name a grouping key", () => {
       renderBadge({ "langwatch.trace.synthetic": "true" });
       expect(screen.getByText("Grouped by LangWatch")).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/grouped them into one trace by/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/grouped them into one trace by/i)).not.toBeInTheDocument();
     });
   });
 

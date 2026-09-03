@@ -26,10 +26,7 @@ function formatEvaluatorOverview(): string {
   const lines: string[] = [];
   lines.push("# Available Evaluator Types\n");
 
-  const byCategory = new Map<
-    string,
-    { type: string; name: string; description: string }[]
-  >();
+  const byCategory = new Map<string, { type: string; name: string; description: string }[]>();
 
   for (const [type, def] of Object.entries(AVAILABLE_EVALUATORS)) {
     const evalDef = def as EvaluatorDefinition<EvaluatorTypes>;
@@ -129,10 +126,7 @@ function formatEvaluatorDetail(evaluatorType: string): string {
       {
         evaluatorType: evaluatorType,
         settings: Object.fromEntries(
-          settingsEntries.map(([key, setting]) => [
-            key,
-            (setting as { default: unknown }).default,
-          ]),
+          settingsEntries.map(([key, setting]) => [key, (setting as { default: unknown }).default]),
         ),
       },
       null,

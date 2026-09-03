@@ -225,9 +225,7 @@ function mergeMachinery(
   header: EnvelopeHeader,
 ): Record<string, unknown> {
   const hasRouting =
-    typeof header.p === "string" ||
-    typeof header.t === "string" ||
-    typeof header.n === "string";
+    typeof header.p === "string" || typeof header.t === "string" || typeof header.n === "string";
   if (!header.m && !hasRouting) return body;
   const merged: Record<string, unknown> = { ...body, ...(header.m ?? {}) };
   if (typeof header.p === "string") merged.__pipelineName = header.p;
@@ -236,10 +234,7 @@ function mergeMachinery(
   return merged;
 }
 
-function routingHeader(
-  jobData: Record<string, unknown>,
-  version: number,
-): EnvelopeHeader {
+function routingHeader(jobData: Record<string, unknown>, version: number): EnvelopeHeader {
   const header: EnvelopeHeader = { v: version, e: "j" };
   if (typeof jobData.__pipelineName === "string") header.p = jobData.__pipelineName;
   if (typeof jobData.__jobType === "string") header.t = jobData.__jobType;
@@ -321,10 +316,7 @@ export class PayloadTooLargeError extends Error {
  * exactly this — see the codec note at the top of this file). Callers must not
  * retire such a value; see `GroupQueue`'s drop branch.
  */
-export type DecodeFailureReason =
-  | "missing_blob"
-  | "malformed_envelope"
-  | "body_unreadable";
+export type DecodeFailureReason = "missing_blob" | "malformed_envelope" | "body_unreadable";
 
 /**
  * A decode failure we can name. Distinct from {@link PayloadTooLargeError} (park,
@@ -475,12 +467,7 @@ export async function encodeJobEnvelope({
   return finalize(
     ENVELOPE_PREFIX_V2,
     header,
-    await inlineBody(
-      payloadJson ?? bytes.toString("utf-8"),
-      payloadBytes,
-      header,
-      compression,
-    ),
+    await inlineBody(payloadJson ?? bytes.toString("utf-8"), payloadBytes, header, compression),
   );
 }
 
@@ -521,14 +508,10 @@ export async function decodeJobEnvelope({
       });
     }
     if (!tieredBlobs) {
-      throw new Error(
-        "Job envelope references a tiered blob but no tiered store was provided",
-      );
+      throw new Error("Job envelope references a tiered blob but no tiered store was provided");
     }
     const data =
-      readMode === "peek"
-        ? await tieredBlobs.peek(header.ref)
-        : await tieredBlobs.get(header.ref);
+      readMode === "peek" ? await tieredBlobs.peek(header.ref) : await tieredBlobs.get(header.ref);
     if (!data) {
       throw new DecodeFailureError({
         message: "Job envelope tiered blob is missing (deleted or expired)",
@@ -546,9 +529,7 @@ export async function decodeJobEnvelope({
     assertDecodeWithinCap(Buffer.byteLength(body, "utf8"));
   }
   const parsedBody =
-    header.e === "gz"
-      ? await decodeBody(Buffer.from(body, "base64"))
-      : parseInlineBody(body);
+    header.e === "gz" ? await decodeBody(Buffer.from(body, "base64")) : parseInlineBody(body);
   return mergeMachinery(parsedBody, header);
 }
 
@@ -647,9 +628,7 @@ export function readJobAttempt(value: string): number | null {
     // out of the payload by name, so a job whose payload carried that key could
     // name a number past the budget — the ladder then treats it as already
     // spent and retires the job, which is the fail-closed direction.
-    return typeof attempt === "number" && Number.isInteger(attempt) && attempt > 0
-      ? attempt
-      : null;
+    return typeof attempt === "number" && Number.isInteger(attempt) && attempt > 0 ? attempt : null;
   } catch {
     return null;
   }
@@ -667,13 +646,7 @@ export function readJobAttempt(value: string): number | null {
  * Unsupported values are returned unchanged so the caller can report them
  * through the canonical decode-failure path without mutating their bytes.
  */
-export function withJobAttempt({
-  value,
-  attempt,
-}: {
-  value: string;
-  attempt: number;
-}): string {
+export function withJobAttempt({ value, attempt }: { value: string; attempt: number }): string {
   if (!value.startsWith(ENVELOPE_PREFIX_V2)) return value;
   try {
     const { header, body } = splitEnvelope(value);
@@ -694,11 +667,7 @@ export function withJobAttempt({
 export function readEnvelopeLeaseFromHeader(
   header: EnvelopeHeader,
 ): { ref: BlobRef; holderId: string } | null {
-  if (
-    (header.e === "redis" || header.e === "s3") &&
-    header.ref &&
-    typeof header.h === "string"
-  ) {
+  if ((header.e === "redis" || header.e === "s3") && header.ref && typeof header.h === "string") {
     return { ref: header.ref, holderId: header.h };
   }
   return null;
@@ -725,9 +694,7 @@ export function readEnvelopeTieredRefFromHeader(header: EnvelopeHeader): BlobRef
  * Returns the ref together with its per-stage lease holder identity, or null
  * for inline bodies and unreadable values.
  */
-export function readEnvelopeLease(
-  value: string,
-): { ref: BlobRef; holderId: string } | null {
+export function readEnvelopeLease(value: string): { ref: BlobRef; holderId: string } | null {
   try {
     if (!isEnvelope(value)) return null;
     const { header } = splitEnvelope(value);

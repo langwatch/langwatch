@@ -304,18 +304,18 @@ export class AgentTrpcApi {
        * Sends one turn to an agent and answers what it returned. The Test
        * panel of the agent drawers.
        */
-      testTurn: policy("evaluations:manage")(
-        procedure.input(agentApiTestTurnInputSchema),
-      ).mutation(async ({ ctx, input }) => {
-        const actor = ctx.actor();
-        return ctx.app.agents.testTurn({
-          id: input.id,
-          projectId: input.projectId,
-          message: input.message,
-          params: input.params,
-          actorId: actor.id,
-        });
-      }),
+      testTurn: policy("evaluations:manage")(procedure.input(agentApiTestTurnInputSchema)).mutation(
+        async ({ ctx, input }) => {
+          const actor = ctx.actor();
+          return ctx.app.agents.testTurn({
+            id: input.id,
+            projectId: input.projectId,
+            message: input.message,
+            params: input.params,
+            actorId: actor.id,
+          });
+        },
+      ),
 
       /**
        * Schedules one scripted "Test agent" run, saving nothing. The "Test

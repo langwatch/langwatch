@@ -72,9 +72,7 @@ export function serializeTracesToSummaryCsv({
   const headers = buildSummaryHeaders({ evaluatorNames });
   const rows = traces.map((trace) => buildSummaryRow({ trace, evaluatorNames }));
 
-  return (
-    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) + CSV_NEWLINE
-  );
+  return Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) + CSV_NEWLINE;
 }
 
 function buildSummaryHeaders({ evaluatorNames }: { evaluatorNames: string[] }): string[] {
@@ -188,9 +186,7 @@ export function serializeTracesToFullCsv({
     }
   }
 
-  return (
-    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) + CSV_NEWLINE
-  );
+  return Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) + CSV_NEWLINE;
 }
 
 function buildFullHeaders({ evaluatorNames }: { evaluatorNames: string[] }): string[] {

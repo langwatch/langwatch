@@ -111,11 +111,7 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   return (
     <>
       <EditorContent editor={editor} />
-      <SuggestionDropdown
-        ui={suggestion}
-        onSelect={acceptSuggestion}
-        anchorX={cursorAnchorX}
-      />
+      <SuggestionDropdown ui={suggestion} onSelect={acceptSuggestion} anchorX={cursorAnchorX} />
     </>
   );
 };

@@ -19,17 +19,11 @@ function validateDependencies<Payload extends Record<string, unknown>>(
   dependencies: GroupQueueDependencies<Payload>,
 ): void {
   const concurrency = dependencies.policy?.globalConcurrency;
-  if (
-    concurrency !== undefined &&
-    (!Number.isSafeInteger(concurrency) || concurrency <= 0)
-  ) {
+  if (concurrency !== undefined && (!Number.isSafeInteger(concurrency) || concurrency <= 0)) {
     throw new Error("Group Queue globalConcurrency must be a positive integer");
   }
   const drainTimeoutMs = dependencies.policy?.drainTimeoutMs;
-  if (
-    drainTimeoutMs !== undefined &&
-    (!Number.isFinite(drainTimeoutMs) || drainTimeoutMs <= 0)
-  ) {
+  if (drainTimeoutMs !== undefined && (!Number.isFinite(drainTimeoutMs) || drainTimeoutMs <= 0)) {
     throw new Error("Group Queue drainTimeoutMs must be a positive number");
   }
   for (const [name, value] of Object.entries({
@@ -183,9 +177,7 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>> {
         },
         processBatch: handlers.batch
           ? async (payloads, delivery) => {
-              const decoded = payloads.map((payload) =>
-                this.definition.payload.parse(payload),
-              );
+              const decoded = payloads.map((payload) => this.definition.payload.parse(payload));
               await handlers.batch!(decoded, context(delivery));
             }
           : undefined,

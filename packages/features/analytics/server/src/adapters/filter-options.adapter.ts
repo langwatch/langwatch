@@ -15,9 +15,7 @@ export class FilterOptionsAdapter {
     resolveClient: ((tenantId: string) => Promise<ClickHouseClient>) | null;
   }): FilterService {
     return new FilterService(
-      options.resolveClient
-        ? new FilterOptionsClickHouseRepository(options.resolveClient)
-        : null,
+      options.resolveClient ? new FilterOptionsClickHouseRepository(options.resolveClient) : null,
     );
   }
 }

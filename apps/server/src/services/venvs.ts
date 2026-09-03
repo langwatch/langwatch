@@ -69,13 +69,7 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
 // set). `--extra all` is the union of these plus the three optional ones
 // below; naming them individually is how we drop some without dropping the
 // rest.
-const LANGEVALS_BASE_EXTRAS = [
-  "azure",
-  "langevals",
-  "openai",
-  "ragas",
-  "topic_clustering",
-];
+const LANGEVALS_BASE_EXTRAS = ["azure", "langevals", "openai", "ragas", "topic_clustering"];
 
 function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
   const root = appRoot();

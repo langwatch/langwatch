@@ -153,9 +153,7 @@ describe("resolveDispatchEvaluatorType", () => {
 
   describe("given any other evaluator type", () => {
     it("passes it through untouched", () => {
-      expect(resolveDispatchEvaluatorType("langevals/llm_boolean")).toBe(
-        "langevals/llm_boolean",
-      );
+      expect(resolveDispatchEvaluatorType("langevals/llm_boolean")).toBe("langevals/llm_boolean");
     });
   });
 
@@ -181,10 +179,7 @@ describe("normalizeEvaluators", () => {
     it("rewrites it to the canonical shape", () => {
       const [normalized] = normalizeEvaluators(evaluators);
 
-      expect(normalized?.comparison?.variants).toEqual([
-        "target-a",
-        "target-b",
-      ]);
+      expect(normalized?.comparison?.variants).toEqual(["target-a", "target-b"]);
     });
 
     it("drops the legacy field so nothing writes it back", () => {
@@ -270,9 +265,7 @@ describe("normalizeEvaluators", () => {
 
       expect(normalized?.id).toBe("evaluator_q5RPFdOD");
       expect(normalized?.evaluatorType).toBe("langevals/exact_match");
-      expect(normalized?.localEvaluatorConfig?.name).toBe(
-        "L3 category exact match",
-      );
+      expect(normalized?.localEvaluatorConfig?.name).toBe("L3 category exact match");
     });
   });
 
@@ -316,10 +309,7 @@ describe("normalizeTargets", () => {
 
       const [normalized] = normalizeTargets(targets);
 
-      expect(normalized?.comparison?.variants).toEqual([
-        "target-a",
-        "target-b",
-      ]);
+      expect(normalized?.comparison?.variants).toEqual(["target-a", "target-b"]);
       expect(normalized?.pairwise).toBeUndefined();
     });
   });
@@ -370,10 +360,7 @@ describe("normalizeTargets", () => {
 
       const [normalized] = normalizeTargets(targets);
 
-      expect(normalized?.comparison?.variants).toEqual([
-        "target-a",
-        "target-b",
-      ]);
+      expect(normalized?.comparison?.variants).toEqual(["target-a", "target-b"]);
     });
   });
 });
@@ -393,9 +380,7 @@ describe("resolveVerdictLabel", () => {
 
   describe("given a winner identifier from a current run", () => {
     it("passes it through", () => {
-      expect(resolveVerdictLabel({ label: "target-c", variants })).toBe(
-        "target-c",
-      );
+      expect(resolveVerdictLabel({ label: "target-c", variants })).toBe("target-c");
     });
   });
 
@@ -407,9 +392,7 @@ describe("resolveVerdictLabel", () => {
 
   describe("given a slot label with no matching variant", () => {
     it("returns the label rather than inventing a winner", () => {
-      expect(resolveVerdictLabel({ label: "B", variants: ["only-one"] })).toBe(
-        "B",
-      );
+      expect(resolveVerdictLabel({ label: "B", variants: ["only-one"] })).toBe("B");
     });
   });
 
@@ -417,9 +400,7 @@ describe("resolveVerdictLabel", () => {
     it("names that variant directly rather than slot-mapping to position 0", () => {
       // A current-run label "B" that matches a variant id is that variant, not
       // legacy slot B → must resolve to itself, not variants[0].
-      expect(
-        resolveVerdictLabel({ label: "B", variants: ["A", "B", "C"] }),
-      ).toBe("B");
+      expect(resolveVerdictLabel({ label: "B", variants: ["A", "B", "C"] })).toBe("B");
     });
   });
 });

@@ -9,9 +9,7 @@ export const asNumber = (value: unknown): number => {
 };
 
 export const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === "string")
-    : [];
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 
 export const parseClickHouseDateTimeMs = (value: string): number => {
   const parsed = new Date(value.replace(" ", "T") + "Z").getTime();

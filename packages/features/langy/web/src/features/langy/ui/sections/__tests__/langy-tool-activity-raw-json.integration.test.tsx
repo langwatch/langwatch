@@ -34,8 +34,7 @@ function skillMessage(): UIMessage {
         state: "output-available",
         input: {
           name: "experiments",
-          description:
-            "Create and run LangWatch experiments for pre-deployment batch testing.",
+          description: "Create and run LangWatch experiments for pre-deployment batch testing.",
         },
         output: "<skill_content>…</skill_content>",
       } as never,

@@ -56,9 +56,7 @@ export function httpWebhookDestination({
         // Endpoints are organization-scoped, so their dispatch cap buckets
         // per organization rather than per project. A test fire passes no
         // scope, which is how it stays exempt.
-        ...(request.isTestFire
-          ? { testFire: true }
-          : { projectId: request.organizationId }),
+        ...(request.isTestFire ? { testFire: true } : { projectId: request.organizationId }),
         eventId: request.batchId,
         dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
         signingSecrets: request.signingSecrets,
@@ -72,9 +70,7 @@ export function httpWebhookDestination({
         status: result.status,
         body: result.body.slice(0, RESPONSE_SNIPPET_CHARS),
         ...(result.responseHeaders ? { responseHeaders: result.responseHeaders } : {}),
-        ...(result.retryAfterMs !== undefined
-          ? { retryAfterMs: result.retryAfterMs }
-          : {}),
+        ...(result.retryAfterMs !== undefined ? { retryAfterMs: result.retryAfterMs } : {}),
         dispatchId: result.eventId,
         ...(verdict === "success" ? {} : { error: `HTTP ${result.status}` }),
       };

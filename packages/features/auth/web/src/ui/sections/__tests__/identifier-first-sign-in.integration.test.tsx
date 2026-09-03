@@ -77,14 +77,7 @@ vi.mock("../../../behavior/use-route", () => ({
 }));
 
 vi.mock("../../elements/router-link", () => ({
-  default: ({
-    href,
-    children,
-    ...props
-  }: {
-    href: string;
-    children: ReactNode;
-  }) => (
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -127,9 +120,7 @@ const renderScreen = () =>
 const pickerMarkup = (container: HTMLElement, email: string): string => {
   const picker = container.querySelector('[data-testid="method-picker"]');
   if (!picker) throw new Error("no method picker rendered");
-  return picker.innerHTML
-    .replaceAll(email, "")
-    .replace(/_r_[0-9a-z]+_/g, "_field_");
+  return picker.innerHTML.replaceAll(email, "").replace(/_r_[0-9a-z]+_/g, "_field_");
 };
 
 const enterEmail = async (email: string) => {
@@ -145,9 +136,7 @@ describe("given the identifier-first sign-in screen", () => {
     // makes a rejected password a WRONG password by default. Set explicitly,
     // because an unset mock resolves — and a resolved sign-up request means
     // "no account here, a link is on its way", which is the opposite.
-    requestSignUpVerificationMock.mockRejectedValue(
-      new Error("email_already_registered"),
-    );
+    requestSignUpVerificationMock.mockRejectedValue(new Error("email_already_registered"));
     routeErrorRef.current = null;
     sessionRef.current = { data: null };
     searchParamsRef.current = new URLSearchParams("");
@@ -174,9 +163,7 @@ describe("given the identifier-first sign-in screen", () => {
           callbackUrl: undefined,
         });
       });
-      expect(
-        await screen.findByTestId("routed-to-connection"),
-      ).toHaveTextContent(/okta/i);
+      expect(await screen.findByTestId("routed-to-connection")).toHaveTextContent(/okta/i);
     });
 
     /** @scenario Wrong-method guidance points at the method my account holds */
@@ -191,9 +178,7 @@ describe("given the identifier-first sign-in screen", () => {
       const { container } = renderScreen();
       await enterEmail("sam@acme.com");
 
-      expect(
-        await screen.findByRole("button", { name: /continue with okta/i }),
-      ).toBeTruthy();
+      expect(await screen.findByRole("button", { name: /continue with okta/i })).toBeTruthy();
       expect(container.querySelector('input[type="password"]')).toBeNull();
     });
   });
@@ -208,9 +193,7 @@ describe("given the identifier-first sign-in screen", () => {
 
       expect(await screen.findByTestId("method-picker")).toBeTruthy();
       await waitFor(() => {
-        expect(
-          container.querySelector('input[type="password"]'),
-        ).not.toBeNull();
+        expect(container.querySelector('input[type="password"]')).not.toBeNull();
       });
       expect(signInMock).not.toHaveBeenCalled();
     });
@@ -255,10 +238,7 @@ describe("given the identifier-first sign-in screen", () => {
       await enterEmail("registered@example.com");
       await screen.findByTestId("method-picker");
       const registeredRequests = routeMock.mock.calls.length;
-      const registeredMarkup = pickerMarkup(
-        registered.container,
-        "registered@example.com",
-      );
+      const registeredMarkup = pickerMarkup(registered.container, "registered@example.com");
       cleanup();
 
       routeMock.mockClear();
@@ -267,9 +247,7 @@ describe("given the identifier-first sign-in screen", () => {
       await screen.findByTestId("method-picker");
 
       expect(routeMock.mock.calls.length).toBe(registeredRequests);
-      expect(pickerMarkup(unknown.container, "nobody@example.com")).toBe(
-        registeredMarkup,
-      );
+      expect(pickerMarkup(unknown.container, "nobody@example.com")).toBe(registeredMarkup);
     });
 
     it("never says whether an account exists", async () => {
@@ -280,9 +258,7 @@ describe("given the identifier-first sign-in screen", () => {
       await screen.findByTestId("method-picker");
 
       expect(container.textContent).not.toMatch(/no account|not registered/i);
-      expect(container.textContent).not.toMatch(
-        /already (have|has) an account/i,
-      );
+      expect(container.textContent).not.toMatch(/already (have|has) an account/i);
     });
   });
 
@@ -299,9 +275,7 @@ describe("given the identifier-first sign-in screen", () => {
       await enterEmail("sam@acme.com");
 
       expect(
-        await screen.findByText(
-          /single sign-on is paused for your organization/i,
-        ),
+        await screen.findByText(/single sign-on is paused for your organization/i),
       ).toBeTruthy();
       expect(container.textContent).not.toContain("connection_suspended");
       expect(container.textContent).not.toMatch(/error|unknown/i);
@@ -322,15 +296,10 @@ describe("given the identifier-first sign-in screen", () => {
       await enterEmail("sam@example.com");
       await screen.findByTestId("method-picker");
 
-      await userEvent.type(
-        container.querySelector('input[type="password"]')!,
-        "wrong-password",
-      );
+      await userEvent.type(container.querySelector('input[type="password"]')!, "wrong-password");
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
 
-      expect(
-        await screen.findByText(/invalid email or password/i),
-      ).toBeTruthy();
+      expect(await screen.findByText(/invalid email or password/i)).toBeTruthy();
       expect(container.textContent).not.toContain("INVALID_EMAIL_OR_PASSWORD");
     });
   });
@@ -350,10 +319,7 @@ describe("given the identifier-first sign-in screen", () => {
       await enterEmail("nobody@example.com");
       await screen.findByTestId("method-picker");
 
-      await userEvent.type(
-        container.querySelector('input[type="password"]')!,
-        "a-new-password",
-      );
+      await userEvent.type(container.querySelector('input[type="password"]')!, "a-new-password");
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
 
       expect(await screen.findByTestId("verification-sent")).toHaveTextContent(
@@ -382,10 +348,7 @@ describe("given the identifier-first sign-in screen", () => {
       const { container } = renderScreen();
       await enterEmail("typo@example.com");
       await screen.findByTestId("method-picker");
-      await userEvent.type(
-        container.querySelector('input[type="password"]')!,
-        "a-new-password",
-      );
+      await userEvent.type(container.querySelector('input[type="password"]')!, "a-new-password");
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
       await screen.findByTestId("verification-sent");
 
@@ -406,23 +369,16 @@ describe("given the identifier-first sign-in screen", () => {
         code: "INVALID_EMAIL_OR_PASSWORD",
         status: 401,
       });
-      requestSignUpVerificationMock.mockRejectedValue(
-        new Error("email_already_registered"),
-      );
+      requestSignUpVerificationMock.mockRejectedValue(new Error("email_already_registered"));
 
       const { container } = renderScreen();
       await enterEmail("sam@example.com");
       await screen.findByTestId("method-picker");
 
-      await userEvent.type(
-        container.querySelector('input[type="password"]')!,
-        "wrong-password",
-      );
+      await userEvent.type(container.querySelector('input[type="password"]')!, "wrong-password");
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
 
-      expect(
-        await screen.findByText(/invalid email or password/i),
-      ).toBeTruthy();
+      expect(await screen.findByText(/invalid email or password/i)).toBeTruthy();
       expect(screen.queryByTestId("verification-sent")).toBeNull();
     });
   });
@@ -441,20 +397,13 @@ describe("given the identifier-first sign-in screen", () => {
       await enterEmail("sam@example.com");
       await screen.findByTestId("method-picker");
 
-      await userEvent.type(
-        container.querySelector('input[type="password"]')!,
-        "a-password",
-      );
+      await userEvent.type(container.querySelector('input[type="password"]')!, "a-password");
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
 
       // The anchor's wording stands, and the real remaining window is added to
       // it rather than replacing it with a guess.
-      expect(await screen.findByTestId("signin-failure")).toHaveTextContent(
-        /too many attempts/i,
-      );
-      expect(screen.getByTestId("retry-countdown")).toHaveTextContent(
-        "Try again in 2 minutes.",
-      );
+      expect(await screen.findByTestId("signin-failure")).toHaveTextContent(/too many attempts/i);
+      expect(screen.getByTestId("retry-countdown")).toHaveTextContent("Try again in 2 minutes.");
       expect(screen.getByRole("button", { name: /^log in$/i })).toBeDisabled();
     });
 
@@ -470,19 +419,12 @@ describe("given the identifier-first sign-in screen", () => {
       await enterEmail("sam@example.com");
       await screen.findByTestId("method-picker");
 
-      await userEvent.type(
-        container.querySelector('input[type="password"]')!,
-        "a-password",
-      );
+      await userEvent.type(container.querySelector('input[type="password"]')!, "a-password");
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
 
-      expect(await screen.findByTestId("signin-failure")).toHaveTextContent(
-        /too many attempts/i,
-      );
+      expect(await screen.findByTestId("signin-failure")).toHaveTextContent(/too many attempts/i);
       expect(screen.queryByTestId("retry-countdown")).toBeNull();
-      expect(
-        screen.getByRole("button", { name: /^log in$/i }),
-      ).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: /^log in$/i })).not.toBeDisabled();
     });
   });
 
@@ -502,9 +444,9 @@ describe("given the identifier-first sign-in screen", () => {
 
       expect(await screen.findByTestId("last-used-method")).toBeTruthy();
       expect(screen.getAllByTestId("last-used-method")).toHaveLength(1);
-      expect(
-        screen.getByRole("button", { name: /continue with okta/i }),
-      ).toHaveTextContent(/last used/i);
+      expect(screen.getByRole("button", { name: /continue with okta/i })).toHaveTextContent(
+        /last used/i,
+      );
 
       // The badge is a label, never an ordering: the password method the
       // decision named first is still first.
@@ -536,9 +478,7 @@ describe("given the identifier-first sign-in screen", () => {
       const addressField = await screen.findByLabelText(/email/i);
       expect(addressField.getAttribute("type")).toBe("email");
       expect(addressField.getAttribute("name")).toBe("email");
-      expect(addressField.getAttribute("autocomplete")).toBe(
-        "username webauthn",
-      );
+      expect(addressField.getAttribute("autocomplete")).toBe("username webauthn");
 
       await enterEmail("sam@example.com");
       await screen.findByTestId("method-picker");
@@ -548,11 +488,9 @@ describe("given the identifier-first sign-in screen", () => {
       const carried = container.querySelector('input[name="email"]');
       expect(carried?.getAttribute("value")).toBe("sam@example.com");
       expect(carried?.getAttribute("autocomplete")).toBe("username");
-      expect(
-        container
-          .querySelector('input[type="password"]')
-          ?.getAttribute("autocomplete"),
-      ).toBe("current-password");
+      expect(container.querySelector('input[type="password"]')?.getAttribute("autocomplete")).toBe(
+        "current-password",
+      );
     });
   });
 

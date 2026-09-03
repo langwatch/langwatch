@@ -32,9 +32,7 @@ describe("<TagPill/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(
-        screen.getByRole("button", { name: "Remove billing tag" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove billing tag" })).toBeInTheDocument();
     });
 
     it("calls onRemove when remove button is clicked", async () => {

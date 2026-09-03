@@ -42,9 +42,7 @@ const TEST_KEYS = crypto.generateKeyPairSync("rsa", {
   privateKeyEncoding: { type: "pkcs8", format: "pem" },
 });
 
-const generation = LicenseGenerationService.create(
-  NodeLicenseCryptographyAdapter.create(),
-);
+const generation = LicenseGenerationService.create(NodeLicenseCryptographyAdapter.create());
 const generateLicenseKey = generation.generate.bind(generation);
 
 describe("buildMintedPlan", () => {

@@ -7,10 +7,7 @@ import {
   type OrganizationGroupMember,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import {
-  GroupRepository,
-  type OrganizationGroupWithMemberCount,
-} from "../group.repository";
+import { GroupRepository, type OrganizationGroupWithMemberCount } from "../group.repository";
 
 const groupSelect = {
   id: true,
@@ -32,10 +29,7 @@ export class PrismaGroupRepository extends GroupRepository {
     return new PrismaGroupRepository(database);
   }
 
-  async get(input: {
-    groupId: string;
-    organizationId: string;
-  }): Promise<OrganizationGroup> {
+  async get(input: { groupId: string; organizationId: string }): Promise<OrganizationGroup> {
     const group = await this.database.group.findFirst({
       where: { id: input.groupId, organizationId: input.organizationId },
       select: groupSelect,
@@ -236,10 +230,7 @@ export class PrismaGroupRepository extends GroupRepository {
         data: { groupId: input.groupId, userId: input.userId },
       });
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new GroupMemberAlreadyAddedError(input.userId);
       }
       throw error;

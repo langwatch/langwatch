@@ -21,9 +21,7 @@ export const listTestSuitesCommand = async (): Promise<CommandResult | void> => 
   try {
     const suites = await service.list();
 
-    spinner.succeed(
-      `Found ${suites.length} test suite${suites.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${suites.length} test suite${suites.length !== 1 ? "s" : ""}`);
 
     return {
       data: suites,

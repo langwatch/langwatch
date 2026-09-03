@@ -24,10 +24,7 @@ export interface ValidatorHandle extends IDisposable {
   revalidate: () => void;
 }
 
-export function registerValidator(
-  monaco: Monaco,
-  contractRef: ContractRef,
-): ValidatorHandle {
+export function registerValidator(monaco: Monaco, contractRef: ContractRef): ValidatorHandle {
   const owner = "langwatch-python-lint";
 
   const validate = (model: editor.ITextModel): void => {

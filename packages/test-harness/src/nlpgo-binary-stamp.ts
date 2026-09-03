@@ -92,9 +92,7 @@ export function digestGoSources({
     ...watchDirs
       .filter((dir) => fs.existsSync(dir))
       .flatMap((dir) => collectBuildInputs(dir, root)),
-    ...watchFiles
-      .filter((file) => fs.existsSync(file))
-      .map((file) => path.relative(root, file)),
+    ...watchFiles.filter((file) => fs.existsSync(file)).map((file) => path.relative(root, file)),
   ].sort();
 
   const digest = createHash("sha256");

@@ -17,10 +17,7 @@ import { useOrganizationToaster, useShowErrorToast } from "../behavior/organizat
  * wire message is the code slug since #5984, so toasting `error.message` would
  * show an admin `join_request_not_pending` and nothing else.
  */
-export function useJoinRequests(scope: {
-  organizationId: string;
-  canManage: boolean;
-}) {
+export function useJoinRequests(scope: { organizationId: string; canManage: boolean }) {
   const answers = usePendingJoinRequests(scope);
   const joining = useDomainJoinSetting(scope);
   return { ...answers, ...joining };
@@ -118,8 +115,7 @@ function usePendingJoinRequests({
         joinRequestId,
         run: approveMutation,
         title: "Request approved",
-        description:
-          "They are a member now, with your organization's default role.",
+        description: "They are a member now, with your organization's default role.",
       }),
     [answer, approveMutation],
   );

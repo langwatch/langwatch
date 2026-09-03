@@ -81,9 +81,7 @@ describe("given a deployment that offers passkeys", () => {
       const email = getByLabelText("Email");
 
       fireEvent.pointerDown(email);
-      await waitFor(() =>
-        expect(passkeyMock).toHaveBeenCalledWith({ autoFill: true }),
-      );
+      await waitFor(() => expect(passkeyMock).toHaveBeenCalledWith({ autoFill: true }));
 
       fireEvent.pointerDown(email);
       fireEvent.keyDown(email, { key: "a" });
@@ -103,9 +101,7 @@ describe("given a deployment that offers passkeys", () => {
 
       fireEvent.keyDown(email, { key: "a" });
 
-      await waitFor(() =>
-        expect(passkeyMock).toHaveBeenCalledWith({ autoFill: true }),
-      );
+      await waitFor(() => expect(passkeyMock).toHaveBeenCalledWith({ autoFill: true }));
     });
   });
 
@@ -120,9 +116,7 @@ describe("given a deployment that offers passkeys", () => {
       fireEvent.keyDown(name, { key: "Tab" });
       getByLabelText("Email").focus();
 
-      await waitFor(() =>
-        expect(passkeyMock).toHaveBeenCalledWith({ autoFill: true }),
-      );
+      await waitFor(() => expect(passkeyMock).toHaveBeenCalledWith({ autoFill: true }));
     });
   });
 

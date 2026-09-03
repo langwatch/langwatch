@@ -27,9 +27,7 @@ describe("migrateModelProviderKeysRow", () => {
 
         const result = migrateModelProviderKeysRow({ row, cipher });
 
-        expect(result).toBe(
-          `encrypted:${JSON.stringify({ apiKey: "sk-123", orgId: "org-456" })}`,
-        );
+        expect(result).toBe(`encrypted:${JSON.stringify({ apiKey: "sk-123", orgId: "org-456" })}`);
       });
     });
   });

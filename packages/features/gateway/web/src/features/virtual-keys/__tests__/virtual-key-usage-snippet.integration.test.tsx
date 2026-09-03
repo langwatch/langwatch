@@ -30,10 +30,7 @@ describe("given a VirtualKeyUsageSnippet", () => {
     /** @scenario Usage example defaults to a model the key can serve */
     it("embeds custom/<model> in the copy-paste example, not gpt-5-mini", async () => {
       const { container } = renderWithGatewayHost(
-        <VirtualKeyUsageSnippet
-          secret="vk-lw-testsecret"
-          model="custom/Qwen2.5-0.5B-Instruct"
-        />,
+        <VirtualKeyUsageSnippet secret="vk-lw-testsecret" model="custom/Qwen2.5-0.5B-Instruct" />,
         { host },
       );
 

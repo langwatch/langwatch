@@ -6,13 +6,9 @@ keywords: pricing, events, billable event, data retention, plans, free plan, ent
 
 LangWatch Cloud pricing is built around two ideas: **seats scale with your team, and usage stays cheap.** Building reliable AI systems is collaborative work: engineers iterate, product teams define success metrics, domain experts review outputs, and stakeholders track performance. We price around that collaboration and keep usage costs low, so more tracking, evaluations, and production traffic adds little to your bill.
 
-<Card
-  title="Start for free, no credit card required"
-  icon="rocket"
-  href="https://app.langwatch.ai"
->
-  The free plan gives you immediate access to all core features, including evaluations,
-  monitoring, and agent simulations.
+<Card title="Start for free, no credit card required" icon="rocket" href="https://app.langwatch.ai">
+  The free plan gives you immediate access to all core features, including evaluations, monitoring,
+  and agent simulations.
 </Card>
 
 ## Events
@@ -57,8 +53,8 @@ Self-hosted deployments are different: the data sits in your own database, so th
 
 <Note>
   To extend retention beyond your plan default, reach out to your contact or
-  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai). Self-hosting? See the
-  [self-hosting docs](/self-hosting/overview) to configure retention with a license.
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai). Self-hosting? See the [self-hosting
+  docs](/self-hosting/overview) to configure retention with a license.
 </Note>
 
 ## Frequently asked questions
@@ -69,16 +65,15 @@ Self-hosted deployments are different: the data sits in your own database, so th
   </Accordion>
 
 <Accordion title="Is there a free plan?">
-  Yes. You can start for free with LangWatch Cloud, no credit card required. The free plan
-  gives you immediate access to all core features: evaluations, monitoring, and agent
-  simulations. It's ideal for developers who want to experiment or run small-scale
-  testing.
+  Yes. You can start for free with LangWatch Cloud, no credit card required. The free plan gives you
+  immediate access to all core features: evaluations, monitoring, and agent simulations. It's ideal
+  for developers who want to experiment or run small-scale testing.
 </Accordion>
 
 <Accordion title="What if I'm working with sensitive data from the start?">
-  Run LangWatch locally on your own machine. All features are available from our
-  [open-source repository](https://github.com/langwatch/langwatch), so you can build with
-  sensitive data without it leaving your environment.
+  Run LangWatch locally on your own machine. All features are available from our [open-source
+  repository](https://github.com/langwatch/langwatch), so you can build with sensitive data without
+  it leaving your environment.
 </Accordion>
 
   <Accordion title="What is the difference between a full member and a lite member?">
@@ -89,54 +84,50 @@ Self-hosted deployments are different: the data sits in your own database, so th
   </Accordion>
 
 <Accordion title="What counts as a billable event?">
-  Billable events are the spans, logs and metrics your app or a tracked coding assistant
-  sends, evaluation results, the steps of an experiment run, and the steps of a scenario
-  simulation. Pricing is based on the total number of ingested events per billing period.
-  [The full list is here](/pricing/billable-events), including how many events a sweep or
-  a simulation produces, what is never billed, and how retries are deduplicated.
+  Billable events are the spans, logs and metrics your app or a tracked coding assistant sends,
+  evaluation results, the steps of an experiment run, and the steps of a scenario simulation.
+  Pricing is based on the total number of ingested events per billing period. [The full list is
+  here](/pricing/billable-events), including how many events a sweep or a simulation produces, what
+  is never billed, and how retries are deduplicated.
 </Accordion>
 
 <Accordion title="Can I customize how long my data is retained?">
-  On LangWatch Cloud each plan includes a default retention window (see the table above),
-  and extending it, a longer window or a higher volume of stored events, is available on
-  **Enterprise plans**. Reach out to
-  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set this up. Self-hosted,
-  the data is in your own database: retention is yours to configure with or without a
+  On LangWatch Cloud each plan includes a default retention window (see the table above), and
+  extending it, a longer window or a higher volume of stored events, is available on **Enterprise
+  plans**. Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to set this up.
+  Self-hosted, the data is in your own database: retention is yours to configure with or without a
   license, and a license adds multi-class retention policies per data category.
 </Accordion>
 
 <Accordion title="Are webhooks and the billing events API included in my plan?">
-  The [webhook endpoints platform](/features/webhooks) (signed event delivery to your
-  systems) and the [billing events surface](/ai-gateway/billing-events) (per-request spend
-  events, reconciliation pulls, replay) are **Enterprise** capabilities, on Cloud and on
-  self-hosted licenses alike. They exist for platforms that rebill their own customers and
-  need billing-grade delivery guarantees. Spend records are retained for a fixed 13 months
-  independent of your data-retention settings. Reach out to
-  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to enable them.
+  The [webhook endpoints platform](/features/webhooks) (signed event delivery to your systems) and
+  the [billing events surface](/ai-gateway/billing-events) (per-request spend events, reconciliation
+  pulls, replay) are **Enterprise** capabilities, on Cloud and on self-hosted licenses alike. They
+  exist for platforms that rebill their own customers and need billing-grade delivery guarantees.
+  Spend records are retained for a fixed 13 months independent of your data-retention settings.
+  Reach out to [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) to enable them.
 </Accordion>
 
 <Accordion title="Can I self-host or run a hybrid setup?">
   Yes. LangWatch is available both [self-hosted](/self-hosting/overview) and
-  [hybrid](/hybrid-setup/overview). With the hybrid option you get the convenience of
-  running on our Cloud while your data stays on your side. See the self-hosting docs or
-  reach out for more information. You can run the self-hosted version for free, with
-  unlimited users, projects, and events on your own hardware. If you require enterprise
-  features such as SSO, RBAC, SCIM, gateway webhooks, or a support SLA, [reach out to
-  us](mailto:enterprise@langwatch.ai). See [Editions and
+  [hybrid](/hybrid-setup/overview). With the hybrid option you get the convenience of running on our
+  Cloud while your data stays on your side. See the self-hosting docs or reach out for more
+  information. You can run the self-hosted version for free, with unlimited users, projects, and
+  events on your own hardware. If you require enterprise features such as SSO, RBAC, SCIM, gateway
+  webhooks, or a support SLA, [reach out to us](mailto:enterprise@langwatch.ai). See [Editions and
   licensing](/self-hosting/licensing) for what a license adds.
 </Accordion>
 
 <Accordion title="Where is my data stored?">
-  For LangWatch Cloud, data is stored securely in the EU. For the US, Pacific, and other
-  regions, contact us at [contact@langwatch.ai](mailto:contact@langwatch.ai) and we'll
-  meet your requirements. For Enterprise users, we offer on-premise options so your data
-  stays entirely within your own infrastructure. Nothing leaves your environment.
+  For LangWatch Cloud, data is stored securely in the EU. For the US, Pacific, and other regions,
+  contact us at [contact@langwatch.ai](mailto:contact@langwatch.ai) and we'll meet your
+  requirements. For Enterprise users, we offer on-premise options so your data stays entirely within
+  your own infrastructure. Nothing leaves your environment.
 </Accordion>
 
 <Accordion title="Do you support custom contracts and procurement reviews?">
-  Yes. We know procurement and legal teams often have their own review processes. For
-  Enterprise and regulated-industry plans, we support custom contracting and custom
-  workflows.
+  Yes. We know procurement and legal teams often have their own review processes. For Enterprise and
+  regulated-industry plans, we support custom contracting and custom workflows.
 </Accordion>
 
 <Accordion title="Is LangWatch secure and compliant?">

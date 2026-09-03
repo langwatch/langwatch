@@ -45,12 +45,7 @@ export const SCIM_SYNC_EVENT_VERSION_LATEST = "2026-08-24" as const;
  * provider that was configured and has never pushed is a setup that stalled,
  * and it looks nothing like one that is working.
  */
-export const SCIM_SYNC_STATES = [
-  "TOKEN_ISSUED",
-  "SYNCING",
-  "ERROR",
-  "REVOKED",
-] as const;
+export const SCIM_SYNC_STATES = ["TOKEN_ISSUED", "SYNCING", "ERROR", "REVOKED"] as const;
 export const scimSyncStateSchema = z.enum(SCIM_SYNC_STATES);
 export type ScimSyncLifecycleState = z.infer<typeof scimSyncStateSchema>;
 
@@ -64,12 +59,7 @@ export type ScimUserOp = z.infer<typeof scimUserOpSchema>;
  * on purpose: what an administrator needs from the failure surface is "the
  * directory could not remove somebody", not `PATCH /Users/:id`.
  */
-export const SCIM_APPLY_OPS = [
-  "push_user",
-  "deactivate_user",
-  "delete_user",
-  "map_group",
-] as const;
+export const SCIM_APPLY_OPS = ["push_user", "deactivate_user", "delete_user", "map_group"] as const;
 export const scimApplyOpSchema = z.enum(SCIM_APPLY_OPS);
 export type ScimApplyOp = z.infer<typeof scimApplyOpSchema>;
 
@@ -80,20 +70,13 @@ export type ScimRevokeCause = z.infer<typeof scimRevokeCauseSchema>;
 
 // ---- events --------------------------------------------------------------
 
-export const SCIM_TOKEN_ISSUED_EVENT_TYPE =
-  "lw.identity.scim_token_issued" as const;
-export const SCIM_USER_PUSHED_EVENT_TYPE =
-  "lw.identity.scim_user_pushed" as const;
-export const SCIM_GROUP_MAPPED_EVENT_TYPE =
-  "lw.identity.scim_group_mapped" as const;
-export const SCIM_APPLY_FAILED_EVENT_TYPE =
-  "lw.identity.scim_apply_failed" as const;
-export const SCIM_APPLY_RECOVERED_EVENT_TYPE =
-  "lw.identity.scim_apply_recovered" as const;
-export const SCIM_APPLY_RETIRED_EVENT_TYPE =
-  "lw.identity.scim_apply_retired" as const;
-export const SCIM_TOKEN_REVOKED_EVENT_TYPE =
-  "lw.identity.scim_token_revoked" as const;
+export const SCIM_TOKEN_ISSUED_EVENT_TYPE = "lw.identity.scim_token_issued" as const;
+export const SCIM_USER_PUSHED_EVENT_TYPE = "lw.identity.scim_user_pushed" as const;
+export const SCIM_GROUP_MAPPED_EVENT_TYPE = "lw.identity.scim_group_mapped" as const;
+export const SCIM_APPLY_FAILED_EVENT_TYPE = "lw.identity.scim_apply_failed" as const;
+export const SCIM_APPLY_RECOVERED_EVENT_TYPE = "lw.identity.scim_apply_recovered" as const;
+export const SCIM_APPLY_RETIRED_EVENT_TYPE = "lw.identity.scim_apply_retired" as const;
+export const SCIM_TOKEN_REVOKED_EVENT_TYPE = "lw.identity.scim_token_revoked" as const;
 
 export const SCIM_SYNC_EVENT_TYPES = [
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
@@ -261,19 +244,11 @@ export interface ScimSyncState {
  * Deriving it means no lookup table stands between a token and its history,
  * and no code path can mint a sync a connection does not know about.
  */
-export function scimSyncIdFor({
-  connectionId,
-}: {
-  connectionId: string;
-}): string {
+export function scimSyncIdFor({ connectionId }: { connectionId: string }): string {
   return connectionId;
 }
 
-export function emptyScimSync({
-  scimSyncId,
-}: {
-  scimSyncId: string;
-}): ScimSyncState {
+export function emptyScimSync({ scimSyncId }: { scimSyncId: string }): ScimSyncState {
   return {
     scimSyncId,
     connectionId: "",
@@ -340,9 +315,7 @@ export function reduceScimSync({
         lastFailure: {
           op: fact.data.op,
           errorCode: fact.data.errorCode,
-          attempts: sameFailure(state.lastFailure, fact.data)
-            ? state.lastFailure.attempts + 1
-            : 1,
+          attempts: sameFailure(state.lastFailure, fact.data) ? state.lastFailure.attempts + 1 : 1,
           retiredAtMs: null,
           userId: fact.data.userId,
           occurredAtMs: fact.occurredAt,

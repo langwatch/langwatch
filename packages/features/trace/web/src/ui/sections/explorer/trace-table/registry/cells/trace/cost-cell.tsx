@@ -20,13 +20,7 @@ function isBundled(row: TraceListItem): boolean {
   return (row.nonBilledCost ?? 0) > 0;
 }
 
-function BundledCostTooltip({
-  row,
-  children,
-}: {
-  row: TraceListItem;
-  children: ReactElement;
-}) {
+function BundledCostTooltip({ row, children }: { row: TraceListItem; children: ReactElement }) {
   return (
     <Tooltip
       content={
@@ -51,13 +45,7 @@ export const CostCell = {
   render: ({ row }) =>
     isBundled(row) ? (
       <BundledCostTooltip row={row}>
-        <Text
-          as="span"
-          color="purple.fg"
-          fontWeight="medium"
-          whiteSpace="nowrap"
-          textStyle="xs"
-        >
+        <Text as="span" color="purple.fg" fontWeight="medium" whiteSpace="nowrap" textStyle="xs">
           Bundled
         </Text>
       </BundledCostTooltip>

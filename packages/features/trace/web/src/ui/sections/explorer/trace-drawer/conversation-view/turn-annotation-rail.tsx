@@ -121,9 +121,7 @@ export function TurnAnnotationRail({
             // without repeating the turn it is sitting next to.
             contextTraceId={traceId}
             isOwn={!!userId && annotation.user?.id === userId}
-            onEdit={() =>
-              openDraft(reopenComment({ annotation, traceId, input, output }))
-            }
+            onEdit={() => openDraft(reopenComment({ annotation, traceId, input, output }))}
           />
         ),
       )}
@@ -189,9 +187,7 @@ function resolveRailDraft({
 }): AnnotationDraft | null {
   if (!draft || draft.traceId !== traceId) return null;
   if (isTurnRailDraft(draft)) return draft;
-  return draft.annotationId && cards.some((a) => a.id === draft.annotationId)
-    ? draft
-    : null;
+  return draft.annotationId && cards.some((a) => a.id === draft.annotationId) ? draft : null;
 }
 
 /** The rail's own way in, for readers who do not know the column is clickable. */

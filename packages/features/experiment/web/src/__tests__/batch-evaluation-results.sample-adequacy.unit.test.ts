@@ -29,10 +29,7 @@ const degenerateEntry = (
   isDegenerate: true,
 });
 
-const leaderboard = (
-  entries: BTLeaderboardEntry[],
-  comparisonCount = 20,
-): BTLeaderboard => ({
+const leaderboard = (entries: BTLeaderboardEntry[], comparisonCount = 20): BTLeaderboard => ({
   entries,
   winMatrix: {},
   comparisonCount,
@@ -173,9 +170,7 @@ describe("computeSampleAdequacy — when multiplicity is worth raising", () => {
       // rate directly, so it would keep passing if this returned 5% for a
       // single pair — which reads as "across 1 pairs there is a 5% chance",
       // a caveat about nothing.
-      expect(
-        computeSampleAdequacy(board(["a", "b"])).familyWiseFalsePositiveRate,
-      ).toBeNull();
+      expect(computeSampleAdequacy(board(["a", "b"])).familyWiseFalsePositiveRate).toBeNull();
     });
   });
 
@@ -192,9 +187,7 @@ describe("computeSampleAdequacy — when multiplicity is worth raising", () => {
       const three = computeSampleAdequacy(board(["a", "b", "c"]));
       const four = computeSampleAdequacy(board(["a", "b", "c", "d"]));
 
-      expect(four.familyWiseFalsePositiveRate!).toBeGreaterThan(
-        three.familyWiseFalsePositiveRate!,
-      );
+      expect(four.familyWiseFalsePositiveRate!).toBeGreaterThan(three.familyWiseFalsePositiveRate!);
     });
   });
 });

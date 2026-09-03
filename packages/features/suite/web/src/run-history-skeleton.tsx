@@ -66,11 +66,7 @@ export function RunHistorySkeleton({ sections = 2 }: { sections?: number }) {
       {Array.from({ length: sections }).map((_, sectionIndex) => (
         <Box key={sectionIndex}>
           <SkeletonHeaderRow />
-          <Grid
-            templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
-            gap={4}
-            padding={4}
-          >
+          <Grid templateColumns="repeat(auto-fill, minmax(250px, 1fr))" gap={4} padding={4}>
             {Array.from({ length: 3 - sectionIndex }).map((_, cardIndex) => (
               <SkeletonCard key={cardIndex} />
             ))}

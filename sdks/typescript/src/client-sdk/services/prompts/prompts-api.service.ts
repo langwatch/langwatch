@@ -76,11 +76,7 @@ export class PromptsApiService {
     /**
      * Wraps the service in a tracing proxy via the decorator.
      */
-    return createTracingProxy(
-      this as PromptsApiService,
-      tracer,
-      PromptServiceTracingDecorator,
-    );
+    return createTracingProxy(this as PromptsApiService, tracer, PromptServiceTracingDecorator);
   }
 
   /**
@@ -128,9 +124,7 @@ export class PromptsApiService {
   ): Promise<PromptResponse> => {
     // Parse version to number, skip for "latest" or invalid values
     const versionNumber =
-      options?.version && options.version !== "latest"
-        ? parseInt(options.version, 10)
-        : undefined;
+      options?.version && options.version !== "latest" ? parseInt(options.version, 10) : undefined;
 
     const { data, error } = await this.apiClient.GET("/api/prompts/{id}", {
       params: {
@@ -170,9 +164,7 @@ export class PromptsApiService {
 
       const originalError = error instanceof PromptsApiError ? error.originalError : null;
       const statusCode =
-        originalError != null &&
-        typeof originalError === "object" &&
-        "statusCode" in originalError
+        originalError != null && typeof originalError === "object" && "statusCode" in originalError
           ? (originalError as { statusCode: unknown }).statusCode
           : null;
 

@@ -120,8 +120,7 @@ export abstract class AbstractFoldProjection<
   } = {}) {
     this.createdAtKey = createdAtKey ?? ("CreatedAt" as CK);
     this.updatedAtKey = updatedAtKey ?? ("UpdatedAt" as UK);
-    this.LastEventOccurredAtKey =
-      LastEventOccurredAtKey ?? ("LastEventOccurredAt" as LEOAK);
+    this.LastEventOccurredAtKey = LastEventOccurredAtKey ?? ("LastEventOccurredAt" as LEOAK);
   }
 
   /**
@@ -219,10 +218,7 @@ export abstract class AbstractFoldProjection<
     const handlerName = this.dispatchMap[event.type];
     if (!handlerName) return state;
 
-    const handler = this[handlerName as keyof this] as (
-      e: { type: string },
-      s: State,
-    ) => State;
+    const handler = this[handlerName as keyof this] as (e: { type: string }, s: State) => State;
     const newState = handler.call(this, event, state);
     const prevUpdatedAt: number = state[this.updatedAtKey];
     const nextUpdatedAt = Math.max(Date.now(), prevUpdatedAt + 1);

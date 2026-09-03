@@ -39,11 +39,7 @@ const LANGY_PROMPTS = [
  * Spec: specs/traces-v2/search.feature ("The search bar's ask affordance
  * belongs to Langy when Langy is available").
  */
-export const FloatingLangyBar: React.FC<FloatingLangyBarProps> = ({
-  rect,
-  onClose,
-  onAsk,
-}) => {
+export const FloatingLangyBar: React.FC<FloatingLangyBarProps> = ({ rect, onClose, onAsk }) => {
   const [prompt, setPrompt] = useState("");
   // Show what will ride along, so "these traces" is never a surprise: the
   // applied search travels with the question as context on the panel.

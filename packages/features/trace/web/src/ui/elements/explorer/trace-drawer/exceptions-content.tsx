@@ -84,12 +84,7 @@ export function ExceptionsContent({
       )}
       {errorSpans.length > 0 && (
         <HStack gap={1.5} flexWrap="wrap" align="center">
-          <Text
-            textStyle="2xs"
-            color="fg.muted"
-            textTransform="uppercase"
-            letterSpacing="0.04em"
-          >
+          <Text textStyle="2xs" color="fg.muted" textTransform="uppercase" letterSpacing="0.04em">
             Spans with errors
           </Text>
           {errorSpans.map(({ span }) => (

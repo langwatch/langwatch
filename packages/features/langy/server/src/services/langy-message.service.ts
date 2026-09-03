@@ -55,9 +55,7 @@ export class LangyMessageService {
       .join("\n");
   }
 
-  static createTrustedMessageReader(
-    repository: LangyMessageRepository,
-  ): LangyTrustedMessageReader {
+  static createTrustedMessageReader(repository: LangyMessageRepository): LangyTrustedMessageReader {
     return {
       async getRecordsByConversation(params): Promise<LangyMessageRecord[]> {
         const rows = await repository.findAllByConversation(params);

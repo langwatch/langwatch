@@ -83,8 +83,7 @@ export const modelProviderRouter = (explicit: Record<string, unknown> = {}) => (
 /** Explicitly declared procedures win; anything else on the router is inert. */
 export const withFallback = (explicit: Record<string, unknown>) =>
   new Proxy(explicit, {
-    get: (target, prop) =>
-      prop in target ? target[prop as string] : (routerProxy as never),
+    get: (target, prop) => (prop in target ? target[prop as string] : (routerProxy as never)),
   });
 
 /**

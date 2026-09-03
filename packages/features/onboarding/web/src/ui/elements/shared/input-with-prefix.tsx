@@ -92,11 +92,7 @@ export function InputWithPrefix({
         hasEndAddon ? (
           <HStack gap="1">
             {showVisibilityToggle && (
-              <Tooltip
-                content={isVisible ? "Hide value" : "Show value"}
-                openDelay={0}
-                showArrow
-              >
+              <Tooltip content={isVisible ? "Hide value" : "Show value"} openDelay={0} showArrow>
                 <IconButton
                   size="2xs"
                   variant="ghost"
@@ -108,11 +104,7 @@ export function InputWithPrefix({
               </Tooltip>
             )}
             {onCopyPlain && (
-              <Tooltip
-                content={`Copy ${ariaLabel.toLowerCase()}`}
-                openDelay={0}
-                showArrow
-              >
+              <Tooltip content={`Copy ${ariaLabel.toLowerCase()}`} openDelay={0} showArrow>
                 <IconButton
                   size="2xs"
                   variant="ghost"

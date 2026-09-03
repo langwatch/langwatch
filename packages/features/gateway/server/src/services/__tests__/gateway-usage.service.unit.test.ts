@@ -35,8 +35,7 @@ function mockVirtualKeys(
   return {
     findMetaByIds: async ({ organizationId, ids }) =>
       virtualKeys.filter(
-        (key) =>
-          ids.includes(key.id) && (key.organizationId ?? belongingTo) === organizationId,
+        (key) => ids.includes(key.id) && (key.organizationId ?? belongingTo) === organizationId,
       ),
   };
 }

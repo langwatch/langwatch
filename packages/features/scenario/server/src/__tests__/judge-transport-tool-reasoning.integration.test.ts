@@ -9,10 +9,7 @@
 import { APICallError, generateText, tool } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import {
-  createJudgeModelFromParams,
-  createModelFromParams,
-} from "@langwatch/scenario-server";
+import { createJudgeModelFromParams, createModelFromParams } from "@langwatch/scenario-server";
 import type { LiteLLMParams } from "@langwatch/scenario-contract";
 import {
   type StubEndpoint,

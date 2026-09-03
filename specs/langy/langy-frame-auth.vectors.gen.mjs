@@ -14,14 +14,7 @@
 //   mac = hex( HMAC-SHA256( key = hexDecode(runToken), signingInput ) )
 import { createHmac } from "node:crypto";
 
-const FIELDS = [
-  "projectId",
-  "userId",
-  "conversationId",
-  "turnId",
-  "frameNonce",
-  "payload",
-];
+const FIELDS = ["projectId", "userId", "conversationId", "turnId", "frameNonce", "payload"];
 
 function signingInput(f) {
   const chunks = [];

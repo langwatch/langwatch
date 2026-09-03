@@ -31,7 +31,11 @@ function commandData(overrides: Partial<ExecuteEvaluationCommandData> = {}) {
   } as ExecuteEvaluationCommandData;
 }
 
-function met(precondition: Record<string, unknown>, data = commandData(), spans: EvaluationTraceSpan[] = []) {
+function met(
+  precondition: Record<string, unknown>,
+  data = commandData(),
+  spans: EvaluationTraceSpan[] = [],
+) {
   return service.areMet({ data, preconditions: [precondition], spans, events: null });
 }
 

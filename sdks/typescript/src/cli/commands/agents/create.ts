@@ -20,9 +20,7 @@ export const createAgentCommand = async (
   const spinner = createSpinner(`Creating agent "${name}"...`).start();
 
   try {
-    const config = options.config
-      ? (JSON.parse(options.config) as Record<string, unknown>)
-      : {};
+    const config = options.config ? (JSON.parse(options.config) as Record<string, unknown>) : {};
 
     const agent = await service.create({
       name,
@@ -30,9 +28,7 @@ export const createAgentCommand = async (
       config,
     });
 
-    spinner.succeed(
-      `Created agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`,
-    );
+    spinner.succeed(`Created agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`);
 
     return {
       data: agent,

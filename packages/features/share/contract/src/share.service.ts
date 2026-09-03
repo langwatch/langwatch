@@ -18,7 +18,5 @@ export abstract class ShareService {
   abstract revokeAllTraceShares(projectId: string): Promise<void>;
   abstract unpinTrace(input: TracePinInput): Promise<void>;
   abstract tryGetCachedPayload(input: SharedPayloadCacheInput): Promise<unknown | null>;
-  abstract cachePayload(
-    input: SharedPayloadCacheInput & { payload: unknown },
-  ): Promise<void>;
+  abstract cachePayload(input: SharedPayloadCacheInput & { payload: unknown }): Promise<void>;
 }

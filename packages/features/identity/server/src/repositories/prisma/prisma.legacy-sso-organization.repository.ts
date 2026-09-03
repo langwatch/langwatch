@@ -12,9 +12,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * `enforce`, which is what makes the rollback "flag off" rather than "restore
  * the data".
  */
-export class PrismaLegacySsoOrganizationRepository
-  implements LegacySsoOrganizationRepository
-{
+export class PrismaLegacySsoOrganizationRepository implements LegacySsoOrganizationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async tryFindLegacySso({

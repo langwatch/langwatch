@@ -62,9 +62,7 @@ function buildRange({
   label: string;
   values: Iterable<number | null | undefined>;
 }): DiscoverDescriptors[number] | null {
-  const nums = [...values].filter(
-    (n): n is number => typeof n === "number" && Number.isFinite(n),
-  );
+  const nums = [...values].filter((n): n is number => typeof n === "number" && Number.isFinite(n));
   if (nums.length === 0) return null;
   return {
     key,

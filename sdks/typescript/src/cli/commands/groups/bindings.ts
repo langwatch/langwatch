@@ -19,9 +19,7 @@ export interface AddGroupBindingOptions {
   scopeId: string;
 }
 
-export const listGroupBindingsCommand = async (
-  groupId: string,
-): Promise<CommandResult | void> =>
+export const listGroupBindingsCommand = async (groupId: string): Promise<CommandResult | void> =>
   runManagement({
     action: "list group bindings",
     pending: `Fetching bindings of group "${groupId}"...`,

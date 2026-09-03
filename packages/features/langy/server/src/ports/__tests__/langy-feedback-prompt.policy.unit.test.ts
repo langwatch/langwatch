@@ -20,10 +20,7 @@ function memoryRedis(): LangyFeedbackPromptRedis & { store: Map<string, string> 
   };
 }
 
-function service(
-  redis: LangyFeedbackPromptRedis | null,
-  now = NOW,
-): LangyFeedbackPromptPolicy {
+function service(redis: LangyFeedbackPromptRedis | null, now = NOW): LangyFeedbackPromptPolicy {
   return LangyFeedbackPromptPolicy.create({ redis, now: () => now });
 }
 

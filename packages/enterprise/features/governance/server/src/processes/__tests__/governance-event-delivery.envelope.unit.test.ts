@@ -7,9 +7,7 @@ import {
 } from "../../adapters/governance-events.adapter";
 import { GovernanceEventDeliveryProcess } from "../governance-event-delivery.process";
 
-const lifecycle = (
-  action: "created" | "rotated" | "disabled" | "enabled" | "revoked",
-) => ({
+const lifecycle = (action: "created" | "rotated" | "disabled" | "enabled" | "revoked") => ({
   tenantId: "proj_1",
   organization_id: "org_1",
   virtual_key_id: "vk_1",
@@ -41,13 +39,7 @@ const crossing = (kind: "threshold_crossed" | "breached") => ({
 describe("governance envelopes", () => {
   /** @scenario Key lifecycle changes become their own envelope types */
   it("types each lifecycle action with a deterministic id and carries the reason", () => {
-    const actions = [
-      "created",
-      "rotated",
-      "disabled",
-      "enabled",
-      "revoked",
-    ] as const;
+    const actions = ["created", "rotated", "disabled", "enabled", "revoked"] as const;
     for (const action of actions) {
       const env = GovernanceEventDeliveryProcess.vkLifecycleEnvelope(lifecycle(action));
       expect(env.type).toBe(`gateway.virtual_key.${action}`);
@@ -76,9 +68,7 @@ describe("governance envelopes", () => {
       // Lowercase snake is THE wire casing; the event store holds the
       // database's own "MONTH" and the seam converts it.
       expect(env.data.window).toBe("month");
-      expect(env.data.period_started_at).toBe(
-        new Date(1_751_328_000_000).toISOString(),
-      );
+      expect(env.data.period_started_at).toBe(new Date(1_751_328_000_000).toISOString());
       expect(env.data.limit_usd).toBe("100.000000");
       expect(env.data.spent_usd).toBe("84.500000");
     }

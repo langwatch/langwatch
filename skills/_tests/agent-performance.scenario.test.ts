@@ -29,9 +29,7 @@ function findReport(dir: string): string | undefined {
     .map((f) => path.join(dir, f));
   // The skill names it agent-performance-report.html; accept any html report
   // but prefer the canonical name so drift is visible in the assertion output.
-  return (
-    candidates.find((f) => f.endsWith("agent-performance-report.html")) ?? candidates[0]
-  );
+  return candidates.find((f) => f.endsWith("agent-performance-report.html")) ?? candidates[0];
 }
 
 describe("Agent Performance Skill", () => {
@@ -77,27 +75,17 @@ describe("Agent Performance Skill", () => {
             assertSkillWasRead(state, "agent-performance");
 
             const report = findReport(tempFolder);
-            expect(
-              report,
-              `Expected an HTML diagnosis report in ${tempFolder}`,
-            ).toBeDefined();
+            expect(report, `Expected an HTML diagnosis report in ${tempFolder}`).toBeDefined();
 
             const html = fs.readFileSync(report!, "utf8").toLowerCase();
-            expect(
-              html.length,
-              "Report is too small to be a real diagnosis",
-            ).toBeGreaterThan(2000);
+            expect(html.length, "Report is too small to be a real diagnosis").toBeGreaterThan(2000);
             expect(
               html.includes("langwatch"),
               "Report must link findings to traces in the LangWatch app",
             ).toBe(true);
             const hasTraceLinks =
-              /https?:\/\/[^"'\s]*langwatch[^"'\s]*/i.test(html) ||
-              html.includes("trace_");
-            expect(
-              hasTraceLinks,
-              "Report must contain links or IDs of example traces",
-            ).toBe(true);
+              /https?:\/\/[^"'\s]*langwatch[^"'\s]*/i.test(html) || html.includes("trace_");
+            expect(hasTraceLinks, "Report must contain links or IDs of example traces").toBe(true);
           },
           scenario.judge(),
         ],

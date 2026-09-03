@@ -116,9 +116,7 @@ function anchorScopeFromQuery(c: Context): AnnotationAnchorScope {
 
   const parsed = annotationAnchorScopeSchema.safeParse(requested);
   if (!parsed.success) {
-    throw new ValidationError(
-      `[anchor] must be one of: ${ANNOTATION_ANCHOR_SCOPES.join(", ")}.`,
-    );
+    throw new ValidationError(`[anchor] must be one of: ${ANNOTATION_ANCHOR_SCOPES.join(", ")}.`);
   }
   return parsed.data;
 }

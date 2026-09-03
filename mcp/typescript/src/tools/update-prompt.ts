@@ -71,7 +71,7 @@ async function identifyNewVersion({
   try {
     const versions = await apiGetPromptVersions(idOrHandle);
     const match = (Array.isArray(versions) ? versions : []).find(
-      (v) => v.commitMessage === commitMessage
+      (v) => v.commitMessage === commitMessage,
     );
     if (match) return { version: match.version, versionId: match.versionId };
   } catch {
@@ -109,7 +109,7 @@ async function renderUpdateSuccess({
     if (updated?.handle) lines.push(`**Handle**: ${updated.handle}`);
     lines.push(`**Commit**: ${params.commitMessage}`);
     lines.push(
-      `**Note**: the update succeeded, but version and deployment details are unavailable (confirmation read failed). Run platform_get_prompt to inspect the current state. Do not retry the update.`
+      `**Note**: the update succeeded, but version and deployment details are unavailable (confirmation read failed). Run platform_get_prompt to inspect the current state. Do not retry the update.`,
     );
     return lines.join("\n");
   }
@@ -124,10 +124,8 @@ async function renderUpdateSuccess({
   lines.push("Prompt updated successfully!\n");
   if (prompt.id) lines.push(`**ID**: ${prompt.id}`);
   if (prompt.handle) lines.push(`**Handle**: ${prompt.handle}`);
-  if (newVersion?.version != null)
-    lines.push(`**Version**: v${newVersion.version}`);
-  if (newVersion?.versionId)
-    lines.push(`**Version ID**: ${newVersion.versionId}`);
+  if (newVersion?.version != null) lines.push(`**Version**: v${newVersion.version}`);
+  if (newVersion?.versionId) lines.push(`**Version ID**: ${newVersion.versionId}`);
   lines.push(`**Commit**: ${params.commitMessage}`);
 
   if (!newVersion) {
@@ -135,18 +133,14 @@ async function renderUpdateSuccess({
     // version by commit message — say so instead of silently omitting the
     // version and deployment lines.
     lines.push(
-      `**Note**: update succeeded, but the new version could not be identified in the re-fetched prompt — version and deployment details are unavailable. Run platform_get_prompt to inspect the current state.`
+      `**Note**: update succeeded, but the new version could not be identified in the re-fetched prompt — version and deployment details are unavailable. Run platform_get_prompt to inspect the current state.`,
     );
   }
 
   if (newVersion) {
     const allDeployments = deploymentTagsOf(prompt);
     const newTags = allDeployments
-      .filter(
-        (tag) =>
-          newVersion.versionId != null &&
-          tag.versionId === newVersion.versionId
-      )
+      .filter((tag) => newVersion.versionId != null && tag.versionId === newVersion.versionId)
       .map((tag) => tag.name);
     if (newTags.length > 0) {
       lines.push(`**Deployed to**: ${newTags.join(", ")}`);
@@ -160,13 +154,11 @@ async function renderUpdateSuccess({
         new Set(
           allDeployments
             .filter((tag) => tag.versionId !== newVersion.versionId)
-            .map((tag) => tag.name)
-        )
+            .map((tag) => tag.name),
+        ),
       );
       if (otherTags.length > 0) {
-        lines.push(
-          `**Existing deployments (untouched)**: ${otherTags.join(", ")}`
-        );
+        lines.push(`**Existing deployments (untouched)**: ${otherTags.join(", ")}`);
       }
     }
   }
@@ -203,9 +195,7 @@ async function renderTagFailure({
   if (matched) {
     const lines: string[] = [];
     lines.push("Prompt update partially failed.\n");
-    lines.push(
-      "A new version was created, but assigning the requested tag(s) failed."
-    );
+    lines.push("A new version was created, but assigning the requested tag(s) failed.");
     if (matched.versionId) lines.push(`**Version ID**: ${matched.versionId}`);
     lines.push(`**Status**: created, untagged`);
     lines.push(`**Failed tag(s)**: ${failedTags}`);

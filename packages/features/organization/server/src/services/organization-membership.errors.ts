@@ -1,6 +1,5 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
-
 export class OrganizationNotFoundForTeamError extends NotFoundError {
   declare readonly code: "organization_not_found_for_team";
 
@@ -98,11 +97,9 @@ export class CannotDemoteLastAdminError extends HandledError {
   declare readonly code: "cannot_demote_last_admin";
 
   constructor() {
-    super(
-      "cannot_demote_last_admin",
-      "Cannot demote the last administrator of an organization",
-      { httpStatus: 400 },
-    );
+    super("cannot_demote_last_admin", "Cannot demote the last administrator of an organization", {
+      httpStatus: 400,
+    });
     this.name = "CannotDemoteLastAdminError";
   }
 }

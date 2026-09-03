@@ -19,11 +19,14 @@
  * there.
  */
 
-import { EXPERIMENT_TYPES, type ExperimentType as ExperimentTypeName } from "@langwatch/experiment-contract";
+import {
+  EXPERIMENT_TYPES,
+  type ExperimentType as ExperimentTypeName,
+} from "@langwatch/experiment-contract";
 
-export const ExperimentType = Object.fromEntries(
-  EXPERIMENT_TYPES.map((name) => [name, name]),
-) as { readonly [K in ExperimentTypeName]: K };
+export const ExperimentType = Object.fromEntries(EXPERIMENT_TYPES.map((name) => [name, name])) as {
+  readonly [K in ExperimentTypeName]: K;
+};
 
 export type ExperimentType = ExperimentTypeName;
 

@@ -1,11 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import type {
-  ArchitectureViolation,
-  FeatureCatalogueEntry,
-  FeatureClassification,
-} from "./types";
+import type { ArchitectureViolation, FeatureCatalogueEntry, FeatureClassification } from "./types";
 
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const featureNameSchema = z.string().regex(NAME);
@@ -87,9 +83,7 @@ export function readFeatureCatalogue(
 
   const catalogueResult = featureCatalogueSchema.safeParse(rawCatalogue);
   if (!catalogueResult.success) {
-    violations.push(
-      issue(path, "Feature catalogue must contain version 0 and a features array."),
-    );
+    violations.push(issue(path, "Feature catalogue must contain version 0 and a features array."));
     return [];
   }
 
@@ -137,9 +131,7 @@ export function readFeatureCatalogue(
       );
     }
     if (ids.has(id)) {
-      violations.push(
-        issue(path, `Feature id ${JSON.stringify(id)} is declared more than once.`),
-      );
+      violations.push(issue(path, `Feature id ${JSON.stringify(id)} is declared more than once.`));
     }
     if (roots.has(root)) {
       violations.push(
@@ -173,8 +165,7 @@ export function readFeatureCatalogue(
 
   const sorted = [...entries].sort((left, right) => {
     const classificationOrder =
-      Number(left.classification === "enterprise") -
-      Number(right.classification === "enterprise");
+      Number(left.classification === "enterprise") - Number(right.classification === "enterprise");
     return classificationOrder || left.id.localeCompare(right.id);
   });
   if (!sorted.every((entry, index) => entry.id === entries[index]?.id)) {

@@ -88,14 +88,7 @@ export function GripHandles({
   return (
     <>
       {/* Grip handles */}
-      <Box
-        position="absolute"
-        top={0}
-        left={0}
-        width="24px"
-        height="100%"
-        pointerEvents="none"
-      >
+      <Box position="absolute" top={0} left={0} width="24px" height="100%" pointerEvents="none">
         {positions.map((pos, idx) => (
           <Box
             key={`grip-${idx}`}

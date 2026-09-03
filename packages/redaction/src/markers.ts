@@ -70,9 +70,7 @@ const MARKER_REGEX = /[[<]([A-Z][A-Z0-9_]*)[\]>]/g;
  * markers naming a known entity are counted, so ordinary bracketed log text
  * (`[INFO]`, `<html>`) is ignored. Returns an empty map when there are none.
  */
-export function findRedactionMarkers(
-  text: string | null | undefined,
-): Map<string, number> {
+export function findRedactionMarkers(text: string | null | undefined): Map<string, number> {
   const counts = new Map<string, number>();
   if (typeof text !== "string" || text.length === 0) return counts;
   for (const match of text.matchAll(MARKER_REGEX)) {

@@ -18,9 +18,7 @@ const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
  * Factory for evaluator_id ClickHouse filter definitions.
  * All 5 variants share the same query template, differing only in an additional WHERE clause.
  */
-function buildEvaluatorIdClickHouseFilter(
-  additionalWhere: string,
-): ClickHouseFilterDefinition {
+function buildEvaluatorIdClickHouseFilter(additionalWhere: string): ClickHouseFilterDefinition {
   return {
     tableName: "evaluation_runs",
     buildQuery: (params) => {
@@ -416,13 +414,9 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
   "evaluations.evaluator_id.guardrails_only":
     buildEvaluatorIdClickHouseFilter("AND IsGuardrail = 1"),
 
-  "evaluations.evaluator_id.has_passed": buildEvaluatorIdClickHouseFilter(
-    "AND Passed IS NOT NULL",
-  ),
+  "evaluations.evaluator_id.has_passed": buildEvaluatorIdClickHouseFilter("AND Passed IS NOT NULL"),
 
-  "evaluations.evaluator_id.has_score": buildEvaluatorIdClickHouseFilter(
-    "AND Score IS NOT NULL",
-  ),
+  "evaluations.evaluator_id.has_score": buildEvaluatorIdClickHouseFilter("AND Score IS NOT NULL"),
 
   "evaluations.evaluator_id.has_label": buildEvaluatorIdClickHouseFilter(
     `AND Label IS NOT NULL AND Label != '' AND Label NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')`,
@@ -477,9 +471,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       `;
     },
     extractResults: (rows: unknown[]) => {
-      const row = (
-        rows as Array<{ min_score: number | null; max_score: number | null }>
-      )[0];
+      const row = (rows as Array<{ min_score: number | null; max_score: number | null }>)[0];
       if (!row || row.min_score === null || row.max_score === null) {
         return [];
       }
@@ -646,9 +638,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       `;
     },
     extractResults: (rows: unknown[]) => {
-      const row = (
-        rows as Array<{ min_value: number | null; max_value: number | null }>
-      )[0];
+      const row = (rows as Array<{ min_value: number | null; max_value: number | null }>)[0];
       if (!row || row.min_value === null || row.max_value === null) {
         return [];
       }

@@ -82,16 +82,7 @@ const TRACE_CAPABILITY: LensCapability = {
     // rather than read with them, and only when it is on screen.
     { id: "annotations", label: "Annotations", section: "Annotations" },
   ],
-  defaultColumns: [
-    "time",
-    "trace",
-    "service",
-    "duration",
-    "cost",
-    "tokens",
-    "model",
-    "labels",
-  ],
+  defaultColumns: ["time", "trace", "service", "duration", "cost", "tokens", "model", "labels"],
   addons: [
     { id: "io-preview", label: "I/O preview" },
     { id: "expanded-peek", label: "Span tree (expanded)" },
@@ -220,10 +211,7 @@ export function reconcileColumns({
   return filtered.length > 0 ? filtered : [...capability.defaultColumns];
 }
 
-export function reconcileAddons(
-  ids: readonly string[],
-  capability: LensCapability,
-): string[] {
+export function reconcileAddons(ids: readonly string[], capability: LensCapability): string[] {
   const valid = new Set(capability.addons.map((a) => a.id));
   return ids.filter((id) => valid.has(id));
 }

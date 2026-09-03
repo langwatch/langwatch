@@ -142,10 +142,7 @@ describe("given a voice turn whose payload holds both recordings", () => {
    */
   const voiceTurn = () =>
     turn({
-      inputMediaRefs: [
-        audioRef(CALLER_RECORDING, "user"),
-        audioRef(REPLY_RECORDING, "assistant"),
-      ],
+      inputMediaRefs: [audioRef(CALLER_RECORDING, "user"), audioRef(REPLY_RECORDING, "assistant")],
       outputMediaRefs: [audioRef(REPLY_RECORDING, "assistant")],
     });
 

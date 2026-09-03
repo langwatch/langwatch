@@ -30,11 +30,7 @@ test("Prompt Management from Workflow", async ({ page }) => {
   await page
     .getByRole("textbox", { name: "Prompt Name" })
     .fill("We will use this prompt in the other node");
-  await page
-    .getByRole("group")
-    .filter({ hasText: "Modelgpt-5" })
-    .getByRole("button")
-    .click();
+  await page.getByRole("group").filter({ hasText: "Modelgpt-5" }).getByRole("button").click();
   await page.getByRole("combobox", { name: "Model" }).click();
   await page
     .getByRole("option", { name: "gpt-3.5-turbo", exact: true })
@@ -47,9 +43,7 @@ test("Prompt Management from Workflow", async ({ page }) => {
   await page.getByRole("spinbutton", { name: "Max Tokens" }).fill("1234");
   await page.getByRole("spinbutton", { name: "Max Tokens" }).press("Tab");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .press("ControlOrMeta+a");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).press("ControlOrMeta+a");
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("This is a great new prompt");
@@ -58,12 +52,8 @@ test("Prompt Management from Workflow", async ({ page }) => {
     .filter({ hasText: /^Inputs$/ })
     .getByRole("button")
     .click();
-  await page
-    .locator('input[name="version\\.configData\\.inputs\\.1\\.identifier"]')
-    .click();
-  await page
-    .locator('input[name="version\\.configData\\.inputs\\.1\\.identifier"]')
-    .fill("test");
+  await page.locator('input[name="version\\.configData\\.inputs\\.1\\.identifier"]').click();
+  await page.locator('input[name="version\\.configData\\.inputs\\.1\\.identifier"]').fill("test");
   await page
     .locator("div")
     .filter({ hasText: /^Outputs$/ })
@@ -74,12 +64,8 @@ test("Prompt Management from Workflow", async ({ page }) => {
     .filter({ hasText: /^Outputs$/ })
     .getByRole("button")
     .press("Tab");
-  await page
-    .locator('input[name="version\\.configData\\.outputs\\.1\\.identifier"]')
-    .click();
-  await page
-    .locator('input[name="version\\.configData\\.outputs\\.1\\.identifier"]')
-    .fill("test2");
+  await page.locator('input[name="version\\.configData\\.outputs\\.1\\.identifier"]').click();
+  await page.locator('input[name="version\\.configData\\.outputs\\.1\\.identifier"]').fill("test2");
   // await page
   //   .locator('[id="field\\:\\:\\:r5i\\:"] > div > .chakra-button')
   //   .click();
@@ -122,10 +108,7 @@ test("Prompt Management from Workflow", async ({ page }) => {
   await page.getByRole("button", { name: "close" }).click();
   await page.getByRole("link").first().click();
   await page.goto("http://localhost:5560/fyes-lT_hZ2/prompts");
-  await page
-    .getByRole("row", { name: "We will use this prompt in" })
-    .getByRole("button")
-    .click();
+  await page.getByRole("row", { name: "We will use this prompt in" }).getByRole("button").click();
   await page.getByRole("textbox", { name: "Type 'delete' to confirm" }).fill("delete");
   await page.getByRole("button", { name: "Delete" }).click();
   await page.getByRole("row", { name: "GenerateAnswer" }).getByRole("button").click();

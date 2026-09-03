@@ -28,12 +28,7 @@ describe("useLabelFilter()", () => {
       ];
       const { result } = renderHook(() => useLabelFilter(scenarios));
 
-      expect(result.current.allLabels).toEqual([
-        "billing",
-        "edge-case",
-        "support",
-        "urgent",
-      ]);
+      expect(result.current.allLabels).toEqual(["billing", "edge-case", "support", "urgent"]);
     });
 
     it("returns labels sorted alphabetically", () => {

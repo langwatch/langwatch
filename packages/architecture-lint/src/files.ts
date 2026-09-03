@@ -21,8 +21,7 @@ export function walkFiles(
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (
         entry.isDirectory() &&
-        (IGNORED_DIRECTORIES.has(entry.name) ||
-          options?.ignoredDirectories?.has(entry.name))
+        (IGNORED_DIRECTORIES.has(entry.name) || options?.ignoredDirectories?.has(entry.name))
       ) {
         continue;
       }

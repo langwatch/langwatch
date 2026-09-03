@@ -79,9 +79,7 @@ const input: StartConversationTurnInput = {
 describe("LangyTurnService package boundary", () => {
   it("admits before it records and directly dispatches only after commit", async () => {
     const fixture = makeFixture();
-    const result = await LangyTurnService.create(fixture.deps).startConversationTurn(
-      input,
-    );
+    const result = await LangyTurnService.create(fixture.deps).startConversationTurn(input);
     expect(result).toEqual({ conversationId: "conversation-1", turnId: "turn-1" });
     expect(fixture.acceptTurn).toHaveBeenCalledOnce();
     expect(fixture.dispatch).toHaveBeenCalledWith(

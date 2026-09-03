@@ -42,9 +42,7 @@ export const storedObjectDeliveryCapabilitySchema = z
     generation: storedObjectGenerationSchema,
   })
   .strict();
-export type StoredObjectDeliveryCapability = z.infer<
-  typeof storedObjectDeliveryCapabilitySchema
->;
+export type StoredObjectDeliveryCapability = z.infer<typeof storedObjectDeliveryCapabilitySchema>;
 
 export const resolvedStoredObjectSchema = z
   .object({

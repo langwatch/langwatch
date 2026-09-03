@@ -20,7 +20,11 @@ import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 import { createUiRouteObjects } from "../src/ui/sections/ui-route-objects";
-import { uiLegacyRedirectRoutes, uiRouteDescriptors, uiRouteTable } from "../src/model/ui-route-table";
+import {
+  uiLegacyRedirectRoutes,
+  uiRouteDescriptors,
+  uiRouteTable,
+} from "../src/model/ui-route-table";
 import { UiPrefixRedirect } from "../src/ui/elements/ui-prefix-redirect";
 
 /** The redirect descriptors the application mounts, materialised the same way. */
@@ -35,9 +39,7 @@ const legacyRedirectRoutes = createUiRouteObjects({
  * hide.
  */
 const gatewayHomeRoute = createUiRouteObjects({
-  table: uiRouteDescriptors(uiRouteTable).filter(
-    (descriptor) => descriptor.path === "/gateway",
-  ),
+  table: uiRouteDescriptors(uiRouteTable).filter((descriptor) => descriptor.path === "/gateway"),
   loaders: {},
 });
 
@@ -61,12 +63,7 @@ function renderRouterAt(initialEntries: string[]) {
       // Mirrors the route table's stanza: retargeted straight to People so
       // the departments rename never adds a hop.
       path: "/governance/cost-centers",
-      element: (
-        <UiPrefixRedirect
-          from="/governance/cost-centers"
-          to="/governance/people"
-        />
-      ),
+      element: <UiPrefixRedirect from="/governance/cost-centers" to="/governance/people" />,
     },
     { path: "/governance/people", element: <div>people</div> },
     { path: "/governance/inventory", element: <div>inventory page</div> },
@@ -187,10 +184,7 @@ describe("legacy governance redirects", () => {
   describe("when the retired ingestion sources address is cold-loaded", () => {
     /** @scenario The retired ingestion sources address lands on the inventory Sources tab */
     it("lands on the inventory Sources tab and replaces the history entry", async () => {
-      const router = renderRouterAt([
-        "/start",
-        "/governance/ingestion-sources",
-      ]);
+      const router = renderRouterAt(["/start", "/governance/ingestion-sources"]);
 
       await waitFor(() => {
         expect(router.state.location.pathname).toBe("/governance/inventory");
@@ -205,9 +199,7 @@ describe("legacy governance redirects", () => {
 
     /** @scenario A stale tab value on a retired sources address still lands on Sources */
     it("overrides a stale tab value instead of carrying it to a different pane", async () => {
-      const router = renderRouterAt([
-        "/governance/ingestion-sources?tab=catalog",
-      ]);
+      const router = renderRouterAt(["/governance/ingestion-sources?tab=catalog"]);
 
       await waitFor(() => {
         expect(router.state.location.pathname).toBe("/governance/inventory");
@@ -217,14 +209,10 @@ describe("legacy governance redirects", () => {
 
     /** @scenario An old ingestion source deep link lands on the inventory detail page */
     it("lands on the inventory detail page with the query intact", async () => {
-      const router = renderRouterAt([
-        "/governance/ingestion-sources/src_123?range=30d",
-      ]);
+      const router = renderRouterAt(["/governance/ingestion-sources/src_123?range=30d"]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe(
-          "/governance/inventory/src_123",
-        );
+        expect(router.state.location.pathname).toBe("/governance/inventory/src_123");
       });
       expect(router.state.location.search).toBe("?range=30d");
     });
@@ -268,9 +256,7 @@ describe("legacy governance redirects", () => {
       const router = renderRouterAt(["/governance/catalog/src_123?range=30d"]);
 
       await waitFor(() => {
-        expect(router.state.location.pathname).toBe(
-          "/governance/inventory/src_123",
-        );
+        expect(router.state.location.pathname).toBe("/governance/inventory/src_123");
       });
       expect(router.state.location.search).toBe("?range=30d");
     });

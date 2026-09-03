@@ -48,9 +48,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         // The multi-part form still round-trips, including keys holding the
         // separator any joined encoding would have needed.
         for (const parts of [["gpt-5-mini"], ["a,b", "c:d"], ["[x]", "]y["]]) {
-          expect(decodeSpendSummariesCursor(encodeSpendSummariesCursor(parts))).toEqual(
-            parts,
-          );
+          expect(decodeSpendSummariesCursor(encodeSpendSummariesCursor(parts))).toEqual(parts);
         }
 
         expect(decodeSpendSummariesCursor("")).toBeNull();

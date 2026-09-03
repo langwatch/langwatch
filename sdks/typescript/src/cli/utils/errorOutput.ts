@@ -142,9 +142,7 @@ const detailLines = (domain: CliHandledError): string[] => {
 
   return [
     "Details:",
-    ...details.map(
-      ([key, value]) => `  ${chalk.dim(key.padEnd(width))}  ${chalk.dim(value)}`,
-    ),
+    ...details.map(([key, value]) => `  ${chalk.dim(key.padEnd(width))}  ${chalk.dim(value)}`),
   ];
 };
 
@@ -176,10 +174,7 @@ export const renderErrorForHumans = (domain: CliHandledError): string => {
   const lines = [`Error: ${enriched.message}`, ...detailLines(enriched)];
 
   if (enriched.suggestions?.length) {
-    lines.push(
-      "Suggestions:",
-      ...enriched.suggestions.map((suggestion) => `  - ${suggestion}`),
-    );
+    lines.push("Suggestions:", ...enriched.suggestions.map((suggestion) => `  - ${suggestion}`));
   }
   if (enriched.docUrl) {
     lines.push(`Docs: ${enriched.docUrl}`);

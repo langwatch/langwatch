@@ -117,9 +117,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       // primer mode still pulses so the affordance pulls the eye to
       // "set me up to use AI."
       animation={
-        reduceMotion || disabledReason
-          ? undefined
-          : `${glowPulse} 6s ease-in-out infinite`
+        reduceMotion || disabledReason ? undefined : `${glowPulse} 6s ease-in-out infinite`
       }
       _hover={isGated ? undefined : { filter: "brightness(1.08)" }}
       cursor={disabledReason ? "not-allowed" : undefined}
@@ -129,13 +127,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       opacity={isGated ? 0.7 : 1}
       filter={isGated ? "saturate(0.7)" : undefined}
     >
-      <Box
-        position="absolute"
-        inset={0}
-        zIndex={0}
-        pointerEvents="none"
-        _dark={{ opacity: 0.7 }}
-      >
+      <Box position="absolute" inset={0} zIndex={0} pointerEvents="none" _dark={{ opacity: 0.7 }}>
         <MeshGradient
           colors={palette}
           distortion={0.5}
@@ -225,10 +217,9 @@ const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({ trigger }
               </Text>
             </HStack>
             <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-              Ask AI uses your own model provider keys to translate plain English into
-              trace queries — &ldquo;errors yesterday from service-x&rdquo;, &ldquo;slow
-              checkout traces with eval scores under 0.5&rdquo;. Add a provider to unlock
-              it.
+              Ask AI uses your own model provider keys to translate plain English into trace queries
+              — &ldquo;errors yesterday from service-x&rdquo;, &ldquo;slow checkout traces with eval
+              scores under 0.5&rdquo;. Add a provider to unlock it.
             </Text>
             <NextLink href="/settings/model-providers" style={{ display: "block" }}>
               <Button

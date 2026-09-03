@@ -14,9 +14,7 @@ interface UseLangyConversationUpdateListenerOptions {
    * Last-write-wins per conversation id: only the freshest operational spine
    * for each conversation is delivered.
    */
-  onConversationUpdated?: (
-    signals: LangyConversationUpdateSignal[],
-  ) => void | Promise<void>;
+  onConversationUpdated?: (signals: LangyConversationUpdateSignal[]) => void | Promise<void>;
   debounceMs?: number;
   maxWaitMs?: number;
 }
@@ -83,10 +81,7 @@ export function useLangyConversationUpdateListener({
 
   const [lastEventAt, setLastEventAt] = useState(0);
 
-  const sse = useSSESubscription<
-    { event: string; timestamp: number },
-    { projectId: string }
-  >(
+  const sse = useSSESubscription<{ event: string; timestamp: number }, { projectId: string }>(
     // @ts-expect-error - tRPC subscription type isn't inferred for the hook's generic
     api.langy.onConversationUpdate,
     { projectId },
@@ -95,8 +90,7 @@ export function useLangyConversationUpdateListener({
       onData: (data) => {
         if (!data.event) return;
         try {
-          const raw =
-            typeof data.event === "string" ? JSON.parse(data.event) : data.event;
+          const raw = typeof data.event === "string" ? JSON.parse(data.event) : data.event;
           const parsed = langyConversationUpdateSignalSchema.safeParse(raw);
           if (!parsed.success) return;
           setLastEventAt(Date.now());

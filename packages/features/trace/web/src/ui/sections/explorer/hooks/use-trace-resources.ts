@@ -1,9 +1,6 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import type {
-  InstrumentationScope,
-  SpanResourceInfoDto,
-} from "@langwatch/trace-contract";
+import type { InstrumentationScope, SpanResourceInfoDto } from "@langwatch/trace-contract";
 import { api } from "../../trace-api";
 import { useSharedTrace } from "../context/shared-trace-context";
 import { useDrawerStore } from "../../../../index";
@@ -32,9 +29,7 @@ const NULL_RESULT: TraceResourcesResult = {
  * The standard span mapper drops both, so this dedicated read path is the
  * only way to surface them in the drawer.
  */
-export function useTraceResources(
-  traceId: string | null | undefined,
-): TraceResourcesResult {
+export function useTraceResources(traceId: string | null | undefined): TraceResourcesResult {
   const { project } = useOrganizationTeamProject();
   const shared = useSharedTrace();
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);

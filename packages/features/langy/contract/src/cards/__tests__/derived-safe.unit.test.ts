@@ -195,9 +195,7 @@ describe("langyDerivedCardSchema", () => {
     });
 
     it("refuses stats with an empty items list", () => {
-      expect(langyDerivedCardSchema.safeParse({ ...stats, items: [] }).success).toBe(
-        false,
-      );
+      expect(langyDerivedCardSchema.safeParse({ ...stats, items: [] }).success).toBe(false);
     });
 
     it("accepts a ragged table row rather than failing the block", () => {
@@ -259,9 +257,9 @@ describe("langyDerivedChoicesCardSchema", () => {
 
   describe("given an empty options list", () => {
     it("refuses the card", () => {
-      expect(
-        langyDerivedChoicesCardSchema.safeParse({ ...choices, options: [] }).success,
-      ).toBe(false);
+      expect(langyDerivedChoicesCardSchema.safeParse({ ...choices, options: [] }).success).toBe(
+        false,
+      );
     });
   });
 

@@ -33,13 +33,7 @@ function refKey(ref: ProcessRef): string {
   return `${ref.processName}|${ref.projectId}|${ref.processKey}`;
 }
 
-function inboxKey({
-  ref,
-  sourceEventId,
-}: {
-  ref: ProcessRef;
-  sourceEventId: string;
-}): string {
+function inboxKey({ ref, sourceEventId }: { ref: ProcessRef; sourceEventId: string }): string {
   return `${ref.processName}|${ref.projectId}|${sourceEventId}`;
 }
 
@@ -65,9 +59,7 @@ function isRequeueTarget(
   if (message.projectId !== target.projectId) return false;
   if (message.processKey !== target.processKey) return false;
   if (message.status !== "dead") return false;
-  return (
-    !target.messageKeyPrefix || message.messageKey.startsWith(target.messageKeyPrefix)
-  );
+  return !target.messageKeyPrefix || message.messageKey.startsWith(target.messageKeyPrefix);
 }
 
 /**
@@ -100,10 +92,7 @@ export class InMemoryProcessStore implements ProcessStore {
     return (instance as PersistedProcessInstance<State> | undefined) ?? null;
   }
 
-  async hasConsumedSource(params: {
-    ref: ProcessRef;
-    sourceEventId: string;
-  }): Promise<boolean> {
+  async hasConsumedSource(params: { ref: ProcessRef; sourceEventId: string }): Promise<boolean> {
     return this.inbox.has(inboxKey(params));
   }
 
@@ -191,9 +180,7 @@ export class InMemoryProcessStore implements ProcessStore {
       }
       this.messages.set(identity, {
         ...message,
-        ...((message.userId ?? params.userId)
-          ? { userId: message.userId ?? params.userId }
-          : {}),
+        ...((message.userId ?? params.userId) ? { userId: message.userId ?? params.userId } : {}),
         processName: ref.processName,
         projectId: ref.projectId,
         processKey: ref.processKey,
@@ -232,8 +219,7 @@ export class InMemoryProcessStore implements ProcessStore {
     for (const message of this.messages.values()) {
       if (leased.length >= params.limit) break;
       if (message.status !== "pending") continue;
-      if (params.processNames && !params.processNames.includes(message.processName))
-        continue;
+      if (params.processNames && !params.processNames.includes(message.processName)) continue;
       if (message.nextAttemptAt > params.now) continue;
       if (message.leasedUntil > params.now) continue;
       message.leasedUntil = params.now + params.leaseDurationMs;
@@ -335,16 +321,12 @@ export class InMemoryProcessStore implements ProcessStore {
     return due;
   }
 
-  async deleteDispatchedBefore(params: {
-    processName: string;
-    before: number;
-  }): Promise<number> {
+  async deleteDispatchedBefore(params: { processName: string; before: number }): Promise<number> {
     let deleted = 0;
     for (const [key, message] of this.messages) {
       if (message.processName !== params.processName) continue;
       if (message.status !== "dispatched") continue;
-      if (message.dispatchedAt === null || message.dispatchedAt >= params.before)
-        continue;
+      if (message.dispatchedAt === null || message.dispatchedAt >= params.before) continue;
       this.deleteMessage(key);
       deleted++;
     }
@@ -362,10 +344,7 @@ export class InMemoryProcessStore implements ProcessStore {
     this.attempts.delete(key);
   }
 
-  async deleteDispatchedOutboxBatch(params: {
-    before: number;
-    limit: number;
-  }): Promise<number> {
+  async deleteDispatchedOutboxBatch(params: { before: number; limit: number }): Promise<number> {
     return this.deleteOutboxBatch(
       params,
       (message) =>
@@ -375,10 +354,7 @@ export class InMemoryProcessStore implements ProcessStore {
     );
   }
 
-  async deleteDeadOutboxBatch(params: {
-    before: number;
-    limit: number;
-  }): Promise<number> {
+  async deleteDeadOutboxBatch(params: { before: number; limit: number }): Promise<number> {
     // Reaped by `updatedAt`, the same column the durable store uses, which
     // the markFailed that retired the row stamped. `discarded` rides the same
     // family for the reason given on the durable store: no other predicate
@@ -391,10 +367,7 @@ export class InMemoryProcessStore implements ProcessStore {
     );
   }
 
-  async deleteConsumedInboxBatch(params: {
-    before: number;
-    limit: number;
-  }): Promise<number> {
+  async deleteConsumedInboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
     let deleted = 0;
     for (const [key, consumedAt] of this.inbox) {

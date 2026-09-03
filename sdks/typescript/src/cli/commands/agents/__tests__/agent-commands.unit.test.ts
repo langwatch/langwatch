@@ -219,9 +219,7 @@ describe("createAgentCommand()", () => {
     it("exits with code 1", async () => {
       mockCreate.mockRejectedValue(new AgentsApiError("Limit reached", "create agent"));
 
-      await expect(createAgentCommand("Test", { type: "http" })).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(createAgentCommand("Test", { type: "http" })).rejects.toThrow(ProcessExitError);
     });
   });
 });

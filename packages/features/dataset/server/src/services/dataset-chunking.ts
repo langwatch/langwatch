@@ -133,9 +133,7 @@ export const toJsonlChunks = (
  * chunk back as one object with the same on-disk shape the append path produces.
  * Returns the blob and its UTF-8 byte size for the PG `chunkOffsets` patch.
  */
-export const toSingleJsonl = (
-  records: unknown[],
-): { jsonl: string; byteSize: number } => {
+export const toSingleJsonl = (records: unknown[]): { jsonl: string; byteSize: number } => {
   const jsonl =
     records.map((record) => JSON.stringify(stripNullBytes(record))).join("\n") +
     (records.length > 0 ? "\n" : "");
@@ -182,11 +180,7 @@ export const assertNoTraversal = (...parts: string[]): void => {
  */
 export const assertKeyWithinProject = (projectId: string, key: string): void => {
   assertNoTraversal(projectId);
-  if (
-    key.includes("..") ||
-    key.startsWith("/") ||
-    !key.startsWith(`staging/${projectId}/`)
-  ) {
+  if (key.includes("..") || key.startsWith("/") || !key.startsWith(`staging/${projectId}/`)) {
     throw new Error("Invalid key: path traversal attempt detected");
   }
 };
@@ -204,11 +198,7 @@ export const parseJsonl = (jsonl: string): unknown[] =>
  * NoSuchKey / ENOENT?" check lives in exactly one place. The prop name is a
  * param because the SDKs disagree (`name` for S3 errors, `code` for Node FS).
  */
-export const errorHasProp = (
-  error: unknown,
-  prop: "code" | "name",
-  value: string,
-): boolean =>
+export const errorHasProp = (error: unknown, prop: "code" | "name", value: string): boolean =>
   typeof error === "object" &&
   error !== null &&
   prop in error &&

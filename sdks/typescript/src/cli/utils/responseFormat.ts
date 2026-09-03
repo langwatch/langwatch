@@ -41,19 +41,13 @@ export const DEFAULT_TEXT_OUTPUT: CliOutput = {
   type: "str",
 };
 
-const SCALAR_OUTPUT_TO_JSON_TYPE: Record<
-  Exclude<CliOutputType, "json_schema">,
-  string
-> = {
+const SCALAR_OUTPUT_TO_JSON_TYPE: Record<Exclude<CliOutputType, "json_schema">, string> = {
   str: "string",
   float: "number",
   bool: "boolean",
 };
 
-const JSON_TYPE_TO_SCALAR_OUTPUT: Record<
-  string,
-  Exclude<CliOutputType, "json_schema">
-> = {
+const JSON_TYPE_TO_SCALAR_OUTPUT: Record<string, Exclude<CliOutputType, "json_schema">> = {
   string: "str",
   number: "float",
   integer: "float",
@@ -69,9 +63,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
  * and normalizes to `{ name?, schema }`. Returns undefined when there is no
  * usable schema.
  */
-export const normalizeResponseFormat = (
-  raw: unknown,
-): LocalResponseFormat | undefined => {
+export const normalizeResponseFormat = (raw: unknown): LocalResponseFormat | undefined => {
   if (!isPlainObject(raw)) return undefined;
 
   // OpenAI-standard wrapper
@@ -111,18 +103,10 @@ export const asFlatFields = (
   if (schema.type !== "object") return null;
   if (!isPlainObject(schema.properties)) return null;
 
-  const allowedSchemaKeys = new Set([
-    "type",
-    "properties",
-    "required",
-    "additionalProperties",
-  ]);
+  const allowedSchemaKeys = new Set(["type", "properties", "required", "additionalProperties"]);
   if (Object.keys(schema).some((k) => !allowedSchemaKeys.has(k))) return null;
 
-  if (
-    schema.additionalProperties !== undefined &&
-    schema.additionalProperties !== false
-  ) {
+  if (schema.additionalProperties !== undefined && schema.additionalProperties !== false) {
     return null;
   }
 

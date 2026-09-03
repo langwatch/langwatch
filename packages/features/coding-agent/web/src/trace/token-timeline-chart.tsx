@@ -42,25 +42,17 @@ export function TokenTimelineChart({
         >
           {points.map((point) => {
             const total = totalOf(point);
-            const fresh =
-              point.inputTokens + point.outputTokens + point.cacheCreationTokens;
+            const fresh = point.inputTokens + point.outputTokens + point.cacheCreationTokens;
             const isRebuild = rebuiltAtMs.has(point.atMs);
             const barPx = Math.max(4, Math.round((total / maxTotal) * CHART_HEIGHT_PX));
             const freshPx =
               total === 0
                 ? barPx
-                : Math.min(
-                    barPx,
-                    Math.max(fresh > 0 ? 1 : 0, Math.round((fresh / total) * barPx)),
-                  );
+                : Math.min(barPx, Math.max(fresh > 0 ? 1 : 0, Math.round((fresh / total) * barPx)));
             const reusedPx = barPx - freshPx;
             const description = `Call ${point.index + 1} of ${points.length} · ${formatCompact(total)} tokens: ${formatCompact(point.cacheReadTokens)} from cache, ${formatCompact(fresh)} fresh${isRebuild ? ` · cache REBUILT (${formatCompact(point.cacheCreationTokens)})` : ""}`;
             return (
-              <Tooltip
-                key={point.index}
-                content={description}
-                positioning={{ placement: "top" }}
-              >
+              <Tooltip key={point.index} content={description} positioning={{ placement: "top" }}>
                 <Box
                   // Focusable so the tooltip's story is reachable without a
                   // mouse; the label carries the same text for screen readers.

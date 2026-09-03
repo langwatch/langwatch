@@ -4,11 +4,7 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
 import { useRequiredSession } from "../../../behavior/auth-session";
 import { api } from "../trace-api";
 
-export type PersonalFeatureKey =
-  | "evaluations"
-  | "datasets"
-  | "annotations"
-  | "automations";
+export type PersonalFeatureKey = "evaluations" | "datasets" | "annotations" | "automations";
 
 /**
  * Click-to-enable gate for personal-workspace advanced features. Used
@@ -70,9 +66,7 @@ export function usePersonalFeatureGate(feature: PersonalFeatureKey): {
     },
   });
 
-  const [pendingResolve, setPendingResolve] = useState<((value: boolean) => void) | null>(
-    null,
-  );
+  const [pendingResolve, setPendingResolve] = useState<((value: boolean) => void) | null>(null);
 
   const isGated = isOnOwnPersonalProject && !featureEnabled;
 

@@ -127,10 +127,10 @@ function CacheRulesPage() {
 
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           <Text fontSize="sm" color="fg.muted" mb={4}>
-            Rules are evaluated first-match-wins by priority (highest first). A
-            per-request <code>X-LangWatch-Cache</code> header always wins over matching
-            rules, and a matched rule always wins over the per-virtual-key default.
-            Changes propagate to the gateway within 30 s via the /changes long-poll.
+            Rules are evaluated first-match-wins by priority (highest first). A per-request{" "}
+            <code>X-LangWatch-Cache</code> header always wins over matching rules, and a matched
+            rule always wins over the per-virtual-key default. Changes propagate to the gateway
+            within 30 s via the /changes long-poll.
           </Text>
           {listQuery.isLoading ? (
             <Spinner />
@@ -148,16 +148,12 @@ function CacheRulesPage() {
                 </EmptyState.Indicator>
                 <EmptyState.Title>No cache rules yet</EmptyState.Title>
                 <EmptyState.Description>
-                  Cache rules let operators force, disable, or override cache behaviour
-                  across virtual keys, models, principals, or custom request metadata — no
-                  client code changes required.
+                  Cache rules let operators force, disable, or override cache behaviour across
+                  virtual keys, models, principals, or custom request metadata — no client code
+                  changes required.
                 </EmptyState.Description>
                 {canCreate && (
-                  <Button
-                    colorPalette="orange"
-                    onClick={() => setCreateOpen(true)}
-                    mt={2}
-                  >
+                  <Button colorPalette="orange" onClick={() => setCreateOpen(true)} mt={2}>
                     <Plus size={14} /> New rule
                   </Button>
                 )}
@@ -226,10 +222,7 @@ function CacheRulesPage() {
                                   </Menu.Item>
                                 )}
                                 {canDelete && (
-                                  <Menu.Item
-                                    value="archive"
-                                    onClick={() => setArchiving(r)}
-                                  >
+                                  <Menu.Item value="archive" onClick={() => setArchiving(r)}>
                                     <Archive size={14} /> Archive
                                   </Menu.Item>
                                 )}

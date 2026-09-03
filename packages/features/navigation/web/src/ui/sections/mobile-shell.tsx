@@ -225,13 +225,7 @@ function MobileMenuOverlay({
         onMenuButtonPress={onClose}
         menuButtonRef={closeButtonRef}
       />
-      <HStack
-        paddingX={4}
-        paddingY={2}
-        gap={2}
-        borderBottomWidth="1px"
-        borderColor="border"
-      >
+      <HStack paddingX={4} paddingY={2} gap={2} borderBottomWidth="1px" borderColor="border">
         <OrganizationSelect activeProductId={state.activeProductId} />
         <ProductScopeControl activeProductId={state.activeProductId} />
         <Spacer />
@@ -239,11 +233,7 @@ function MobileMenuOverlay({
       </HStack>
       <Box flex={1} minHeight={0}>
         <SideMenuDensityProvider density="compact">
-          <SidebarContent
-            surface={state.activeProductId ?? "settings"}
-            showExpanded
-            isFullWidth
-          />
+          <SidebarContent surface={state.activeProductId ?? "settings"} showExpanded isFullWidth />
         </SideMenuDensityProvider>
       </Box>
     </Box>
@@ -268,13 +258,7 @@ function ownsKeyboardElsewhere(overlay: HTMLElement | null) {
  * Keeps Tab and Shift+Tab inside the open menu: the last entry wraps to
  * the first and back.
  */
-function trapTab({
-  event,
-  overlay,
-}: {
-  event: KeyboardEvent;
-  overlay: HTMLElement | null;
-}) {
+function trapTab({ event, overlay }: { event: KeyboardEvent; overlay: HTMLElement | null }) {
   const active = document.activeElement;
   if (!overlay || !active || !overlay.contains(active)) return;
 

@@ -18,10 +18,7 @@
  * and it is folded into the turn's process record elsewhere
  * (logic/langyReasoningTitles).
  */
-import {
-  LANGY_CARD_FAILED_PART_TYPE,
-  LANGY_CARD_PART_TYPE,
-} from "@langwatch/langy-contract";
+import { LANGY_CARD_FAILED_PART_TYPE, LANGY_CARD_PART_TYPE } from "@langwatch/langy-contract";
 
 export type LangyTranscriptRun =
   /** Prose, and the card blocks stamped into the reply's own flow. */
@@ -51,16 +48,13 @@ function partType(part: unknown): string | undefined {
 }
 
 /** The turn's parts, grouped into the runs they are read in. */
-export function langyTranscriptRuns(
-  parts: readonly unknown[],
-): LangyTranscriptRun[] {
+export function langyTranscriptRuns(parts: readonly unknown[]): LangyTranscriptRun[] {
   const runs: LangyTranscriptRun[] = [];
 
   for (const part of parts) {
     const type = partType(part);
     if (type !== undefined && INERT_PART_TYPES.has(type)) continue;
-    const kind =
-      type !== undefined && ANSWER_PART_TYPES.has(type) ? "answer" : "activity";
+    const kind = type !== undefined && ANSWER_PART_TYPES.has(type) ? "answer" : "activity";
     const open = runs.at(-1);
     if (open?.kind === kind) {
       open.parts = [...open.parts, part];
@@ -77,8 +71,6 @@ export function langyRunText(parts: readonly unknown[]): string {
   return parts
     .filter((part) => partType(part) === "text")
     .map((part) => (part as { text?: unknown }).text)
-    .filter(
-      (text): text is string => typeof text === "string" && text.length > 0,
-    )
+    .filter((text): text is string => typeof text === "string" && text.length > 0)
     .join("\n\n");
 }

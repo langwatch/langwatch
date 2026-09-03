@@ -67,14 +67,10 @@ describe("resolveLangyActivityOwnership", () => {
   });
 
   it("keeps measured and loaded counts on the capability card", () => {
-    expect(formatLangyProgressCount({ current: 1_204, total: 4_901 })).toBe(
-      "1,204 of 4,901",
-    );
+    expect(formatLangyProgressCount({ current: 1_204, total: 4_901 })).toBe("1,204 of 4,901");
     expect(formatLangyPreviewCount({ loadedCount: 5, totalCount: 58 })).toBe(
       "58 matches · 5 shown",
     );
-    expect(formatLangyPreviewCount({ loadedCount: 5, totalCount: null })).toBe(
-      "5 shown so far",
-    );
+    expect(formatLangyPreviewCount({ loadedCount: 5, totalCount: null })).toBe("5 shown so far");
   });
 });

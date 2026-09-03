@@ -37,11 +37,10 @@ export class AnnotationScoreInvalidError extends HandledError {
   declare readonly code: "annotation_score_invalid";
 
   constructor() {
-    super(
-      "annotation_score_invalid",
-      "One or more annotation scores are not in this project",
-      { httpStatus: 400, fault: "customer" },
-    );
+    super("annotation_score_invalid", "One or more annotation scores are not in this project", {
+      httpStatus: 400,
+      fault: "customer",
+    });
     this.name = "AnnotationScoreInvalidError";
   }
 }

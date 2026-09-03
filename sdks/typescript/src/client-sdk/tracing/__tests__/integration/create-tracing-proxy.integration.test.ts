@@ -623,9 +623,7 @@ describe("createTracingProxy Integration Tests", () => {
       const underscoreSpan = exportedSpans.find(
         (s) => s.name === "TestClass.method_with_underscore",
       );
-      const camelSpan = exportedSpans.find(
-        (s) => s.name === "TestClass.methodWithCamelCase",
-      );
+      const camelSpan = exportedSpans.find((s) => s.name === "TestClass.methodWithCamelCase");
 
       expect(dashSpan).toBeDefined();
       expect(underscoreSpan).toBeDefined();
@@ -741,9 +739,7 @@ describe("createTracingProxy Integration Tests", () => {
       // getCounter is also a public method, so it gets traced too
       expect(exportedSpans).toHaveLength(3);
 
-      const methodSpans = exportedSpans.filter(
-        (s) => s.name === "TestClass.publicMethod",
-      );
+      const methodSpans = exportedSpans.filter((s) => s.name === "TestClass.publicMethod");
       const counterSpans = exportedSpans.filter((s) => s.name === "TestClass.getCounter");
 
       expect(methodSpans).toHaveLength(2);
@@ -833,19 +829,11 @@ describe("createTracingProxy Integration Tests", () => {
       const target = new TestClass();
       const proxy = createTracingProxy(target, tracer);
 
-      const concurrentOperations = Array.from({ length: 5 }, (_, i) =>
-        proxy.publicMethod(i),
-      );
+      const concurrentOperations = Array.from({ length: 5 }, (_, i) => proxy.publicMethod(i));
 
       const results = await Promise.all(concurrentOperations);
 
-      expect(results).toEqual([
-        "result-0",
-        "result-1",
-        "result-2",
-        "result-3",
-        "result-4",
-      ]);
+      expect(results).toEqual(["result-0", "result-1", "result-2", "result-3", "result-4"]);
 
       await spanProcessor.forceFlush();
       const exportedSpans = spanExporter.getFinishedSpans();

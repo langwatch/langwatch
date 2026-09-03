@@ -1,13 +1,4 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Center,
-  Separator,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, Center, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link2Off } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "../../ui/blocks/link";
@@ -39,8 +30,7 @@ function SharedTraceView() {
   const spanTree = shared?.spanTree ?? [];
 
   const selectedSpan = useMemo(
-    () =>
-      selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null,
+    () => (selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null),
     [selectedSpanId, spanTree],
   );
 
@@ -48,8 +38,8 @@ function SharedTraceView() {
     return (
       <Center flex={1} padding={8}>
         <Text color="fg.muted">
-          This shared trace didn&apos;t load. Refresh the page, or ask whoever shared it
-          for a new link.
+          This shared trace didn&apos;t load. Refresh the page, or ask whoever shared it for a new
+          link.
         </Text>
       </Center>
     );
@@ -72,9 +62,8 @@ function SharedTraceView() {
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Description fontSize="sm">
-                This is a large trace. The timeline below is complete, but step-by-step
-                detail is only shown for the first{" "}
-                {shared.spansFull.length.toLocaleString()} steps.
+                This is a large trace. The timeline below is complete, but step-by-step detail is
+                only shown for the first {shared.spansFull.length.toLocaleString()} steps.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
@@ -113,8 +102,8 @@ function SharePageSignUpInvitation() {
     <VStack gap={3} width="full" paddingTop={2}>
       <Separator />
       <Text fontSize="14px" color="fg.muted" maxWidth="420px">
-        LangWatch shows you what your AI agents actually did — every call, its cost, and
-        where it went wrong.
+        LangWatch shows you what your AI agents actually did — every call, its cost, and where it
+        went wrong.
       </Text>
       <VStack gap={2}>
         <Link href="/auth/signup">

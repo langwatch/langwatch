@@ -7,17 +7,16 @@ sidebarTitle: Members & invites
 The members surface at `/settings/members` is the admin entry point for everything **about who is in your org**: existing members and their roles, pending invites, invite requests waiting for admin approval, and removal flows. Per-user account self-service (change password, sign-in method status, optional add-method when allowed) lives at `/settings/authentication`, the same URL used by the legacy non-governance LLMOps shell, so existing bookmarks and muscle memory keep working.
 
 <Info>
-  **Pairs with:** [Roles & permissions](/ai-governance/roles-and-permissions) (the role
-  catalog and what each org-level role can do) and [Audit log](/ai-governance/audit-log)
-  (every invite, role change, and removal records a row).
+  **Pairs with:** [Roles & permissions](/ai-governance/roles-and-permissions) (the role catalog and
+  what each org-level role can do) and [Audit log](/ai-governance/audit-log) (every invite, role
+  change, and removal records a row).
 </Info>
 
 <Note>
-  **Permissions**: `/settings/members` requires `organization:manage` (admins). Members
-  navigating here directly see an "Access Restricted" panel. The underlying tRPC
-  procedures (`organization.getAllOrganizationMembers`, `organization.createInvites`,
-  `organization.deleteMember`, `organization.updateMemberRole`) are also gated
-  server-side.
+  **Permissions**: `/settings/members` requires `organization:manage` (admins). Members navigating
+  here directly see an "Access Restricted" panel. The underlying tRPC procedures
+  (`organization.getAllOrganizationMembers`, `organization.createInvites`,
+  `organization.deleteMember`, `organization.updateMemberRole`) are also gated server-side.
 </Note>
 
 ## What admins see at `/settings/members`

@@ -18,11 +18,7 @@ import chalk from "chalk";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import {
-  fetchBatchRuns,
-  tallyBatchRuns,
-  type BatchRun,
-} from "./batchRunProgress";
+import { fetchBatchRuns, tallyBatchRuns, type BatchRun } from "./batchRunProgress";
 import { createSpinner } from "./spinner";
 
 /** How long the poll waits before giving up. */
@@ -105,9 +101,7 @@ export async function waitForBatchRun({
   machine,
 }: WaitForBatchRunParams): Promise<WaitForBatchRunResult> {
   if (!machine) console.log();
-  const pollSpinner = createSpinner(
-    `Waiting for the ${subject} to complete...`,
-  ).start();
+  const pollSpinner = createSpinner(`Waiting for the ${subject} to complete...`).start();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
@@ -132,17 +126,9 @@ export async function waitForBatchRun({
     if (Date.now() - startTime > TIMEOUT_MS) {
       outcome = "timeout";
       process.exitCode = 1;
-      pollSpinner.fail(
-        chalk.red(
-          `The ${subject} timed out after ${TIMEOUT_MS / 60000} minutes`,
-        ),
-      );
+      pollSpinner.fail(chalk.red(`The ${subject} timed out after ${TIMEOUT_MS / 60000} minutes`));
       if (!machine) {
-        console.log(
-          chalk.yellow(
-            `Check results in the dashboard. Batch ID: ${batchRunId}`,
-          ),
-        );
+        console.log(chalk.yellow(`Check results in the dashboard. Batch ID: ${batchRunId}`));
       }
       break;
     }

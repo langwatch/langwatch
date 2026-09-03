@@ -113,10 +113,7 @@ export class LangyTurnStartService {
     };
   }
 
-  private requireTurnModel(
-    modelOverride: string | undefined,
-    resolvedModel: string | null,
-  ) {
+  private requireTurnModel(modelOverride: string | undefined, resolvedModel: string | null) {
     const turnModel = modelOverride ?? resolvedModel;
     if (!turnModel) {
       throw new LangyModelNotConfiguredError();
@@ -163,8 +160,7 @@ export class LangyTurnStartService {
       conversation: {
         id: admission.conversationId,
         isNew:
-          speculativeConversation.isNew ||
-          speculativeConversation.id !== admission.conversationId,
+          speculativeConversation.isNew || speculativeConversation.id !== admission.conversationId,
       },
       turnId: admission.turnId,
       claimToken: admission.claimToken,
@@ -182,9 +178,7 @@ export class LangyTurnStartService {
     input: StartConversationTurnInput;
     request: ReturnType<LangyTurnStartService["prepareRequest"]>;
     runtime: ReturnType<LangyTurnStartService["requireRuntime"]>;
-    credentials: Awaited<
-      ReturnType<LangyTurnBaseDependenciesService["resolve"]>
-    >["credentials"];
+    credentials: Awaited<ReturnType<LangyTurnBaseDependenciesService["resolve"]>>["credentials"];
     turnModel: string;
     claimed: ClaimedTurn;
   }): Promise<{ conversationId: string; turnId: string }> {

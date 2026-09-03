@@ -115,12 +115,7 @@ export const CopyExperimentDialog = ({
                       >
                         {project.label}
                         {!hasPermission && (
-                          <Text
-                            display="inline-block"
-                            fontSize="sm"
-                            color="fg.subtle"
-                            ml={2}
-                          >
+                          <Text display="inline-block" fontSize="sm" color="fg.subtle" ml={2}>
                             (no permission)
                           </Text>
                         )}
@@ -130,10 +125,7 @@ export const CopyExperimentDialog = ({
                 </Select.Content>
               </Select.Root>
             </Field.Root>
-            <Checkbox
-              checked={copyDatasets}
-              onCheckedChange={(e) => setCopyDatasets(!!e.checked)}
-            >
+            <Checkbox checked={copyDatasets} onCheckedChange={(e) => setCopyDatasets(!!e.checked)}>
               Replicate associated dataset
             </Checkbox>
           </VStack>

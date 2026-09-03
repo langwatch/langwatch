@@ -216,9 +216,7 @@ export function createTenantRouter({
 
       const organizationId = await organizationFor(tenantId);
       const url = table.routes.get(organizationId);
-      return url === undefined
-        ? { kind: "shared" }
-        : { kind: "private", organizationId, url };
+      return url === undefined ? { kind: "shared" } : { kind: "private", organizationId, url };
     },
     invalidateAll() {
       cache.clear();

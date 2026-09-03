@@ -135,9 +135,7 @@ async function fetchProjectName(
     });
     if (!res.ok) return undefined;
     const body = (await res.json()) as { name?: string };
-    return typeof body.name === "string" && body.name.trim() !== ""
-      ? body.name
-      : undefined;
+    return typeof body.name === "string" && body.name.trim() !== "" ? body.name : undefined;
   } catch {
     return undefined;
   }

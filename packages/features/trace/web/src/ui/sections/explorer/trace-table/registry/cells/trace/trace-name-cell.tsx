@@ -7,12 +7,7 @@ export const TraceNameCell = {
   id: "trace-name",
   label: "Trace name",
   render: ({ row }) => (
-    <Text
-      textStyle="sm"
-      color={row.traceName ? "fg" : "fg.subtle"}
-      fontWeight="500"
-      truncate
-    >
+    <Text textStyle="sm" color={row.traceName ? "fg" : "fg.subtle"} fontWeight="500" truncate>
       {row.traceName || dash}
     </Text>
   ),

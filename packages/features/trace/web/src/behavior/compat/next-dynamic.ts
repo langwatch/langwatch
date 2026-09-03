@@ -30,11 +30,7 @@ export function resolveModule(mod: any): { default: ComponentType<any> } {
     return { default: resolved };
   }
   // If resolved is an object with a default that's a function (double-wrapped CJS)
-  if (
-    resolved &&
-    typeof resolved === "object" &&
-    typeof resolved.default === "function"
-  ) {
+  if (resolved && typeof resolved === "object" && typeof resolved.default === "function") {
     return { default: resolved.default };
   }
   // Fallback: return as-is and let React error if it's wrong

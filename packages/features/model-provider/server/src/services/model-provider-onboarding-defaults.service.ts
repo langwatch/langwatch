@@ -2,10 +2,7 @@ import {
   buildProviderOnboardingDefaultPlan,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
-import type {
-  ModelDefaultRepository,
-  ModelProviderIdService,
-} from "../ports/model-provider.port";
+import type { ModelDefaultRepository, ModelProviderIdService } from "../ports/model-provider.port";
 import type { ModelProviderScopeService } from "./model-provider-scope.service";
 
 type ModelProviderOnboardingDefaultsOptions = {

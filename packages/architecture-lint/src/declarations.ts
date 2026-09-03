@@ -38,10 +38,7 @@ function declarationAt(path: string, outputs: Map<string, string>): string | und
   return undefined;
 }
 
-function reachableDeclarations(
-  roots: Set<string>,
-  outputs: Map<string, string>,
-): Set<string> {
+function reachableDeclarations(roots: Set<string>, outputs: Map<string, string>): Set<string> {
   const reachable = new Set<string>();
   const pending = [...roots];
   while (pending.length > 0) {

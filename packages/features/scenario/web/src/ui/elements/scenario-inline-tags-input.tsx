@@ -111,9 +111,7 @@ export function ScenarioInlineTagsInput({
             onMouseOver={(e) =>
               (e.currentTarget.style.color = "var(--chakra-colors-blue-emphasized)")
             }
-            onMouseOut={(e) =>
-              (e.currentTarget.style.color = "var(--chakra-colors-blue-fg)")
-            }
+            onMouseOut={(e) => (e.currentTarget.style.color = "var(--chakra-colors-blue-fg)")}
           >
             <X size={12} />
           </button>

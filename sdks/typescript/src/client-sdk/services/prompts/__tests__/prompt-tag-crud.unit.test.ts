@@ -126,9 +126,7 @@ describe("Tag CRUD", () => {
             error: { error: "Tag already exists" },
           });
 
-          await expect(service.createTag({ name: "canary" })).rejects.toThrow(
-            PromptsApiError,
-          );
+          await expect(service.createTag({ name: "canary" })).rejects.toThrow(PromptsApiError);
         });
       });
     });

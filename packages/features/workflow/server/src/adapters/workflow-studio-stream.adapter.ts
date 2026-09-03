@@ -11,10 +11,7 @@
  * URL is a supported shape rather than a degraded one — it is what every
  * self-hosted install and every local stack already runs.
  */
-import {
-  WorkflowStudioStreamPort,
-  type WorkflowStudioStreamInput,
-} from "../ports/workflow.port";
+import { WorkflowStudioStreamPort, type WorkflowStudioStreamInput } from "../ports/workflow.port";
 
 /** The engine's streaming studio route at a single configured address. */
 export class HttpWorkflowStudioStreamAdapter extends WorkflowStudioStreamPort {
@@ -27,27 +24,20 @@ export class HttpWorkflowStudioStreamAdapter extends WorkflowStudioStreamPort {
     return new HttpWorkflowStudioStreamAdapter(options);
   }
 
-  private constructor(
-    private readonly options: { serviceUrl: string; fetch?: typeof fetch },
-  ) {
+  private constructor(private readonly options: { serviceUrl: string; fetch?: typeof fetch }) {
     super();
   }
 
-  async open(
-    input: WorkflowStudioStreamInput,
-  ): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+  async open(input: WorkflowStudioStreamInput): Promise<ReadableStreamDefaultReader<Uint8Array>> {
     const call = this.options.fetch ?? fetch;
-    const response = await call(
-      `${this.options.serviceUrl.replace(/\/$/, "")}/go/studio/execute`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-LangWatch-Origin": input.origin,
-        },
-        body: JSON.stringify(input.body),
+    const response = await call(`${this.options.serviceUrl.replace(/\/$/, "")}/go/studio/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-LangWatch-Origin": input.origin,
       },
-    );
+      body: JSON.stringify(input.body),
+    });
 
     const body = response.body;
     if (!body) {

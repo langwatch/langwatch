@@ -24,9 +24,7 @@ describe("parseRecordsJson()", () => {
   describe("when given a non-array JSON value", () => {
     /** @scenario Add records rejects non-array JSON */
     it("throws for a JSON object", () => {
-      expect(() => parseRecordsJson('{"input": "hello"}')).toThrow(
-        "expected a JSON array",
-      );
+      expect(() => parseRecordsJson('{"input": "hello"}')).toThrow("expected a JSON array");
     });
 
     it("throws for a JSON string", () => {

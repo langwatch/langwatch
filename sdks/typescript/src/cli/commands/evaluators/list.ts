@@ -21,9 +21,7 @@ export const listEvaluatorsCommand = async (): Promise<CommandResult | void> => 
   try {
     evaluators = await service.getAll();
 
-    spinner.succeed(
-      `Found ${evaluators.length} evaluator${evaluators.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${evaluators.length} evaluator${evaluators.length !== 1 ? "s" : ""}`);
   } catch (error) {
     // No explicit `format`: see traces/search.ts — the preAction hook covers
     // every spelling; the `-f` commander default must not override it.
@@ -39,14 +37,10 @@ export const listEvaluatorsCommand = async (): Promise<CommandResult | void> => 
         console.log(chalk.gray("No evaluators found in this project."));
         console.log(chalk.gray("Create your first evaluator with:"));
         console.log(
-          chalk.cyan(
-            '  langwatch evaluator create "My Evaluator" --type langevals/llm_boolean',
-          ),
+          chalk.cyan('  langwatch evaluator create "My Evaluator" --type langevals/llm_boolean'),
         );
         console.log(
-          chalk.gray(
-            `Run ${chalk.cyan("langwatch evaluator types")} to list every valid type`,
-          ),
+          chalk.gray(`Run ${chalk.cyan("langwatch evaluator types")} to list every valid type`),
         );
         return;
       }
@@ -77,9 +71,7 @@ export const listEvaluatorsCommand = async (): Promise<CommandResult | void> => 
 
       console.log();
       console.log(
-        chalk.gray(
-          `Use ${chalk.cyan("langwatch evaluator get <slug>")} to view evaluator details`,
-        ),
+        chalk.gray(`Use ${chalk.cyan("langwatch evaluator get <slug>")} to view evaluator details`),
       );
     },
   };

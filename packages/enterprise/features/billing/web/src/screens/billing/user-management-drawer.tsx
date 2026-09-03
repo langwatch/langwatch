@@ -76,19 +76,15 @@ export function UserManagementDrawer({
       countFullMembers(pendingInvitesWithMemberType) +
       countFullMembers(plannedUsers);
 
-    const autoFillCount =
-      maxSeats != null ? Math.max(0, maxSeats - occupiedFullMemberSeats) : 0;
+    const autoFillCount = maxSeats != null ? Math.max(0, maxSeats - occupiedFullMemberSeats) : 0;
 
     setInitialAutoFillCount(autoFillCount);
 
-    const autoFilledRows: PlannedUser[] = Array.from(
-      { length: autoFillCount },
-      (_, i) => ({
-        id: `auto-${Date.now()}-${i}`,
-        email: "",
-        memberType: "FullMember" as MemberType,
-      }),
-    );
+    const autoFilledRows: PlannedUser[] = Array.from({ length: autoFillCount }, (_, i) => ({
+      id: `auto-${Date.now()}-${i}`,
+      email: "",
+      memberType: "FullMember" as MemberType,
+    }));
 
     setLocalPlannedUsers([...plannedUsers, ...autoFilledRows]);
   }, [open, users, plannedUsers, pendingInvitesWithMemberType, maxSeats]);
@@ -186,8 +182,7 @@ export function UserManagementDrawer({
                 <HStack justify="flex-start" width="full">
                   <Collapsible.Trigger asChild>
                     <Button variant="ghost" size="xs" color="fg.muted" fontSize="xs">
-                      Show members (
-                      {editableUsers.length + pendingInvitesWithMemberType.length}
+                      Show members ({editableUsers.length + pendingInvitesWithMemberType.length}
                       )
                       <ChevronDown size={12} />
                     </Button>
@@ -206,21 +201,12 @@ export function UserManagementDrawer({
                               Active
                             </Text>
                           </Box>
-                          <Box
-                            as="td"
-                            paddingY={2}
-                            textAlign="right"
-                            verticalAlign="middle"
-                          >
+                          <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
                             <Badge
-                              colorPalette={
-                                user.memberType === "FullMember" ? "blue" : "yellow"
-                              }
+                              colorPalette={user.memberType === "FullMember" ? "blue" : "yellow"}
                               variant="outline"
                             >
-                              {user.memberType === "FullMember"
-                                ? "Full Member"
-                                : "Lite Member"}
+                              {user.memberType === "FullMember" ? "Full Member" : "Lite Member"}
                             </Badge>
                           </Box>
                         </Box>
@@ -240,21 +226,12 @@ export function UserManagementDrawer({
                               Invited - Waiting for acceptance
                             </Text>
                           </Box>
-                          <Box
-                            as="td"
-                            paddingY={2}
-                            textAlign="right"
-                            verticalAlign="middle"
-                          >
+                          <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
                             <Badge
-                              colorPalette={
-                                invite.memberType === "FullMember" ? "blue" : "yellow"
-                              }
+                              colorPalette={invite.memberType === "FullMember" ? "blue" : "yellow"}
                               variant="outline"
                             >
-                              {invite.memberType === "FullMember"
-                                ? "Full Member"
-                                : "Lite Member"}
+                              {invite.memberType === "FullMember" ? "Full Member" : "Lite Member"}
                             </Badge>
                           </Box>
                         </Box>
@@ -292,9 +269,7 @@ export function UserManagementDrawer({
                         size="sm"
                         flex={1}
                         value={user.email}
-                        onChange={(e) =>
-                          handleUpdatePlannedUserEmail(user.id, e.target.value)
-                        }
+                        onChange={(e) => handleUpdatePlannedUserEmail(user.id, e.target.value)}
                       />
                       <Badge
                         data-testid={`seat-member-type-${index}`}
@@ -347,11 +322,7 @@ export function UserManagementDrawer({
 
               <HStack justify="space-between">
                 <Text fontWeight="bold">{priceLabel}</Text>
-                <Text
-                  fontWeight="bold"
-                  color="blue.fg"
-                  data-testid="monthly-price-footer"
-                >
+                <Text fontWeight="bold" color="blue.fg" data-testid="monthly-price-footer">
                   {formatPrice({ cents: totalPriceCentsInDrawer, currency })}
                   {periodSuffix}
                 </Text>

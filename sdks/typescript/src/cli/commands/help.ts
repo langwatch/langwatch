@@ -116,9 +116,7 @@ export const helpCommand = (program: Command, topics: string[]): void => {
     (cmd) => cmd.name() === topic || cmd.aliases().includes(topic),
   );
   for (const word of rest) {
-    target = target?.commands.find(
-      (cmd) => cmd.name() === word || cmd.aliases().includes(word),
-    );
+    target = target?.commands.find((cmd) => cmd.name() === word || cmd.aliases().includes(word));
   }
   if (!target && rest.length === 0) {
     const renderTopic = HELP_TOPICS[topic];

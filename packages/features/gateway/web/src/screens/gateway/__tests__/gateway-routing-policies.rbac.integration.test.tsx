@@ -103,9 +103,7 @@ describe("routing policies page access", () => {
       renderPage(["organization:view", "routingPolicies:view"]);
 
       expect(screen.getByText("House default")).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /New policy/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /New policy/ })).not.toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /Actions for House default/ }),
       ).not.toBeInTheDocument();
@@ -117,12 +115,8 @@ describe("routing policies page access", () => {
     it("offers the authoring controls", () => {
       renderPage(["organization:view", "routingPolicies:manage"]);
 
-      expect(
-        screen.getAllByRole("button", { name: /New policy/ }).length,
-      ).toBeGreaterThan(0);
-      expect(
-        screen.getByRole("button", { name: /Actions for House default/ }),
-      ).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: /New policy/ }).length).toBeGreaterThan(0);
+      expect(screen.getByRole("button", { name: /Actions for House default/ })).toBeInTheDocument();
       expect(screen.queryByText(/routingPolicies:manage/)).not.toBeInTheDocument();
     });
   });

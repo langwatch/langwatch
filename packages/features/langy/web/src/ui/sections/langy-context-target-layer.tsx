@@ -135,13 +135,7 @@ function SpotlightLayer() {
 function AbsorbFlashLayer() {
   const absorbFlash = useLangyContextTargetStore((s) => s.absorbFlash);
   if (!absorbFlash) return null;
-  return (
-    <AbsorbOoze
-      key={absorbFlash.nonce}
-      targetId={absorbFlash.id}
-      nonce={absorbFlash.nonce}
-    />
-  );
+  return <AbsorbOoze key={absorbFlash.nonce} targetId={absorbFlash.id} nonce={absorbFlash.nonce} />;
 }
 
 /** How long the ooze plays. Mirrors the CSS animation — keep the two equal. */
@@ -289,8 +283,7 @@ function useBottomBarLift(): number {
       for (const bar of bars) {
         const rect = bar.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) continue;
-        const clearance =
-          window.innerHeight - rect.top + HINT_BAR_GAP_PX - HINT_BOTTOM_PX;
+        const clearance = window.innerHeight - rect.top + HINT_BAR_GAP_PX - HINT_BOTTOM_PX;
         needed = Math.max(needed, clearance);
       }
       setLift((previous) => (previous === needed ? previous : needed));
@@ -475,9 +468,7 @@ function ActiveLayer() {
       document.removeEventListener("focusin", onGeometryChange);
       unsubscribe();
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-      useLangyContextTargetStore
-        .getState()
-        .setProximity({ nearIds: [], hoveredId: null });
+      useLangyContextTargetStore.getState().setProximity({ nearIds: [], hoveredId: null });
     };
   }, [measure, schedule]);
 
@@ -570,9 +561,7 @@ function TargetAffordance({ targetId }: { targetId: string }) {
       // (the chips, the "+ context" control), so the pair reads on first
       // sight. The title carries the reverse, which the label alone can't.
       title={
-        isAdded
-          ? `Langy has ${target.label} — click to release it`
-          : `Give Langy ${target.label}`
+        isAdded ? `Langy has ${target.label} — click to release it` : `Give Langy ${target.label}`
       }
       position="fixed"
       top={`${box.top + AFFORDANCE_INSET_PX}px`}

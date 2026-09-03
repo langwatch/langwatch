@@ -78,10 +78,7 @@ describe("scopeChipDetail", () => {
         [{ scopeType: "GROUP", name: "Engineering" }, "Group: Engineering"],
         [{ scopeType: "PRINCIPAL", name: "Ada Lovelace" }, "Person: Ada Lovelace"],
         [{ scopeType: "VIRTUAL_KEY", name: "Scenario CI" }, "Virtual key: Scenario CI"],
-        [
-          { scopeType: "ATTRIBUTED_USER", name: "prod-openai" },
-          "Attributed user: prod-openai",
-        ],
+        [{ scopeType: "ATTRIBUTED_USER", name: "prod-openai" }, "Attributed user: prod-openai"],
       ];
       for (const [entry, expected] of cases) {
         expect(scopeChipTooltip(entry)).toBe(expected);

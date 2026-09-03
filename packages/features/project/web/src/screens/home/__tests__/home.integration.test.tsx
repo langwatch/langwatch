@@ -62,13 +62,7 @@ vi.mock("../components/docs-guides", () => ({
 }));
 vi.mock("../components/home-fortune", () => ({ HomeFortune: () => null }));
 vi.mock("../components/home-page-banners", () => ({
-  HomePageBanners: ({
-    variant,
-    children,
-  }: {
-    variant?: string;
-    children?: React.ReactNode;
-  }) => (
+  HomePageBanners: ({ variant, children }: { variant?: string; children?: React.ReactNode }) => (
     <div data-testid="banners" data-variant={variant ?? "default"}>
       {children}
     </div>

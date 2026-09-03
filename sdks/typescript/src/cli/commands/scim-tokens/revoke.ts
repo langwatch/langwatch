@@ -11,9 +11,7 @@ export const revokeScimTokenCommand = async (id: string): Promise<CommandResult 
     succeed: () => `Revoked SCIM token "${id}"`,
     table: () => {
       console.log();
-      console.log(
-        chalk.gray("The identity provider using this token will stop syncing."),
-      );
+      console.log(chalk.gray("The identity provider using this token will stop syncing."));
       console.log();
     },
   });

@@ -75,12 +75,7 @@ export const LensNameDialog: React.FC<LensNameDialogProps> = ({
             <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              size="sm"
-              colorPalette="blue"
-              onClick={submit}
-              disabled={!name.trim()}
-            >
+            <Button size="sm" colorPalette="blue" onClick={submit} disabled={!name.trim()}>
               Create
             </Button>
           </HStack>

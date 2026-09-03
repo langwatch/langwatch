@@ -26,7 +26,6 @@ const unreadableLogRecords = {
   },
 } as unknown as CanonicalLogRecordRepository;
 
-
 /** Narrows the result union so a test can assert on the collected counters. */
 function expectCollected(
   result: LogRequestCollectionResult,

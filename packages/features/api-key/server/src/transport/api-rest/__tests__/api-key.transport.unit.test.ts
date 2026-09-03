@@ -198,10 +198,7 @@ function buildApi(
     audit,
   });
 
-  const send = (
-    path: string,
-    init: { method?: string; body?: unknown; as?: string } = {},
-  ) =>
+  const send = (path: string, init: { method?: string; body?: unknown; as?: string } = {}) =>
     hono.request(path, {
       ...(init.method === undefined ? {} : { method: init.method }),
       ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
@@ -624,9 +621,7 @@ describe("createApiKeysRestApp", () => {
           expiresAt: null,
           lastUsedAt: null,
           revokedAt: null,
-          roleBindings: [
-            { id: "binding-1", role: "MEMBER", scopeType: "TEAM", scopeId: "team-1" },
-          ],
+          roleBindings: [{ id: "binding-1", role: "MEMBER", scopeType: "TEAM", scopeId: "team-1" }],
         },
       ]);
       for (const row of body.data) {
@@ -702,9 +697,7 @@ describe("createApiKeysRestApp", () => {
         permissionMode: "restricted",
         permissions: ["analytics:view", "traces:view"],
         bindings: [{ role: "MEMBER", scopeType: "TEAM", scopeId: "team-1" }],
-        roleBindings: [
-          { id: "binding-1", role: "MEMBER", scopeType: "TEAM", scopeId: "team-1" },
-        ],
+        roleBindings: [{ id: "binding-1", role: "MEMBER", scopeType: "TEAM", scopeId: "team-1" }],
       });
       expect(body).not.toHaveProperty("token");
       expect(body).not.toHaveProperty("lookupId");
@@ -833,9 +826,7 @@ describe("createApiKeysRestApp", () => {
       expect(response.status).toBe(200);
       const body = (await response.json()) as { name: string; bindings: unknown[] };
       expect(body.name).toBe("rename-after");
-      expect(body.bindings).toEqual([
-        { role: "MEMBER", scopeType: "TEAM", scopeId: "team-1" },
-      ]);
+      expect(body.bindings).toEqual([{ role: "MEMBER", scopeType: "TEAM", scopeId: "team-1" }]);
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "api-key-1",
@@ -989,9 +980,7 @@ describe("createApiKeysRestApp", () => {
       const response = await send("/api/api-keys/api-key-1", { method: "DELETE" });
 
       expect(response.status).toBe(403);
-      expect(revoke).toHaveBeenCalledWith(
-        expect.objectContaining({ callerIsAdmin: false }),
-      );
+      expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ callerIsAdmin: false }));
     });
 
     /** @scenario Revoking a key that is already revoked names the code */
@@ -1023,9 +1012,9 @@ describe("createApiKeysRestApp", () => {
         },
       });
 
-      expect(
-        (await send("/api/api-keys/nonexistent-key-id", { method: "DELETE" })).status,
-      ).toBe(404);
+      expect((await send("/api/api-keys/nonexistent-key-id", { method: "DELETE" })).status).toBe(
+        404,
+      );
     });
   });
 });

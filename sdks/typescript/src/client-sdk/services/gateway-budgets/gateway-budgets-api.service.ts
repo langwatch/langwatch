@@ -24,14 +24,7 @@ export type BudgetScopeKind =
   | "group"
   | "attributed_user";
 
-export type BudgetWindow =
-  | "minute"
-  | "hour"
-  | "day"
-  | "week"
-  | "month"
-  | "total"
-  | "manual";
+export type BudgetWindow = "minute" | "hour" | "day" | "week" | "month" | "total" | "manual";
 export type BudgetOnBreach = "block" | "warn";
 
 export interface GatewayBudget {
@@ -407,9 +400,7 @@ export class GatewayBudgetsApiService {
     id: string,
     options: { endUserId?: string; reason?: string } & MutationOptions = {},
   ): Promise<GatewayBudget> {
-    const query = options.endUserId
-      ? `?end_user_id=${encodeURIComponent(options.endUserId)}`
-      : "";
+    const query = options.endUserId ? `?end_user_id=${encodeURIComponent(options.endUserId)}` : "";
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       `reset gateway budget "${id}"`,
       `/api/gateway/v1/budgets/${encodeURIComponent(id)}/reset${query}`,

@@ -82,20 +82,14 @@ export const IntegrationCTACard: React.FC = () => {
       >
         <Flex align="flex-start" justify="space-between" gap={3}>
           <HStack align="flex-start" gap={3} flex={1}>
-            <Icon
-              as={Cable}
-              boxSize={5}
-              color="orange.fg"
-              flexShrink={0}
-              marginTop={0.5}
-            />
+            <Icon as={Cable} boxSize={5} color="orange.fg" flexShrink={0} marginTop={0.5} />
             <VStack align="stretch" gap={2} flex={1}>
               <Text textStyle="sm" fontWeight="semibold" color="fg" lineHeight="snug">
                 Integrate your code to see real traces here
               </Text>
               <Text textStyle="xs" color="fg.muted" lineHeight="tall">
-                The rows below are sample data. Send your own traces by connecting the
-                LangWatch SDK, MCP server, or a coding agent skill.
+                The rows below are sample data. Send your own traces by connecting the LangWatch
+                SDK, MCP server, or a coding agent skill.
               </Text>
               <HStack gap={2} paddingTop={1}>
                 <Button
@@ -106,12 +100,7 @@ export const IntegrationCTACard: React.FC = () => {
                 >
                   Integrate
                 </Button>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  color="fg.muted"
-                  onClick={handleDismiss}
-                >
+                <Button size="xs" variant="ghost" color="fg.muted" onClick={handleDismiss}>
                   Remind me later
                 </Button>
               </HStack>

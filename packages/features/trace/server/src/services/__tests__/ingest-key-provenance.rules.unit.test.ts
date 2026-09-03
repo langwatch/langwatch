@@ -129,17 +129,13 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
         nonBillable: false,
       });
       expect(
-        attrMap(billed.resourceMetrics[0]!.resource.attributes)[
-          "langwatch.cost.non_billable"
-        ],
+        attrMap(billed.resourceMetrics[0]!.resource.attributes)["langwatch.cost.non_billable"],
       ).toBe("false");
 
       const unset = { resourceMetrics: [{ resource: { attributes: [] } }] };
       stampIngestKeyProvenanceOnMetricRequest(unset, PROVENANCE);
       expect(
-        attrMap(unset.resourceMetrics[0]!.resource.attributes)[
-          "langwatch.cost.non_billable"
-        ],
+        attrMap(unset.resourceMetrics[0]!.resource.attributes)["langwatch.cost.non_billable"],
       ).toBeUndefined();
     });
   });
@@ -154,9 +150,7 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
         templateId: "tmpl_1",
       });
       expect(
-        attrMap(withTemplate.resourceMetrics[0]!.resource.attributes)[
-          "langwatch.template.id"
-        ],
+        attrMap(withTemplate.resourceMetrics[0]!.resource.attributes)["langwatch.template.id"],
       ).toBe("tmpl_1");
 
       const noTemplate = {
@@ -164,9 +158,7 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
       };
       stampIngestKeyProvenanceOnMetricRequest(noTemplate, PROVENANCE);
       expect(
-        attrMap(noTemplate.resourceMetrics[0]!.resource.attributes)[
-          "langwatch.template.id"
-        ],
+        attrMap(noTemplate.resourceMetrics[0]!.resource.attributes)["langwatch.template.id"],
       ).toBeUndefined();
     });
   });
@@ -182,9 +174,7 @@ describe("stampIngestKeyProvenanceOnLogRequest", () => {
         resourceLogs: [
           {
             resource: {
-              attributes: [
-                { key: "service.name", value: { stringValue: "claude-code" } },
-              ],
+              attributes: [{ key: "service.name", value: { stringValue: "claude-code" } }],
             },
           },
           { resource: { attributes: [] } },
@@ -212,9 +202,7 @@ describe("stampIngestKeyProvenanceOnLogRequest", () => {
         nonBillable: false,
       });
       expect(
-        attrMap(request.resourceLogs[0]!.resource.attributes)[
-          "langwatch.cost.non_billable"
-        ],
+        attrMap(request.resourceLogs[0]!.resource.attributes)["langwatch.cost.non_billable"],
       ).toBe("false");
     });
   });
@@ -297,9 +285,7 @@ describe("enforceApiKeyIdOnTraceRequest", () => {
     const span = request.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
     const holders = [span, span.events[0]!, span.links[0]!];
     for (const holder of holders) {
-      expect(holder.attributes.some((a) => a.key === PROVENANCE_ATTR_API_KEY_ID)).toBe(
-        false,
-      );
+      expect(holder.attributes.some((a) => a.key === PROVENANCE_ATTR_API_KEY_ID)).toBe(false);
     }
   });
 
@@ -319,10 +305,7 @@ describe("enforceApiKeyIdOnTraceRequest", () => {
 
   it("keeps unrelated attributes untouched", () => {
     const request = requestWith({
-      resourceAttrs: [
-        forged,
-        { key: "service.name", value: { stringValue: "acme-api" } },
-      ],
+      resourceAttrs: [forged, { key: "service.name", value: { stringValue: "acme-api" } }],
     });
 
     enforceApiKeyIdOnTraceRequest(request, "key_real");

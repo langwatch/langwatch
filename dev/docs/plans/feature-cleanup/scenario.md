@@ -78,7 +78,9 @@ The divergence is not hypothetical. `scenario-v1.api.ts:145-150` reads the calle
 **from a request header** and builds the actor itself:
 
 ```ts
-function actorFromRequest(c: { req: { header: (name: string) => string | undefined } }): ScenarioActor {
+function actorFromRequest(c: {
+  req: { header: (name: string) => string | undefined };
+}): ScenarioActor {
   const declared = c.req.header("X-LangWatch-Surface")?.toLowerCase();
   return { userId: null, label: declared === "cli" ? "cli" : "api" };
 }
@@ -86,7 +88,7 @@ function actorFromRequest(c: { req: { header: (name: string) => string | undefin
 
 passed at `:317` (create) and `:389` (update). tRPC does the opposite —
 `scenario-crud.api.ts:80, :140, :217` hand `ctx.actor()` to the app, which stamps
-**two** fields (`app/scenario.app.ts:186-190`): `lastUpdatedById` *and* `actor`.
+**two** fields (`app/scenario.app.ts:186-190`): `lastUpdatedById` _and_ `actor`.
 REST sets `actor` only, so an API-key update leaves `lastUpdatedById` stale while
 the version history records `api`. Two doors, two answers — the exact failure the
 facade's own docstring says it prevents.
@@ -125,12 +127,12 @@ from typed columns.
 
 `services/scenario-execution.service.ts:36-56`:
 
-| Method | Body |
-|---|---|
-| `submit` (`:36`) | `this.options.pool.submit(input)` |
-| `cancel` (`:40`) | `this.options.cancellations.publish(input)` |
-| `prefetch` (`:44`) | `this.options.prefetcher.prefetch(input)` |
-| `prepare` (`:50`) | `this.options.prefetcher.prepare(input)` |
+| Method                          | Body                                                 |
+| ------------------------------- | ---------------------------------------------------- |
+| `submit` (`:36`)                | `this.options.pool.submit(input)`                    |
+| `cancel` (`:40`)                | `this.options.cancellations.publish(input)`          |
+| `prefetch` (`:44`)              | `this.options.prefetcher.prefetch(input)`            |
+| `prepare` (`:50`)               | `this.options.prefetcher.prepare(input)`             |
 | `finishUnsuccessfulRun` (`:54`) | `this.options.failures.finishUnsuccessfulRun(input)` |
 
 `ast-grep` flags `:44, :50, :54`. Underneath, `prefetch` delegates again:
@@ -142,22 +144,22 @@ tRPC → `ScenarioApp.prefetchExecution` (`scenario.app.ts:272`) →
 
 ### P5 — 54 operations, ≈273 declarations (breaks R8)
 
-| Operation set | Declared in | Count |
-|---|---|---|
-| Simulation (25) | `contract/src/simulation.service.ts:114-163` | 25 |
-| | `server/src/services/simulation.service.ts:73-219` | 24 |
-| | `server/src/repositories/simulation.repository.ts:41-83` | 17 |
-| | `server/src/repositories/simulation.repository.ts:86-151` (`NullSimulationRepository`) | 17 |
-| | `server/src/repositories/clickhouse/simulation-clickhouse.repository.ts` | 17 |
-| | `server/src/testing.ts:39-153` (`TestSimulationService`) | 25 |
-| | `server/src/ports/simulation-execution.port.ts:13-22` | 8 |
-| | `platform/app/src/runtime/app/features/simulation.ts:25-65` | 8 |
-| | `server/src/app/scenario.app.ts` (simulation reads) | 12 |
-| Scenario (29) | `contract/src/scenario.service.ts` | 29 |
-| | `server/src/services/scenario.service.ts:73-427` | 28 |
-| | `server/src/repositories/scenario.repository.ts:21-73` | 24 |
-| | `server/src/repositories/prisma/scenario.repository.ts:85-682` | 23 |
-| | `server/src/app/scenario.app.ts` (scenario ops) | 16 |
+| Operation set   | Declared in                                                                            | Count |
+| --------------- | -------------------------------------------------------------------------------------- | ----- |
+| Simulation (25) | `contract/src/simulation.service.ts:114-163`                                           | 25    |
+|                 | `server/src/services/simulation.service.ts:73-219`                                     | 24    |
+|                 | `server/src/repositories/simulation.repository.ts:41-83`                               | 17    |
+|                 | `server/src/repositories/simulation.repository.ts:86-151` (`NullSimulationRepository`) | 17    |
+|                 | `server/src/repositories/clickhouse/simulation-clickhouse.repository.ts`               | 17    |
+|                 | `server/src/testing.ts:39-153` (`TestSimulationService`)                               | 25    |
+|                 | `server/src/ports/simulation-execution.port.ts:13-22`                                  | 8     |
+|                 | `platform/app/src/runtime/app/features/simulation.ts:25-65`                            | 8     |
+|                 | `server/src/app/scenario.app.ts` (simulation reads)                                    | 12    |
+| Scenario (29)   | `contract/src/scenario.service.ts`                                                     | 29    |
+|                 | `server/src/services/scenario.service.ts:73-427`                                       | 28    |
+|                 | `server/src/repositories/scenario.repository.ts:21-73`                                 | 24    |
+|                 | `server/src/repositories/prisma/scenario.repository.ts:85-682`                         | 23    |
+|                 | `server/src/app/scenario.app.ts` (scenario ops)                                        | 16    |
 
 Adding one simulation read means editing six files before a query exists.
 
@@ -186,21 +188,21 @@ imported outside: `AUTH_STRATEGIES`, `CANCELLATION_CHANNEL`, `ChildLoggerAdapter
 
 Implementations found by `grep -rn "extends <Port>"` repo-wide, excluding tests:
 
-| Port | Production impls | Verdict |
-|---|---|---|
-| `ScenarioClockPort` (`scenario-clock.port.ts:1`) | 1, `platform/app/.../scenario.ts:76` | **Keep** — cross-package |
-| `ScenarioIdPort` / `ScenarioFolderIdPort` (`scenario-id.port.ts:1,5`) | 1 each, `platform/app/.../scenario.ts:48,62` | **Keep, merge** — see below |
-| `ScenarioSecretCipherPort` (`:2`) | 1, `platform/app/.../scenario.ts:90` | **Keep** — cross-package |
-| `ScenarioHttpPort` (`scenario-http.port.ts:18`) | 1, `platform/app/src/runtime/worker/scenario-child-process.ts:12` | **Keep** — SSRF policy inversion |
-| `ScenarioProcessorServiceMetricsPort` (`:1`) | 1, `platform/app/src/runtime/worker/app-scenario-processor.adapter.ts:15` | **Keep** — cross-package |
-| `SimulationExecutionPort` (`:13`) | 1, `platform/app/.../simulation.ts:25` | **Keep** — cross-package |
-| `SimulationWindowedReadPort` (`:26`) | 1, `platform/app/.../simulation.ts:68` | **Keep** — cross-package |
-| `CancellationPublisherPort` (`:9`) | 2 in-package (`redis.cancellation-channel.adapter.ts:22,40`) | **Keep** |
-| `ScenarioExecutionPoolPort` (`:4`) | 2 in-package (`scenario-execution-pool.service.ts:29,243`) | **Keep** |
-| `CancellationSubscriberPort` (`:14`) | 1 in-package (`redis.cancellation-channel.adapter.ts:58`) | **Delete** |
-| `ScenarioTabStorePort` (`:1`) | 1 in-package (`redis.scenario-tab-store.adapter.ts:26`) | **Keep — after P9** |
-| `ScenarioChildBootstrapPort` + `ScenarioChildExecutionSession` (`:17, :12`) | 1 in-package (`node-scenario-child-process.adapter.ts:59, :211`) | **Delete** |
-| `ScenarioExecutionRunnerPort` (`:3`) | 1 in-package (`scenario-processor.service.ts:25`) | **Delete with P8** |
+| Port                                                                        | Production impls                                                          | Verdict                          |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------- |
+| `ScenarioClockPort` (`scenario-clock.port.ts:1`)                            | 1, `platform/app/.../scenario.ts:76`                                      | **Keep** — cross-package         |
+| `ScenarioIdPort` / `ScenarioFolderIdPort` (`scenario-id.port.ts:1,5`)       | 1 each, `platform/app/.../scenario.ts:48,62`                              | **Keep, merge** — see below      |
+| `ScenarioSecretCipherPort` (`:2`)                                           | 1, `platform/app/.../scenario.ts:90`                                      | **Keep** — cross-package         |
+| `ScenarioHttpPort` (`scenario-http.port.ts:18`)                             | 1, `platform/app/src/runtime/worker/scenario-child-process.ts:12`         | **Keep** — SSRF policy inversion |
+| `ScenarioProcessorServiceMetricsPort` (`:1`)                                | 1, `platform/app/src/runtime/worker/app-scenario-processor.adapter.ts:15` | **Keep** — cross-package         |
+| `SimulationExecutionPort` (`:13`)                                           | 1, `platform/app/.../simulation.ts:25`                                    | **Keep** — cross-package         |
+| `SimulationWindowedReadPort` (`:26`)                                        | 1, `platform/app/.../simulation.ts:68`                                    | **Keep** — cross-package         |
+| `CancellationPublisherPort` (`:9`)                                          | 2 in-package (`redis.cancellation-channel.adapter.ts:22,40`)              | **Keep**                         |
+| `ScenarioExecutionPoolPort` (`:4`)                                          | 2 in-package (`scenario-execution-pool.service.ts:29,243`)                | **Keep**                         |
+| `CancellationSubscriberPort` (`:14`)                                        | 1 in-package (`redis.cancellation-channel.adapter.ts:58`)                 | **Delete**                       |
+| `ScenarioTabStorePort` (`:1`)                                               | 1 in-package (`redis.scenario-tab-store.adapter.ts:26`)                   | **Keep — after P9**              |
+| `ScenarioChildBootstrapPort` + `ScenarioChildExecutionSession` (`:17, :12`) | 1 in-package (`node-scenario-child-process.adapter.ts:59, :211`)          | **Delete**                       |
+| `ScenarioExecutionRunnerPort` (`:3`)                                        | 1 in-package (`scenario-processor.service.ts:25`)                         | **Delete with P8**               |
 
 `ScenarioIdPort` and `ScenarioFolderIdPort` (`ports/scenario-id.port.ts:1-6`) are
 byte-identical abstract classes — `abstract next(): string` — and their two app
@@ -244,7 +246,9 @@ the same three lines (`:41-42, :64-65, :87-88, :113-114, :139-140`):
 
 ```ts
 const store = this.options.store;
-if (!store) { /* …an entire in-memory implementation… */ }
+if (!store) {
+  /* …an entire in-memory implementation… */
+}
 ```
 
 The in-memory half is real code: two maps (`:19-20`), `memoryEntry` (`:157`),
@@ -302,23 +306,23 @@ a divergence between the five copies is a correctness bug, not a style one.
 Source files named in comments, checked against the tree (`packages/`, `platform/`,
 `apps/`, `services/`):
 
-| Comment | Names | In tree? |
-|---|---|---|
-| `adapters/scenario-child-execution.adapter.ts:16` | `scenario.processor.ts` | **gone** |
-| `contract/src/scenario-infra-error.ts:308` | `scenario.processor.ts` | **gone** |
-| `processes/simulation-run-execution-data.process.ts:72` | `execution-pool.ts` | **gone** |
-| `adapters/litellm-model.adapter.ts:5` | `standalone-adapters.ts`, `scenario-worker.ts` | **gone** |
-| `contract/src/scenario-infra-error.ts:147, :320` | `http-agent.adapter.ts` | **gone** |
-| `contract/src/scenario-execution-data.ts:318` | `job-model-params.ts` | **gone** |
-| `contract/src/scenario-execution-data.ts:339` | `serialized-adapter.registry.ts` | **gone** |
-| `repositories/clickhouse/clickhouse.simulation-run-state.repository.ts:220-229` | `simulation.clickhouse.repository.ts` | **gone** (file is `simulation-clickhouse…`) |
+| Comment                                                                         | Names                                          | In tree?                                    |
+| ------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------- |
+| `adapters/scenario-child-execution.adapter.ts:16`                               | `scenario.processor.ts`                        | **gone**                                    |
+| `contract/src/scenario-infra-error.ts:308`                                      | `scenario.processor.ts`                        | **gone**                                    |
+| `processes/simulation-run-execution-data.process.ts:72`                         | `execution-pool.ts`                            | **gone**                                    |
+| `adapters/litellm-model.adapter.ts:5`                                           | `standalone-adapters.ts`, `scenario-worker.ts` | **gone**                                    |
+| `contract/src/scenario-infra-error.ts:147, :320`                                | `http-agent.adapter.ts`                        | **gone**                                    |
+| `contract/src/scenario-execution-data.ts:318`                                   | `job-model-params.ts`                          | **gone**                                    |
+| `contract/src/scenario-execution-data.ts:339`                                   | `serialized-adapter.registry.ts`               | **gone**                                    |
+| `repositories/clickhouse/clickhouse.simulation-run-state.repository.ts:220-229` | `simulation.clickhouse.repository.ts`          | **gone** (file is `simulation-clickhouse…`) |
 
 Incident narratives and rollout notes that belong in an ADR:
 
 - `clickhouse.simulation-run-state.repository.ts:220-229` — "exhausted the server
   memory limit (Code 241) …", and the file it points at for the fix is misnamed.
 - `simulation-clickhouse.repository.ts:551-569` — 19 lines on a completed
-  migration: "This is the widening the old empty-clause helper did *silently* …
+  migration: "This is the widening the old empty-clause helper did _silently_ …
   precisely what byte-identical adoption forbids."
 - `simulation-clickhouse.repository.ts:1082-1087` — a manual cross-file sync
   contract, "⚠️ KEEP IN SYNC … run-history-transforms.ts → computeGroupSummary()",
@@ -402,7 +406,10 @@ export class ScenarioApp {
     return { userId: by.id, label: by.label };
   }
 
-  create(input: Omit<ScenarioCreateInput, "lastUpdatedById" | "actor">, by: ScenarioCaller): Promise<Scenario> {
+  create(
+    input: Omit<ScenarioCreateInput, "lastUpdatedById" | "actor">,
+    by: ScenarioCaller,
+  ): Promise<Scenario> {
     return this.dependencies.scenarios.create({
       ...input,
       lastUpdatedById: by.id,
@@ -428,11 +435,14 @@ export class ScenarioProcessorService {
   static create(options: {
     execution: ScenarioExecutionServiceContract;
     concurrency: number;
-    cancellations: CancellationSubscriber;      // concrete; the port had one impl
+    cancellations: CancellationSubscriber; // concrete; the port had one impl
     childProcesses: NodeScenarioChildProcessAdapter;
     metrics: ScenarioProcessorServiceMetricsPort;
   }): ScenarioProcessorService {
-    return new ScenarioProcessorService(options, ScenarioExecutionPool.create(options.concurrency, /* runner */ undefined!));
+    return new ScenarioProcessorService(
+      options,
+      ScenarioExecutionPool.create(options.concurrency, /* runner */ undefined!),
+    );
   }
 }
 ```
@@ -492,7 +502,7 @@ lines down to ~90, and one fewer validation pass per page of run data.
   rules (attribution, the queued-run metadata envelope at `:287-316` including the
   deliberate secrets-beside-not-inside split, and `readSuiteRunData`). 24 of its 32
   methods being pass-throughs is the shape of a facade, not a defect. P1 and P2 are
-  about it being *bypassed*, not about it existing.
+  about it being _bypassed_, not about it existing.
 - **`projections/`, `subscribers/`, `processes/`, `intents/`, `stores/eventing/`** —
   event-sourcing code correctly inside the server package. Right where it belongs.
 - **`contract/`** — 84 non-test files outside the feature import it. The abstract

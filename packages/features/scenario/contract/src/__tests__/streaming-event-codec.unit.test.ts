@@ -31,9 +31,7 @@ describe("streaming-event-codec", () => {
 
     describe("when messageIndex is provided", () => {
       it("includes the i key with the index value", () => {
-        const result = JSON.parse(
-          encodeStart({ ...baseFields, role: "user", messageIndex: 3 }),
-        );
+        const result = JSON.parse(encodeStart({ ...baseFields, role: "user", messageIndex: 3 }));
 
         expect(result).toEqual({
           e: "S",
@@ -48,9 +46,7 @@ describe("streaming-event-codec", () => {
 
     describe("when messageIndex is 0", () => {
       it("includes the i key with value 0", () => {
-        const result = JSON.parse(
-          encodeStart({ ...baseFields, role: "user", messageIndex: 0 }),
-        );
+        const result = JSON.parse(encodeStart({ ...baseFields, role: "user", messageIndex: 0 }));
 
         expect(result.i).toBe(0);
       });

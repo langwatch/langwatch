@@ -75,15 +75,9 @@ function isExpired(cfg: GovernanceConfig): boolean {
  * the dead tokens (and the personal project cache tied to them) are cleared
  * so `isLoggedIn` honestly reports logged-out from here on.
  */
-async function refreshSession(
-  cfg: GovernanceConfig,
-  opts: SessionApiOptions,
-): Promise<boolean> {
+async function refreshSession(cfg: GovernanceConfig, opts: SessionApiOptions): Promise<boolean> {
   const outcome = await sharedRefreshSession(cfg, {
-    fetchImpl: boundedFetch(
-      opts.fetchImpl ?? fetch,
-      opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS,
-    ),
+    fetchImpl: boundedFetch(opts.fetchImpl ?? fetch, opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS),
   });
   if (outcome.status === "refreshed") return true;
 
@@ -121,10 +115,7 @@ async function sessionRequest(
   if (isExpired(cfg)) {
     await refreshSession(cfg, opts);
   }
-  const f = boundedFetch(
-    opts.fetchImpl ?? fetch,
-    opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS,
-  );
+  const f = boundedFetch(opts.fetchImpl ?? fetch, opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS);
   const doFetch = () =>
     f(normalizeEndpoint(cfg.control_plane_url) + path, {
       method,
@@ -158,13 +149,7 @@ export async function fetchPersonalProject(
   cfg: GovernanceConfig = loadConfig(),
   opts: SessionApiOptions = {},
 ): Promise<SessionPersonalProject | null> {
-  const res = await sessionRequest(
-    cfg,
-    "GET",
-    "/api/auth/cli/personal-project",
-    undefined,
-    opts,
-  );
+  const res = await sessionRequest(cfg, "GET", "/api/auth/cli/personal-project", undefined, opts);
   if (res.status === 404) return null;
   if (res.status === 401) {
     throw new SessionApiError(
@@ -208,13 +193,7 @@ export async function fetchProjectKeyBySlug(
   slug: string,
   opts: SessionApiOptions = {},
 ): Promise<SessionProjectKey> {
-  const res = await sessionRequest(
-    cfg,
-    "POST",
-    "/api/auth/cli/project-key",
-    { slug },
-    opts,
-  );
+  const res = await sessionRequest(cfg, "POST", "/api/auth/cli/project-key", { slug }, opts);
   if (res.status === 401) {
     throw new SessionApiError(
       401,

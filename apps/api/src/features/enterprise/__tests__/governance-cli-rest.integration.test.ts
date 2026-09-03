@@ -119,11 +119,7 @@ describe("given a device session asking for a project's key", () => {
       const world = governanceCliWorld({ activeMembership: false });
       const api = mount(world);
 
-      const response = await api.post(
-        "/api/auth/cli/project-key",
-        { slug: "shared" },
-        BEARER,
-      );
+      const response = await api.post("/api/auth/cli/project-key", { slug: "shared" }, BEARER);
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toEqual({
@@ -140,11 +136,7 @@ describe("given a device session asking for a project's key", () => {
       const world = governanceCliWorld({ permitted: false });
       const api = mount(world);
 
-      const response = await api.post(
-        "/api/auth/cli/project-key",
-        { slug: "shared" },
-        BEARER,
-      );
+      const response = await api.post("/api/auth/cli/project-key", { slug: "shared" }, BEARER);
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toEqual({
@@ -206,8 +198,7 @@ function governanceCliWorld(
 
   world.ports = {
     accessTokens: {
-      resolve: (authHeader) =>
-        Promise.resolve(authHeader === BEARER ? caller : null),
+      resolve: (authHeader) => Promise.resolve(authHeader === BEARER ? caller : null),
       revoke: (input) => {
         world.revokedSessions.push(input.userId);
         return Promise.resolve();

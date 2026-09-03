@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectService } from "@langwatch/project-contract";
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
-import {
-  NoopSchedulerWakeService,
-  SchedulerAuditSink,
-  type ScheduledJobRecord,
-} from "../../index";
+import { NoopSchedulerWakeService, SchedulerAuditSink, type ScheduledJobRecord } from "../../index";
 import type { SchedulerOpsRepository } from "../../index";
 import { SchedulerOpsService } from "../scheduler-ops.service";
 
@@ -37,9 +33,7 @@ class SchedulerRepositoryStub implements SchedulerOpsRepository {
   readonly tryFindByIdForOps =
     vi.fn<(params: { id: string }) => Promise<ScheduledJobRecord | null>>();
   readonly setActiveForOps =
-    vi.fn<
-      (params: { id: string; projectId: string; active: boolean }) => Promise<boolean>
-    >();
+    vi.fn<(params: { id: string; projectId: string; active: boolean }) => Promise<boolean>>();
   readonly releaseSlotForOps =
     vi.fn<
       (params: {
@@ -58,14 +52,9 @@ class SchedulerRepositoryStub implements SchedulerOpsRepository {
         now: Date;
       }) => Promise<boolean>
     >();
-  readonly listForOps =
-    vi.fn<(params: { limit: number }) => Promise<ScheduledJobRecord[]>>();
+  readonly listForOps = vi.fn<(params: { limit: number }) => Promise<ScheduledJobRecord[]>>();
   readonly listPausedForOps =
-    vi.fn<
-      (params: {
-        limit: number;
-      }) => Promise<{ rows: ScheduledJobRecord[]; total: number }>
-    >();
+    vi.fn<(params: { limit: number }) => Promise<{ rows: ScheduledJobRecord[]; total: number }>>();
 }
 
 class SchedulerAuditSinkStub extends SchedulerAuditSink {
@@ -114,9 +103,9 @@ describe("scheduler controls", () => {
       it("refuses with a cause the operator can act on", async () => {
         const { service } = makeService(null);
 
-        expect(
-          await codeOf(() => service.runNow({ scheduleId: "gone", actorUserId: "u1" })),
-        ).toBe("schedule_not_found");
+        expect(await codeOf(() => service.runNow({ scheduleId: "gone", actorUserId: "u1" }))).toBe(
+          "schedule_not_found",
+        );
       });
     });
   });
@@ -128,9 +117,7 @@ describe("scheduler controls", () => {
         const { service, repo } = makeService(record({ active: false }));
 
         expect(
-          await codeOf(() =>
-            service.runNow({ scheduleId: "sched_1", actorUserId: "u1" }),
-          ),
+          await codeOf(() => service.runNow({ scheduleId: "sched_1", actorUserId: "u1" })),
         ).toBe("schedule_inactive");
         expect(repo.requestImmediateRunForOps).not.toHaveBeenCalled();
       });
@@ -211,9 +198,7 @@ describe("scheduler controls", () => {
         const call = repo.requestImmediateRunForOps.mock.calls[0]?.[0];
         expect(call).toBeDefined();
         if (!call) {
-          throw new Error(
-            "Expected the scheduler repository to receive the control request",
-          );
+          throw new Error("Expected the scheduler repository to receive the control request");
         }
         expect(call.expectedNextRunAt).toEqual(at(600_000));
       });
@@ -259,9 +244,7 @@ describe("scheduler controls", () => {
         repo.requestImmediateRunForOps.mockResolvedValue(false);
 
         expect(
-          await codeOf(() =>
-            service.runNow({ scheduleId: "sched_1", actorUserId: "u1" }),
-          ),
+          await codeOf(() => service.runNow({ scheduleId: "sched_1", actorUserId: "u1" })),
         ).toBe("schedule_already_in_flight");
       });
     });
@@ -468,9 +451,7 @@ describe("scheduler controls", () => {
         cleared.repo.releaseSlotForOps,
         ran.repo.requestImmediateRunForOps,
       ]) {
-        expect(write).toHaveBeenCalledWith(
-          expect.objectContaining({ projectId: "project_acme" }),
-        );
+        expect(write).toHaveBeenCalledWith(expect.objectContaining({ projectId: "project_acme" }));
       }
     });
   });

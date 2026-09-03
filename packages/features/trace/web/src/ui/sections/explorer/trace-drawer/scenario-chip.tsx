@@ -16,9 +16,7 @@ export interface ScenarioChipData {
   scenarioRunId: string;
   name: string | null;
   isLoading: boolean;
-  status:
-    | (typeof SCENARIO_RUN_STATUS_CONFIG)[keyof typeof SCENARIO_RUN_STATUS_CONFIG]
-    | undefined;
+  status: (typeof SCENARIO_RUN_STATUS_CONFIG)[keyof typeof SCENARIO_RUN_STATUS_CONFIG] | undefined;
   statusKey: keyof typeof SCENARIO_RUN_STATUS_CONFIG | undefined;
   durationInMs: number | null;
   metCriteria: string[];
@@ -64,8 +62,7 @@ export function useScenarioChipData(
     metCriteria: data?.results?.metCriteria ?? [],
     unmetCriteria: data?.results?.unmetCriteria ?? [],
     reasoning: data?.results?.reasoning ?? null,
-    openScenarioDrawer: () =>
-      openDrawer("scenarioRunDetail", { urlParams: { scenarioRunId } }),
+    openScenarioDrawer: () => openDrawer("scenarioRunDetail", { urlParams: { scenarioRunId } }),
   };
 }
 
@@ -76,8 +73,7 @@ export function buildScenarioChipDef(d: ScenarioChipData): ChipDef {
   const unmetCount = d.unmetCriteria.length;
   const totalCount = metCount + unmetCount;
   const hasResults = totalCount > 0;
-  const displayName =
-    d.name ?? (d.isLoading ? "loading…" : `run ${d.scenarioRunId.slice(0, 8)}`);
+  const displayName = d.name ?? (d.isLoading ? "loading…" : `run ${d.scenarioRunId.slice(0, 8)}`);
 
   return {
     id: `scenario:${d.scenarioRunId}`,

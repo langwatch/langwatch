@@ -5,11 +5,7 @@ import type {
   PlatformToolSlug,
 } from "./platform-tool-policy";
 
-export const AI_TOOL_TYPES = [
-  "coding_assistant",
-  "model_provider",
-  "external_tool",
-] as const;
+export const AI_TOOL_TYPES = ["coding_assistant", "model_provider", "external_tool"] as const;
 export const aiToolTypeSchema = z.enum(AI_TOOL_TYPES);
 export type AiToolType = z.infer<typeof aiToolTypeSchema>;
 
@@ -29,9 +25,7 @@ export const ASSISTANT_KINDS = [
 export const assistantKindSchema = z.enum(ASSISTANT_KINDS);
 export type AssistantKind = z.infer<typeof assistantKindSchema>;
 
-export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<
-  Record<AssistantKind, PlatformToolSlug>
-> = {
+export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<Record<AssistantKind, PlatformToolSlug>> = {
   claude_code: "claude",
   codex: "codex",
   gemini: "gemini",
@@ -159,9 +153,7 @@ export type UpdateAiToolEntryInput = z.infer<typeof updateAiToolEntryInputSchema
 
 export const reorderAiToolEntriesInputSchema = aiToolOrganizationInputSchema
   .extend({
-    updates: z.array(
-      z.object({ id: z.string().min(1), order: z.number().int() }).strict(),
-    ),
+    updates: z.array(z.object({ id: z.string().min(1), order: z.number().int() }).strict()),
   })
   .strict();
 export type ReorderAiToolEntriesInput = z.infer<typeof reorderAiToolEntriesInputSchema>;
@@ -246,8 +238,7 @@ export const AI_TOOL_STARTER_TILES: readonly AiToolStarterTile[] = [
     config: {
       providerKey: "openai",
       defaultLabel: "openai-key",
-      projectSuggestionText:
-        "Building an app? Create a project to track its usage separately.",
+      projectSuggestionText: "Building an app? Create a project to track its usage separately.",
     },
   },
   {

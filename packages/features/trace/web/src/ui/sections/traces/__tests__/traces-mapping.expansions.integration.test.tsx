@@ -130,8 +130,7 @@ function renderMapping({ expansions }: { expansions: string[] }) {
  * hidden checkbox, so it reaches the accessibility tree as a checkbox named
  * after its own words.
  */
-const switchNamed = (name: string) =>
-  screen.getByRole<HTMLInputElement>("checkbox", { name });
+const switchNamed = (name: string) => screen.getByRole<HTMLInputElement>("checkbox", { name });
 
 /** The words of one switch, which is what a reader actually clicks. */
 const labelOf = (label: string) => screen.getByText(label);

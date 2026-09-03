@@ -19,8 +19,7 @@ export function DeadLettersEmpty() {
               No dead messages
             </Text>
             <Text textStyle="xs" color="fg.muted">
-              Every intent the substrate has emitted either dispatched or is still being
-              retried.
+              Every intent the substrate has emitted either dispatched or is still being retried.
             </Text>
           </Box>
         </HStack>

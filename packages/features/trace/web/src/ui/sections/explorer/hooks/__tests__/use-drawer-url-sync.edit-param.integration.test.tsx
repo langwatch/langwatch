@@ -82,10 +82,7 @@ describe("useDrawerUrlSync", () => {
 
       renderHook(() => useDrawerUrlSync());
 
-      expect(harness.updateDrawerParams).toHaveBeenCalledWith(
-        { edit: undefined },
-        { push: false },
-      );
+      expect(harness.updateDrawerParams).toHaveBeenCalledWith({ edit: undefined }, { push: false });
     });
   });
 });

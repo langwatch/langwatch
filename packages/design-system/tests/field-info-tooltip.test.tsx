@@ -33,15 +33,11 @@ describe("FieldInfoTooltip", () => {
     });
 
     it("keeps the paragraph behind the icon until it is asked for", async () => {
-      renderWithDesignSystem(
-        <FieldInfoTooltip description="Which key signs outgoing requests." />,
-      );
+      renderWithDesignSystem(<FieldInfoTooltip description="Which key signs outgoing requests." />);
 
       expect(screen.queryByRole("dialog")).toBeNull();
 
-      expect((await openInfo()).textContent).toContain(
-        "Which key signs outgoing requests.",
-      );
+      expect((await openInfo()).textContent).toContain("Which key signs outgoing requests.");
     });
 
     it("tells one (i) from the next when a form has several", () => {
@@ -118,9 +114,7 @@ describe("FieldInfoTooltip", () => {
 
   describe("given no docs to point at", () => {
     it("shows the paragraph alone", async () => {
-      renderWithDesignSystem(
-        <FieldInfoTooltip description="Which key signs outgoing requests." />,
-      );
+      renderWithDesignSystem(<FieldInfoTooltip description="Which key signs outgoing requests." />);
       await openInfo();
 
       expect(screen.queryByRole("link")).toBeNull();
@@ -130,10 +124,7 @@ describe("FieldInfoTooltip", () => {
   describe("given a form that opted into hover", () => {
     it("opens on hover so several (i)s can be scanned without clicking", async () => {
       renderWithDesignSystem(
-        <FieldInfoTooltip
-          description="Which key signs outgoing requests."
-          trigger="hover"
-        />,
+        <FieldInfoTooltip description="Which key signs outgoing requests." trigger="hover" />,
       );
 
       fireEvent.mouseEnter(screen.getByRole("button", { name: "More info" }));
@@ -145,10 +136,7 @@ describe("FieldInfoTooltip", () => {
 
     it("refuses to close while the pointer is still on the icon", async () => {
       renderWithDesignSystem(
-        <FieldInfoTooltip
-          description="Which key signs outgoing requests."
-          trigger="hover"
-        />,
+        <FieldInfoTooltip description="Which key signs outgoing requests." trigger="hover" />,
       );
       const trigger = screen.getByRole("button", { name: "More info" });
 

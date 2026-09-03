@@ -30,7 +30,9 @@ vi.mock("@langwatch/analytics-web/components/CustomGraph", () => ({
     emptyState?: React.ReactNode;
     input?: { graphType?: string };
   }) => (
-    <div data-testid={input?.graphType === "line" ? "traces-overview-trend" : "traces-overview-graph"}>
+    <div
+      data-testid={input?.graphType === "line" ? "traces-overview-trend" : "traces-overview-graph"}
+    >
       {emptyState}
     </div>
   ),

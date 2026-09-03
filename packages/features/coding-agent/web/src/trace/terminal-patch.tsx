@@ -25,14 +25,8 @@ export const TerminalPatch = memo(function TerminalPatch({
   hunks: PatchHunk[];
   filePath?: string | null;
 }) {
-  const added = hunks.reduce(
-    (n, h) => n + h.lines.filter((l) => l.startsWith("+")).length,
-    0,
-  );
-  const removed = hunks.reduce(
-    (n, h) => n + h.lines.filter((l) => l.startsWith("-")).length,
-    0,
-  );
+  const added = hunks.reduce((n, h) => n + h.lines.filter((l) => l.startsWith("+")).length, 0);
+  const removed = hunks.reduce((n, h) => n + h.lines.filter((l) => l.startsWith("-")).length, 0);
 
   return (
     <Box>
@@ -118,11 +112,7 @@ function PatchLine({ line, lineNumber }: { line: string; lineNumber: number | nu
         whiteSpace="pre"
         flex={1}
         color={
-          isAdd
-            ? DIFF_TOKENS.addFg
-            : isRemove
-              ? DIFF_TOKENS.removeFg
-              : TERMINAL_TOKENS.screenFg
+          isAdd ? DIFF_TOKENS.addFg : isRemove ? DIFF_TOKENS.removeFg : TERMINAL_TOKENS.screenFg
         }
       >
         {line}

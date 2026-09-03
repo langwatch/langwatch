@@ -20,7 +20,11 @@ vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -66,7 +70,13 @@ const connectedAgent = (overrides: Partial<AgentResponse> = {}): AgentResponse =
   owner: null,
   hostLabel: null,
   parameters: [
-    { name: "model", type: "string", options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini", required: false },
+    {
+      name: "model",
+      type: "string",
+      options: ["gpt-5", "gpt-5-mini"],
+      default: "gpt-5-mini",
+      required: false,
+    },
     { name: "plan", type: "string", required: true, description: "Customer plan" },
   ],
   ...overrides,
@@ -192,7 +202,9 @@ describe("getAgentCommand()", () => {
     });
 
     it("describes one parameter on one line", () => {
-      expect(describeParameter({ name: "n", type: "number", default: 5 })).toBe("n: number, default 5");
+      expect(describeParameter({ name: "n", type: "number", default: 5 })).toBe(
+        "n: number, default 5",
+      );
     });
   });
 });
@@ -223,7 +235,11 @@ describe("runAgentCommand()", () => {
     /** @scenario "An input body with messages is sent as the relay body" */
     it("sends an input with messages, thread id and session as the body", async () => {
       service.get.mockResolvedValue(connectedAgent());
-      service.call.mockResolvedValue({ output: "ok", instance: { hostname: "pod-a" }, durationMs: 1 });
+      service.call.mockResolvedValue({
+        output: "ok",
+        instance: { hostname: "pod-a" },
+        durationMs: 1,
+      });
       const input = JSON.stringify({
         messages: [{ role: "user", content: "again" }],
         threadId: "t1",
@@ -245,7 +261,9 @@ describe("runAgentCommand()", () => {
     it("refuses an input with no messages and no message", async () => {
       service.get.mockResolvedValue(connectedAgent());
 
-      await expect(runAgentCommand("agent_conn", { input: '{"question":"hi"}' })).rejects.toThrow(ProcessExitError);
+      await expect(runAgentCommand("agent_conn", { input: '{"question":"hi"}' })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(service.call).not.toHaveBeenCalled();
       const errors = vi.mocked(console.error).mock.calls.flat().join("\n");
@@ -273,7 +291,9 @@ describe("runAgentCommand()", () => {
     it("says the agent is offline and names connectAgent", async () => {
       service.get.mockResolvedValue(connectedAgent({ status: "offline", instances: [] }));
 
-      await expect(runAgentCommand("agent_conn", { message: "hi" })).rejects.toThrow(ProcessExitError);
+      await expect(runAgentCommand("agent_conn", { message: "hi" })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(service.call).not.toHaveBeenCalled();
       const errors = vi.mocked(console.error).mock.calls.flat().join("\n");
@@ -289,7 +309,10 @@ describe("runAgentCommand()", () => {
       vi.stubGlobal("fetch", fetchMock);
       try {
         const result = await runAgentCommand("agent_http", { input: '{"question":"hi"}' });
-        expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/agent", expect.objectContaining({ method: "POST" }));
+        expect(fetchMock).toHaveBeenCalledWith(
+          "https://api.example.com/agent",
+          expect.objectContaining({ method: "POST" }),
+        );
         expect(service.call).not.toHaveBeenCalled();
         expect(result?.data).toEqual({ answer: "hi" });
       } finally {
@@ -304,7 +327,10 @@ describe("the agent command help", () => {
 
   /** @scenario "The dev command help points code agents to connectAgent" */
   it("says agent dev is for HTTP agents and names connectAgent and connect_agent", () => {
-    const devHelp = program.slice(program.indexOf('.command("dev")'), program.indexOf('.option("--port <number>"'));
+    const devHelp = program.slice(
+      program.indexOf('.command("dev")'),
+      program.indexOf('.option("--port <number>"'),
+    );
     expect(devHelp).toContain("For HTTP agents");
     expect(devHelp).toContain("connectAgent");
     expect(devHelp).toContain("connect_agent");
@@ -312,7 +338,10 @@ describe("the agent command help", () => {
 
   /** @scenario "The target help names the connected forms" */
   it("names connected:<id> and connected:<name>@<environment> in the target help", () => {
-    const targetHelp = program.slice(program.indexOf("const TARGET_FLAG_HELP"), program.indexOf("const RUN_NAME_FLAG_HELP"));
+    const targetHelp = program.slice(
+      program.indexOf("const TARGET_FLAG_HELP"),
+      program.indexOf("const RUN_NAME_FLAG_HELP"),
+    );
     expect(targetHelp).toContain("connected:agent_abc123");
     expect(targetHelp).toContain("connected:<name>@<environment>");
   });

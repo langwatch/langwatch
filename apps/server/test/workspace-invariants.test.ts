@@ -252,19 +252,14 @@ describe("the repo is a single pnpm workspace", () => {
       // name, no `@range` selector) would drag every project onto one
       // version; a future merge adding one back must fail here.
       const disputed = ["zod", "@opentelemetry/api-logs", "@opentelemetry/sdk-logs"];
-      const unconditional = rootOverrideKeys().filter(
-        (k) => !k.replace(/^@/, "").includes("@"),
-      );
+      const unconditional = rootOverrideKeys().filter((k) => !k.replace(/^@/, "").includes("@"));
 
       // Guards the guard: the parser returning nothing would pass
       // vacuously. The alignment block genuinely holds unconditional keys.
       expect(unconditional.length).toBeGreaterThan(3);
 
       for (const name of disputed) {
-        expect(
-          unconditional,
-          `root overrides pin ${name} for every project`,
-        ).not.toContain(name);
+        expect(unconditional, `root overrides pin ${name} for every project`).not.toContain(name);
       }
     });
   });
@@ -368,9 +363,7 @@ describe("the repo is a single pnpm workspace", () => {
 
     /** @scenario Every project the lockfile mentions is resolvable */
     it("ships a manifest for every workspace member", () => {
-      const shipped = readJson(
-        "apps/server/distribution-files.json",
-      ) as unknown as string[];
+      const shipped = readJson("apps/server/distribution-files.json") as unknown as string[];
 
       // Workspace members only — `sdks/typescript/examples/*` carry a
       // package.json but are not members, so the lockfile never mentions

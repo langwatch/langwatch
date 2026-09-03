@@ -42,8 +42,7 @@ export class StudioDatasetMaterializerService {
           };
         }
 
-        const entrySelection =
-          event.type === "execute_flow" ? node.data.entry_selection : "all";
+        const entrySelection = event.type === "execute_flow" ? node.data.entry_selection : "all";
         const sourceDataset = node.data.dataset;
         if (sourceDataset.inline) {
           if (entrySelection === "all") {
@@ -103,10 +102,7 @@ export class StudioDatasetMaterializerService {
   }
 
   private rowsFromColumns(columns: Record<string, unknown[]>): DatasetRows {
-    const rowCount = Math.max(
-      0,
-      ...Object.values(columns).map((values) => values.length),
-    );
+    const rowCount = Math.max(0, ...Object.values(columns).map((values) => values.length));
 
     return Array.from({ length: rowCount }, (_, index) =>
       Object.fromEntries(
@@ -140,10 +136,7 @@ export class StudioDatasetMaterializerService {
             Object.fromEntries(
               input.dataset.columnTypes.map((column) => {
                 const value = record.entry[column.name];
-                return [
-                  column.name,
-                  typeof value === "object" ? JSON.stringify(value) : value,
-                ];
+                return [column.name, typeof value === "object" ? JSON.stringify(value) : value];
               }),
             ),
           ),

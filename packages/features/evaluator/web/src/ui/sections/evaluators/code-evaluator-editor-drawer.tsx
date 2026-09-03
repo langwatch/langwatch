@@ -67,8 +67,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const isEditing = !!evaluatorId;
 
   const mappingsConfig =
-    props.mappingsConfig ??
-    (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
+    props.mappingsConfig ?? (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
   const onMappingChange =
     props.onMappingChange ?? getFlowCallbacks("codeEvaluatorEditor")?.onMappingChange;
 
@@ -114,10 +113,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     }
   };
 
-  const handleMappingChange = (
-    identifier: string,
-    mapping: UIFieldMapping | undefined,
-  ) => {
+  const handleMappingChange = (identifier: string, mapping: UIFieldMapping | undefined) => {
     setMappings((prev) => {
       const next = { ...prev };
       if (mapping) {
@@ -167,8 +163,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
 
   const updateMutation = api.evaluators.update.useMutation({
     onSuccess: finishSave,
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't save code evaluator" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save code evaluator" }),
   });
 
   const handleSave = () => {
@@ -279,11 +274,7 @@ export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps)
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
           <HStack width="full" justify="space-between" gap={3}>
             {form.disabledReason ? (
-              <Text
-                fontSize="sm"
-                color="fg.muted"
-                data-testid="code-evaluator-disabled-reason"
-              >
+              <Text fontSize="sm" color="fg.muted" data-testid="code-evaluator-disabled-reason">
                 {form.disabledReason}
               </Text>
             ) : (
