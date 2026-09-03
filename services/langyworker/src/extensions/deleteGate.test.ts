@@ -620,17 +620,21 @@ describe("Brace-expansion word-length budget (unmatched-brace-run DoS)", () => {
     );
   });
 
-  /** @scenario A non-langwatch command with the same unmatched-brace run is unaffected */
-  it("does not hold a non-langwatch head carrying the same unmatched-brace run", () => {
-    // The word-length budget only applies inside a langwatch invocation's
-    // argument-brace pass; an ordinary command is never routed through it.
+  /** @scenario A long run of unmatched braces is held quickly on any command */
+  it("holds a non-langwatch head carrying the same unmatched-brace run", () => {
+    // A word with an unquoted `{` over the cap is held fail-closed in EVERY
+    // position, not only under a langwatch head — an executor could hide behind
+    // padding inside the group. Still a single linear pass, so it is fast.
     const glued = "{".repeat(50_000);
     const command = `echo ${glued}`;
     const start = performance.now();
     const decision = bash(command);
     const elapsedMs = performance.now() - start;
-    expect(decision.allow).toBe(true);
+    expect(decision.allow).toBe(false);
     expect(elapsedMs).toBeLessThan(100);
+    expect(findDestructiveMatches(command)).toContainEqual(
+      expect.objectContaining({ kind: "unparseable", cause: "brace-expansion-budget" }),
+    );
   });
 
   /** @scenario A long brace-free langwatch argument is not over-blocked */
@@ -769,6 +773,185 @@ describe("awk system() concatenation (Finding B)", () => {
       expect(findDestructiveMatches(payload)).toContainEqual(
         expect.objectContaining({ kind: "exec-file" }),
       );
+    }
+  });
+});
+
+describe("Off-head brace-spliced executor (Finding 1)", () => {
+  /** Real bash: brace expansion reassembles the executor name as its own word,
+   * so `nice {bash,} …` runs `bash`. printf emits one arg per line. */
+  function bashWords(word: string): string[] {
+    const out = execFileSync("bash", ["-c", `printf '%s\\n' ${word}`], { encoding: "utf8" });
+    return out.split("\n").filter((w) => w.length > 0);
+  }
+
+  /** @scenario A brace-spliced shell or interpreter name anywhere in a segment is held */
+  it("holds a brace splice that bash expands to a shell or interpreter behind a wrapper", () => {
+    // Real bash resolves each brace splice to a genuine shell/interpreter word.
+    expect(bashWords("{bash,}")).toContain("bash");
+    expect(bashWords("{ba,}sh")).toContain("bash");
+    expect(bashWords("b{a..a}sh")).toContain("bash");
+    expect(bashWords("{,bash}")).toContain("bash");
+
+    // Off-head: the wrapper is the head, so the old head-only brace pass never
+    // ran and the shell slipped through. The MUST-FIX reproduction is the first.
+    for (const command of [
+      'nice {bash,} -c "echo hi"',
+      "nice {,bash} -c 'echo hi'",
+      "{bash,} -c 'echo hi'",
+      "nice {python3,} -c 'pass'",
+    ]) {
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+      expect(findDestructiveMatches(command), command).toContainEqual(
+        expect.objectContaining({ kind: "exec-file" }),
+      );
+    }
+  });
+
+  /** @scenario A brace-spliced shell or interpreter name anywhere in a segment is held */
+  it("holds an over-cap brace word that pads an executor name, in any position", () => {
+    // An executor can hide behind arbitrary padding inside the group; the word
+    // exceeds MAX_BRACE_WORD_LENGTH, so it is held before expansion rather than
+    // skipped. Real bash still expands it to `bash`.
+    const padded = `{bash,${"a".repeat(1100)}}`;
+    expect(bashWords(padded)).toContain("bash");
+    const command = `nice ${padded} -c 'echo hi'`;
+    expect(bash(command, confirmedForD1).allow).toBe(false);
+    expect(findDestructiveMatches(command)).toContainEqual(
+      expect.objectContaining({ kind: "unparseable", cause: "brace-expansion-budget" }),
+    );
+  });
+
+  /** @scenario A brace-spliced shell or interpreter name anywhere in a segment is held */
+  it("holds a brace-spliced executor name at the segment head", () => {
+    // These trip the head-splice obfuscation hold (an unparseable) rather than
+    // the executor scan, but both are holds — bash still reassembles a shell.
+    for (const command of ["{ba,}sh script.sh", "b{a..a}sh script.sh"]) {
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+    }
+  });
+
+  /** @scenario A brace-spliced shell or interpreter name anywhere in a segment is held */
+  it("does not over-block a routine brace that expands to no executor", () => {
+    for (const command of [
+      "cp foo.{js,ts} bar/",
+      "mkdir -p src/{a,b,c}",
+      "nice echo {1..3}",
+    ]) {
+      expect(bash(command).allow, command).toBe(true);
+    }
+  });
+});
+
+describe("Versioned and aliased interpreters and shells (Finding 2)", () => {
+  /** @scenario Versioned interpreters and alternative shells are held */
+  it("holds a versioned interpreter or an alternative shell reached as an executor", () => {
+    const held = [
+      'python3.12 -c "pass"',
+      "python3.11 cleanup.py",
+      "pypy3 cleanup.py",
+      'php8.3 -r "1"',
+      "lua5.4 cleanup.lua",
+      "ruby3.2 cleanup.rb",
+      "fish cleanup.fish",
+      "csh cleanup.csh",
+      "tcsh cleanup.csh",
+      "ash cleanup.sh",
+      'pwsh -c "1"',
+      'powershell -c "1"',
+      "nu cleanup.nu",
+      "xonsh cleanup.xsh",
+      "elvish cleanup.elv",
+      "rc cleanup.rc",
+      "oil cleanup.osh",
+      "osh cleanup.osh",
+      "nice python3.12 cleanup.py",
+    ];
+    for (const command of held) {
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+      expect(findDestructiveMatches(command), command).toContainEqual(
+        expect.objectContaining({ kind: "exec-file" }),
+      );
+    }
+  });
+
+  /** @scenario Versioned interpreters and alternative shells are held */
+  it("does not over-block interpreter-adjacent names that are not an executor", () => {
+    for (const command of [
+      "python3-config --cflags",
+      "ls node_modules",
+      "perl-doc Foo::Bar",
+      "cat bash.md",
+      "cat python3.12.txt",
+    ]) {
+      expect(bash(command).allow, command).toBe(true);
+    }
+  });
+});
+
+describe("Shell inside tight subshell parentheses (Finding 3)", () => {
+  /** @scenario A shell inside tight subshell parentheses is held */
+  it("holds a shell or interpreter grouped in a subshell with no surrounding space", () => {
+    // Real bash: a `(cmd)` group runs `cmd`, so `(bash script.sh)` runs bash.
+    expect(execFileSync("bash", ["-c", "(echo insub)"], { encoding: "utf8" }).trim()).toBe(
+      "insub",
+    );
+
+    const held = [
+      "(bash script.sh)",
+      "((bash x))",
+      "( bash x )",
+      "(cd dir && bash x)",
+      "(python3 -c 'pass')",
+    ];
+    for (const command of held) {
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+      expect(findDestructiveMatches(command), command).toContainEqual(
+        expect.objectContaining({ kind: "exec-file" }),
+      );
+    }
+  });
+
+  /** @scenario A shell inside tight subshell parentheses is held */
+  it("does not over-block an ordinary command grouped in a subshell", () => {
+    for (const command of ["(echo hi)", "(ls -la)", "( git status )"]) {
+      expect(bash(command).allow, command).toBe(true);
+    }
+  });
+});
+
+describe("Globbed executor name (Finding 4)", () => {
+  /** @scenario A globbed executor name is held while ordinary globs are allowed */
+  it("holds a glob whose pattern could name a shell or interpreter", () => {
+    const held = [
+      "/bin/ba*sh script.sh",
+      "ba?h x",
+      "/bin/ba?h x",
+      "[b]ash x",
+      "/bin/[b]ash x",
+      'pyth*n3 -c "1"',
+      "ba*sh script.sh",
+    ];
+    for (const command of held) {
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+      expect(findDestructiveMatches(command), command).toContainEqual(
+        expect.objectContaining({ kind: "exec-file" }),
+      );
+    }
+  });
+
+  /** @scenario A globbed executor name is held while ordinary globs are allowed */
+  it("does not over-block an ordinary glob that names no executor", () => {
+    for (const command of [
+      "ls *.ts",
+      "rm -f *.tmp",
+      "grep foo src/**/*.ts",
+      "cat *.md",
+      "ls ba*.txt",
+      // A quoted glob is literal to bash, so it is never an executor either.
+      'ls "*.ts"',
+    ]) {
+      expect(bash(command).allow, command).toBe(true);
     }
   });
 });

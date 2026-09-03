@@ -225,9 +225,33 @@ const CLI_NAMES = new Set(["langwatch", "lw"]);
 /**
  * Shell interpreters that run a file the gate never sees. Executing an
  * agent-written file through any of these (with a script argument) is
- * unresolvable and held unconditionally.
+ * unresolvable and held unconditionally. Beyond the POSIX-ish core, the
+ * alternative shells an agent could reach on a real box are enumerated too
+ * (`fish`, `csh`/`tcsh`, `ash`, PowerShell as `pwsh`/`powershell`, and the
+ * newer `nu`/`xonsh`/`elvish`/`rc`/`oil`/`osh`) so a hand-off to any of them is
+ * held on the same footing as `bash`.
  */
-const FILE_EXECUTORS = new Set(["bash", "sh", "zsh", "dash", "ksh", "source", "."]);
+const FILE_EXECUTORS = new Set([
+  "bash",
+  "sh",
+  "zsh",
+  "dash",
+  "ksh",
+  "source",
+  ".",
+  "fish",
+  "csh",
+  "tcsh",
+  "ash",
+  "pwsh",
+  "powershell",
+  "nu",
+  "xonsh",
+  "elvish",
+  "rc",
+  "oil",
+  "osh",
+]);
 
 /**
  * Language interpreters whose executed code is lexically unresolvable to this
@@ -305,6 +329,31 @@ export const CODE_INTERPRETERS = new Set([
  * program by a wrapper's argv.
  */
 const SEGMENT_EXECUTORS = new Set<string>([...FILE_EXECUTORS, ...CODE_INTERPRETERS]);
+
+/**
+ * Version- and point-release-suffixed forms of the language interpreters, the
+ * way they are actually installed on a PATH (`python3.12`, `python3.11`,
+ * `pypy3`, `node`/`nodejs`, `php8.3`, `lua5.4`, `ruby3.2`). Exact-set membership
+ * alone missed every one of these, so a versioned interpreter could head a
+ * segment and slip the executor hold. The base name is the WHOLE word (we match
+ * against the already-taken basename), anchored at both ends, so an over-block
+ * on lookalikes is avoided: `python3-config`, `node_modules`, `perl-doc`,
+ * `bash.md` and `python3.12.txt` do NOT match (the tail after the digits must be
+ * empty or a run of `.<digits>`). Shells are NOT in here — they are matched by
+ * exact `FILE_EXECUTORS` membership — so `bash5`/`sh5` remain documented
+ * residuals rather than false hits on a real basename ending in a digit.
+ */
+const VERSIONED_INTERPRETER =
+  /^(?:python|pypy|python3|pypy3|node|nodejs|ruby|perl|php|lua|luajit)\d*(?:\.\d+)*$/;
+
+/**
+ * True when a basename is a shell or code interpreter the gate holds: an exact
+ * member of `SEGMENT_EXECUTORS`, or a versioned interpreter form. Callers pass a
+ * lower-cased basename (path prefix and case already stripped).
+ */
+function matchesExecutor(base: string): boolean {
+  return SEGMENT_EXECUTORS.has(base) || VERSIONED_INTERPRETER.test(base);
+}
 
 /** HTTP clients whose invocations reach the REST/GraphQL delete surface. */
 const HTTP_CLIENTS = new Set(["curl", "http", "https", "wget", "fetch", "xh"]);
@@ -424,7 +473,13 @@ export function shellWords(segment: string): { words: Word[]; unterminated: bool
   let i = 0;
   const n = segment.length;
   while (i < n) {
-    while (i < n && /\s/.test(segment[i] ?? "")) i += 1;
+    // Unquoted `(` / `)` are bash metacharacters that group a subshell — they
+    // are not part of any word, so they separate words exactly like whitespace.
+    // Consuming them here turns `(bash script.sh)` into the words `bash`,
+    // `script.sh` (it lexed as one word `(bash` before). `$(`/`<(` never reach
+    // this lexer: a segment carrying `$` or `<(` is held by UNRESOLVABLE first.
+    while (i < n && (/\s/.test(segment[i] ?? "") || segment[i] === "(" || segment[i] === ")"))
+      i += 1;
     if (i >= n) break;
     // An unquoted `#` at a word boundary begins a comment that runs to the end
     // of the segment (bash semantics). Stop lexing here: the comment text is not
@@ -437,6 +492,8 @@ export function shellWords(segment: string): { words: Word[]; unterminated: bool
     let value = "";
     while (i < n && !/\s/.test(segment[i] ?? "")) {
       const c = segment[i] ?? "";
+      // An unquoted `(` or `)` ends the current word (see the leading skip).
+      if (c === "(" || c === ")") break;
       if (c === "'") {
         // Single quotes: everything up to the next `'` is literal, no escapes.
         raw += c;
@@ -816,6 +873,67 @@ function hasUnquotedBrace(raw: string): boolean {
 }
 
 /**
+ * True when `raw` contains an unquoted, unescaped glob metacharacter (`*`, `?`,
+ * or `[`) — the ones bash would subject to pathname expansion. A quoted or
+ * escaped glob (`ls "*.ts"`, `grep -r '*' .`) is left literal by bash and must
+ * NOT be read as a glob, so it is not detected here.
+ */
+function hasUnquotedGlobChar(raw: string): boolean {
+  let inSingle = false;
+  let inDouble = false;
+  for (let i = 0; i < raw.length; i += 1) {
+    const c = raw[i];
+    if (c === "\\" && !inSingle) {
+      i += 1; // skip the escaped character
+      continue;
+    }
+    if (c === "'" && !inDouble) {
+      inSingle = !inSingle;
+    } else if (c === '"' && !inSingle) {
+      inDouble = !inDouble;
+    } else if (!inSingle && !inDouble && (c === "*" || c === "?" || c === "[")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * True when a globbed basename could expand to a shell or code interpreter, so
+ * the segment must be held (`/bin/ba*sh`, `ba?h`, `[b]ash`, `pyth*n3`). Not
+ * every glob is held — only one whose pattern could name an executor — so
+ * ordinary globbing stays allowed (`ls *.ts`, `rm -f *.tmp`, `grep foo
+ * src/**` + `/*.ts`).
+ *
+ * `[...]` bracket expressions are reduced to a representative first inner char
+ * (`[b]ash` → `bash`, bash-simplest, an accepted residual for multi-char
+ * classes). `*` and `?` become a `.*`/`.` regex tested against every executor
+ * name: `*` matches zero-or-more, `?` exactly one, so `ba*sh`/`ba?h` both reach
+ * `bash` and `pyth*n3` reaches `python3` — a naive "strip the glob chars" would
+ * miss all three (it yields `bah`/`pythn3`). Only the finite `SEGMENT_EXECUTORS`
+ * universe is scanned; a glob crafted to hit ONLY a versioned interpreter form
+ * (`python3.1*`) is a documented residual.
+ */
+function globCouldBeExecutor(base: string): boolean {
+  if (!/[*?[]/.test(base)) return false;
+  // Reduce each `[..]` to its first inner char, then drop any stray unmatched
+  // `[` so it is not carried into the regex as a metacharacter.
+  let candidate = base.replace(/\[(.)[^\]]*\]/g, "$1").replace(/\[/g, "");
+  if (candidate.includes("*") || candidate.includes("?")) {
+    const pattern = `^${candidate
+      .split(/([*?])/)
+      .map((part) => (part === "*" ? ".*" : part === "?" ? "." : escapeForRegExp(part)))
+      .join("")}$`;
+    const re = new RegExp(pattern);
+    for (const name of SEGMENT_EXECUTORS) {
+      if (re.test(name)) return true;
+    }
+    return false;
+  }
+  return matchesExecutor(candidate);
+}
+
+/**
  * The (resource-type, identifier) a resolved CLI delete acts on: the first
  * resource-group token after the CLI name, and the first bare argument after
  * the destructive verb. Null when either cannot be read (e.g. the verb hid in a
@@ -934,12 +1052,36 @@ function classifySegment(segment: string): DestructiveMatch | null {
   // executor becomes the head and a head-only hold never fires. Adding wrappers to
   // a strip-list is not the fix — flag-taking wrappers (`nice -n 10 bash`,
   // `timeout 5 sh`) and unknown ones (`foo bar bash`) still bypass it. Scanning
-  // every de-spliced word closes the whole family at once and folds in what the
-  // old ARGV_RUNNERS/HANDOFF_EXECUTORS special case did for `xargs sh -c` and
+  // every word covers the wrappered forms, and folds in what the old
+  // ARGV_RUNNERS/HANDOFF_EXECUTORS special case did for `xargs sh -c` and
   // `find … -exec python3 {} \;` — those are just the same executor sitting in a
   // runner's argv. `.` / `source` (the source builtin) count only at the head;
   // off-head, `.` is find's current-directory argument and neither can be exec'd
   // as an external program by a wrapper.
+  //
+  // Each word is inspected three ways, because bash reaches the same executor by
+  // more than a bare name:
+  //  1. an unquoted BRACE splice (`{bash,}`, `{ba,}sh`, `b{a..a}sh`, `nice
+  //     {,bash}`) — the lexer copies braces literally, so the executor name is
+  //     never contiguous in `.value`; expand it bash-faithfully and test each
+  //     result. Over-budget/unenumerable expansions fail closed exactly as the
+  //     langwatch argument pass does, and a word with an unquoted `{` over
+  //     `MAX_BRACE_WORD_LENGTH` is HELD before expansion in every position (an
+  //     executor could hide behind arbitrary padding inside the group,
+  //     `{bash,<1100 chars>}`, and the unmatched-brace-run DoS is closed the
+  //     same way) — not only under a langwatch head.
+  //  2. an unquoted GLOB (`/bin/ba*sh`, `ba?h`, `[b]ash`, `pyth*n3`) whose
+  //     pattern could name an executor — ordinary globs (`ls *.ts`) are untouched.
+  //  3. the plain basename, by exact membership OR a versioned interpreter form
+  //     (`python3.12`, `php8.3`).
+  //
+  // What this scan covers, stated precisely: quote/backslash/brace splices of the
+  // name (via the lexer + the brace pass), an arbitrary chain of wrappers and
+  // path prefixes in front of it, globbed names, and version suffixes. What
+  // remains residual: a name assembled at RUNTIME from a `$VAR` (already held by
+  // UNRESOLVABLE), a name embedded inside a single quoted string that is not its
+  // own word (`env -S "python3 -c …"`), and a shell name carrying a suffix the
+  // interpreter regex does not cover (`bash5`, `bash.exe`).
   //
   // Accepted over-block, fail-closed by design: a plain word that merely EQUALS an
   // interpreter name is held too — `echo bash`, `grep python3 file`, `which sh`,
@@ -948,11 +1090,44 @@ function classifySegment(segment: string): DestructiveMatch | null {
   // `ls ./sh.txt`, `ls python3/` whose trailing-slash basename is empty), and a
   // quoted multi-word value never equals a bare name (`git commit -m "run bash later"`).
   for (let i = 0; i < stripped.length; i += 1) {
-    const value = stripped[i]?.value ?? "";
-    const base = (value.split("/").pop() ?? value).toLowerCase();
+    const word = stripped[i];
+    if (!word) continue;
+    const base = (word.value.split("/").pop() ?? word.value).toLowerCase();
+
+    // 1. Brace-spliced executor name anywhere in the segment.
+    if (hasUnquotedBrace(word.raw)) {
+      // A word carrying an unquoted `{` longer than the cap is held before
+      // expansion is attempted — fail-closed in EVERY position, since an
+      // executor name can hide behind arbitrary padding inside the group
+      // (`{bash,<pad>}`) and the unmatched-brace-run DoS shape is closed the
+      // same way. See `MAX_BRACE_WORD_LENGTH`.
+      if (word.raw.length > MAX_BRACE_WORD_LENGTH) {
+        return { kind: "unparseable", segment, cause: "brace-expansion-budget" };
+      }
+      const expansions = bashBraceExpand(word.raw);
+      if (expansions === null) {
+        // Over-budget or unenumerable: cannot prove no executor hides in it.
+        return { kind: "unparseable", segment, cause: "brace-expansion-budget" };
+      }
+      for (const expansion of expansions) {
+        const eb = (expansion.split("/").pop() ?? expansion).toLowerCase();
+        if (!eb) continue;
+        if ((eb === "." || eb === "source") && i !== 0) continue;
+        if (matchesExecutor(eb)) {
+          return { kind: "exec-file", segment };
+        }
+      }
+    }
+
+    // 2. Globbed executor name (only a glob that could name an executor).
+    if (hasUnquotedGlobChar(word.raw) && globCouldBeExecutor(base)) {
+      return { kind: "exec-file", segment };
+    }
+
+    // 3. Plain basename: exact member or a versioned interpreter form.
     if (!base) continue; // e.g. a trailing-slash path (`python3/`) — not an executable.
     if ((base === "." || base === "source") && i !== 0) continue;
-    if (SEGMENT_EXECUTORS.has(base)) {
+    if (matchesExecutor(base)) {
       return { kind: "exec-file", segment };
     }
   }
