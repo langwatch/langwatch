@@ -30,10 +30,7 @@ import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_MODEL,
 } from "@langwatch/workflow-web/utils/constants";
-import {
-  DEFAULT_MAPPINGS,
-  migrateLegacyMappings,
-} from "../../../model/evaluations/evaluation-mappings";
+import { DEFAULT_MAPPINGS, migrateLegacyMappings } from "@langwatch/evaluator-contract";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {
   type Evaluators,
@@ -49,7 +46,7 @@ import {
   type CheckPreconditions,
   checkPreconditionsSchema,
 } from "../../../model/evaluations/types";
-import { type MappingState, mappingStateSchema } from "@langwatch/trace-web/server/tracer/tracesMapping";
+import { type MappingState, mappingStateSchema } from "@langwatch/trace-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { EvaluatorTracesMapping } from "../../elements/evaluations/evaluator-traces-mapping";
 import { HorizontalFormControl } from "@langwatch/workflow-web/components/HorizontalFormControl";

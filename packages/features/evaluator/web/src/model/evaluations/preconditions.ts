@@ -6,7 +6,7 @@ import {
   PRECONDITION_FIELD_MATCHERS,
   type PreconditionTraceData,
 } from "@langwatch/analytics-web/server/filters/precondition-matchers";
-import { extractRAGTextualContext } from "@langwatch/trace-web/server/tracer/collector/rag";
+import { extractRAGTextualContext } from "@langwatch/trace-contract";
 import type {
   ElasticSearchTrace,
   ErrorCapture,

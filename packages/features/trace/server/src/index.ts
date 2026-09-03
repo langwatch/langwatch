@@ -573,6 +573,7 @@ export {
 export { coerceContentToArray } from "./services/trace-content-array.service";
 export { binaryInputPartSchema } from "./services/trace-binary-part.service";
 export {
+  extractInlineMediaFromEvent,
   processContentPart,
   type ExtractedRef,
 } from "./services/trace-content-extraction.service";
@@ -639,3 +640,7 @@ export {
   type CompileProjectionArgs,
   type ProjectionRequest,
 } from "./services/trace-projection.types";
+export {
+  OtelTraceEdgeMediaTelemetryAdapter,
+  TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME,
+} from "./adapters/otel.trace-edge-media-telemetry.adapter";

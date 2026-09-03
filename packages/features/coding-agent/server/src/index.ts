@@ -70,3 +70,7 @@ export {
   createCodingAgentRestApp,
   type CodingAgentRestAuditPort,
 } from "./transport/api-rest/coding-agent.api";
+export {
+  CODING_AGENT_SESSION_LIST_READ_METRIC_NAME,
+  OtelCodingAgentReadMetricsAdapter,
+} from "./adapters/coding-agent-read-metrics.adapter";

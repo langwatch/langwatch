@@ -499,6 +499,48 @@ export const incrementEsProcessIntentsSuppressed = ({
   count: number;
 }) => processIntentsSuppressed.labels(processName).inc(count);
 
+/**
+ * The two store-side series, and the sink shape `EventSourcingServiceOptions.metrics`
+ * accepts.
+ *
+ * They were declared in the platform application's own `server/metrics.ts`
+ * while its composition root passed the sink in. That root is gone, so the
+ * declarations live beside the `es_*` family they belong to and beside the
+ * only code that can increment them. `NOOP_EVENT_SOURCING_METRICS` is the
+ * default a process gets by leaving `metrics` out: the series is then not
+ * published at all, which is the honest state — a panel that is flat because
+ * nothing writes the metric reads exactly like a system that is idle.
+ */
+const eventsStoredTotal = counter(
+  "event_sourcing_events_stored_total",
+  "Total number of events stored by event sourcing pipelines",
+  ["pipeline_name"],
+);
+
+const storeDurationMs = histogram(
+  "event_sourcing_store_duration_milliseconds",
+  "Duration of storeEvents (store + projection dispatch) in milliseconds",
+  ["pipeline_name"],
+);
+
+export type EventSourcingStoreMetrics = {
+  eventsStored(pipelineName: string, count: number): void;
+  storeDuration(pipelineName: string, durationMs: number): void;
+};
+
+/** Publishes the two store-side series onto the process's prom-client registry. */
+export const PROMETHEUS_EVENT_SOURCING_METRICS: EventSourcingStoreMetrics = {
+  eventsStored: (pipelineName, count) => eventsStoredTotal.labels(pipelineName).inc(count),
+  storeDuration: (pipelineName, durationMs) =>
+    storeDurationMs.labels(pipelineName).observe(durationMs),
+};
+
+/** Records nothing. The default for a process that publishes no registry. */
+export const NOOP_EVENT_SOURCING_METRICS: EventSourcingStoreMetrics = {
+  eventsStored: () => undefined,
+  storeDuration: () => undefined,
+};
+
 export async function withMetrics<T>({
   fn,
   onComplete,

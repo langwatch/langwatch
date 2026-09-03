@@ -170,6 +170,15 @@
       ]
     },
     {
+      "id": "hosted-mcp",
+      "root": "packages/features/hosted-mcp",
+      "classification": "core",
+      "subjects": [
+        "hosted-mcp",
+        "mcp-oauth"
+      ]
+    },
+    {
       "id": "identity",
       "root": "packages/features/identity",
       "classification": "core",

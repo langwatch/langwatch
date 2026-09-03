@@ -275,3 +275,11 @@ export {
   releaseLangyGithubPrPermit,
   reserveLangyGithubPrPermit,
 } from "./services/langy-github-pr-quota.service";
+export {
+  LANGY_DISPATCH_METRIC_NAME,
+  OtelLangyWorkerMetricsAdapter,
+} from "./adapters/otel.langy-worker-metrics.adapter";
+export {
+  LANGY_BLOCKS_METRIC_NAME,
+  createOtelLangyBlockCounter,
+} from "./adapters/otel.langy-block-metrics.adapter";

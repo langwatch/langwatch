@@ -6,7 +6,7 @@
  * (mixed trace + thread scenario).
  */
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
-import type { MappingState } from "@langwatch/trace-web/server/tracer/tracesMapping";
+import type { MappingState } from "@langwatch/trace-contract";
 
 export function deserializeMappingStateToUI(
   existingMappings: MappingState,

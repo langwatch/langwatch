@@ -129,6 +129,11 @@ export { EventUtils } from "./utils/event.utils";
 export * from "./deferred";
 export * from "./disabledPipeline";
 export * from "./mapCommands";
+export {
+  NOOP_EVENT_SOURCING_METRICS,
+  PROMETHEUS_EVENT_SOURCING_METRICS,
+  type EventSourcingStoreMetrics,
+} from "./metrics";
 export * from "./parseErrorText";
 export * from "./pipeline/processBuilder";
 export * from "./pipeline/processManagerDefinition";

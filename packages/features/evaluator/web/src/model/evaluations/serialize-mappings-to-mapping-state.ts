@@ -10,7 +10,7 @@ import {
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPINGS,
   type TRACE_MAPPINGS,
-} from "@langwatch/trace-web/server/tracer/tracesMapping";
+} from "@langwatch/trace-contract";
 
 export function serializeMappingsToMappingState(
   mappings: Record<string, UIFieldMapping>,

@@ -12,7 +12,7 @@ import { useProjectSpanNames } from "@langwatch/trace-web/hooks/useProjectSpanNa
 import {
   getThreadAvailableSources,
   getTraceAvailableSources,
-} from "@langwatch/trace-web/server/tracer/tracesMapping";
+} from "@langwatch/trace-contract";
 
 const logger = createLogger("EvaluatorMappingsSection");
 
