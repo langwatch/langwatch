@@ -85,7 +85,7 @@ export class IdentityErasedError extends HandledError {
   }
 }
 
-/** Postgres' unique-violation code, raised by the one-open-link index. */
+/** Postgres' unique-violation code. */
 const UNIQUE_VIOLATION = "23505";
 
 /**
@@ -98,8 +98,8 @@ const UNIQUE_VIOLATION = "23505";
 const PRISMA_UNIQUE_VIOLATION = "P2002";
 
 /**
- * Whether a thrown value is the one-open-link index refusing a second open
- * link.
+ * Whether a thrown value is Postgres refusing a duplicate under any unique
+ * rule.
  *
  * Reads the code off whichever shape carried it: Prisma's `P2002` wrapper, a
  * raw driver error's SQLSTATE in `code` or `meta.code`, or — for the wrapper
@@ -107,7 +107,7 @@ const PRISMA_UNIQUE_VIOLATION = "P2002";
  * the message. Never a `String(err).includes` over the whole message: that
  * would also match an error whose *payload* happened to contain the digits.
  */
-export function isOpenLinkViolation(error: unknown): boolean {
+export function isUniqueViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const code = (error as { code?: unknown }).code;
   if (code === UNIQUE_VIOLATION || code === PRISMA_UNIQUE_VIOLATION)
@@ -119,4 +119,13 @@ export function isOpenLinkViolation(error: unknown): boolean {
     typeof message === "string" &&
     new RegExp(`\\b${UNIQUE_VIOLATION}\\b`).test(message)
   );
+}
+
+/**
+ * Whether a thrown value is the one-open-link index refusing a second open
+ * link. The same refusal shape as any unique violation; the name records
+ * which rule the caller believes it tripped (`IdentityMatch` has no other).
+ */
+export function isOpenLinkViolation(error: unknown): boolean {
+  return isUniqueViolation(error);
 }

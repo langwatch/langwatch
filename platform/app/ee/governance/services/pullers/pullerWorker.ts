@@ -45,7 +45,9 @@ import {
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
+import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
+import { PersonDiscoveryService } from "../personDiscovery.service";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,
@@ -487,6 +489,37 @@ async function writePulledEvents({
     logger.info(
       { ingestionSourceId: source.id, suppressedCount },
       "skipped pulled events naming an erased identifier",
+    );
+  }
+  // `kept`, again deliberately: discovery running on the pre-partition list
+  // would re-create a plaintext person row for an erased identifier on the
+  // next thirty-day re-read (ADR-128 §9 step 1). And a discovery failure
+  // never costs the run its events — the next run sees the same actors
+  // again, while audit rows missed would be gone for good.
+  try {
+    await PersonDiscoveryService.create(prisma).recordFromPulledEvents({
+      organizationId: source.organizationId,
+      provider: source.sourceType,
+      events: kept,
+    });
+  } catch (error) {
+    logger.error(
+      { error: toError(error), ingestionSourceId: source.id },
+      "could not record discovered people; the pulled events are still delivered",
+    );
+  }
+  // Department facts ride the same directory events, behind the same
+  // partition, with the same isolation: the directory read runs again
+  // tomorrow, so a failed sync costs a day, never the run.
+  try {
+    await DirectoryDepartmentSyncService.create(prisma).applyDirectoryEvents({
+      organizationId: source.organizationId,
+      events: kept,
+    });
+  } catch (error) {
+    logger.error(
+      { error: toError(error), ingestionSourceId: source.id },
+      "could not apply directory departments; the pulled events are still delivered",
     );
   }
   // `kept`, not `events`. This is the export that leaves our storage entirely
