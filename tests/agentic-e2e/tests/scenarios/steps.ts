@@ -104,13 +104,26 @@ export async function thenISeeTheResultsTab(page: Page) {
  * agent through the same drawer a person uses. The address does not have to
  * answer: a run against it fails, and that is a result too.
  */
+/**
+ * The scenarios panel has three settled shapes: day zero (no agent), an
+ * empty suite, or a suite with its "New scenario" button. Deciding which
+ * step to take before one of them is on screen reads a page that is still
+ * loading as "nothing to do" — the production build on a cold CI runner
+ * takes longer than a fixed five-second look — and every scenario test
+ * then fails on a button that would have appeared a moment later.
+ */
+async function waitForTheScenariosPanelToSettle(page: Page) {
+  const settled = page
+    .getByTestId("agent-testing-connect-agent-empty")
+    .or(page.getByTestId("agent-testing-first-suite-empty"))
+    .or(page.getByRole("button", { name: /new scenario/i }));
+  await settled.first().waitFor({ state: "visible", timeout: 30000 });
+}
+
 export async function givenTheProjectHasAnAgent(page: Page) {
+  await waitForTheScenariosPanelToSettle(page);
   const connectEmpty = page.getByTestId("agent-testing-connect-agent-empty");
-  const needsAgent = await connectEmpty
-    .waitFor({ state: "visible", timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!needsAgent) return;
+  if (!(await connectEmpty.isVisible())) return;
 
   await connectEmpty.getByRole("button", { name: /setup agent/i }).click();
   await page.getByTestId("agent-type-http").click();
@@ -130,12 +143,9 @@ export async function givenTheProjectHasAnAgent(page: Page) {
  * Every scenario sits in a suite, so a project with none names one first.
  */
 export async function givenTheProjectHasATestSuite(page: Page) {
+  await waitForTheScenariosPanelToSettle(page);
   const suiteEmpty = page.getByTestId("agent-testing-first-suite-empty");
-  const needsSuite = await suiteEmpty
-    .waitFor({ state: "visible", timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!needsSuite) return;
+  if (!(await suiteEmpty.isVisible())) return;
 
   await suiteEmpty.getByRole("button", { name: /new test suite/i }).click();
   const dialog = page.getByTestId("agent-testing-suite-name-dialog");
