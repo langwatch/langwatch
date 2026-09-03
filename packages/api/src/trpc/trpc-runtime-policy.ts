@@ -12,7 +12,7 @@
  * scope id, the lineage guard compares nothing, and the audit row lands with no
  * arguments, no project and no organization. Nothing reports an error.
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, type RequestContext } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
 import {
@@ -348,6 +348,20 @@ export function createTrpcRuntimePolicy<
    * configuration, a disabled provider — is answered through the cause
    * translation port, because those classes are the application's and the
    * client interceptors that act on them are too.
+   *
+   * A bare `ZodError` — a `.parse` inside a service, not the procedure's own
+   * `.input()` parser, which rejects before this chain is reached — is promoted
+   * the same way the REST door already promotes it (`isZodLikeError` →
+   * `validationErrorFromZod` in `../errors.ts`). Without the branch it matches
+   * neither arm, falls through `return result`, and stays
+   * INTERNAL_SERVER_ERROR: the customer still read the right copy, because the
+   * error formatter recognises a Zod failure structurally and serialises it as
+   * `validation_error`, while the log line, the span status and every alert
+   * built on them booked a customer's typo as one of our 500s. The same throw
+   * was a 422 through Hono and a 500 through tRPC.
+   *
+   * Matched by shape, not by class: routes and services on this process
+   * validate with whichever zod major their schema was authored against.
    */
   const handledErrorMiddleware = root.middleware(async ({ next }) => {
     const result = await next();
@@ -359,6 +373,21 @@ export function createTrpcRuntimePolicy<
         code: handledErrorToTRPCCode(cause),
         message: cause.message,
         cause,
+      });
+    }
+
+    if (isZodLikeError(cause)) {
+      // `ValidationError.fromZodError` is the same promotion the error
+      // formatter performs, so the serialised payload on the wire is byte for
+      // byte what it already was — only `data.code` and the HTTP status change.
+      const validation = ValidationError.fromZodError(cause);
+      throw new TRPCError({
+        code: handledErrorToTRPCCode(validation),
+        // The code, not `validation.message`: zod's `message` is the whole
+        // issue array as JSON, and this string is what the span and the log
+        // record carry. The wire message is the code either way (#5984).
+        message: validation.code,
+        cause: validation,
       });
     }
 

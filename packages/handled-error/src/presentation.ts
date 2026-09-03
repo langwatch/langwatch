@@ -2757,9 +2757,17 @@ const presentations = {
           return `There's a problem with ${listLabels(labels)}.`;
         }
       }
+      // `formErrors` holds the issues whose `path` is empty. Most of them are
+      // LangWatch's own form-level complaints, deliberately put there by a
+      // service so this line can render them — but the empty path is also
+      // where zod files `unrecognized_keys`, whose sentence is built from
+      // SCHEMA identifiers rather than from anything the customer typed. See
+      // {@link ZOD_KEY_PROSE}.
       const formErrors = error.meta.formErrors;
       if (Array.isArray(formErrors)) {
-        const first = formErrors.find((entry): entry is string => typeof entry === "string");
+        const first = formErrors.find(
+          (entry): entry is string => typeof entry === "string" && !ZOD_KEY_PROSE.test(entry),
+        );
         if (first) return safeProse(first);
       }
       return "Some of the values aren't valid.";
@@ -3547,6 +3555,26 @@ const USER_VISIBLE_FIELDS: Record<string, string> = {
   reason: "the reason",
   resource: "the resource",
 };
+
+/**
+ * Zod's own sentence for the one issue it names WIRE KEYS in.
+ *
+ * `unrecognized_keys` is reported with an empty `path`, so `flatten()` files it
+ * under `formErrors` rather than against a field — and its message is built
+ * from the schema's identifiers, never from the customer's input. Editing a
+ * saved automation showed the customer `Unrecognized keys: "action",
+ * "triggerKind", "customGraphId"`: three internal command-schema keys, off a
+ * form that shows none of them. `USER_VISIBLE_FIELDS` exists to stop exactly
+ * that leak on the `fieldErrors` side; nothing was stopping it here.
+ *
+ * Matched by its opening rather than by dropping `formErrors` wholesale,
+ * because the same slot carries prose LangWatch AUTHORED — the governance
+ * services put their whole complaint there — and that copy must still render.
+ * Both zod majors open the same two words: v3 writes
+ * `Unrecognized key(s) in object: 'a', 'b'` and v4 writes
+ * `Unrecognized keys: "a", "b"` (singular `key` for one).
+ */
+const ZOD_KEY_PROSE = /^unrecognized key/i;
 
 /** Joins labels into "a", "a and b", "a, b and c". */
 function listLabels(labels: string[]): string {

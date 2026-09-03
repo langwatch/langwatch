@@ -5,6 +5,7 @@
  */
 import { goErrorCodes, nodeErrorCodes } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
 import {
@@ -509,6 +510,71 @@ describe("explainHandledError", () => {
 
       expect(title).toBe("Check your input");
       expect(description).toBe("There's a problem with the name and the URL slug.");
+    });
+  });
+
+  describe("given a validation error with no field to attach", () => {
+    /**
+     * `unrecognized_keys` is the one zod issue whose message is built from the
+     * SCHEMA's identifiers rather than from anything the customer typed, and it
+     * is reported with an empty `path` — so `flatten()` files it under
+     * `formErrors`, where `USER_VISIBLE_FIELDS` never sees it. Editing any
+     * saved automation showed the customer `Unrecognized keys: "action",
+     * "triggerKind", "customGraphId"`: three internal command-schema keys off a
+     * form that shows none of them.
+     *
+     * The meta is produced by a real parse rather than by typing zod's sentence
+     * out here, so a zod release that rewords it reopens the leak loudly
+     * instead of quietly.
+     */
+    const unrecognizedKeysMeta = () => {
+      const parsed = z
+        .object({ triggerId: z.string() })
+        .strict()
+        .safeParse({ triggerId: "trigger-1", action: "SEND_EMAIL", triggerKind: "REPORT" });
+      if (parsed.success) throw new Error("Expected the strict parse to fail");
+      const flat = parsed.error.flatten();
+      return { fieldErrors: flat.fieldErrors, formErrors: flat.formErrors };
+    };
+
+    it("is the shape this case actually arrives in: no fields, one form-level sentence", () => {
+      const meta = unrecognizedKeysMeta();
+
+      expect(Object.keys(meta.fieldErrors)).toEqual([]);
+      expect(meta.formErrors).toHaveLength(1);
+    });
+
+    /** @scenario "An unlisted key is refused without naming it to the customer" */
+    it("never quotes a schema key the customer never typed", () => {
+      const meta = unrecognizedKeysMeta();
+
+      const { title, description } = explainHandledError(
+        shape({ code: "validation_error", httpStatus: 422, meta }),
+      );
+
+      expect(title).toBe("Check your input");
+      expect(description).toBe("Some of the values aren't valid.");
+      for (const key of ["action", "triggerKind", "triggerId"]) {
+        expect(description, `named the wire key ${key}`).not.toContain(key);
+      }
+    });
+
+    /**
+     * The blunt version of that fix — drop `formErrors` altogether — would
+     * take the governance services' own complaints with it. They put the whole
+     * sentence there deliberately, and it is copy LangWatch wrote.
+     */
+    /** @scenario "An unlisted key is refused without naming it to the customer" */
+    it("still renders a form-level complaint the platform authored", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "validation_error",
+          httpStatus: 422,
+          meta: { fieldErrors: {}, formErrors: ["Pick which custom role to use."] },
+        }),
+      );
+
+      expect(description).toBe("Pick which custom role to use.");
     });
   });
 

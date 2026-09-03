@@ -290,3 +290,71 @@ Feature: Knowable failures reach the customer as themselves
     Given the platform rejects the credential itself
     When the SDK raises for that response
     Then the raised error says authentication failed
+
+  # ---------------------------------------------------------------------------
+  # A schema parse inside a service
+  #
+  # A service that calls `.parse` on its own data and loses raises a bare
+  # ZodError — not through a procedure's `.input()` parser, which rejects before
+  # any policy middleware runs, but from inside the call. The REST door has
+  # always promoted that to a validation failure. The tRPC door translated only
+  # handled errors and the process's own typed causes, so the identical throw
+  # left as a customer-actionable refusal through one door and as a server fault
+  # through the other. The customer read the right copy either way, because the
+  # error formatter recognises a Zod failure structurally — which is why it
+  # survived. What did not was the transport code: the span status, the log
+  # level and the exception reporter all booked a customer's typo as our 500.
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: A schema parse inside a service is a validation failure on tRPC too
+    Given a service that parses its own data and rejects a field
+    When the caller reaches it over tRPC
+    Then the answer is a validation failure the caller can act on
+    And it is not reported as a server fault
+    And the rejected field travels with it so the form can mark it
+
+  @integration
+  Scenario: A validation failure is not reported as a platform exception
+    Given a service that parses its own data and rejects a field
+    When the caller reaches it over tRPC
+    Then the failure is not handed to the exception reporter
+
+  @integration
+  Scenario: An unrecognized key answers the same validation code
+    Given a service handed a key its schema does not list
+    When the caller reaches it over tRPC
+    Then the answer is the same validation failure
+    And no field is named, because the refusal is about the request as a whole
+
+  @integration
+  Scenario: Both API doors answer one code for one throw
+    Given one schema failure raised inside a service
+    When it leaves through the REST door and through the tRPC door
+    Then both doors answer the same code and the same status
+
+  @integration
+  Scenario: An unnamed failure still degrades to unknown
+    Given a failure nobody named, raised inside a service
+    When the caller reaches it over tRPC
+    Then it is still reported as a server fault
+    And it is handed to the exception reporter
+
+  # ---------------------------------------------------------------------------
+  # The words for a refusal with no field to attach
+  #
+  # Zod reports an unlisted key with an empty issue path, so it flattens into
+  # the form-level slot rather than against a field — and its sentence is built
+  # from the SCHEMA's identifiers. Editing any saved automation showed the
+  # customer three internal command-schema key names off a form that shows none
+  # of them. The form-level slot still carries complaints the platform wrote
+  # itself, and those must keep rendering.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: An unlisted key is refused without naming it to the customer
+    Given a validation failure about a key the schema does not list
+    When the surface resolves what to render
+    Then the copy is the generic validation line
+    And it does not quote a schema key the customer never typed
+    And a form-level complaint the platform wrote is still rendered
