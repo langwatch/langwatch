@@ -4,8 +4,8 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 # FILE: ./introduction.mdx
 
 ---
-title: "LangWatch: The Open-Source Platform for LLM Ops, Coding Agents, AI Gateway and AI Governance"
-description: "Observability, evaluations, agent testing and prompt management for your LLM applications. Cost and activity of every coding agent. One gateway for every LLM call. Governance over every AI tool in the company. Open core, with an Apache 2.0 core you can self-host and over 3.5k stars on GitHub."
+title: "The open-source platform for AI in production"
+description: "Trace, test, route and govern every LLM call in your company, from your own agents to the coding assistants your engineers use."
 sidebarTitle: Introduction
 keywords: langwatch, llm, ai, observability, evaluation, agent testing, prompt management, coding agents, ai gateway, ai governance, llmops, open-source, github
 ---
