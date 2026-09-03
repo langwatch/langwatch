@@ -1,10 +1,7 @@
 /**
- * The navigation capability, over the router this package already owns.
- *
- * `react-router` is one of the imports ADR-004 seals off from a frontend
- * feature, so the binding lives here in global behaviour and reaches a screen
- * as a `UiNavigationPort`. That is also what makes a screen's navigation
- * assertable: a test hands it a recording port instead of a router.
+ * The navigation capability, over the router this package already owns —
+ * `react-router` is sealed off from a frontend feature (ADR-004), so a
+ * screen gets a `UiNavigationPort` instead, which a test can record.
  */
 
 import { useMemo } from "react";
@@ -39,10 +36,8 @@ export function createRouterUiNavigation({
 }
 
 /**
- * The navigation capability of the router this render is inside.
- *
- * Only valid below `RouterProvider`; the application shell mounts it inside
- * the root layout, which is where every routed screen renders.
+ * Only valid below `RouterProvider` — the application shell mounts it
+ * inside the root layout, where every routed screen renders.
  */
 export function useRouterUiNavigation(): UiNavigationPort {
   const navigate = useNavigate();
@@ -50,13 +45,9 @@ export function useRouterUiNavigation(): UiNavigationPort {
 }
 
 /**
- * The address of this render, as a screen reads it.
- *
- * Path parameters and the query string arrive as one flat reading, and the
- * query is written whole. `useSearchParams` keeps a multi-valued map; a screen
- * that put `?tab=sources` in the URL is asking a single-valued question, so the
- * reading collapses repeats to the last one rather than making every caller
- * handle an array it never sets.
+ * Params and query arrive as one flat reading. `useSearchParams` keeps a
+ * multi-valued map; a repeated key collapses to its last value, since a
+ * screen writing `?tab=sources` is asking a single-valued question.
  */
 class RouterUiRoute extends UiRoutePort {
   constructor(

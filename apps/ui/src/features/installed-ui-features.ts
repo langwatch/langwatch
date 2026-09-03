@@ -1,16 +1,7 @@
 /**
- * What this package serves itself, declared in one place.
- *
- * `createUiApplication` takes a feature install, and until now every field of
- * it came from the composing application. That was right while apps/ui served
- * no pages of its own; it is wrong now that it does, because it would mean a
- * host had to know about — and pass — a screen that moved out of its own source
- * tree. So the standing declaration lives here, the host's install is merged
- * over it, and `platform/app`'s shell adapter keeps passing nothing at all.
- *
- * This file sits at the features root rather than inside a feature on purpose:
- * a global layer may not import a private feature, and the package entry and
- * this registry are the only two places allowed to compose them.
+ * What this package serves itself: `createUiApplication` merges the host's
+ * install over this standing declaration. Sits at the features root — this
+ * registry and the package entry are the only places allowed to import a feature.
  */
 
 import { BrowserUiFeedback } from "../behavior/ui-feedback";
@@ -20,10 +11,7 @@ import { agentApiBinding, agentPageLoaders } from "./agent";
 import { analyticsApiBinding, analyticsPageLoaders } from "./analytics";
 import { apiKeyApiBinding, apiKeyPageLoaders } from "./api-key";
 import { annotationApiBinding, annotationPageLoaders } from "./annotation";
-import {
-  annotationScoresApiBinding,
-  annotationScoresPageLoaders,
-} from "./annotation-scores";
+import { annotationScoresApiBinding, annotationScoresPageLoaders } from "./annotation-scores";
 import { authApiBinding, authPageLoaders } from "./auth";
 import { authorizePageLoaders } from "./authorize";
 import { authzApiBinding, authzPageLoaders } from "./authz";
@@ -141,4 +129,3 @@ export const installedUiFeatures: UiFeatureInstall = {
   capabilities: { feedback: BrowserUiFeedback.create() },
   session: useBrowserUiSession,
 };
-

@@ -1,25 +1,7 @@
 /**
- * What the Datasets screens are mounted inside.
- *
- * Two things go around `/:project/datasets` and `/:project/datasets/:id`: the
- * tRPC Provider the package's own hooks run on, and the host port that answers
- * for the project, the reader's grants and membership, the replication targets,
- * the address and the feedback. Both are mounted here, once, so a screen module
- * stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product want
- * it. This family reads the whole graph rather than one project, because the
- * replication picker offers every project the reader may create a dataset in.
- *
- * `isReportedGlobally` is a recorded gap rather than a carried behaviour, and
- * the honest answer here is `false`. `platform/app` deduped a refusal one of
- * its four global interceptors already rendered against, and those
- * interceptors live on `platform/app`'s own MutationCache, which does not wrap
- * the client this application builds for a package's hooks. It closes when the
- * global interceptors move to the transport rather than to one application's
- * cache.
+ * What the Datasets screens are mounted inside: the tRPC Provider their
+ * hooks run on, and the host port for project, grants/membership,
+ * replication targets, address and feedback.
  */
 
 import {
@@ -41,13 +23,7 @@ export function DatasetHost({ children }: { children: ReactNode }) {
 
   const organizations = datasetApi.organization.getAll.useQuery({ isDemo: false });
 
-  /**
-   * The project the address is about.
-   *
-   * Resolved from the one graph read rather than from a second query. Without a
-   * project in scope the screens render their empty shells, which is what they
-   * did before: every dataset belongs to a project.
-   */
+  /** The project the address is about, resolved from the one graph read rather than a second query. */
   const project = useMemo(() => {
     if (!scope.projectId) return void 0;
     for (const organization of organizations.data ?? []) {
@@ -85,6 +61,8 @@ export function DatasetHost({ children }: { children: ReactNode }) {
           createToast: (toast) => toaster.create(toast),
         }),
       failed: (failure) => feedback.failed(failure),
+      // Recorded gap, not a carried behaviour: the dedup interceptors this
+      // answers for live on platform/app's own MutationCache, not here.
       isReportedGlobally: () => false,
     }),
     [project, session, isLiteMember, copyTargets, reading, route, navigation, feedback],

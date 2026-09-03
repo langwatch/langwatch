@@ -1,16 +1,7 @@
 /**
- * The organization graph a scope is resolved against, and what a resolution
- * produces.
- *
- * These are the fields the resolution READS, not the whole record the server
- * returns. `organization.getAll` hands back fully loaded Prisma rows with
- * dozens of columns; naming only what decides a scope keeps the harvested
- * rules honest — a field that appears here is a field some precedence rule
- * consults, and nothing else can quietly start depending on the wire shape.
- *
- * Every optional field is optional because the source makes it so: a team the
- * caller holds no membership row in arrives with `members: []`, and
- * `isPersonal` / `ownerUserId` are nullable columns.
+ * The organization graph a scope is resolved against — only the fields
+ * the resolution READS, not the whole Prisma row `organization.getAll`
+ * returns, so nothing can quietly depend on the wire shape.
  */
 
 /** The reserved top-level addresses that also bind the `:project` segment. */

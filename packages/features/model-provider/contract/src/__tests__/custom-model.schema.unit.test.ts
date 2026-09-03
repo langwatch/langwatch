@@ -197,16 +197,17 @@ describe("toLegacyCompatibleCustomModels", () => {
     it("converts strings to CustomModelEntry objects for chat mode", () => {
       const result = toLegacyCompatibleCustomModels(["model-a", "model-b"], "chat");
 
-      expect(result).toEqual([
+      expect(result.entries).toEqual([
         { modelId: "model-a", displayName: "model-a", mode: "chat" },
         { modelId: "model-b", displayName: "model-b", mode: "chat" },
       ]);
+      expect(result.rejected).toEqual([]);
     });
 
     it("converts strings to CustomModelEntry objects for embedding mode", () => {
       const result = toLegacyCompatibleCustomModels(["embedding-a"], "embedding");
 
-      expect(result).toEqual([
+      expect(result.entries).toEqual([
         {
           modelId: "embedding-a",
           displayName: "embedding-a",
@@ -216,7 +217,7 @@ describe("toLegacyCompatibleCustomModels", () => {
     });
 
     it("returns empty array for empty input", () => {
-      expect(toLegacyCompatibleCustomModels([], "chat")).toEqual([]);
+      expect(toLegacyCompatibleCustomModels([], "chat").entries).toEqual([]);
     });
   });
 
@@ -226,17 +227,33 @@ describe("toLegacyCompatibleCustomModels", () => {
 
       const result = toLegacyCompatibleCustomModels(entries, "chat");
 
-      expect(result).toEqual(entries);
+      expect(result.entries).toEqual(entries);
+      expect(result.rejected).toEqual([]);
+    });
+  });
+
+  describe("when an entry carries an unrecognised key", () => {
+    /** @scenario A stored custom model entry that fails the strict parse is dropped loudly */
+    it("drops it loudly: named in `rejected`, absent from `entries`", () => {
+      const entries = [
+        { modelId: "model-a", displayName: "Model A", mode: "chat" as const },
+        { modelId: "model-b", displayName: "Model B", mode: "chat", extra: "nope" },
+      ];
+
+      const result = toLegacyCompatibleCustomModels(entries, "chat");
+
+      expect(result.entries).toEqual([entries[0]]);
+      expect(result.rejected).toEqual([{ name: "model-b" }]);
     });
   });
 
   describe("when input is null or undefined", () => {
     it("returns empty array for null", () => {
-      expect(toLegacyCompatibleCustomModels(null, "chat")).toEqual([]);
+      expect(toLegacyCompatibleCustomModels(null, "chat").entries).toEqual([]);
     });
 
     it("returns empty array for undefined", () => {
-      expect(toLegacyCompatibleCustomModels(undefined, "chat")).toEqual([]);
+      expect(toLegacyCompatibleCustomModels(undefined, "chat").entries).toEqual([]);
     });
   });
 });

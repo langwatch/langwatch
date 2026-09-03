@@ -1,9 +1,7 @@
 /**
- * The seam between the route table and the modules that serve it.
- *
- * The table names a page by key; the composing application registers a loader
- * for that key. Neither half knows where the other's file lives, which is what
- * lets a page move into a feature-web `screens/` entry without touching a URL.
+ * The seam between the route table and the modules that serve it — the
+ * table names a page by key, a loader is registered for it, and neither
+ * side knows where the other's file lives.
  */
 
 import type { UiRouteDescriptor } from "../model/ui-route-table";
@@ -32,10 +30,8 @@ export function uiRoutePageKeys(table: readonly UiRouteDescriptor[]): string[] {
 }
 
 /**
- * A missing key is a composition fault, not a routing one: the application
- * registered an install list that does not cover the table it was handed. It
- * throws where the router is built rather than on the navigation that would
- * have reached the page, so the gap surfaces at boot and names the key.
+ * A missing key is a composition fault, not a routing one — throws
+ * where the router is built, not on the navigation, so the gap surfaces at boot.
  */
 export function resolveUiPageLoader({
   registry,

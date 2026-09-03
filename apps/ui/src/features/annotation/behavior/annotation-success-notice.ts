@@ -1,11 +1,7 @@
 /**
- * Where an annotation confirmation's optional link is rendered.
- *
- * The shared feedback capability carries a title and a description and no
- * action, so a notice that has one is rendered on the Design System toaster's
- * own action trigger instead. Everything without one still goes through the
- * capability, which is what keeps the code-keyed copy deciding the words a
- * customer reads.
+ * Where an annotation confirmation's optional link is rendered: the shared
+ * feedback capability carries no action, so a notice with one renders on
+ * the Design System toaster's own action trigger instead.
  */
 
 import { toaster } from "@langwatch/design-system/toaster";

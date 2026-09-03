@@ -1,17 +1,13 @@
 /**
- * What the Topic Clustering screen is mounted inside.
- *
- * Two things go around `/settings/topic-clustering`: the tRPC Provider the
- * package's own hooks run on, and the host port that answers for the project
- * and the two notices.
- *
- * THE PROJECT IS THE SESSION'S ACTIVE SCOPE. `platform/app` read it off
- * `useOrganizationTeamProject`, which resolves the whole organization graph for
- * one id; the capability layer already holds that id, and the clustering reads
- * take nothing but the id, so no graph is fetched for this page at all.
+ * What the Topic Clustering screen is mounted inside: the tRPC Provider its
+ * hooks run on, and the host port for project and feedback. The project is
+ * the session's active scope — no graph fetched for this page.
  */
 
-import { TopicHostProvider, type TopicHostPort } from "@langwatch/topic-web/screens/topic-clustering";
+import {
+  TopicHostProvider,
+  type TopicHostPort,
+} from "@langwatch/topic-web/screens/topic-clustering";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";

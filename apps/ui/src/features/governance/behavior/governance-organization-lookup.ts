@@ -1,9 +1,4 @@
-/**
- * Which of the reader's organizations the governance section is scoped to.
- *
- * Not the first one, and not a guess: an unresolved or unreachable
- * organization id answers `undefined` rather than a mismatched row.
- */
+/** Which of the reader's organizations governance is scoped to; an unresolved id answers `undefined` rather than a mismatched row. */
 import type { GovernanceOrganization } from "@langwatch/enterprise-governance-web/screens/governance";
 
 export function resolveGovernanceOrganization({

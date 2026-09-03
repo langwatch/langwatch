@@ -1,14 +1,4 @@
-/**
- * Which page key the Data Retention address answers, and what it is wrapped in.
- *
- * ONE KEY, ONE SCREEN. The key still reads `pages/settings/data-retention`, and
- * it is kept rather than renamed: the route transcript in `apps/ui/tests`
- * is the parity bar for the URL surface and fails the moment a page key
- * changes, so renaming one would spend that guard's signal on a cosmetic edit.
- *
- * THE POLICY IS THE PLATFORM PAGE'S, ONE FOR ONE: `withPermissionGuard`
- * ("project:view") and no flag, framed by the settings layout.
- */
+/** Which page key the Data Retention address answers: `project:view`, framed by the settings layout, matching the platform page one for one. */
 
 import { dataRetentionScreens } from "@langwatch/data-retention-web/screens/data-retention";
 import type { ComponentType } from "react";

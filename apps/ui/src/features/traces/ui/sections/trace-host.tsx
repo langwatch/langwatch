@@ -1,26 +1,7 @@
 /**
- * What the trace screens are mounted inside.
- *
- * Two things go around `/:project/traces` and `/share/:id`: the tRPC Provider
- * the package's own hooks run on, and the host port that answers for the
- * project, the team it sits on, the organization, the reader, their grants, the
- * address and the feedback. Both are mounted here, once, so a screen module
- * stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it. This family reads it for four answers — which project the address is
- * about, which team it sits on, whether that team is the reader's own personal
- * workspace, and whether presence is switched on above it.
- *
- * THE GRAPH READ IS SKIPPED WHEN THERE IS NO READER, and that is what lets the
- * same host serve the shared-trace page: `/share/:id` is reachable signed out,
- * `organization.getAll` is protected, and asking it there would 401 on every
- * load of a link that is meant to work for somebody with no account at all. The
- * shared page needs none of the graph's answers — its whole payload arrives
- * with the token — so the host answers `undefined` for all four and the screen
- * renders read-only, which is what it did in `platform/app`.
+ * What `/:project/traces` and `/share/:id` mount inside: the tRPC Provider,
+ * and the host port for project/team/org/reader/grants/feedback — one
+ * `organization.getAll` read, skipped for `/share/:id` to avoid a 401.
  */
 
 import {
@@ -46,13 +27,7 @@ export function TraceHost({ children }: { children: ReactNode }) {
     { enabled: !!actor },
   );
 
-  /**
-   * The project the address is about, and the team and organization above it.
-   *
-   * Resolved from the one graph read rather than from three queries. Without a
-   * project in scope the explorer renders its empty shell, which is what the
-   * platform page did: every trace belongs to a project.
-   */
+  /** The project, team and organization the address is about — from the one graph read rather than three queries. */
   const placement = useMemo(() => {
     if (!scope.projectId) return void 0;
     for (const organization of organizations.data ?? []) {
@@ -73,9 +48,7 @@ export function TraceHost({ children }: { children: ReactNode }) {
               id: placement.project.id,
               slug: placement.project.slug,
               name: placement.project.name,
-              ...(placement.project.apiKey === void 0
-                ? {}
-                : { apiKey: placement.project.apiKey }),
+              ...(placement.project.apiKey === void 0 ? {} : { apiKey: placement.project.apiKey }),
               ...(placement.project.firstMessage === void 0
                 ? {}
                 : { firstMessage: placement.project.firstMessage }),
@@ -102,7 +75,9 @@ export function TraceHost({ children }: { children: ReactNode }) {
           ? {
               id: placement.team.id,
               name: placement.team.name,
-              ...(placement.team.isPersonal === void 0 ? {} : { isPersonal: placement.team.isPersonal }),
+              ...(placement.team.isPersonal === void 0
+                ? {}
+                : { isPersonal: placement.team.isPersonal }),
               ...(placement.team.ownerUserId === void 0
                 ? {}
                 : { ownerUserId: placement.team.ownerUserId }),
@@ -110,12 +85,9 @@ export function TraceHost({ children }: { children: ReactNode }) {
             }
           : void 0,
       /**
-       * The reader's standing in the organization.
-       *
-       * The graph read does not carry it, and the one gate that asks —
-       * Langy's — treats an unanswered role as "not an administrator", which
-       * is the safe reading: an administrator who is also a member of the
-       * team passes the same gate on the membership branch.
+       * Unanswered: the graph read carries no role, and Langy's gate treats
+       * an unanswered role as "not an administrator" — the safe default,
+       * since an admin who is also a team member passes on membership.
        */
       organizationRole: () => void 0,
       currentUser: () =>
@@ -144,11 +116,9 @@ export function TraceHost({ children }: { children: ReactNode }) {
   );
 
   /**
-   * The failure singleton, published for the mutation callbacks.
-   *
-   * `showErrorToast` fires from `onError`, where no hook can run, so the
-   * package keeps a module-scope host. Set on every render rather than once,
-   * because the host is a new value object whenever the scope moves.
+   * Published for `onError`, where no hook can run — the package keeps a
+   * module-scope host instead. Set every render, since `host` is a new
+   * value object whenever the scope moves.
    */
   useEffect(() => {
     setTraceErrorHost(host);

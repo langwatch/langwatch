@@ -1,15 +1,7 @@
 /**
- * Which page keys the legacy online-evaluation edit form answers.
- *
- * TWO KEYS, ONE SCREEN, exactly as `platform/app` registered them: the
- * `.../edit/choose` address predates the drawer that superseded this form and
- * has always resolved the same module, which is why both keys name one loader
- * and the screen never reads which of the two it was opened at.
- *
- * THE HOST IS THE WORKFLOW HOST. `CheckConfigForm` and its whole closure moved
- * into `@langwatch/evaluator-web` with the studio slice, already reading
- * `@langwatch/workflow-web/studio-host/*` for the project, the transport, the
- * router and the toasts; a port of this family's own would answer none of them.
+ * Which page keys the legacy online-evaluation edit form answers: both
+ * resolve one module, one host — the workflow host, since `CheckConfigForm`
+ * already reads `@langwatch/workflow-web/studio-host/*`.
  */
 
 import { evaluationEditScreens } from "@langwatch/evaluator-web/screens/evaluation-edit";

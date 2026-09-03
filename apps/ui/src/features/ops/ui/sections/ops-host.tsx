@@ -1,24 +1,7 @@
 /**
- * What every Ops screen is mounted inside.
- *
- * Two things go around every `/ops/*` page: the tRPC Provider the package's own
- * hooks run on, and the host port that answers for operator access, the project
- * the reader is standing in, the address and the feedback. Both are mounted
- * here, once, so a screen module stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product want
- * it. This family reads the PROJECT's API key off it, because the Foundry sends
- * a generated trace with the key of the project the operator is standing in.
- *
- * THE TWO ACCESS ANSWERS ARE SESSION GRANTS, and that is the whole of the admin
- * gate. `platform/app` asked a live `ops.getScope` probe for the workspace and a
- * separate `user.isAdmin` read for the Backoffice, deliberately decoupled so
- * that widening one could never widen the other. Both facts are already in the
- * session capability as platform-tier permissions — `ops:view` reads,
- * `ops:manage` writes — so a reader with `ops:view` and no `ops:manage` sees the
- * workspace and is refused the Backoffice.
+ * What every Ops screen is mounted inside: the tRPC Provider its hooks run
+ * on, and the host port for operator access, project, address and feedback.
+ * `ops:view`/`ops:manage` are deliberately decoupled — widening one can't widen the other.
  */
 
 import { opsApi, OpsHostProvider, type OpsHostPort } from "@langwatch/ops-web/screens/ops";
@@ -40,14 +23,7 @@ export function OpsHost({ children }: { children: ReactNode }) {
 
   const organizations = opsApi.organization.getAll.useQuery({ isDemo: false });
 
-  /**
-   * The project the address is about, and the key it ingests with.
-   *
-   * Resolved from the one graph read rather than from a second query, and only
-   * when there IS a project in scope: an operator on `/ops` with no project
-   * selected gets `undefined`, which is what the Foundry's picker already
-   * handles.
-   */
+  /** The project the address is about, and the key it ingests with — resolved from the one graph read, `undefined` with none in scope. */
   const project = useMemo(() => {
     if (!scope.projectId) return void 0;
     for (const organization of organizations.data ?? []) {

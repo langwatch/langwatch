@@ -118,9 +118,8 @@ vi.mock("../../elements/langy-model-pill", () => ({
 }));
 
 vi.mock("../../../../../behavior/langy-api", async () => {
-  const { createTrpcUtils, idleQuery, modelProviderRouter, withFallback } = await import(
-    "../../../__tests__/support/langy-api-mock"
-  );
+  const { createTrpcUtils, idleQuery, modelProviderRouter, withFallback } =
+    await import("../../../__tests__/support/langy-api-mock");
   const React = await import("react");
 
   const useHeldHistoryQuery = (enabled: boolean) => {
@@ -269,6 +268,9 @@ class FakeLangyHost extends LangyHostPort {
   isLoading() {
     return false;
   }
+  isDemoProject() {
+    return false;
+  }
   featureFlag() {
     return false;
   }
@@ -351,9 +353,7 @@ describe("reopening a conversation that has not loaded yet", () => {
         // The reveal animation splits a message into per-character spans, so
         // the question is read off the rendered text rather than matched as
         // one node.
-        await waitFor(() =>
-          expect(document.body.textContent).toContain("the remembered question"),
-        );
+        await waitFor(() => expect(document.body.textContent).toContain("the remembered question"));
         expect(skeleton()).toBeNull();
         expect(invitation()).toBeNull();
       });

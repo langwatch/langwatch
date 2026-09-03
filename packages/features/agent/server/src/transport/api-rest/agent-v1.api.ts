@@ -44,14 +44,8 @@ import {
   readAgentPresence,
   type AgentPresence,
 } from "../../services/connected-agent-presence.service";
-import {
-  toAgentListRow,
-  type AgentListRow,
-} from "../../services/agent.service";
-import {
-  registerCallEndpoint,
-  type AgentCallDeps,
-} from "./agent-call.api";
+import { toAgentListRow, type AgentListRow } from "../../services/agent.service";
+import { registerCallEndpoint, type AgentCallDeps } from "./agent-call.api";
 import { registerConnectEndpoints } from "./agent-connect.api";
 import type { AgentPlatformUrlBuilder } from "./agent-legacy.api";
 
@@ -158,9 +152,7 @@ const archiveResultSchema = z.object({
 });
 
 export const agentTestRunResponseSchema = z.object({
-  scenarioRunId: z
-    .string()
-    .describe("The run to follow; open it in the simulations run drawer."),
+  scenarioRunId: z.string().describe("The run to follow; open it in the simulations run drawer."),
   batchRunId: z.string().describe("The batch the run belongs to."),
   setId: z.string().describe("The internal set that holds agent test runs."),
 });
@@ -179,7 +171,11 @@ export interface AgentsV1Deps {
   /** Absent when this process composes no connected-agent runtime. */
   connectedRuntime?: () => ConnectedAgentRuntime | undefined;
   /** Absent when this process composes no connected-agent transport. */
-  connect?: { transport: () => LongPollTransport };
+  connect?: {
+    transport: () => LongPollTransport;
+    /** `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`; the default cap when absent. */
+    relayMaxPayloadMb?: number;
+  };
   /** Absent when this process composes no connected-agent runtime. */
   call?: Omit<AgentCallDeps, "agents">;
 }
@@ -278,7 +274,11 @@ export function createAgentV1RestApp(
   // The static `/connect/*` paths are registered first, or `/:id` would
   // answer for the segment "connect".
   if (deps.connect) {
-    registerConnectEndpoints({ secured, transport: deps.connect.transport });
+    registerConnectEndpoints({
+      secured,
+      transport: deps.connect.transport,
+      relayMaxPayloadMb: deps.connect.relayMaxPayloadMb,
+    });
   }
   registerCollectionEndpoints({ secured, deps });
   registerItemEndpoints({ secured, deps });

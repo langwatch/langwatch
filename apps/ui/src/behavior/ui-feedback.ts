@@ -1,27 +1,7 @@
 /**
- * The feedback capability, over the Design System's toaster.
- *
- * A screen never composes the sentence a customer reads for a failure: it hands
- * over the raw error and names the action that failed, and the words are
- * resolved HERE from the error's `code`. That split is the whole point of
- * `UiFailureNotice` — since #5984 the wire message of a handled error is the
- * code slug, so a screen that toasted `error.message` would print
- * `validation_error` at the customer.
- *
- * The words themselves come from `@langwatch/handled-error/presentation`, the code-keyed
- * registry (ADR-045, amendment 2026-07-21). This module used to carry a
- * four-entry copy table of its own because the registry had not moved yet; it
- * has, so the table is gone and every enumerated code — app, Go and node alike
- * — resolves to the copy a customer reads everywhere else. What is left here is
- * the three rules a TOAST applies on top of that registry:
- *
- *   1. Registry copy outranks the screen's `fallbackTitle`, because it names
- *      this exact failure where the fallback only names the action.
- *   2. A server remediation tip is folded in when it says something the
- *      registry description did not — a toast has room for one, and for
- *      `clickhouse_unavailable` that one is the only escalation path offered.
- *   3. A failure with no handled payload gets ADR-045's unknown state: the
- *      screen's own title, one calm generic line, and the trace id.
+ * The feedback capability, over the Design System's toaster. A screen
+ * hands over the raw error; the words are resolved HERE from its `code`
+ * via `@langwatch/handled-error/presentation` — never `error.message`.
  */
 
 import { toaster } from "@langwatch/design-system/toaster";
@@ -55,12 +35,9 @@ export type ResolvedUiFailureCopy = {
 };
 
 /**
- * The words for one failure: the registry's when it knows the code, the
- * screen's otherwise, and the generic unknown line when neither has anything.
- *
- * The registry WINS over a screen's own `fallbackTitle` and `description`,
- * which is the property that keeps a screen from talking over registered copy.
- * They only fill the gap where there is no code to look up at all.
+ * The words for one failure: registry when it knows the code, the
+ * screen's `fallbackTitle`/`description` only fill the gap when there is
+ * no code to look up — the registry always wins where it has an answer.
  */
 export function resolveUiFailureCopy({
   error,
@@ -114,11 +91,9 @@ export function resolveUiFailureCopy({
 }
 
 /**
- * The toast's single body line: the registry's description, plus the one
- * remaining server tip that adds something to it.
- *
- * A toast has room for one tip; an inline alert, when that surface moves here,
- * is where the rest belong.
+ * The toast's single body line: the registry's description plus the one
+ * remaining tip that adds something — a toast has room for one; an inline
+ * alert, once that surface exists, is where the rest belong.
  */
 function toastBody({
   description,
@@ -135,13 +110,9 @@ function toastBody({
 }
 
 /**
- * The tips that add something the description did not already say.
- *
- * Compared on a normalised form — lower-cased, punctuation flattened — because
- * the two authorings are never character-identical: `query_timeout`'s registry
- * description is "Narrow the time range or add a filter, then try again." and
- * its first tip is "Narrow the time range". Dropping every tip whenever the
- * registry had ANY description threw the escalation path away instead.
+ * Compared on a normalised form (lower-cased, punctuation flattened),
+ * since a tip is never character-identical to the description it
+ * overlaps — e.g. `query_timeout`'s tip repeats part of its description.
  */
 function supplementalTips({
   tips,
@@ -178,13 +149,9 @@ export type UiToaster = {
     duration?: number;
     meta?: Record<string, unknown>;
     /**
-     * The one way out the failure offered, in the shape the Design System's
-     * toast renders: it draws the trigger itself, in the status accent, and
-     * dismisses the toast when the reader takes it.
-     *
-     * `UiFailureAction` says `run`; this says `onClick`. The rename is the
-     * whole of the translation, and it happens here rather than in the port
-     * because a port describes what happens and a toaster describes a click.
+     * The one way out, in the Design System toast's own shape — it draws
+     * the trigger and dismisses on click. `UiFailureAction` says `run`;
+     * this says `onClick`; the rename happens here, not in the port.
      */
     action?: { label: string; onClick: () => void };
   }) => unknown;

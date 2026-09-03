@@ -1,17 +1,7 @@
 /**
- * What the evaluators screen is mounted inside.
- *
- * Two things go around `/:project/evaluators`: the tRPC Provider the package's
- * own hooks run on, and the host port that answers for the project, the
- * reader's grants, the replication targets, the address and the feedback. Both
- * are mounted here, once, so a screen module stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it. This family reads the whole graph rather than one project, because
- * the replication picker offers every project in every organization the reader
- * belongs to.
+ * What the evaluators screen is mounted inside: the tRPC Provider its hooks
+ * run on, and the host port for project, grants, replication targets,
+ * address and feedback.
  */
 
 import {
@@ -34,13 +24,7 @@ export function EvaluatorHost({ children }: { children: ReactNode }) {
 
   const organizations = evaluatorApi.organization.getAll.useQuery({ isDemo: false });
 
-  /**
-   * The project the address is about.
-   *
-   * Resolved from the one graph read rather than from a second query. Without a
-   * project in scope the screen renders its empty shell, which is what the
-   * platform page did: every evaluator belongs to a project.
-   */
+  /** The project the address is about, resolved from the one graph read rather than a second query. */
   const project = useMemo(() => {
     if (!scope.projectId) return { projectId: void 0, projectSlug: void 0 };
     for (const organization of organizations.data ?? []) {

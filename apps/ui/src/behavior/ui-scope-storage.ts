@@ -1,15 +1,7 @@
 /**
- * Where the last resolved scope is remembered, and how.
- *
- * Three keys, written by whichever page resolved last and read by whichever
- * page names no project of its own. The names and the encoding are
- * NOT free choices: the application still serves most of the product from the
- * same origin, its `useLocalStorage` reads these exact keys, and it stores a
- * string JSON-encoded — `"acme-app"`, quotes included. A scope written here in
- * any other shape reads as a different selection over there, which is the
- * split-brain the whole harvest exists to avoid. The custom `local-storage`
- * event is the other half of that contract: it is what makes the application's
- * mounted readers see a write this package made without a reload.
+ * Where the last resolved scope is remembered — three keys, NOT free
+ * choices: `useLocalStorage` reads these exact keys, JSON-string-encoded,
+ * and the `local-storage` event lets readers see a write with no reload.
  */
 
 import { useCallback, useSyncExternalStore } from "react";
@@ -61,10 +53,8 @@ export function readUiScopeMemory(storage: Storage): UiScopeMemory {
 }
 
 /**
- * Performs the writes a resolution asked for, and tells the document.
- *
- * The writes arrive already guarded — `uiScopeSelectionWrites` emits one only
- * when the stored value differs — so this loop never broadcasts a no-op.
+ * Performs the writes a resolution asked for, and tells the document —
+ * already guarded, so this loop never broadcasts a no-op.
  */
 export function writeUiScopeSelection({
   writes,
@@ -88,11 +78,9 @@ export function broadcastUiScopeWrite(key: string): void {
 }
 
 /**
- * The remembered scope, re-read whenever anything in the document writes it.
- *
- * The snapshot is cached against the raw stored strings so React sees a stable
- * value between writes; without that, `useSyncExternalStore` would re-render
- * forever on a fresh object.
+ * The remembered scope, re-read on every document write — cached against
+ * the raw strings so React sees a stable value; a fresh object every
+ * read would make `useSyncExternalStore` re-render forever.
  */
 class UiScopeMemoryStore {
   private raw = "";

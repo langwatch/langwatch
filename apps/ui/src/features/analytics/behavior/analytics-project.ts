@@ -1,10 +1,4 @@
-/**
- * The project an analytics address is about, resolved from the organization
- * graph rather than a second query.
- *
- * Without a project in scope every screen renders its empty shell, which is
- * what the platform pages did: every chart belongs to a project.
- */
+/** The project an analytics address is about, resolved from the organization graph rather than a second query. */
 
 import type { AnalyticsHostProject } from "@langwatch/analytics-web/screens/analytics";
 

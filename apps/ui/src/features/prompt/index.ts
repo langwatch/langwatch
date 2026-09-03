@@ -1,13 +1,4 @@
-/**
- * The Prompts family, as this application composes it.
- *
- * Prompt Studio — the tabbed browser, the chat, the sidebar and its six
- * dialogs — lives in `@langwatch/prompt-web`; what belongs to the application
- * is everything it is not allowed to own: which page key the address answers,
- * the permission policy in front of it, the transport its hooks run on, and the
- * host port that turns this application's capabilities into the questions the
- * family asks.
- */
+/** Prompts: Prompt Studio's tabbed browser, chat, sidebar and six dialogs, all in `@langwatch/prompt-web`. */
 
 import { promptApi } from "@langwatch/prompt-web/screens/prompt-studio";
 import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";

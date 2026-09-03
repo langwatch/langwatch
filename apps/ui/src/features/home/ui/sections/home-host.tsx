@@ -1,23 +1,7 @@
 /**
- * What the project home is mounted inside.
- *
- * Two things go around `/[project]`: the tRPC Provider the package's own hooks
- * run on, and the host port that answers for the reader, the project and
- * organization in scope, the grants, the two rollouts, the deployment and the
- * motion preference.
- *
- * THE PROJECT AND THE ORGANIZATION COME OFF THE GRAPH THE SHELL ALREADY HOLDS.
- * `organization.getAll` is asked with the same path and input the chrome asks
- * with, which under tRPC's path-plus-input cache key is one entry: the home,
- * the sidebar and the switchers read one workspace and cannot disagree about
- * it.
- *
- * THE ASSISTANT'S TWO GATES ARE ANSWERED HERE, and they are different grants.
- * `langy:view` is what makes the panel visible at all; `langy:create` is what a
- * hand-off needs, because the hand-off queues a prompt that auto-sends. The
- * home puts a composer in front of the reader as the first thing on the page,
- * so it asks the second one before it offers anything, and a reader who holds
- * only the read grant is told so in a line rather than left to discover a 403.
+ * What the project home is mounted inside: the tRPC Provider its hooks run
+ * on, and the host port for reader, scope, grants, rollouts and deployment.
+ * `langy:view` shows the panel; `langy:create` is needed for a hand-off.
  */
 
 import {
@@ -32,6 +16,7 @@ import {
 import { useMemo, type ReactNode } from "react";
 
 import { readPublicAppConfig } from "../../../../behavior/public-config";
+import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { useUiPrefersReducedMotion } from "../../../../behavior/ui-reduced-motion";
 
@@ -55,13 +40,7 @@ type OrganizationsRead = ReadonlyArray<{
   }>;
 }>;
 
-/**
- * What kind of deployment this is, off the config the HTML shell carries.
- *
- * A document with no config block is a self-hosted deployment as far as every
- * branch below goes, never a crash — the same shape the navigation host takes
- * for the same reason.
- */
+/** What kind of deployment this is: a document with no config block reads as self-hosted, never a crash. */
 function readDeployment(): ProjectHomeDeployment {
   try {
     const config = readPublicAppConfig();
@@ -111,6 +90,10 @@ export function ProjectHomeHostSection({ children }: { children: ReactNode }) {
 
   const langyFlag = session.featureFlag(LANGY_RELEASE_FLAG);
   const deployment = useMemo(readDeployment, []);
+  const isDemoProject = isLangyDemoProject({
+    projectSlug: project?.slug,
+    demoProjectSlug: deployment.demoProjectSlug,
+  });
 
   const host = useMemo<ProjectHomeHostPort>(
     () => ({
@@ -126,12 +109,13 @@ export function ProjectHomeHostSection({ children }: { children: ReactNode }) {
         return { enabled: answer === true, isLoading: answer === void 0 };
       },
       langyVisibility: () => ({
-        show: session.hasPermission(LANGY_VIEW_PERMISSION) && langyFlag === true,
+        show: session.hasPermission(LANGY_VIEW_PERMISSION) && langyFlag === true && !isDemoProject,
         // "No" and "not yet" are different answers, and only the second one
         // may hold the page back from picking a composition.
         isResolving: organizations.isLoading || langyFlag === void 0,
       }),
-      canAskLangy: () => session.hasPermission(LANGY_CREATE_PERMISSION) && langyFlag === true,
+      canAskLangy: () =>
+        session.hasPermission(LANGY_CREATE_PERMISSION) && langyFlag === true && !isDemoProject,
       deployment: () => deployment,
       reducedMotion: () => reducedMotion,
       navigate: (to) => navigation.navigate(to),
@@ -143,6 +127,7 @@ export function ProjectHomeHostSection({ children }: { children: ReactNode }) {
       organizations.isLoading,
       langyFlag,
       deployment,
+      isDemoProject,
       reducedMotion,
       session,
       navigation,

@@ -1,12 +1,4 @@
-/**
- * The Model Provider settings family, as this application composes it.
- *
- * The two screens live in `@langwatch/model-provider-web`; what belongs to the
- * application is everything they are not allowed to own — which page keys the
- * addresses answer, the settings chrome around them, the transport their hooks
- * run on, and the host port that turns this application's capabilities into the
- * questions the family asks.
- */
+/** Model Provider settings: two screens in `@langwatch/model-provider-web`. */
 
 import { modelProviderApi } from "@langwatch/model-provider-web/screens/model-provider";
 import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
@@ -19,17 +11,9 @@ export const modelProviderApiBinding: UiFeatureApiBinding = uiFeatureApi({
 });
 
 /**
- * The drawers this family serves, by the name the address uses.
- *
- * ALL THREE RECOVERED FROM `platform/app`, deleted in `cc91631cd8`. The Model Costs
- * table's Add, Edit and Clone all write `?drawer.open=llmModelCost`, and so
- * does the trace drawer's "this model has no cost mapping" suggestion; the
- * Default Models table's "+ Add config" and every row's Edit write
- * `?drawer.open=defaultModelOverride`. Every one of them changed the URL and
- * opened nothing, which meant a customer could neither author a cost rule nor
- * configure a default model — and, through `editModelProvider`, could not add
- * or edit a credential at all, which is the one that made every other model
- * surface in the product unusable on a fresh organization.
+ * `defaultModelOverride` and `llmModelCost` open from the Default Models
+ * and Model Costs tables; `editModelProvider` adds or edits a credential —
+ * without it, no model surface in the product works on a fresh org.
  */
 export const modelProviderDrawers: UiDrawerRegistry = {
   defaultModelOverride: lazyDrawer({

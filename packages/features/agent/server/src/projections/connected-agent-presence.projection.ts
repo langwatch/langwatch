@@ -13,9 +13,17 @@
 
 import { LAST_SEEN_WRITE_INTERVAL_MS } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
-import type { AgentRepository } from "../repositories/agent.repository";
 
 const logger = createLogger("langwatch:connected-agents:presence");
+
+/**
+ * The one write this projection needs, not the whole repository — narrow so
+ * a composition root outside the package can satisfy it without the private
+ * `AgentRepository` type.
+ */
+export interface AgentLastSeenWriter {
+  touchLastSeenAt(input: { id: string; projectId: string; at: Date }): Promise<void>;
+}
 
 /** When each agent's row was last written by this process. */
 const lastWrites = new Map<string, number>();
@@ -34,7 +42,7 @@ export async function touchAgentLastSeen({
   now = Date.now(),
   intervalMs = LAST_SEEN_WRITE_INTERVAL_MS,
 }: {
-  repository: AgentRepository;
+  repository: AgentLastSeenWriter;
   projectId: string;
   agentId: string;
   now?: number;

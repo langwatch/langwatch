@@ -1,25 +1,7 @@
 /**
- * The CLI device-flow exchange, as this application performs it.
- *
- * `/cli/auth` talks to three REST routes the application serves —
- * `GET /api/auth/cli/lookup`, `POST /api/auth/cli/approve` and
- * `POST /api/auth/cli/deny` — and the OTHER SIDE OF THAT EXCHANGE IS THE
- * PUBLISHED CLI: `langwatch login` prints the verification URI, then polls
- * `/exchange` until the record this file flips comes back approved. So the wire
- * is a compatibility surface with a shipped binary, not an internal detail, and
- * it is reproduced here byte for byte from what
- * `platform/app/src/pages/settings/../cli/auth.tsx` sent: the same paths, the
- * same method and header, the same snake-cased body keys, the same reading of
- * 404 and 410 as distinct outcomes, and the same message precedence
- * (`message` before `error_description` before a status-code line).
- *
- * IT LIVES IN THE GLOBAL LAYER RATHER THAN IN THE FEATURE, and that is a rule
- * rather than a preference: `ui-browser-capability` forbids `apps/ui/src/features/*`
- * from naming `fetch`, and `src/behavior/` is the browser-transport home the
- * feature-pilot gate carved out for exactly this. The api-key frontend feature
- * adapts these three functions onto its package's host port.
- *
- * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ * The CLI device-flow exchange — the OTHER SIDE is the published CLI
+ * (`langwatch login` polls `/exchange`), so this wire is a compatibility
+ * surface reproduced byte for byte. Spec: cli-onboarding/login-unified.feature.
  */
 
 /** Which credential the CLI is asking for. */
@@ -62,12 +44,9 @@ const DENY_PATH = "/api/auth/cli/deny";
 type CliErrorBody = { error_description?: string; message?: string };
 
 /**
- * The message a failed response should read as.
- *
- * `message` wins over `error_description` because the approve route can send a
- * handled error's customer-safe message, and it says more than the route's own
- * generic description. A response with neither falls back to naming the action
- * and its status, which is what the page has always shown.
+ * `message` wins over `error_description` — the approve route can send a
+ * handled error's customer-safe message there, which says more than the
+ * generic description. Neither present: falls back to naming the action and status.
  */
 function failureMessage(body: CliErrorBody, action: string, status: number): string {
   return body.message ?? body.error_description ?? `${action} (${status})`;
@@ -115,12 +94,9 @@ export async function lookupCliDeviceCode(userCode: string): Promise<UiCliDevice
 }
 
 /**
- * Approves a device code with the reviewed selection.
- *
- * `project_id` and `key_selection` are included only when the caller supplied
- * them, which is what keeps the body identical to the platform page's: a
- * project login sends the project and no selection, a device session sends the
- * selection and no project.
+ * `project_id` and `key_selection` are included only when the caller
+ * supplied them — a project login sends the project and no selection, a
+ * device session sends the selection and no project.
  */
 export async function approveCliDeviceCode(
   approval: UiCliDeviceApproval,
@@ -160,12 +136,9 @@ export async function approveCliDeviceCode(
 }
 
 /**
- * Rejects a device code.
- *
- * DENIED EITHER WAY, which is the platform page's behaviour and the right one:
- * a network failure on the way to this route leaves the code to expire by
- * itself, and telling the reader their refusal did not go through would be
- * asking them to worry about something they cannot act on.
+ * DENIED EITHER WAY — a network failure here leaves the code to expire
+ * on its own, and telling the reader their refusal failed would ask
+ * them to worry about something they cannot act on.
  */
 export async function denyCliDeviceCode(userCode: string): Promise<UiCliDeviceActionResult> {
   try {

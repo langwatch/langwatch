@@ -1,51 +1,9 @@
 import { defineConfig } from "@chakra-ui/react";
 
 /**
- * Langy's colour theme — a real Chakra config, not a stylesheet of overrides.
- *
- * Two custom CONDITIONS are declared,
- *
- *     _langy      →  ".langy-root &"          (Langy, light)
- *     _langyDark  →  ".dark .langy-root &"    (Langy, dark)
- *
- *, and Langy's palette is attached to the SAME semantic tokens the rest of
- * the app uses (`bg.surface`, `fg.muted`, `border`, `orange.*`). `mergeConfigs`
- * folds these condition keys in beside the app's existing `_light` / `_dark`
- * values rather than replacing them, so:
- *
- *   - every Langy component keeps styling through `bg="bg.surface"` — there is
- *     no Langy-specific prop vocabulary to learn, and no component churn;
- *   - nothing leaks: outside `.langy-root` the app's own values still apply;
- *   - the tokens are typed, discoverable, and live with the design system.
- *
- * The specificity that makes it win falls out of Chakra's own emission:
- * `.dark .langy-root { … }` (0,2,0) beats `.dark` (0,1,0). Verified against
- * `system.getTokenCss()`.
- *
- * ── The two grounds ─────────────────────────────────────────────────────────
- * LIGHT IS THE APP'S OWN PALETTE. Langy in light mode carries NO overrides for
- * surfaces, text, borders or accent ramps: inside `.langy-root` the standard
- * light tokens apply unchanged, so the panel reads as part of the product. (A
- * warm paper palette was tried here and read as a beige island next to the
- * app's white surfaces.) The `_langy` condition survives for the tokens that
- * have no app-level fallback: Langy's own `langy.*` namespace and the panel's
- * type scale.
- *
- * DARK IS THE MARKETING SITE'S INK. Lifted from the homepage's dark sections
- * (`SectionLangy`, `SectionEnterprise`), the very sections that present
- * Langy:
- *
- *   - TEXT IS PAPER AT ALPHA, NOT GREY. The site never writes a grey on ink; it
- *     writes white and turns it down (`text-paper/55`, `/35`).
- *   - ONE HAIRLINE: `white/10`, used for the card edge AND the dividers inside
- *     it. `white/15` is the only step up.
- *   - ELEVATION IS LIGHT, NOT GREY: every surface above the ink ground is
- *     white-alpha (3% → 6% → 10%), so a raised surface is the same ground with
- *     more light on it.
- *   - NO SHADOWS. `grep -c shadow` over both dark sections returns 0.
- *   - ONE ACCENT: brand-300 (#ffb380) at an alpha, plus moss/rust for pass/fail.
- *
- * Spec: specs/langy/langy-panel-theme.feature
+ * Langy's colour theme — a real Chakra config, not overrides. Two
+ * conditions (`_langy`, `_langyDark`) attach Langy's palette to the
+ * app's own tokens. See `specs/langy/langy-panel-theme.feature`.
  */
 
 const ink = {
@@ -179,19 +137,9 @@ export const langyThemeConfig = defineConfig({
           // paper-at-alpha move, one notch under full white.
           answerFg: langy("#363530", white(0.87)),
 
-          // The user's message bubble. It has its OWN tokens because the
-          // generic ones do not survive the light ground: `bg.muted` and
-          // `border.muted` BOTH resolve to gray.100 (#f1f5f9) there, so the
-          // bubble was a 3%-off-white fill outlined in exactly its own colour —
-          // no edge at all — floating on a white panel that is itself
-          // translucent over a gray.100 page. It was invisible.
-          //
-          // Light therefore steps the fill down to gray.200 and gives it a real
-          // gray.300 hairline: still quiet, still neutral (the panel keeps the
-          // app's own palette — a warm bubble read as a beige island), but
-          // unmistakably a bubble. Dark already worked and keeps its values:
-          // elevation as white-alpha over the ink ground, the site's one
-          // hairline.
+          // OWN tokens — the generic ones (`bg.muted`/`border.muted`) both
+          // resolve to gray.100 in light, making the bubble invisible.
+          // Light steps to gray.200 + a gray.300 hairline; dark is unchanged.
           userBubbleBg: langy("#e2e8f0", white(0.06)),
           userBubbleBorder: langy("#cbd5e1", white(0.1)),
         },
@@ -206,12 +154,10 @@ export const langyThemeConfig = defineConfig({
         langyCard: { value: { _langy: "none", _langyDark: "none" } },
       },
 
-      // ── Type scale ────────────────────────────────────────────────────────
-      // One notch down. Langy's column is narrow and dense; the app's default
-      // scale read shouty in it. Overriding the font-size tokens under the Langy
-      // conditions re-scales every surface at once (message body, rows, cards,
-      // composer) with no per-component edits — the same trick the colours use.
-      // `2xs` is left alone: it is already at the floor.
+      // ── Type scale ──────────────────────────────────────────────────────
+      // One notch down: Langy's column is narrow and dense, and the app's
+      // default scale read shouty in it. Re-scales every surface at once
+      // (message body, rows, cards, composer), the same trick the colours use.
       fontSizes: {
         xs: { value: { _langy: "0.71875rem", _langyDark: "0.71875rem" } },
         sm: { value: { _langy: "0.8125rem", _langyDark: "0.8125rem" } },

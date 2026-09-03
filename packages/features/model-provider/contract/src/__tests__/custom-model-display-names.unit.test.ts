@@ -195,7 +195,7 @@ describe("modelDisplayLabel()", () => {
     describe("when the label is resolved", () => {
       /** @scenario A legacy custom model resolves to its model id */
       it("resolves to its model id", () => {
-        const legacyEntries = toLegacyCompatibleCustomModels(["gpt-5.1"], "chat");
+        const legacyEntries = toLegacyCompatibleCustomModels(["gpt-5.1"], "chat").entries;
         const displayNames = buildCustomModelDisplayNames([
           makeProvider({ provider: "custom", customModels: legacyEntries }),
         ]);

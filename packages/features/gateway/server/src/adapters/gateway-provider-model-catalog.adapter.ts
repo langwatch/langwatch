@@ -1,4 +1,7 @@
 import { llmModels, toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
+
+const logger = createLogger("langwatch:gateway:provider-model-catalog");
 
 const HOSTED_CATALOG_PREFIXES: Record<string, string> = {
   openai: "openai",
@@ -30,11 +33,17 @@ export function declaredModelsForProvider(mp: {
 }): string[] | undefined {
   const declared = new Set<string>();
 
-  for (const entry of toLegacyCompatibleCustomModels(mp.customModels, "chat")) {
+  const chat = toLegacyCompatibleCustomModels(mp.customModels, "chat");
+  const embeddings = toLegacyCompatibleCustomModels(mp.customEmbeddingsModels, "embedding");
+  for (const entry of [...chat.entries, ...embeddings.entries]) {
     if (entry.modelId) declared.add(entry.modelId);
   }
-  for (const entry of toLegacyCompatibleCustomModels(mp.customEmbeddingsModels, "embedding")) {
-    if (entry.modelId) declared.add(entry.modelId);
+  const rejected = [...chat.rejected, ...embeddings.rejected];
+  if (rejected.length > 0) {
+    logger.warn(
+      { provider: mp.provider, rejected: rejected.map((entry) => entry.name) },
+      "dropped unroutable custom model entries that failed the strict parse",
+    );
   }
   for (const id of hostedCatalogByProvider[mp.provider] ?? []) {
     declared.add(id);

@@ -1,14 +1,7 @@
 /**
- * Which page keys the Workflows addresses answer, and what they are wrapped in.
- *
- * THREE KEYS, THREE SCREENS, kept rather than renamed: the route transcript in
- * `apps/ui/tests/fixtures` is the parity bar for the URL surface and fails the
- * moment a page key changes.
- *
- * THE POLICIES DIFFER AND THEY ARE THE PLATFORM PAGES', ONE FOR ONE. The list
- * page carries `workflows:view`; the studio page and the chat page carry no
- * guard at all, which is what a shared link to a published workflow's chat has
- * always done, and what `workflow.getById` refuses on its own for the studio.
+ * Three page keys, kept rather than renamed — the route transcript in
+ * `apps/ui/tests/fixtures` is the parity bar for the URL surface. Only the
+ * list page carries `workflows:view`; studio and chat carry no guard.
  */
 
 import { studioScreens } from "@langwatch/workflow-web/screens/studio";

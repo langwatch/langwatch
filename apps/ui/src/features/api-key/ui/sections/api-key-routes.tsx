@@ -1,19 +1,7 @@
 /**
- * Which page keys the API Key addresses answer, and what they are wrapped in.
- *
- * TWO KEYS, TWO SCREENS, TWO DIFFERENT FRAMES. `pages/settings/api-keys` gets
- * the host, the settings chrome and the guard, in that order. `pages/cli/auth`
- * is where a browser opened by `langwatch login` lands, with no product shell
- * around it — the screen carries its own narrowed copy of that frame — so it
- * gets the host, a document title and the guard, and no settings chrome.
- *
- * NEITHER KEY CARRIES A PAGE-LEVEL GRANT OR A FLAG. `/settings/api-keys` was
- * `SettingsLayout` and nothing else, deciding what a reader may DO from
- * `apiKey.orgMembers` answering non-empty and from `project:manage`; a member
- * who can see their own keys keeps seeing them. `/cli/auth` had no guard
- * either — it does its own session redirect, preserving the device code
- * through SSO, which a permission guard would break by refusing before the
- * redirect could run.
+ * Which page keys the API Key addresses answer. Neither carries a
+ * page-level grant: `/settings/api-keys` decides per-row; `/cli/auth` does
+ * its own SSO redirect, which a guard would break by refusing it first.
  */
 
 import { apiKeyScreens } from "@langwatch/api-key-web/screens/api-key";
@@ -26,13 +14,7 @@ import { ApiKeyHost } from "./api-key-host";
 /** What `/cli/auth` calls itself in the browser tab. */
 export const CLI_AUTH_DOCUMENT_TITLE = "Authorize CLI · LangWatch";
 
-/**
- * The browser tab's title, set by the page that owns it.
- *
- * A screen may not reach the document, so the title travels as data and the
- * document-title capability writes it — and puts the previous one back when the
- * page unmounts, which is what keeps a title from outliving its page.
- */
+/** The browser tab's title: a screen may not reach the document, so this writes it via the capability and restores the previous one on unmount. */
 function withDocumentTitle<P extends object>(
   title: string,
   Page: ComponentType<P>,

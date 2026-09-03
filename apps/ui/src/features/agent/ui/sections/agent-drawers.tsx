@@ -1,30 +1,7 @@
 /**
- * The agent drawers, mounted in the host their package asks for.
- *
- * `agentTypeSelector` was ALREADY a pure URL adapter in `platform/app` — the
- * control itself is `@langwatch/agent-web`'s — so what moved here is the half
- * that was always composition: reading the caller's `onSelect` off the drawer
- * navigator's in-memory slot, and turning the pick into the next drawer's
- * address.
- *
- * ONE DEFECT FIXED ON THE WAY, because carrying it would have made the move
- * pointless: `platform/app`'s adapter passed `open={props.open === true}`, and
- * the registry hands a drawer the PARSED ADDRESS — so `open` arrives as the
- * string `"agentTypeSelector"`, the strict comparison is false, and the control
- * renders closed. It reads the way every other registered drawer reads it now:
- * anything defined and not `false` means open.
- *
- * THE THREE EDITORS IT LEADS TO ARE REGISTERED, AND NOT HERE. `agentCodeEditor`,
- * `agentHttpEditor` and `workflowSelector` are `@langwatch/scenario-web`
- * components that read that package's host, so they are mounted by the
- * simulations feature — `features/simulations/ui/sections/simulations-drawers`
- * states the rule and the reasoning. This family writes the address and owns
- * nothing else about them; the caller's own `onSelect` still fires alongside,
- * which is what the flows that pass one act on.
- *
- * "Connect from Code" is the same shape: the card is the package's, the address
- * it opens (`agentConnectFromCode`) is this application's, so it arrives as a
- * callback rather than as a name the package would have to know.
+ * The agent drawers, mounted in the host their package asks for. The three
+ * editors it opens are registered by `simulations-drawers`, not here — this
+ * family only writes their address.
  */
 
 import {

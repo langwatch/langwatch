@@ -6,10 +6,8 @@ interface CreateUiAnalyticsClientParams {
   posthogClient: PostHog | undefined;
   isGtagReady: boolean;
   /**
-   * Whether this build is a development build. Supplied by the composing
-   * application rather than read here: browser UI never reads the process
-   * environment, and the bundler define that answers it belongs to the
-   * application build.
+   * Whether this build is a development build — supplied by the composing
+   * application, since browser UI never reads the process environment.
    */
   isDevelopment: boolean;
 }

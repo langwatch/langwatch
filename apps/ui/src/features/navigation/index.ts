@@ -1,13 +1,7 @@
 /**
- * The navigation family, as this application composes it.
- *
- * The landing screen lives in `@langwatch/navigation-web`; what belongs to the
- * application is which page key the root address answers, the transport the
- * package's hooks run on, and the host port that turns this application's scope
- * resolution, session and address bar into the questions the redirect asks.
- *
- * The same package also publishes the project switcher, which is chrome rather
- * than a page — `features/chrome` composes that half.
+ * The navigation family: the landing screen lives in
+ * `@langwatch/navigation-web`; this owns the page key, transport and host
+ * port. The package's project switcher is chrome, composed by `features/chrome`.
  */
 
 import { navigationApi } from "@langwatch/navigation-web/screens/landing";

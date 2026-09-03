@@ -1,14 +1,7 @@
 /**
- * Re-reading who is signed in, on demand.
- *
- * The session is one React Query entry, fetched once per document and held
- * forever (`staleTime: Infinity`), which is right: it changes when the reader
- * signs in or out, and both of those reload the page. One surface changes it
- * without a reload — the avatar control writes a new photo and the header has
- * to stop showing the old one — so it asks for the entry to be re-fetched.
- *
- * It lives in the global behavior layer because a frontend feature may not
- * import React Query, and because the query key is this layer's to know.
+ * Re-reading who is signed in, on demand — the session query is held
+ * forever (`staleTime: Infinity`) since sign-in/out both reload the page.
+ * The one exception: the avatar control's new photo needs a re-fetch.
  */
 
 import { useQueryClient } from "@tanstack/react-query";

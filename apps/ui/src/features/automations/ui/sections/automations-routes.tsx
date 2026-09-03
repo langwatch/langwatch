@@ -1,18 +1,7 @@
 /**
- * Which page key each automations tab answers, and what it is wrapped in.
- *
- * The route table names FIVE page keys under `/:project/automations` and the
- * package exposes ONE screen, because the five addresses were always one page:
- * `platform/app`'s loader registry pointed all five keys at the same module,
- * and the module then matched the pathname to decide which tab to show. This is
- * the map between the two vocabularies, and it makes the tab explicit — a key
- * names a tab here, so the screen is told rather than having to read the
- * address back.
- *
- * `/:project/automations/activity` is the fifth key and it shows the OVERVIEW,
- * which is what it has shown since the History tab was folded into the overview
- * page. The address is kept because links to it exist; nothing about the page
- * distinguishes it any more.
+ * Which page key each automations tab answers. Five keys, one screen — each
+ * key tells the screen its tab. `/activity` shows `overview`: kept for old
+ * links since the History tab folded into it.
  */
 
 import {

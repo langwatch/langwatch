@@ -1,14 +1,7 @@
 /**
- * Which page key each governance screen answers, and what it is wrapped in.
- *
- * The route table names eleven page keys under `/governance`; the package
- * exposes eleven loaders under names of its own. This is the map between them,
- * and the only place either vocabulary meets the other.
- *
- * The guard states the policy the two platform higher-order components used to
- * carry — the section flag first, then the page's own flag where it has one,
- * then the grant — with the flag reading as a 404 for everyone before any
- * permission is considered.
+ * Which page key each governance screen answers. The guard checks the
+ * section flag first, then the page's own flag if it has one, then the
+ * grant — a flag reads as a 404 for everyone before any permission check.
  */
 
 import type { ComponentType } from "react";

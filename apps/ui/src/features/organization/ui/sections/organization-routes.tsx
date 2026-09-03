@@ -1,18 +1,7 @@
 /**
- * Which page key the Audit Log address answers, and what it is wrapped in.
- *
- * FIVE KEYS, FIVE SCREENS. Every key still reads the address the platform page
- * served, kept rather than renamed: the route transcript in `apps/ui/tests` is
- * the parity bar for the URL surface and fails the moment a page key changes,
- * so renaming one would spend that guard's signal on a cosmetic edit.
- *
- * GRANTS, one for one with the platform pages and NOT all the same — the
- * asymmetry is carried rather than tidied: members, teams and groups were
- * `organization:manage`, the audit log the same, and the team detail page was
- * `team:view` (a reader who may see a team may open it). The PLAN gate a reader
- * below Enterprise meets on the audit log is not a second guard here and
- * deliberately not one: hiding a paid capability makes it look missing rather
- * than purchasable.
+ * Which page key the Audit Log address answers. Grants are not all the
+ * same: most are `organization:manage`, team detail is `team:view`. The
+ * plan gate below Enterprise is not a second guard.
  */
 
 import { organizationScreens } from "@langwatch/organization-web/screens/organization";

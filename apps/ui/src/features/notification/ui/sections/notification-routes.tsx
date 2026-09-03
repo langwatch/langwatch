@@ -1,13 +1,4 @@
-/**
- * Which page key the Email Suppressions address answers, and what it is wrapped in.
- *
- * ONE KEY, ONE SCREEN.
- *
- * THE CHROME IS THE POINT OF THIS KEY'S HISTORY. `specs/settings/settings-page-chrome.feature`
- * exists because this page once named the layout only as the guard's
- * `layoutComponent`, which frames the refusal and not the page; `uiPage`'s
- * settings layout frames both.
- */
+/** Which page key the Email Suppressions address answers: `uiPage`'s settings layout frames both the page and a refusal, unlike the old `layoutComponent` guard. */
 
 import { notificationScreens } from "@langwatch/notification-web/screens/email-suppressions";
 import type { ComponentType } from "react";

@@ -17,7 +17,7 @@ import type { ChatTransport, UIMessage } from "ai";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types";
+import type { LangyUiActionHandlers } from "../../../../../model/ui-actions/langy-ui-action-types";
 
 // The auto-resizing textarea (Ark's field-textarea) reaches for
 // ResizeObserver on mount, which jsdom does not implement.
@@ -84,9 +84,8 @@ const subscription = vi.fn((_input: unknown, _options: unknown) => ({
 }));
 
 vi.mock("../../../../../behavior/langy-api", async () => {
-  const { createTrpcUtils, idleQuery, withFallback } = await import(
-    "../../../__tests__/support/langy-api-mock"
-  );
+  const { createTrpcUtils, idleQuery, withFallback } =
+    await import("../../../__tests__/support/langy-api-mock");
 
   const trpcUtils = createTrpcUtils();
 
@@ -206,6 +205,9 @@ class FakeLangyHost extends LangyHostPort {
     return true;
   }
   isLoading() {
+    return false;
+  }
+  isDemoProject() {
     return false;
   }
   featureFlag(flag: string) {

@@ -1,17 +1,7 @@
 /**
- * The project home, as this application composes it.
- *
- * The page lives in `@langwatch/project-web`; what belongs to the application
- * is the page key it answers, the `return_to` redirect that wraps it, the
- * transport its hooks run on, and the host port that turns this application's
- * capabilities into the questions the page asks.
- *
- * IT IS ITS OWN FRONTEND FEATURE rather than a second entry under
- * `features/project`, and the split follows the package's own: the settings
- * page is `/settings` and answers `organization:view`, the home is `/[project]`
- * and answers nothing — two addresses, two policies, two host ports. What they
- * share is a workspace graph, and they share it the only way that matters:
- * both ask `organization.getAll` with the same input, which is one cache entry.
+ * The project home: the page key, the `return_to` redirect, the transport
+ * and the host port. Its own frontend feature, not a second entry under
+ * `features/project` — `/[project]` and `/settings` differ in policy.
  */
 
 import { homeApi } from "@langwatch/project-web/screens/home";

@@ -1,25 +1,7 @@
 /**
- * What the two API Key screens are mounted inside.
- *
- * Two things go around `/settings/api-keys` and `/cli/auth`: the tRPC Provider
- * the package's own hooks run on, and the host port that answers for the scope,
- * the grants, the visible scopes, the organization graph, the session, the
- * address, the feedback, the clipboard, the lead-source stamp, the one platform
- * drawer and the three CLI device-flow calls — and nothing else. A screen stays
- * a screen module.
- *
- * The reads live here because the port is satisfied structurally: `organization.getAll`
- * is asked with the same input the application shell asks with, which under
- * tRPC's path-plus-input cache key is the same entry: the graph is fetched once
- * for the document however many halves of the product want it. Both screens
- * read it, for different things — the settings page for the scope filter's
- * options and the legacy project key, the CLI page for the project picker's
- * ownership and slug facts.
- *
- * THE TEAM IS DERIVED, NOT ASKED, the same way the retention and model-provider
- * families derive it: `UiActiveScope` carries the organization and the project,
- * and the scope filter also needs the team the project belongs to. It is one
- * lookup in the graph already read.
+ * What the two API Key screens are mounted inside: the tRPC Provider their
+ * hooks run on, and the host port for scope, grants, org graph, session,
+ * address, feedback, clipboard, lead-source and the CLI device-flow calls.
  */
 
 import {
@@ -47,12 +29,9 @@ import { recordLeadSourceIfAbsent } from "../../behavior/api-key-lead-source";
 import { openPlatformDrawer } from "../../behavior/api-key-platform-drawer";
 
 /**
- * Where the API a minted key will be used against lives.
- *
- * A composition whose HTML shell carries no configuration is a self-hosted one
- * with no stated base URL rather than a broken one: the snippets then name the
- * cloud endpoint, which is the same default `build-mcp-config` has always used.
- * The governance family reads the same fact the same way.
+ * Where the API a minted key will be used against lives: no configured base
+ * URL means a self-hosted deployment with none stated, not a broken one, so
+ * this falls back to the same cloud endpoint `build-mcp-config` defaults to.
  */
 function readApiEndpoint(): string {
   try {
@@ -63,13 +42,9 @@ function readApiEndpoint(): string {
 }
 
 /**
- * The `#...` part of the address, without the hash.
- *
- * `UiRoutePort` answers params and query and carries no fragment, and a screen
- * may not read `window.location` — so the whole address comes from the global
- * layer's `useUiAddress`, which is the seam that keeps `react-router` out of a
- * feature. A trace's API-key attribute deep-links to `#api-key-<id>`, and the
- * settings screen re-does the scroll once its rows exist.
+ * The `#...` part of the address, without the hash. `UiRoutePort` carries no
+ * fragment and a screen may not read `window.location`, so this comes off
+ * the global layer's `useUiAddress` — the seam keeping `react-router` out.
  */
 function fragmentOf(address: string): string {
   const hash = address.indexOf("#");
@@ -77,12 +52,9 @@ function fragmentOf(address: string): string {
 }
 
 /**
- * The organization graph, as narrow as the two screens read it.
- *
- * `organization.getAll` answers a wide server row; what is named here is the
- * subset the package's own port declares, plus the two fields the API Keys table
- * needs off the active project — its name for the scope chip and its LEGACY
- * base key for the one row that renders one.
+ * The organization graph, narrowed to what the two screens read: the
+ * package's own port shape, plus the active project's name (scope chip)
+ * and legacy `apiKey` (the one row that renders one).
  */
 type OrganizationGraphEntry = {
   id: string;
@@ -174,14 +146,9 @@ export function ApiKeyHost({ children }: { children: ReactNode }) {
   const actor = session.currentUser();
 
   /**
-   * Three states from two answers, and the order matters.
-   *
-   * `/cli/auth` bounces a reader with no session through SSO, so reading "not
-   * signed in" one render too early would send a signed-in reader on a
-   * round-trip through sign-in. `isSettled()` is false until the organization
-   * read has answered, and `/cli/auth` is NOT in `UI_PUBLIC_ROUTES`, so that
-   * read is enabled from the first render and the loading state is real rather
-   * than incidental.
+   * Three states from two answers, order matters: `/cli/auth` bounces a
+   * signed-out reader through SSO, so reading "not signed in" one render too
+   * early would round-trip a signed-in reader. `isSettled()` gates it.
    */
   const sessionStatus: ApiKeySessionStatus = actor
     ? "authenticated"

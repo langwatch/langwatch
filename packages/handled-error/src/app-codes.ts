@@ -405,6 +405,7 @@ export const APP_ERROR_CODES = [
   "scope_not_in_organization",
   "seat_billing_unavailable",
   "service_unavailable",
+  "session_read_failed",
   "share_link_exhausted",
   "share_link_expired",
   "share_link_forbidden",

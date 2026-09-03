@@ -1,17 +1,13 @@
 /**
- * What the Integrations screen is mounted inside.
- *
- * Two things go around `/settings/integrations`: the tRPC Provider the
- * package's own hooks run on, and the host port that answers for the
- * organization, the address, the failure notice and the two departures.
- *
- * THE ORGANIZATION IS THE SESSION'S ACTIVE SCOPE. `platform/app` read it off
- * `useOrganizationTeamProject`, which resolves the whole organization graph for
- * one id; the capability layer already holds that id, so the screen is handed
- * it directly and no graph is fetched for this page at all.
+ * What the Integrations screen is mounted inside: the tRPC Provider its
+ * hooks run on, and the host port for organization, address, feedback and
+ * departures. The organization is the session's active scope — no graph fetched for this page.
  */
 
-import { GithubHostProvider, type GithubHostPort } from "@langwatch/github-web/screens/integrations";
+import {
+  GithubHostProvider,
+  type GithubHostPort,
+} from "@langwatch/github-web/screens/integrations";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";

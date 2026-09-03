@@ -1,15 +1,6 @@
 /**
- * What the analytics screens are mounted inside.
- *
- * Two things go around `/:project/analytics` and its eight sibling addresses:
- * the tRPC Provider the package's own hooks run on, and the host port that
- * answers for the project, the reader's grants, the address and the feedback.
- * Both are mounted here, once, so a screen module stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it.
+ * What the analytics screens are mounted inside: the tRPC Provider their
+ * hooks run on, and the host port for project, grants, address and feedback.
  */
 
 import {

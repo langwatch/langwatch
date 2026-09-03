@@ -192,8 +192,26 @@ describe("given a project pick in the switcher", () => {
 
     it("keeps the project home a project home", () => {
       expect(
-        projectSwitchHref({ pathname: "/acme-app", currentSlug: "acme-app", nextSlug: "acme-labs" }),
+        projectSwitchHref({
+          pathname: "/acme-app",
+          currentSlug: "acme-app",
+          nextSlug: "acme-labs",
+        }),
       ).toBe("/acme-labs");
+    });
+
+    /** @scenario Picking a project from a route with extra dynamic segments */
+    it("drops to the parent list route when the route has a second dynamic segment", () => {
+      // A trace id can't exist in another project, so the switch lands on the
+      // target project's trace list rather than a 404ing per-trace URL.
+      expect(
+        projectSwitchHref({
+          pathname: "/acme-app/traces/trace_abc",
+          routePattern: "/:project/traces/:traceId",
+          currentSlug: "acme-app",
+          nextSlug: "acme-labs",
+        }),
+      ).toBe("/acme-labs/traces");
     });
   });
 

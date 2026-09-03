@@ -1,10 +1,4 @@
-/**
- * Writes a scope choice through the application's own storage seam.
- *
- * Broadcast on every write, because the application still serves most of the
- * product from the same origin and its mounted `useLocalStorage` readers see
- * a write only through that event.
- */
+/** Writes a scope choice through the application's storage seam, broadcasting since same-origin `useLocalStorage` readers see a write only through that event. */
 
 import type { NavigationScopeWrite } from "@langwatch/navigation-web/screens/landing";
 import { broadcastUiScopeWrite, writeUiScopeSelection } from "../../../behavior/ui-scope-storage";

@@ -1,15 +1,7 @@
 /**
- * What the governance screens are mounted inside.
- *
- * Two things go around every `/governance/*` page: the tRPC Provider the
- * package's own hooks run on, and the host port that answers for the session,
- * the organization graph, the plan, the address and the feedback. Both are
- * mounted here, once, so a screen module stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it.
+ * What the governance screens are mounted inside: the tRPC Provider their
+ * hooks run on, and the host port for session, org graph, plan, address and
+ * feedback.
  */
 
 import {
@@ -23,12 +15,8 @@ import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { resolveGovernanceOrganization } from "../../behavior/governance-organization-lookup";
 
 /**
- * The deployment shape, read once.
- *
- * A composition whose HTML shell carries no configuration is a self-hosted one
- * with no stated base URL rather than a broken one: the install card then shows
- * the endpoint flag with the CLI's own default, which is what it showed before
- * any of this moved.
+ * The deployment shape, read once. No config means a self-hosted deployment
+ * with none stated, not a broken one — the install card falls back to the CLI's own default endpoint.
  */
 function readDeployment(): { isSaas: boolean; appBaseUrl: string } {
   try {

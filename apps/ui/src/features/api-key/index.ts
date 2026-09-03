@@ -1,12 +1,6 @@
 /**
- * The API Key family, as this application composes it.
- *
- * The two screens live in `@langwatch/api-key-web`; what belongs to the
- * application is everything they are not allowed to own — which page keys the
- * addresses answer, the settings chrome around one of them, the transport their
- * hooks run on, the host port that turns this application's capabilities into
- * the questions the family asks, and the CLI device-flow wire the published
- * `langwatch` binary is on the other side of.
+ * API Key: two screens in `@langwatch/api-key-web`, plus the CLI
+ * device-flow wire the published `langwatch` binary is on the other side of.
  */
 
 import { apiKeyApi } from "@langwatch/api-key-web/screens/api-key";

@@ -59,3 +59,11 @@ export {
   type ScenarioRouteReading,
   type ScenarioSuccessNotice,
 } from "../../model/scenario-host";
+
+/**
+ * The connected agents' own card grid (ADR-128), for `@langwatch/agent-web`'s
+ * agents page to plug into `AgentManagementHostPort.connectedSection()`.
+ * Presentational only — it reads its rows from props, not this package's
+ * transport — so no host is required to render it.
+ */
+export { ConnectedAgentsSection } from "../../ui/sections/agents/connected/connected-agents-section";

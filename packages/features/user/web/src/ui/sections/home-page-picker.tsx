@@ -52,7 +52,11 @@ export function HomePagePicker({ organizationId }: Props) {
   });
 
   const options = useMemo<PickerOption[]>(() => {
-    const firstProjectSlug = stateQuery.data?.firstProjectSlug ?? null;
+    // The resolver's OWN project slug, never `homePagePickerState`'s: that
+    // read is unfiltered and can name a personal workspace the resolver
+    // would never route to (ADR-038 v6) — offering it would pin a
+    // destination this same picker's "Auto" could never actually reach.
+    const firstProjectSlug = resolverQuery.data?.firstProjectSlug ?? null;
     const persona = resolverQuery.data?.persona;
     const opts: PickerOption[] = [
       {

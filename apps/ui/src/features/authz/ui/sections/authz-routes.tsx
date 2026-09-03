@@ -1,18 +1,7 @@
 /**
- * Which page keys the RBAC settings addresses answer, and what they are
- * wrapped in.
- *
- * TWO KEYS, TWO SCREENS. The keys still read `pages/settings/roles` and
- * `pages/settings/role-bindings`, and they are kept rather than renamed: the
- * route transcript in `apps/ui/tests` is the parity bar for the URL surface and
- * fails the moment a page key changes, so renaming one would spend that guard's
- * signal on a cosmetic edit.
- *
- * BOTH KEYS CARRY A PAGE-LEVEL GRANT, and it is `organization:manage` for a
- * reason the platform recorded in a regression pin: five legacy administration
- * pages once guarded themselves on permissions a MEMBER inherits, and the roles
- * page was one of them, so a member session could read the full organization.
- * `apps/ui/tests/authz-page-policy.integration.test.tsx` mounts the refusal.
+ * Which page keys the RBAC settings addresses answer. Both guard on
+ * `organization:manage`, not a member-inherited permission — a past
+ * regression let a member session read the whole organization.
  */
 
 import { AUTHZ_MANAGE_PERMISSION, authzScreens } from "@langwatch/authz-web/screens/authz";

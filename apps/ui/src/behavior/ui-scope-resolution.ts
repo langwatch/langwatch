@@ -1,23 +1,7 @@
 /**
- * Which organization, team and project a page is about.
- *
- * Harvested from the application's `useOrganizationTeamProject`, whose 770
- * lines are the only statement of these rules that exists. A second, slightly
- * different answer to "what project is this page about" is a tenancy bug, so
- * this is a move rather than a rewrite: same precedence, same reserved slugs,
- * same stickiness rules, same demo handling. What changed is the shape — the
- * decisions are pure functions over route, storage and data, and the hook that
- * feeds them lives at the edge in `ui-session`.
- *
- * The order of preference, top to bottom:
- *
- *   1. the demo project, when the address names the deployment's demo slug
- *   2. a `?team=` slug that matches a team the caller can see
- *   3. a `:project` slug in the address bar, reserved slugs excluded
- *   4. the same slug carried over from storage, unless it is stale (below)
- *   5. the caller's own personal workspace, on the personal-workspace pages
- *   6. the remembered team, when the caller can still be shown it
- *   7. the ambient team — a shared team the caller is on, project first
+ * Which organization, team and project a page is about — a pure-function
+ * harvest of the 770-line `useOrganizationTeamProject` (same rules,
+ * moved not rewritten). Precedence order: `ui-family-move-manifests.md`.
  */
 
 import {
@@ -32,11 +16,9 @@ import {
 } from "../model/ui-scope";
 
 /**
- * Whether the caller holds a membership on this team.
- *
- * `organization.getAll` returns every team in the organization but narrows
- * `team.members` to the caller's own row, synthesizing one from a RoleBinding
- * when the legacy membership row is absent.
+ * Whether the caller holds a membership on this team — `organization.getAll`
+ * narrows `team.members` to the caller's own row, synthesizing one from
+ * a RoleBinding when the legacy membership row is absent.
  */
 export function userBelongsToTeam(team: Pick<UiScopeTeam, "members">, userId: string): boolean {
   return team.members?.some((member) => member.userId === userId) ?? false;
@@ -51,17 +33,9 @@ export function organizationRoleOf(
 }
 
 /**
- * Whether the caller can be shown a team's context.
- *
- * A membership row answers it, and so does the organization ADMIN role on its
- * own: `organization.getAll` hands an admin every team of the organization
- * with no membership row in most of them, and the server grants team
- * permissions on the admin role alone. The chrome applies the same two-part
- * test, so a context this accepts is one a page renders rather than refuses.
- *
- * A caller with no user id yet is not held to the test: the session is still
- * resolving, and refusing there would drop a selection that is about to be
- * valid.
+ * Whether the caller can be shown a team's context — a membership row,
+ * or the organization ADMIN role alone. No user id yet: not held to
+ * the test, since the session is still resolving.
  */
 export function userCanOpenTeam({
   team,
@@ -78,23 +52,9 @@ export function userCanOpenTeam({
 }
 
 /**
- * Ambient team for organization-level work.
- *
- * Membership decides first. The teams list carries the whole organization, not
- * just the caller's corner of it, so a preference expressed purely as "the
- * first team shaped like X" hands members a team they are not on the moment an
- * organization has more than one — and everything scoped to the ambient
- * project then aims at a project in someone else's team.
- *
- * Within the teams the caller does belong to, the order is: a shared team that
- * already holds a project, then any shared team, then whatever is left.
- *
- * Personal workspaces sort last because they are a private context — one
- * project, owned by one person — while everything scoped to the ambient
- * project belongs to the organization. A personal team always holds exactly
- * one project, so a plain "first team with a project" lookup lets it win
- * whenever it sorts first. An organization whose only team is personal still
- * resolves to it, so a solo user is never left without a context.
+ * Ambient team for organization-level work. Membership decides first —
+ * the teams list carries the whole organization, not just the caller's
+ * corner. Ordering and the personal-sorts-last rule: `ui-family-move-manifests.md`.
  */
 export function selectAmbientTeam<
   T extends {
@@ -132,10 +92,8 @@ export type UiScopeResolutionInput = {
 };
 
 /**
- * One organization / team / project match for a project slug.
- *
- * A slug is unique within a team, never across the whole graph, so a match
- * carries the organization and team it was found under.
+ * One match for a project slug — unique within a team, never across the
+ * whole graph, so a match carries the organization and team it was found under.
  */
 type UiSlugMatch = {
   organization: UiScopeOrganization;
@@ -163,12 +121,10 @@ export function resolveUiScope({
       )
     : void 0;
 
-  // The address bar is what separates "the user is in their personal
-  // workspace" from "the app picked it for them". A personal project or team
-  // named in the URL resolves exactly like any other; the persisted selection
-  // does not, because nothing on an organization-scoped page tells the user
-  // which project it is about to write to. A `?team=` that resolves to no team
-  // the user can see addresses nothing, so it stays out of the predicate.
+  // The address bar separates "the user is in their personal workspace"
+  // from "the app picked it for them": a URL slug resolves like any
+  // other, but the persisted selection does not (see the stickiness rule
+  // in `ui-family-move-manifests.md`).
   const isAddressedBySlug = !!projectSlugFromUrl || !!teamsMatchingSlug?.[0];
 
   const slugMatches: UiSlugMatch[] =
@@ -198,21 +154,10 @@ export function resolveUiScope({
     (userId ? slugMatches.find((match) => userBelongsToTeam(match.team, userId)) : void 0) ??
     slugMatches[0];
 
-  // A slug that resolved off the persisted selection rather than off the URL
-  // is stickiness, not intent: it survives from the last visit to a project
-  // page into every organization-scoped page that carries no project of its
-  // own. Three kinds have to be dropped there — a personal workspace is a
-  // private context the caller never asked to work in, a team the caller
-  // cannot be shown is one the chrome refuses outright, and any project at all
-  // is the wrong answer on the personal-workspace pages. All three let the
-  // ambient resolution below pick again, and the pick is re-persisted, so the
-  // stale selection heals itself.
-  //
-  // An organization admin passes the second test on their role, so the project
-  // they picked in a team they hold no membership row in stays picked. A slug
-  // named in the address bar keeps resolving exactly as before, including into
-  // a team the caller cannot open: the refusal that follows is the plain
-  // answer to typing someone else's project into the URL.
+  // Stale stickiness, not intent — dropped for a personal workspace, a
+  // team the chrome refuses, or any project on personal-workspace pages;
+  // the ambient pick below re-resolves and re-persists, healing itself.
+  // Admin-role and URL-slug edge cases: `ui-family-move-manifests.md`.
   const stickySlugIsUnusable =
     !!slugMatch &&
     !isAddressedBySlug &&
@@ -244,12 +189,9 @@ export function resolveUiScope({
             organizations[0])
           : void 0;
 
-  // The personal workspace itself, on the pages that are about it. Checked
-  // BEFORE the remembered-team lookup, not merely added as a further fallback
-  // after it: a caller who visited any organization-scoped page earlier in the
-  // session has a shared team id persisted, that stale selection legitimately
-  // wins on THOSE pages, and it must never win on the personal-workspace
-  // pages, which cannot mean anything else.
+  // Checked BEFORE the remembered-team lookup, not as a fallback after
+  // it — a stale shared-team id persisted from an earlier organization
+  // page must never win on the personal-workspace pages.
   const ownPersonalTeam = route.isPersonalScopeRoute
     ? organization?.teams.find((team) => team.isPersonal && team.ownerUserId === userId)
     : void 0;
@@ -311,13 +253,9 @@ export type UiScopeSelectionWrite =
   | { readonly key: "projectSlug"; readonly value: string };
 
 /**
- * What the resolution should leave behind for the next page.
- *
- * Pure, and every write is guarded by "it differs from what is already
- * stored". That guard is not an optimisation: each write broadcasts a storage
- * event that re-renders every mounted reader, and an unguarded write re-fires
- * on every pass — inside a route transition's effect cascade that trips
- * React's nested-update limit and wedges navigation.
+ * What the resolution should leave behind — every write is guarded by
+ * "differs from what's stored": unguarded, each write's storage event
+ * re-renders every reader, tripping React's nested-update limit mid-navigation.
  */
 export function uiScopeSelectionWrites({
   resolved,
@@ -336,11 +274,9 @@ export function uiScopeSelectionWrites({
     writes.push({ key: "organizationId", value: organization.id });
   }
 
-  // The remembered selection answers "where was I working", which is a
-  // question about the organization's teams and projects. A personal workspace
-  // is not one of them: written here it replaces the project the reader had
-  // open. The private context resolves from its own address every time, so it
-  // needs nothing remembered.
+  // "Where was I working" is a question about the organization's teams
+  // and projects — a personal workspace isn't one; it resolves from its
+  // own address every time, so nothing about it needs remembering.
   if (!team?.isPersonal) {
     if (team && team.id !== selection.teamId) {
       writes.push({ key: "teamId", value: team.id });

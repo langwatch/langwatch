@@ -1,20 +1,7 @@
 /**
- * Web Storage and a console logger, as capabilities a frontend feature can ask
- * for.
- *
- * A frontend feature may not name a browser global — `ui-browser-capability`
- * says so, and it is right to: a feature that reaches `window` directly cannot
- * be mounted anywhere else. The global layer can, which is where
- * `ui-scope-storage.ts` already keeps the application's own selection memory.
- *
- * The storage is read through a getter rather than captured once: this module
- * is on the boot graph and `window` is not guaranteed to exist at import time,
- * while every call that reaches it happens in a render or an event handler.
- *
- * The logger is the console. `@langwatch/observability` is a first-party
- * implementation package a frontend feature may not import either, and what
- * this logs — a corrupt or missing record in a feature's own persisted state —
- * is a developer's problem rather than a customer's.
+ * Web Storage and a console logger, as capabilities a frontend feature
+ * asks for — a feature may not name `window` directly. Read through a
+ * getter, not captured once, since `window` isn't guaranteed at import time.
  */
 
 /** The subset of Web Storage a persisted feature state needs, enumeration included. */
@@ -47,13 +34,9 @@ export const browserUiStorage: UiBrowserStorage = {
 };
 
 /**
- * Per-TAB storage, for state that must not outlive the visit.
- *
- * The CLI authorize screen's first-touch acquisition stamp lives here rather
- * than in `localStorage`, because that is where `platform/app`'s attribution
- * module put it: a lead source belongs to the visit that produced the signup,
- * and a value that survived the tab would attribute a later signup to a campaign
- * the reader arrived on weeks ago.
+ * Per-TAB storage, for state that must not outlive the visit — a lead
+ * source belongs to the visit that produced the signup, and a value that
+ * survived the tab would attribute a later signup to a stale campaign.
  */
 export const browserUiSessionStorage: UiBrowserStorage = {
   get length() {

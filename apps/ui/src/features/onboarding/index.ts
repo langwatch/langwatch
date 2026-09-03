@@ -1,11 +1,7 @@
 /**
- * The onboarding family, as this application composes it.
- *
- * The five screens live in `@langwatch/onboarding-web`; what belongs to the
- * application is which page keys the addresses answer, the transport their hooks
- * run on, and the host port that turns this application's capabilities into the
- * questions the family asks — including `revealProjectApiKey()`, which is how the
- * setup guide gets a base key without the scope graph ever carrying one.
+ * Onboarding: five screens in `@langwatch/onboarding-web`.
+ * `revealProjectApiKey()` is how the setup guide gets a base key without
+ * the scope graph ever carrying one.
  */
 
 import { onboardingApi } from "@langwatch/onboarding-web/screens/onboarding";

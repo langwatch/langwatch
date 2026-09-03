@@ -1,24 +1,9 @@
 import type { Logger, LogLevel, LogType } from "vite";
 
 /**
- * The dev server's lane, printed the way the other four lanes print theirs.
- *
- * `pnpm dev` puts Vite, two Node applications, two Go services and a vendored
- * ClickHouse driver in one terminal, and Vite's own logger was the odd one out
- * twice over: a twelve-hour clock with no milliseconds, and a `[vite]` tag
- * repeating what `concurrently`'s own `[ui]` prefix already said. So a line
- * here reads
- *
- *   [13:10:46.108] INFO (vite): ready in 812 ms
- *
- * — the same columns as the Node lanes, whose pino-pretty console prints
- * exactly this shape.
- *
- * It also collapses the proxy's failures. With the api lane down, Vite logs a
- * red `http proxy error: <url>` and a full AggregateError stack for EVERY
- * request the browser makes, and a single boot with the api lane failing to
- * bind buried the one line that said why. The same fact, said once per target
- * every few seconds, is the whole of what a developer can act on.
+ * The dev server's lane, printed in the same shape the four Node/Go lanes
+ * use instead of Vite's own two-digit clock and `[vite]` tag. Also collapses
+ * a proxy failure to one line instead of a stack repeated per request.
  */
 
 export interface DevLogSink {
@@ -41,10 +26,9 @@ export function timeOfDay(at: Date): string {
 }
 
 /**
- * One line, in the shape every lane prints.
- *
- * A message spanning several lines — Vite's startup banner, a stack — keeps
- * its own shape after the first line rather than being prefixed line by line.
+ * One line, in the shape every lane prints — a multi-line message (Vite's
+ * startup banner, a stack) keeps its own shape after the first line rather
+ * than being prefixed line by line.
  */
 export function devLogLine({
   level,
@@ -69,10 +53,9 @@ function proxyFailurePath(message: string): string | null {
 }
 
 /**
- * Vite colours its own messages; the pattern match must not depend on that.
- *
- * Built rather than written as a literal because the escape it matches is a
- * control character, which a regular expression literal may not carry.
+ * Built rather than written as a literal: the escape this matches is a
+ * control character, which a regex literal may not carry. Strips Vite's own
+ * ANSI colour before the proxy-failure pattern match runs.
  */
 const ANSI_COLOUR = new RegExp(String.fromCharCode(27) + "\\[[0-9;]*m", "g");
 
@@ -90,10 +73,9 @@ export interface DevLoggerOptions {
 }
 
 /**
- * Vite's `customLogger`, which is where the proxy's failures are caught as
- * well as formatted: Vite logs them through `config.logger.error` itself,
- * after any `configure` hook has run, so a per-entry handler would silence
- * nothing and this one place covers all eleven proxy entries at once.
+ * Vite's `customLogger` — where proxy failures are caught, since Vite routes
+ * them through `config.logger.error` after any `configure` hook runs, so
+ * this one place covers all eleven proxy entries at once.
  */
 export function createDevLogger(options: DevLoggerOptions): Logger {
   const sink = options.sink ?? CONSOLE_SINK;

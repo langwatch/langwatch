@@ -1,11 +1,4 @@
-/**
- * What this package installs for itself, and how a host's install meets it.
- *
- * The governance move made `apps/ui` a package that serves pages, and this is
- * the seam that made that possible without editing the host: the loaders and
- * the feature transports are declared here, merged under whatever the composing
- * application passes.
- */
+/** What this package installs for itself, and how a host's install merges over it. */
 
 import { describe, expect, it } from "vitest";
 import { UiFeedbackPort } from "../src/behavior/ui-capabilities";
@@ -21,13 +14,7 @@ const AGENT_PAGE_KEYS = [
 ];
 
 const ANALYTICS_PAGE_KEYS = [
-  // NINE keys for EIGHT screens. Seven addresses are their own screen; the
-  // chart builder serves two and is told which by a `mode` prop, the
-  // automations tab-as-prop shape applied to a form. All nine carry the same
-  // grant — every one of the platform page files was
-  // `withPermissionGuard("analytics:view")` — and
-  // `analytics-page-policy.integration.test.tsx` asserts that in both
-  // directions, key by key.
+  // Nine keys for eight screens: the chart builder serves two, told apart by a `mode` prop.
   "pages/[project]/analytics/index",
   "pages/[project]/analytics/users",
   "pages/[project]/analytics/topics",
@@ -40,16 +27,8 @@ const ANALYTICS_PAGE_KEYS = [
 ];
 
 const ANNOTATION_PAGE_KEYS = [
-  // FOUR keys for ONE screen, the automations shape applied to a list: the
-  // four addresses were four page files that differed only in the props they
-  // handed one table, so the feature maps each key to the VIEW it shows and the
-  // screen is told rather than reading the address.
-  //
-  // THE FIFTH ADDRESS IS HERE NOW. `/annotations/my-queue` was the one key of
-  // the family that stayed behind, because the queue walker mounts the trace
-  // family's conversation view; that view is `@langwatch/trace-web`'s since the
-  // traces move, so the walker came with it — and it takes its own screen
-  // rather than a view of the list's.
+  // Five keys, one screen (view-as-prop) — except `my-queue`, whose walker
+  // mounts `@langwatch/trace-web`'s conversation view with its own screen.
   "pages/[project]/annotations",
   "pages/[project]/annotations/me",
   "pages/[project]/annotations/all",
@@ -58,14 +37,8 @@ const ANNOTATION_PAGE_KEYS = [
 ];
 
 const EXPERIMENT_PAGE_KEYS = [
-  // FIVE keys, four screens. `/experiments` used to resolve a NAMED export of
-  // the evaluations module, because the guard wrapper was what that address
-  // served; the guard is the route's now, so the key names a plain default.
-  //
-  // The last of them is the retired evaluation wizard's forward, and it lives
-  // with the experiments rather than with the evaluations: its only read is
-  // `experiments.getExperimentBySlugOrId` and its branch turns on
-  // `ExperimentType`, so ownership put it here.
+  // Five keys, four screens — the retired evaluation wizard's forward lives
+  // here since its only read is `experiments.getExperimentBySlugOrId`.
   "pages/[project]/experiments/index",
   "pages/[project]/experiments/[experiment]",
   "pages/[project]/experiments/workbench/index",
@@ -82,38 +55,19 @@ const EVALUATION_EDIT_PAGE_KEYS = [
 ];
 
 const API_KEY_PAGE_KEYS = [
-  // Two keys, one package, one frontend feature — and they had to ship
-  // together: `/cli/auth` imports the permission ceiling and the category
-  // picker Settings > API Keys owns, so moving one without the other would have
-  // left the CLI screen importing files the settings move deletes. Neither
-  // carries a page-level grant; `api-key-page-policy.integration.test.tsx`
-  // asserts that in both directions.
+  // Shipped together: `/cli/auth` imports files the Settings > API Keys move owns.
   "pages/settings/api-keys",
   "pages/cli/auth",
 ];
 
 const AUTHORIZE_PAGE_KEYS = [
-  // The two handoff addresses, and the last pages the manifests held back. They
-  // are screens of `@langwatch/api-key-web` rather than a package of their own:
-  // `/authorize` prints the same legacy project key the API Keys table renders,
-  // off the same procedure under the same permission check, so splitting them
-  // would have meant two packages asking `organization.getAll` for one key.
-  //
-  // NEITHER CARRIES A PAGE-LEVEL GRANT, which is the platform pages' policy one
-  // for one: `/authorize` refuses nobody — a reader without `project:update`
-  // gets the server's own empty key — and `/mcp/authorize` does its own session
-  // redirect, which a guard would pre-empt.
+  // Screens of `@langwatch/api-key-web`, not a package of their own — both read the same procedure. Neither carries a page-level grant.
   "pages/authorize",
   "pages/mcp/authorize",
 ];
 
 const ONBOARDING_PAGE_KEYS = [
-  // Five keys, one package, TWO frames. The four `/onboarding/*` addresses sit
-  // OUTSIDE the application chrome exactly where the route table puts them —
-  // there is no project to switch between yet — and carry no page-level grant,
-  // because a grant is resolved against a scope and these readers have none.
-  // `/:project/setup` is inside the chrome like every project-scoped address and
-  // keeps the `project:view` grant its platform page carried.
+  // The four `/onboarding/*` addresses sit outside the chrome (no project yet, no grant); `/:project/setup` is inside it, guarded by `project:view`.
   "pages/onboarding",
   "pages/onboarding/welcome",
   "pages/onboarding/product/index",
@@ -149,24 +103,14 @@ const AUTH_PAGE_KEYS = [
   "pages/invite/accept",
 ];
 
-/**
- * The chrome layout route, which is a KEY and not a page: the route table entry
- * that names it carries children and no path, so it renders the header and the
- * navigation host around whatever matched below it. It is registered the same
- * way every page is, because the loader registry is the one seam the route table
- * resolves a component through.
- */
+/** A key, not a page: the route table entry that names it carries children and no path. */
 const CHROME_PAGE_KEYS = ["features/chrome/UiAppChrome"];
 
 /**
  * The root address, `/`. Its whole body is the landing redirect, and it carries
  * no page guard for the same reason the front door carries none.
  */
-const NAVIGATION_PAGE_KEYS = [
-  "pages/@project/[...path]/index",
-  "pages/index",
-  "pages/not-found",
-];
+const NAVIGATION_PAGE_KEYS = ["pages/@project/[...path]/index", "pages/index", "pages/not-found"];
 
 const AUTHZ_PAGE_KEYS = [
   // Two settings keys, one package, one frontend feature. BOTH carry a
@@ -255,12 +199,7 @@ const GITHUB_PAGE_KEYS = [
 ];
 
 const ORGANIZATION_PAGE_KEYS = [
-  // Five keys now, and the same rule chose all five. `organization.getAuditLogs`
-  // is `@langwatch/organization-server`'s transport and `EnrichedAuditLog` is
-  // `@langwatch/organization-contract`'s, so the credentials family's rule —
-  // a key belongs to the family that owns its transport — puts the audit log
-  // here; members, teams, the one team and groups arrived behind it, off the
-  // same `organization`, `team` and `group` routers.
+  // A key belongs to the family that owns its transport — all five read the `organization`, `team` or `group` routers.
   "pages/settings/audit-log",
   "pages/settings/groups",
   "pages/settings/members",
@@ -352,20 +291,10 @@ const WORKFLOW_PAGE_KEYS = [
   "pages/[project]/studio/[workflow]",
 ];
 
-/**
- * The Langy dock's LAYOUT key, which is a key and not a page for the same
- * reason the chrome's is: the two route-table entries that name it carry
- * children and no path, so the dock stays mounted while the pages below it
- * swap and one conversation survives a navigation.
- */
+/** The Langy dock's layout key: a key, not a page, so the dock stays mounted while pages below it swap. */
 const LANGY_PAGE_KEYS = ["features/langy/ProjectLangyLayout"];
 
-/**
- * The run board, the Scenario Library and Agent Testing — one product surface
- * over one transport, so one package and one frontend feature. The board's key
- * answers three route-table rows, because a catch-all page serves All Runs, a
- * run plan and an external set without a page transition.
- */
+/** One board key answers three route-table rows: a catch-all page serves All Runs, a run plan and an external set. */
 const SIMULATION_PAGE_KEYS = [
   "pages/[project]/simulations/[[...path]]",
   "pages/[project]/simulations/scenarios/index",
@@ -420,21 +349,7 @@ const GOVERNANCE_PAGE_KEYS = [
   "pages/governance/users/[id]",
 ];
 
-/**
- * The project home, at `/[project]`.
- *
- * ONE KEY, and it is the LAST legacy loader `platform/app` held: its registry
- * is empty now, so nothing is left that only that application can serve.
- *
- * The key still names the platform module path it was born with, the way every
- * other family's does. The route transcript is the parity bar for the URL
- * surface and fails on any page-key change, so a cosmetic rename would spend
- * that guard's signal for nothing.
- *
- * It carries NO page-level grant, and the platform page carried none either:
- * reaching a project at all is what the scope resolution already decided, and
- * every section of the home gates its own reads.
- */
+/** The project home, `/[project]`: the last legacy loader `platform/app` held. No page-level grant — scope resolution already decided reachability. */
 const HOME_PAGE_KEYS = ["pages/[project]/index"];
 
 describe("given what apps/ui serves itself", () => {

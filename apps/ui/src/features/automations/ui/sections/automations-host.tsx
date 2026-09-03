@@ -1,18 +1,7 @@
 /**
- * What the automations screen and its two editors are mounted inside.
- *
- * Two things go around every `/:project/automations*` page: the tRPC Provider
- * the package's own hooks run on, and the host port that answers for the scope,
- * the permissions, the flags, this deployment's address, the query string and
- * the feedback. Both are mounted here, once, so a screen module stays a screen
- * module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it. This family reads the TEAM off it as well as the organization and
- * project, because the Slack delivery provider stamps a message with the team
- * the automation belongs to.
+ * What the automations screen and its two editors are mounted inside: the
+ * tRPC Provider their hooks run on, and the host port for scope, permissions,
+ * flags, address and feedback. Reads the team too, since Slack delivery stamps a message with it.
  */
 
 import {
@@ -30,11 +19,8 @@ import { DRAWER_OPEN_PARAM } from "../../../drawers";
 
 /**
  * This application's own address, for the links a rendered preview prints.
- *
- * A composition whose HTML shell carries no configuration is a self-hosted one
- * with no stated address rather than a broken one: the preview then prints the
- * hosted application, which is the same fallback `platform/app` applied when
- * the drawer rendered outside a browser.
+ * No configured base URL means a self-hosted deployment with none stated,
+ * not a broken one, so this falls back to the hosted application's address.
  */
 function readAppBaseUrl(): string {
   try {
@@ -50,13 +36,7 @@ export function AutomationsHost({ children }: { children: ReactNode }) {
 
   const organizations = automationApi.organization.getAll.useQuery({ isDemo: false });
 
-  /**
-   * The organization, team and project the address is about.
-   *
-   * Resolved from the one graph read rather than from three: the scope names an
-   * organization and a project, and the team is whichever one holds the
-   * project.
-   */
+  /** The organization, team and project the address is about, resolved from the one graph read rather than three. */
   const placement = useMemo(() => {
     const organization = (organizations.data ?? []).find(
       (candidate) => candidate.id === scope.organizationId,

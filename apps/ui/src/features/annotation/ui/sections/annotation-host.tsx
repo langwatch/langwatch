@@ -1,18 +1,7 @@
 /**
- * What the annotations screen is mounted inside.
- *
- * Two things go around `/:project/annotations` and its three sibling addresses:
- * the tRPC Provider the package's own hooks run on, and the host port that
- * answers for the project, the reviewer, their grants and membership, whether
- * this is their own personal workspace, the address and the feedback. Both are
- * mounted here, once, so a screen module stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it. This family reads it for two answers — which project the address is
- * about, and whether the TEAM that project sits on is the reviewer's own
- * personal one.
+ * What the annotations screen is mounted inside: the tRPC Provider its hooks
+ * run on, and the host port for project, reviewer, grants/membership,
+ * personal-workspace flag, address and feedback.
  */
 
 import {
@@ -34,13 +23,7 @@ export function AnnotationHost({ children }: { children: ReactNode }) {
 
   const actor = session.currentUser();
 
-  /**
-   * The project the address is about, and the team it sits on.
-   *
-   * Resolved from the one graph read rather than from a second query. Without a
-   * project in scope the screen renders its empty shell, which is what the
-   * platform pages did: every annotation belongs to a project.
-   */
+  /** The project the address is about, and the team it sits on — resolved from the one graph read. */
   const placement = useMemo(() => {
     if (!scope.projectId) return void 0;
     for (const organization of organizations.data ?? []) {

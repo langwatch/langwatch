@@ -1,17 +1,7 @@
 /**
- * Which page key the Langy layout route answers.
- *
- * A LAYOUT key, not a page key — the same shape `features/chrome/UiAppChrome`
- * takes: the two route-table entries that name it carry children and no path,
- * so React Router keeps it mounted while the pages below it swap. That is the
- * whole reason the dock keeps one conversation, one open panel and one live
- * turn across a navigation, and it is what `specs/langy/langy-navigation-persistence.feature`
- * pins.
- *
- * THE OUTLET IS THIS APPLICATION'S. `@langwatch/langy-web` renders the layout
- * around whatever it is given; which router is below it is the composition's
- * business, and `react-router` is sealed off from a feature package's screens
- * anyway. So the package's layout takes children, and this supplies them.
+ * Which page key the Langy layout route answers: a layout key, not a page
+ * key — kept mounted while pages below it swap, which is how the dock keeps
+ * one conversation across a navigation. The outlet is this application's.
  */
 
 import { ProjectLangyLayout } from "@langwatch/langy-web/screens/langy-layout";

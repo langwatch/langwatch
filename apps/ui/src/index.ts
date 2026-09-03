@@ -81,18 +81,22 @@ export {
 export {
   BrowserUiSession,
   readUiDemoProjectSlug,
+  UI_SIGN_IN_PATH,
   UiFeatureFlagRequests,
+  uiSignedOutDeparture,
   useBrowserUiSession,
   type BrowserUiSessionState,
   type UiSessionSource,
 } from "./behavior/ui-session";
 export {
   readUiActor,
+  SessionReadFailedError,
   toUiActor,
   uiAuthClient,
   UI_SESSION_PATH,
   UI_SESSION_QUERY_KEY,
   type UiAuthClient,
+  type UiSessionReading,
 } from "./behavior/ui-session-client";
 export {
   UI_EFFECTIVE_PERMISSIONS_PROCEDURE,

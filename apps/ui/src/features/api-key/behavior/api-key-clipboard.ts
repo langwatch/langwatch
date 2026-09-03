@@ -1,11 +1,7 @@
 /**
- * A clipboard write that only claims success once the write actually landed.
- *
- * A clipboard write can be refused — Safari private mode, a non-secure
- * context — and the refusal arrives as a rejection rather than as a return
- * value. Telling the reader "copied" for a write that did not happen is worse
- * than saying nothing, because the failure only shows up when they paste a
- * credential that does not work.
+ * A clipboard write that only claims success once the write actually
+ * landed: a refusal (Safari private mode, a non-secure context) arrives as
+ * a rejection, and silently saying "copied" is worse than saying nothing.
  */
 
 import type {

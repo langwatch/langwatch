@@ -1,19 +1,7 @@
 /**
- * What the personal-workspace screens are mounted inside.
- *
- * Two things go around every `/me/*` page and the two project-scoped
- * coding-agent pages: the tRPC Provider the package's hooks run on, and the
- * host port that answers for the session, the organization graph, the
- * deployment, the address and the feedback. Both are mounted here, once, so a
- * screen module stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it. This family reads one more thing off it than the gateway family
- * does — the caller's own membership row, which the read narrows to them, and
- * whose `role` is what tells a view-only member why their own workspace refuses
- * writes.
+ * What the personal-workspace screens are mounted inside: the tRPC Provider
+ * their hooks run on, and the host port for session, org graph, deployment,
+ * address and feedback — including the caller's own membership `role`.
  */
 
 import {
@@ -39,11 +27,8 @@ import {
 } from "../../behavior/personal-workspace-scope-lookup";
 
 /**
- * The deployment shape, read once.
- *
- * A composition whose HTML shell carries no configuration is a self-hosted one
- * with no stated address rather than a broken one: the install copy then prints
- * the hosted application, which is the same fallback the CLI itself applies.
+ * The deployment shape, read once. No config means a self-hosted
+ * deployment with none stated, not a broken one — the install copy falls back to the CLI's own default.
  */
 function readDeployment(): { isSaas: boolean; appBaseUrl: string; passkeysEnabled: boolean } {
   try {
@@ -70,13 +55,7 @@ export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
 
   const organizations = personalWorkspaceApi.organization.getAll.useQuery({ isDemo: false });
 
-  /**
-   * The graph, with each project told which team it belongs to.
-   *
-   * `organization.getAll` nests projects under teams and so never repeats the
-   * team id on a project row; the screens read a flat project and need it, so
-   * it is stamped on here rather than asked for a second time.
-   */
+  /** The graph, with each project stamped with its team id — the screens read a flat project and need it. */
   const organizationsWithTeamIds: readonly PersonalOrganization[] = useMemo(
     () =>
       (organizations.data ?? []).map((organization) => ({
@@ -96,14 +75,7 @@ export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
     [organizations.data],
   );
 
-  /**
-   * The reader's own standing in the organization they are scoped to.
-   *
-   * The read narrows `members` to the caller (and, on a demo organization, the
-   * demo user), so the first row is theirs. Undefined while the graph is still
-   * arriving, which is not the same as a member holding no elevated role — the
-   * view-only notice reads it that way on purpose.
-   */
+  /** The reader's own role: `members` is narrowed to the caller, so the first row is theirs; `undefined` means still arriving, not "no role". */
   const organizationRole = useMemo(() => {
     const organizationId = scope.organizationId;
     if (!organizationId) return void 0;

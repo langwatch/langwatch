@@ -1,18 +1,4 @@
-/**
- * Which page key the Agents address answers, and what it is wrapped in.
- *
- * ONE KEY, ONE SCREEN. The key still reads
- * `runtime/ui/features/agent-ui-host.adapter`, and it is kept rather than
- * renamed: the route transcript in `apps/ui/tests/fixtures` is the parity bar
- * for the URL surface and fails the moment a page key changes, so renaming one
- * would spend that guard's signal on a cosmetic edit.
- *
- * THE POLICY IS THE PLATFORM PAGE'S, ONE FOR ONE: `withPermissionGuard`
- * ("evaluations:view") and no flag. `layoutComponent: DashboardLayout` was the
- * other half of that call and does not travel — chrome belongs to the route
- * tree, and this page is a child of a layout route the composing application
- * still serves.
- */
+/** Which page key the Agents address answers, and what it is wrapped in. */
 
 import { agentScreens } from "@langwatch/agent-web/screens/agent-management";
 import type { ComponentType } from "react";
@@ -24,6 +10,8 @@ import { AgentHost } from "./agent-host";
 const AGENT_PAGE_PERMISSION = "evaluations:view";
 
 export const agentPageLoaders: UiPageLoaderRegistry = {
+  // Key and permission unchanged from the platform page; layoutComponent
+  // doesn't travel — chrome belongs to the route tree, not this page.
   "runtime/ui/features/agent-ui-host.adapter": uiPage({
     screen: async () => ({
       default: (await agentScreens.agentManagement()).default as ComponentType,

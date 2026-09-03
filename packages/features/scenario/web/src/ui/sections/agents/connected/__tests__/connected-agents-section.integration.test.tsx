@@ -12,7 +12,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConnectedAgentsSection } from "../connected-agents-section";
-import type { ConnectedAgentInstance, ConnectedAgentView } from "../connected-agent-rows";
+import type { ConnectedAgentInstance, ConnectedAgentView } from "@langwatch/agent-contract";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

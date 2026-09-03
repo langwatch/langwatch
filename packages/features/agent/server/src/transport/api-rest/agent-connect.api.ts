@@ -25,24 +25,23 @@ import {
   resultFrameSchema,
 } from "@langwatch/agent-contract";
 import { handlerManagedAuth } from "@langwatch/api";
-import {
-  bodyLimit,
-  type AppRestProjectVariables,
-  type SecuredApp,
-} from "@langwatch/api/rest";
+import { bodyLimit, type AppRestProjectVariables, type SecuredApp } from "@langwatch/api/rest";
 import type { Context } from "hono";
 import { describeRoute, type DescribeRouteOptions, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import {
   INSTANCE_TOKEN_HEADER,
-  type ConnectCredentials,
   type LongPollTransport,
 } from "../../services/connected-agent-long-poll.service";
+import type { ConnectCredentials } from "../../services/connected-agent-session.service";
 
 /** The schema slot of a `describeRoute` request body, on hono-openapi's terms. */
 type RequestBodySchema = NonNullable<
-  Extract<NonNullable<DescribeRouteOptions["requestBody"]>, { content: unknown }>["content"][string]["schema"]
+  Extract<
+    NonNullable<DescribeRouteOptions["requestBody"]>,
+    { content: unknown }
+  >["content"][string]["schema"]
 >;
 
 /**
@@ -127,11 +126,7 @@ async function jsonBodyOf(c: Context): Promise<unknown> {
 }
 
 /** A credential refusal is a refused frame; anything else stays an error. */
-function refusedOrThrow(
-  c: Context,
-  error: unknown,
-  transport: LongPollTransport,
-): Response {
+function refusedOrThrow(c: Context, error: unknown, transport: LongPollTransport): Response {
   if (error instanceof AgentRegisterRefusedError) {
     const answer = transport.refusedAnswer(error);
     return c.json(answer.body, answer.status as 200);
@@ -139,15 +134,15 @@ function refusedOrThrow(
   throw error;
 }
 
-const payloadGuard = () =>
+const payloadGuard = (relayMaxPayloadMb: number | undefined) =>
   bodyLimit({
-    maxSize: relayPayloadCaps().frameBytes,
+    maxSize: relayPayloadCaps(relayMaxPayloadMb).frameBytes,
     onError: () => {
       // The cap stopped the read, so no size was measured; the message names
       // the limit alone rather than a number nothing weighed.
       throw new AgentPayloadTooLargeError({
         what: "result",
-        limitBytes: relayPayloadCaps().frameBytes,
+        limitBytes: relayPayloadCaps(relayMaxPayloadMb).frameBytes,
       });
     },
   });
@@ -155,10 +150,16 @@ const payloadGuard = () =>
 export interface ConnectEndpointDeps {
   secured: SecuredApp<{ Variables: AppRestProjectVariables }>;
   transport: () => LongPollTransport;
+  /** `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`; the default cap when absent. */
+  relayMaxPayloadMb?: number;
 }
 
 /** The register endpoint: one process announces the agents it serves. */
-function registerRegisterEndpoint({ secured, transport }: ConnectEndpointDeps): void {
+function registerRegisterEndpoint({
+  secured,
+  transport,
+  relayMaxPayloadMb,
+}: ConnectEndpointDeps): void {
   secured.access(connectAccess).post(
     "/connect/register",
     describeRoute({
@@ -180,20 +181,18 @@ function registerRegisterEndpoint({ secured, transport }: ConnectEndpointDeps): 
         },
         401: { description: "The API key is not valid: a refused frame" },
         403: {
-          description:
-            "The key type or its permissions cannot connect an agent: a refused frame",
+          description: "The key type or its permissions cannot connect an agent: a refused frame",
         },
         422: {
           description:
             "The body is not a register frame, or an agent of it is not valid: a refused frame",
         },
         503: {
-          description:
-            "The deployment runs several replicas without Redis: a refused frame",
+          description: "The deployment runs several replicas without Redis: a refused frame",
         },
       },
     }),
-    payloadGuard(),
+    payloadGuard(relayMaxPayloadMb),
     async (c) => {
       const answer = await transport().register({
         credentials: credentialsOf(c),
@@ -221,8 +220,7 @@ function registerPollEndpoint({ secured, transport }: ConnectEndpointDeps): void
         },
         401: { description: "The API key is not valid: a refused frame" },
         410: {
-          description:
-            "The instance token is not known; register the instance again",
+          description: "The instance token is not known; register the instance again",
         },
       },
     }),
@@ -249,7 +247,11 @@ function registerPollEndpoint({ secured, transport }: ConnectEndpointDeps): void
 }
 
 /** The frames endpoint: the instance posts its answers back. */
-function registerFramesEndpoint({ secured, transport }: ConnectEndpointDeps): void {
+function registerFramesEndpoint({
+  secured,
+  transport,
+  relayMaxPayloadMb,
+}: ConnectEndpointDeps): void {
   secured.access(connectAccess).post(
     "/connect/frames",
     describeRoute({
@@ -271,21 +273,19 @@ function registerFramesEndpoint({ secured, transport }: ConnectEndpointDeps): vo
         },
         401: { description: "The API key is not valid: a refused frame" },
         410: {
-          description:
-            "The instance token is not known; register the instance again",
+          description: "The instance token is not known; register the instance again",
         },
         422: { description: "A frame is not one the endpoint takes" },
       },
     }),
-    payloadGuard(),
+    payloadGuard(relayMaxPayloadMb),
     async (c) => {
       try {
         const parsed = postedFramesSchema.safeParse(await jsonBodyOf(c));
         if (!parsed.success) {
           throw new AgentRegisterRefusedError({
             reason: "protocol_invalid",
-            message:
-              "The body must carry ack, result and deregister frames under frames.",
+            message: "The body must carry ack, result and deregister frames under frames.",
           });
         }
         const answer = await transport().frames({

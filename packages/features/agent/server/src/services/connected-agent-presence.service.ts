@@ -95,7 +95,7 @@ export async function readAgentPresence({
   runtime,
 }: {
   projectId: string;
-  agents: { id: string; type: string }[];
+  agents: readonly { id: string; type: string }[];
   runtime: ConnectedAgentRuntime;
 }): Promise<Map<string, AgentPresence>> {
   const registry = runtime.registry;

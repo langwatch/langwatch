@@ -1,16 +1,7 @@
 /**
- * The organization settings family, as this application composes it.
- *
- * The screen lives in `@langwatch/organization-web`; what belongs to the
- * application is which page key the address answers, the grant in front of it,
- * the settings chrome around it, the transport its hooks run on, and the host
- * port that turns this application's capabilities into the questions the screen
- * asks — including the one no family asked before it, handing the reader a file.
- *
- * IT SERVES TWO DRAWERS AS WELL AS ITS SCREENS. The Members page and the
- * command palette both open `inviteMember`, and the Teams page opens
- * `createTeam`; both components are `@langwatch/organization-web`'s and neither
- * was registered anywhere, so the address was written and nothing opened.
+ * Organization settings: screen in `@langwatch/organization-web`. Serves
+ * two drawers, `inviteMember` and `createTeam`, opened from the Members
+ * page, the command palette and the Teams page.
  */
 
 import { organizationApi } from "@langwatch/organization-web/screens/organization";

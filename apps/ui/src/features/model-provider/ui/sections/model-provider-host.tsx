@@ -1,28 +1,7 @@
 /**
- * What the two Model Provider screens are mounted inside.
- *
- * Three things go around `/settings/model-providers` and
- * `/settings/model-costs`: the tRPC Provider the package's own hooks run on, the
- * host port that answers for the scope, the grants, the visible scopes, the
- * address, the feedback and the three platform drawers — and nothing else. A
- * screen stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product want
- * it. `useAvailableScopes` derived exactly this from the same graph in
- * `platform/app`.
- *
- * THE TEAM IS DERIVED, NOT ASKED, the same way the retention family derives it.
- * `UiActiveScope` carries the organization and the project; the providers page
- * also needs the team the project belongs to, for the filter's "This Team" and
- * for the cascade. It is one lookup in the graph already read.
- *
- * `isReportedGlobally` IS A RECORDED GAP, answered honestly rather than guessed.
- * `platform/app`'s answer is a `WeakSet` that four interceptors on its
- * MutationCache write to, and that cache does not wrap the tRPC client this
- * application builds — so no failure reaching a screen here has been reported
- * anywhere else, and `false` is the true answer for every one of them.
+ * What the two Model Provider screens are mounted inside: the tRPC Provider
+ * their hooks run on, and the host port for scope, grants, visible scopes,
+ * address, feedback and the three platform drawers.
  */
 
 import {
@@ -60,14 +39,7 @@ export function ModelProviderHost({ children }: { children: ReactNode }) {
     [organizations.data, activeScope.organizationId],
   );
 
-  /**
-   * The team the project in scope belongs to, and the project's own slug.
-   *
-   * Both are derived from the one graph read rather than asked for again: the
-   * providers page needs the team for its filter's "This Team" and for the
-   * cascade, and the cost drawer's matching-spans preview needs the slug,
-   * because a trace address is `/<projectSlug>/traces?...`.
-   */
+  /** The team the project in scope belongs to, and its slug (for the cost drawer's `/<slug>/traces` preview) — both derived from the one graph read. */
   const { teamId, projectSlug } = useMemo(() => {
     if (!activeScope.projectId) return { teamId: void 0, projectSlug: void 0 };
     for (const team of organization?.teams ?? []) {
@@ -111,6 +83,8 @@ export function ModelProviderHost({ children }: { children: ReactNode }) {
       setQuery: (next, options) => route.setQuery(next, options),
       succeeded: (notice) => feedback.succeeded(notice),
       failed: (failure) => feedback.failed(failure),
+      // Recorded gap: platform/app's dedup WeakSet lives on its own
+      // MutationCache, which doesn't wrap this application's client.
       isReportedGlobally: () => false,
       openPlatformDrawer: ({ drawer, params }) =>
         openPlatformDrawer({

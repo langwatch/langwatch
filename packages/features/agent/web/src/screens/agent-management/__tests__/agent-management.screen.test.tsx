@@ -199,6 +199,13 @@ class TestHost extends AgentManagementHostPort {
   openAgentEditor(input: { drawer: AgentEditorDrawer; agentId?: string }): void {
     this.editorsOpened.push(input);
   }
+  readonly connectedAgentsOpened: string[] = [];
+  connectedSection() {
+    return undefined;
+  }
+  openConnectedAgent(agentId: string): void {
+    this.connectedAgentsOpened.push(agentId);
+  }
 }
 
 async function mountScreen(query: Record<string, string | undefined> = {}) {

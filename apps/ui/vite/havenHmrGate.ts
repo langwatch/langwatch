@@ -3,28 +3,9 @@ import path from "path";
 import type { Plugin, ViteDevServer } from "vite";
 
 /**
- * Auto-gated HMR.
- *
- * When an AI agent is making many rapid edits, firing Vite HMR on every save
- * thrashes a human's open browser through broken intermediate states. This
- * plugin detects that automatically — no explicit "start editing" signal
- * needed — by watching the actual cadence of file changes:
- *
- * - An update that arrives more than `burstGapMs` after the previous one is
- *   treated as an isolated human save and passed straight through: zero added
- *   latency, identical to Vite's own behaviour.
- * - An update that arrives WITHIN `burstGapMs` of the previous one is part of a
- *   rapid burst: it is swallowed and coalesced. Once the burst goes quiet for
- *   `burstSettleMs`, one full-reload fires so the browser jumps straight to the
- *   final state instead of thrashing through every intermediate one.
- *
- * `haven hmr on [--ttl] | off` still works as an explicit override on top of
- * this (a marker file with an expiry) for the rare case an agent's edits have
- * natural pauses longer than burstGapMs and it wants to guarantee no
- * intermediate reload regardless — but it is no longer required for the common
- * case. Either way a reload can never be withheld forever: the marker is
- * always time-bounded, and the burst detector's own trailing flush fires as
- * soon as edits stop arriving.
+ * Auto-gated HMR: coalesces a rapid burst of saves (an AI agent editing)
+ * into one trailing full-reload, instead of thrashing a human's browser
+ * through every intermediate state. `haven hmr on|off` still overrides it.
  */
 export function havenHmrGate(options?: {
   markerPath?: string;

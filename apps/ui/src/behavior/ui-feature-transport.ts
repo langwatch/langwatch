@@ -1,42 +1,7 @@
 /**
- * The browser transport a feature package's hooks run on.
- *
- * A feature web package writes its procedures as a plain map and calls
- * `createFeatureApi` once; what it never does is build a client, because that
- * means choosing an endpoint, a transformer and a batching window. This module
- * makes that choice for `apps/ui`, and the application shell hands the one
- * client to every feature Provider it mounts.
- *
- * ONE CACHE, TWO LANES. `@trpc/react-query` derives its React Query key from
- * the procedure path alone, so a query registered through a feature's hooks
- * and the same query registered by the host application are the same cache
- * entry — given the same QueryClient. The shell takes the host's QueryClient
- * when it is mounted inside one, which is what keeps invalidation working in
- * both directions while pages are still split across the two packages.
- *
- * The HTTP lane is NOT shared. The host builds its own client, so a query
- * fired here and a query fired by a host hook in the same tick travel in two
- * requests rather than one batch. That is the cost of `apps/ui` owning its own
- * transport instead of being handed the host's, and it is the right trade for
- * this slice: the alternative is a twelfth provider slot that every host must
- * fill before a single screen can move. Batching is a latency optimisation and
- * cache identity is a correctness property, so the split lane is affordable
- * and a split cache would not be.
- *
- * SUBSCRIPTIONS RIDE A THIRD LANE, and they are not a WebSocket. The platform
- * serves every live procedure over Server-Sent Events at `/api/sse/{path}`,
- * and its own transport routes `op.type === "subscription"` there before any
- * other split is consulted — the WebSocket it also runs is opt-in per call for
- * high-frequency queries and carries no subscriptions at all. This transport
- * makes the same split in the same order, so an operation keeps its lane when
- * a hook moves. See dev/docs/plans/ui-subscription-transport.md.
- *
- * The session on that channel is the browser's, carried by nothing more than
- * the origin: an `EventSource` sends the better-auth cookie because the URL is
- * same-origin, which is the one and only reason the server can read a session
- * off it. That is why the base below is the document's own origin rather than
- * anything configurable — a subscription pointed elsewhere is a subscription
- * pointed at an anonymous channel.
+ * The browser transport a feature package's hooks run on: one tRPC client
+ * per application, HTTP split by `skipBatch`, subscriptions same-origin SSE.
+ * Rationale and pins: dev/docs/plans/ui-subscription-transport.md.
  */
 
 import {
@@ -44,6 +9,7 @@ import {
   type FeatureApiMap,
   type RouterFromMap,
 } from "@langwatch/platform-api-client";
+import type { AppRouter } from "@langwatch/platform-api/app-trpc/types";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createTRPCClient,
@@ -51,6 +17,7 @@ import {
   httpBatchLink,
   httpLink,
   splitLink,
+  type TRPCClient,
 } from "@trpc/client";
 import type { ComponentType, ReactNode } from "react";
 import superjson from "superjson";
@@ -66,13 +33,9 @@ export const UI_TRPC_ENDPOINT = "/api/trpc";
 export const UI_SSE_ENDPOINT_PREFIX = "/api/sse/";
 
 /**
- * The origin a subscription opens against.
- *
- * `EventSource` takes no relative URL, so this cannot be written the way
- * `UI_TRPC_ENDPOINT` is — and the origin is the whole auth story, so it
- * resolves to the document's own rather than to anything a caller supplies.
- * Outside a browser there is no session to carry and no `EventSource` to open
- * with, so the placeholder only ever has to parse.
+ * `EventSource` takes no relative URL and must stay same-origin for the
+ * session cookie to ride along, so this resolves the document's own origin
+ * rather than taking one from a caller. Outside a browser it only has to parse.
  */
 function subscriptionOrigin(): string {
   return typeof window === "undefined" ? "http://localhost" : window.location.origin;
@@ -99,19 +62,19 @@ export type UiFeatureApiClientOptions = {
 };
 
 /**
- * The transport, built once per application.
+ * The three lanes, built once and shared by both clients below.
  *
- * `op.context.skipBatch` sends one request for one call, for a query mounted
- * on the application shell that would otherwise be stuck behind a page's slow
- * fan-out. The host reads the same flag, so a hook keeps its meaning when it
- * moves.
+ * Shared rather than restated so the typed client the api-map retirement moves
+ * features onto cannot take a different lane from the untyped one it replaces
+ * — a subscription that quietly rode the request lane renders once and then
+ * looks like a screen with no news.
  */
-export function createUiFeatureApiClient({
+function uiFeatureApiLinks({
   url = UI_TRPC_ENDPOINT,
   fetch,
   subscriptionUrl = subscriptionOrigin(),
   eventSource,
-}: UiFeatureApiClientOptions = {}): UiFeatureApiTransport {
+}: UiFeatureApiClientOptions) {
   const httpRouting = splitLink({
     condition: (operation) => operation.context.skipBatch === true,
     true: httpLink({ url, transformer: superjson, ...(fetch ? { fetch } : {}) }),
@@ -123,25 +86,45 @@ export function createUiFeatureApiClient({
     }),
   });
 
-  const client = createTRPCClient<RouterFromMap<FeatureApiMap>>({
-    links: [
-      splitLink({
-        condition: (operation) => operation.type === "subscription",
-        // Reconnect attempts and backoff are the link's own defaults, which
-        // are the platform host's pins. Restating them here would be a second
-        // place for the number to live and a second place for it to drift.
-        true: sseSubscriptionLink({
-          url: subscriptionUrl,
-          transformer: superjson,
-          transformPath: (path) => `${UI_SSE_ENDPOINT_PREFIX}${path}`,
-          ...(eventSource ? { eventSource } : {}),
-        }),
-        false: httpRouting,
+  return [
+    splitLink({
+      condition: (operation) => operation.type === "subscription",
+      // Reconnect attempts and backoff are the link's own defaults, which
+      // are the platform host's pins. Restating them here would be a second
+      // place for the number to live and a second place for it to drift.
+      true: sseSubscriptionLink({
+        url: subscriptionUrl,
+        transformer: superjson,
+        transformPath: (path) => `${UI_SSE_ENDPOINT_PREFIX}${path}`,
+        ...(eventSource ? { eventSource } : {}),
       }),
-    ],
-  });
+      false: httpRouting,
+    }),
+  ];
+}
 
-  return getUntypedClient(client);
+/** Builds the transport once per application; `op.context.skipBatch` opts a query out of batching (same flag the host reads). */
+export function createUiFeatureApiClient(
+  options: UiFeatureApiClientOptions = {},
+): UiFeatureApiTransport {
+  return getUntypedClient(
+    createTRPCClient<RouterFromMap<FeatureApiMap>>({ links: uiFeatureApiLinks(options) }),
+  );
+}
+
+/**
+ * The same three lanes, typed by the router the API process actually mounts.
+ *
+ * `AppRouter` is read from the api process's `./app-trpc/types` subpath, which
+ * is types only — no value crosses from the API into the browser bundle. This
+ * is what retires the 38 hand-written `*ApiMap`s: a procedure's input and its
+ * answer are inferred from the procedure, so a rename on the server is a
+ * compile error in the screen that calls it rather than a 404 a person finds.
+ */
+export function createUiAppApiClient(
+  options: UiFeatureApiClientOptions = {},
+): TRPCClient<AppRouter> {
+  return createTRPCClient<AppRouter>({ links: uiFeatureApiLinks(options) });
 }
 
 /** A feature's Provider, with the types its own procedure map gave it erased. */
@@ -159,24 +142,9 @@ export type UiFeatureApiBinding = {
 };
 
 /**
- * Declares that a feature's hooks run on this application's transport.
- *
- * At runtime there is one kind of client: it dispatches on a path string and
- * knows nothing about router types. Each feature's Provider is typed by its
- * own procedure map, so mounting a list of them in one loop needs the props
- * erased — and this is the one place that erases them, rather than a cast at
- * every mount site.
- *
- * `TClient` is deliberately unconstrained rather than bounded to
- * `FeatureApiClient<TMap extends FeatureApiMap>`: a package still on a
- * hand-written `*ApiMap` hands a `Provider` typed by `RouterFromMap<TMap>`,
- * and a package built on the one shared `createTRPCReact<AppRouter>()` client
- * (`@langwatch/platform-api-client`'s `trpcReact`) hands one typed by the real
- * router — a different shape this function does not need to name, and every
- * feature web package but this file is forbidden from naming it at all. Both
- * shapes are the same `TRPCUntypedClient` at runtime, and this is the one
- * place that erases either back to the untyped prop the shell actually mounts
- * every feature with.
+ * Erases a feature's typed client Provider to the untyped prop the shell
+ * mounts every feature with. `TClient` stays unconstrained on purpose: this
+ * is the one place allowed to erase either client shape.
  */
 export function uiFeatureApi<TClient>({
   name,

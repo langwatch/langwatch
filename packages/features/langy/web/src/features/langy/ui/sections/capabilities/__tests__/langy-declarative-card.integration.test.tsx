@@ -55,6 +55,9 @@ class FakeLangyHost extends LangyHostPort {
   isLoading() {
     return false;
   }
+  isDemoProject() {
+    return false;
+  }
   featureFlag() {
     return true;
   }
@@ -221,9 +224,7 @@ describe("LangyDeclarativeCard", () => {
         renderCard({
           name: "langwatch.ui.actions",
           output: JSON.stringify({
-            actions: [
-              { kind: "workbench.getState", name: "Read the workbench" },
-            ],
+            actions: [{ kind: "workbench.getState", name: "Read the workbench" }],
           }),
         });
 
@@ -493,9 +494,7 @@ describe("LangyDeclarativeCard", () => {
         });
         renderHydrated();
 
-        expect(
-          screen.getByText("These prompts are no longer available."),
-        ).toBeTruthy();
+        expect(screen.getByText("These prompts are no longer available.")).toBeTruthy();
         expect(screen.queryByText("No prompts yet.")).toBeNull();
       });
     });

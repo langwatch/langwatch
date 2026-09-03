@@ -20,13 +20,7 @@ export function resolveGatewayOrganization({
   return organizations.find((candidate) => candidate.id === organizationId);
 }
 
-/**
- * The project the address is about, found in the graph rather than fetched.
- *
- * Every organization the reader can reach is already in hand, so the project
- * behind the active scope is a lookup; a second read would be a second
- * request for a row that is on the page.
- */
+/** The project the address is about, found in the graph already in hand rather than fetched again. */
 export function resolveGatewayProject({
   organizations,
   projectId,

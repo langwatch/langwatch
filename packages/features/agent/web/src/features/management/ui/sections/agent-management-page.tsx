@@ -1,7 +1,12 @@
 import { Button, Center, EmptyState, Grid, Skeleton, VStack } from "@chakra-ui/react";
-import type { AgentCopy, AgentWithFields, RelatedAgentEntities } from "@langwatch/agent-contract";
+import type {
+  AgentCopy,
+  AgentWithFields,
+  ConnectedAgentView,
+  RelatedAgentEntities,
+} from "@langwatch/agent-contract";
 import { Bot, Plus } from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { Fragment, type ComponentType, type ReactNode, useEffect, useState } from "react";
 import type { AgentBrowserPort } from "../../../../model/agent-browser.port";
 
 export type AgentCopyProject = {
@@ -101,6 +106,23 @@ export abstract class AgentManagementCardPort {
   abstract render(input: AgentCardRenderInput): ReactNode;
 }
 
+/**
+ * The connected agents' own card grid (ADR-128), when the host mounts one.
+ * `agents` are the SAME `ConnectedAgentView` rows the host answered off
+ * `data.items`; deleting one reuses this page's own archive dialog, so a
+ * connected agent's delete confirmation reads exactly like every other
+ * agent's.
+ */
+export type AgentManagementConnectedSection = {
+  Component: ComponentType<{
+    agents: ConnectedAgentView[];
+    onOpen: (agent: ConnectedAgentView) => void;
+    onDelete?: (agent: ConnectedAgentView) => void;
+  }>;
+  agents: ConnectedAgentView[];
+  onOpen: (agent: ConnectedAgentView) => void;
+};
+
 export type AgentManagementPageProps = {
   data: AgentManagementData;
   navigation: AgentManagementNavigationPort;
@@ -108,6 +130,7 @@ export type AgentManagementPageProps = {
   lifecycle: AgentManagementLifecyclePort;
   composition: AgentPageCompositionPort;
   card: AgentManagementCardPort;
+  connectedSection?: AgentManagementConnectedSection;
 };
 
 type SelectedAgent = {
@@ -276,6 +299,9 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
 
   const hasAgents = props.data.items.length > 0;
   const showEmptyState = !props.data.isLoading && !hasAgents;
+  // Connected agents draw their own card via `connectedSection`; every other
+  // type keeps the grid below.
+  const otherItems = props.data.items.filter((agent) => agent.type !== "connected");
 
   return (
     <>
@@ -307,7 +333,18 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
               Array.from({ length: 3 }).map((_, index) => (
                 <Skeleton key={index} height="100px" borderRadius="md" />
               ))}
-            {props.data.items.map((agent) => (
+            {props.connectedSection && (
+              <props.connectedSection.Component
+                agents={props.connectedSection.agents}
+                onOpen={props.connectedSection.onOpen}
+                onDelete={(connected) =>
+                  setAgentToDelete(
+                    props.data.items.find((item) => item.id === connected.id) ?? null,
+                  )
+                }
+              />
+            )}
+            {otherItems.map((agent) => (
               <Fragment key={agent.id}>
                 {props.card.render({
                   agent,

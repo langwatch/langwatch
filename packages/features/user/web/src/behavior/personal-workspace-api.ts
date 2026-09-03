@@ -235,6 +235,8 @@ export type PersonaResolutionView = {
   isOverride: boolean;
   governanceUiEnabled: boolean;
   intentPinned: boolean;
+  /** The resolver's own project — never a personal workspace (ADR-038 v6). */
+  firstProjectSlug: string | null;
 };
 
 /**

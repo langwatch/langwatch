@@ -1,17 +1,7 @@
 /**
- * What the online evaluations screen is mounted inside.
- *
- * Two things go around `/:project/online-evaluations`: the tRPC Provider the
- * package's own hooks run on, and the host port that answers for the project,
- * the reader's grants, the replication targets, the time zone, the address and
- * the feedback. Both are mounted here, once, so a screen module stays a screen
- * module.
- *
- * THE TIME ZONE IS READ HERE. `platform/app` called
- * `Intl.DateTimeFormat().resolvedOptions().timeZone` inside the page body,
- * which is a browser reading a governed screen may not take; the application
- * takes it and the port carries the answer, so a suite can pin the buckets a
- * monitor's week is cut into rather than inheriting the machine running it.
+ * What the online evaluations screen is mounted inside: the tRPC Provider
+ * its hooks run on, and the host port for project, grants, replication,
+ * time zone, address and feedback. Time zone is read here — a browser read a governed screen may not take.
  */
 
 import {

@@ -1,17 +1,7 @@
 /**
- * What the two handoff screens are mounted inside.
- *
- * One thing goes around `/authorize` and `/mcp/authorize`: the host port. They
- * declare no transport of their own — every read they make is the application's
- * — so the tRPC Provider mounted here is `@langwatch/api-key-web`'s, the SAME
- * instance the API Keys settings screen runs on. Binding it twice would give the
- * two halves of one package two providers over one cache; the api-key frontend
- * feature already installs it, so this feature only calls it.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the graph
- * is fetched once for the document, and the base key `/authorize` prints comes
- * back on that one read under the server's own `project:update` redaction.
+ * What the two handoff screens are mounted inside: the host port only. They
+ * share `@langwatch/api-key-web`'s tRPC Provider with the API Keys settings
+ * screen rather than binding a second instance over one cache.
  */
 
 import {
@@ -69,12 +59,9 @@ export function AuthorizeHost({ children }: { children: ReactNode }) {
   const actor = session.currentUser();
 
   /**
-   * Three states from two answers, and the order matters.
-   *
-   * `/mcp/authorize` bounces a reader with no session through sign-in carrying
-   * the whole consent request; reading "not signed in" one render too early
-   * would send a signed-in reader on a round trip through the front door and
-   * back. `isSettled()` is false until the session answer has arrived.
+   * Three states from two answers, order matters: reading "not signed in"
+   * one render too early would round-trip a signed-in reader through the
+   * front door. `isSettled()` gates it.
    */
   const sessionStatus: AuthorizeSessionStatus = actor
     ? "authenticated"

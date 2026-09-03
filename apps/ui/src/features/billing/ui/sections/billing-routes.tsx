@@ -1,13 +1,7 @@
 /**
- * Which page keys the billing addresses answer, and what they are wrapped in.
- *
- * THE GRANTS ARE THE PLATFORM PAGES', ONE FOR ONE, AND THEY DISAGREE WITH EACH
- * OTHER. Plans carried `organization:view`, Usage carried `cost:view`, and
- * Subscription carried nothing at all. The asymmetry is carried rather than
- * tidied: inventing a guard is a change to who can reach an address, and a page
- * move does not own that decision. It is not a hole — every procedure behind
- * the unguarded key states its own policy — but it is RECORDED, so whoever owns
- * billing permissions can decide whether Subscription should state one.
+ * Which page keys the billing addresses answer. Grants disagree on purpose,
+ * matching the platform pages: Plans wants `organization:view`, Usage wants
+ * `cost:view`, Subscription wants neither — every procedure behind it states its own policy.
  */
 
 import { billingScreens } from "@langwatch/enterprise-billing-web/screens/billing";

@@ -1,15 +1,7 @@
 /**
- * What the Data Privacy screen is mounted inside.
- *
- * Two things go around `/settings/data-privacy`: the tRPC Provider the
- * package's own hooks run on, and the host port that answers for the scope, the
- * address and the feedback.
- *
- * NARROWER THAN ITS SIBLING, and for a reason worth stating: privacy's own
- * snapshot carries every scope the reader may write to AND the effective policy
- * at each tier, so the screen needs no organization graph of its own. The one
- * thing it does need from outside the snapshot is the TEAM, for the "This Team"
- * filter, and the snapshot answers that too — a project row carries its team.
+ * What the Data Privacy screen is mounted inside: the tRPC Provider its
+ * hooks run on, and the host port for scope, address and feedback. No org
+ * graph needed — the snapshot already carries every writable scope and team.
  */
 
 import {

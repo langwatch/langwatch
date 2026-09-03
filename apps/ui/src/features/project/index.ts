@@ -1,11 +1,4 @@
-/**
- * The general Settings family, as this application composes it.
- *
- * The screen lives in `@langwatch/project-web`; what belongs to the application
- * is the page key, the permission policy, the settings chrome, the transport,
- * and the host port that turns this application's capabilities into the
- * questions the screen asks.
- */
+/** General Settings: single screen in `@langwatch/project-web`. */
 
 import { projectApi } from "@langwatch/project-web/screens/project";
 import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
@@ -21,15 +14,9 @@ export const projectApiBinding: UiFeatureApiBinding = uiFeatureApi({
 });
 
 /**
- * The drawers this family serves, by the name the address uses.
- *
- * BOTH CAME BACK FROM `platform/app`, deleted in `cc91631cd8`. The Teams page's
- * header button and its per-team "+ New Project", the team form and the
- * CLI-auth screen all kept writing `?drawer.open=createProject`, and the Teams
- * page's overflow menu kept writing `editProject`; every one of them changed
- * the URL and opened nothing. Their components are
- * `@langwatch/organization-web`'s, because that is where the openers and every
- * hook they need already live.
+ * `createProject` opens from the Teams page header, each team's "+ New
+ * Project", the team form and the CLI-auth screen; `editProject` from the
+ * Teams overflow menu. Both are `@langwatch/organization-web`'s components.
  */
 export const projectDrawers: UiDrawerRegistry = {
   createProject: lazyDrawer({

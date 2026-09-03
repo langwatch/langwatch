@@ -51,8 +51,10 @@ import {
 } from "../adapters/connected-agent-state.adapter";
 import type { InstanceMeta } from "../adapters/connected-agent-registry.adapter";
 import { normalizeParameterSchema } from "./connected-agent-parameter-spec.service";
-import { touchAgentLastSeen } from "../projections/connected-agent-presence.projection";
-import type { AgentRepository } from "../repositories/agent.repository";
+import {
+  touchAgentLastSeen,
+  type AgentLastSeenWriter,
+} from "../projections/connected-agent-presence.projection";
 import type { ConnectedAgentRuntime } from "./connected-agent-runtime.service";
 import {
   type ConnectCredentialPort,
@@ -80,21 +82,24 @@ export interface SessionCoreOptions {
   runtime: ConnectedAgentRuntime;
   agents: AgentService;
   /** The repository that owns the presence projection's write. */
-  agentRepository: AgentRepository;
+  agentRepository: AgentLastSeenWriter;
   credentials: ConnectCredentialPort;
   agentPlatformUrl: AgentPlatformUrlBuilder;
   /** The app replicas of this deployment, for the no-Redis refusal. */
   replicaCount: number;
+  /** `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`; the default cap when absent. */
+  relayMaxPayloadMb?: number;
   now?: () => number;
 }
 
 export class AgentSessionCore {
   readonly runtime: ConnectedAgentRuntime;
   private readonly agents: AgentService;
-  private readonly agentRepository: AgentRepository;
+  private readonly agentRepository: AgentLastSeenWriter;
   private readonly credentials: ConnectCredentialPort;
   private readonly agentPlatformUrl: AgentPlatformUrlBuilder;
   private readonly replicaCount: number;
+  private readonly relayMaxPayloadMb: number | undefined;
   readonly now: () => number;
 
   constructor(options: SessionCoreOptions) {
@@ -104,6 +109,7 @@ export class AgentSessionCore {
     this.credentials = options.credentials;
     this.agentPlatformUrl = options.agentPlatformUrl;
     this.replicaCount = options.replicaCount;
+    this.relayMaxPayloadMb = options.relayMaxPayloadMb;
     this.now = options.now ?? (() => Date.now());
   }
 
@@ -116,8 +122,7 @@ export class AgentSessionCore {
     if (this.runtime.store.shared || this.replicaCount <= 1) return null;
     return new AgentRegisterRefusedError({
       reason: "replica_count_unsupported",
-      message:
-        "Connected agents need Redis on a deployment with more than one app replica.",
+      message: "Connected agents need Redis on a deployment with more than one app replica.",
     });
   }
 
@@ -127,9 +132,7 @@ export class AgentSessionCore {
     projectId,
   }: ConnectCredentials): Promise<ResolvedConnectCredential> {
     const header = authorization ?? "";
-    const token = header.toLowerCase().startsWith("bearer ")
-      ? header.slice(7).trim()
-      : "";
+    const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
     if (!token) {
       throw new AgentRegisterRefusedError({
         reason: "api_key_invalid",
@@ -221,9 +224,7 @@ export class AgentSessionCore {
     frame: RegisterFrame;
     projectId: string;
     userId: string | null;
-  }): Promise<
-    { id: string; name: string; environment: string; notes: string[] }[]
-  > {
+  }): Promise<{ id: string; name: string; environment: string; notes: string[] }[]> {
     const registered: {
       id: string;
       name: string;
@@ -265,10 +266,7 @@ export class AgentSessionCore {
         name: agent.name,
         config: {
           parameters: normalized.parameters,
-          timeoutMs: Math.min(
-            agent.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
-            MAX_CALL_TIMEOUT_MS,
-          ),
+          timeoutMs: Math.min(agent.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
           concurrency: agent.concurrency,
           sticky: agent.sticky,
           sdk: frame.sdk,
@@ -320,10 +318,7 @@ export class AgentSessionCore {
    * or it was routed at an instance that never registered its agent, in
    * which case the call is refused for that instance here and now.
    */
-  async readCallForSession(
-    session: SessionInfo,
-    callId: string,
-  ): Promise<StoredCall | null> {
+  async readCallForSession(session: SessionInfo, callId: string): Promise<StoredCall | null> {
     const raw = await this.runtime.store.get(callKey(callId));
     if (!raw) return null;
     let stored: StoredCall;
@@ -377,11 +372,7 @@ export class AgentSessionCore {
   async ack(session: SessionInfo, callId: string): Promise<void> {
     const stored = await this.readStoredCall(callId);
     if (!stored || stored.instanceId !== session.instanceId) return;
-    await this.runtime.store.set(
-      callAckKey(callId),
-      "1",
-      ttlOf(stored, this.now()),
-    );
+    await this.runtime.store.set(callAckKey(callId), "1", ttlOf(stored, this.now()));
     await this.nudgeReply(stored, { callId, kind: "ack" });
   }
 
@@ -392,7 +383,7 @@ export class AgentSessionCore {
     const violation = resultCapViolation({
       output: frame.output,
       session: frame.session,
-      caps: relayPayloadCaps(),
+      caps: relayPayloadCaps(this.relayMaxPayloadMb),
     });
     const result: StoredResult = violation
       ? tooLarge(session, violation)
@@ -429,10 +420,7 @@ export class AgentSessionCore {
    * tell every pod so the dispatcher fails them at once instead of at the
    * deadline.
    */
-  async retire(
-    session: SessionInfo,
-    activeCallIds: Iterable<string>,
-  ): Promise<void> {
+  async retire(session: SessionInfo, activeCallIds: Iterable<string>): Promise<void> {
     await this.runtime.registry.deregister({
       projectId: session.projectId,
       instanceId: session.instanceId,
@@ -488,23 +476,13 @@ export class AgentSessionCore {
     });
   }
 
-  private async nudgeReply(
-    stored: StoredCall,
-    nudge: ReplyNudge,
-  ): Promise<void> {
-    await this.runtime.store.publish(
-      replyChannel(stored.replyTo),
-      JSON.stringify(nudge),
-    );
+  private async nudgeReply(stored: StoredCall, nudge: ReplyNudge): Promise<void> {
+    await this.runtime.store.publish(replyChannel(stored.replyTo), JSON.stringify(nudge));
   }
 }
 
 function ttlOf(stored: StoredCall, now: number): number {
-  return Math.max(
-    1,
-    Math.ceil((stored.envelope.deadlineAt - now) / 1000) +
-      CALL_KEY_SLACK_SECONDS,
-  );
+  return Math.max(1, Math.ceil((stored.envelope.deadlineAt - now) / 1000) + CALL_KEY_SLACK_SECONDS);
 }
 
 function tooLarge(

@@ -23,13 +23,12 @@
  * above the Langy layout, so it cannot be reused; the two must be kept in step
  * until whichever surface outlives the other takes the single one.
  *
- * TWO THINGS THE PLATFORM GATE HAD AND THIS DOES NOT: the demo-project
- * exclusion, which read `DEMO_PROJECT_SLUG` off the application's public
- * configuration — a deployment fact a feature package may not read (ADR-101) —
- * and the organization-scoped flag context, which the host's flag reader
- * resolves for the whole session rather than per target. The first means the
- * panel renders on a demo project and every send is refused by the server,
- * which is a worse first frame than hiding it; recorded rather than hidden.
+ * ONE THING THE PLATFORM GATE HAD THAT STILL DIFFERS HERE: the
+ * organization-scoped flag context, which the host's flag reader resolves for
+ * the whole session rather than per target. The demo-project exclusion below
+ * closes the other gap — `isDemoProject` is the application's own answer
+ * (ADR-101: a deployment fact this package may not read itself), reached
+ * through the host the same way membership and the flag are.
  */
 
 import { useFeatureFlag } from "../../../behavior/use-feature-flag";
@@ -56,11 +55,16 @@ export interface LangyVisibility {
 /** The gate, with its own uncertainty exposed. See {@link LangyVisibility}. */
 export function useLangyVisibility(): LangyVisibility {
   const { data: session, status: sessionStatus } = useRequiredSession();
-  const { team, organizationRole, hasPermission, isLoading: contextLoading } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const {
+    team,
+    organizationRole,
+    isDemoProject,
+    hasPermission,
+    isLoading: contextLoading,
+  } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
 
   const user = session?.user;
   const isOnOwnPersonalProject = !!team?.isPersonal && team.ownerUserId === user?.id;
@@ -68,7 +72,9 @@ export function useLangyVisibility(): LangyVisibility {
     isOnOwnPersonalProject ||
     (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
     organizationRole === "ADMIN";
-  const mayReadLangy = userIsPartOfTeam && hasPermission("langy:view");
+  // The server refuses Langy on the demo project outright; rendering the
+  // panel there would only produce a chat where every send 403s.
+  const mayReadLangy = userIsPartOfTeam && !isDemoProject && hasPermission("langy:view");
 
   const { data: releaseLangy, isLoading: flagLoading } = useFeatureFlag(LANGY_RELEASE_FLAG);
 

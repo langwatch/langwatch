@@ -1,22 +1,7 @@
 /**
- * What the Data Retention screen is mounted inside.
- *
- * Three things go around `/settings/data-retention`: the tRPC Provider the
- * package's own hooks run on, the host port that answers for the scope, the
- * plan tier, the platform-admin flag, the visible scopes, the address and the
- * feedback — and nothing else. A screen stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it. This family reads the whole graph because the scope FILTER offers
- * every scope the reader can see, which is deliberately wider than the
- * RBAC-filtered set the snapshot says they may write to.
- *
- * THE TEAM IS DERIVED, NOT ASKED. `UiActiveScope` carries the organization and
- * the project; the retention page also needs the team the project belongs to,
- * for "This Team" and for the scope cascade. It is one lookup in the graph
- * already read, which is cheaper and more consistent than a second query.
+ * What the Data Retention screen is mounted inside: the tRPC Provider its
+ * hooks run on, and the host port for scope, plan, flags, visible scopes,
+ * address and feedback. Reads the whole graph — wider than the writable set — since the filter must show every visible scope.
  */
 
 import {

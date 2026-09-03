@@ -1,10 +1,4 @@
-/**
- * The success notice only goes out once the write has actually resolved.
- *
- * On this page more than anywhere: telling a reader "copied" for a clipboard
- * write the browser refused sends them to a terminal with an empty paste and
- * a credential they think they have.
- */
+/** The success notice only goes out once the clipboard write actually resolved — a refused write would send the reader to a terminal with an empty paste. */
 import type { AuthorizeSuccessNotice } from "@langwatch/api-key-web/screens/authorize";
 
 export async function copyProjectApiKeyToClipboard({

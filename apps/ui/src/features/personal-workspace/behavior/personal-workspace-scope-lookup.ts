@@ -1,10 +1,4 @@
-/**
- * Which organization and project the personal workspace address is about.
- *
- * Both resolved out of the graph already in hand rather than asked for again:
- * every organization the reader can reach is already on the page, so finding
- * the one (and the project) the scope names is a lookup, not a fetch.
- */
+/** Which organization and project the personal workspace address is about, resolved out of the graph already in hand rather than fetched again. */
 import type {
   PersonalOrganization,
   PersonalProject,

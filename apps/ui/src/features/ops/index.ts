@@ -1,15 +1,7 @@
 /**
- * The Ops family, as this application composes it.
- *
- * The fourteen screens and everything they render live in `@langwatch/ops-web`;
- * what belongs to the application is everything they are not allowed to own —
- * which page key each address answers, the permission policy in front of it,
- * the transport their hooks run on, and the host port that turns this
- * application's capabilities into the questions the family asks.
- *
- * IT SERVES ONE DRAWER AS WELL AS ITS SCREENS. The command palette opens the
- * Foundry beside whatever an operator is diagnosing; the page was registered
- * and the drawer was not, so that entry opened nothing.
+ * Ops: fourteen screens in `@langwatch/ops-web`. Serves one drawer,
+ * `foundry`, opened beside whatever an operator is diagnosing from the
+ * command palette.
  */
 
 import { opsApi } from "@langwatch/ops-web/screens/ops";

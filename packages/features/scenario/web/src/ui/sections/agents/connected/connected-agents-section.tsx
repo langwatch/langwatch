@@ -21,8 +21,8 @@ import {
   AgentCardMenuTrigger,
   AgentCardShell,
 } from "@langwatch/agent-web/screens/agent-management";
+import type { ConnectedAgentView } from "@langwatch/agent-contract";
 import {
-  type ConnectedAgentView,
   environmentTone,
   instanceCountLabel,
   presenceLabel,

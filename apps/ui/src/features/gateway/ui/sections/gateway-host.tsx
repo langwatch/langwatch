@@ -1,15 +1,7 @@
 /**
- * What the AI Gateway screens are mounted inside.
- *
- * Two things go around every `/gateway/*` page: the tRPC Provider the package's
- * own hooks run on, and the host port that answers for the session, the
- * organization graph, the plan, the deployment, the address and the feedback.
- * Both are mounted here, once, so a screen module stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it.
+ * What the AI Gateway screens are mounted inside: the tRPC Provider their
+ * hooks run on, and the host port for session, org graph, plan, deployment,
+ * address and feedback.
  */
 
 import {
@@ -30,12 +22,9 @@ import {
 } from "../../behavior/gateway-scope-lookup";
 
 /**
- * The deployment shape, read once.
- *
- * A composition whose HTML shell carries no configuration is a self-hosted one
- * with no stated addresses rather than a broken one: the usage snippet then
- * prints the hosted gateway, which is what `resolveSnippetGatewayBaseUrl` falls
- * back to on its own.
+ * The deployment shape, read once. No config means a self-hosted deployment
+ * with none stated, not a broken one — the usage snippet falls back to the
+ * hosted gateway's address.
  */
 function readDeployment(): { isSaas: boolean; appBaseUrl: string; gatewayBaseUrl: string } {
   try {
@@ -66,13 +55,7 @@ export function GatewayHost({ children }: { children: ReactNode }) {
     { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
   );
 
-  /**
-   * The graph, with each project told which team it belongs to.
-   *
-   * `organization.getAll` nests projects under teams and so never repeats the
-   * team id on a project row; the screens read a flat project and need it, so
-   * it is stamped on here rather than asked for a second time.
-   */
+  /** The graph, with each project stamped with its team id — the screens read a flat project and need it. */
   const organizationsWithTeamIds: readonly GatewayOrganization[] = useMemo(
     () =>
       (organizations.data ?? []).map((organization) => ({

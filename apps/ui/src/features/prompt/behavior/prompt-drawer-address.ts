@@ -1,15 +1,7 @@
 /**
- * The address the trace drawer opens at, from a Prompt Studio playground turn.
- *
- * `traceV2Details` is registered in `platform/app` and opened by most of the
- * product, so this move may neither delete nor copy it. The `drawer.`
- * vocabulary is written HERE rather than by the screen — the model-config
- * family's shape — including the clearing of every stale `drawer.*` key,
- * exactly as `openDrawer` does.
- *
- * KNOWN GAP: nothing mounts that registry above a screen served from
- * `apps/ui` until the chrome layout route exists, so the address is right and
- * the drawer does not open yet.
+ * The address the trace drawer (`traceV2Details`) opens at, from a Prompt
+ * Studio playground turn — written here, not by the screen, clearing every
+ * stale `drawer.*` key exactly as `openDrawer` does.
  */
 export function resolvePromptDrawerAddress({
   query,

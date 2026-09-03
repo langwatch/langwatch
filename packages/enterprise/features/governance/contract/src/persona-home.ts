@@ -3,16 +3,9 @@
 import { z } from "zod";
 
 export const governanceOrganizationIntentSchema = z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]);
-export type GovernanceOrganizationIntent = z.infer<
-  typeof governanceOrganizationIntentSchema
->;
+export type GovernanceOrganizationIntent = z.infer<typeof governanceOrganizationIntentSchema>;
 
-export const personaSchema = z.enum([
-  "personal_only",
-  "mixed",
-  "project_only",
-  "governance_admin",
-]);
+export const personaSchema = z.enum(["personal_only", "mixed", "project_only", "governance_admin"]);
 export type Persona = z.infer<typeof personaSchema>;
 
 export const personaResolverInputSchema = z
@@ -42,6 +35,12 @@ export const personaResolutionSchema = z
     isOverride: z.boolean(),
     governanceUiEnabled: z.boolean(),
     intentPinned: z.boolean(),
+    /**
+     * The same filtered project the resolver would route to — never a
+     * personal workspace (ADR-038 v6). Callers offering a "project home"
+     * option (the picker) must use this rather than an unfiltered query.
+     */
+    firstProjectSlug: z.string().nullable(),
   })
   .strict();
 export type PersonaResolution = z.infer<typeof personaResolutionSchema>;
@@ -56,9 +55,7 @@ export class PersonaHomeResolverService {
     const persona = this.detectPersona(input);
 
     if (input.organizationIntent) {
-      const projectHome = input.firstProjectSlug
-        ? `/${input.firstProjectSlug}`
-        : "/settings";
+      const projectHome = input.firstProjectSlug ? `/${input.firstProjectSlug}` : "/settings";
       return {
         persona,
         destination:
@@ -68,6 +65,7 @@ export class PersonaHomeResolverService {
         isOverride: false,
         governanceUiEnabled: input.hasGovernanceUi,
         intentPinned: true,
+        firstProjectSlug: input.firstProjectSlug,
       };
     }
 
@@ -78,6 +76,7 @@ export class PersonaHomeResolverService {
         isOverride: true,
         governanceUiEnabled: input.hasGovernanceUi,
         intentPinned: false,
+        firstProjectSlug: input.firstProjectSlug,
       };
     }
 
@@ -87,6 +86,7 @@ export class PersonaHomeResolverService {
       isOverride: false,
       governanceUiEnabled: input.hasGovernanceUi,
       intentPinned: false,
+      firstProjectSlug: input.firstProjectSlug,
     };
   }
 
@@ -116,6 +116,7 @@ export class PersonaHomeResolverService {
         isOverride: false,
         governanceUiEnabled: input.hasGovernanceUi ?? false,
         intentPinned: false,
+        firstProjectSlug: input.firstProjectSlug,
       };
     }
   }

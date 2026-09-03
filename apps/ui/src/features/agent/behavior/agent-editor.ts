@@ -1,14 +1,7 @@
 /**
- * The address that opens the application's registered agent editor drawer.
- *
- * `openAgentEditor` IS THE ONE PIECE OF PLATFORM VOCABULARY THIS FAMILY KEEPS.
- * The code, HTTP and workflow editors are registered drawers, still opened by
- * the scenario editor, the experiments workbench, the agent-testing dialog and
- * the Agent list drawer, and their closures reach the optimization studio. So
- * the screen names the drawer and this writes the address the rest of the
- * product already produces for an agent — the same `?drawer.open=…&drawer.agentId=…`
- * that `agent-platform-url.ts` and Langy's deep links emit, and the same params
- * `openDrawer` writes, including its clearing of every other `drawer.*` key.
+ * Writes the address the rest of the product already uses to open the agent
+ * editor drawer (`agent-platform-url.ts`, Langy's deep links, `openDrawer`)
+ * — same params, same clearing of every other `drawer.*` key.
  */
 
 import type { AgentEditorDrawer } from "@langwatch/agent-web/screens/agent-management";
@@ -25,6 +18,33 @@ export function openAgentEditor({
 }: {
   query: Readonly<Record<string, string | undefined>>;
   drawer: AgentEditorDrawer;
+  agentId?: string;
+  setQuery: (next: Readonly<Record<string, string | undefined>>) => void;
+}): void {
+  openAgentDrawer({ query, drawer, agentId, setQuery });
+}
+
+/** The same address, opening the read-only connected-agent detail drawer. */
+export function openConnectedAgentDrawer({
+  query,
+  agentId,
+  setQuery,
+}: {
+  query: Readonly<Record<string, string | undefined>>;
+  agentId: string;
+  setQuery: (next: Readonly<Record<string, string | undefined>>) => void;
+}): void {
+  openAgentDrawer({ query, drawer: "agentConnectedDetail", agentId, setQuery });
+}
+
+function openAgentDrawer({
+  query,
+  drawer,
+  agentId,
+  setQuery,
+}: {
+  query: Readonly<Record<string, string | undefined>>;
+  drawer: AgentEditorDrawer | "agentConnectedDetail";
   agentId?: string;
   setQuery: (next: Readonly<Record<string, string | undefined>>) => void;
 }): void {

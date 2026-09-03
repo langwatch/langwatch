@@ -29,7 +29,7 @@
  * router, and only one of them would be checked.
  */
 
-import type { AgentWithFields } from "@langwatch/agent-contract";
+import type { AgentListView } from "@langwatch/agent-contract";
 import { createFeatureApi } from "@langwatch/platform-api-client";
 
 /** The project every agent procedure is scoped to. */
@@ -44,7 +44,7 @@ export type AgentApiMap = {
      * superjson rather than a JSON projection.
      */
     getAll: {
-      query: { input: ProjectScope; output: AgentWithFields[] };
+      query: { input: ProjectScope; output: AgentListView[] };
     };
   };
 

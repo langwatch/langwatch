@@ -1,15 +1,7 @@
 /**
- * Recovery from stale content-hashed chunks after a deploy.
- *
- * Vite emits JS chunks with content-hash filenames (e.g.
- * `react-json-view-CugXrtI-.js`). When a new version is deployed the old
- * hashes are removed from the CDN, but a tab opened before the deploy still
- * references them. The next lazy `import()` of such a chunk 404s with
- * "Failed to fetch dynamically imported module".
- *
- * Route chunks are guarded by `lazyRoute` in `./lazy-route`; the global
- * `vite:preloadError` listener (registered by the shell adapter) covers every
- * other lazy import by reloading once so the browser fetches fresh hashes.
+ * Recovery from stale content-hashed chunks after a deploy — the next
+ * lazy `import()` of a removed chunk 404s with "Failed to fetch
+ * dynamically imported module". Route chunks: `lazyRoute`; everything else: `vite:preloadError`.
  */
 
 const RELOAD_COOLDOWN_MS = 10_000;

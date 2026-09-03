@@ -1,10 +1,7 @@
 /**
- * Puts a registered drawer's address in the URL.
- *
- * `params` are the drawer's own parameter names, unprefixed — the `drawer.`
- * vocabulary belongs to the host, which writes `?drawer.open=<drawer>` plus
- * one `drawer.<name>` per parameter and clears every stale `drawer.*` key, so
- * a previous drawer's parameters never leak into the next one that opens.
+ * Puts a registered drawer's address in the URL: `params` are the drawer's
+ * own unprefixed names, written as `?drawer.open=<drawer>&drawer.<name>=…`
+ * with every stale `drawer.*` key cleared first.
  */
 
 import type { GatewayDrawer } from "@langwatch/gateway-web/screens/gateway";

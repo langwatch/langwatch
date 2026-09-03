@@ -1,17 +1,7 @@
 /**
- * Which page key each gateway screen answers, and what it is wrapped in.
- *
- * The route table names ten page keys under `/gateway`; the package exposes ten
- * loaders under names of its own. This is the map between them, and the only
- * place either vocabulary meets the other. `/gateway` itself is not here: it is
- * a redirect row in the table, which is what a page whose whole body was a
- * `router.replace` should have been all along.
- *
- * THE PERMISSIONS ARE THE PLATFORM PAGES', ONE FOR ONE. The webhooks page is
- * the one with none, and that is not an oversight: it opened for anyone in the
- * organization, showed the Enterprise upsell to a plan without the entitlement,
- * and asked `webhookEndpoints:manage` for its own controls. Adding a view grant
- * here would refuse readers the platform page admitted.
+ * Which page key each gateway screen answers. Webhooks carries no
+ * permission on purpose, matching the platform page: it opens for anyone
+ * and asks `webhookEndpoints:manage` only for its own controls.
  */
 
 import type { ComponentType } from "react";
@@ -20,12 +10,7 @@ import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { GatewayHost } from "./gateway-host";
 
-/**
- * Routing policies are the one gateway page behind a flag, and it is the
- * governance section's flag rather than a gateway one: the editor was a
- * `/settings/governance` page until the addresses moved, and the flag moved
- * with it. Spec: specs/navigation/gateway-url-move.feature.
- */
+/** Routing policies' flag is governance's, not gateway's — the editor was a `/settings/governance` page before the address moved. */
 const ROUTING_POLICIES_FLAG = "release_ui_ai_governance_enabled";
 
 function gatewayPage(

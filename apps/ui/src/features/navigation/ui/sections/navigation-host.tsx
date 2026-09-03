@@ -1,21 +1,7 @@
 /**
- * What the navigation package's screens and the application chrome are mounted
- * inside.
- *
- * Two things go around them: the tRPC Provider the package's own hooks run on,
- * and the host port that answers for the workspace graph, the reader, the
- * grants, the flags, the deployment, this device's scope memory and the
- * navigations.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product want
- * it.
- *
- * WHICH TEAMS THE READER MAY OPEN is this application's own policy, and it is
- * already written down once, in `behavior/ui-scope-resolution`. The port asks
- * for the answer rather than the rules, so the switcher, the LLM Ops home and
- * the chrome offer exactly the teams a page would render for.
+ * What the navigation package's screens and the application chrome are
+ * mounted inside: the tRPC Provider their hooks run on, and the host port
+ * for workspace graph, reader, grants, flags and deployment.
  */
 
 import {
@@ -37,7 +23,10 @@ import {
 import { LangyMark, LangyMarkGradientDefs, useLangyStore } from "@langwatch/langy-web";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useCallback, useMemo, type ReactNode } from "react";
+import { useMatches } from "react-router";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
+import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
+import { routePatternOf } from "../../../../behavior/navigation-tracing";
 import { useUiAddress } from "../../../../behavior/ui-address";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
@@ -54,13 +43,8 @@ const OPS_VIEW_PERMISSION = "ops:view";
 const OPS_MANAGE_PERMISSION = "ops:manage";
 
 /**
- * The grant that STARTS a Langy turn, and the rollout that reveals Langy at all.
- *
- * `langy:view` is the read grant the panel needs; `langy:create` is what a
- * hand-off from the palette needs, because the hand-off queues a prompt that
- * auto-sends. Offering the hand-off on the read grant would be an invitation
- * into a 403, so the palette is told "no assistant" rather than "an assistant
- * you may not talk to".
+ * `langy:create` gates the palette hand-off (it queues an auto-send), not
+ * `langy:view` — offering it on the read grant would invite a 403.
  */
 const LANGY_CREATE_PERMISSION = "langy:create";
 const LANGY_RELEASE_FLAG = "release_langy_enabled";
@@ -89,13 +73,7 @@ type OrganizationsRead = ReadonlyArray<{
   }>;
 }>;
 
-/**
- * The graph, in the navigation package's own vocabulary.
- *
- * A narrowing rather than a translation: every field below is already on the
- * procedure's answer, and the ones this application carries and the package does
- * not (slugs on teams, owner ids on projects) simply do not travel.
- */
+/** The graph, narrowed to the navigation package's own vocabulary — fields the package doesn't carry simply don't travel. */
 function toNavigationOrganizations(organizations: OrganizationsRead): NavigationOrganization[] {
   return organizations.map((organization) => ({
     id: organization.id,
@@ -118,13 +96,7 @@ function toNavigationOrganizations(organizations: OrganizationsRead): Navigation
   }));
 }
 
-/**
- * What kind of deployment this is, off the config the HTML shell carries.
- *
- * A composition whose document has no config block is a self-hosted deployment
- * as far as every branch below goes, never a crash — the same shape
- * `readUiIsSaaS` takes for the same reason.
- */
+/** What kind of deployment this is: a document with no config block reads as self-hosted, never a crash. */
 function readDeployment(): NavigationDeployment {
   try {
     const config = readPublicAppConfig();
@@ -149,12 +121,8 @@ function readDeployment(): NavigationDeployment {
 }
 
 /**
- * Mounts the host above whatever it wraps.
- *
- * Exported because the CHROME mounts it once, above the outlet, rather than
- * once per screen: the switchers in the header, the sidebar and the screen
- * below them have to be looking at the same workspace graph, and one provider
- * is what makes them.
+ * Mounts the host above whatever it wraps. Exported because the chrome
+ * mounts it once, above the outlet, so every switcher and screen below reads the same workspace graph.
  */
 export function NavigationHostSection({
   children,
@@ -162,17 +130,9 @@ export function NavigationHostSection({
 }: {
   children: ReactNode;
   /**
-   * Whether this mount is the one that carries the search palette.
-   *
-   * THE PALETTE IS A SINGLETON — one document, one Cmd+K, one dialog — and
-   * this section is mounted in two places: once by the chrome layout route,
-   * above every page this application serves, and once per screen for the
-   * three addresses that sit OUTSIDE that layout. Mounting the provider
-   * unconditionally would put two dialogs on any page where those nest. So the
-   * chrome asks for it and nothing else does, and the host's `commandBar()`
-   * answers `null` wherever it was not asked for — which is the same honest
-   * answer it gave while the palette was still in `platform/app`: no Quick
-   * Search row, no header trigger.
+   * Whether this mount carries the search palette — a singleton (one
+   * document, one Cmd+K). Only the chrome layout route passes `true`;
+   * mounting it unconditionally would put two dialogs where mounts nest.
    */
   commandBar?: boolean;
 }) {
@@ -195,13 +155,7 @@ export function NavigationHostSection({
     [graph, activeScope.organizationId],
   );
 
-  /**
-   * The reader's role in the resolved organization.
-   *
-   * `organization.getAll` narrows `members` to the caller's own row, so the
-   * first one IS the reader's membership. Read off the raw answer rather than
-   * the narrowed graph, which deliberately does not carry memberships.
-   */
+  /** The reader's role: `organization.getAll` narrows `members` to the caller's own row, so the first entry IS it. */
   const organizationRole = useMemo(
     () =>
       ((organizations.data ?? []) as OrganizationsRead).find(
@@ -251,17 +205,16 @@ export function NavigationHostSection({
 
   const deployment = useMemo(readDeployment, []);
 
-  /**
-   * The assistant, as the palette's hand-off needs it: may this reader start a
-   * turn, the way to hand a question over, the way to tell a minimised panel to
-   * stand down while an inline field is in use, and the mark the composer
-   * draws. `null` is the gate — see the two constants above.
-   */
+  /** The assistant, as the palette's hand-off needs it; `null` is the gate — see the two constants above. */
   const askLangy = useLangyStore((store) => store.askLangy);
   const setHomeAskOpen = useLangyStore((store) => store.setHomeAskOpen);
   const canAskLangy =
     session.hasPermission(LANGY_CREATE_PERMISSION) &&
-    session.featureFlag(LANGY_RELEASE_FLAG) === true;
+    session.featureFlag(LANGY_RELEASE_FLAG) === true &&
+    !isLangyDemoProject({
+      projectSlug: project?.slug,
+      demoProjectSlug: deployment.demoProjectSlug,
+    });
   const langy: NavigationLangy | null = useMemo(
     () =>
       canAskLangy
@@ -280,12 +233,8 @@ export function NavigationHostSection({
   );
 
   /**
-   * The palette's two shell entries, and the door into it.
-   *
-   * `open` goes through the package's own module-scope control rather than its
-   * context, because this object is built ABOVE the provider that owns the
-   * state — the provider asks this host who the reader is. The trigger is a
-   * node, so it reads the context at the point the top bar draws it.
+   * The palette's shell entries. `open` uses the package's module-scope
+   * control, not its context — this object is built above the provider.
    */
   const commandBarAnswer = useMemo(
     () =>
@@ -317,13 +266,16 @@ export function NavigationHostSection({
       : [withoutHash.slice(0, queryAt), withoutHash.slice(queryAt)];
   }, [address]);
 
-  /**
-   * The segments a catch-all captured, joined.
-   *
-   * `/@project/<rest>` is the only address that asks, and React Router hands
-   * the rest of the path back under the `*` parameter.
-   */
+  /** The segments a catch-all captured, joined: `/@project/<rest>` is the only address that asks. */
   const catchAllPath = routeReading.pathname.replace(/^\/@project\/?/, "");
+
+  /**
+   * The router's matched pattern for the address on screen — the project
+   * switcher's only way to tell "a trace id lives past this point" without a
+   * route table (`use-project-pick-groups.ts`).
+   */
+  const matches = useMatches();
+  const routePattern = routePatternOf(pathname, matches[matches.length - 1]?.params ?? {});
 
   const setDocumentTitle = useCallback(
     (title: string) => documentTitle.set(title),
@@ -350,6 +302,7 @@ export function NavigationHostSection({
       waiting: () => <UiPageLoading />,
       notFound: () => <UiPageLoading />,
       pathname: () => pathname,
+      routePattern: () => routePattern,
       search: () => search,
       projectParam: () => routeReading.projectParam,
       catchAllPath: () => catchAllPath,
@@ -405,6 +358,7 @@ export function NavigationHostSection({
       organizationRole,
       memory,
       pathname,
+      routePattern,
       search,
       routeReading.projectParam,
       catchAllPath,

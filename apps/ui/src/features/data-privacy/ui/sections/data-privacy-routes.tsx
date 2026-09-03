@@ -1,11 +1,7 @@
 /**
- * Which page key the Data Privacy address answers, and what it is wrapped in.
- *
- * ONE KEY, ONE SCREEN, and the same three wrappers in the same order as its
- * sibling: the host outermost, the harvested settings chrome inside it, and the
- * platform page's own `project:view` grant innermost — so a refusal is framed
- * by the settings menu, exactly as `withPermissionGuard({ layoutComponent })`
- * framed its own.
+ * Which page key the Data Privacy address answers: host outermost, settings
+ * chrome inside it, `project:view` grant innermost — same order as its
+ * sibling, so a refusal is framed by the settings menu.
  */
 
 import { dataPrivacyScreens } from "@langwatch/data-privacy-web/screens/data-privacy";

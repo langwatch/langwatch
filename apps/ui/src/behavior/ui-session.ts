@@ -1,26 +1,16 @@
 /**
- * The session capability, assembled.
- *
- * Four questions a screen may ask — who is here, what scope this page is
- * about, what they may do, and what is switched on — answered from four reads
- * and the harvested scope resolution. All four answer SYNCHRONOUSLY and fail
- * closed, so a screen renders the same way while an answer is loading as it
- * does when the answer is no: a permission that flickers open is a permission
- * that leaked.
- *
- * The three expensive answers are resolved once per scope, never per call.
- * `hasPermission` reads a set built once per fetched permission list; a page
- * asking about a dozen permissions on every render rebuilds nothing and fires
- * nothing. `isFeatureEnabled` cannot know in advance which flags a screen will
- * ask about, so the first ask registers the flag and answers false; the read
- * that follows answers for every later render.
+ * The session capability: who is here, what scope, what they may do, what
+ * is switched on. All FOUR ANSWER SYNCHRONOUSLY AND FAIL CLOSED — a
+ * permission that flickers open while loading is a permission that leaked.
  */
 
 import { permissionSatisfiedBy } from "@langwatch/authz-contract";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { UiActiveScope, UiActor } from "./ui-capabilities";
+import type { UiActiveScope, UiActor, UiFeedbackPort } from "./ui-capabilities";
 import { UiSessionPort } from "./ui-capabilities";
+import { useUiAddress } from "./ui-address";
+import { uiLeaveTo } from "./ui-departure";
 import type { UiFeatureApiTransport } from "./ui-feature-transport";
 import { readPublicAppConfig } from "./public-config";
 import { resolveUiScope, uiScopeSelectionWrites } from "./ui-scope-resolution";
@@ -40,21 +30,48 @@ import {
 } from "./ui-session-queries";
 
 /**
- * A composition's live session, built where the transport is.
- *
- * Declared as a source rather than a port because the answer changes as the
- * reader navigates and the reads land: it is a hook, called once inside the
- * shell, and what it returns is the port for that render.
+ * A composition's live session, built where the transport is — declared
+ * as a source (a hook, called once) rather than a port, since the answer
+ * changes as the reader navigates and the reads land.
  */
-export type UiSessionSource = (input: { transport: UiFeatureApiTransport }) => UiSessionPort;
+export type UiSessionSource = (input: {
+  transport: UiFeatureApiTransport;
+  /** Where a refused session read is told, since nobody else sees it. */
+  feedback: UiFeedbackPort;
+}) => UiSessionPort;
+
+/** The screen a visitor with no session is sent to. */
+export const UI_SIGN_IN_PATH = "/auth/signin";
 
 /**
- * The deployment's demo project slug, or nothing.
+ * Where a visitor goes once the session read has answered — null means stay.
  *
- * Absent config means no demo project, never a crash: the application reads
- * the same fact from a query that is simply undefined until it answers, and a
- * composition whose HTML shell carries no config is a composition with no demo
- * project rather than a broken one.
+ * Carried over from `platform/app`'s `useRequiredSession`: the sign-in screen,
+ * never onboarding, and the address they asked for rides along as the
+ * callback. A public route needs no session, and an offline browser cannot
+ * load the sign-in screen either, so both stay put.
+ */
+export function uiSignedOutDeparture({
+  actor,
+  isAnswered,
+  isPublicRoute,
+  isOnline,
+  address,
+}: {
+  actor: UiActor | null;
+  isAnswered: boolean;
+  isPublicRoute: boolean;
+  isOnline: boolean;
+  address: string;
+}): string | null {
+  if (!isAnswered || actor !== null || isPublicRoute || !isOnline) return null;
+  return `${UI_SIGN_IN_PATH}?callbackUrl=${encodeURIComponent(address)}`;
+}
+
+/**
+ * The deployment's demo project slug, or nothing — absent config means no
+ * demo project, never a crash: a shell with no config just has no demo
+ * project, the same as a query that hasn't answered yet.
  */
 export function readUiDemoProjectSlug(
   documentRoot?: Parameters<typeof readPublicAppConfig>[0],
@@ -68,13 +85,9 @@ export function readUiDemoProjectSlug(
 }
 
 /**
- * The flags screens have asked about, in ask order.
- *
- * A screen names its flag while it renders, and a read cannot start there:
- * React refuses a state update from inside another component's render, and it
- * would be a fresh render pass per flag anyway. The ask is recorded and
- * broadcast on the microtask queue instead, so the render that asked finishes
- * with `false` and the next one has the read in flight.
+ * A screen names its flag mid-render, where React refuses a state update
+ * — so the ask is recorded and broadcast on the microtask queue instead;
+ * the render that asked finishes with `false`, the next has it in flight.
  */
 export class UiFeatureFlagRequests {
   private readonly asked = new Set<string>();
@@ -130,12 +143,9 @@ export class BrowserUiSession extends UiSessionPort {
   }
 
   /**
-   * Whether the caller holds a permission in the active scope.
-   *
-   * The server answers with the granted set and the browser applies the one
-   * hierarchy rule the engine applies — `<resource>:manage` satisfies the
-   * narrower actions on the same resource — through the engine's own helper,
-   * so the two can never drift into disagreeing.
+   * Whether the caller holds a permission — applies the one hierarchy
+   * rule the engine applies (`<resource>:manage` satisfies narrower
+   * actions) through the engine's own helper, so the two can't drift.
    */
   hasPermission(permission: string): boolean {
     const granted = this.state.permissions;
@@ -158,21 +168,22 @@ export class BrowserUiSession extends UiSessionPort {
 }
 
 /**
- * The session capability of the document this application is running in.
- *
- * Install it with `createUiApplication({ features: { session:
- * useBrowserUiSession } })`. A composition that installs nothing keeps the
- * refusing default, which is the right answer for one that has no host to ask.
+ * Install with `createUiApplication({ features: { session:
+ * useBrowserUiSession } })`. Uninstalled, the refusing default is right
+ * for a composition with no host to ask.
  */
 export function useBrowserUiSession({
   transport,
+  feedback,
   authClient,
 }: {
   transport: UiFeatureApiTransport;
+  feedback: UiFeedbackPort;
   /** The deployment's own client unless a test answers with a recorded session. */
   authClient?: UiAuthClient;
 }): UiSessionPort {
   const route = useUiRouteReading();
+  const address = useUiAddress();
   const memory = useUiScopeMemory();
   const [demoProjectSlug] = useState(readUiDemoProjectSlug);
   const [flagRequests] = useState(() => new UiFeatureFlagRequests());
@@ -184,8 +195,29 @@ export function useBrowserUiSession({
     retry: false,
     refetchOnWindowFocus: false,
   });
-  const actor = session.data ?? null;
+  const actor = session.data?.actor ?? null;
+  const failure = session.data?.failure ?? null;
   const userId = actor?.id;
+
+  // Once, per failed read, rather than once per render: the query holds its
+  // answer, so the effect only re-runs when a re-read failed again.
+  useEffect(() => {
+    if (!failure) return;
+    feedback.failed({ error: failure, fallbackTitle: "Couldn't check your session" });
+  }, [failure, feedback]);
+
+  const departure = uiSignedOutDeparture({
+    actor,
+    isAnswered: session.isSuccess,
+    isPublicRoute: route.isPublicRoute,
+    isOnline: navigator.onLine,
+    address,
+  });
+
+  useEffect(() => {
+    if (departure === null) return;
+    uiLeaveTo(departure);
+  }, [departure]);
 
   // The demo project is addressed by the raw segment, reserved slugs included:
   // it is the URL naming the deployment's demo, not a project of the caller's.

@@ -1,13 +1,7 @@
 /**
- * A Datasets success notice, routed to a toast action when it carries an undo.
- *
- * THE UNDO IS RENDERED ON THE TOASTER'S OWN ACTION TRIGGER. The feedback
- * capability carries a title and a description and no action, and widening it
- * is a change to a shared port a page move does not own; the platform page put
- * an Undo button inside the toast, and a toast action is the same affordance
- * without the JSX. Everything else — every notice without an undo — goes
- * through the capability, so the code-keyed copy still decides the words a
- * customer reads.
+ * A Datasets success notice, routed to a toast action when it carries an
+ * undo — the shared feedback capability carries no action, so undo renders
+ * on the toaster's own action trigger instead.
  */
 
 import type { DatasetSuccessNotice } from "@langwatch/dataset-web/screens/datasets";

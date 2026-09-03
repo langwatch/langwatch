@@ -48,7 +48,7 @@ describe("given a real display name and a legacy identity row that collide on th
   });
   const legacyRow = makeProvider({
     provider: "custom",
-    customModels: toLegacyCompatibleCustomModels(["gpt-5.1"], "chat"),
+    customModels: toLegacyCompatibleCustomModels(["gpt-5.1"], "chat").entries,
   });
 
   describe("when the legacy row is returned last", () => {

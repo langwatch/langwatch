@@ -1,15 +1,7 @@
 /**
- * What the address bar says about the scope.
- *
- * The application reads this through a `next/router` compatibility shim whose
- * `pathname` is the matched PATTERN — `/[project]/traces`, not
- * `/acme-app/traces` — and several rules turn on that difference. This package
- * has the router itself, so it reads the same facts from `react-router`
- * directly: the `:project` segment is a route param, `?team=` is a search
- * param, and the personal-workspace test is "the router matched no project
- * segment and the first one is `me`", which is the pattern test restated in
- * terms the router can answer. `/me/traces` therefore stays a project named
- * `me`, exactly as it does today.
+ * What the address bar says about the scope, read directly from
+ * `react-router`: personal workspace is "no `:project` segment matched
+ * and the first path segment is `me`" — so `/me/traces` stays a project.
  */
 
 import { useMemo } from "react";
@@ -17,10 +9,8 @@ import { matchPath, useLocation, useParams, useSearchParams } from "react-router
 import type { UiScopeRoute } from "../model/ui-scope";
 
 /**
- * The addresses that render without a session.
- *
- * The application's list, in this router's pattern syntax. Only the share page
- * carries a scope, and it carries the whole of it in one read.
+ * The addresses that render without a session, in this router's pattern
+ * syntax. Only the share page carries a scope, in one read.
  */
 export const UI_PUBLIC_ROUTES: readonly string[] = [
   "/share/:id",

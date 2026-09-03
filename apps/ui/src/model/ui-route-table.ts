@@ -1,27 +1,14 @@
 /**
- * The application's URL surface, as data.
- *
- * Every path, its nesting under a layout route and every retired prefix that
- * still has to land somewhere live here, in one ordered table. A page itself
- * is named, not imported: the entry carries the module KEY its loader is
- * registered under, and the composing application supplies the loader for that
- * key. That is what lets a page move into a feature-web `screens/` entry one
- * at a time — the loader for its key repoints and this table does not change.
- *
- * The table is data, so it holds no element, no lazy import and no component.
- * `ui/sections/ui-route-objects` turns it into React Router route objects, and
- * `behavior/ui-router` builds the router around them.
+ * The application's URL surface, as data — a page is named by its
+ * loader KEY, not imported, so it can move into a feature-web `screens/`
+ * entry with only the loader repointed. Turned into routes elsewhere.
  */
 
 export type UiRedirectDescriptor = {
   /**
-   * The retired address. Whatever the matched path carries BEYOND this is a
-   * sub-path and travels to the destination.
-   *
-   * A `:name` in `from`, in `to`, or in a `pinParams` value is filled from the
-   * matched route params, which is what lets a retired address inside a
-   * parameterised family — `/:project/messages/:trace` — name its destination
-   * without a page of its own to read `useParams` for it.
+   * The retired address; whatever the matched path carries BEYOND this
+   * travels to the destination. A `:name` anywhere fills from matched
+   * route params, so a parameterised retirement needs no page of its own.
    */
   readonly from: string;
   readonly to: string;
@@ -32,11 +19,9 @@ export type UiRedirectDescriptor = {
    */
   readonly pinParams?: Readonly<Record<string, string>>;
   /**
-   * A rename table for the first sub-path segment, applied before the
-   * sub-path joins the destination — `/admin/user/u_1` reaches
-   * `/ops/backoffice/users/u_1`. Lookup is case-insensitive, and a segment
-   * the table does not name lands on the destination's own home. See
-   * `UiPrefixRedirect`, which is what applies it.
+   * A rename table for the first sub-path segment: `/admin/user/u_1`
+   * reaches `/ops/backoffice/users/u_1`. Case-insensitive; an unnamed
+   * segment lands on the destination's own home.
    */
   readonly mapSegment?: Readonly<Record<string, string>>;
 };
@@ -58,11 +43,9 @@ export type UiRedirectRouteDescriptor = {
 export type UiRouteDescriptor = UiPageRouteDescriptor | UiRedirectRouteDescriptor;
 
 /**
- * Every descriptor in a table, flattened into match order.
- *
- * Nesting only joins a layout to the pages it wraps; every path in the table
- * is absolute, so a flat list ranks the same way the router does. Callers that
- * need to ask what the application routes read this rather than the file.
+ * Every descriptor, flattened into match order — nesting only joins a
+ * layout to the pages it wraps, and every path is absolute, so a flat
+ * list ranks the same way the router does.
  */
 export function uiRouteDescriptors(table: readonly UiRouteDescriptor[]): UiRouteDescriptor[] {
   return table.flatMap((descriptor) =>
@@ -73,25 +56,14 @@ export function uiRouteDescriptors(table: readonly UiRouteDescriptor[]): UiRoute
 }
 
 /**
- * Prefixes that moved to a new top-level home. Old links, bookmarks, emails
- * and stored pins keep landing: the whole prefix forwards with sub-path,
- * query and hash intact, and the history entry is replaced. Named separately
- * from the table it is spread into so the redirect tests exercise the same
- * descriptors the application mounts.
- *
- * Spec: specs/navigation/gateway-url-move.feature and
- * specs/ai-gateway/governance/governance-home-routing.feature (the retired
- * ingestion-sources prefix).
+ * Prefixes that moved to a new top-level home — the whole prefix
+ * forwards with sub-path/query/hash intact, so old links keep landing.
+ * Specs: gateway-url-move.feature, governance-home-routing.feature.
  */
 export const uiLegacyRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
-  // The sources surface has had three addresses: ingestion-sources →
-  // catalog (PR-renamed) → the inventory Sources tab. Every retired
-  // address maps STRAIGHT to its final home — no chaining through the
-  // also-retired middle name. The bare forms pin ?tab=sources, overriding
-  // any tab the old address carried: they served one pane, so every value
-  // they ever took rendered the sources list, while the inventory default
-  // is Catalog. The deep-link forms go to the detail page, which has no
-  // tabs.
+  // Sources has had three addresses: ingestion-sources -> catalog ->
+  // inventory Sources tab. Every retired address maps STRAIGHT to its
+  // final home, no chaining. Bare forms pin ?tab=sources; deep links go to the detail page.
   {
     path: "/governance/ingestion-sources/*",
     redirect: { from: "/governance/ingestion-sources", to: "/governance/inventory" },

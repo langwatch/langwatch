@@ -1,20 +1,7 @@
 /**
- * What a screen may ask of the process it is mounted in.
- *
- * A screen must not reach for the browser's document, a toast singleton, the
- * router or the session client: those are the imports ADR-004 seals off from
- * `src/features/*`, and reaching for them is also what makes a screen
- * untestable outside a running application. It asks these ports instead, and
- * the composition root decides who answers.
- *
- * Two of the four have an implementation this package can write on its own:
- * the document title is `document.title`, and navigation is the router
- * `apps/ui` already owns (`ui-router-navigation`). The other two need
- * something only the host has — a toast renderer wired to the code-keyed
- * error copy, and the session, organization and project a request is about.
- * Until a host supplies them, their default refuses loudly rather than
- * pretending: a swallowed error message and a silently empty permission set
- * are both worse than a stack trace naming the capability.
+ * What a screen may ask of the process it is mounted in — ADR-004 seals
+ * off `document`, the router, the toaster and the session client, so a
+ * screen asks ports instead. Missing ports refuse loudly, never silently.
  */
 
 import { createContext, useContext } from "react";
@@ -36,18 +23,9 @@ export abstract class UiDocumentTitlePort {
 }
 
 /**
- * The one way out a failure offers, when there is one.
- *
- * A failure that has a fix the reader can reach in a click — open the run plan
- * that has nothing runnable in it, configure the model provider the run needs
- * — is not fully reported by words alone: the registry's copy for
- * `suite_all_scenarios_archived` literally reads "Edit the plan to include
- * active scenarios", and the button is what acts on that sentence. Without this
- * slot those failures had to choose between the registry's words and the
- * button, and five of them chose the button and stayed off the port.
- *
- * `run` rather than `onClick`: a port describes what happens, not which input
- * device caused it. The renderer is what turns it into a click handler.
+ * The one way out a failure offers, when there is one — a fix in a click
+ * (open the plan with nothing runnable, configure the model provider).
+ * `run`, not `onClick`: a port describes what happens, not the input device.
  */
 export type UiFailureAction = {
   label: string;
@@ -63,47 +41,29 @@ export type UiSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels, never a message the screen composed: the words a
- * customer reads are resolved from the error's `code` by the host's
- * presentation registry, and a screen that wrote its own sentence would print
- * the code slug instead. `fallbackTitle` names the action that failed, so an
- * unrecognised code still says what the user was doing.
+ * A failure, as the screen knows it — the raw `error` travels, never a
+ * message the screen composed: words are resolved from `error.code` by
+ * the host's registry. `fallbackTitle` names the action, for when there's no code.
  */
 export type UiFailureNotice = {
   error: unknown;
   fallbackTitle: string;
   /**
-   * A hard override of the headline, registry entry or not.
-   *
-   * Rare, and usually a smell: where the registry's copy is wrong for a code,
-   * the fix is the registry rather than one call site. It is here because the
-   * families that moved already pass it — `useShowErrorToast` in the
-   * automations, gateway, ops and coding-agent packages all forward a `title`
-   * — and a port that quietly dropped it left those screens rendering copy
-   * nobody chose.
+   * A hard override of the headline, registry entry or not — rare, and
+   * usually a smell: where the registry's copy is wrong, fix the registry
+   * rather than one call site.
    */
   title?: string;
   /**
-   * A sentence for a refusal the SCREEN made rather than the server.
-   *
-   * Ignored the moment the error carries a code this composition can say
-   * something better about, so it can never override registered copy. It exists
-   * for the failures that have no code at all: a form guard decided in the
-   * browser, or a feature-owned copy table for codes the registry does not list
-   * yet. Without it those degrade to the generic "something went wrong on our
-   * side", which is both untrue and unactionable for a thing the reader can fix
-   * where they are standing.
+   * A sentence for a refusal the SCREEN made, not the server — ignored the
+   * moment the error carries a code the registry can say something better
+   * about. For failures with no code: a browser-side form guard, say.
    */
   description?: string;
   /**
-   * The single fix this failure offers, rendered as a button on the notice.
-   *
-   * Optional, and it stays rare: most failures have no one-click way out, and a
-   * button that only re-runs what just failed is noise. Where one does exist it
-   * belongs HERE rather than in a hand-rolled toast, because that is what lets
-   * the failure keep the registry's words as well as the button.
+   * The single fix this failure offers, as a button — belongs HERE rather
+   * than a hand-rolled toast, so the failure keeps the registry's words
+   * as well as the button. Stays rare: a re-run-what-just-failed button is noise.
    */
   action?: UiFailureAction;
   id?: string;
@@ -131,12 +91,9 @@ export type UiRouteReadingValues = {
 };
 
 /**
- * The address a screen is rendering, as data.
- *
- * A screen that reads `useSearchParams` reaches the router, which is one of the
- * imports ADR-004 seals off; it asks this instead. `setQuery` takes the WHOLE
- * next query rather than a patch, because a screen that keeps view state in the
- * URL has to be able to remove a key as well as set one.
+ * The address a screen is rendering, as data — `useSearchParams` reaches
+ * the router, sealed off by ADR-004. `setQuery` takes the WHOLE next
+ * query, not a patch, so a screen can remove a key as well as set one.
  */
 export abstract class UiRoutePort {
   abstract reading(): UiRouteReadingValues;
@@ -161,11 +118,9 @@ export type UiActiveScope = {
 };
 
 /**
- * Who is here, where they are, and what they may do.
- *
- * `hasPermission` and `isFeatureEnabled` answer synchronously and fail closed,
- * so a screen renders the same way while the answer is still loading as it
- * does when the answer is no.
+ * Who is here, where they are, and what they may do — `hasPermission`
+ * and `isFeatureEnabled` answer synchronously and fail closed, so a
+ * loading screen renders the same as a "no" screen.
  */
 export abstract class UiSessionPort {
   abstract currentUser(): UiActor | null;
@@ -173,22 +128,16 @@ export abstract class UiSessionPort {
   abstract hasPermission(permission: string): boolean;
 
   /**
-   * Whether the answers above have arrived for the current scope.
-   *
-   * A page guard needs the difference that `hasPermission` deliberately hides:
-   * "no, you may not" and "we have not asked yet" are the same `false` to a
-   * screen, and must not be the same to the guard that would otherwise show a
-   * refusal notice for a frame to everyone who has the grant.
+   * Whether the answers above have arrived — a guard needs the
+   * difference `hasPermission` hides: "no" and "not asked yet" are the
+   * same `false` to a screen, but must not be to a guard.
    */
   abstract isSettled(): boolean;
 
   /**
-   * Whether a flag is on, off, or not yet answered.
-   *
-   * The tri-state exists for the same reason as `isSettled`: a guard that reads
-   * an unanswered flag as off renders its not-found fallback on the first frame
-   * of every load. A screen wants the two-state answer and uses
-   * {@link isFeatureEnabled}.
+   * Whether a flag is on, off, or not yet answered — tri-state like
+   * `isSettled`: a guard reading unanswered as off would flash its
+   * not-found fallback on every load's first frame. Screens use {@link isFeatureEnabled}.
    */
   abstract featureFlag(flag: string): boolean | undefined;
 
@@ -277,10 +226,8 @@ export type UiCapabilityResolution = {
   navigation: UiNavigationPort;
   route: UiRoutePort;
   /**
-   * The default only a live host can build: the reader, the scope and what
-   * they may do, all read from the deployment this page came from. Absent for
-   * a composition that declared no session source, and the refusal below is
-   * then the honest answer.
+   * The default only a live host can build — absent for a composition
+   * that declared no session source, when the refusal below is the honest answer.
    */
   session?: UiSessionPort;
 };
@@ -311,10 +258,8 @@ const UiCapabilityContext = createContext<UiCapabilities | undefined>(void 0);
 export const UiCapabilityContextProvider = UiCapabilityContext.Provider;
 
 /**
- * The capabilities of the process this screen is running in.
- *
- * Missing means the screen was mounted outside the application shell, which is
- * a composition fault and not something the screen can degrade around.
+ * Missing means the screen was mounted outside the application shell — a
+ * composition fault, not something the screen can degrade around.
  */
 export function useUiCapabilities(): UiCapabilities {
   const capabilities = useContext(UiCapabilityContext);

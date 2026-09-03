@@ -1,9 +1,4 @@
-/**
- * Which page key the Topic Clustering address answers, and what it is wrapped in.
- *
- * ONE KEY, ONE SCREEN, the same `project:manage` grant the platform page's own
- * `withPermissionGuard({ layoutComponent: SettingsLayout })` framed.
- */
+/** Which page key the Topic Clustering address answers: `project:manage`, the same grant the platform page framed. */
 
 import { topicScreens } from "@langwatch/topic-web/screens/topic-clustering";
 import type { ComponentType } from "react";

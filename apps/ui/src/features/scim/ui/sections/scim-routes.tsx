@@ -1,12 +1,4 @@
-/**
- * Which page key the SCIM address answers, and what it is wrapped in.
- *
- * ONE KEY, ONE SCREEN, and the same wrapping order as every other settings
- * family: the host outermost, the settings chrome inside it, and the platform
- * page's own `organization:manage` grant innermost. That grant is the
- * administrator's on purpose — a SCIM bearer token creates and deactivates
- * people in this organization.
- */
+/** Which page key the SCIM address answers: `organization:manage`, the administrator's grant, since a SCIM token creates and deactivates people. */
 
 import { scimScreens } from "@langwatch/enterprise-scim-web/screens/scim";
 import type { ComponentType } from "react";

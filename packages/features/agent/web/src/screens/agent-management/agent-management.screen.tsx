@@ -1,5 +1,9 @@
 import { Spacer } from "@chakra-ui/react";
-import type { AgentWithFields } from "@langwatch/agent-contract";
+import type {
+  AgentWithFields,
+  ConnectedAgentConfig,
+  ConnectedAgentView,
+} from "@langwatch/agent-contract";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, type ReactNode } from "react";
@@ -247,6 +251,30 @@ export function AgentManagementScreen() {
   const agentsQuery = agentApi.agents.getAll.useQuery({ projectId }, { enabled: Boolean(project) });
 
   const items = useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
+  // The connected agents draw their own card (ADR-128); `items` keeps every
+  // type, including these, for the archive dialog's own lookup by id.
+  const connectedAgents = useMemo<ConnectedAgentView[]>(
+    () =>
+      items
+        .filter((agent) => agent.type === "connected")
+        .map((agent) => ({
+          id: agent.id,
+          name: agent.name,
+          environment: agent.environment ?? null,
+          hostLabel: agent.hostLabel ?? null,
+          lastSeenAt: agent.lastSeenAt ?? null,
+          status: agent.status,
+          instances: agent.instances,
+          owner: agent.owner,
+          parameters: agent.parameters,
+          // `.filter()` above is a plain predicate, not a type guard, so
+          // `agent.config` is still every agent kind's config here; `satisfies`
+          // would reject the wider union and wouldn't narrow the field either.
+          config: agent.config as ConnectedAgentConfig,
+        })),
+    [items],
+  );
+  const ConnectedSection = host.connectedSection();
   const reading = host.route();
   const historyAgentId = reading.query[AGENT_HISTORY_QUERY_KEY];
   const isCreating = reading.query[AGENT_NEW_QUERY_KEY] === AGENT_NEW_QUERY_VALUE;
@@ -325,6 +353,15 @@ export function AgentManagementScreen() {
         lifecycle={lifecycle}
         composition={composition}
         card={screenCard}
+        connectedSection={
+          ConnectedSection
+            ? {
+                Component: ConnectedSection,
+                agents: connectedAgents,
+                onOpen: (agent) => host.openConnectedAgent(agent.id),
+              }
+            : undefined
+        }
       />
       {isCreating && (
         <AgentTypeSelectorDrawer

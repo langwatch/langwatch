@@ -1,27 +1,7 @@
 /**
- * Dispatching a procedure BY NAME, on this application's transport.
- *
- * The typed feature hooks are the ordinary way a screen reads: a package writes
- * its procedures as a map and calls them as `x.y.useQuery(...)`. A few surfaces
- * cannot, and the Agents browser port is the one this was written for — it
- * covers eleven procedures behind one adapter that takes a path string, which is
- * what lets the whole family move without eleven map entries and eleven promises
- * about a router nothing checks yet.
- *
- * IT LIVES IN THE GLOBAL LAYER BECAUSE THAT IS THE ONLY PLACE IT MAY. Building
- * this means holding the tRPC client and the QueryClient, and ADR-004 seals both
- * off from `src/features/*` — a feature that imported them would be a feature
- * choosing its own transport. The shell holds both already, mounts one of these
- * beside the capability ports, and a feature asks for it.
- *
- * THE CACHE KEY IS TRPC'S, and getting that wrong is the bug this module exists
- * to avoid. Keying a read under a namespace of its own — `["agent-ui", path,
- * input]`, which is what the platform host did before it was fixed — shares no
- * prefix with any tRPC key, so an invalidation anywhere else in the product is
- * invisible to it and its own invalidation reaches nothing but itself. The
- * symptom is stale UI that looks random. `trpcQueryKey` is what makes a
- * procedure dispatched here and the same procedure read by a typed hook ONE
- * cache entry.
+ * Dispatching a procedure BY NAME — for surfaces (like the Agents port)
+ * covering many procedures behind one path-string adapter. Cache key is
+ * `trpcQueryKey`'s, so a dispatch here and a typed hook share ONE entry.
  */
 
 import { trpcQueryKey } from "@langwatch/platform-api-client";
@@ -47,18 +27,9 @@ export abstract class UiRpcPort {
   abstract mutate(path: string, input: unknown): Promise<unknown>;
 
   /**
-   * A LIVE procedure, opened from outside React.
-   *
-   * The typed hooks cover every subscription a component watches;
-   * this is for the one that is driven from outside the tree — Langy bridges
-   * `langy.onTurnStream` into a `ReadableStream` an `useChat` transport reads,
-   * which is a plain async function and cannot hold a hook. It rides the SAME
-   * transport, so it takes the same SSE lane and the same session cookie a
-   * hook-driven subscription would.
-   *
-   * Nothing is cached: a stream of entries is not a query result, and writing
-   * one into the QueryClient would give the last entry the standing of an
-   * answer.
+   * A LIVE procedure, opened from outside React — Langy bridges
+   * `langy.onTurnStream` into a `ReadableStream` a plain async function
+   * reads, on the SAME transport/SSE lane. Nothing is cached.
    */
   abstract subscribe(
     path: string,
@@ -89,11 +60,7 @@ export class BrowserUiRpc extends UiRpcPort {
     });
   }
 
-  subscribe(
-    path: string,
-    input: unknown,
-    handlers: UiRpcSubscriptionHandlers,
-  ): UiRpcSubscription {
+  subscribe(path: string, input: unknown, handlers: UiRpcSubscriptionHandlers): UiRpcSubscription {
     return this.transport.subscription(path, input, handlers);
   }
 

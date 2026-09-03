@@ -1,17 +1,7 @@
 /**
- * What the Langy layout is mounted inside.
- *
- * Three things go around it: the tRPC Provider the package's hooks run on, the
- * VANILLA client `langyChatTransport` drives one turn from, and the host port
- * that answers for the project, the reader, their grants, the release flags,
- * the address and the feedback.
- *
- * THE VANILLA CLIENT IS THE SAME CLIENT. `langy.onTurnStream` is bridged into a
- * `ReadableStream<UIMessageChunk>` from outside React, so it cannot use a hook,
- * and `platform/app` handed it the application's own tRPC client. Handing the
- * package a second one would mean a second SSE lane and a second cookie story,
- * so this hands it the one the shell already built — the same lane, the same
- * batching window, the same session.
+ * What the Langy layout is mounted inside: the tRPC Provider its hooks run
+ * on, the vanilla client `langyChatTransport` drives, and the host port for
+ * project, reader, grants, flags, address and feedback. One client, not two — a second would mean a second SSE lane and cookie story.
  */
 
 import {
@@ -24,6 +14,8 @@ import {
 import { useEffect, useMemo, type ReactNode } from "react";
 import { useLocation, useParams } from "react-router";
 
+import { readPublicAppConfig } from "../../../../behavior/public-config";
+import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { useUiRpc } from "../../../../behavior/ui-rpc";
 
@@ -53,6 +45,15 @@ export function LangyHost({ children }: { children: ReactNode }) {
     return void 0;
   }, [organizations.data, scope.projectId]);
 
+  /** The one config leaf a feature package may not read itself (ADR-101). */
+  const demoProjectSlug = useMemo(() => {
+    try {
+      return readPublicAppConfig().demoProjectSlug;
+    } catch {
+      return void 0;
+    }
+  }, []);
+
   const reading = route.reading();
   const host = useMemo<LangyHostPort>(
     () => ({
@@ -62,9 +63,7 @@ export function LangyHost({ children }: { children: ReactNode }) {
               id: placement.project.id,
               slug: placement.project.slug,
               name: placement.project.name,
-              ...(placement.project.apiKey === void 0
-                ? {}
-                : { apiKey: placement.project.apiKey }),
+              ...(placement.project.apiKey === void 0 ? {} : { apiKey: placement.project.apiKey }),
               ...(placement.project.firstMessage === void 0
                 ? {}
                 : { firstMessage: placement.project.firstMessage }),
@@ -94,27 +93,17 @@ export function LangyHost({ children }: { children: ReactNode }) {
               ...(placement.team.members === void 0 ? {} : { members: placement.team.members }),
             }
           : void 0,
-      /**
-       * The reader's standing in the organization.
-       *
-       * The graph read does not carry it, and Langy's own visibility gate
-       * treats an unanswered role as "not an administrator" — the safe
-       * reading, since an administrator who is also a member of the team
-       * passes the same gate on the membership branch.
-       */
+      // The graph read doesn't carry it; Langy's gate treats unanswered as
+      // "not an administrator", the safe reading.
       organizationRole: () => void 0,
+      isDemoProject: () =>
+        isLangyDemoProject({ projectSlug: placement?.project.slug, demoProjectSlug }),
       currentUser: () =>
         actor ? { id: actor.id, name: actor.name, email: actor.email, image: actor.image } : void 0,
       hasPermission: (permission) => session.hasPermission(permission),
       featureFlag: (flag) => session.featureFlag(flag),
       isLoading: () => !!actor && organizations.isLoading,
       route: () => ({ params, query: reading.query, pathname: location.pathname }),
-      /**
-       * Where a reader lifts a plan limit.
-       *
-       * `IS_SAAS` is the application's own public configuration; the dock only
-       * ever needs the destination it implies.
-       */
       planManagementUrl: () => "/settings/subscription",
       setQuery: (next, options) => route.setQuery({ ...reading.query, ...next }, options),
       navigate: (to, options) =>
@@ -124,6 +113,7 @@ export function LangyHost({ children }: { children: ReactNode }) {
     }),
     [
       placement,
+      demoProjectSlug,
       actor,
       session,
       organizations.isLoading,
@@ -142,14 +132,9 @@ export function LangyHost({ children }: { children: ReactNode }) {
   }, [host]);
 
   /**
-   * The by-path dispatcher, handed over as the vanilla client Langy expects.
-   *
-   * `UiRpcPort` is the shell's one seam onto the transport for a caller that
-   * cannot hold a hook, and `langyChatTransport` is exactly that caller: it
-   * opens `langy.onTurnStream` from inside a `ReadableStream` and mutates
-   * `createConversation` / `continueConversation` from a plain async function.
-   * Adapted here rather than in the package, because the shapes either side are
-   * this application's and that package's respectively.
+   * The by-path dispatcher, handed over as the vanilla client Langy expects:
+   * `UiRpcPort` is the shell's one seam onto the transport for a caller
+   * (`langyChatTransport`) that cannot hold a hook.
    */
   useEffect(() => {
     setLangyTrpcClient({

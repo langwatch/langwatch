@@ -1,11 +1,4 @@
-/**
- * The Data Privacy family, as this application composes it.
- *
- * The screen and its rule drawer live in `@langwatch/data-privacy-web`; what
- * belongs to the application is everything they are not allowed to own — the
- * page key, the permission policy, the settings chrome, the transport and the
- * host port.
- */
+/** Data Privacy: screen and its rule drawer, both in `@langwatch/data-privacy-web`. */
 
 import { dataPrivacyApi } from "@langwatch/data-privacy-web/screens/data-privacy";
 import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";

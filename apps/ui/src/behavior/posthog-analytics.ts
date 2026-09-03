@@ -3,21 +3,17 @@ import { useEffect, useRef } from "react";
 import type { PublicEnvironment } from "../model/public-environment";
 
 /**
- * The public configuration PostHog needs. The composing application resolves
- * it — this behaviour never reads it from the environment itself — and passes
- * the same object it holds, so the initialisation effect keeps reacting to the
- * arrival of configuration exactly as it did before the move.
+ * The public configuration PostHog needs — the composing application
+ * resolves and passes it; this behaviour never reads the environment itself.
  */
 export type PostHogPublicConfig = Pick<
   PublicEnvironment,
   "POSTHOG_KEY" | "POSTHOG_HOST" | "NODE_ENV"
 >;
 
-// Returns a cancel function so callers can drop pending work if the effect
-// tears down (or re-runs) before the idle/load callback fires — otherwise a
-// stale callback from a previous render/session could call
-// startSessionRecording() after the component believes recording was never
-// started, silently re-enabling it out from under later state.
+// Returns a cancel function so a torn-down (or re-run) effect can drop
+// pending work — otherwise a stale callback could start recording after
+// the component believes it never started, re-enabling it from under later state.
 function startSessionRecordingWhenIdle(): () => void {
   let cancelled = false;
   const guarded = () => {
@@ -59,44 +55,29 @@ export function usePostHog(config: PostHogPublicConfig | undefined) {
     const posthogHost = config.POSTHOG_HOST;
 
     if (posthogKey) {
-      // capture_pageview: "history_change" tells posthog-js to capture
-      // $pageview on every History API navigation (pushState / popstate),
-      // not just on initial page load. In posthog-js 1.369 this defaults
-      // to true (initial load only) unless `defaults` is set to >=
-      // '2025-05-24', so we set it explicitly to avoid silently dropping
-      // SPA pageviews after the migration off Next.js.
-      // We deliberately do NOT also call posthog.capture("$pageview") on
-      // routeChangeComplete — letting posthog-js handle it avoids the
-      // multiplier bug from the next-router compat layer (every mounted
-      // useRouter() instance used to fan out one capture per consumer).
+      // capture_pageview: "history_change" captures $pageview on every
+      // History API navigation, not just initial load (posthog-js 1.369
+      // otherwise defaults to initial-load-only). We do NOT also call
+      // capture("$pageview") on route change ourselves — that caused a
+      // multiplier bug under the old next-router compat layer.
       posthog.init(posthogKey, {
         api_host: posthogHost ?? "https://eu.i.posthog.com",
         person_profiles: "always",
         autocapture: true,
         capture_pageview: "history_change",
         capture_exceptions: true,
-        // Recording options stay configured, but recording itself starts
-        // disabled — the recorder chunk (rrweb + replay extensions) is
-        // 50KB+ and was loading eagerly as part of init, competing with
-        // first paint. Core capture (autocapture/pageview/identify) stays
-        // eager below; only the recorder's own fetch is deferred to idle
-        // via startSessionRecordingWhenIdle(), so no events are dropped.
+        // Recording stays configured but starts disabled — the recorder
+        // chunk (rrweb + replay, 50KB+) was loading eagerly as part of
+        // init, competing with first paint. Its fetch alone is deferred
+        // to idle via startSessionRecordingWhenIdle(); core capture stays eager.
         session_recording: {
           recordCrossOriginIframes: true,
         },
         disable_session_recording: true,
         loaded: (posthog) => {
-          // Explicitly expose `window.posthog` so the PostHog toolbar
-          // (launched from the PostHog dashboard's "Toolbar" button)
-          // can attach in any environment, not just development. The
-          // posthog-js library sets this internally on most builds, but
-          // bundlers and strict-mode wrappers can sometimes strip the
-          // implicit global; the assignment is best-effort and has no
-          // downside in environments where it's already set.
-          // SSR-safety guard: unreachable in this Vite SPA (never
-          // server-rendered) and `window`/`document` are used
-          // unconditionally elsewhere in this same callback anyway, so the
-          // false branch can't be meaningfully exercised in a browser test.
+          // Explicitly exposes `window.posthog` so the PostHog toolbar can
+          // attach in any environment — bundlers can strip the implicit
+          // global posthog-js sets itself. SSR-unreachable in this Vite SPA.
           /* v8 ignore next */
           if (typeof window !== "undefined") {
             (window as unknown as { posthog: typeof posthog }).posthog = posthog;

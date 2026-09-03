@@ -4,9 +4,9 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
+import type { ConnectedAgentView } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
 import {
-  type ConnectedAgentView,
   environmentTone,
   instanceCountLabel,
   presenceLabel,

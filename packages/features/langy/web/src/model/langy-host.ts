@@ -73,6 +73,13 @@ export abstract class LangyHostPort {
 
   abstract isLoading(): boolean;
 
+  /**
+   * Whether the project in scope is the deployment's shared demo project.
+   * A deployment fact (ADR-101), so this package cannot compare it itself —
+   * the application reads its own config leaf and answers here.
+   */
+  abstract isDemoProject(): boolean;
+
   /** Tri-state: `undefined` while the answer is still arriving. */
   abstract featureFlag(flag: string): boolean | undefined;
 

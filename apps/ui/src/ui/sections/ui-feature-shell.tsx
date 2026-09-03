@@ -24,6 +24,7 @@ import {
   BrowserUiDocumentTitle,
   resolveUiCapabilities,
   UiCapabilityContextProvider,
+  UNAVAILABLE_UI_FEEDBACK,
   UNAVAILABLE_UI_SESSION,
   type UiCapabilityInstall,
   type UiSessionPort,
@@ -75,7 +76,13 @@ export function createUiFeatureShell({
     const navigation = useRouterUiNavigation();
     const route = useRouterUiRoute();
     const [documentTitle] = useState(() => BrowserUiDocumentTitle.create());
-    const sessionPort: UiSessionPort = useSessionCapability({ transport: sessionTransport });
+    // The installed feedback port, resolved ahead of the session rather than
+    // read back out of the resolution: a refused session read is told through
+    // it, and it is the only failure with nobody else to tell.
+    const sessionPort: UiSessionPort = useSessionCapability({
+      transport: sessionTransport,
+      feedback: capabilities.feedback ?? UNAVAILABLE_UI_FEEDBACK,
+    });
     const resolved = useMemo(
       () =>
         resolveUiCapabilities({

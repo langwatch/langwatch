@@ -1,18 +1,7 @@
 /**
- * What the Workflows screens are mounted inside.
- *
- * Two things go around `/:project/workflows` and `/:project/chat/:workflow`:
- * the tRPC Provider the package's own hooks run on, and the host port that
- * answers for the project, the reader's grants, the replication targets, the
- * address, the feedback and the navigation into the studio. Both are mounted
- * here, once, so a screen module stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it. This family reads the whole graph rather than one project, because
- * the replication picker offers every project the reader may create a workflow
- * in — and because the project SLUG, which both navigations need, is on it.
+ * What the Workflows screens mount inside: the tRPC Provider, and the host
+ * port for project, grants, replication targets, address, feedback and
+ * studio navigation — whole graph read, since replication targets any project.
  */
 
 import {
@@ -26,11 +15,8 @@ import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { uiCopyTargets } from "../../../../model/ui-copy-targets";
 
 /**
- * The grant a replication target is judged by.
- *
- * `useProjectsForCopy("workflows:create")` is what `CopyWorkflowDialog` asked
- * for, and it is the right question: replicating writes a NEW workflow into the
- * target project.
+ * The grant a replication target is judged by: `workflows:create`, since
+ * replicating writes a NEW workflow into the target project.
  */
 const WORKFLOW_COPY_PERMISSION = "workflows:create";
 
@@ -40,14 +26,9 @@ export function WorkflowHost({
 }: {
   children: ReactNode;
   /**
-   * The grant the replicate picker asks about, per family.
-   *
-   * Workflows ask `workflows:create`, because replicating writes a new workflow
-   * into the target project. The EXPERIMENTS family mounts this same host — its
-   * closure answers to `@langwatch/workflow-web/studio-host/*`, so a second port
-   * would have split the tRPC cache — and its replicate dialog has always asked
-   * `evaluations:manage`. One derivation, told which question to ask, rather
-   * than two hosts over one page.
+   * The grant the replicate picker asks about, per family — the experiments
+   * family mounts this same host (one port, so the tRPC cache doesn't split)
+   * and asks `evaluations:manage` instead.
    */
   copyPermission?: string;
 }) {
@@ -56,13 +37,7 @@ export function WorkflowHost({
 
   const organizations = workflowApi.organization.getAll.useQuery({ isDemo: false });
 
-  /**
-   * The project the address is about.
-   *
-   * Resolved from the one graph read rather than from a second query. Without a
-   * project in scope the screens render their empty shells, which is what the
-   * platform pages did: every workflow belongs to a project.
-   */
+  /** The project the address is about — from the one graph read rather than a second query. */
   const project = useMemo(() => {
     if (!scope.projectId) {
       return {
@@ -141,20 +116,9 @@ export function WorkflowHost({
 }
 
 /**
- * Wraps a screen in the workflow host its package asks for.
- *
- * NOT ONLY THE WORKFLOWS FAMILY'S. The experiments family and the legacy
- * online-evaluation edit form both moved with the studio slice, so their whole
- * closure — `experiments-v3`'s hooks, `CheckConfigForm` and everything under it
- * — reads `@langwatch/workflow-web/studio-host/*` for the project, the
- * transport, the router, the toasts and the errors. Mounting this host over
- * their screens is what makes those readings answer; mounting a second port of
- * their own would have split the tRPC cache and left `useTargetName` asking a
- * host nothing had mounted.
- *
- * KEPT AS A HOC, unlike its sibling families, because `experiments` and
- * `evaluations` — outside this fold's scope — still import it directly and
- * call it with a per-screen `copyPermission` override.
+ * Wraps a screen in the workflow host its package asks for — shared by
+ * experiments and the legacy online-evaluation form too (one host, so the
+ * tRPC cache doesn't split); kept as a HOC since both call it directly.
  */
 export function withWorkflowHost<P extends object>(
   Screen: ComponentType<P>,

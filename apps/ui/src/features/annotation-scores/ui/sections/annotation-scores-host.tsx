@@ -1,20 +1,7 @@
 /**
- * What the Annotation Scoring screen and its editor are mounted inside.
- *
- * Two things go around `/settings/annotation-scores`: the tRPC Provider the
- * package's own hooks run on, and the host port that answers for the project,
- * the lite-member flag, the editor's address and the two notices.
- *
- * THE EDITOR IS AN ADDRESS, not mounted state. `?drawer.open=annotationScoreEditor`
- * with `drawer.annotationScoreId` beside it is what says the overlay is open and
- * on what, which is why a link to a definition being edited is a link somebody
- * else can open — and why the overlay is in the drawer registry rather than
- * rendered by the screen.
- *
- * `isLiteMember` COMES OFF THE ORGANIZATION FACTS, not off a permission: the
- * lite `EXTERNAL` role is a column on the membership, so `hasPermission` cannot
- * answer it. `useUiOrganizationFacts` reads it on this application's transport
- * under the same cache key the settings chrome uses.
+ * What the Annotation Scoring screen and its editor mount inside. The editor
+ * is an address, not mounted state, so a link to it is shareable.
+ * `isLiteMember` comes off the organization facts, not a permission.
  */
 
 import {

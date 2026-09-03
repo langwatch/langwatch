@@ -1,32 +1,14 @@
 /**
- * What Prompt Studio is mounted inside.
- *
- * Two things go around `/:project/prompts`: the tRPC Provider the package's own
- * hooks run on, and the host port that answers for the project, the reader's
- * grants, the replication targets, the address, the feedback, the browser
- * storage the open tabs live in and the upgrade prompt. Both are mounted here,
- * once, so a screen module stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product
- * want it. This family reads the whole graph rather than one project, because
- * the replication picker offers every project the reader may create a prompt
- * in — and because the project's API key, which the chat run and the deploy
- * snippets send, is a column on it.
- *
- * `isReportedGlobally` IS A RECORDED GAP RATHER THAN A CARRIED BEHAVIOUR, and
- * the honest answer here is `false`. `platform/app` dedupes a refusal that one
- * of its four global interceptors already rendered as a modal — the plan limit,
- * the lite-member restriction — and the prompt row actions asked before
- * toasting so a reader was not told the same thing twice. That answer is a
- * `WeakSet` those interceptors write to, and the interceptors live on
- * `platform/app`'s own MutationCache (`utils/api.tsx`), which does NOT wrap the
- * client `apps/ui` builds. Nothing reaching this screen has been through them,
- * so nothing has been reported twice; the screen's own notice is the only one.
+ * What Prompt Studio is mounted inside: the tRPC Provider its hooks run on,
+ * and the host port for project, grants, replication targets, address,
+ * feedback, tab storage and the upgrade prompt.
  */
 
-import { promptApi, PromptHostProvider, type PromptHostPort } from "@langwatch/prompt-web/screens/prompt-studio";
+import {
+  promptApi,
+  PromptHostProvider,
+  type PromptHostPort,
+} from "@langwatch/prompt-web/screens/prompt-studio";
 import { useMemo, type ReactNode } from "react";
 import { browserUiLogger, browserUiStorage } from "../../../../behavior/ui-browser-storage";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
@@ -35,27 +17,13 @@ import type { PromptTabCapabilities } from "../../behavior/prompt-tab-capabiliti
 import { promptCopyTargets } from "../../model/prompt-copy-targets";
 import { promptPlaygroundChatAvailability } from "../../model/prompt-playground-chat-availability";
 
-/**
- * The browser services the packaged tab store runs on.
- *
- * Both come from the global layer rather than being reached for here: a
- * frontend feature may not name a browser global, which is what
- * `ui-browser-capability` enforces and what keeps a feature mountable
- * elsewhere. `behavior/ui-browser-storage.ts` is where the application answers
- * for the two, beside the selection memory it already keeps there.
- */
+/** The browser services the packaged tab store runs on — a feature may not name a browser global, so these come from the global layer. */
 const tabCapabilities: PromptTabCapabilities = {
   storage: browserUiStorage,
   logger: browserUiLogger,
 };
 
-/**
- * The chat runtime this application serves, which is none.
- *
- * Resolved once at module scope because it is a property of the composition
- * rather than of the reader, the project or the address — see
- * `model/prompt-playground-chat-availability` for why the answer is what it is.
- */
+/** The chat runtime this application serves (none), resolved once at module scope — a property of the composition, not the reader or address. */
 const playgroundChat = promptPlaygroundChatAvailability();
 
 export function PromptHost({ children }: { children: ReactNode }) {
@@ -105,18 +73,14 @@ export function PromptHost({ children }: { children: ReactNode }) {
       navigate: (to) => navigation.navigate(to),
       succeeded: (notice) => feedback.succeeded(notice),
       failed: (failure) => feedback.failed(failure),
-      // See the file docblock: nothing above a package-served screen has
-      // reported a failure yet, so the answer is always no.
+      // Recorded gap: platform/app's dedup WeakSet lives on its own
+      // MutationCache, which doesn't wrap this application's client.
       isReportedGlobally: () => false,
       copyTargets: () => copyTargets,
       tabCapabilities: () => tabCapabilities,
       playgroundChat: () => playgroundChat,
-      /**
-       * `platform/app` opened its own upgrade modal from a module-level
-       * store. Nothing above a screen served from `apps/ui` holds one, so
-       * the reader is sent to the plan settings instead — the same place
-       * that modal's own call to action leads.
-       */
+      // No upgrade modal above this screen, so send the reader to plan
+      // settings directly — the same place that modal's own CTA leads.
       requestUpgrade: () => navigation.navigate("/settings/subscription"),
       openPlatformDrawer: (request) =>
         route.setQuery(resolvePromptDrawerAddress({ query: reading.query, ...request })),

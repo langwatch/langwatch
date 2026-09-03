@@ -1,11 +1,4 @@
-/**
- * The Topic Clustering family, as this application composes it.
- *
- * The screen lives in `@langwatch/topic-web`; what belongs to the application
- * is everything it is not allowed to own — the page key, the permission policy,
- * the settings chrome, the transport, and the host port that turns this
- * application's capabilities into the questions the screen asks.
- */
+/** Topic Clustering: single screen in `@langwatch/topic-web`. */
 
 import { topicApi } from "@langwatch/topic-web/screens/topic-clustering";
 import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";

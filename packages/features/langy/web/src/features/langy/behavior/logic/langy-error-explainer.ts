@@ -1,4 +1,7 @@
-import { explainHandledError, UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
+import {
+  explainHandledError,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "@langwatch/handled-error/presentation";
 import {
   type HandledErrorShape,
   readHandledError,
@@ -239,9 +242,7 @@ const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
  * never by sniffing the provider's message. Runs after it, so the codex codes
  * keep their more specific cards.
  */
-export function promoteUpstreamProviderError(
-  domain: LangyDomainError,
-): LangyDomainError {
+export function promoteUpstreamProviderError(domain: LangyDomainError): LangyDomainError {
   if (domain.code !== "langy_agent_errored") return domain;
   return hasReasonKind(domain.reasons, UPSTREAM_PROVIDER_REASONS)
     ? { ...domain, code: "llm_upstream_error" }
@@ -279,9 +280,7 @@ const MODEL_UNAVAILABLE_REASONS: ReadonlySet<string> = new Set([
  * to reach, and the same request fails the same way forever, so the card
  * offers the setting instead of a retry.
  */
-export function promoteModelUnavailableError(
-  domain: LangyDomainError,
-): LangyDomainError {
+export function promoteModelUnavailableError(domain: LangyDomainError): LangyDomainError {
   if (domain.code !== "langy_agent_errored") return domain;
   return hasReasonKind(domain.reasons, MODEL_UNAVAILABLE_REASONS)
     ? { ...domain, code: "langy_model_unavailable" }
@@ -347,9 +346,7 @@ function parseReasons(value: unknown): LangySerializedReason[] | undefined {
  * error as a JSON string (see `serializeStreamError` in routes/langy.ts);
  * returns null for a plain-string legacy error so the caller can fall back.
  */
-export function readLangyStreamError(
-  message: string | undefined | null,
-): LangyDomainError | null {
+export function readLangyStreamError(message: string | undefined | null): LangyDomainError | null {
   if (!message) return null;
   let parsed: unknown;
   try {
@@ -367,6 +364,7 @@ export function readLangyStreamError(
     httpStatus?: unknown;
     traceId?: unknown;
     reasons?: unknown;
+    retryable?: unknown;
   };
   const code =
     typeof value.code === "string"
@@ -379,11 +377,10 @@ export function readLangyStreamError(
     code,
     httpStatus: typeof value.httpStatus === "number" ? value.httpStatus : 500,
     meta:
-      value.meta && typeof value.meta === "object"
-        ? (value.meta as Record<string, unknown>)
-        : {},
+      value.meta && typeof value.meta === "object" ? (value.meta as Record<string, unknown>) : {},
     traceId: typeof value.traceId === "string" ? value.traceId : undefined,
     reasons: parseReasons(value.reasons),
+    retryable: value.retryable === true,
   };
 }
 
@@ -419,6 +416,7 @@ export function resolveLiveTurnError({
       code: "unknown",
       meta: {},
       httpStatus: 500,
+      retryable: false,
     }
   );
 }
@@ -468,12 +466,14 @@ const REGISTRY_CODE_ALIASES: Record<string, string> = {
  */
 type RegistryReason = HandledErrorShape["reasons"][number];
 
-function toRegistryReasons(
-  reasons: LangySerializedReason[] | undefined,
-): RegistryReason[] {
+function toRegistryReasons(reasons: LangySerializedReason[] | undefined): RegistryReason[] {
   return (reasons ?? []).map((reason) => ({
     code: reason.kind,
     kind: reason.kind,
+    // Langy's own parsed reason never carries a retryable flag (see
+    // `LangySerializedReason`), and the registry does not read it off a
+    // reason anyway — only off the top-level error.
+    retryable: false,
     reasons: toRegistryReasons(reason.reasons),
   }));
 }
@@ -484,6 +484,7 @@ function registryCopy(domain: LangyDomainError) {
     meta: domain.meta,
     httpStatus: domain.httpStatus,
     fault: domain.fault ?? "customer",
+    retryable: domain.retryable,
     tips: domain.tips ?? [],
     docsUrl: domain.docsUrl,
     traceId: domain.traceId,
@@ -543,15 +544,11 @@ export function isStaleLangyHistoryRead({
   hasContentOnScreen: boolean;
 }): boolean {
   return (
-    !!presentation &&
-    hasContentOnScreen &&
-    isTransientLangyHistoryReadFailure(presentation.kind)
+    !!presentation && hasContentOnScreen && isTransientLangyHistoryReadFailure(presentation.kind)
   );
 }
 
-export function explainLangyError(
-  received: LangyDomainError,
-): LangyErrorPresentation {
+export function explainLangyError(received: LangyDomainError): LangyErrorPresentation {
   // Order matters: the narrower promotions run first, so a codex session that
   // also carries an upstream status keeps its own card. "Not reachable at all"
   // is checked before "reached and refused" for the same reason.
@@ -712,8 +709,7 @@ export function explainLangyError(
       return {
         kind: domain.code,
         title: "You're sending messages too quickly",
-        description:
-          "Send this again in a few seconds. Your message is still in the box.",
+        description: "Send this again in a few seconds. Your message is still in the box.",
         render: "composer-notice",
         ...debug,
       };
@@ -764,8 +760,7 @@ export function explainLangyError(
       return {
         kind: domain.code,
         title: isRegistered ? title : "Langy couldn't finish that",
-        description:
-          description || "The request was rejected. Try rephrasing or start again.",
+        description: description || "The request was rejected. Try rephrasing or start again.",
         render: "card",
         action: retry,
         traceId: domain.traceId,

@@ -6,6 +6,12 @@
  * pulled in through `types: ["vite/client"]`, which would put every Vite
  * ambient into a package that does not build with Vite.
  */
+interface ImportMetaEnv {
+  readonly DEV: boolean;
+  readonly PROD: boolean;
+  readonly MODE: string;
+}
+
 interface ImportMeta {
-  readonly env: Record<string, string | boolean | undefined>;
+  readonly env: ImportMetaEnv;
 }

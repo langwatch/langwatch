@@ -1,13 +1,7 @@
 /**
- * Which page key the general Settings address answers, and what it is wrapped in.
- *
- * ONE KEY, ONE SCREEN.
- *
- * THE GRANT IS THE MEMBER'S, not the administrator's, and that is deliberate:
- * every member may READ their organization's settings, and each control on the
- * page is separately disabled for a reader who may not change it. Hiding the
- * page would tell a member nothing about what their organization is configured
- * to do.
+ * Which page key the general Settings address answers: the member's grant,
+ * not the administrator's — every member may read the settings, and each
+ * control is separately disabled for a reader who may not change it.
  */
 
 import { projectScreens } from "@langwatch/project-web/screens/project";

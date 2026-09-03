@@ -265,9 +265,7 @@ vi.mock("../../../../../behavior/langy-api", async () => {
                 messages: snapshot.messages.map((message) => ({
                   id: message.id,
                   role: message.role,
-                  parts: message.parts ?? [
-                    { type: "text", text: message.text },
-                  ],
+                  parts: message.parts ?? [{ type: "text", text: message.text }],
                   createdAtMs: 0,
                 })),
                 lastError: null,
@@ -341,6 +339,9 @@ class FakeLangyHost extends LangyHostPort {
   isLoading() {
     return false;
   }
+  isDemoProject() {
+    return false;
+  }
   featureFlag() {
     return false;
   }
@@ -391,11 +392,7 @@ const composerField = (): HTMLTextAreaElement => {
 };
 
 /** A recorded step, in the wire shape the tail read serves. */
-const recordedAccepted = (o: {
-  id: string;
-  createdAt: number;
-  turnId: string;
-}) => ({
+const recordedAccepted = (o: { id: string; createdAt: number; turnId: string }) => ({
   id: o.id,
   createdAt: o.createdAt,
   occurredAt: o.createdAt,
@@ -473,9 +470,7 @@ describe("given a turn I stopped partway is on the record", () => {
 
       renderReloadedPanel();
 
-      expect(
-        await screen.findByText("I got as far as the retriever"),
-      ).toBeTruthy();
+      expect(await screen.findByText("I got as far as the retriever")).toBeTruthy();
       // Settled and continuable: Send, never Stop or Stopping, and no red card.
       expect(await screen.findByLabelText("Send")).toBeTruthy();
       expect(screen.queryByLabelText("Stop")).toBeNull();
@@ -496,9 +491,7 @@ describe("given a turn I stopped partway is on the record", () => {
         ]);
       });
 
-      expect(useLangyStore.getState().turnProjection.turn?.Status).toBe(
-        "stopped",
-      );
+      expect(useLangyStore.getState().turnProjection.turn?.Status).toBe("stopped");
       expect(useLangyStore.getState().turnPhase).toBe("idle");
       expect(await screen.findByLabelText("Send")).toBeTruthy();
       expect(screen.getByText("I got as far as the retriever")).toBeTruthy();
@@ -644,9 +637,7 @@ describe("given the streamed answer is on screen", () => {
       // A durable read that is BEHIND arrives — it must not shorten the answer.
       refreshHistory();
       await waitFor(() => {
-        expect(
-          screen.getByText("The retriever regressed after the reindex."),
-        ).toBeTruthy();
+        expect(screen.getByText("The retriever regressed after the reindex.")).toBeTruthy();
       });
 
       // Once the record is AHEAD of the thread it takes over, and what it
@@ -666,9 +657,7 @@ describe("given the streamed answer is on screen", () => {
       refreshHistory();
 
       expect(await screen.findByText("and the cost?")).toBeTruthy();
-      expect(
-        screen.getByText("The retriever regressed after the reindex."),
-      ).toBeTruthy();
+      expect(screen.getByText("The retriever regressed after the reindex.")).toBeTruthy();
     });
   });
 });
@@ -698,10 +687,7 @@ describe("given a running turn that is following a plan", () => {
           id: "m2",
           role: "assistant",
           text: "Rewriting the prompt now.",
-          parts: [
-            todoPart,
-            { type: "text", text: "Rewriting the prompt now." },
-          ],
+          parts: [todoPart, { type: "text", text: "Rewriting the prompt now." }],
         },
       ],
       isTurnInFlight: true,
@@ -748,8 +734,7 @@ describe("given a running turn that is following a plan", () => {
         getComputedStyle(node).overflowY === "auto" &&
         node.contains(screen.getByText("improve this prompt")),
     );
-    if (!scroller)
-      throw new Error("the conversation scroller is not on screen");
+    if (!scroller) throw new Error("the conversation scroller is not on screen");
     return scroller;
   };
 
@@ -762,8 +747,7 @@ describe("given a running turn that is following a plan", () => {
 
     // Above the composer…
     expect(
-      card.compareDocumentPosition(composerBox()) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      card.compareDocumentPosition(composerBox()) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     // …and outside the scroller, so it is a row of the column rather than a
     // layer over the conversation: nothing above it is covered.

@@ -1,17 +1,7 @@
 /**
- * The Annotation Scoring family, as this application composes it.
- *
- * The screen, its editor and their transport live in
- * `@langwatch/annotation-web/screens/annotation-scores`; what belongs to the
- * application is the page key, the permission policy, the settings chrome, the
- * transport Provider, the drawer registration and the host port.
- *
- * IT IS ITS OWN FEATURE ROOT rather than part of `features/annotation`, and the
- * package's second screen scope for the same reason: the four annotations LIST
- * keys moved as their own family, and widening theirs to carry a settings page
- * that arrived later would tangle two moves. The transports share a React Query
- * cache — `createFeatureApi` keys on the procedure path — so the list's counts
- * still refresh when this page toggles a definition off.
+ * The Annotation Scoring family: screen/editor/transport live in
+ * `@langwatch/annotation-web`; this owns the page key, permission, chrome,
+ * transport Provider and host port — its own feature root on purpose.
  */
 
 import { annotationScoresApi } from "@langwatch/annotation-web/screens/annotation-scores";

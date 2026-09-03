@@ -28,6 +28,7 @@ export function useOrganizationTeamProject(_options?: {
     organization: host.organization(),
     team: host.team(),
     organizationRole: host.organizationRole(),
+    isDemoProject: host.isDemoProject(),
     hasPermission: (permission: string) => host.hasPermission(permission),
     /**
      * A grant asked ABOUT THE ORGANIZATION rather than the project.

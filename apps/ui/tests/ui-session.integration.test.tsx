@@ -160,8 +160,8 @@ function renderSession({
     transport,
     ...(live
       ? {
-          session: ({ transport: mounted }) =>
-            useBrowserUiSession({ transport: mounted, authClient }),
+          session: ({ transport: mounted, feedback }) =>
+            useBrowserUiSession({ transport: mounted, feedback, authClient }),
         }
       : {}),
   });

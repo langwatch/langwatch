@@ -1,13 +1,4 @@
-/**
- * The Workflows family, as this application composes it.
- *
- * The two screens, their dialogs and the chat panel live in
- * `@langwatch/workflow-web`; what belongs to the application is everything they
- * are not allowed to own — which page key each address answers, the permission
- * policy in front of the list, the transport their hooks run on, and the host
- * port that turns this application's capabilities into the questions the family
- * asks.
- */
+/** Workflows: two screens, their dialogs and the chat panel, all in `@langwatch/workflow-web`. */
 
 import { workflowApi } from "@langwatch/workflow-web/screens/workflows";
 import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
@@ -20,17 +11,9 @@ export const workflowApiBinding: UiFeatureApiBinding = uiFeatureApi({
 });
 
 /**
- * The drawers mounted in the STUDIO host, by the name the address uses.
- *
- * EIGHT OF THEM AND NOT ONE IS THIS FAMILY'S COMPONENT: five are published by
- * `@langwatch/evaluator-web`, two by `@langwatch/dataset-web` and one by
- * `@langwatch/prompt-web`. What they share is the host they read — every one
- * came out of `platform/app` with the studio slice, already wired to
- * `@langwatch/workflow-web/studio-host/*` — and a drawer is mounted where its
- * host is. See `ui/sections/studio-host-drawers` for the whole argument.
- *
- * Lazy, like every page loader here, so seven editors and a CSV parser stay out
- * of the bundle until a reader opens one.
+ * Eight drawers mounted in the STUDIO host, none this family's own —
+ * five from `@langwatch/evaluator-web`, two from `@langwatch/dataset-web`,
+ * one from `@langwatch/prompt-web` (`studio-host-drawers.tsx`).
  */
 export const workflowDrawers: UiDrawerRegistry = {
   addOrEditDataset: lazyDrawer({

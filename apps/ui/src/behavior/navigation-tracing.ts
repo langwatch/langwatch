@@ -1,23 +1,7 @@
 /**
- * Turns a React Router navigation into a span.
- *
- * The router is the only thing that knows a navigation happened — the browser
- * fires no event for it — so the integration lives here, in the application
- * that owns the router, and `@langwatch/react-rum` stays router-agnostic.
- *
- * The shape of a navigation, as far as tracing is concerned:
- *
- *   begin   the router leaves `idle` (a lazy chunk, a loader) — or, for a route
- *           already in hand, the location simply changes and the router never
- *           leaves `idle` at all
- *   commit  the new location is on screen; the span's duration ends here,
- *           because this is what the user waited for
- *   settle  a frame later, the span stops being the parent for new work — the
- *           page dispatches its first queries from mount effects, which run
- *           between commit and paint, so one frame is what it takes to catch
- *           them
- *
- * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
+ * Turns a React Router navigation into a span: begin, commit (span ends),
+ * settle (one frame later, stops parenting new work). See ADR-058 and
+ * `browser-rum-trace-correlation.feature`.
  */
 
 import { type NavigationSpanHandle, startNavigationSpan } from "@langwatch/react-rum";
@@ -25,10 +9,8 @@ import { useEffect, useRef } from "react";
 import { useLocation, useMatches, useNavigation } from "react-router";
 
 /**
- * Backstop for the settle timer. `requestAnimationFrame` does not fire in a
- * background tab, and a navigation that never settles would leave its span
- * open and adopting every later fetch as a child. Losing the tail of a
- * backgrounded navigation is the cheaper failure.
+ * Backstop: `requestAnimationFrame` never fires in a background tab, and
+ * an unsettled span would adopt every later fetch as a child.
  */
 const SETTLE_DEADLINE_MS = 5_000;
 
@@ -38,10 +20,9 @@ const INITIAL_LOCATION_KEY = "default";
 export function useNavigationTracing({ enabled }: { enabled: boolean }): void {
   const navigation = useNavigation();
   const location = useLocation();
-  // `useMatches` rather than `useParams`: this hook runs in the root layout,
-  // and `useParams` there resolves against the root's own match — which has
-  // none of the child route's params. The last match is the leaf, and its
-  // params are the accumulated set.
+  // `useMatches`, not `useParams`: in the root layout, `useParams`
+  // resolves against the root's own match, which has none of the child
+  // route's params. The last match is the leaf, with the accumulated set.
   const matches = useMatches();
 
   const spanRef = useRef<NavigationSpanHandle | null>(null);
@@ -82,9 +63,8 @@ export function useNavigationTracing({ enabled }: { enabled: boolean }): void {
       fromPath: fromPathRef.current,
       navigationType: "resolved",
     });
-    // `location.pathname` is only a fallback for a pending navigation with no
-    // location of its own, and re-running when it changes would restart the
-    // span the commit effect is about to close.
+    // `location.pathname` is a fallback only; re-running on its change
+    // would restart the span the commit effect is about to close.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, isNavigating, pendingPath]);
 
@@ -114,9 +94,8 @@ export function useNavigationTracing({ enabled }: { enabled: boolean }): void {
     });
     fromPathRef.current = location.pathname;
     settle(span);
-    // `matches` and `location.pathname` are read at commit time and change
-    // together with the key; depending on them would re-commit an already
-    // committed navigation.
+    // `matches`/`location.pathname` are read at commit time; depending on
+    // them would re-commit an already-committed navigation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, isNavigating, locationKey]);
 
@@ -133,14 +112,9 @@ export function useNavigationTracing({ enabled }: { enabled: boolean }): void {
 }
 
 /**
- * The route pattern behind a path — `/my-project/traces/abc123` read back as
- * `/:project/traces/:traceId`.
- *
- * Span names have to be low-cardinality to be worth anything: named by path,
- * every project and every trace id would be its own name and no aggregate
- * would exist to ask "how slow is the traces page". React Router does not hand
- * out the matched pattern, but it hands out the params, and substituting them
- * back segment by segment reconstructs it.
+ * `/my-project/traces/abc123` read back as `/:project/traces/:traceId` —
+ * span names must be low-cardinality, and React Router hands out only the
+ * params, not the matched pattern, so this reconstructs it from them.
  */
 export function routePatternOf(
   pathname: string,

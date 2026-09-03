@@ -1,18 +1,7 @@
 /**
- * The personal workspace, as this application composes it.
- *
- * The screens live in `@langwatch/user-web`; what belongs to the application is
- * everything the screens are not allowed to own — which page key each answers,
- * the flag policy in front of them, the browser tab's title, the
- * last-home marker, the transports their hooks run on, and the host port that
- * turns this application's capabilities into the questions the family asks.
- *
- * TWO transports rather than one, which is what makes this feature different
- * from the gateway's and the governance section's. The sessions and
- * pull-request screens render tables from `@langwatch/coding-agent-web`, which
- * calls procedures of its own; that package is not a governed web package, so
- * this feature may not import it, and its api object reaches here through the
- * screen entry of the package that does render its tables.
+ * The personal workspace: screens in `@langwatch/user-web`. TWO transports
+ * — `@langwatch/coding-agent-web`'s tables reach here through `user-web`'s
+ * own screen entry, since a governed package may not import it directly.
  */
 
 import {

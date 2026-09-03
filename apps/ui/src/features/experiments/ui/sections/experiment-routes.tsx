@@ -1,20 +1,7 @@
 /**
- * Which page keys the experiment screens answer, and what they are wrapped in.
- *
- * FIVE KEYS, FOUR SCREENS. `/:project/experiments` is the list;
- * `/:project/experiments/workbench` creates an experiment and forwards to its
- * slug, `/:project/experiments/workbench/:slug` IS the workbench, and
- * `/:project/experiments/:experiment` is the read-only view for a legacy run.
- * `/:project/evaluations/wizard/:slug` is the retired wizard's forward, which
- * reads the experiment to decide which of the three can render it.
- *
- * THE HOST IS THE WORKFLOW HOST, and that is not a shortcut. The studio slice
- * moved `experiments-v3` into `@langwatch/experiment-web` already wired to
- * `@langwatch/workflow-web/studio-host/*` — `useTargetName` and
- * `useTargetOutputs` read the project and the transport through it — so a port
- * of this family's own would have split the tRPC cache and left those hooks
- * asking a host nothing mounted. The copy permission is told to the host rather
- * than assumed: this family's replicate dialog asks `evaluations:manage`.
+ * Which page keys the experiment screens answer: five keys, four screens
+ * (the retired wizard forwards into one of the other three). The host is
+ * the workflow host, whose cache `useTargetName`/`useTargetOutputs` share.
  */
 
 import {

@@ -38,15 +38,11 @@ import { AgentApp } from "#app/agent.app";
 import type { ConnectedAgentRuntime } from "../../services/connected-agent-runtime.service";
 
 export const relayCallBodySchema = z.object({
-  messages: z
-    .array(messageSchema)
-    .describe("The whole conversation so far, OpenAI style."),
+  messages: z.array(messageSchema).describe("The whole conversation so far, OpenAI style."),
   newMessages: z
     .array(messageSchema)
     .optional()
-    .describe(
-      "The messages added since the agent's last turn. Defaults to the last message.",
-    ),
+    .describe("The messages added since the agent's last turn. Defaults to the last message."),
   threadId: z
     .string()
     .max(255)
@@ -54,9 +50,7 @@ export const relayCallBodySchema = z.object({
     .describe(
       "The conversation id. Turns of one conversation share it; a new id starts a new one.",
     ),
-  params: paramsSchema
-    .optional()
-    .describe("Run parameter values by name, as JSON scalars."),
+  params: paramsSchema.optional().describe("Run parameter values by name, as JSON scalars."),
   session: z
     .unknown()
     .optional()
@@ -67,12 +61,8 @@ export const relayCallBodySchema = z.object({
     .string()
     .max(255)
     .optional()
-    .describe(
-      "The W3C trace context the agent adopts, so its spans join this turn's trace.",
-    ),
-  run: callRunSchema
-    .optional()
-    .describe("The simulation run this turn belongs to, if any."),
+    .describe("The W3C trace context the agent adopts, so its spans join this turn's trace."),
+  run: callRunSchema.optional().describe("The simulation run this turn belongs to, if any."),
 });
 
 export const relayCallResponseSchema = z.object({
@@ -111,6 +101,8 @@ export interface AgentCallDeps {
   agents: () => AgentApp;
   runtime: () => ConnectedAgentRuntime;
   assertRunnable: AssertConnectedAgentsRunnablePort;
+  /** `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`; the default cap when absent. */
+  relayMaxPayloadMb?: number;
 }
 
 /** The agent the dispatcher needs, with the per-call budget capped. */
@@ -125,10 +117,7 @@ function dispatchAgentOf({
     id: agent.id,
     name: agent.name,
     environment: agent.environment,
-    timeoutMs: Math.min(
-      config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
-      MAX_CALL_TIMEOUT_MS,
-    ),
+    timeoutMs: Math.min(config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
     isSticky: config.sticky ?? false,
   };
 }
@@ -233,20 +222,19 @@ export function registerCallEndpoint({
           description: "No connected agent with that id in this project",
         },
         429: {
-          description:
-            "Every instance is busy; Retry-After says when to try again",
+          description: "Every instance is busy; Retry-After says when to try again",
         },
         503: { description: "No instance of the agent is connected" },
       },
     }),
     bodyLimit({
-      maxSize: relayPayloadCaps().envelopeBytes,
+      maxSize: relayPayloadCaps(deps.relayMaxPayloadMb).envelopeBytes,
       onError: () => {
         // The cap stopped the read, so no size was measured; the message
         // names the limit alone rather than a number nothing weighed.
         throw new AgentPayloadTooLargeError({
           what: "envelope",
-          limitBytes: relayPayloadCaps().envelopeBytes,
+          limitBytes: relayPayloadCaps(deps.relayMaxPayloadMb).envelopeBytes,
         });
       },
     }),
@@ -272,17 +260,22 @@ export function registerCallEndpoint({
           await dispatchTurn({
             runtime: deps.runtime(),
             projectId: project.id,
-            agent,
+            // `agent` is the full discriminated union `AgentApp.getById`
+            // answers; `dispatchTurn` only ever reads these four fields, so
+            // it declares the narrow contract view rather than the union.
+            agent: {
+              id: agent.id,
+              name: agent.name,
+              environment: agent.environment ?? null,
+              config: agent.config,
+            },
             call,
             signal: c.req.raw.signal,
           }),
         );
       } catch (error) {
         if (error instanceof AgentBusyError) {
-          c.header(
-            "Retry-After",
-            String(Math.ceil((error.meta.retryAfterMs as number) / 1000)),
-          );
+          c.header("Retry-After", String(Math.ceil((error.meta.retryAfterMs as number) / 1000)));
         }
         throw error;
       }

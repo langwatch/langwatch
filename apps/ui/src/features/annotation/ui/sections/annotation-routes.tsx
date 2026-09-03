@@ -1,26 +1,7 @@
 /**
  * Which page key each annotation view answers, and what it is wrapped in.
- *
- * FOUR KEYS, ONE SCREEN. `platform/app` had four page files under
- * `/:project/annotations` whose bodies differed only in the props they handed
- * one table; the package exposes one screen, and this is the map between the
- * two vocabularies. The automations family's tab-as-prop shape, applied to a
- * list.
- *
- * The walker takes the same host as the other four and mounts the TRACE host
- * itself, inside the package: `ConversationView` and `useConversationTurns` ask
- * `@langwatch/trace-web`'s port for the project their turns belong to, and
- * answering that from the annotation host keeps this application mounting one
- * host per page.
- *
- * THE POLICY IS THE PLATFORM PAGES', ONE FOR ONE, AND ONLY ONE OF THE FOUR HAD
- * ONE: `annotations.tsx` was `withPermissionGuard("annotations:view")`; the
- * other three, and the queue walker, were wrapped in nothing at all. The
- * asymmetry is carried rather than tidied — inventing a guard is a change to
- * who can reach a page, which a page move does not own. It is not a hole:
- * every procedure behind all four keys carries `annotations:view` as its own
- * policy, so a reader without the grant meets an empty page whose reads all
- * refused rather than data they should not see.
+ * Only `inbox` carries an explicit `annotations:view` guard — not a gap,
+ * every procedure behind all five keys enforces the grant on its own.
  */
 
 import {

@@ -33,7 +33,8 @@
  *   rest of the product already produces for it.
  */
 
-import { createContext, useContext } from "react";
+import type { ConnectedAgentView } from "@langwatch/agent-contract";
+import { createContext, useContext, type ComponentType } from "react";
 import type { AgentBrowserPort } from "./agent-browser.port";
 
 /** The project every agent on this page belongs to. */
@@ -122,6 +123,24 @@ export abstract class AgentManagementHostPort {
 
   /** Opens the application's registered editor drawer for one agent. */
   abstract openAgentEditor(input: { drawer: AgentEditorDrawer; agentId?: string }): void;
+
+  /**
+   * The connected agents' own card grid (ADR-128), when the application
+   * mounts one. `scenario-web` already owns the component this package may
+   * not import directly — `agent-web` importing it would cycle back, since
+   * `scenario-web` already imports this package's agent-management screen —
+   * so the application plugs the component in here instead.
+   */
+  abstract connectedSection():
+    | ComponentType<{
+        agents: ConnectedAgentView[];
+        onOpen: (agent: ConnectedAgentView) => void;
+        onDelete?: (agent: ConnectedAgentView) => void;
+      }>
+    | undefined;
+
+  /** Opens the application's registered detail drawer for one connected agent. */
+  abstract openConnectedAgent(agentId: string): void;
 }
 
 const AgentManagementHostContext = createContext<AgentManagementHostPort | undefined>(void 0);

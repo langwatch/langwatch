@@ -1,13 +1,7 @@
 /**
- * The evaluator drawers, mounted in the host their package asks for.
- *
- * A DRAWER IS NOT A PAGE, and the difference is what this file exists for: a
- * page is mounted by the route it answers, so its frontend feature wraps it
- * once in `uiPage`'s `host` option there. A drawer opens OVER whatever page the
- * reader is on — the evaluators list, a workflow, a trace — so the host has to
- * travel with the drawer rather than with the address. Wrapping happens here,
- * once, and the whole file is behind the registry's lazy import, so a reader
- * who never opens an evaluator drawer never downloads the adapter either.
+ * The evaluator drawers, mounted in the host their package asks for; the
+ * host travels with the drawer, not the address. See
+ * dev/docs/best_practices/drawers.md#host-wrapping-in-appsui.
  */
 
 import {
@@ -19,14 +13,7 @@ import { useDrawer } from "@langwatch/ui-drawer";
 import { withHost } from "../../../../ui/sections/ui-page";
 import { EvaluatorHost } from "./evaluator-host";
 
-/**
- * `evaluatorHistory`, as the address spells it.
- *
- * The two identifiers arrive as `drawer.evaluatorId` and
- * `drawer.evaluatorName`. A link that lost the id has nothing to show, so it
- * renders nothing rather than an empty history somebody would read as "no
- * changes recorded".
- */
+/** `evaluatorHistory`. No `drawer.evaluatorId` means nothing to show, so it renders null rather than an empty-looking history. */
 function EvaluatorHistory({
   evaluatorId,
   evaluatorName,

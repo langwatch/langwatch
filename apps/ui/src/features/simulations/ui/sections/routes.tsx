@@ -1,15 +1,7 @@
 /**
- * Which page keys the simulation screens answer, and what they are wrapped in.
- *
- * THREE KEYS, and the route table already carries five ROWS for them: the run
- * board serves `/:project/simulations`, `/:project/simulations/*` and, once the
- * library's own row has matched, everything else under the prefix.
- *
- * All three state `withPermissionGuard("scenarios:view")`, unchanged. Agent
- * Testing states `release_ui_agent_testing_v2_enabled` as well, and the ORDER
- * is the policy: the flag is read before the permission, so the address reads
- * as "not found" for everyone while the flag is off rather than as "you may
- * not". `withUiPageGuard` (via `uiPage`) carries that rule already.
+ * Which page keys the simulation screens answer: all three `scenarios:view`,
+ * unchanged. Agent Testing's flag is read before the permission, so the
+ * address reads as "not found" for everyone while it's off, not "you may not".
  */
 
 import { scenarioScreens } from "@langwatch/scenario-web/screens/simulations";
@@ -27,7 +19,9 @@ const AGENT_TESTING_RELEASE_FLAG = "release_ui_agent_testing_v2_enabled";
 
 export const simulationsPageLoaders: UiPageLoaderRegistry = {
   "pages/[project]/simulations/[[...path]]": uiPage({
-    screen: async () => ({ default: (await scenarioScreens.simulations()).default as ComponentType }),
+    screen: async () => ({
+      default: (await scenarioScreens.simulations()).default as ComponentType,
+    }),
     host: ScenarioHost,
     permission: SIMULATIONS_PAGE_PERMISSION,
   }),
@@ -39,7 +33,9 @@ export const simulationsPageLoaders: UiPageLoaderRegistry = {
     permission: SIMULATIONS_PAGE_PERMISSION,
   }),
   "pages/[project]/agent-testing/[[...path]]": uiPage({
-    screen: async () => ({ default: (await scenarioScreens.agentTesting()).default as ComponentType }),
+    screen: async () => ({
+      default: (await scenarioScreens.agentTesting()).default as ComponentType,
+    }),
     host: ScenarioHost,
     permission: SIMULATIONS_PAGE_PERMISSION,
     flags: [AGENT_TESTING_RELEASE_FLAG],

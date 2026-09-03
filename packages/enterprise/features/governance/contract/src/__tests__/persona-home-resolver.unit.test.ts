@@ -10,10 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  PersonaHomeResolverService,
-  type PersonaResolverInput,
-} from "../persona-home";
+import { PersonaHomeResolverService, type PersonaResolverInput } from "../persona-home";
 
 const personaHomes = PersonaHomeResolverService.create();
 const resolvePersonaHome = personaHomes.resolve.bind(personaHomes);
@@ -421,5 +418,18 @@ describe("resolvePersonaHomeSafe", () => {
     expect(result.destination).toBe("/team-prod");
     expect(result.destination).not.toBe("/governance");
     expect(result.destination).not.toBe("/me");
+  });
+
+  /** @scenario "The resolution carries the same project slug it routed with" */
+  it("echoes the caller's (already-filtered) firstProjectSlug on every path", () => {
+    // A picker offering a "project home" option must read this rather than
+    // a second, unfiltered query — see home-page-picker.tsx.
+    expect(resolvePersonaHomeSafe({ firstProjectSlug: "team-prod" }).firstProjectSlug).toBe(
+      "team-prod",
+    );
+    expect(resolvePersonaHomeSafe({ firstProjectSlug: null }).firstProjectSlug).toBeNull();
+    expect(
+      resolvePersonaHome({ ...baseInput, firstProjectSlug: "team-prod" }).firstProjectSlug,
+    ).toBe("team-prod");
   });
 });

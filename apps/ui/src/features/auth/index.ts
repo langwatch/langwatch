@@ -1,14 +1,7 @@
 /**
- * The front door, as this application composes it.
- *
- * The eight screens, their transport map and the host port they answer through
- * live in `@langwatch/auth-web`; what belongs to the application is everything
- * they are not allowed to own — the page keys, the deployment's public
- * configuration and the address.
- *
- * NO PERMISSION POLICY, DELIBERATELY. Every other family declares one here;
- * this family is the unauthenticated surface, and a grant it could ask for
- * does not exist yet at the moment these pages render.
+ * Front door: eight screens in `@langwatch/auth-web`. NO permission policy,
+ * deliberately — this is the unauthenticated surface, and no grant exists
+ * yet when these pages render.
  */
 
 import { authApi } from "@langwatch/auth-web/screens/auth";

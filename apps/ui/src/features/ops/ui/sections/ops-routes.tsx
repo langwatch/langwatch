@@ -1,28 +1,7 @@
 /**
- * Which page key each Ops address answers, and what it is wrapped in.
- *
- * The route table names TWENTY page keys under `/ops` and the package exposes
- * FOURTEEN screens, because the six Backoffice addresses were always one page:
- * `platform/app` had six three-line files, each rendering a resource view inside
- * one shared admin-gated shell. This is the map between the two vocabularies,
- * and it makes the resource explicit — a key names a resource here, so the
- * screen is told rather than having to read the address. That is the shape the
- * automations family established for its four tabs.
- *
- * THE POLICY IS THE PLATFORM SHELLS', ONE FOR ONE, AND IT IS TWO POLICIES.
- * `OpsPageShell` gated the workspace on the live `ops.getScope` probe and
- * `BackofficeShell` gated the Backoffice on `user.isAdmin`, decoupled on purpose
- * so widening operator access could never widen the Backoffice. Here they are
- * the two platform-tier grants the authz registry already declares: `ops:view`
- * for the workspace, `ops:manage` for the Backoffice. A reader with the first
- * and not the second sees every Ops page and is refused every Backoffice one.
- *
- * WHAT DOES NOT TRAVEL is the redirect. Both platform shells pushed a denied
- * reader to `/`; the guard renders a refusal in place instead — a redirect
- * hides from the reader that the address exists and they may not see it.
- *
- * `DashboardLayout` and `SettingsLayout` were the other half of those shells and
- * do not travel either: chrome belongs to the route tree.
+ * Which page key each Ops address answers: `ops:view` for the workspace,
+ * `ops:manage` for the Backoffice, deliberately decoupled. A refusal
+ * renders in place, not a redirect — that would hide the address exists.
  */
 
 import { opsScreens, type BackofficeResource } from "@langwatch/ops-web/screens/ops";

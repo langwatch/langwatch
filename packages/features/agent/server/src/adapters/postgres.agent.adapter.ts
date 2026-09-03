@@ -50,17 +50,34 @@ export class PostgresAgentAdapter {
   }
 
   private service: AgentServiceContract | undefined;
+  private repository: PrismaAgentRepository | undefined;
 
   private constructor(private readonly options: PostgresAgentAdapterOptions) {}
 
   build(): AgentServiceContract {
     this.service ??= AgentService.create({
-      repository: PrismaAgentRepository.create(this.options.database),
+      repository: this.repo(),
       workflows: this.linkedWorkflows(),
       auditLog: PrismaAgentHistoryRepository.create(this.options.database),
       generateId: this.options.generateId,
     });
     return this.service;
+  }
+
+  /**
+   * The one write ADR-128's presence projection needs, over the SAME
+   * repository {@link build} uses — narrow so a process outside this package
+   * (the connected-agent session core's composition root) can satisfy it
+   * without the private `AgentRepository` type.
+   */
+  presenceWriter(): { touchLastSeenAt: PrismaAgentRepository["touchLastSeenAt"] } {
+    const repository = this.repo();
+    return { touchLastSeenAt: (input) => repository.touchLastSeenAt(input) };
+  }
+
+  private repo(): PrismaAgentRepository {
+    this.repository ??= PrismaAgentRepository.create(this.options.database);
+    return this.repository;
   }
 
   /**

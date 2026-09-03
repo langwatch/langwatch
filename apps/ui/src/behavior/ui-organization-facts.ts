@@ -1,24 +1,7 @@
 /**
- * The facts about a reader and their organization that are NOT permissions.
- *
- * The session capability answers who is here, what scope this page is about and
- * what they may do. Three questions the moved settings surfaces ask fall
- * outside that: which plan the organization is on, whether the reader holds the
- * lite `EXTERNAL` membership role, and whether they administer the PLATFORM.
- * None is a grant — the first is a billing fact, the second a membership
- * column, and the third an email allowlist that is deliberately not an
- * organization permission, because folding it into one would widen it.
- *
- * Every read runs on this application's transport under the key
- * `@trpc/react-query` would have produced for the same procedure, so a read
- * here and the same read by an application hook are ONE cache entry: the
- * organization graph the shell already holds is not fetched twice, and
- * `limits.getUsage` lands on the same entry as the application's
- * `useActivePlan`.
- *
- * A feature cannot do any of this for itself — `@tanstack/react-query` is one
- * of the imports ADR-004 seals off from `src/features/*` — which is why the
- * reads live in global behaviour and reach a feature as plain values.
+ * Facts about a reader and their organization that are NOT permissions:
+ * plan tier, `EXTERNAL` lite-member role, PLATFORM admin (an allowlist,
+ * deliberately not an org permission) — cached under `trpcQueryKey`.
  */
 
 import { trpcQueryKey } from "@langwatch/platform-api-client";
@@ -44,12 +27,9 @@ type OrganizationsRead = ReadonlyArray<{
 }>;
 
 /**
- * Whether this deployment is the hosted product.
- *
- * It decides one thing in the menu: Subscription on SaaS, License everywhere
- * else. A composition whose HTML shell carries no config is a self-hosted
- * deployment as far as that choice goes, never a crash — the same shape
- * `readUiDemoProjectSlug` takes for the same reason.
+ * Whether this deployment is the hosted product — decides one menu
+ * entry, Subscription vs License. No config reads as self-hosted, never
+ * a crash, the same shape `readUiDemoProjectSlug` takes.
  */
 export function readUiIsSaaS(documentRoot?: Parameters<typeof readPublicAppConfig>[0]): boolean {
   try {
@@ -72,11 +52,9 @@ export type UiOrganizationFacts = {
 };
 
 /**
- * The plan tier and the membership role, for the scope this page is about.
- *
- * `limits.getUsage` is asked only where the platform hook asked it: with an
- * organization in scope and `organization:view` held. Without it the plan reads
- * as not-enterprise and not-loading, which is what the hook returned too.
+ * The plan tier and membership role — `limits.getUsage` is asked only
+ * with an organization in scope and `organization:view` held; otherwise
+ * the plan reads as not-enterprise and not-loading.
  */
 export function useUiOrganizationFacts(): UiOrganizationFacts {
   const { session } = useUiCapabilities();
@@ -119,12 +97,9 @@ export function useUiOrganizationFacts(): UiOrganizationFacts {
 }
 
 /**
- * Whether the reader administers the PLATFORM.
- *
- * `user.isAdmin` is an email allowlist rather than an organization grant, so it
- * has no permission to read it off and is asked directly. It decides only which
- * options a surface OFFERS; every route that acts on it authorizes the
- * capability again, so a stale `true` widens a menu and never an outcome.
+ * `user.isAdmin` is an email allowlist, not an org grant, asked directly
+ * — it only decides which options a surface OFFERS; every route that
+ * acts re-authorizes, so a stale `true` widens a menu, never an outcome.
  */
 export function useUiPlatformAdmin(): boolean {
   const rpc = useUiRpc();

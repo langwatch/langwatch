@@ -1,25 +1,7 @@
 /**
- * The tRPC link that carries a subscription.
- *
- * The platform serves every live procedure over Server-Sent Events at
- * `/api/sse/{procedure.path}`, and the frames on that stream are OURS rather
- * than tRPC's: superjson-encoded, with three control shapes the client has to
- * recognise. `@trpc/client`'s stock `httpSubscriptionLink` speaks a different
- * wire format and would read none of it, so the link is written out.
- *
- * THE SESSION RIDES THE ORIGIN. There is no token here and no header: the
- * browser attaches the better-auth session cookie to an `EventSource` because
- * the URL is same-origin, and the server reads it with the same
- * `getServerAuthSession` every other request goes through. Point this link at
- * another origin and the channel silently becomes anonymous, which is why the
- * caller passes a base URL and the composition that owns the base URL is what
- * proves it matches the HTTP lane's.
- *
- * The transformer and the `EventSource` constructor are injected rather than
- * imported. This package chooses neither: superjson is the application's
- * choice for its whole transport, and `EventSource` does not exist in Node or
- * in jsdom, so it is resolved when a connection opens rather than when the
- * module loads.
+ * The tRPC link that carries a subscription over this application's own SSE
+ * frame format (not tRPC's wire format) and the same-origin session cookie.
+ * See dev/docs/plans/ui-subscription-transport.md.
  */
 
 import type { TRPCLink } from "@trpc/client";
@@ -75,17 +57,9 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
 /**
- * Classify one parsed frame. A `type: "error"` frame is AMBIGUOUS: the route
- * wrapper's PROTOCOL error (`{type:"error", message}`, the subscription
- * generator threw) shares its discriminant with legitimate subscription DATA
- * whose own union carries an error variant — the Langy turn stream's terminal
- * is `{type:"error", error:"<serialized domain error>"}`.
- *
- * The two shapes are disjoint (protocol always carries a string `message`, a
- * domain entry carries `error` and no `message`), so split on that. A domain
- * entry must reach the subscriber as data, or every live-watched turn failure
- * collapses into a dead subscription and a generic unknown card while the
- * typed cause is sitting right there on the wire.
+ * A `type: "error"` frame is ambiguous: a protocol error carries `message`,
+ * a domain error (e.g. a turn-stream failure) carries `error` with none —
+ * misclassifying one collapses it into a dead subscription.
  */
 export function classifySseFrame(
   parsed: unknown,

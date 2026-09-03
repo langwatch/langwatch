@@ -36,7 +36,8 @@ import {
 } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/scenario-api";
-import { type ConnectedAgentView, presenceLabel, scopeOf, sdkLabel } from "./connected-agent-rows";
+import type { ConnectedAgentView } from "@langwatch/agent-contract";
+import { presenceLabel, scopeOf, sdkLabel } from "./connected-agent-rows";
 
 export type ConnectedAgentDrawerProps = {
   agentId?: string;

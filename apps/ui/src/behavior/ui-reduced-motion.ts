@@ -1,17 +1,7 @@
 /**
- * Whether this reader asked their operating system for less motion.
- *
- * One line of browser API, in the global layer for the reason every other module
- * here is: `ui-browser-capability` forbids `apps/ui/src/features/*` from naming
- * `window`, and a feature that reaches `matchMedia` directly cannot be mounted
- * anywhere else or driven by a test with no browser.
- *
- * It LISTENS rather than reading once. The preference is changed from a system
- * settings panel while a page is open, and a full-screen animation that keeps
- * playing after the reader turned motion off is exactly the thing the setting
- * exists to stop. A browser that does not implement `matchMedia` — and jsdom,
- * unless a suite stubs it — reads as "no preference", which is the same answer
- * the media query gives when there is none.
+ * In the global layer since a feature may not name `window` directly.
+ * LISTENS rather than reading once — the OS preference can change while a
+ * page is open, and an unsupported `matchMedia` reads as "no preference".
  */
 
 import { useEffect, useState } from "react";

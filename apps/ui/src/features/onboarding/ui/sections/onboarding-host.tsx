@@ -1,27 +1,7 @@
 /**
- * What the five onboarding screens are mounted inside.
- *
- * Two things go around them: the tRPC Provider the package's own hooks run on,
- * and the host port that answers for the organization graph, the session, the
- * address, the governance-fork flag, sign-out, the two notices, the clipboard,
- * the reduced-motion preference and the project's base key. THE DEPLOYMENT IS
- * NOT ON IT: the package decodes the public-config meta tag itself, because half
- * the modules that read it are also mounted by `@langwatch/trace-web`, which
- * mounts no onboarding host. A screen stays a screen module.
- *
- * `organization.getAll` is asked with the same input the application shell asks
- * with, which under tRPC's path-plus-input cache key is the same entry: the
- * graph is fetched once for the document however many halves of the product want
- * it. THE READ IS ENABLED UNCONDITIONALLY, which matters on these addresses in a
- * way it does not elsewhere — `/onboarding/welcome` decides whether to show the
- * create-an-organization form from whether the reader belongs to one, and an
- * answer that never arrives shows it to a member.
- *
- * `revealProjectApiKey()` DOES NOT WIDEN THE SCOPE GRAPH: `UiScopeProject`
- * carries an id, a slug and a name and no credential. The key arrives as its own
- * reading off the same `organization.getAll` answer, redacted server-side by the
- * same `project:update` check that decides who may hold one at all — a reader
- * who may not gets `undefined`.
+ * What the five onboarding screens are mounted inside: the tRPC Provider
+ * their hooks run on, and the host port for org graph, session, address,
+ * flags, feedback, clipboard and the project's base key. No deployment on it — the package decodes the config tag itself.
  */
 
 import {

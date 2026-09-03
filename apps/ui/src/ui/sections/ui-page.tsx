@@ -1,21 +1,12 @@
 /**
- * One helper for every routed page: screen, host, settings chrome, guard.
- *
- * The wrapping order is fixed and stated once, here, instead of in 38 route
- * file docblocks: the host is OUTERMOST (a refusal must still have the host
- * mounted for pages that need it before their first render is moot only when
- * there is no host at all), the settings chrome sits outside the guard (a
- * reader who lacks a grant still sees the frame they navigated into), and the
- * guard is innermost, around the screen itself.
+ * The wrapping order, fixed once here instead of in 38 route files: host
+ * OUTERMOST (a page needs it mounted before first render even when refused),
+ * settings chrome outside the guard, guard innermost around the screen.
  */
 
 import type { ComponentType, ReactNode } from "react";
 import type { UiPageLoader } from "../../behavior/ui-page-loaders";
-import {
-  UiPageForbidden,
-  UiPageLoading,
-  UiPageNotFound,
-} from "../elements/ui-page-fallbacks";
+import { UiPageForbidden, UiPageLoading, UiPageNotFound } from "../elements/ui-page-fallbacks";
 import { withUiPageGuard, type UiPageGuardFallbacks } from "./ui-page-guard";
 import { withUiSettingsLayout } from "./ui-settings-layout";
 

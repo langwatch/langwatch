@@ -87,10 +87,22 @@ describe("given the client the session is read with", () => {
   });
 
   describe("when the endpoint refuses the read", () => {
-    it("fails rather than reporting the reader as signed out", async () => {
-      await expect(
-        readUiActor(readingClient(() => Promise.resolve({ error: { status: 500 } }))),
-      ).rejects.toThrow(/session endpoint refused/);
+    it("reads nobody, and names the refusal rather than losing it", async () => {
+      const reading = await readUiActor(
+        readingClient(() => Promise.resolve({ error: { status: 500 } })),
+      );
+
+      expect(reading.actor).toBeNull();
+      expect(reading.failure?.code).toBe("session_read_failed");
+    });
+
+    it("reads nobody when the read never reached the endpoint at all", async () => {
+      const reading = await readUiActor(
+        readingClient(() => Promise.reject(new Error("Failed to fetch"))),
+      );
+
+      expect(reading.actor).toBeNull();
+      expect(reading.failure?.code).toBe("session_read_failed");
     });
   });
 });

@@ -1,18 +1,7 @@
 /**
- * Which page keys the Datasets addresses answer, and what they are wrapped in.
- *
- * TWO KEYS, TWO SCREENS. The keys still read `pages/[project]/datasets` and
- * `pages/[project]/datasets/[id]`, and they are kept rather than renamed: the
- * route transcript in `apps/ui/tests/fixtures` is the parity bar for the URL
- * surface and fails the moment a page key changes, so renaming one would spend
- * that guard's signal on a cosmetic edit.
- *
- * THE POLICY IS THE PLATFORM PAGES', ONE FOR ONE, AND THEY DIFFER FROM EACH
- * OTHER: the list page was wrapped in `withPermissionGuard("datasets:view")`,
- * and the detail page was NOT wrapped at all — it read `hasPermission` only to
- * decide whether to offer the Run experiment button. So the list key carries the
- * grant and the detail key carries none, which is the behaviour a reader with a
- * deep link into one dataset has today.
+ * Which page keys the Datasets addresses answer. The two differ on purpose:
+ * the list guards on `datasets:view`, the detail page carries no grant — a
+ * deep link into one dataset works, matching the platform pages.
  */
 
 import { datasetScreens } from "@langwatch/dataset-web/screens/datasets";

@@ -1,17 +1,7 @@
 /**
- * Which page key the unsubscribe landing answers, and what it is NOT wrapped
- * in.
- *
- * NO GUARD AND NO HOST, and both absences are deliberate. ADR-031 makes the
- * `?token=` the authorization — its HMAC binds it to one recipient — so a
- * permission guard would refuse the only person the link was ever minted for,
- * and a host port that answers for the session, the organization and the
- * project has nothing to say about somebody who is not signed in.
- *
- * THE TOKEN IS READ HERE. The screen takes it as a prop, so the address is read
- * once, by the half of the application that owns addresses, and the screen stays
- * a screen. Nothing else about the query travels: the token reaches exactly one
- * procedure and is never written anywhere this application controls.
+ * Which page key the unsubscribe landing answers: no guard, no host. ADR-031
+ * makes the `?token=` HMAC the authorization, binding it to one recipient —
+ * a guard would refuse the only person the link was ever minted for.
  */
 
 import { unsubscribeScreens } from "@langwatch/automation-web/screens/unsubscribe";

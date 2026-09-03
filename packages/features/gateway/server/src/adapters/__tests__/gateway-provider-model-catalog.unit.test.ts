@@ -1,4 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const warned = vi.fn();
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: (...args: unknown[]) => warned(...args),
+    debug: vi.fn(),
+  }),
+}));
 
 import { declaredModelsForProvider } from "../gateway-provider-model-catalog.adapter";
 
@@ -95,6 +105,26 @@ describe("declaredModelsForProvider", () => {
           customEmbeddingsModels: [],
         }),
       ).toBeUndefined();
+    });
+  });
+
+  describe("when a stored custom model entry fails the strict parse", () => {
+    /** @scenario A malformed custom model entry is dropped loudly, not silently */
+    it("drops it from the declared list and logs it at warn by name", () => {
+      warned.mockClear();
+      const declared = declaredModelsForProvider({
+        provider: "custom",
+        customModels: [
+          { modelId: "good-model", displayName: "Good", mode: "chat" },
+          { modelId: "bad-model", displayName: "Bad", mode: "chat", extra: "nope" },
+        ],
+        customEmbeddingsModels: null,
+      });
+
+      expect(declared).toEqual(["good-model"]);
+      expect(warned).toHaveBeenCalledTimes(1);
+      const [payload] = warned.mock.calls[0] as [{ rejected: string[] }];
+      expect(payload.rejected).toEqual(["bad-model"]);
     });
   });
 

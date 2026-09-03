@@ -1,20 +1,7 @@
 /**
- * What the general Settings screen is mounted inside.
- *
- * Two things go around `/settings`: the tRPC Provider the package's own hooks
- * run on, and the host port that answers for the organization, the project, the
- * grants, the flag, the switcher, the overlay address and the two notices.
- *
- * THE ORGANIZATION AND THE PROJECT COME OFF THE GRAPH THE SHELL ALREADY HOLDS.
- * This page EDITS the two rows, so it needs their current values as form
- * defaults — and `organization.getAll` already carries both in full, which is
- * exactly what `useOrganizationTeamProject` handed the platform page. Same
- * input, same tRPC cache entry, no read of this family's own, and the refetch
- * the save fires is what puts the new values back on the page.
- *
- * A PERSONAL WORKSPACE IS NOT THE ORGANIZATION'S PROJECT, and the screen makes
- * that check rather than this host: the port answers what the address names,
- * and the page decides what to render for it.
+ * What the general Settings screen is mounted inside: the tRPC Provider its
+ * hooks run on, and the host port for organization, project, grants, flag,
+ * switcher, overlay address and feedback — both rows' current values, since this page edits them.
  */
 
 import {

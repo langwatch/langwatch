@@ -35,6 +35,7 @@ const gate = {
   flagEnabled: true,
   permissions: ["langy:view"] as string[],
   project: { id: "project-demo", slug: "demo", name: "demo" } as GateProject,
+  isDemoProject: false,
 };
 const gateListeners = new Set<() => void>();
 const setGateProject = (project: GateProject) => {
@@ -91,6 +92,7 @@ class FakeLangyHost extends LangyHostPort {
       team: LangyHostTeam;
       permissions: string[];
       flagEnabled: boolean;
+      isDemoProject: boolean;
     },
   ) {
     super();
@@ -115,6 +117,9 @@ class FakeLangyHost extends LangyHostPort {
   }
   isLoading() {
     return false;
+  }
+  isDemoProject() {
+    return this.state.isDemoProject;
   }
   featureFlag() {
     return this.state.flagEnabled;
@@ -145,9 +150,15 @@ function TestHost({ children }: { children: React.ReactNode }) {
       new FakeLangyHost({
         project,
         organization: { id: "org-1" },
-        team: { id: "team-1", isPersonal: false, ownerUserId: "someone-else", members: [{ userId: "user-1" }] },
+        team: {
+          id: "team-1",
+          isPersonal: false,
+          ownerUserId: "someone-else",
+          members: [{ userId: "user-1" }],
+        },
         permissions: gate.permissions,
         flagEnabled: gate.flagEnabled,
+        isDemoProject: gate.isDemoProject,
       }),
     [project],
   );
@@ -189,6 +200,7 @@ beforeEach(() => {
   gate.flagEnabled = true;
   gate.permissions = ["langy:view"];
   gate.project = { id: "project-demo", slug: "demo", name: "demo" };
+  gate.isDemoProject = false;
   drawerState.current = null;
   // The store is a module singleton — start every test closed and uncounted.
   useLangyStore.setState({
@@ -311,14 +323,25 @@ describe("ProjectLangyLayout", () => {
         expect(drawer()).toBeNull();
       });
     });
+
+    describe("when the project is the deployment's demo project", () => {
+      it("hides Langy even with the flag and permission granted", () => {
+        // The server refuses Langy on the demo project outright; the panel
+        // mirrors that so it can't render a chat where every send 403s.
+        gate.flagEnabled = true;
+        gate.isDemoProject = true;
+        renderAt("/demo/traces");
+        expect(screen.getByText("traces page")).toBeTruthy();
+        expect(drawer()).toBeNull();
+      });
+    });
   });
 
   // The dock's room is reserved by exactly one party (spec:
   // specs/langy/langy-panel-layout.feature). The wrapper exposes who holds it
   // via data-langy-dock; the app shell claims through the real store.
   describe("given the panel is open in sidebar mode", () => {
-    const dockWrapper = () =>
-      document.querySelector("[data-langy-dock]") as HTMLElement | null;
+    const dockWrapper = () => document.querySelector("[data-langy-dock]") as HTMLElement | null;
 
     /** @scenario "Pages without the app shell keep the flush dock" */
     it("reserves the width at the page wrapper when no shell is mounted", async () => {

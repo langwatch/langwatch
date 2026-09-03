@@ -1,21 +1,11 @@
 /**
- * Who is signed in, read from the deployment this page was served by.
- *
- * The client is BetterAuth's, configured the way the application configures
- * its own: same origin, no `baseURL` of its own to get wrong, and no plugins,
- * because none of the application's plugins take part in a session read — the
- * passkey plugin it declares is for the sign-in screens, which are not this
- * slice.
- *
- * What it reads is `/session`, not BetterAuth's own `/get-session`. That is
- * the deployment's impersonation-aware endpoint: it resolves the session
- * server-side and rewrites the user to the impersonated identity, which the
- * raw endpoint does not. An admin impersonating a customer must see the
- * customer's screens, so reading the raw session here would quietly show them
- * their own.
+ * Who is signed in, via BetterAuth's client. Reads `/session`, the
+ * deployment's impersonation-aware endpoint, not BetterAuth's own
+ * `/get-session` — an impersonating admin must see the customer's screens.
  */
 
 import { createAuthClient } from "better-auth/react";
+import { HandledError } from "@langwatch/handled-error";
 import type { UiActor } from "./ui-capabilities";
 
 /** The session endpoint, relative to the auth client's own base URL. */
@@ -25,21 +15,15 @@ export const UI_SESSION_PATH = "/session";
 export const UI_SESSION_QUERY_KEY: readonly string[] = ["langwatch-ui", "auth", "session"];
 
 /**
- * As much of the auth client as a session read uses.
- *
- * Structural, so the real client satisfies it without a cast and a test can
- * answer with a recorded payload instead of a server.
+ * As much of the auth client as a session read uses — structural, so the
+ * real client satisfies it without a cast and a test can fake it.
  */
 export type UiAuthClient = {
   $fetch: (path: string) => Promise<{ data?: unknown; error?: unknown }>;
   /**
-   * Ends the session.
-   *
-   * Declared here because this client is the ONE identity instance in the
-   * document: a second `createAuthClient` would keep its own base URL and its
-   * own view of the session, and a governed web package may not construct one
-   * at all (`frontend-ui-boundaries` names `better-auth` by name). So the
-   * account menu asks its host, and the host asks this.
+   * Ends the session. Declared here because this client is the ONE
+   * identity instance in the document — a governed web package may not
+   * construct its own (`frontend-ui-boundaries` names `better-auth`).
    */
   signOut: () => Promise<unknown>;
 };
@@ -47,11 +31,9 @@ export type UiAuthClient = {
 let sharedClient: UiAuthClient | undefined;
 
 /**
- * The one client per document.
- *
- * Built on first use rather than at module scope: constructing it resolves the
- * base URL from `window.location`, and a package entry point that does that on
- * import cannot be loaded anywhere else.
+ * The one client per document — built on first use, not module scope,
+ * since constructing it resolves the base URL from `window.location` and
+ * an entry point that does that on import can't load anywhere else.
  */
 export function uiAuthClient(): UiAuthClient {
   sharedClient ??= createAuthClient({});
@@ -73,11 +55,8 @@ function readableString(value: unknown): string | null {
 }
 
 /**
- * The signed-in user, or null when nobody is.
- *
- * A payload without a user id is not a user: the endpoint answers `null` for a
- * signed-out reader, and anything else it could answer with no id is a shape
- * this cannot act on either way.
+ * The signed-in user, or null when nobody is — a payload with no user id
+ * is not a user, whatever shape the endpoint answered with.
  */
 export function toUiActor(payload: unknown): UiActor | null {
   if (!payload || typeof payload !== "object") return null;
@@ -94,22 +73,54 @@ export function toUiActor(payload: unknown): UiActor | null {
 }
 
 /**
- * Ends the session on this device.
- *
- * Fire-and-forget on purpose: the endpoint clears the cookie, and what the
- * reader sees next is decided by the address they are sent to rather than by
- * this promise. A refusal leaves them signed in, which the next session read
- * reports on its own.
+ * Fire-and-forget: the endpoint clears the cookie, and what the reader
+ * sees next is decided by their redirect, not this promise. A refusal
+ * leaves them signed in, which the next session read reports on its own.
  */
 export async function signOutUi(client: UiAuthClient = uiAuthClient()): Promise<void> {
   await client.signOut();
 }
 
-/** One session read, over the client's own transport. */
-export async function readUiActor(client: UiAuthClient = uiAuthClient()): Promise<UiActor | null> {
-  const response = await client.$fetch(UI_SESSION_PATH);
-  if (response.error) {
-    throw new Error("The session endpoint refused the read.", { cause: response.error });
+/**
+ * The read failed, so who is here is not known. Named rather than thrown as
+ * a plain Error because the reader is about to be treated as signed out and
+ * is owed the reason — `session_read_failed` carries the words they read.
+ */
+export class SessionReadFailedError extends HandledError {
+  declare readonly code: "session_read_failed";
+
+  constructor(cause: unknown) {
+    super("session_read_failed", "The session endpoint refused the read.", {
+      httpStatus: 503,
+      fault: "platform",
+      retryable: true,
+      ...(cause instanceof Error ? { reasons: [cause] } : {}),
+    });
+    this.name = "SessionReadFailedError";
   }
-  return toUiActor(response.data);
+}
+
+/**
+ * One session read. A refusal resolves to signed out with the failure
+ * attached rather than rejecting: an unanswered session is what leaves the
+ * shell on an empty document, and "we could not tell" has to route somewhere.
+ */
+export type UiSessionReading = {
+  readonly actor: UiActor | null;
+  /** The refusal, when there was one. Nobody is signed in either way. */
+  readonly failure: SessionReadFailedError | null;
+};
+
+export async function readUiActor(
+  client: UiAuthClient = uiAuthClient(),
+): Promise<UiSessionReading> {
+  try {
+    const response = await client.$fetch(UI_SESSION_PATH);
+    if (response.error) {
+      return { actor: null, failure: new SessionReadFailedError(response.error) };
+    }
+    return { actor: toUiActor(response.data), failure: null };
+  } catch (error) {
+    return { actor: null, failure: new SessionReadFailedError(error) };
+  }
 }

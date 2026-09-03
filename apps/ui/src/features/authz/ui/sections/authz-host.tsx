@@ -1,18 +1,7 @@
 /**
- * What the two RBAC screens are mounted inside.
- *
- * Two things go around `/settings/roles` and `/settings/role-bindings`: the
- * tRPC Provider the package's own hooks run on, and the host port that answers
- * for the organization, the reader's grants, the plan tier and the two notices
- * — and nothing else. A screen stays a screen module.
- *
- * THE PLAN IS READ WHERE EVERY MOVED SETTINGS FAMILY READS IT.
- * `useUiOrganizationFacts` asks `limits.getUsage` under the key
- * `@trpc/react-query` would have produced, so it lands on the same cache entry
- * as the application's own `useActivePlan` and the settings menu's gate — one
- * request for the document, however many halves of the product want the answer.
- * A feature could not do this for itself: `@tanstack/react-query` is one of the
- * imports ADR-004 seals off from `src/features/*`.
+ * What the two RBAC screens are mounted inside: the tRPC Provider their
+ * hooks run on, and the host port for organization, grants, plan and
+ * feedback. Plan comes off `useUiOrganizationFacts` — `react-query` is sealed off from features.
  */
 
 import { AuthzHostProvider, type AuthzHostPort } from "@langwatch/authz-web/screens/authz";

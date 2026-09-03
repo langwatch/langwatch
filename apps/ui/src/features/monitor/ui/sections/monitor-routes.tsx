@@ -1,10 +1,4 @@
-/**
- * Which page key the online evaluations screen answers, and what it is wrapped
- * in.
- *
- * ONE KEY, ONE SCREEN. The guard states the policy the platform higher-order
- * component carried — `withPermissionGuard("evaluations:view")`, unchanged.
- */
+/** Which page key the online evaluations screen answers: `evaluations:view`, unchanged from the platform page. */
 
 import { monitorScreens } from "@langwatch/monitor-web/screens/online-evaluations";
 

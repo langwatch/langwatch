@@ -1,31 +1,7 @@
 /**
- * The settings navigation, as data.
- *
- * Harvested from `platform/app/src/components/SettingsLayout.tsx`, entry for
- * entry and gate for gate. It is a MODEL rather than a component because that
- * is what makes "the menu did not lose an entry" a test rather than a promise:
- * the harvest's whole risk is a silently dropped link, and a list is
- * assertable in a way a tree of JSX is not.
- *
- * WHY apps/ui OWNS IT AT ALL. Every `pages/settings/*` page wrapped
- * `SettingsLayout`, and a feature-web package can own neither: the layout is
- * host chrome shared by twenty-odd settings families, and a package may not
- * import `apps/ui`. So the chrome moves here — a copy, not a repoint — and the
- * frontend feature that serves a settings page wraps its screen in it. The
- * platform copy stays for the pages that have not moved and dies with the last
- * of them.
- *
- * WHAT DID NOT TRAVEL, and both are recorded rather than hidden:
- *
- * - `DashboardLayout`. It is 738 lines of application chrome — the header, the
- *   product menu, the command bar, Langy's dock and the drawer registry — and
- *   it is the same chrome gap every family since the gateway has recorded. This
- *   layout frames the settings content and nothing above it.
- * - The navigation-v2 branch. `SettingsLayout` stands its own menu down when
- *   the v2 shell is active, because that shell carries a richer settings menu
- *   of its own (`features/navigation/useSettingsMenu.ts`). No v2 shell exists
- *   above a page served from here, so this menu always renders — and harvesting
- *   the v2 menu is navigation's move, not this family's.
+ * The settings navigation, as data — a MODEL, not a component, so "the
+ * menu did not lose an entry" is a test. Harvested from `platform/app`'s
+ * `SettingsLayout.tsx`; its `DashboardLayout` chrome did NOT travel.
  */
 
 /** One link in the settings menu. */
@@ -55,11 +31,9 @@ export type UiSettingsMenu = {
 };
 
 /**
- * Everything the menu's shape turns on.
- *
- * `showEnterpriseNav` is deliberately not `isEnterprise`: the platform layout
- * shows the enterprise entries while the plan is still loading, so a reader on
- * the enterprise plan never watches four links appear a beat after the page.
+ * `showEnterpriseNav` is deliberately not `isEnterprise` — shown while
+ * the plan is still loading, so an enterprise reader never watches four
+ * links appear a beat after the page.
  */
 export type UiSettingsMenuGates = {
   hasPermission: (permission: string) => boolean;

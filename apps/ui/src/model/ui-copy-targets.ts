@@ -1,33 +1,7 @@
 /**
- * Which projects a thing may be replicated into, for any family that offers it.
- *
- * `platform/app/src/hooks/useProjectsForCopy.ts` answered this by importing
- * `~/server/api/rbac` into a browser hook — `hasPermissionWithHierarchy` for a
- * custom role's own permission list, `teamRoleHasPermission` for the built-in
- * team roles. `apps/ui` may not reach `~/server`, and it does not have to:
- * `@langwatch/authz-contract` publishes both answers, and its roles module says
- * in its own docblock that they are parity-tested against the rbac pair this
- * replaces.
- *
- * THE AGENTS, PROMPTS AND DATASETS FAMILIES EACH WROTE THIS OUT PRIVATELY, and
- * this move needed it for TWO more families at once. Authoring a fourth and a
- * fifth identical copy in one commit is not recording a duplication, it is
- * creating one, so the derivation lives in the global model instead: a private
- * frontend feature may import a global layer, and only the reverse is refused.
- * The three existing private copies are untouched — repointing them is a change
- * to three other families' code that a page move does not own — and this is the
- * module to fold them into.
- *
- * THE PERMISSION IS PER TEAM, NOT PER PAGE, which is why the session
- * capability's `hasPermission` is the wrong question here: it answers for the
- * scope the reader is standing in, and this list offers every project in every
- * organization they belong to. A team the reader holds no membership row in
- * contributes no projects at all.
- *
- * A CLOSED PROJECT IS STILL LISTED, carrying `canCreate: false`, because the
- * two dialogs this serves grey their unreachable rows and say why —
- * `ReplicateToProjectDialog`'s behaviour, which both moved screens keep. A
- * caller that wants the shorter list filters it.
+ * Which projects a thing may be replicated into, via
+ * `@langwatch/authz-contract` (apps/ui may not reach `~/server`). PER
+ * TEAM, not per page. A closed project stays listed, `canCreate: false`.
  */
 
 import {
@@ -64,12 +38,9 @@ export type UiCopyTargetRow = {
 const TEAM_ROLES = new Set(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 
 /**
- * A custom role's own permission list, when it has a non-empty one.
- *
- * The column is JSON, so a row that has never been edited arrives as `null` and
- * a legacy row can arrive as anything. Only an array of strings is a permission
- * list; everything else falls through to the built-in role, which is what the
- * platform hook did when `permissions.length === 0`.
+ * A custom role's own permission list, when non-empty — the column is
+ * JSON, so only an array of strings counts; anything else (including a
+ * never-edited `null`) falls through to the built-in role.
  */
 function assignedPermissions(member: UiCopyTeamMember): readonly string[] | undefined {
   const permissions = member.assignedRole?.permissions;

@@ -1,12 +1,4 @@
-/**
- * The Agents family, as this application composes it.
- *
- * The screen, its three dialogs and its two overlays live in
- * `@langwatch/agent-web`; what belongs to the application is everything they are
- * not allowed to own — which page key the address answers, the permission policy
- * in front of it, the transport their hooks run on, and the host port that turns
- * this application's capabilities into the questions the family asks.
- */
+/** Agents: screen, three dialogs and two overlays, all in `@langwatch/agent-web`. */
 
 import { agentApi } from "@langwatch/agent-web/screens/agent-management";
 import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";

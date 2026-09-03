@@ -1,14 +1,7 @@
 /**
  * Which page key each analytics screen answers, and what it is wrapped in.
- *
- * NINE KEYS, EIGHT SCREENS. Seven addresses are their own screen; the chart
- * builder serves two and is TOLD which by a `mode` prop, so nothing has to read
- * the address to learn what the router already knew — the automations family's
- * tab-as-prop shape, applied to a form. The graph `:id` itself is a route
- * PARAMETER, which the router captured.
- *
- * THE POLICY IS THE PLATFORM PAGES', ONE FOR ONE, AND HERE ALL NINE AGREE:
- * every one of the nine page files was `withPermissionGuard("analytics:view")`.
+ * The chart builder serves two keys via a `mode` prop rather than reading
+ * the address itself — same shape as the automations tab-as-prop pages.
  */
 
 import {

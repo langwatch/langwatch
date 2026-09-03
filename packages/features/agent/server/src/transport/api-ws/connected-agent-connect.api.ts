@@ -30,10 +30,7 @@ import {
   type InstanceNudge,
   instanceNudgeSchema,
 } from "../../adapters/connected-agent-envelope.adapter";
-import {
-  instanceChannel,
-  pendingKey,
-} from "../../adapters/connected-agent-state.adapter";
+import { instanceChannel, pendingKey } from "../../adapters/connected-agent-state.adapter";
 import {
   AgentSessionCore,
   type SessionCoreOptions,
@@ -84,15 +81,13 @@ export class ConnectGateway {
     this.pongWaitMs = options.pongWaitMs ?? PONG_WAIT_MS;
     this.wss = new WebSocketServer({
       noServer: true,
-      maxPayload: relayPayloadCaps().frameBytes,
+      maxPayload: relayPayloadCaps(options.relayMaxPayloadMb).frameBytes,
     });
   }
 
   /** Mounts the upgrade path on the shared router. */
   mount(router: ConnectUpgradeRouterPort): void {
-    router.register(CONNECT_PATH, (request, socket, head) =>
-      this.upgrade(request, socket, head),
-    );
+    router.register(CONNECT_PATH, (request, socket, head) => this.upgrade(request, socket, head));
   }
 
   /** How many processes hold a socket on this pod. */
@@ -100,11 +95,7 @@ export class ConnectGateway {
     return this.sessions.size;
   }
 
-  private upgrade(
-    request: IncomingMessage,
-    socket: Duplex,
-    head: Buffer,
-  ): void {
+  private upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
     this.wss.handleUpgrade(request, socket, head, (ws) => {
       void this.accept(ws, request);
     });
@@ -138,9 +129,7 @@ export class ConnectGateway {
       const projectHeader = request.headers["x-project-id"];
       resolved = await this.core.authenticate({
         authorization: request.headers.authorization,
-        projectId: Array.isArray(projectHeader)
-          ? projectHeader[0]
-          : projectHeader,
+        projectId: Array.isArray(projectHeader) ? projectHeader[0] : projectHeader,
       });
     } catch (error) {
       ws.off("message", hold);
@@ -276,10 +265,7 @@ export class ConnectGateway {
     });
   }
 
-  private async onFrame(
-    session: Session,
-    raw: WebSocket.RawData,
-  ): Promise<void> {
+  private async onFrame(session: Session, raw: WebSocket.RawData): Promise<void> {
     const frame = parseSdkFrame(raw);
     if (!frame) return;
     switch (frame.type) {

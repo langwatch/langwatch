@@ -13,41 +13,7 @@
  */
 
 import { formatDistanceStrict } from "date-fns";
-import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
-
-/** The SDK that registered an agent, as the card prints it. */
-export interface ConnectedAgentSdk {
-  name: string;
-  version: string;
-  language: string;
-}
-
-/** One instance of a connected agent, as the drawer's table reads it. */
-export interface ConnectedAgentInstance {
-  instanceId: string;
-  hostname: string;
-  username: string;
-  pid: number;
-  label: string | null;
-  sdk: ConnectedAgentSdk;
-  connectedAt: Date | string;
-  inflight: number;
-  maxConcurrency: number;
-}
-
-/** A connected agent as every screen of this folder reads it. */
-export interface ConnectedAgentView {
-  id: string;
-  name: string;
-  environment: string | null;
-  hostLabel: string | null;
-  lastSeenAt: Date | string | null;
-  status: "online" | "offline";
-  instances: ConnectedAgentInstance[];
-  owner: { userId: string; name: string | null } | null;
-  parameters: ScenarioParameterDefinition[];
-  config: { description?: string; sdk?: ConnectedAgentSdk } & Record<string, unknown>;
-}
+import type { ConnectedAgentView } from "@langwatch/agent-contract";
 
 /** The scope a development card belongs to: a person, or a machine. */
 export type ConnectedAgentScope =

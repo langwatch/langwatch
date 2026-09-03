@@ -1,15 +1,7 @@
 /**
- * The one piece of drawer vocabulary this family writes.
- *
- * `openPlatformDrawer` IS THE PLATFORM VOCABULARY THIS FAMILY KEEPS, the same
- * way the agents family kept `openAgentEditor`. The provider editor, the
- * default-model override and the model-cost editor are registered drawers in
- * `platform/app`; two of them have openers outside this family (the evaluator
- * type selector, and the unmapped-cost suggestion in a trace), so the move may
- * not delete them, and a screen may not carry a copy of a drawer registry. The
- * screen names the drawer and this writes the address the rest of the product
- * already produces — the same `?drawer.open=…&drawer.<name>=…` params
- * `openDrawer` writes, including its clearing of every other `drawer.*` key.
+ * Writes the address the rest of the product already uses to open one of
+ * this family's drawers — same params and stale-key clearing `openDrawer`
+ * produces. Two of the three drawers have openers outside this family.
  */
 
 import type { ModelProviderPlatformDrawer } from "@langwatch/model-provider-web/screens/model-provider";

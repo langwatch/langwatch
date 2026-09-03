@@ -1,16 +1,7 @@
 /**
- * The four reads a session capability is built out of.
- *
- * Each one runs on the application's transport and is cached under the key
- * `@trpc/react-query` would have produced for the same procedure, so a query
- * this package fires and the same query fired by an application hook are ONE
- * cache entry: the organization graph is read once per document however many
- * halves of the product are mounted, and an invalidation from either side
- * refetches for both. `trpcQueryKey` is what guarantees that — a hand-rolled
- * key would give this package a private cache that no invalidation reaches.
- *
- * The declared result types name only the fields a scope, a permission or a
- * flag decision reads. They are a view of the wire, not the whole of it.
+ * The four reads a session capability is built out of — cached under the
+ * key `trpcQueryKey` would produce for the same procedure, so this
+ * package's queries and the application's own share ONE cache entry.
  */
 
 import { trpcQueryKey } from "@langwatch/platform-api-client";
@@ -34,12 +25,9 @@ const ORGANIZATIONS_STALE_TIME_MS = 30_000;
 const FEATURE_FLAG_STALE_TIME_MS = 5 * 60_000;
 
 /**
- * Off the HTTP batch.
- *
- * These queries are mounted on the application shell and refetch on focus and
- * on route change. Left in the batch they wait behind a page's slowest read —
- * measured at seconds on a drawer-open burst — and the shell is what the page
- * needs FIRST. On their own connection they run in parallel instead.
+ * Off the HTTP batch: left in it, these shell-mounted queries wait behind
+ * a page's slowest read (seconds, on a drawer-open burst) — the shell is
+ * what the page needs FIRST, so it runs on its own connection instead.
  */
 const OFF_BATCH = { context: { skipBatch: true } } as const;
 
@@ -76,12 +64,9 @@ export function useUiOrganizations({
 }
 
 /**
- * The project behind a share token.
- *
- * The share page resolves everything it renders, its chrome included, through
- * this one read; the same key means the page's own copy and this one are a
- * single request. It never refetches: a share token addresses one immutable
- * view, and a viewer has no session for a refetch to pick anything up from.
+ * The project behind a share token — the share page resolves everything
+ * it renders through this one read. Never refetches: a token addresses
+ * one immutable view, and a viewer has no session to pick anything up from.
  */
 export function useUiSharedProject({
   transport,
@@ -106,11 +91,9 @@ export function useUiSharedProject({
 }
 
 /**
- * What the caller may do in one scope, answered by the server.
- *
- * The narrower id wins, exactly as the procedure resolves it: a project id
- * names a project scope, and the organization id is sent only when there is no
- * project to ask about.
+ * What the caller may do in one scope — the narrower id wins: a project
+ * id names the scope, and the organization id is sent only when there is
+ * no project to ask about.
  */
 export function useUiEffectivePermissions({
   transport,
@@ -139,12 +122,9 @@ export function useUiEffectivePermissions({
 }
 
 /**
- * Every flag a screen has asked about so far, and the answers that arrived.
- *
- * `projectId` and `organizationId` are both stated on every read, because a
- * targeting rule that names a scope the read left out can never match: a
- * missing id turns a per-project rollout into a silent no-op. JSON carries no
- * `undefined`, so "no such scope" travels as null.
+ * `projectId` and `organizationId` are both stated on every read — a
+ * targeting rule that names a scope the read left out can never match, so
+ * a missing id would turn a per-project rollout into a silent no-op.
  */
 export function useUiFeatureFlags({
   transport,

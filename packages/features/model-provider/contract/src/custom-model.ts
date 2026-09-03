@@ -43,16 +43,38 @@ export function isLegacyCustomModels(value: unknown): value is string[] {
   return typeof value[0] === "string";
 }
 
+/** A stored entry that failed the strict parse, named without its content. */
+export type RejectedCustomModelEntry = { name: string };
+
+export type ParsedCustomModels = {
+  entries: CustomModelEntry[];
+  rejected: RejectedCustomModelEntry[];
+};
+
+/** Best-effort name for a log line — never the raw (possibly huge) entry. */
+function nameOfRejectedEntry(entry: unknown): string {
+  const modelId =
+    entry && typeof entry === "object" ? (entry as Record<string, unknown>).modelId : void 0;
+  return typeof modelId === "string" && modelId.length > 0 ? modelId : "<unnamed>";
+}
+
 export function toLegacyCompatibleCustomModels(
   value: unknown,
   mode: "chat" | "embedding",
-): CustomModelEntry[] {
-  if (value == null || !Array.isArray(value)) return [];
+): ParsedCustomModels {
+  if (value == null || !Array.isArray(value)) return { entries: [], rejected: [] };
   if (isLegacyCustomModels(value)) {
-    return value.map((modelId) => ({ modelId, displayName: modelId, mode }));
+    return {
+      entries: value.map((modelId) => ({ modelId, displayName: modelId, mode })),
+      rejected: [],
+    };
   }
-  return value.flatMap((entry) => {
+  const entries: CustomModelEntry[] = [];
+  const rejected: RejectedCustomModelEntry[] = [];
+  for (const entry of value) {
     const parsed = customModelEntrySchema.safeParse(entry);
-    return parsed.success ? [parsed.data] : [];
-  });
+    if (parsed.success) entries.push(parsed.data);
+    else rejected.push({ name: nameOfRejectedEntry(entry) });
+  }
+  return { entries, rejected };
 }

@@ -63,9 +63,8 @@ vi.mock("../../elements/langy-model-pill", () => ({
 }));
 
 vi.mock("../../../../../behavior/langy-api", async () => {
-  const { createTrpcUtils, idleQuery, withFallback } = await import(
-    "../../../__tests__/support/langy-api-mock"
-  );
+  const { createTrpcUtils, idleQuery, withFallback } =
+    await import("../../../__tests__/support/langy-api-mock");
 
   const trpcUtils = createTrpcUtils();
 
@@ -161,6 +160,9 @@ class FakeLangyHost extends LangyHostPort {
     return true;
   }
   isLoading() {
+    return false;
+  }
+  isDemoProject() {
     return false;
   }
   featureFlag() {

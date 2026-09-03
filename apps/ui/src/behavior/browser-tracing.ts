@@ -1,10 +1,6 @@
 /**
- * Starts browser tracing once the composing application has said whether it is
- * wanted.
- *
- * The flag lives on the server, so nothing can start until the application's
- * public configuration query resolves; the caller passes the resolved values
- * rather than this behaviour reading them. See ADR-058.
+ * Starts once the composing application says it's wanted — the flag lives
+ * on the server, so the caller passes resolved values in. See ADR-058.
  */
 
 import { RUM_DEFAULT_SAMPLE_RATIO, startBrowserTracing } from "@langwatch/react-rum";
@@ -24,10 +20,9 @@ export function useBrowserTracing({
 }: BrowserTracingPublicConfig): void {
   useEffect(() => {
     if (!enabled) return;
-    // Idempotent — remounts and strict-mode double effects are expected here.
-    // The sampling ratio is fixed at this first call: it is read into the
-    // provider's sampler, and a later change would need a provider we cannot
-    // replace without orphaning the one already exporting.
+    // Idempotent — remounts and strict-mode double effects are expected.
+    // The sampling ratio is fixed at this first call and can't be changed
+    // without a new provider, orphaning the one already exporting.
     startBrowserTracing({
       environment,
       sampleRatio: sampleRatio ?? RUM_DEFAULT_SAMPLE_RATIO,
