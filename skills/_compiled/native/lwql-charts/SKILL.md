@@ -44,7 +44,7 @@ GROUP BY bucket
 ORDER BY bucket
 ```
 
-Your own parameters (`{since:DateTime}`, `{model:String}`, …) get their values from `--param`; never pass a value for the reserved `period_*` names.
+Your own parameters (`{since:DateTime}`, `{model:String}`, …) get their values from `--param`; never pass a value for the reserved `dashboard_context_*` names.
 
 ## Step 3: Save the chart, then prove it runs
 
