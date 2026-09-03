@@ -76,14 +76,27 @@ function recordingTransport({
   return { transport: transport as unknown as UiFeatureApiTransport, calls, callsTo };
 }
 
+/**
+ * Ending the session is on the same client the read rides, but no screen here
+ * ends one — so it refuses rather than resolving quietly, which would let a
+ * sign-out reach it unnoticed.
+ */
+const refusesToSignOut = (): Promise<unknown> => {
+  throw new Error("A session read ended the session.");
+};
+
 const signedInAsJane: UiAuthClient = {
   $fetch: () =>
     Promise.resolve({
       data: { user: { id: JANE, name: "Jane", email: "jane@example.com", image: null } },
     }),
+  signOut: refusesToSignOut,
 };
 
-const signedOut: UiAuthClient = { $fetch: () => Promise.resolve({ data: null }) };
+const signedOut: UiAuthClient = {
+  $fetch: () => Promise.resolve({ data: null }),
+  signOut: refusesToSignOut,
+};
 
 class StubSession extends UiSessionPort {
   currentUser() {

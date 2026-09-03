@@ -11,7 +11,26 @@
 import { describe, expect, it } from "vitest";
 import { createPublicAppConfigMetaTag } from "@langwatch/config/public-app-config";
 import { readUiDemoProjectSlug } from "../src/behavior/ui-session";
-import { readUiActor, toUiActor, UI_SESSION_PATH } from "../src/behavior/ui-session-client";
+import {
+  readUiActor,
+  toUiActor,
+  UI_SESSION_PATH,
+  type UiAuthClient,
+} from "../src/behavior/ui-session-client";
+
+/**
+ * An auth client that answers a read and refuses to end the session.
+ *
+ * `signOut` rides the same instance because the account menu ends the session
+ * through it, but a session READ never reaches it — so this refuses rather
+ * than resolving quietly, which would let one slip in here unnoticed.
+ */
+const readingClient = ($fetch: UiAuthClient["$fetch"]): UiAuthClient => ({
+  $fetch,
+  signOut: () => {
+    throw new Error("The session read ended the session.");
+  },
+});
 
 describe("given a reply from the deployment's session endpoint", () => {
   describe("when it carries a user", () => {
@@ -55,12 +74,12 @@ describe("given the client the session is read with", () => {
     it("asks the deployment's impersonation-aware endpoint, not the raw one", async () => {
       const asked: string[] = [];
 
-      await readUiActor({
-        $fetch: (path: string) => {
+      await readUiActor(
+        readingClient((path: string) => {
           asked.push(path);
           return Promise.resolve({ data: { user: { id: "user-jane" } } });
-        },
-      });
+        }),
+      );
 
       expect(asked).toEqual(["/session"]);
       expect(UI_SESSION_PATH).toBe("/session");
@@ -70,7 +89,7 @@ describe("given the client the session is read with", () => {
   describe("when the endpoint refuses the read", () => {
     it("fails rather than reporting the reader as signed out", async () => {
       await expect(
-        readUiActor({ $fetch: () => Promise.resolve({ error: { status: 500 } }) }),
+        readUiActor(readingClient(() => Promise.resolve({ error: { status: 500 } }))),
       ).rejects.toThrow(/session endpoint refused/);
     });
   });

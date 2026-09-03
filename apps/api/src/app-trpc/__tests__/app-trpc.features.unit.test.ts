@@ -48,6 +48,7 @@ import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type { EvaluatorTrpcContext } from "@langwatch/evaluator-server";
 import type { ExperimentTrpcContext } from "@langwatch/experiment-server";
 import type { ExportTrpcContext } from "../../features/export/export-trpc.mount";
+import type { GithubTrpcContext } from "../../features/github/github-trpc.mount";
 import type { BugReportTrpcContext } from "@langwatch/ops-server";
 import type {
   GroupTrpcContext,
@@ -110,6 +111,7 @@ type TestContext = AnalyticsTrpcContext &
   ExperimentTrpcContext &
   ExportTrpcContext &
   FrontDoorTrpcContext &
+  GithubTrpcContext &
   GraphTrpcContext &
   GroupTrpcContext &
   HomeTrpcContext &

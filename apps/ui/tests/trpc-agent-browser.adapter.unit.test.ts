@@ -1,6 +1,6 @@
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
-import { UiRpcPort } from "../src/behavior/ui-rpc";
+import { UiRpcPort, type UiRpcSubscription } from "../src/behavior/ui-rpc";
 import { TrpcAgentBrowserAdapter } from "../src/features/agent/behavior/trpc-agent-browser.adapter";
 
 type RpcCall = {
@@ -24,6 +24,17 @@ class RecordingRpc extends UiRpcPort {
   mutate(path: string, input: unknown): Promise<unknown> {
     this.calls.push({ kind: "mutation", path, input });
     return Promise.resolve(this.responses.get(path));
+  }
+
+  /**
+   * The agent browser opens no live procedure, so this refuses rather than
+   * recording: a stub that handed back a silent subscription would let one
+   * appear here unnoticed.
+   */
+  subscribe(path: string): UiRpcSubscription {
+    throw new Error(
+      `The agent browser subscribed to ${path}; it dispatches queries and mutations only.`,
+    );
   }
 }
 
