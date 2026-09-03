@@ -64,6 +64,17 @@ const UNRESOLVABLE_REASON =
   "an unrecognised wrapper, unbalanced quotes, or executing a file this gate cannot read). Re-issue it as a " +
   "single plain `langwatch` command with no substitutions and no wrapper script so it can be checked.";
 
+const OBFUSCATED_NAME_REASON =
+  "Blocked: the command name is obfuscated by quote, backslash, or brace splicing (for example " +
+  "`lang\"\"watch`, `lang\\watch`, or `lang{,}watch`), so it could not be checked for a destructive LangWatch " +
+  "operation. Re-issue it with the command name written plainly — no quotes, backslashes, or braces splitting " +
+  "it — so it can be checked.";
+
+const HTTP_REASON =
+  "Blocked: this destructive request cannot be authorized as a raw HTTP call to the LangWatch API — a " +
+  "confirmation cannot bind to a curl/HTTP request, so confirming and retrying the same call will keep " +
+  "looping. Re-issue it as a plain `langwatch` CLI command, which the user can then confirm.";
+
 const WRITE_THEN_EXEC_REASON =
   "Blocked: this file content contains a destructive LangWatch command, which would run unchecked once the " +
   "file is executed. Re-issue the destructive step as a single plain `langwatch` command instead of writing " +
@@ -134,16 +145,26 @@ export function evaluateToolCall({
   if (matches.length === 0) return { allow: true };
 
   // Unresolvable kinds are held before the confirmation check ever runs, and no
-  // confirmation can release them (write-then-exec / agent-written file).
+  // confirmation can release them (write-then-exec / agent-written file). Where
+  // the classifier knows the specific cause — an obfuscated/spliced command
+  // name — surface a targeted reason so the agent fixes the right thing instead
+  // of guessing among the generic four causes.
   if (matches.some((match) => match.kind === "unparseable" || match.kind === "exec-file")) {
-    return { allow: false, reason: UNRESOLVABLE_REASON };
+    const obfuscatedName = matches.some(
+      (match) => match.kind === "unparseable" && match.cause === "obfuscated-command-name",
+    );
+    return {
+      allow: false,
+      reason: obfuscatedName ? OBFUSCATED_NAME_REASON : UNRESOLVABLE_REASON,
+    };
   }
 
   // A destructive HTTP call carries no bindable (resource-type, identifier), so
-  // it can never match a confirmation. Held with the confirm reason: the agent
-  // re-issues it through the CLI, where a confirmation can bind it.
+  // it can never match a confirmation. Its reason must NOT tell the user to
+  // confirm the curl (that loops); it says to re-issue through the CLI, where a
+  // confirmation can bind it.
   if (matches.some((match) => match.kind === "http")) {
-    return { allow: false, reason: BLOCK_REASON };
+    return { allow: false, reason: HTTP_REASON };
   }
 
   // Every destructive CLI segment must be authorized by a bound confirmation —

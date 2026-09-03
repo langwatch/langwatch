@@ -38,7 +38,19 @@ export type DestructiveMatch =
   | { kind: "cli-verb"; verb: string; segment: string; target: GateTarget | null }
   | { kind: "http"; segment: string }
   | { kind: "exec-file"; segment: string }
-  | { kind: "unparseable"; segment: string };
+  | {
+      kind: "unparseable";
+      segment: string;
+      /**
+       * The specific reason the segment could not be resolved, when known.
+       * `obfuscated-command-name` means the head/command-name token was spliced
+       * by quotes, a backslash, or a brace group so its literal is never
+       * contiguous — the confirmation layer surfaces a targeted "write the
+       * command name plainly" reason for it instead of the generic four-cause
+       * list. Absent for genuinely unknown causes (substitution, wrapper, etc.).
+       */
+      cause?: "obfuscated-command-name";
+    };
 
 /** Tool names whose input can reach a destructive command. */
 export const GATED_TOOL_NAMES = ["bash", "write", "edit"] as const;
@@ -230,10 +242,12 @@ const FILE_EXECUTORS = new Set(["bash", "sh", "zsh", "dash", "ksh", "source", ".
  * Deliberately NOT added, each judged already-covered or an accepted residual
  * (a head-based hold would over-block their overwhelmingly benign everyday use):
  *  - `sed`/`gsed`: GNU sed's `e` command/flag can exec, but a LITERAL `langwatch`
- *    in a sed script already trips the `mentionsCli` unparseable hold below, a
- *    quote-splice trips `QUOTE_SPLICE`, and sed has no practical runtime
- *    string-concatenation primitive to assemble the CLI name otherwise. Holding
- *    every `sed 's/…/…/'` would be ruinous over-block for near-zero marginal gain.
+ *    in a sed script already trips the `mentionsCli` unparseable hold below, and
+ *    sed has no practical runtime string-concatenation primitive to assemble the
+ *    CLI name otherwise. A quote-splice buried inside a single-quoted sed script
+ *    is a narrow accepted residual (head-scoped splice detection does not reach
+ *    argument interiors); holding every `sed 's/…/…/'` would be ruinous
+ *    over-block for near-zero marginal gain.
  *  - `xargs`, `find -exec`: pass arguments to a command, they do not concatenate
  *    strings — a `langwatch` they invoke is a literal token caught by
  *    `mentionsCli`. Holding all `find`/`xargs` would over-block routine use.
@@ -271,19 +285,28 @@ const HTTP_CLIENTS = new Set(["curl", "http", "https", "wget", "fetch", "xh"]);
 const UNRESOLVABLE = /[$`]|<\(/;
 
 /**
- * A quote character glued to word text on BOTH sides — the bash native
- * quote-splice (`lang""watch` → `langwatch`, `l"w"` → `lw`, `lang''watch` →
- * `langwatch`). The shell strips the quotes and joins the neighbours into one
- * word, so the literal `langwatch`/`lw` the head resolution and `mentionsCli`
- * substring check both look for is never contiguous in the source — the segment
- * would be waved through. It is held as unresolvable instead, fail-closed.
+ * A word-splice mechanism glued to word text — the ways bash collapses a token
+ * into a different word than its source spells, so the literal `langwatch`/`lw`
+ * that head resolution looks for is never contiguous:
+ *  - quote runs:      `lang""watch` → `langwatch`, `l"w"` → `lw`, `lang''watch`
+ *  - backslash escape: `lang\watch` → `langwatch`, `l\w` → `lw`
+ *  - word-internal brace group: `lang{,}watch` → `langwatch`
  *
- * The both-sides-word requirement is what keeps legitimate quoted arguments out:
- * `--name "my dataset"`, `echo "hello world"`, `grep -r "foo" .` each put a quote
- * next to whitespace (or a shell boundary) on at least one side, never word text
- * on both, so none match.
+ * Applied to the HEAD/command-name token ONLY (post-preamble-stripping): a
+ * spliced command name is an obfuscation we cannot resolve statically, so it is
+ * held unconditionally as unresolvable, fail-closed. Scoping to the head is what
+ * keeps legitimate quoted/escaped ARGUMENTS out — `git commit -m "don't crash"`,
+ * `grep -rn 'foo"bar' .`, `sed 's/foo"bar"baz/qux/'` all carry word-internal
+ * splices in argument position, which are not CLI-name obfuscations and must not
+ * hold the segment. A splice that reassembles a destructive verb in argument
+ * position is still caught: the lexer de-splices each token to its bash word
+ * value before the verb match runs.
+ *
+ * Each alternative requires word text adjacent to the splice, so a fully-quoted
+ * token (`"langwatch"`, which the lexer already resolves cleanly) never matches.
  */
-const QUOTE_SPLICE = /[A-Za-z0-9]["']+[A-Za-z0-9]/;
+const HEAD_SPLICE =
+  /[A-Za-z0-9]["']+[A-Za-z0-9]|[A-Za-z0-9]\\[A-Za-z0-9]|[A-Za-z0-9]\{[^}]*\}|\{[^}]*\}[A-Za-z0-9]/;
 
 const DESTRUCTIVE_VERB_SET = new Set<string>(DESTRUCTIVE_VERBS);
 
@@ -351,11 +374,75 @@ export function tokenize(segment: string): string[] {
   return tokens;
 }
 
+/**
+ * One bash word: its verbatim source (`raw`, quotes/backslashes intact, for
+ * head-obfuscation detection) and the word bash would produce after quote
+ * removal and backslash-escape collapse (`value`, for command resolution). The
+ * split is what lets the gate hold an obfuscated command NAME while still
+ * resolving a spliced destructive VERB in argument position to its real value.
+ */
+export type Word = { raw: string; value: string };
+
+/**
+ * Split a segment into bash words, honouring quoting the way the shell does:
+ * whitespace inside quotes does not break a word, and adjacent quoted/unquoted
+ * runs concatenate into one word (`lang""watch` → one word `langwatch`,
+ * `"de""lete"` → one word `delete`). Brace expansion is NOT performed — braces
+ * are copied literally into both `raw` and `value`; a word-internal brace group
+ * in the HEAD is caught by `HEAD_SPLICE` on `raw` instead. `unterminated` is
+ * true when a quote is opened and never closed, which means the parse does not
+ * describe the command and the segment must be held.
+ */
+export function shellWords(segment: string): { words: Word[]; unterminated: boolean } {
+  const words: Word[] = [];
+  let unterminated = false;
+  let i = 0;
+  const n = segment.length;
+  while (i < n) {
+    while (i < n && /\s/.test(segment[i] ?? "")) i += 1;
+    if (i >= n) break;
+    let raw = "";
+    let value = "";
+    while (i < n && !/\s/.test(segment[i] ?? "")) {
+      const c = segment[i] ?? "";
+      if (c === '"' || c === "'") {
+        raw += c;
+        i += 1;
+        while (i < n && segment[i] !== c) {
+          raw += segment[i];
+          value += segment[i];
+          i += 1;
+        }
+        if (i < n) {
+          raw += segment[i]; // closing quote
+          i += 1;
+        } else {
+          unterminated = true;
+        }
+      } else if (c === "\\") {
+        raw += c;
+        i += 1;
+        if (i < n) {
+          raw += segment[i];
+          value += segment[i];
+          i += 1;
+        }
+      } else {
+        raw += c;
+        value += c;
+        i += 1;
+      }
+    }
+    words.push({ raw, value });
+  }
+  return { words, unterminated };
+}
+
 /** Drop `FOO=bar` prefixes, runner wrappers, and package-manager preambles. */
-function stripPreamble(tokens: string[]): string[] {
+function stripPreamble(words: Word[]): Word[] {
   let index = 0;
-  while (index < tokens.length) {
-    const token = tokens[index] ?? "";
+  while (index < words.length) {
+    const token = words[index]?.value ?? "";
     if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) {
       index += 1;
       continue;
@@ -367,12 +454,12 @@ function stripPreamble(tokens: string[]): string[] {
     }
     if (PACKAGE_MANAGERS.has(base)) {
       index += 1;
-      while (index < tokens.length && PACKAGE_MANAGER_SUBCOMMANDS.has(tokens[index] ?? "")) index += 1;
+      while (index < words.length && PACKAGE_MANAGER_SUBCOMMANDS.has(words[index]?.value ?? "")) index += 1;
       continue;
     }
     break;
   }
-  return tokens.slice(index);
+  return words.slice(index);
 }
 
 /** The destructive verb a token carries, honouring `--flag=verb` and case. */
@@ -449,29 +536,47 @@ function classifyHttp(segment: string): DestructiveMatch | null {
  * parseable AND provably not a destructive LangWatch call.
  */
 function classifySegment(segment: string): DestructiveMatch | null {
-  const mentionsCli = /\blangwatch\b|\blw\b/.test(segment);
-
   // A segment we cannot resolve statically is held whenever it could reach the
-  // product: command substitution, variable expansion, and process
-  // substitution can all spell any command at all — and a bash native
-  // quote-splice (`lang""watch`) reassembles `langwatch`/`lw` past every
-  // substring check, so it is unresolvable to static inspection just the same.
-  if (UNRESOLVABLE.test(segment) || QUOTE_SPLICE.test(segment)) {
+  // product: command substitution, variable expansion, and process substitution
+  // can all spell any command at all.
+  if (UNRESOLVABLE.test(segment)) {
     return { kind: "unparseable", segment };
   }
 
-  const tokens = tokenize(segment);
-  if (tokens.length === 0) return null;
+  const { words, unterminated } = shellWords(segment);
+  if (words.length === 0) return null;
 
-  // Unbalanced quotes: the tokenizer's output does not describe the command.
-  const doubleQuotes = (segment.match(/"/g) ?? []).length;
-  const singleQuotes = (segment.match(/'/g) ?? []).length;
-  if (doubleQuotes % 2 !== 0 || singleQuotes % 2 !== 0) {
+  // A quote opened and never closed: the parse does not describe the command.
+  if (unterminated) {
     return { kind: "unparseable", segment };
   }
 
-  const stripped = stripPreamble(tokens);
-  const head = stripped[0] ?? "";
+  const stripped = stripPreamble(words);
+  if (stripped.length === 0) return null;
+
+  const headWord = stripped[0] ?? { raw: "", value: "" };
+
+  // Head-token obfuscation: the command name is spliced by quotes, a backslash,
+  // or a brace group (`lang""watch`, `lang\watch`, `lang{,}watch`), so bash
+  // reassembles a real `langwatch`/`lw` invocation while its literal is never
+  // contiguous in the source. We cannot resolve which command it is, so it is
+  // held unconditionally — no confirmation releases an unparseable segment. An
+  // ARGUMENT-position splice does NOT trip this (it is not a CLI-name
+  // obfuscation), which is what keeps ordinary quoted/escaped arguments allowed.
+  if (HEAD_SPLICE.test(headWord.raw)) {
+    return { kind: "unparseable", segment, cause: "obfuscated-command-name" };
+  }
+
+  // From here on, resolve against the bash-word VALUES (quotes/backslashes
+  // already collapsed), so a spliced destructive verb in argument position
+  // (`langwatch dataset "de""lete" d1` → `delete`) is matched at its real value.
+  const values = stripped.map((word) => word.value);
+  // Command-name mentions of the CLI count on the collapsed value too, so an
+  // unrecognised wrapper that reaches a spliced `lang""watch` is still held.
+  const mentionsCli =
+    /\blangwatch\b|\blw\b/.test(segment) || words.some((word) => /\blangwatch\b|\blw\b/.test(word.value));
+
+  const head = headWord.value;
   // Lower-cased so an upper-cased head (`PYTHON3 -c`, `BASH f.sh`, `CURL -X`)
   // cannot dodge a membership check whose sets are all lower-case.
   const headBase = (head.split("/").pop() ?? head).toLowerCase();
@@ -489,7 +594,7 @@ function classifySegment(segment: string): DestructiveMatch | null {
 
   // Executing an agent-written file: the shell resolves file contents the gate
   // never sees, so it is unresolvable and held unconditionally.
-  if (FILE_EXECUTORS.has(headBase) && stripped.length > 1) {
+  if (FILE_EXECUTORS.has(headBase) && values.length > 1) {
     return { kind: "exec-file", segment };
   }
   if (/^\.{1,2}\//.test(head)) {
@@ -497,11 +602,11 @@ function classifySegment(segment: string): DestructiveMatch | null {
   }
 
   if (CLI_NAMES.has(headBase)) {
-    for (let i = 1; i < stripped.length; i += 1) {
-      const token = stripped[i] ?? "";
+    for (let i = 1; i < values.length; i += 1) {
+      const token = values[i] ?? "";
       const verb = verbOfToken(token);
       if (verb) {
-        return { kind: "cli-verb", verb, segment, target: commandTarget(stripped, i, verb) };
+        return { kind: "cli-verb", verb, segment, target: commandTarget(values, i, verb) };
       }
     }
     return null;

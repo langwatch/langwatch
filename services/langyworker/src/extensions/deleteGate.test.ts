@@ -188,6 +188,30 @@ describe("Ordinary and unrelated commands", () => {
     if (decision.allow) throw new Error("expected block");
     expect(decision.reason).toMatch(/re-issue/i);
   });
+
+  /** @scenario An obfuscated command-name block names the obfuscation and says to re-issue the name plainly */
+  it("gives an obfuscated command name its own reason naming the obfuscation", () => {
+    const decision = bash('lang""watch dataset delete d1');
+    expect(decision.allow).toBe(false);
+    if (decision.allow) throw new Error("expected block");
+    // Names the specific cause (the spliced/obfuscated command name) instead of
+    // the generic four-cause list, and still tells the agent to re-issue it.
+    expect(decision.reason).toMatch(/obfuscat|splic|command name/i);
+    expect(decision.reason).toMatch(/re-issue/i);
+  });
+
+  /** @scenario A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm */
+  it("gives a destructive HTTP call a re-issue-through-CLI reason, not the confirm-first loop", () => {
+    const decision = bash("curl -X POST https://app.langwatch.ai/api/dashboard/d1/purge");
+    expect(decision.allow).toBe(false);
+    if (decision.allow) throw new Error("expected block");
+    // An HTTP match is never confirmation-bindable, so its reason must not tell
+    // the user to confirm the curl (which would loop); it says to re-issue as a
+    // plain langwatch CLI command.
+    expect(decision.reason).toMatch(/re-issue/i);
+    expect(decision.reason).toMatch(/\blangwatch\b/i);
+    expect(decision.reason).not.toMatch(/ask them to confirm/i);
+  });
 });
 
 describe("Unresolvable commands held unconditionally", () => {
@@ -299,14 +323,50 @@ describe("Bash native quote-splice evasion (Finding A)", () => {
     }
   });
 
-  /** @scenario A legitimate quoted argument adjacent to whitespace is not over-blocked */
-  it("does not over-block a quoted argument that borders whitespace, not word text", () => {
-    // Each quote sits next to whitespace or a shell boundary on at least one
-    // side — a normal quoted argument, never a splice — so these still pass.
-    expect(bash('echo "hello world"').allow).toBe(true);
-    expect(bash('grep -r "foo" .').allow).toBe(true);
-    expect(bash('ls -la "my dir"').allow).toBe(true);
-    expect(bash('langwatch dataset list --filter "some name"').allow).toBe(true);
+  /** @scenario A backslash- or brace-spliced command name that reassembles the CLI name is held */
+  it("holds a backslash- or brace-spliced command name, even with a valid confirmation", () => {
+    // `bash -c` collapses each command-name splice to a real `langwatch`/`lw`
+    // invocation (`lang\watch` -> `langwatch`, `l\w` -> `lw`, `lang{,}watch` ->
+    // `langwatch langwatch`). Statically the literal is never contiguous, so the
+    // obfuscated head is held as unresolvable — no confirmation releases it.
+    for (const command of [
+      "lang\\watch delete dataset d1",
+      "l\\w delete dataset d1",
+      "lang{,}watch delete dataset d1",
+    ]) {
+      expect(bash(command).allow, command).toBe(false);
+      expect(bash(command, confirmedForD1).allow, command).toBe(false);
+      expect(findDestructiveMatches(command)).toContainEqual(
+        expect.objectContaining({ kind: "unparseable", cause: "obfuscated-command-name" }),
+      );
+    }
+  });
+
+  /** @scenario A quoted or escaped argument is not over-blocked, even with word-internal splices */
+  it("does not over-block a splice that sits in an argument, not the command name", () => {
+    // Splice detection is scoped to the command-name/head token. A quote,
+    // backslash, or brace splice inside an ARGUMENT is not a CLI-name
+    // obfuscation, so ordinary quoted/escaped arguments — contractions included
+    // — must pass. These are routine agent-workflow commands; blocking them is
+    // the over-block that gets the whole gate flag-disabled.
+    for (const command of [
+      'echo "hello world"',
+      'grep -r "foo" .',
+      'ls -la "my dir"',
+      'langwatch dataset list --filter "some name"',
+      // Word-internal quotes/backslashes in ARGUMENTS (the contraction class).
+      'git commit -m "fix: don\'t crash on empty input"',
+      'gh pr comment 123 --body "I\'ve verified this works"',
+      'echo "we\'re done"',
+      "grep -rn 'foo\"bar' .",
+      "sed 's/foo\"bar\"baz/qux/' file.txt",
+      'curl -d \'{"key":"value"}\'',
+      'jq -r \'.data."id"\'',
+      "git log --pretty='%H %s (%an)'",
+      "psql -c \"SELECT * WHERE name='bar'\"",
+    ]) {
+      expect(bash(command).allow, command).toBe(true);
+    }
   });
 });
 

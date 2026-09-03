@@ -129,12 +129,15 @@ Feature: Langy's worker-side delete gate
         | pnpm test:unit   |
 
     @unit
-    Scenario: A legitimate quoted argument adjacent to whitespace is not over-blocked
-      Given a command whose quotes border whitespace or a shell boundary, not
-        word text on both sides (`echo "hello world"`, `grep -r "foo" .`)
+    Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices
+      Given a command whose only quote, backslash, or brace splices are in
+        ARGUMENTS, not the command name (`git commit -m "don't crash"`,
+        `grep -rn 'foo"bar' .`, `sed 's/foo"bar"baz/qux/' f.txt`)
       When the gated bash command runs
       Then the gate returns allow:true
-      # The quote-splice hold must not swallow ordinary quoted arguments.
+      # Splice detection is scoped to the command-name/head token; an
+      # argument-position splice is not a CLI-name obfuscation and must not hold
+      # the segment — that over-block is what gets the whole gate flag-disabled.
 
     @unit
     Scenario: A block reason for an unconfirmed delete tells the agent to ask first
@@ -148,6 +151,16 @@ Feature: Langy's worker-side delete gate
       Given a gated bash command is unparseable
       When the gate returns allow:false
       Then the reason matches /re-issue/i
+
+    @unit
+    Scenario: An obfuscated command-name block names the obfuscation and says to re-issue the name plainly
+      Given a gated bash command whose command name is spliced by quotes, a
+        backslash, or a brace group
+      When the gate returns allow:false
+      Then the reason names the command name as obfuscated
+      And the reason matches /re-issue/i
+      # The specific cause is surfaced instead of the generic four-cause list, so
+      # the agent fixes the command name rather than guessing.
 
   Rule: A command the matcher cannot resolve is held unconditionally, before the confirmation check
 
@@ -207,6 +220,17 @@ Feature: Langy's worker-side delete gate
       # Held as unresolvable — the literal langwatch/lw is never contiguous statically.
 
     @unit
+    Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held
+      Given a command where a backslash escape or a word-internal brace group
+        splices the command name (`lang\watch`, `l\w`, `lang{,}watch`), which
+        bash resolves to a real langwatch or lw invocation
+      When the spliced command deletes a LangWatch resource
+      Then the gate returns allow:false
+      # Same class as the quote-splice: bash collapses the head token to
+      # langwatch/lw, so the literal is never contiguous statically and the
+      # obfuscated command name is held with a targeted re-issue reason.
+
+    @unit
     Scenario: An awk program that concatenates a destructive command through system() is held
       Given an awk, gawk, or mawk program that builds "langwatch" at runtime by
         string concatenation inside system()
@@ -240,6 +264,15 @@ Feature: Langy's worker-side delete gate
     Scenario: A read or non-destructive GraphQL POST to a langwatch host is not blocked
       When a gated command sends a POST GraphQL "query {…}" document, or a non-destructive mutation such as create or rename, to a langwatch API host
       Then the gate returns allow:true
+
+    @unit
+    Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm
+      Given a destructive HTTP call to a langwatch host that no confirmation can bind
+      When the gate returns allow:false
+      Then the reason says the HTTP call cannot be authorized and to re-issue it as a plain langwatch CLI command
+      And the reason matches /re-issue/i
+      # An http match is never confirmation-bindable, so the reason must not send
+      # the user into a confirm-and-retry loop on the same curl.
 
   Rule: The verb matcher is complete across flag forms, case, and the live command catalogue
 
@@ -371,11 +404,11 @@ Feature: Langy's worker-side delete gate
 # AC 7: "Mismatch: confirm A, delete B -> blocked" -> Scenario Outline: A confirmed delete does not authorize a mismatched target
 # AC 8: "Single-use: consumed on first gated allow" -> Scenario: A confirmation is consumed on its first authorized delete
 # AC 9: "Multi-target in one command, partial confirm -> blocked" -> Scenario: A multi-target command with only one target confirmed is blocked entirely
-# AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A legitimate quoted argument adjacent to whitespace is not over-blocked
+# AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices
 # AC 11: "Non-langwatch bash passes" -> Scenario Outline: Non-langwatch bash commands pass without confirmation
-# AC 12: "Block reason is actionable" -> Scenario: A block reason for an unconfirmed delete tells the agent to ask first; Scenario: A block reason for an unresolvable command tells the agent how to re-issue it
-# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: An awk program that concatenates a destructive command through system() is held
-# AC 14: "Destructive HTTP beyond literal DELETE is held" -> Scenario: A POST GraphQL delete or archive mutation...; Scenario: A PUT or PATCH soft-delete...; Scenario: A POST to a destructive action endpoint...; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (HTTP-shape delete case)
+# AC 12: "Block reason is actionable" -> Scenario: A block reason for an unconfirmed delete tells the agent to ask first; Scenario: A block reason for an unresolvable command tells the agent how to re-issue it; Scenario: An obfuscated command-name block names the obfuscation and says to re-issue the name plainly; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm
+# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: An awk program that concatenates a destructive command through system() is held
+# AC 14: "Destructive HTTP beyond literal DELETE is held" -> Scenario: A POST GraphQL delete or archive mutation...; Scenario: A PUT or PATCH soft-delete...; Scenario: A POST to a destructive action endpoint...; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (HTTP-shape delete case)
 # AC 15: "Benign HTTP to a langwatch host is NOT over-blocked" -> Scenario: A GET request to a langwatch host is not blocked; Scenario: A read or non-destructive GraphQL POST to a langwatch host is not blocked
 # AC 16: "Equals-form flag values are evaluated" -> Scenario: An equals-form flag value carrying a destructive verb is matched; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (equals-form case)
 # AC 17: "Case-insensitive + new-verb classification is forced by canary" -> Scenario: A destructive verb matches regardless of case; Scenario: The verb canary red-fails on a catalog leaf verb classified as neither destructive nor reviewed-benign
