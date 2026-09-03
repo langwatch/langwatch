@@ -53,7 +53,9 @@ A VK's eligible-provider set is the union of every ModelProvider whose scope is 
 
 ### Rate limits (RPM, TPM, RPD)
 
-The section has an input for each of the three, and the value you save is stored on the row. The gateway does not enforce any of them: the config bundle it reads carries no rate limit on a provider, and its limiter counts requests per virtual key. Set a ceiling on the key instead. See [Rate limits](/ai-gateway/rate-limits).
+The section has an input for each of the three, and the value you save is stored on the row. The gateway does not enforce any of them.
+
+The control plane does send them. It puts the saved values on each provider slot under `config.rate_limit`, but the gateway's provider slot has no field for them, so it drops them when it decodes the bundle. The only rate limit it reads is the one on the virtual key, and its limiter counts requests per key. Set the ceiling there instead, and see [Rate limits](/ai-gateway/rate-limits).
 
 ### Fallback priority (global)
 
