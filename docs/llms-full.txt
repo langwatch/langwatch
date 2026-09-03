@@ -19852,7 +19852,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument claude --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument claude --personal` | Back to your personal workspace |
 
-LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest, and the machine that held it mints a fresh one with `langwatch instrument claude`.
+LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest. If that machine comes back, it mints a fresh key on its next session and asks you to restart Claude Code.
 
 The wrapper accepts the same flags: `langwatch claude --project acme-app` pins the project and then starts Claude Code. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Claude Code reads it.
 
@@ -20622,7 +20622,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument gemini --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument gemini --personal` | Back to your personal workspace |
 
-LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest, and the machine that held it mints a fresh one with `langwatch instrument gemini`.
+LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest. If that machine comes back, run `langwatch instrument gemini` again to mint a fresh key.
 
 The wrapper accepts the same flags: `langwatch gemini --project acme-app` pins the project and then starts Gemini CLI. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Gemini CLI reads it.
 
@@ -20797,7 +20797,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument copilot --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument copilot --personal` | Back to your personal workspace |
 
-LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest, and the machine that held it mints a fresh one with `langwatch instrument copilot`.
+LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest. If that machine comes back, run `langwatch instrument copilot` again to mint a fresh key.
 
 Replace `copilot` with `code` for the Visual Studio Code extension. The two are separate, so you can send the command-line tool to a team project and keep the editor on your personal workspace.
 
@@ -21101,7 +21101,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument codex --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument codex --personal` | Back to your personal workspace |
 
-LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest, and the machine that held it mints a fresh one with `langwatch instrument codex`.
+LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest. If that machine comes back, it mints a fresh key on its next session and asks you to restart Codex.
 
 The wrapper accepts the same flags: `langwatch codex --project acme-app` pins the project and then starts Codex. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Codex reads it.
 
@@ -21337,7 +21337,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument opencode --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument opencode --personal` | Back to your personal workspace |
 
-LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest, and the machine that held it mints a fresh one with `langwatch instrument opencode`.
+LangWatch mints one personal key per device and never replaces another device's key, so setting up a second machine does not stop this one. A machine cloned from another keeps the parent's key until it mints its own. One workspace holds up to ten live personal keys per tool: past that, a new device retires the key that has gone unused the longest. If that machine comes back, it mints a fresh key on its next session and asks you to restart OpenCode.
 
 The wrapper accepts the same flags: `langwatch opencode --project acme-app` pins the project and then starts OpenCode. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before OpenCode reads it.
 

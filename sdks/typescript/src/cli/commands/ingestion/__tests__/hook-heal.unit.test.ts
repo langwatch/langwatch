@@ -143,6 +143,27 @@ describe("the session context hook's self-heal", () => {
     });
   });
 
+  describe("given a 401 on a target that carried no key", () => {
+    /** @scenario "A 401 the device sent no key with is not this key's failure" */
+    it("hands the healer no rejected token, and stays silent when it declines", async () => {
+      const healRevokedKey = vi.fn().mockResolvedValue(null);
+
+      // No OTEL_EXPORTER_OTLP_HEADERS: the target carries an endpoint and no
+      // authorization at all, so the 401 is not the cached key's failure.
+      await hook.runHook({
+        fetchImpl: hook.collector(401),
+        healRevokedKey,
+      });
+
+      expect(healRevokedKey).toHaveBeenCalledWith({
+        agent: "claude_code",
+        rejectedToken: undefined,
+      });
+      expect(hook.stdout).toEqual([]);
+      expect(hook.exits).toEqual([]);
+    });
+  });
+
   describe("given a collector that fails for another reason", () => {
     it("does not treat a 500 as a dead key", async () => {
       const healRevokedKey = vi.fn().mockResolvedValue(HEALED);

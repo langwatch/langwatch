@@ -331,13 +331,17 @@ Rule: A revoked ingest key heals itself
     And a collector that answers 401
     When the hook runs
     Then no personal key is minted
+    And stdout stays empty and the exit code is zero
 
   @unit
   Scenario: Wiring that writes no target leaves the cached key in place
     Given a signed-in CLI whose cached personal key the collector answers 401 to
     And a device where writing the tool's wiring lands no target
     When the hook runs
-    Then the new key is not cached and the hook reports no healed target
+    Then the hook reports no healed target
+    And the cache still holds the key the collector rejected, so the next
+    session heals instead of comparing against a key it never exported with
+    And stdout stays empty and the exit code is zero
 
   @unit
   Scenario: A payload that never arrives does not outlive the session

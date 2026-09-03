@@ -202,8 +202,10 @@ describe("healRevokedIngestKey", () => {
 
   describe("given wiring that reports no failure but writes no target", () => {
     /** @scenario "Wiring that writes no target leaves the cached key in place" */
-    it("leaves the cache on the old key, so the next 401 can heal", async () => {
+    it("leaves the cache on the rejected key, so the next 401 can heal", async () => {
+      const cfg = config();
       const d = deps({
+        loadConfig: () => cfg,
         installTelemetryWiring: vi.fn().mockReturnValue({
           labels: [],
           warnings: ["could not write ~/.claude/settings.json: EACCES"],
@@ -219,6 +221,11 @@ describe("healRevokedIngestKey", () => {
 
       expect(healed).toBeNull();
       expect(d.saveConfig).not.toHaveBeenCalled();
+      // The invariant the next heal depends on: the cache still names the key
+      // the collector rejected, so `rejectedToken === cached` holds next time.
+      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(
+        CACHED,
+      );
     });
   });
 });
