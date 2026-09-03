@@ -945,7 +945,7 @@ app:
 # =============================================================================
 # Configuration for running BullMQ background workers in a separate pod.
 # Workers are always deployed as their own Deployment; the main app
-# pod never starts in-process workers (START_WORKERS=false).
+# pod never runs jobs, since apps/worker is its own application.
 # Uses the same container image as the app, started from the apps/worker working directory.
 ## @section Workers
 workers:
