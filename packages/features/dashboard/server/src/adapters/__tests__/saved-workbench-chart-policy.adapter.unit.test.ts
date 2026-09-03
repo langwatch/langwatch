@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-web/validation";
+import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
 import {
   AnalyticsSavedWorkbenchChartPolicy,

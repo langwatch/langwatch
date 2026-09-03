@@ -20,16 +20,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { LangWatchQLVegaLiteChart } from "../langwatch-ql-vega-lite-chart";
-import { LangWatchQLVegaLoadBlockedError } from "../../../model/visualization/no-network-vega-loader";
+import { LangWatchQLVegaLoadBlockedError } from "@langwatch/analytics-contract/visualization";
 import type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
-} from "../../../model/visualization/visualization-types";
+} from "@langwatch/analytics-contract/visualization";
 import {
   langwatchVegaConfig,
   langwatchVegaPinnedConfig,
   type LangwatchVegaTokens,
-} from "../../../model/visualization/langwatch-vega-config";
+} from "@langwatch/analytics-contract/visualization";
 
 import {
   barOverQueryResult,
@@ -122,11 +122,9 @@ vi.mock("vega-embed", () => ({ default: vega.embed }));
 /** Set to make the next spec build throw, before `embed` is ever reached. */
 const build = vi.hoisted(() => ({ throwWith: null as unknown }));
 
-vi.mock("../../../model/visualization/build-langwatch-ql-vega-spec", async (importOriginal) => {
+vi.mock("@langwatch/analytics-contract/visualization", async (importOriginal) => {
   const original =
-    await importOriginal<
-      typeof import("../../../model/visualization/build-langwatch-ql-vega-spec")
-    >();
+    await importOriginal<typeof import("@langwatch/analytics-contract/visualization")>();
   return {
     ...original,
     buildLangWatchQLVegaSpec: (input: {

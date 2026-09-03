@@ -8,7 +8,13 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
+    // No "node". This package is loaded by the browser — `./public-app-config`
+    // is the contract the client bundle parses out of the HTML shell — so a
+    // `node:*` import or a `Buffer` reference must not compile here. The suite
+    // is checked by tsconfig.test.json, which supplies the node types the
+    // browser-graph guard needs to read its subjects off disk.
     "types": ["vitest/globals"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["src/**/__tests__/**"]
 }

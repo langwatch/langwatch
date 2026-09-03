@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import type { EmailContent } from "@langwatch/notification-server";
 import { JoinRequestMailAdapter } from "../join-request-mail.adapter";
 
 /**
  * Spec: packages/features/identity/specs/join-request-worker-composition.feature
  *
- * The literals below are the twin pin, not a snapshot of convenience. Until
- * the legacy registry drops its own join-request pipeline, BOTH graphs hold
- * these wakes, and the application renders the same two mails from JSX in
- * `platform/app/src/server/mailer/joinRequestEmails.tsx`. This module writes
- * the same element tree with `createElement`, because the strict feature
- * layout admits no `.tsx` module — so the thing that could silently fork is
- * exactly the translation, and what proves it has not is the rendered bytes.
+ * The literals below are the twin pin, and the twin is gone: these bytes were
+ * captured while this adapter wrote its own `createElement` translation of the
+ * two mails, and they still pass now that the words come from
+ * `@langwatch/mail`'s JSX through `MailRenderPort`. That is what the pin is
+ * for — it is the evidence the move changed no message, character for
+ * character, which no amount of reading two templates side by side gives you.
+ *
+ * The renderer is the real one rather than a double for the same reason: a
+ * stub would assert the test's own strings back at itself.
  *
  * A drift here is invisible in production: two admins on one organization
  * would receive two differently-worded reminders depending on which process
@@ -42,6 +45,7 @@ const compose = () => {
     mailer,
     adapter: JoinRequestMailAdapter.create({
       mailer: mailer as unknown as never,
+      renderer: ReactEmailMailRenderer.create(),
       baseHost: "https://langwatch.acme.example",
     }),
   };

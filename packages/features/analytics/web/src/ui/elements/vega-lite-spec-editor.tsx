@@ -19,7 +19,7 @@ import { Box, Text, VStack } from "@chakra-ui/react";
 import type { editor } from "monaco-editor";
 import { lazy, Suspense } from "react";
 
-import type { VegaValidationError } from "../../model/visualization/visualization-types";
+import type { VegaValidationError } from "@langwatch/analytics-contract/visualization";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 

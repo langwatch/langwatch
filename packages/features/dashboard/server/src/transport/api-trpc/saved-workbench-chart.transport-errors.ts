@@ -1,4 +1,4 @@
-import type { VegaValidationError } from "@langwatch/analytics-web/validation";
+import type { VegaValidationError } from "@langwatch/analytics-contract/visualization/validation";
 import { HandledError, remediation } from "@langwatch/handled-error";
 
 /** Preserves the established REST and tRPC error envelopes at the Dashboard transport edge. */

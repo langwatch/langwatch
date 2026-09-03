@@ -134,7 +134,8 @@ export function handledErrorEnvelope({
   return { data: { error: { code, httpStatus, fault, meta } } };
 }
 
-export * from "../model/visualization/__tests__/fixtures/adversarial";
-export * from "../model/visualization/__tests__/fixtures/invalid";
-export * from "../model/visualization/__tests__/fixtures/lwql-dataset-registry";
-export * from "../model/visualization/__tests__/fixtures/valid";
+// The Vega-Lite corpus moved with the policy it validates, into
+// `@langwatch/analytics-contract`. It is re-exported here rather than imported
+// twice because the workbench suites reach for LangWatchQL fixtures and chart
+// fixtures in the same breath, and there is exactly one corpus either way.
+export * from "@langwatch/analytics-contract/testing";

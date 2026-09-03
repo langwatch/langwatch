@@ -19,7 +19,7 @@ import type { LangWatchQLVegaViewStatus } from "../../behavior/use-langwatch-ql-
 import type {
   LangWatchQLVegaLiteChartProps,
   VegaValidationWarning,
-} from "../../model/visualization/visualization-types";
+} from "@langwatch/analytics-contract/visualization";
 
 import { LangWatchQLChartFailure } from "../elements/langwatch-ql-chart-failure";
 

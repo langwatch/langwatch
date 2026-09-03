@@ -7,6 +7,7 @@ import {
 } from "@langwatch/automation-server/testing";
 import type { SlackApiTransport } from "@langwatch/automation-server";
 import { WebhookEgressService } from "@langwatch/egress";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-server";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -69,7 +70,11 @@ function composeGraph(
   const database = createGraphActivityPrismaDouble(seed);
   const mailer = new RecordingMailer();
   const slackApi = new RecordingSlackApi();
-  const mail = { delivery: mailer, baseHost: config.mail?.baseHost ?? "" };
+  const mail = {
+    delivery: mailer,
+    renderer: ReactEmailMailRenderer.create(),
+    baseHost: config.mail?.baseHost ?? "",
+  };
   const delivery = tryCreateWorkerAutomationDelivery({
     config,
     mail,
@@ -136,7 +141,11 @@ describe("tryCreateWorkerAutomationGraphComposition", () => {
 
       tryCreateWorkerAutomationDelivery({
         config: resolveWorkerConfig(ENVIRONMENT),
-        mail: { delivery: new RecordingMailer(), baseHost: ENVIRONMENT.BASE_HOST },
+        mail: {
+          delivery: new RecordingMailer(),
+          renderer: ReactEmailMailRenderer.create(),
+          baseHost: ENVIRONMENT.BASE_HOST,
+        },
         webhookTransport: {
           send: async () => ({ status: 200, body: "", eventId: "evt_1" }),
           assertDelivered: () => undefined,
@@ -281,7 +290,11 @@ describe("resolveWorkerConfig automation leaves", () => {
       /** @scenario "The graph vertical takes the project reads this process composes" */
       it("accepts the composed project metadata service as its project reads", () => {
         const config = resolveWorkerConfig(ENVIRONMENT);
-        const mail = { delivery: new RecordingMailer(), baseHost: ENVIRONMENT.BASE_HOST };
+        const mail = {
+          delivery: new RecordingMailer(),
+          renderer: ReactEmailMailRenderer.create(),
+          baseHost: ENVIRONMENT.BASE_HOST,
+        };
         const graph = tryCreateWorkerAutomationGraphComposition({
           config,
           delivery: tryCreateWorkerAutomationDelivery({

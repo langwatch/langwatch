@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   createPublicAppConfigMetaTag,
   injectPublicAppConfigIntoHtml,
+  parsePublicAppConfigMetaContent,
   PUBLIC_APP_CONFIG_META_NAME,
-  readPublicAppConfig,
-} from "../src/behavior/public-config";
-import type { PublicAppConfig } from "../src/model/public-config";
+  type PublicAppConfig,
+} from "../public-app-config";
 
 const config: PublicAppConfig = {
   appBaseUrl: "https://app.example.com",
@@ -29,11 +29,7 @@ describe("public application config browser codec", () => {
     )?.[1];
 
     expect(html).not.toContain(`script data-${PUBLIC_APP_CONFIG_META_NAME}`);
-    expect(
-      readPublicAppConfig({
-        querySelector: () => (content ? { getAttribute: () => content } : null),
-      }),
-    ).toEqual(config);
+    expect(parsePublicAppConfigMetaContent(content ?? "")).toEqual(config);
   });
 
   it("uses an attribute-safe alphabet rather than embedding markup", () => {

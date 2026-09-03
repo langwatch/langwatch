@@ -1,12 +1,29 @@
-import type { AlertType } from "@langwatch/automation-contract";
 import { Column, Container, Heading, Html, Img, Link, Row, Section } from "@react-email/components";
 import { render } from "@react-email/render";
 import { createElement, Fragment, type ReactNode } from "react";
 
 /** One settled match, as a row in the digest. */
-type DigestEntry = {
+export type TriggerDigestEntry = {
   traceId?: string | undefined;
   graphId?: string | undefined;
+};
+
+/**
+ * What the digest is rendered from.
+ *
+ * `triggerType` is a plain string rather than the automation feature's
+ * `AlertType`: the only thing the template does with it is put it in
+ * parentheses ahead of the heading, so naming the union here would buy the
+ * mail gateway a dependency on a feature contract for a value it never
+ * branches on.
+ */
+export type TriggerDigestMail = {
+  triggerName: string;
+  triggerType: string | null;
+  triggerMessage: string;
+  projectSlug: string;
+  baseHost: string;
+  entries: readonly TriggerDigestEntry[];
 };
 
 /**
@@ -23,23 +40,17 @@ const DIGEST_ROW_LIMIT = 10;
  * The digest an automation sends when its author wrote no template of their
  * own — which is most automations.
  *
- * Written with `createElement` rather than JSX because the strict feature
- * layout admits no `.tsx` module and this package's TypeScript project builds
- * `.ts` only. The element TREE is what `render` turns into HTML, so this
- * produces the same bytes the application's JSX does.
+ * Kept in `createElement` form through its move out of the worker, where the
+ * strict feature layout admitted no `.tsx`. The element TREE is what `render`
+ * turns into HTML, so the rendered bytes are the same either way — and
+ * translating a tree that no test pins literal-for-literal is how a mail
+ * quietly changes shape during a move.
  *
  * Nothing here reads configuration. `baseHost` arrives from the composition
  * root, and every link in the mail is built from it, so a deployment behind a
  * different origin sends links that resolve.
  */
-export function renderTriggerDigestEmail(input: {
-  triggerName: string;
-  triggerType: AlertType | null;
-  triggerMessage: string;
-  projectSlug: string;
-  baseHost: string;
-  entries: DigestEntry[];
-}): Promise<string> {
+export function renderTriggerDigestEmail(input: TriggerDigestMail): Promise<string> {
   const prefix = input.triggerType ? `(${input.triggerType}) ` : "";
 
   return render(
@@ -78,7 +89,7 @@ export function renderTriggerDigestEmail(input: {
 function digestTable(input: {
   projectSlug: string;
   baseHost: string;
-  entries: DigestEntry[];
+  entries: readonly TriggerDigestEntry[];
 }): ReactNode {
   return createElement(
     Section,
@@ -106,7 +117,10 @@ function digestTable(input: {
  * carries neither: a link that goes nowhere is better than one that resolves to
  * a trace page for an id the project does not hold.
  */
-function linkFor(entry: DigestEntry, input: { projectSlug: string; baseHost: string }): string {
+function linkFor(
+  entry: TriggerDigestEntry,
+  input: { projectSlug: string; baseHost: string },
+): string {
   if (entry.graphId) {
     return `${input.baseHost}/${input.projectSlug}/analytics/custom/${entry.graphId}`;
   }
@@ -117,7 +131,7 @@ function linkFor(entry: DigestEntry, input: { projectSlug: string; baseHost: str
   return "#";
 }
 
-function textFor(entry: DigestEntry): string {
+function textFor(entry: TriggerDigestEntry): string {
   if (entry.graphId) {
     return "View Graph";
   }

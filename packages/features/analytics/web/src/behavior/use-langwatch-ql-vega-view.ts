@@ -26,17 +26,17 @@ import embed, { type EmbedOptions, type Result } from "vega-embed";
 import {
   buildLangWatchQLVegaSpec,
   type LangWatchQLVegaSpecBuild,
-} from "../model/visualization/build-langwatch-ql-vega-spec";
+} from "@langwatch/analytics-contract/visualization";
 import type {
   LangWatchQLVegaColorMode,
   LangWatchQLVegaConfig,
-} from "../model/visualization/langwatch-vega-config";
-import { lwqlRenderFailure } from "../model/visualization/lwql-chart-failures";
-import { createNoNetworkVegaLoader } from "../model/visualization/no-network-vega-loader";
+} from "@langwatch/analytics-contract/visualization";
+import { lwqlRenderFailure } from "@langwatch/analytics-contract/visualization";
+import { createNoNetworkVegaLoader } from "@langwatch/analytics-contract/visualization";
 import type {
   LangWatchQLDataset,
   VegaValidationError,
-} from "../model/visualization/visualization-types";
+} from "@langwatch/analytics-contract/visualization";
 
 export type LangWatchQLVegaViewStatus = "idle" | "embedding" | "ready" | "failed";
 

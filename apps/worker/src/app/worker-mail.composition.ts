@@ -1,14 +1,22 @@
 import { AwsClientProcessRuntime, OutboundProxyResolverPort } from "@langwatch/aws-client";
+import { ReactEmailMailRenderer, type MailRenderPort } from "@langwatch/mail";
 import { EmailDeliveryAdapter, type EmailDeliveryPort } from "@langwatch/notification-server";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { WorkerConfig, WorkerOutboundProxyConfig } from "../platform/config/worker.config";
 
 /**
- * The one outbound mail graph a worker process holds, and the host its
- * messages link back to.
+ * The one outbound mail graph a worker process holds, the host its messages
+ * link back to, and the renderer that turns a message into HTML.
+ *
+ * The renderer is composed here rather than reached for inside an adapter
+ * because `@langwatch/mail` is the ONE package a backend graph may load React
+ * through — react-email renders server-side, at send time. Naming it once, at
+ * the root that already owns the gateway, is what keeps every adapter
+ * downstream free of a template of its own.
  */
 export type WorkerMailComposition = Readonly<{
   delivery: EmailDeliveryPort;
+  renderer: MailRenderPort;
   baseHost: string;
 }>;
 
@@ -50,7 +58,11 @@ export function tryCreateWorkerMailComposition(options: {
     },
   });
   resources.own("worker mail delivery", () => delivery.close());
-  return { delivery, baseHost: config.mail.baseHost };
+  return {
+    delivery,
+    renderer: ReactEmailMailRenderer.create(),
+    baseHost: config.mail.baseHost,
+  };
 }
 
 function ownedAwsRuntime({

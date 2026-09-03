@@ -65,6 +65,22 @@ export { lintServiceQualityFile } from "./service-quality";
 export { lintServiceProjectionBoundaries } from "./service-projection-boundaries";
 export { lintStrictContractBuildConfigs } from "./contract-build-config";
 export { lintFrontendUiBoundaries } from "./frontend-ui-boundaries";
+export type {
+  ModuleImport,
+  PackageManifestRecord,
+  ValueImportGraph,
+  WorkspaceModuleResolver,
+} from "./module-graph";
+export {
+  chainsToSeeds,
+  createWorkspaceModuleResolver,
+  moduleImports,
+  rendersJsx,
+  resolveRelativeModule,
+  resolveSourceCandidate,
+  valueImports,
+  walkValueImportGraph,
+} from "./module-graph";
 export { lintTestQuality } from "./test-quality";
 export type { TestQualityLintOptions } from "./test-quality";
 export {

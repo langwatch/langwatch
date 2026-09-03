@@ -11,8 +11,11 @@ import { LangWatchQLVegaLiteChart as VegaLiteChart } from "./langwatch-ql-vega-l
 import type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
-} from "../../model/visualization/visualization-types";
-import { langwatchVegaConfig, langwatchVegaPinnedConfig } from "../../model/visualization";
+} from "@langwatch/analytics-contract/visualization";
+import {
+  langwatchVegaConfig,
+  langwatchVegaPinnedConfig,
+} from "@langwatch/analytics-contract/visualization";
 import { useLangwatchVegaTokens } from "../../behavior/use-langwatch-vega-tokens";
 
 export interface LangWatchQLVegaLiteChartProps {

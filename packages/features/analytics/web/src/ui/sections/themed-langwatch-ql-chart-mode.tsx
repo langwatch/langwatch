@@ -13,7 +13,10 @@ import {
   LangWatchQLChartMode as ChartMode,
   type LangWatchQLChartResult,
 } from "./langwatch-ql-chart-mode";
-import { langwatchVegaConfig, langwatchVegaPinnedConfig } from "../../model/visualization";
+import {
+  langwatchVegaConfig,
+  langwatchVegaPinnedConfig,
+} from "@langwatch/analytics-contract/visualization";
 import { useLangwatchVegaTokens } from "../../behavior/use-langwatch-vega-tokens";
 
 export type { LangWatchQLChartResult };

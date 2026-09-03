@@ -16,7 +16,7 @@ behaviour.
 
 `@langwatch/analytics-web/visualization` is browser-chunk-safe policy and
 theme support. The generated-schema save admission path is deliberately the
-separate `@langwatch/analytics-web/validation` export, so server-side chart
+separate `@langwatch/analytics-contract/visualization/validation` export, so server-side chart
 saves cannot make ordinary visualization imports eager.
 
 Deliberate app residue is limited to `useLangWatchQLQuery`,

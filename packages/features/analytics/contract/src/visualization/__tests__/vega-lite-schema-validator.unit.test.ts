@@ -9,14 +9,14 @@ import {
   generateVegaLiteValidatorSource,
   readBundledVegaLiteSchema,
   VEGA_LITE_AJV_OPTIONS,
-} from "../../../../scripts/generate-vega-lite-validator";
+} from "../../../scripts/generate-vega-lite-validator";
 
 import { getVegaLiteSchemaValidator } from "../vega-lite-schema";
 import { ADVERSARIAL_VEGA_FIXTURES } from "./fixtures/adversarial";
 import { INVALID_VEGA_FIXTURES } from "./fixtures/invalid";
 import { VALID_VEGA_FIXTURES } from "./fixtures/valid";
 
-const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
+const PACKAGE_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
 const CORPUS: readonly { name: string; spec: unknown }[] = [
   ...VALID_VEGA_FIXTURES.map(({ name, spec }) => ({ name: `valid/${name}`, spec })),

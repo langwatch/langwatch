@@ -4,6 +4,7 @@ import { EmailDeliveryPort, type EmailContent } from "@langwatch/notification-se
 import { describe, expect, it } from "vitest";
 import { createWorkerWebhookTransport } from "../../../app/worker-webhook-egress.composition";
 import { resolveWorkerConfig } from "../../../platform/config/worker.config";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { WorkerAutomationNotificationDeliveryAdapter } from "../automation-notification-delivery.adapter";
 
 /**
@@ -61,6 +62,7 @@ function composeDelivery(
   const logger = over.logger ?? new RecordingLogger();
   const adapter = WorkerAutomationNotificationDeliveryAdapter.create({
     mailer,
+    renderer: ReactEmailMailRenderer.create(),
     baseHost: BASE_HOST,
     unsubscribeSigningSecret: SIGNING_KEY,
     ...(over.webhookTransport ? { webhookTransport: over.webhookTransport } : {}),
@@ -174,7 +176,6 @@ describe("WorkerAutomationNotificationDeliveryAdapter", () => {
         }),
       ).rejects.toThrow(/no outbound webhook sender/);
     });
-
   });
 
   /**

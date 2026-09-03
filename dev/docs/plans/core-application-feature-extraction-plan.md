@@ -9825,7 +9825,8 @@ platform-era guards landed in the same cutover.
 ### What it opens with: two findings, not a baseline
 
 Neither is written down as accepted. The test is **red**, and these are the
-reasons.
+reasons. **Both are closed** — see "Fix lane" below, which moved the code
+rather than widening the guard.
 
 **1. React is on the worker's boot graph.** Five roots, one cause:
 
@@ -9945,6 +9946,238 @@ walk is there when that list is.
 | `packages/architecture-lint/src/index.ts` | Exports the module-graph surface. |
 | `specs/setup/memory-footprint.feature` | "Server code cannot reach browser-only UI, even transitively" re-worded for the new roots (title unchanged, so the binding holds); "Backend code never imports a module out of a browser package" added, `@unit`. |
 | `CLAUDE.md` | The row names the new path and both refusals. |
+
+## Fix lane — the frontend boundary is green, and the mail exception is real, 2026-09-03
+
+The guard lane above landed red on two findings and named both as decisions
+rather than guard changes. This lane took both decisions the way it said to:
+**the code moved, nothing was baselined, and the guard's terminal was not
+widened by a character.** `frontend-boundary.unit.test.ts` is **16 of 16**.
+
+```
+  BEFORE                                    AFTER
+
+  worker.entrypoint                         worker.entrypoint
+    -> worker-automation-graph                -> worker-mail.composition
+    -> automation-notification-delivery       -> @langwatch/mail   ← TERMINAL, walk stops
+    -> trigger-digest-mail.template
+    -> react                    ✗           the adapters hold MailRenderPort (a TYPE),
+                                            the composition holds the renderer
+
+  ten apps/api compositions                 ten apps/api compositions
+    -> dashboard-server                       -> dashboard-server
+    -> analytics-WEB/…/validation ✗           -> @langwatch/analytics-contract/visualization/validation
+
+  api-production.composition                api-production.composition
+    -> app-static.surface                     -> app-static.surface
+    -> apps/UI/behavior/public-config ✗       -> @langwatch/config/public-app-config[/projection]
+```
+
+### 1. React off the worker's boot graph
+
+`@langwatch/mail` already held twin templates. The exception the guard grants
+was written for exactly this and was **inert** — no backend root imported the
+package at all — so the twins it existed to prevent had already been written.
+
+The digest template moved whole:
+`apps/worker/src/features/automation/trigger-digest-mail.template.ts` →
+`packages/mail/src/templates/trigger-digest-email.ts`. It is still written in
+`createElement` rather than JSX, deliberately: the reason given in its docblock
+(the strict feature layout admits no `.tsx`) no longer applies, but the element
+TREE is what `render` turns into HTML and **no test pins the digest's bytes**.
+Translating an unpinned template during a move is how a mail quietly changes
+shape. The docblock now says that instead of the stale reason.
+
+**What differed between the join-request twins: nothing a customer would ever
+see, and one thing a maintainer would.** Heading, body, button label, both
+subjects and the lapse notice's wording are identical, character for character
+— which is not an argument from reading them side by side, it is what
+`join-request-mail.adapter.unit.test.ts` proves: the two HTML literals in it
+were captured off the worker's `createElement` output, and they still pass now
+that the words come from the mail package's JSX. The move changed no message.
+
+Three real differences, all structural, all resolved the way the brief asked
+(keep the mail package's):
+
+| | worker twin | `@langwatch/mail` (kept) |
+| --- | --- | --- |
+| the members link | built inside the template from `baseHost` | taken as `membersSettingsUrl`, built by the caller |
+| the send | `mailer.send(...)` directly | `sendEmail({ mailer, content })` — the shared default-`From` path |
+| what it is | render + send in one class | render and send are separate exports |
+
+The link difference is the one that carried behaviour, and it was ported rather
+than dropped: `JoinRequestMailAdapter` still builds `${baseHost}/settings/members`
+and passes it, because the deployment's host is a composition-root fact and the
+words are not.
+
+`MailRenderPort` (`packages/mail/src/ports/mail-render.port.ts`) is the seam:
+three render methods returning HTML, implemented once by `ReactEmailMailRenderer`.
+**The package renders, the worker sends** — the worker keeps the whole envelope
+(no-reply `To`, BCC fan-out, unsubscribe footer and its RFC 8058 headers), which
+is what made the twin look justified in the first place.
+
+`WorkerMailComposition` gained `renderer`, so the renderer is composed once
+beside the gateway rather than reached for inside two adapters. Both adapters
+take it as a **required** constructor argument and type-import the port, so
+`apps/worker`'s only edge to react-email is the composition root's, and the walk
+stops there.
+
+`apps/worker/package.json` lost `@react-email/components`, `@react-email/render`,
+`react` and `@types/react`, and gained `@langwatch/mail`.
+
+**`apps/worker/tsconfig.json` gained `"jsx": "react-jsx"`, and that is the whole
+reason the twins existed.** `@langwatch/mail` resolves to source, its templates
+are `.tsx`, and a program without `jsx` cannot NAME the package — `TS6142` on
+every re-export in its barrel. Nothing in `apps/worker` is a `.tsx` and nothing
+may be; the flag is there so the app can reach the one package the contract
+lets it reach.
+
+### 2. Backend code out of the browser packages
+
+**`analytics-web` → `analytics-contract`.** The whole
+`model/visualization/` tree moved to
+`packages/features/analytics/contract/src/visualization/`: 19 modules, the 8MB
+ahead-of-time Ajv validator, 19 test files, the fixture corpus and the
+generator script. Not just `validation.ts` — the guard bans the module, so the
+whole value closure had to leave, and the closure is the model. The four
+chart-authoring modules followed it rather than being stranded, because
+`rule-coverage.unit.test.ts` reads the tests that cover them and
+`module-purity.unit.test.ts` scans the directory; splitting the tree would have
+left the rule vocabulary in one package and a third of its coverage in another.
+
+Two subpath exports, and the split between them is load-bearing:
+`./visualization` (the model) and `./visualization/validation` (the schema
+validator). It is the same split the old web barrel had — the 8MB validator is
+right while a chart is being saved and wrong for an ordinary browser import of
+the theme helpers — so it was preserved rather than flattened into one barrel.
+`./testing` publishes the fixture corpus the browser suites still read.
+
+`@langwatch/dashboard-server` dropped its `@langwatch/analytics-web` dependency
+outright. The ten `apps/api` compositions needed no edit: they reached the seed
+through the dashboard barrel, so repointing the adapter closed all ten.
+
+`analytics-contract`'s `tsconfig.json` gained `"dom"` in `lib` — the
+spec-size measurement encodes with `TextEncoder`, which every runtime this
+package loads in has and only `lib.dom` declares. It is not licence to touch the
+document: `module-purity` runs every entry point under plain node with no
+`window` and no `document`.
+
+**`apps/ui` → `@langwatch/config`.** The API writes the public-config meta tag
+and the browser reads it, so the contract belonged to neither end.
+`packages/config/src/public-app-config.ts` now holds the schema, the meta name,
+the base64url codec, the injector and `parsePublicAppConfigMetaContent`;
+`public-app-config.projection.ts` holds the env projection.
+
+**They are two modules on two subpaths on purpose**, and the reason is written
+into both: the projection declares the deployment's secret variable NAMES
+(`SENDGRID_API_KEY`, `RESEND_API_KEY`, `SMTP_URL`) at module scope, nothing here
+sets `sideEffects: false`, and the browser reader imports the contract. The
+guard that pins it moved too, and now reads **across the workspace** — the
+contract is in `packages/config` and the reader stayed in `apps/ui`, so a test
+looking at only one of them would pass over the half it cannot see.
+
+`apps/ui/src/behavior/public-config.ts` keeps exactly one thing: the
+`document` query. `apps/ui/src/model/public-config.ts` is gone, and so is
+`@langwatch/ui`'s `./public-config/projection` export.
+
+### 3. The exception is exercised now
+
+The guard's self-validation grew a case, because the brief was right that an
+exception nothing exercises excuses nothing and reads exactly like one that
+works:
+
+- **"is reached by a real backend root, so the terminal is exercised"** —
+  `worker-mail.composition.ts` is in `BACKEND_ROOTS`, value-imports
+  `@langwatch/mail`, the resolver lands inside `packages/mail/`,
+  `isMailTerminal` is true for it, and neither the composition nor
+  `worker.entrypoint.ts` reports a chain.
+
+Two existing cases lost their subjects to the moves and were re-pointed rather
+than deleted:
+
+- **"stops at that package and nowhere else"** named the worker's twin
+  template. Its replacement asks the same question of a React-rendering file
+  outside the package.
+- **"given a type-only import of a browser package"** named
+  `saved-workbench-chart.transport-errors.ts` importing
+  `@langwatch/analytics-web/validation`. **No backend file names a browser type
+  any more** — which is the guard's whole point — so the subject is a browser
+  module that type-imports React, and what is pinned is the walker
+  (`moduleImports` sees it, `valueImports` refuses to count it) rather than the
+  file's location.
+
+### Decisions taken, so the next reader does not re-litigate them
+
+- **`triggerType` widened from `AlertType` to `string`** on the digest input.
+  The template puts it in parentheses ahead of a heading and branches on nothing
+  else, so naming the union would buy `@langwatch/mail` a dependency on a
+  feature contract for a value it never reads.
+- **The digest stayed `createElement`.** See above: unpinned bytes.
+- **`langwatch-vega-config.ts` moved with the model** rather than
+  `LangWatchQLVegaLiteChartProps` being split out of `visualization-types.ts`.
+  Both are framework-free — the config's own docblock says it reads no Chakra
+  and no DOM — and moving one module beats surgery on an interface that four
+  suites name.
+- **`lwql-fixtures.ts` re-exports `@langwatch/analytics-contract/testing`.**
+  The corpus moved with the policy it validates, and the workbench suites reach
+  for LangWatchQL fixtures and chart fixtures in the same breath. This is an
+  aggregating test barrel, not a compatibility shim for moved production code.
+- **`@langwatch/config` gained a `tsconfig.test.json`**, mirroring
+  `analytics-contract`: `node:fs` compiles for the browser-graph guard and
+  nowhere else, so the config itself stays loadable by a browser.
+
+### Gates
+
+- `packages/architecture-lint`: **38 of 38 files, 495 of 495 tests.**
+  `frontend-boundary.unit.test.ts` is **16 of 16** — the guard lane's 15 plus
+  the terminal-is-exercised case.
+- `apps/worker`: `tsc --noEmit` and `tsc --noEmit -p tsconfig.test.json` clean;
+  vitest **60 files / 452 tests**, exactly the baseline.
+- `apps/api`: `tsc --noEmit` clean. `tsconfig.test.json` reports three errors in
+  `app-trpc/__tests__/app-trpc.features.unit.test.ts`, a tRPC context-union
+  mismatch in a file this lane did not touch and cannot reach — this lane's
+  `apps/api` files are the three under `app-static/`.
+- `@langwatch/mail`: 4 files / 36 tests. `@langwatch/config`: 10 files / 67
+  tests (up from 7/56 — the three moved suites). `@langwatch/analytics-contract`:
+  21 files / 115 tests (up from 2/28 — the 19 moved suites).
+  `@langwatch/analytics-web`: 34 files / 274 tests.
+  `@langwatch/dashboard-server`: 7 passed / 2 skipped, 81 tests.
+- `apps/ui`: vitest **96 files / 1003 tests**. `tsc --noEmit` reports six errors,
+  all six in `packages/features/workflow/web/**` — a sibling lane's tree,
+  unmodified in this working copy. Zero in this lane's files.
+- `oxfmt`: the eleven files this lane put out of format are reformatted; the two
+  others with drift (`app-rest.process-features.ts`,
+  `api-production.composition.ts`) are a sibling lane's uncommitted work and
+  were left alone.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/mail/src/templates/trigger-digest-email.ts` | MOVED from `apps/worker/src/features/automation/trigger-digest-mail.template.ts`. Exports `TriggerDigestEntry` and `TriggerDigestMail`; `triggerType` widened to `string`. |
+| `packages/mail/src/templates/join-request-emails.tsx` | Render split from send: `renderJoinRequestReminderEmail`, `renderJoinRequestExpiredEmail` and the two subject builders are exports; the send functions call them. |
+| `packages/mail/src/ports/mail-render.port.ts` | NEW. `MailRenderPort` — three render methods, no transport. |
+| `packages/mail/src/adapters/react-email.render.adapter.ts` | NEW. `ReactEmailMailRenderer`, the one place react-email is evaluated on a backend graph. |
+| `packages/mail/src/index.ts` | Exports the port, the renderer, the digest and the join-request render halves. Header rewritten — the digest IS here now. |
+| `apps/worker/src/features/automation/automation-notification-delivery.adapter.ts` | Takes `renderer: MailRenderPort` (type-import); renders through it. |
+| `apps/worker/src/features/identity/join-request-mail.adapter.ts` | The templates deleted; envelope only, words through the port. |
+| `apps/worker/src/app/worker-mail.composition.ts` | `WorkerMailComposition` gained `renderer`, composed once as `ReactEmailMailRenderer`. |
+| `apps/worker/src/app/worker-automation-graph.composition.ts`, `worker-production.composition.ts` | Pass `mail.renderer` through. Anchored edits. |
+| `apps/worker/tsconfig.json` | `"jsx": "react-jsx"`, so the app can name `@langwatch/mail` at all. |
+| `apps/worker/package.json` | `-@react-email/*`, `-react`, `-@types/react`, `+@langwatch/mail`. |
+| `packages/features/analytics/contract/src/visualization/**` | MOVED, whole, from `packages/features/analytics/web/src/model/visualization/**`: 19 modules, the generated validator, 19 suites and the fixture corpus. New `index.ts` barrel. |
+| `packages/features/analytics/contract/scripts/generate-vega-lite-validator.ts` | MOVED from the web package; output paths repointed. |
+| `packages/features/analytics/contract/package.json` | `./visualization`, `./visualization/validation`, `./testing` exports; `ajv` dependency; `vega`, `vega-lite`, `tsx` dev; the generator script. |
+| `packages/features/analytics/contract/tsconfig{,.test}.json` | `lib` gained `dom` (`TextEncoder`); nested `__tests__` excluded from the source program and included in the test one. |
+| `packages/features/analytics/web/**` | 16 modules repointed at `@langwatch/analytics-contract/visualization`; `./validation` and `./visualization` exports and the generator script removed; `lwql-fixtures.ts` re-exports the moved corpus. |
+| `packages/features/dashboard/server/src/adapters/saved-workbench-chart-policy.adapter.ts`, `transport/api-trpc/saved-workbench-chart.transport-errors.ts` | Repointed at the contract. Package dropped `@langwatch/analytics-web`. |
+| `packages/config/src/public-app-config.ts` | NEW, from `apps/ui/src/model/public-config.ts` plus the framework-free half of `apps/ui/src/behavior/public-config.ts`. Adds `parsePublicAppConfigMetaContent`. |
+| `packages/config/src/public-app-config.projection.ts` | MOVED from `apps/ui/src/behavior/public-config.projection.ts`. |
+| `packages/config/src/__tests__/public-app-config{,.projection,-browser-graph}.unit.test.ts`, `ui-public-bootstrap.unit.test.ts` | MOVED from `apps/ui/tests/`. The browser-graph guard now reads across the workspace. |
+| `packages/config/package.json`, `tsconfig.json`, `tsconfig.test.json` | Two subpath exports; `@types/node` dev; a test project so `node:fs` compiles nowhere else. |
+| `apps/ui/src/behavior/public-config.ts` | Reduced to `readPublicAppConfig`. `apps/ui/src/model/public-config.ts` deleted; `./public-config/projection` export removed; `src/index.ts` and `vite.config.ts` repointed. |
+| `apps/api/src/app-static/app-static.surface.ts`, `app-static.handler.ts`, `__tests__/app-static-handler.unit.test.ts` | Repointed at `@langwatch/config/public-app-config`. |
+| `packages/architecture-lint/tests/frontend-boundary.unit.test.ts` | The terminal-is-exercised case added; two self-validation cases re-pointed after their subjects moved. 16 cases. |
 
 ## The OpenAPI document gets a producer and a guard again, 2026-09-03
 

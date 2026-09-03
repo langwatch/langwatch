@@ -9,6 +9,6 @@
   // The suite, plus the sources it exercises. `node:fs` compiles here and
   // nowhere else: the import-free guard has to read its subject off disk,
   // while the contract itself must stay loadable by a browser.
-  "include": ["src/**/*.ts", "src/__tests__/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/__tests__/**/*.ts"],
   "exclude": []
 }

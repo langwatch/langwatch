@@ -44,10 +44,10 @@ const require_ = createRequire(import.meta.url);
 export const VEGA_LITE_SCHEMA_SPECIFIER = "vega-lite/vega-lite-schema.json";
 
 export const GENERATED_VALIDATOR_PATH =
-  "src/model/visualization/vega-lite-schema-validator.generated.js";
+  "src/visualization/vega-lite-schema-validator.generated.js";
 
 export const GENERATED_VALIDATOR_TYPES_PATH =
-  "src/model/visualization/vega-lite-schema-validator.generated.d.ts";
+  "src/visualization/vega-lite-schema-validator.generated.d.ts";
 
 /**
  * The Ajv options the validator is compiled with. Exported so the drift guard

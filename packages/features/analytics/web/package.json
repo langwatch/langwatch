@@ -62,18 +62,9 @@
     "./testing": {
       "types": "./src/__tests__/lwql-fixtures.ts",
       "default": "./src/__tests__/lwql-fixtures.ts"
-    },
-    "./validation": {
-      "types": "./src/model/visualization/validation.ts",
-      "default": "./src/model/visualization/validation.ts"
-    },
-    "./visualization": {
-      "types": "./src/model/visualization/index.ts",
-      "default": "./src/model/visualization/index.ts"
     }
   },
   "scripts": {
-    "generate:vega-validator": "tsx scripts/generate-vega-lite-validator.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",

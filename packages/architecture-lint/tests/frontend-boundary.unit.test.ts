@@ -180,9 +180,7 @@ const browserModuleRoots = (): string[] => {
 const BROWSER_MODULE_ROOTS = browserModuleRoots();
 
 const bannedPackage = (specifier: string): string | undefined =>
-  BROWSER_ONLY_PACKAGES.find(
-    (name) => specifier === name || specifier.startsWith(`${name}/`),
-  );
+  BROWSER_ONLY_PACKAGES.find((name) => specifier === name || specifier.startsWith(`${name}/`));
 
 const bannedModule = (target: string | undefined): string | undefined =>
   target !== void 0 && BROWSER_MODULE_ROOTS.some((root) => target.startsWith(root))
@@ -266,8 +264,9 @@ describe("browser-only UI never reaches backend code", () => {
     it("roots the walk at the process entrypoints, the compositions and every server package", () => {
       expect(BACKEND_ROOTS).toContain(join(API_SRC, "api.main.ts"));
       expect(BACKEND_ROOTS).toContain(join(WORKER_SRC, "worker.entrypoint.ts"));
-      expect(BACKEND_ROOTS.filter((file) => file.endsWith(".composition.ts")).length).
-        toBeGreaterThan(50);
+      expect(
+        BACKEND_ROOTS.filter((file) => file.endsWith(".composition.ts")).length,
+      ).toBeGreaterThan(50);
       expect(SERVER_PACKAGE_ROOTS.length).toBeGreaterThan(30);
       expect(SERVER_PACKAGE_ROOTS).toContain(
         join(REPO_ROOT, "packages", "eventing", "src", "server"),
@@ -315,10 +314,7 @@ describe("browser-only UI never reaches backend code", () => {
     });
 
     it("leaves a .tsx that renders nothing alone, so the rule is not the extension", () => {
-      const noJsx = join(
-        REPO_ROOT,
-        "packages/features/trace/web/src/ui/elements/close-button.tsx",
-      );
+      const noJsx = join(REPO_ROOT, "packages/features/trace/web/src/ui/elements/close-button.tsx");
       expect(existsSync(noJsx)).toBe(true);
 
       expect(rendersJsx({ file: noJsx })).toBe(false);
@@ -329,23 +325,31 @@ describe("browser-only UI never reaches backend code", () => {
   // Both halves are pinned. Asserting only the exclusion passes just as
   // happily when the import is deleted — which is how the platform version of
   // this case quietly lost its subject.
-  describe("given a type-only import of a browser package's module", () => {
-    const server = join(
+  //
+  // The subject is a browser module rather than a backend one because no
+  // backend file names a browser type today, which is the guard's whole point:
+  // the two that did were moved rather than excused. What is pinned here is the
+  // WALKER — `moduleImports` sees the statement, `valueImports` refuses to
+  // count it — and that is what lets a backend file name a component's props
+  // without being reported the day one does.
+  describe("given a type-only import of a browser package", () => {
+    const module = join(
       REPO_ROOT,
-      "packages/features/dashboard/server/src/transport/api-trpc/saved-workbench-chart.transport-errors.ts",
+      "packages/features/annotation/web/src/model/annotation-form-types.ts",
     );
-    const specifier = "@langwatch/analytics-web/validation";
+    const specifier = "react";
 
     it("still makes that import, so the case has a subject", () => {
       expect(
-        moduleImports({ file: server }).filter((entry) => entry.specifier === specifier),
+        moduleImports({ file: module }).filter((entry) => entry.specifier === specifier),
       ).toHaveLength(1);
     });
 
     it("does not count it, because types are erased", () => {
-      expect(valueImports({ file: server }).map((entry) => entry.specifier)).not.toContain(
+      expect(valueImports({ file: module }).map((entry) => entry.specifier)).not.toContain(
         specifier,
       );
+      expect(chainFromFile({ file: module })).toBeUndefined();
     });
   });
 
@@ -446,13 +450,42 @@ describe("browser-only UI never reaches backend code", () => {
     });
 
     it("stops at that package and nowhere else", () => {
-      const workerTemplate = join(
+      // The sharpest subject used to be the worker's own react-email template,
+      // a twin of one this package already held. It is gone — moved here,
+      // which is what made the exception mean something — so the case asks the
+      // question of a file that renders React outside the package instead. A
+      // terminal that widened to "anything that renders mail" would take the
+      // guard's teeth with it, silently.
+      const outside = join(
         REPO_ROOT,
-        "apps/worker/src/features/automation/trigger-digest-mail.template.ts",
+        "packages/features/agent/web/src/features/management/ui/blocks/agent-card.tsx",
       );
-      expect(existsSync(workerTemplate)).toBe(true);
+      expect(existsSync(outside)).toBe(true);
 
-      expect(isMailTerminal({ file: workerTemplate })).toBe(false);
+      expect(isMailTerminal({ file: outside })).toBe(false);
+      expect(chainFromFile({ file: outside })).toBeDefined();
+    });
+
+    // An exception nothing exercises excuses nothing, and reads exactly like an
+    // exception that works. When this guard was rebuilt no backend root
+    // imported `@langwatch/mail` at all — mail left through ports and the two
+    // processes that rendered it wrote their own templates — so the terminal
+    // was inert and the twins it should have prevented already existed.
+    it("is reached by a real backend root, so the terminal is exercised", () => {
+      const composition = join(REPO_ROOT, "apps/worker/src/app/worker-mail.composition.ts");
+      expect(BACKEND_ROOTS).toContain(composition);
+      expect(valueImports({ file: composition }).map((entry) => entry.specifier)).toContain(
+        "@langwatch/mail",
+      );
+
+      const resolved = resolver.resolve({ specifier: "@langwatch/mail", file: composition });
+      expect(resolved).toBeDefined();
+      expect(isMailTerminal({ file: resolved! })).toBe(true);
+
+      // And the walk stops there: the composition reaches the package, the
+      // package renders React, and no chain is reported for either.
+      expect(chainFromFile({ file: composition })).toBeUndefined();
+      expect(chainFromFile({ file: join(WORKER_SRC, "worker.entrypoint.ts") })).toBeUndefined();
     });
   });
 });

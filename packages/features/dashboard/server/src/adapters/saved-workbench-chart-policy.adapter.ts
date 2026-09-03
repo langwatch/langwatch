@@ -13,7 +13,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   LWQL_QUERY_RESULT_DATASET,
   validateVegaLiteSpecStructure,
-} from "@langwatch/analytics-web/validation";
+} from "@langwatch/analytics-contract/visualization/validation";
 import {
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartDashboardNotFoundError,

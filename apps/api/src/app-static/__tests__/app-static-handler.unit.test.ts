@@ -6,7 +6,10 @@ import { join } from "path";
 import { Readable } from "stream";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { readPublicAppConfig, type PublicAppConfig } from "@langwatch/ui/public-config";
+import {
+  parsePublicAppConfigMetaContent,
+  type PublicAppConfig,
+} from "@langwatch/config/public-app-config";
 import { serveStaticOrFallback } from "../app-static.handler";
 
 const publicConfig: PublicAppConfig = {
@@ -20,24 +23,18 @@ const publicConfig: PublicAppConfig = {
   identityFrontDoor: false,
 };
 
-function rawRequest(
-  port: number,
-  rawPath: string,
-): Promise<{ status: number; body: string }> {
+function rawRequest(port: number, rawPath: string): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
-    const req = httpRequest(
-      { host: "127.0.0.1", port, method: "GET", path: rawPath },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (c: Buffer) => chunks.push(c));
-        res.on("end", () =>
-          resolve({
-            status: res.statusCode ?? 0,
-            body: Buffer.concat(chunks).toString("utf8"),
-          }),
-        );
-      },
-    );
+    const req = httpRequest({ host: "127.0.0.1", port, method: "GET", path: rawPath }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () =>
+        resolve({
+          status: res.statusCode ?? 0,
+          body: Buffer.concat(chunks).toString("utf8"),
+        }),
+      );
+    });
     req.on("error", reject);
     req.end();
   });
@@ -55,10 +52,7 @@ describe("serveStaticOrFallback", () => {
       join(clientDistDir, "assets", "index-abc123.js"),
       "console.log('hello from index-abc123');\n",
     );
-    writeFileSync(
-      join(clientDistDir, "assets", "main-deadbeef.css"),
-      "body { color: red; }\n",
-    );
+    writeFileSync(join(clientDistDir, "assets", "main-deadbeef.css"), "body { color: red; }\n");
     writeFileSync(
       join(clientDistDir, "index.html"),
       '<!doctype html><html><head><script type="module" ' +
@@ -97,9 +91,7 @@ describe("serveStaticOrFallback", () => {
       const res = await fetch(`${baseUrl}/assets/index-abc123.js`);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("application/javascript");
-      expect(res.headers.get("cache-control")).toBe(
-        "public, max-age=31536000, immutable",
-      );
+      expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
       expect(await res.text()).toContain("hello from index-abc123");
     });
 
@@ -107,9 +99,7 @@ describe("serveStaticOrFallback", () => {
       const res = await fetch(`${baseUrl}/assets/main-deadbeef.css`);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("text/css");
-      expect(res.headers.get("cache-control")).toBe(
-        "public, max-age=31536000, immutable",
-      );
+      expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     });
   });
 
@@ -161,12 +151,7 @@ describe("serveStaticOrFallback", () => {
       const content = body.match(
         /<meta name="langwatch-public-config" content="([A-Za-z0-9_-]+)">/,
       )?.[1];
-      expect(
-        readPublicAppConfig({
-          querySelector: () =>
-            content ? ({ getAttribute: () => content } as unknown as Element) : null,
-        }),
-      ).toEqual(publicConfig);
+      expect(parsePublicAppConfigMetaContent(content ?? "")).toEqual(publicConfig);
     });
 
     it("serves the SPA shell with a revalidate Cache-Control so reloads pick up new chunks", async () => {
@@ -219,9 +204,7 @@ describe("serveStaticOrFallback", () => {
       it("rewrites the entry ref to the CDN and points the resolver at it", async () => {
         const res = await fetch(`${baseUrl}/projects/foo/traces`);
         const body = await res.text();
-        expect(body).toContain(
-          'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
-        );
+        expect(body).toContain('src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"');
         expect(body).not.toContain('src="/assets/index-abc123.js"');
         expect(body).toContain("https://cdn.langwatch.ai/abc123/");
       });
@@ -230,9 +213,7 @@ describe("serveStaticOrFallback", () => {
         const res = await fetch(`${baseUrl}/index.html`);
         const body = await res.text();
         expect(res.headers.get("content-type")).toBe("text/html");
-        expect(body).toContain(
-          'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
-        );
+        expect(body).toContain('src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"');
       });
 
       it("rewrites the root path via the index.html fall-through", async () => {
@@ -241,9 +222,7 @@ describe("serveStaticOrFallback", () => {
         const res = await fetch(`${baseUrl}/`);
         const body = await res.text();
         expect(res.status).toBe(200);
-        expect(body).toContain(
-          'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
-        );
+        expect(body).toContain('src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"');
       });
     });
   });

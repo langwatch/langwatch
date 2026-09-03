@@ -13,7 +13,14 @@
     "noEmit": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    // No `.tsx` lives in this app, and none may. It is here because
+    // `@langwatch/mail` is resolved from source and its templates are JSX:
+    // react-email renders them server-side at send time, which is the one
+    // exception `frontend-boundary.unit.test.ts` grants a backend graph.
+    // Without this the worker cannot name the mail package at all, and the
+    // absence is what produced the `createElement` twins this replaced.
+    "jsx": "react-jsx"
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/__tests__/**"]

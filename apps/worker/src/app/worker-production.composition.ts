@@ -1301,6 +1301,7 @@ export class WorkerProductionComposition {
           mail: mail
             ? JoinRequestMailAdapter.create({
                 mailer: mail.delivery,
+                renderer: mail.renderer,
                 baseHost: mail.baseHost,
               })
             : AbsentJoinRequestMail.create(),

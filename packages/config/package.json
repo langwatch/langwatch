@@ -13,10 +13,18 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./public-app-config": {
+      "types": "./src/public-app-config.ts",
+      "default": "./src/public-app-config.ts"
+    },
+    "./public-app-config/projection": {
+      "types": "./src/public-app-config.projection.ts",
+      "default": "./src/public-app-config.projection.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
@@ -25,6 +33,7 @@
     "zod-validation-error": "^5.0.0"
   },
   "devDependencies": {
+    "@types/node": "^26.0.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

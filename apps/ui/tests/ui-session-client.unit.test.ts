@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createPublicAppConfigMetaTag } from "../src/behavior/public-config";
+import { createPublicAppConfigMetaTag } from "@langwatch/config/public-app-config";
 import { readUiDemoProjectSlug } from "../src/behavior/ui-session";
 import { readUiActor, toUiActor, UI_SESSION_PATH } from "../src/behavior/ui-session-client";
 

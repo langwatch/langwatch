@@ -43,7 +43,7 @@ import { analyticsApi } from "../../behavior/analytics-api";
 
 import { useLangWatchQLWidgetRun } from "../../behavior/use-langwatch-ql-widget-run";
 import { widgetCoarsenedNotice } from "../../model/widget-coarsened-notice";
-import type { LangWatchQLDatasetColumn } from "../../model/visualization";
+import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
 
 import { LazyLangWatchQLWidgetChart } from "./lazy-langwatch-ql-widget-chart";
 

@@ -4,10 +4,13 @@ import { readFileSync } from "fs";
 import path from "path";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
 import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
-import { injectPublicAppConfigIntoHtml, type PublicAppConfig } from "./src/behavior/public-config";
+import {
+  injectPublicAppConfigIntoHtml,
+  type PublicAppConfig,
+} from "@langwatch/config/public-app-config";
 // The resolver reads the server environment, so it deliberately lives on the
 // projection module rather than being re-exported to browser code.
-import { resolveUiPublicBootstrap } from "./src/behavior/public-config.projection";
+import { resolveUiPublicBootstrap } from "@langwatch/config/public-app-config/projection";
 import { UI_ASSET_URL_GLOBAL } from "./src/model/ui-asset-base";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";

@@ -46,8 +46,8 @@
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/analytics-server": "workspace:*",
     "@langwatch/api-key-server": "workspace:*",
-    "@langwatch/authz-server": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authz-server": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/automation-server": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
@@ -88,6 +88,7 @@
     "@langwatch/langy-server": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/log-server": "workspace:*",
+    "@langwatch/mail": "workspace:*",
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/metric-server": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
@@ -116,20 +117,16 @@
     "@langwatch/trace-server": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-server": "workspace:*",
-    "@react-email/components": "^1.0.12",
-    "@react-email/render": "^2.0.9",
     "@slack/webhook": "^7.1.0",
     "ioredis": "5.10.1",
     "nanoid": "^6.0.0",
     "node-fetch-cache": "^5.1.0",
     "posthog-node": "^5.39.4",
-    "react": "^19.2.7",
     "tiktoken": "^1.0.22",
     "tsx": "^4.20.6",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/react": "^19.2.17",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

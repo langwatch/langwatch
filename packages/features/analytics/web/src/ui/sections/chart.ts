@@ -15,4 +15,4 @@ export * from "../../behavior/use-langwatch-ql-vega-view";
 export type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
-} from "../../model/visualization/visualization-types";
+} from "@langwatch/analytics-contract/visualization";

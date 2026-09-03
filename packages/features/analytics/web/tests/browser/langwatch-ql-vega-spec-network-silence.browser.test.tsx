@@ -34,8 +34,11 @@ vi.mock("@monaco-editor/react", () => {
 });
 
 import { LangWatchQLVegaLiteChart } from "../../ui/sections/themed-langwatch-ql-vega-lite-chart";
-import { validateVegaLiteSpec } from "../../model/visualization/validation";
-import type { LangWatchQLDataset, LangWatchQLDatasetColumn } from "../../model/visualization";
+import { validateVegaLiteSpec } from "@langwatch/analytics-contract/visualization/validation";
+import type {
+  LangWatchQLDataset,
+  LangWatchQLDatasetColumn,
+} from "@langwatch/analytics-contract/visualization";
 
 import {
   ADVERSARIAL_VEGA_FIXTURES,

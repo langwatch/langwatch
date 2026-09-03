@@ -85,6 +85,7 @@ export function tryCreateWorkerAutomationDelivery(options: {
   return {
     delivery: WorkerAutomationNotificationDeliveryAdapter.create({
       mailer: mail.delivery,
+      renderer: mail.renderer,
       baseHost: mail.baseHost,
       ...(config.mail.unsubscribeSigningSecret === undefined
         ? {}

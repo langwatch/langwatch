@@ -13,20 +13,37 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./visualization": {
+      "types": "./src/visualization/index.ts",
+      "default": "./src/visualization/index.ts"
+    },
+    "./visualization/validation": {
+      "types": "./src/visualization/validation.ts",
+      "default": "./src/visualization/validation.ts"
+    },
+    "./testing": {
+      "types": "./src/visualization/__tests__/fixtures/index.ts",
+      "default": "./src/visualization/__tests__/fixtures/index.ts"
     }
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
+    "generate:vega-validator": "tsx scripts/generate-vega-lite-validator.ts",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26",
+    "tsx": "^4.20.6",
     "typescript": "^7.0.2",
+    "vega": "6.3.1",
+    "vega-lite": "6.4.3",
     "vitest": "^4.1.9"
   }
 }

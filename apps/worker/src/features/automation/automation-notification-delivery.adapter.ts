@@ -15,10 +15,10 @@ import {
   type WebhookSendResult,
 } from "@langwatch/automation-server";
 import { toDispatchError } from "@langwatch/eventing";
+import type { MailRenderPort } from "@langwatch/mail";
 import type { TraceRecord } from "@langwatch/trace-contract";
 import type { EmailDeliveryPort } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { renderTriggerDigestEmail } from "./trigger-digest-mail.template";
 import { WorkerSlackWebhookClientAdapter } from "./slack-webhook.client.adapter";
 import { WorkerSlackWebApiTransportAdapter } from "./slack-web-api.transport.adapter";
 
@@ -62,6 +62,11 @@ type SettlementDigestEntry = {
 export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotificationDeliveryPort {
   static create(options: {
     mailer: EmailDeliveryPort;
+    /**
+     * Renders the default digest. `@langwatch/mail` holds the words; this
+     * adapter holds the envelope they leave in.
+     */
+    renderer: MailRenderPort;
     /** The deployment's own origin; every unsubscribe link is built from it. */
     baseHost: string;
     /** `NEXTAUTH_SECRET`, as the application spells it. */
@@ -77,6 +82,7 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
 
     return new WorkerAutomationNotificationDeliveryAdapter(
       options.mailer,
+      options.renderer,
       options.baseHost,
       UnsubscribeTokenService.create({ secret: options.unsubscribeSigningSecret }),
       TriggerNoReplyService.create({
@@ -98,6 +104,7 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
 
   private constructor(
     private readonly mailer: EmailDeliveryPort,
+    private readonly renderer: MailRenderPort,
     private readonly baseHost: string,
     private readonly unsubscribeTokens: UnsubscribeTokenService,
     private readonly noReply: TriggerNoReplyService,
@@ -133,7 +140,7 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
   }): Promise<void> {
     let html: string;
     try {
-      html = await renderTriggerDigestEmail({
+      html = await this.renderer.renderTriggerDigest({
         triggerName: input.triggerName,
         triggerType: input.triggerType,
         triggerMessage: input.triggerMessage,

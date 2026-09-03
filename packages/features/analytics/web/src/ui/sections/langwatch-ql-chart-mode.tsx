@@ -22,23 +22,23 @@
 import { Badge, Box, Button, HStack, Stack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef } from "react";
 
-import { LWQL_QUERY_RESULT_DATASET } from "../../model/visualization/lwql-dataset-names";
-import { starterVegaLiteSpecText } from "../../model/visualization/starter-vega-lite-spec";
+import { LWQL_QUERY_RESULT_DATASET } from "@langwatch/analytics-contract/visualization";
+import { starterVegaLiteSpecText } from "@langwatch/analytics-contract/visualization";
 import {
   parseVegaLiteSpecText,
   validateVegaLiteSpec,
-} from "../../model/visualization/validate-vega-lite-spec";
-import { isPlainObject } from "../../model/visualization/vega-lite-structure";
-import { ALLOWED_VEGA_LITE_TRANSFORMS } from "../../model/visualization/vega-lite-policy";
+} from "@langwatch/analytics-contract/visualization/validation";
+import { isPlainObject } from "@langwatch/analytics-contract/visualization";
+import { ALLOWED_VEGA_LITE_TRANSFORMS } from "@langwatch/analytics-contract/visualization";
 import type {
   LangWatchQLDatasetColumn,
   VegaLiteValidationResult,
   VegaValidationError,
-} from "../../model/visualization/visualization-types";
+} from "@langwatch/analytics-contract/visualization";
 import type {
   LangWatchQLVegaColorMode,
   LangWatchQLVegaConfig,
-} from "../../model/visualization/langwatch-vega-config";
+} from "@langwatch/analytics-contract/visualization";
 
 import { LangWatchQLChartFailure } from "../elements/langwatch-ql-chart-failure";
 import { LangWatchQLVegaLiteChart } from "./langwatch-ql-vega-lite-chart";

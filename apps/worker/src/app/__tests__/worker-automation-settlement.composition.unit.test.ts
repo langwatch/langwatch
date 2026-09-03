@@ -5,6 +5,7 @@ import {
   AutomationEmailCapService,
   AutomationTraceRecordUnavailableError,
 } from "@langwatch/automation-server";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { WorkerAutomationNotificationDeliveryAdapter } from "../../features/automation/automation-notification-delivery.adapter";
 import {
   createWorkerAutomationSettlement,
@@ -206,6 +207,7 @@ function tryDelivery(config: ReturnType<typeof resolveWorkerConfig>, wanted: boo
     baseHost: ENVIRONMENT.BASE_HOST,
     delivery: WorkerAutomationNotificationDeliveryAdapter.create({
       mailer: new RecordingMailer() as never,
+      renderer: ReactEmailMailRenderer.create(),
       baseHost: ENVIRONMENT.BASE_HOST,
       ...(config.mail?.unsubscribeSigningSecret === undefined
         ? {}
@@ -245,10 +247,7 @@ type BuiltDefinition = {
       config: {
         eventTypes: readonly string[];
         schedule?: { everyMs: number };
-        intents: Record<
-          string,
-          { run: (payload: never, context: never) => Promise<void> | void }
-        >;
+        intents: Record<string, { run: (payload: never, context: never) => Promise<void> | void }>;
       };
     }
   >;
@@ -339,9 +338,7 @@ describe("given the automations pipeline this process composes for itself", () =
       // per-trace claim that stops a redelivered window notifying twice.
       expect(RECORDED.claims).toHaveLength(2);
       expect(RECORDED.claims.map((claim) => claim.traceId)).toContain("trace-1");
-      expect(
-        RECORDED.claims.filter((claim) => claim.traceId !== "trace-1"),
-      ).toHaveLength(1);
+      expect(RECORDED.claims.filter((claim) => claim.traceId !== "trace-1")).toHaveLength(1);
       expect(
         RECORDED.claims.every(
           (claim) => claim.triggerId === "trigger-1" && claim.projectId === "project-1",

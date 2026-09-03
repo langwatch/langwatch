@@ -97,21 +97,25 @@ export const sendJoinRequestArrivedEmail = async ({
   });
 };
 
-/** The one nudge, on the seventh day. */
-export const sendJoinRequestReminderEmail = async ({
-  mailer,
-  adminEmail,
+/**
+ * The one nudge, on the seventh day — rendered only.
+ *
+ * Separated from the send because a process that owns its own envelope still
+ * has to send exactly these words. The worker holds the mail gateway and the
+ * deployment's host; what it must not hold is a second copy of the message,
+ * which is what put react-email on its boot graph and let two admins on one
+ * organization receive two differently-worded reminders.
+ */
+export const renderJoinRequestReminderEmail = ({
   organizationName,
   requesterName,
   membersSettingsUrl,
 }: {
-  mailer: EmailDeliveryPort;
-  adminEmail: string;
   organizationName: string;
   requesterName: string;
   membersSettingsUrl: string;
-}) => {
-  const html = await render(
+}): Promise<string> =>
+  render(
     shell({
       heading: "A request to join is still waiting",
       children: (
@@ -126,11 +130,40 @@ export const sendJoinRequestReminderEmail = async ({
       ),
     }),
   );
+
+/** The subject the reminder carries, wherever it is sent from. */
+export const joinRequestReminderSubject = ({
+  organizationName,
+  requesterName,
+}: {
+  organizationName: string;
+  requesterName: string;
+}): string => `${requesterName} is still waiting to join ${organizationName}`;
+
+/** The one nudge, on the seventh day. */
+export const sendJoinRequestReminderEmail = async ({
+  mailer,
+  adminEmail,
+  organizationName,
+  requesterName,
+  membersSettingsUrl,
+}: {
+  mailer: EmailDeliveryPort;
+  adminEmail: string;
+  organizationName: string;
+  requesterName: string;
+  membersSettingsUrl: string;
+}) => {
+  const html = await renderJoinRequestReminderEmail({
+    organizationName,
+    requesterName,
+    membersSettingsUrl,
+  });
   await sendEmail({
     mailer,
     content: {
       to: adminEmail,
-      subject: `${requesterName} is still waiting to join ${organizationName}`,
+      subject: joinRequestReminderSubject({ organizationName, requesterName }),
       html,
     },
   });
@@ -206,17 +239,16 @@ export const sendJoinRequestRejectedEmail = async ({
   });
 };
 
-/** Nobody answered in time. Sent to the requester, who may ask again. */
-export const sendJoinRequestExpiredEmail = async ({
-  mailer,
-  requesterEmail,
+/**
+ * Nobody answered in time — rendered only. See the reminder above for why the
+ * render and the send are separate.
+ */
+export const renderJoinRequestExpiredEmail = ({
   organizationName,
 }: {
-  mailer: EmailDeliveryPort;
-  requesterEmail: string;
   organizationName: string;
-}) => {
-  const html = await render(
+}): Promise<string> =>
+  render(
     shell({
       heading: "Your request lapsed",
       children: (
@@ -230,11 +262,30 @@ export const sendJoinRequestExpiredEmail = async ({
       ),
     }),
   );
+
+/** The subject the lapse notice carries, wherever it is sent from. */
+export const joinRequestExpiredSubject = ({
+  organizationName,
+}: {
+  organizationName: string;
+}): string => `Your request to join ${organizationName} lapsed`;
+
+/** Nobody answered in time. Sent to the requester, who may ask again. */
+export const sendJoinRequestExpiredEmail = async ({
+  mailer,
+  requesterEmail,
+  organizationName,
+}: {
+  mailer: EmailDeliveryPort;
+  requesterEmail: string;
+  organizationName: string;
+}) => {
+  const html = await renderJoinRequestExpiredEmail({ organizationName });
   await sendEmail({
     mailer,
     content: {
       to: requesterEmail,
-      subject: `Your request to join ${organizationName} lapsed`,
+      subject: joinRequestExpiredSubject({ organizationName }),
       html,
     },
   });

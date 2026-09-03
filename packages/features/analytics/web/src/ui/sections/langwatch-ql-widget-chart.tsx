@@ -25,8 +25,8 @@ import { useMemo } from "react";
 import {
   type LangWatchQLDatasetColumn,
   LWQL_QUERY_RESULT_DATASET,
-  starterVegaLiteSpec,
-} from "../../model/visualization";
+} from "@langwatch/analytics-contract/visualization";
+import { starterVegaLiteSpec } from "@langwatch/analytics-contract/visualization";
 
 import { ThemedLangWatchQLVegaLiteChart } from "./themed-langwatch-ql-vega-lite-chart";
 

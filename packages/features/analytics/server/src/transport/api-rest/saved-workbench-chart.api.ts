@@ -60,7 +60,7 @@ type LangWatchQLApp = SecuredApp<{ Variables: AppRestProjectVariables }>;
  * it is the largest specification the policy admits, so a definition this
  * route accepts is one the policy can still judge.
  *
- * @see packages/features/analytics/web/src/model/visualization/vega-lite-policy.ts
+ * @see packages/features/analytics/contract/src/visualization/vega-lite-policy.ts
  */
 const MAX_VEGA_SPEC_BYTES = 262_144;
 

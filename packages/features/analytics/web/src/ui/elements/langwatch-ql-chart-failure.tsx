@@ -17,7 +17,7 @@ import { Badge, Box, Stack, Text, VStack } from "@chakra-ui/react";
 import type {
   VegaValidationError,
   VegaValidationErrorCode,
-} from "../../model/visualization/visualization-types";
+} from "@langwatch/analytics-contract/visualization";
 
 interface FailureCopy {
   /** What happened, in the member's terms. */

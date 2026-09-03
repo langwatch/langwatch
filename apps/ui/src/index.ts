@@ -151,25 +151,13 @@ export {
 } from "./ui/sections/ui-outer-providers";
 export { createUiRouteObjects, type UiRouteObjectsOptions } from "./ui/sections/ui-route-objects";
 export { createUiRootLayout, type UiRootLayoutInstall } from "./ui/sections/ui-root-layout";
+// The contract itself, the meta tag that carries it and the deployment
+// projection that builds it are `@langwatch/config/public-app-config` and its
+// `/projection` subpath: the API writes the tag and this application reads it,
+// so the shared half cannot live in a browser application. What is left here
+// is the read.
 export {
-  createPublicAppConfigMetaTag,
-  injectPublicAppConfigIntoHtml,
-  PUBLIC_APP_CONFIG_META_NAME,
-  publicAppConfigSchema,
   readPublicAppConfig,
-  type PublicAppConfig,
   type PublicEnvironment,
   toPublicEnvironment,
 } from "./behavior/public-config";
-// The deployment projection, kept off the browser reader's graph on purpose —
-// it declares the names of the deployment's secret variables at module scope.
-// Server code should prefer `@langwatch/ui/public-config/projection`, which
-// reaches it without pulling the root barrel.
-export {
-  LOCAL_GATEWAY_URL,
-  resolveGatewayBaseUrl,
-  resolveUiPublicBootstrap,
-  SAAS_GATEWAY_URL,
-  type GatewayBaseUrlSource,
-  type UiPublicBootstrap,
-} from "./behavior/public-config.projection";

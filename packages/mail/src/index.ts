@@ -18,14 +18,16 @@
  *    reads an environment variable, so a credential is stable for the lifetime
  *    of the process that composed it.
  *
- * The trace-settlement digest did NOT come here: the worker renders it
- * beside the transports that send it
- * (`apps/worker/src/features/automation/trigger-digest-mail.template.ts`),
+ * The trace-settlement digest IS here now, and the reason it was not is the
+ * reason the split below exists. It lived beside the transports that send it
  * because the footer, the no-reply `To` and the BCC fan-out are one envelope
- * decision with the unsubscribe token that signs it. The usage-limit,
- * automation-limit and licence messages ARE here: each is a rendered message
- * with no transport of its own, and the vertical that decides when to send it
- * holds only a port.
+ * decision with the unsubscribe token that signs it — but rendering it there
+ * put react-email, and so React, on the worker's boot graph, next to a twin of
+ * the join-request mails this package already held. `MailRenderPort` keeps the
+ * envelope where it belongs and moves only the words: this package renders,
+ * the process sends. The usage-limit, automation-limit and licence messages
+ * are whole sends, because each has no transport decision of its own and the
+ * vertical that decides when to send one holds only a port.
  */
 export {
   EmailDeliveryPort,
@@ -45,18 +47,25 @@ export {
   type SesAwsClientConfiguration,
 } from "./providers/ses";
 export { SendgridEmailProvider } from "./providers/sendgrid";
-export {
-  buildSmtpTransportOptions,
-  isSmtpConfigured,
-  SmtpEmailProvider,
-} from "./providers/smtp";
+export { buildSmtpTransportOptions, isSmtpConfigured, SmtpEmailProvider } from "./providers/smtp";
 export { ResendEmailProvider } from "./providers/resend";
 export { computeDefaultFrom, sendEmail } from "./email-sender";
+export { MailRenderPort } from "./ports/mail-render.port";
+export { ReactEmailMailRenderer } from "./adapters/react-email.render.adapter";
+export {
+  renderTriggerDigestEmail,
+  type TriggerDigestEntry,
+  type TriggerDigestMail,
+} from "./templates/trigger-digest-email";
 export { sendBudgetIncreaseRequestEmail } from "./templates/budget-increase-request-email";
 export type { SendBudgetIncreaseRequestEmailInput } from "./templates/budget-increase-request-email";
 export { sendInviteEmail } from "./templates/invite-email";
 export { sendInviteReRequestEmail } from "./templates/invite-re-request-email";
 export {
+  joinRequestExpiredSubject,
+  joinRequestReminderSubject,
+  renderJoinRequestExpiredEmail,
+  renderJoinRequestReminderEmail,
   sendDomainAutoJoinedEmail,
   sendJoinRequestApprovedEmail,
   sendJoinRequestArrivedEmail,

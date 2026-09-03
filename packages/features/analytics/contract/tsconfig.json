@@ -3,7 +3,13 @@
     "incremental": true,
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/analytics-contract.tsbuildinfo",
     "target": "es2022",
-    "lib": ["es2022"],
+    // `dom` for the WHATWG globals a browser-loaded contract may name — the
+    // spec-size measurement encodes with `TextEncoder`, which every runtime
+    // this package loads in has and only `lib.dom` declares. It is NOT licence
+    // to touch the document: `visualization/__tests__/module-purity` runs every
+    // entry point under plain node with no `window` and no `document`, so a
+    // module that reached for one would fail before a single assertion ran.
+    "lib": ["es2022", "dom"],
     "module": "preserve",
     "moduleResolution": "bundler",
     "strict": true,
@@ -20,5 +26,5 @@
     "types": ["vitest/globals"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/__tests__/**"]
+  "exclude": ["src/**/__tests__/**"]
 }

@@ -12,24 +12,24 @@
 
 import { useMemo, type RefObject } from "react";
 
-import { referencedDatasetNames } from "../model/visualization/build-langwatch-ql-vega-spec";
-import { lwqlEmptyEncodingFailure } from "../model/visualization/lwql-chart-failures";
+import { referencedDatasetNames } from "@langwatch/analytics-contract/visualization";
+import { lwqlEmptyEncodingFailure } from "@langwatch/analytics-contract/visualization";
 import {
   encodedFieldsByDataset,
   scanLangWatchQLChartValues,
-} from "../model/visualization/scan-langwatch-ql-chart-values";
-import { validateVegaLiteSpec } from "../model/visualization/validate-vega-lite-spec";
+} from "@langwatch/analytics-contract/visualization";
+import { validateVegaLiteSpec } from "@langwatch/analytics-contract/visualization/validation";
 import type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
   VegaLiteValidationResult,
   VegaValidationError,
   VegaValidationWarning,
-} from "../model/visualization/visualization-types";
+} from "@langwatch/analytics-contract/visualization";
 import type {
   LangWatchQLVegaColorMode,
   LangWatchQLVegaConfig,
-} from "../model/visualization/langwatch-vega-config";
+} from "@langwatch/analytics-contract/visualization";
 import {
   type LangWatchQLVegaViewState,
   useLangWatchQLVegaView,

@@ -47,7 +47,7 @@ import embed from "vega-embed";
 
 import { LangWatchQLChartMode } from "../../ui/sections/themed-langwatch-ql-chart-mode";
 import { lwqlVegaEmbedOptions, type LangWatchQLDatasetColumn } from "../../src/ui/sections/chart";
-import { buildLangWatchQLVegaSpec } from "../../model/visualization";
+import { buildLangWatchQLVegaSpec } from "@langwatch/analytics-contract/visualization";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
   { name: "evaluator_name", type: "String" },
