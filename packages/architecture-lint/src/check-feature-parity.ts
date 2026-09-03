@@ -950,13 +950,27 @@ export function findScenarioAnnotations(
  * `tester.run(name, rule, { valid, invalid })`, with `RuleTester.it = it`
  * underneath, so that call is the test call for a fixture suite.
  */
-function isFollowedByTestCall(src: string, start: number): boolean {
+export function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
   let i = start;
   while (i < len) {
     const ch = src[i];
     if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
       i++;
+      continue;
+    }
+    // The annotation may sit on any line of a JSDoc block, not only its last.
+    // What follows it is then the rest of that block: ` *` continuation lines
+    // and the ` */` closer. Both are comment, not code, so the scan steps over
+    // them the same way it steps over a fresh comment below.
+    if (ch === "*" && src[i + 1] === "/") {
+      i += 2;
+      continue;
+    }
+    if (ch === "*") {
+      const nl = src.indexOf("\n", i);
+      if (nl === -1) return false;
+      i = nl + 1;
       continue;
     }
     if (ch === "/" && src[i + 1] === "*") {

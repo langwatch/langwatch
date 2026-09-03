@@ -27,6 +27,7 @@ import {
   collectGoBindings,
   discoverFeatureFiles,
   findScenarioAnnotations,
+  isFollowedByTestCall,
   formatFailureBanner,
   formatUnknownAnnotations,
   isEntryModule,
@@ -530,6 +531,54 @@ describe("formatUnknownAnnotations", () => {
       expect(text).toContain("line 10");
       expect(text).toContain("✗ @scenario Second");
       expect(text).toContain("line 42");
+    });
+  });
+});
+
+describe("isFollowedByTestCall", () => {
+  const afterAnnotation = (src: string): boolean => {
+    const [annotation] = findScenarioAnnotations(src);
+    if (!annotation) throw new Error("fixture has no annotation");
+    return isFollowedByTestCall(src, annotation.end);
+  };
+
+  describe("given the annotation sits inside a JSDoc that continues after it", () => {
+    /** @scenario "An annotation followed by more of its own JSDoc still binds the test below" */
+    it("steps over the continuation lines and the closer to the test call", () => {
+      const src = [
+        "    /**",
+        '     * @scenario "Inside a block"',
+        "     *",
+        "     * Two lines of prose explaining why this test exists.",
+        "     */",
+        '    it("does the thing", () => {});',
+      ].join("\n");
+
+      expect(afterAnnotation(src)).toBe(true);
+    });
+  });
+
+  describe("given the annotation is on the closing line", () => {
+    /** @scenario "An annotation on the closing line still binds" */
+    it("binds exactly as before", () => {
+      const src = ['/** @scenario "One line" */', 'it("does the thing", () => {});'].join("\n");
+
+      expect(afterAnnotation(src)).toBe(true);
+    });
+  });
+
+  describe("given a statement that is not a test call follows the comment", () => {
+    /** @scenario "Prose after the comment does not bind" */
+    it("binds nothing", () => {
+      const src = [
+        "    /**",
+        '     * @scenario "Inside a block"',
+        "     */",
+        "    const fixture = 1;",
+        '    it("does the thing", () => {});',
+      ].join("\n");
+
+      expect(afterAnnotation(src)).toBe(false);
     });
   });
 });
