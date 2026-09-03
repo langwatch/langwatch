@@ -19,7 +19,11 @@ import type {
 import crypto from "crypto";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import {
+  createServiceApp,
+  internalSecret,
+  publicEndpoint,
+} from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { sendCanary } from "~/server/health-probes/canary.service";
 import { runScenarioHealthCanary } from "~/server/health-probes/scenario-canary.service";
@@ -545,7 +549,12 @@ secured
 //
 // @see specs/scenarios/scenario-canary-healthcheck.feature
 secured
-  .access(publicEndpoint("scenario canary health probe"))
+  .access(
+    internalSecret(
+      "scenario canary health probe — CRON_API_KEY shared secret checked " +
+        "in-handler via validateInternalSecret before any run is queued",
+    ),
+  )
   .get("/scenarios", async (c) => {
     if (!c.req.header("authorization")) {
       return c.json(

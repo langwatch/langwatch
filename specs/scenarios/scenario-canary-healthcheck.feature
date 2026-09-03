@@ -13,15 +13,28 @@ Feature: A scenario canary health check that fires a real run and says what brok
   verdict came back — no results, an error on results, or a missing verdict).
   A first unhealthy outcome is retried exactly once, because a single LLM run
   is noisy; total wall time stays under 120s inclusive of that retry, with each
-  attempt capped at 55s. On a timeout the run itself is left alone — there is no
-  cancel command, and the stall watchdog already reaps a stuck run to terminal
-  ERROR, so nothing is orphaned by walking away from it.
+  attempt capped at 55s. The 120s is a real deadline, not a hope: it is threaded
+  into every attempt and the retry is abandoned once the budget is spent, so
+  unbounded launch or database latency cannot run past it, and a boundary await
+  that never returns (a wedged datastore, a hung launch) is bounded by a real
+  timer so it reports `timeout` rather than wedging the probe busy-forever. On a
+  timeout the run itself is left alone — there is no cancel command, and the
+  stall watchdog already reaps a stuck run to terminal ERROR, so nothing is
+  orphaned by walking away from it.
+
+  A run that cannot even be launched — the launcher throws, or the server-side
+  canary config is missing or names a target type outside the simulation-target
+  union — is `run_failed`, reported inside the same 200/503/429 contract rather
+  than escaping as a raw 500. The config is validated up front, before any run
+  is queued.
 
   Auth is the shared `CRON_API_KEY` secret (`validateInternalSecret`), checked
   before any run is queued: a status-page poller has no user session and no
-  project API key, only this one shared secret. A second request arriving while
-  a canary is already running starts no second LLM run — it is told the probe
-  is busy.
+  project API key, only this one shared secret. The route is declared as an
+  internal-secret endpoint, so the generated OpenAPI spec never advertises this
+  LLM-spend endpoint as needing no auth. A second request arriving while a
+  canary is already running starts no second LLM run — it is told the probe is
+  busy.
 
   # Bindings:
   #   platform/app/src/server/health-probes/scenario-canary.service.ts
@@ -120,3 +133,37 @@ Feature: A scenario canary health check that fires a real run and says what brok
     When the scenario canary endpoint is called
     Then the run is queued against the configured canary project id
     And that project id is never taken from the caller's request
+
+  @unit
+  Scenario: The probe abandons the retry once the total budget is spent
+    Given a first attempt whose launch latency spends the whole 120s budget
+    When the probe runs the canary
+    Then the outcome is unhealthy with reason "timeout"
+    And no second run is queued
+    And the probe returns within the 120 second total budget
+
+  @unit
+  Scenario: A wedged datastore times out and releases the in-flight lock
+    Given a boundary read that never returns
+    When the probe runs the canary
+    Then the probe returns unhealthy with reason "timeout" rather than hanging
+    And the in-flight lock is released so the next call is not told the probe is busy
+
+  @unit
+  Scenario: A launch-time failure is reported as unhealthy run_failed, not a raw error
+    Given the launcher throws before a run is queued
+    When the probe runs the canary
+    Then the outcome is unhealthy with reason "run_failed"
+    And no raw error escapes the documented contract
+
+  @unit
+  Scenario: A misconfigured canary reports unhealthy without launching a run
+    Given a canary config value is missing or names an unknown target type
+    When the config is validated
+    Then the config is rejected before any run is launched
+
+  @integration
+  Scenario: The scenario canary route is declared internal-secret, never public
+    Given the scenario canary route gates in-handler on the internal secret
+    When its registered access policy is read
+    Then the policy is declared internal-secret, not a public endpoint

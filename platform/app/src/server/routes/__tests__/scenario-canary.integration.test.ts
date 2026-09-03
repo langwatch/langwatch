@@ -53,6 +53,25 @@ describe("GET /api/health/scenarios", () => {
     return mod.app;
   }
 
+  describe("access policy declaration", () => {
+    /** @scenario "The scenario canary route is declared internal-secret, never public" */
+    it("declares the scenario canary route as internalSecret so the OpenAPI spec never advertises this LLM-spend endpoint as unauthenticated", async () => {
+      // The handler gates in-handler on validateInternalSecret, so its declared
+      // access policy must be `internal`. A `public` declaration would document
+      // a real-run, LLM-spend endpoint as needing no auth. Registering the app
+      // populates the process-wide route registry as a side effect.
+      await import("../health-checks");
+      const { getRoutePolicy } = await import(
+        "~/server/api/security/route-registry"
+      );
+
+      const registered = getRoutePolicy("GET", "/api/health/scenarios");
+
+      expect(registered?.policy.kind).toBe("internal");
+      expect(registered?.policy.kind).not.toBe("public");
+    });
+  });
+
   describe("given the request carries no Authorization header", () => {
     /** @scenario "A request with no auth secret is refused before any run is queued" */
     it("responds 401", async () => {

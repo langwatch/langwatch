@@ -11,13 +11,22 @@
  *  - {@link classifyCanaryOutcome} is the pure status+verdict → healthy/reason
  *    mapper.
  *  - {@link runScenarioCanary} is the orchestrator: queue → poll to terminal
- *    (or per-attempt timeout) → classify → retry once on an unhealthy first
- *    outcome, all bounded by a total wall-time budget. It reads its queue/poll
- *    boundary and its clock from injected {@link ScenarioCanaryDeps}.
+ *    (or per-attempt / total-budget deadline) → classify → retry once on an
+ *    unhealthy first outcome, all bounded by a real total wall-time budget. It
+ *    reads its queue/poll boundary and its clock from injected
+ *    {@link ScenarioCanaryDeps}.
  *  - {@link createSingleFlightScenarioCanary} wraps the orchestrator so a
  *    second call while one is in flight starts no second run.
  *  - {@link runScenarioHealthCanary} is the production entrypoint the route
- *    crosses: it builds the real deps and drives the single-flight guard.
+ *    crosses: it validates the server-side config, builds the real deps and
+ *    drives the single-flight guard.
+ *
+ * Two failure modes the injected clock alone cannot bound are handled with a
+ * real timer instead: a boundary await (`queueRun` / `getScenarioRunData`) that
+ * never returns is raced against a wall-clock deadline so a wedged datastore
+ * reports `timeout` rather than hanging the probe forever, and the total budget
+ * is a real deadline threaded into every attempt so unbounded launch/DB latency
+ * cannot run past it.
  *
  * On a timeout the in-flight run is left alone — there is deliberately no
  * cancel command in {@link ScenarioCanaryDeps}. The execution stall watchdog
@@ -39,7 +48,10 @@ import {
 } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
 import type { RunActor } from "~/server/scenarios/run-actor";
-import type { SimulationTarget } from "~/server/scenarios/simulation-target";
+import {
+  simulationTargetSchema,
+  type SimulationTarget,
+} from "~/server/scenarios/simulation-target";
 
 const logger = createLogger("langwatch:scenario-canary");
 
@@ -76,6 +88,19 @@ export interface ScenarioRunSnapshot {
 }
 
 /**
+ * Races `work` against a wall-clock deadline of `ms`, resolving to `timedOut`
+ * when the deadline fires before `work` settles. This is the one guard that
+ * does NOT run on the injected logical clock: a wedged boundary await never
+ * yields control back to the poll loop, so only a real timer can bound it. The
+ * production implementation ({@link raceAgainstRealDeadline}) uses `setTimeout`;
+ * the unit tests drive it with vitest fake timers.
+ */
+export type DeadlineRace = <T>(
+  ms: number,
+  work: Promise<T>,
+) => Promise<{ timedOut: true } | { value: T }>;
+
+/**
  * The queue/poll boundary and the clock the orchestrator drives, injected so
  * the whole retry/budget/single-flight logic runs against a fake clock in the
  * unit tests with no network and no real waiting.
@@ -94,7 +119,33 @@ export interface ScenarioCanaryDeps {
   now: () => number;
   /** Waits `ms`, advancing a fake clock in tests instead of blocking. */
   sleep: (ms: number) => Promise<void>;
+  /**
+   * Bounds a single boundary await against a real deadline. Optional: defaults
+   * to {@link raceAgainstRealDeadline}. Injected only by tests that need to
+   * drive the wedged-datastore path deterministically.
+   */
+  raceDeadline?: DeadlineRace;
 }
+
+/**
+ * Production {@link DeadlineRace}: a real `setTimeout` the injected logical
+ * clock cannot influence, so a boundary await that never returns is abandoned
+ * after `ms` real milliseconds rather than hanging the probe. When `work` wins
+ * the timer is cleared, so a fast boundary adds no real waiting. The abandoned
+ * run is left to terminate on its own (no cancel); a late rejection from it is
+ * swallowed so it never surfaces as an unhandled rejection.
+ */
+export const raceAgainstRealDeadline: DeadlineRace = (ms, work) => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<{ timedOut: true }>((resolve) => {
+    timer = setTimeout(() => resolve({ timedOut: true }), ms);
+  });
+  const settled = work.then((value) => ({ value }));
+  // Handle a late rejection of the abandoned work if the deadline won the race,
+  // so it never surfaces as an unhandled rejection.
+  void settled.catch(() => undefined);
+  return Promise.race([settled, timeout]).finally(() => clearTimeout(timer));
+};
 
 /**
  * Maps a terminal run's status and judge results onto healthy, or one of the
@@ -123,43 +174,76 @@ export function classifyCanaryOutcome({
 }
 
 /**
- * One attempt: queue a run, then poll to a terminal status or the per-attempt
- * budget, whichever comes first. A budget exhaustion is a `timeout`; the run is
- * left to terminate on its own.
+ * One attempt: queue a run, then poll to a terminal status or the attempt's
+ * deadline, whichever comes first. The deadline is the earlier of one
+ * per-attempt budget and the probe's total `hardDeadline`, so a slow attempt
+ * can never push the probe past its total budget.
+ *
+ * Both boundary awaits are raced against the deadline so a wedged `queueRun` or
+ * `getScenarioRunData` reports `timeout` rather than hanging forever. A launch
+ * or read that THROWS (a rejected boundary) is a `run_failed`, so a launch-time
+ * error is classified inside the documented contract instead of escaping as a
+ * raw 500.
  */
 async function runCanaryAttempt(
   deps: ScenarioCanaryDeps,
-): Promise<{ scenarioRunId: string; verdict: CanaryVerdict }> {
-  const { scenarioRunId } = await deps.queueRun();
-  const deadline = deps.now() + SCENARIO_CANARY_ATTEMPT_BUDGET_MS;
+  hardDeadline: number,
+): Promise<{ scenarioRunId?: string; verdict: CanaryVerdict }> {
+  const raceDeadline = deps.raceDeadline ?? raceAgainstRealDeadline;
+  const deadline = Math.min(
+    deps.now() + SCENARIO_CANARY_ATTEMPT_BUDGET_MS,
+    hardDeadline,
+  );
+  let scenarioRunId: string | undefined;
 
-  while (deps.now() < deadline) {
-    const snapshot = await deps.getScenarioRunData(scenarioRunId);
-    if (snapshot && isTerminalStatus(snapshot.status)) {
-      return { scenarioRunId, verdict: classifyCanaryOutcome(snapshot) };
+  try {
+    const queued = await raceDeadline(deadline - deps.now(), deps.queueRun());
+    if ("timedOut" in queued) {
+      return { verdict: { healthy: false, reason: "timeout" } };
     }
-    // Never sleep past the attempt deadline, so the next attempt can start no
-    // later than one attempt-budget after this one did.
-    const remaining = deadline - deps.now();
-    await deps.sleep(Math.min(SCENARIO_CANARY_POLL_INTERVAL_MS, remaining));
-  }
+    scenarioRunId = queued.value.scenarioRunId;
 
-  return { scenarioRunId, verdict: { healthy: false, reason: "timeout" } };
+    while (deps.now() < deadline) {
+      const read = await raceDeadline(
+        deadline - deps.now(),
+        deps.getScenarioRunData(scenarioRunId),
+      );
+      if ("timedOut" in read) break;
+      const snapshot = read.value;
+      if (snapshot && isTerminalStatus(snapshot.status)) {
+        return { scenarioRunId, verdict: classifyCanaryOutcome(snapshot) };
+      }
+      // Never sleep past the deadline, so the next attempt can start no later
+      // than one attempt-budget after this one did.
+      const remaining = deadline - deps.now();
+      await deps.sleep(Math.min(SCENARIO_CANARY_POLL_INTERVAL_MS, remaining));
+    }
+
+    return { scenarioRunId, verdict: { healthy: false, reason: "timeout" } };
+  } catch (error) {
+    logger.error(
+      { error, scenarioRunId },
+      "Scenario canary attempt failed to launch or read the run",
+    );
+    return { scenarioRunId, verdict: { healthy: false, reason: "run_failed" } };
+  }
 }
 
 /**
  * Runs the canary: one attempt, and if that first attempt is unhealthy, exactly
  * one retry — a single LLM run is noisy, so one healthy retry reports healthy.
- * A healthy first outcome is never retried. Both attempts sit inside the total
- * wall-time budget.
+ * A healthy first outcome is never retried, and neither is a first failure once
+ * the total wall-time budget is already spent: a retry that could not finish
+ * inside the budget is worse than reporting the first failure now.
  */
 export async function runScenarioCanary(
   deps: ScenarioCanaryDeps,
 ): Promise<CanaryOutcome> {
   const startedAt = deps.now();
+  const hardDeadline = startedAt + SCENARIO_CANARY_TOTAL_BUDGET_MS;
 
-  const first = await runCanaryAttempt(deps);
-  if (first.verdict.healthy) {
+  const first = await runCanaryAttempt(deps, hardDeadline);
+  if (first.verdict.healthy || deps.now() >= hardDeadline) {
     return {
       ...first.verdict,
       scenarioRunId: first.scenarioRunId,
@@ -167,7 +251,7 @@ export async function runScenarioCanary(
     };
   }
 
-  const second = await runCanaryAttempt(deps);
+  const second = await runCanaryAttempt(deps, hardDeadline);
   return {
     ...second.verdict,
     scenarioRunId: second.scenarioRunId,
@@ -199,19 +283,65 @@ export function createSingleFlightScenarioCanary(
 /** The synthetic actor a canary run is recorded against — no real person. */
 const CANARY_ACTOR: RunActor = { id: "scenario-canary", label: "api" };
 
+/** The validated server-side config a canary run needs to launch. */
+export interface CanaryConfig {
+  projectId: string;
+  scenarioId: string;
+  target: SimulationTarget;
+}
+
 /**
- * Builds the production queue/poll boundary: launches through the shared
- * launcher into the dedicated canary project, and reads status back through the
- * same simulations read service the Results tab uses.
+ * Validates the four server-side config values the canary needs BEFORE any run
+ * is launched, so a misconfiguration reports a clear unhealthy reason instead
+ * of dying deep inside the launch prefetch. The target type is parsed against
+ * the real {@link simulationTargetSchema} union rather than cast past the type
+ * system, so an unknown type is caught here.
  */
-function buildProductionDeps(): ScenarioCanaryDeps {
-  const projectId = env.SCENARIO_CANARY_PROJECT_ID ?? "";
-  const scenarioId = env.SCENARIO_CANARY_SCENARIO_ID ?? "";
-  const target: SimulationTarget = {
-    type: (env.SCENARIO_CANARY_TARGET_TYPE ??
-      "prompt") as SimulationTarget["type"],
-    referenceId: env.SCENARIO_CANARY_TARGET_ID ?? "",
+export function parseCanaryConfig(raw: {
+  projectId: string | undefined;
+  scenarioId: string | undefined;
+  targetType: string | undefined;
+  referenceId: string | undefined;
+}): CanaryConfig | { invalid: string } {
+  const { projectId, scenarioId, referenceId } = raw;
+  const parsedType = simulationTargetSchema.shape.type.safeParse(
+    raw.targetType ?? "prompt",
+  );
+  const missing = [
+    !projectId && "SCENARIO_CANARY_PROJECT_ID",
+    !scenarioId && "SCENARIO_CANARY_SCENARIO_ID",
+    !referenceId && "SCENARIO_CANARY_TARGET_ID",
+    !parsedType.success && "SCENARIO_CANARY_TARGET_TYPE",
+  ].filter((entry): entry is string => Boolean(entry));
+
+  if (!projectId || !scenarioId || !referenceId || !parsedType.success) {
+    return { invalid: `scenario canary misconfigured: ${missing.join(", ")}` };
+  }
+
+  return {
+    projectId,
+    scenarioId,
+    target: { type: parsedType.data, referenceId },
   };
+}
+
+/** Reads and validates the canary config off server-side env. */
+function resolveCanaryConfig(): CanaryConfig | { invalid: string } {
+  return parseCanaryConfig({
+    projectId: env.SCENARIO_CANARY_PROJECT_ID,
+    scenarioId: env.SCENARIO_CANARY_SCENARIO_ID,
+    targetType: env.SCENARIO_CANARY_TARGET_TYPE,
+    referenceId: env.SCENARIO_CANARY_TARGET_ID,
+  });
+}
+
+/**
+ * Builds the production queue/poll boundary from validated config: launches
+ * through the shared launcher into the dedicated canary project, and reads
+ * status back through the same simulations read service the Results tab uses.
+ */
+function buildProductionDeps(config: CanaryConfig): ScenarioCanaryDeps {
+  const { projectId, scenarioId, target } = config;
 
   return {
     queueRun: async () => {
@@ -247,9 +377,18 @@ const singleFlightCanary = createSingleFlightScenarioCanary(runScenarioCanary);
  * The route's single entrypoint. Takes no arguments — the canary project,
  * scenario, target and model are resolved entirely from server-side config, so
  * no value on the caller's request can redirect a canary run into a customer
- * project.
+ * project. A misconfiguration reports unhealthy `run_failed` without launching
+ * anything.
  */
 export async function runScenarioHealthCanary(): Promise<CanaryResult> {
   logger.info("Running scenario canary health check");
-  return singleFlightCanary(buildProductionDeps());
+  const config = resolveCanaryConfig();
+  if ("invalid" in config) {
+    logger.error(
+      { reason: config.invalid },
+      "Scenario canary misconfigured; reporting unhealthy without launching a run",
+    );
+    return { healthy: false, reason: "run_failed", durationMs: 0 };
+  }
+  return singleFlightCanary(buildProductionDeps(config));
 }

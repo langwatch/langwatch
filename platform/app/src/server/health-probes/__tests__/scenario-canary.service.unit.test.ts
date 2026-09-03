@@ -20,10 +20,13 @@ import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
 import {
   classifyCanaryOutcome,
   createSingleFlightScenarioCanary,
+  parseCanaryConfig,
+  raceAgainstRealDeadline,
   runScenarioCanary,
   SCENARIO_CANARY_ATTEMPT_BUDGET_MS,
   SCENARIO_CANARY_TOTAL_BUDGET_MS,
   type ScenarioCanaryDeps,
+  type ScenarioRunSnapshot,
 } from "../scenario-canary.service";
 
 /**
@@ -192,6 +195,65 @@ describe("runScenarioCanary", () => {
     });
   });
 
+  describe("given a queueRun whose launch latency spends the whole total budget", () => {
+    /** @scenario "The probe abandons the retry once the total budget is spent" */
+    it("skips the retry and stays within the total budget, advancing time inside queueRun", async () => {
+      const clock = fakeClock();
+      let queueRunCalls = 0;
+      const deps: ScenarioCanaryDeps = {
+        // Launch latency is real wall time: the fake clock advances INSIDE the
+        // queue call, not 0ms across it. One slow launch here eats the whole
+        // total budget, so no second attempt may start.
+        queueRun: async () => {
+          queueRunCalls++;
+          await clock.sleep(SCENARIO_CANARY_TOTAL_BUDGET_MS);
+          return { scenarioRunId: `canary-run-${queueRunCalls}` };
+        },
+        getScenarioRunData: async () => ({
+          status: ScenarioRunStatus.IN_PROGRESS,
+          results: null,
+        }),
+        now: clock.now,
+        sleep: clock.sleep,
+      };
+
+      const outcome = await runScenarioCanary(deps);
+
+      expect(outcome).toMatchObject({ healthy: false, reason: "timeout" });
+      // The retry is abandoned because the total budget is already spent — the
+      // real bound is the total deadline, not just 2x the per-attempt budget.
+      expect(queueRunCalls).toBe(1);
+      expect(clock.now()).toBeLessThanOrEqual(SCENARIO_CANARY_TOTAL_BUDGET_MS);
+    });
+  });
+
+  describe("given the launch boundary throws", () => {
+    /** @scenario "A launch-time failure is reported as unhealthy run_failed, not a raw error" */
+    it("classifies a throwing queueRun as run_failed instead of propagating the throw", async () => {
+      const clock = fakeClock();
+      let queueRunCalls = 0;
+      const deps: ScenarioCanaryDeps = {
+        queueRun: async () => {
+          queueRunCalls++;
+          throw new Error("launch blew up");
+        },
+        getScenarioRunData: async () => ({
+          status: ScenarioRunStatus.IN_PROGRESS,
+          results: null,
+        }),
+        now: clock.now,
+        sleep: clock.sleep,
+      };
+
+      const outcome = await runScenarioCanary(deps);
+
+      expect(outcome).toMatchObject({ healthy: false, reason: "run_failed" });
+      // Retried once, and the second launch throws too — still a settled
+      // outcome, never a raw error escaping the documented contract.
+      expect(queueRunCalls).toBe(2);
+    });
+  });
+
   describe("given the first attempt is unhealthy and the second is healthy", () => {
     /** @scenario "A first unhealthy outcome is retried once and a healthy retry reports healthy" */
     it("reports healthy after exactly two queued runs", async () => {
@@ -304,5 +366,130 @@ describe("given the canary scenario is queued with no model override", () => {
     await runScenarioCanary(deps);
 
     expect(queueRunCallArgs).toEqual([]);
+  });
+});
+
+describe("raceAgainstRealDeadline", () => {
+  /** @scenario "A wedged datastore times out and releases the in-flight lock" */
+  it("resolves to the work value when the work settles before the deadline", async () => {
+    const result = await raceAgainstRealDeadline(1_000, Promise.resolve("done"));
+
+    expect(result).toEqual({ value: "done" });
+  });
+
+  /** @scenario "A wedged datastore times out and releases the in-flight lock" */
+  it("resolves to timedOut when the work never settles before the deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const wedged = new Promise<string>(() => undefined);
+      const raced = raceAgainstRealDeadline(1_000, wedged);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(await raced).toEqual({ timedOut: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("runScenarioCanary with a wedged boundary await", () => {
+  describe("given getScenarioRunData never resolves", () => {
+    /** @scenario "A wedged datastore times out and releases the in-flight lock" */
+    it("still settles to timeout and releases the single-flight lock for the next call", async () => {
+      // A hung boundary await never yields control back to the poll loop, so
+      // only a real (here, vitest-faked) timer can bound it. This proves the
+      // probe answers `timeout` rather than hanging forever, and that the
+      // in-flight lock clears so a following call is NOT told the probe is busy.
+      vi.useFakeTimers();
+      try {
+        let queueRunCalls = 0;
+        const deps: ScenarioCanaryDeps = {
+          queueRun: async () => {
+            queueRunCalls++;
+            return { scenarioRunId: `canary-run-${queueRunCalls}` };
+          },
+          // Never resolves: a wedged datastore read.
+          getScenarioRunData: () =>
+            new Promise<ScenarioRunSnapshot | null>(() => undefined),
+          now: () => Date.now(),
+          sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+          // No injected raceDeadline: exercise the real-timer default.
+        };
+
+        const singleFlight = createSingleFlightScenarioCanary(runScenarioCanary);
+
+        const firstCall = singleFlight(deps);
+        await vi.advanceTimersByTimeAsync(
+          SCENARIO_CANARY_TOTAL_BUDGET_MS + SCENARIO_CANARY_ATTEMPT_BUDGET_MS,
+        );
+        const firstOutcome = await firstCall;
+
+        expect(firstOutcome).toMatchObject({ healthy: false, reason: "timeout" });
+
+        // Lock released: a following call runs a real attempt (queueRun fires
+        // again) rather than being short-circuited to busy.
+        const secondCall = singleFlight(deps);
+        await vi.advanceTimersByTimeAsync(
+          SCENARIO_CANARY_TOTAL_BUDGET_MS + SCENARIO_CANARY_ATTEMPT_BUDGET_MS,
+        );
+        const secondOutcome = await secondCall;
+
+        expect(secondOutcome).not.toEqual({ busy: true });
+        expect(secondOutcome).toMatchObject({ healthy: false, reason: "timeout" });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+});
+
+describe("parseCanaryConfig", () => {
+  const valid = {
+    projectId: "canary-project",
+    scenarioId: "canary-scenario",
+    targetType: "prompt",
+    referenceId: "canary-prompt-id",
+  };
+
+  describe("given every config value is present and the target type is known", () => {
+    /** @scenario "A misconfigured canary reports unhealthy without launching a run" */
+    it("returns the validated config with the target type parsed as the real union", () => {
+      const result = parseCanaryConfig(valid);
+
+      expect(result).toEqual({
+        projectId: "canary-project",
+        scenarioId: "canary-scenario",
+        target: { type: "prompt", referenceId: "canary-prompt-id" },
+      });
+    });
+
+    it("defaults an unset target type to prompt", () => {
+      const result = parseCanaryConfig({ ...valid, targetType: undefined });
+
+      expect(result).toMatchObject({ target: { type: "prompt" } });
+    });
+  });
+
+  describe.each([
+    ["projectId", { ...valid, projectId: undefined }],
+    ["scenarioId", { ...valid, scenarioId: undefined }],
+    ["referenceId", { ...valid, referenceId: undefined }],
+  ] as const)("given %s is missing", (_name, raw) => {
+    /** @scenario "A misconfigured canary reports unhealthy without launching a run" */
+    it("returns an invalid result rather than a config", () => {
+      const result = parseCanaryConfig(raw);
+
+      expect(result).toHaveProperty("invalid");
+    });
+  });
+
+  describe("given the target type is not a member of the simulation-target union", () => {
+    /** @scenario "A misconfigured canary reports unhealthy without launching a run" */
+    it("returns invalid instead of casting an unknown type past validation", () => {
+      const result = parseCanaryConfig({ ...valid, targetType: "not-a-target" });
+
+      expect(result).toHaveProperty("invalid");
+    });
   });
 });
