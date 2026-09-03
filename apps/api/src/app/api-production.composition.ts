@@ -177,6 +177,7 @@ import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
+import { PostgresModelProviderEvidenceAdapter } from "@langwatch/model-provider-server";
 
 import { createPlatformUrlBuilder } from "./api-rest-ports";
 import { nanoid } from "nanoid";
@@ -2579,6 +2580,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       projects,
       organizations,
       users,
+      // The setup checklist's provider step, answered by the model-provider
+      // feature's OWN persistence rather than by a `prisma.modelProvider` read
+      // written in the checklist. Composed here rather than taken from the
+      // gateway this process may also hold: the question is one existence read
+      // over the project's scope cascade, and every collaborator the gateway
+      // demands is there for writing a credential rather than for counting one.
+      modelProviders: PostgresModelProviderEvidenceAdapter.create({
+        database: database.client,
+        projects,
+      }).build(),
       processName: options.config.serviceName,
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
       eventing: this.composedEventing?.eventSourcing,

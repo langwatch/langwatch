@@ -36,8 +36,10 @@ Feature: Encrypt model provider API keys at rest
     Then the already-encrypted rows are skipped
     And the data remains valid after decryption
 
+  @integration
   Scenario: All database access goes through the repository
-    Given the modelProvider router and service
-    Then no code outside the repository calls prisma.modelProvider directly
-    And deletes use repository.delete or repository.deleteByProvider
-    And reads use repository.findAll or repository.findByProvider
+    Given the API process's setup checklist reports whether a provider is configured
+    When the checklist answers the provider step
+    Then the read is issued by the model provider repository, not by the checklist
+    And the read selects an identifier rather than the stored credential
+    And a provider attached to the organization counts toward every project under it

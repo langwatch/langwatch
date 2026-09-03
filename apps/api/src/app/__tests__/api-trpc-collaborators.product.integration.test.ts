@@ -31,6 +31,8 @@ import type { AuthzCanBatchByIdsInput, AuthzService } from "@langwatch/authz-con
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ModelCostProjectPort } from "@langwatch/model-provider-server";
+import { PostgresModelProviderEvidenceAdapter } from "@langwatch/model-provider-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { EventEmitter } from "node:events";
@@ -50,6 +52,7 @@ import {
   composeApiProductCollaborators,
   sealApiTrpcCollaborators,
   withApiProductCollaborators,
+  type ApiModelProviderEvidencePort,
 } from "../api-trpc-collaborators.product.composition";
 
 /**
@@ -284,9 +287,22 @@ function testPrisma() {
       ]),
     },
     annotationQueue: { count: vi.fn(async () => 1) },
-    // The checklist's two probes beyond the project include: a provider
-    // visible through the scope cascade, and a prompt with a version.
-    modelProvider: { findFirst: vi.fn(async () => ({ id: "provider-1" })) },
+    // The provider step is NOT this connection's to answer. Every access to
+    // the delegate refuses — a property read, not only a call — so a
+    // composition that reaches for `prisma.modelProvider` at all fails here
+    // rather than quietly reading a table whose credential column it has no
+    // rules for.
+    modelProvider: new Proxy(
+      {},
+      {
+        get(_target, property) {
+          throw new Error(
+            `the checklist reached prisma.modelProvider.${String(property)}; the provider step is the model-provider feature's read`,
+          );
+        },
+      },
+    ),
+    // The checklist's own probe beyond the project: a prompt with a version.
     llmPromptConfig: { findFirst: vi.fn(async () => null) },
     bugReport: {
       findMany: vi.fn(async () => [{ id: "bugreport_1", title: "CLI cannot reach the API" }]),
@@ -536,7 +552,42 @@ function baseCollaborators(broadcast: EventEmitter): AnyApiTrpcCollaborators {
   } as unknown as AnyApiTrpcCollaborators;
 }
 
-function composeProductHalf(prisma: PrismaClient, clickHouse: ReturnType<typeof testClickHouse>) {
+/**
+ * The setup checklist's provider step, as the process composes it: the REAL
+ * `ModelProviderEvidenceService`, built by the model-provider package's own
+ * adapter over its own client.
+ *
+ * Not a stub, because the seam being pinned is which code issues the read.
+ * The client below is this reader's, and the one the product half is composed
+ * on refuses every access to the same delegate — so the checklist can only be
+ * answered by going through the feature.
+ */
+function testProviderEvidence() {
+  const findFirst = vi.fn(async () => ({ id: "provider-1" }));
+  const port = PostgresModelProviderEvidenceAdapter.create({
+    database: { modelProvider: { findFirst } } as unknown as Pick<PrismaClient, "modelProvider">,
+    projects: {
+      tryGetWithTeam: async () => ({
+        id: PROJECT_ID,
+        teamId: TEAM_ID,
+        team: { organizationId: ORGANIZATION_ID },
+      }),
+      getWithTeam: async () => ({
+        id: PROJECT_ID,
+        teamId: TEAM_ID,
+        team: { organizationId: ORGANIZATION_ID },
+      }),
+    } as unknown as ModelCostProjectPort,
+  }).build();
+
+  return { port, findFirst };
+}
+
+function composeProductHalf(
+  prisma: PrismaClient,
+  clickHouse: ReturnType<typeof testClickHouse>,
+  providerEvidence: ApiModelProviderEvidencePort,
+) {
   return composeApiProductCollaborators({
     prisma,
     authz: testAuthz(),
@@ -550,6 +601,7 @@ function composeProductHalf(prisma: PrismaClient, clickHouse: ReturnType<typeof 
       }),
       getOrganizationId: async () => ORGANIZATION_ID,
     } as unknown as ProjectService,
+    modelProviders: providerEvidence,
     organizations: {
       getOrganizationMembers: async () => [],
       getTeamById: async () => ({ organizationId: ORGANIZATION_ID }),
@@ -568,11 +620,12 @@ function composeApplication() {
   const clickHouse = testClickHouse([`trace-a`]);
   const broadcast = new EventEmitter();
   const audit = new RecordingAudit();
+  const providers = testProviderEvidence();
 
   const collaborators = sealApiTrpcCollaborators(
     withApiProductCollaborators(
       baseCollaborators(broadcast),
-      composeProductHalf(prisma.client, clickHouse),
+      composeProductHalf(prisma.client, clickHouse, providers.port),
     ),
   );
   if (!collaborators) throw new Error("the collaborator set was sealed as incomplete");
@@ -602,7 +655,7 @@ function composeApplication() {
     },
   });
 
-  return { application, prisma, clickHouse, broadcast, audit, features };
+  return { application, prisma, clickHouse, broadcast, audit, features, providers };
 }
 
 /** The lane's own security; its credential services are never reached here. */
@@ -760,16 +813,22 @@ describe("given an API process composed with the product half of the record", ()
 
   describe("when the onboarding screens render the setup checklist", () => {
     /**
-     * @scenario "An organization-scoped model provider counts toward every project under it"
+     * The rollup lives in this composition rather than in a feature package,
+     * and until now it read `prisma.modelProvider` here to fill its provider
+     * step. That table holds every stored credential in the deployment, and
+     * the rule that only the model-provider repository reads it is enforced by
+     * a lint over IMPORTS — which a composition already holding the client
+     * walks straight past.
      *
-     * The rollup moved into this composition rather than into a feature
-     * package, so the one rule it carries that is easy to lose moves with it:
-     * a provider is visible through the PROJECT -> TEAM -> ORGANIZATION
-     * cascade, not at the project scope alone. Matching only PROJECT left this
-     * step stuck incomplete for organization-scoped credentials.
+     * So the fake client below refuses every access to that delegate, and the
+     * step is still answered: by the feature's own reader, which applies the
+     * PROJECT -> TEAM -> ORGANIZATION cascade (an organization-wide credential
+     * counts toward every project under it) and selects an id rather than a
+     * credential column.
      */
-    it("fans the rollup out over this process's own connection", async () => {
-      const { application, prisma } = composeApplication();
+    /** @scenario "All database access goes through the repository" */
+    it("answers the provider step through the model-provider feature, not this connection", async () => {
+      const { application, providers } = composeApplication();
 
       const { status, body } = await callTrpc(application, "integrationsChecks.getCheckStatus", {
         projectId: PROJECT_ID,
@@ -795,12 +854,7 @@ describe("given an API process composed with the product half of the record", ()
         },
       });
 
-      const providerRead = (
-        prisma.client as unknown as {
-          modelProvider: { findFirst: { mock: { calls: Array<[Record<string, never>]> } } };
-        }
-      ).modelProvider.findFirst.mock.calls[0]?.[0];
-      expect(providerRead).toMatchObject({
+      expect(providers.findFirst).toHaveBeenCalledWith({
         where: {
           enabled: true,
           scopes: {
@@ -813,6 +867,7 @@ describe("given an API process composed with the product half of the record", ()
             },
           },
         },
+        select: { id: true },
       });
     });
   });
@@ -884,7 +939,7 @@ describe("given an API process composed with the product half of the record", ()
       const sealed = sealApiTrpcCollaborators(
         withApiProductCollaborators(
           withoutExecution as unknown as AnyApiTrpcCollaborators,
-          composeProductHalf(testPrisma().client, testClickHouse([])),
+          composeProductHalf(testPrisma().client, testClickHouse([]), testProviderEvidence().port),
         ),
         report,
       );
@@ -906,7 +961,11 @@ describe("given an API process composed with the product half of the record", ()
   describe("when the deployment composed no trace read pipeline", () => {
     /** @scenario "A capability the deployment does not hold refuses by name" */
     it("refuses the reviewer's trace content by name rather than answering an empty queue", async () => {
-      const product = composeProductHalf(testPrisma().client, testClickHouse([]));
+      const product = composeProductHalf(
+        testPrisma().client,
+        testClickHouse([]),
+        testProviderEvidence().port,
+      );
 
       await expect(
         product.annotationPorts.loadTraces({ actor: () => ({ id: SESSION_USER.id }) } as never, {

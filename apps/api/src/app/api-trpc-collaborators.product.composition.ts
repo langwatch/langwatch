@@ -129,6 +129,27 @@ export abstract class ApiSimulationEvidencePort {
   abstract hasAnySimulation(input: { projectId: string }): Promise<boolean>;
 }
 
+/**
+ * Whether this project has a model provider attached and switched on, for the
+ * setup checklist's own step.
+ *
+ * A port rather than a `prisma.modelProvider` read written here, and the reason
+ * is the column next to the one this needs. Every credential in the deployment
+ * lives on the row this question is asked of, encrypted, and
+ * `specs/model-providers/encrypt-custom-keys.feature` says the only reader of
+ * that table is the model-provider feature's own repository — which decrypts
+ * through the deployment's cipher and hands nobody the ciphertext. The lint
+ * that enforces it governs IMPORTS rather than call sites, so a composition
+ * holding the client could reach the table with no such rule attached, and
+ * this one did.
+ *
+ * `ModelProviderEvidenceService` answers it, composed from the same client and
+ * the same project directory this half already holds.
+ */
+export abstract class ApiModelProviderEvidencePort {
+  abstract hasEnabledProvider(input: { projectId: string }): Promise<boolean>;
+}
+
 /** Everything the product half is composed from. */
 export type ApiProductCollaboratorsOptions = Readonly<{
   /** The one guarded connection every row read below runs on. */
@@ -157,6 +178,16 @@ export type ApiProductCollaboratorsOptions = Readonly<{
   traceContent?: ApiAnnotationTraceContentPort;
   /** The simulations step of the setup checklist; absent reports not started. */
   simulations?: ApiSimulationEvidencePort;
+  /**
+   * The model-provider step of the setup checklist, read through that
+   * feature's own persistence.
+   *
+   * Required rather than optional, unlike the simulations step beside it: this
+   * one needs the guarded client and the project directory that already gate
+   * this half, so there is no deployment shape in which the half composes and
+   * the reader cannot be built.
+   */
+  modelProviders: ApiModelProviderEvidencePort;
 }>;
 
 /** The application slice and the four port groups, composed together. */
@@ -257,6 +288,7 @@ export function composeApiProductCollaborators(
 
   const checklist = ApiOnboardingChecks.create({
     prisma: options.prisma,
+    modelProviders: options.modelProviders,
     ...(options.simulations ? { simulations: options.simulations } : {}),
   });
 
@@ -741,15 +773,21 @@ class ApiDataPrivacyPermissions extends DataPrivacyPermissionsPort {
 class ApiOnboardingChecks {
   static create(dependencies: {
     prisma: PrismaClient;
+    modelProviders: ApiModelProviderEvidencePort;
     simulations?: ApiSimulationEvidencePort;
   }): ApiOnboardingChecks {
-    return new ApiOnboardingChecks(dependencies.prisma, dependencies.simulations);
+    return new ApiOnboardingChecks(
+      dependencies.prisma,
+      dependencies.modelProviders,
+      dependencies.simulations,
+    );
   }
 
   private readonly logger: Pick<Logger, "warn"> = createLogger("langwatch:api:onboarding-checks");
 
   private constructor(
     private readonly prisma: PrismaClient,
+    private readonly modelProviders: ApiModelProviderEvidencePort,
     private readonly simulations: ApiSimulationEvidencePort | undefined,
   ) {}
 
@@ -779,11 +817,7 @@ class ApiOnboardingChecks {
     });
 
     const [modelProviders, simulations, prompts] = await Promise.all([
-      this.hasVisibleModelProvider({
-        projectId,
-        teamId: project?.teamId ?? null,
-        organizationId: project?.team?.organizationId ?? null,
-      }),
+      this.modelProviders.hasEnabledProvider({ projectId }),
       this.hasAnySimulation(projectId),
       this.hasVersionedPrompt(projectId),
     ]);
@@ -803,39 +837,6 @@ class ApiOnboardingChecks {
       firstMessage: project?.firstMessage ?? false,
       integrated: project?.integrated ?? false,
     };
-  }
-
-  /**
-   * Any enabled model provider scoped at the PROJECT, its TEAM, or its
-   * ORGANIZATION.
-   *
-   * The same PROJECT → TEAM → ORGANIZATION cascade the provider repository
-   * applies for real reads, so an organization-wide credential counts toward
-   * every project under it. Matching only the PROJECT scope left this step
-   * stuck incomplete for organization-scoped credentials.
-   */
-  private async hasVisibleModelProvider(input: {
-    projectId: string;
-    teamId: string | null;
-    organizationId: string | null;
-  }): Promise<boolean> {
-    if (!input.organizationId || !input.teamId) return false;
-    const found = await this.prisma.modelProvider.findFirst({
-      where: {
-        enabled: true,
-        scopes: {
-          some: {
-            OR: [
-              { scopeType: "PROJECT", scopeId: input.projectId },
-              { scopeType: "TEAM", scopeId: input.teamId },
-              { scopeType: "ORGANIZATION", scopeId: input.organizationId },
-            ],
-          },
-        },
-      },
-      select: { id: true },
-    });
-    return found !== null;
   }
 
   private async hasAnySimulation(projectId: string): Promise<boolean> {

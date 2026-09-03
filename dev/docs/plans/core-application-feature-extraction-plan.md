@@ -15924,3 +15924,326 @@ which is what the two enricher tests resolve.
   `getLicenseStatus` is still unreachable in both processes. See judgment call 3.
 - **`LANGWATCH_LICENSE_KEY` and the SSO gate were not touched.**
 - **Nothing under `platform/` was created, edited or read.**
+
+## The setup checklist read the credential table directly, 2026-09-03
+
+`dev/docs/plans/inert-spec-files-census.md` (d272e436b1) surfaced this one, and
+it is worth stating in the census's own terms: an inert spec is not a spec that
+says nothing, it is a spec whose invariant nobody is checking.
+`specs/model-providers/encrypt-custom-keys.feature` carries six scenarios and,
+until this pass, **no tag at all** — so the parity checker read it as
+`0/0 scenarios bound · ✓ all bound` and the last of the six,
+*"All database access goes through the repository"*, enforced nothing.
+
+The thing it was not enforcing had already happened.
+`api-trpc-collaborators.product.composition.ts:823` filled the setup
+checklist's provider step with:
+
+```
+const found = await this.prisma.modelProvider.findFirst({
+  where: {
+    enabled: true,
+    scopes: { some: { OR: [
+      { scopeType: "PROJECT",      scopeId: input.projectId },
+      { scopeType: "TEAM",         scopeId: input.teamId },
+      { scopeType: "ORGANIZATION", scopeId: input.organizationId },
+    ] } },
+  },
+  select: { id: true },
+});
+```
+
+Read narrowly it is harmless: an id, from a boolean question, asked by
+`ApiOnboardingChecks.getCheckStatus` on behalf of `integrationsChecks.*` —
+the four-namespace product half's own rollup — with the `teamId` and
+`organizationId` handed down from the project row the rollup had already read.
+Nothing decrypts, nothing leaks.
+
+What is wrong with it is the seam, not the columns. `ModelProvider` is the
+table every stored provider credential lives on, `customKeys` encrypted beside
+the `id` this selected, and the rule that only the model-provider repository
+reads that table is the rule that keeps the encryption format in one place.
+**The lint that enforces it governs IMPORTS, not call sites** — `prisma-containment`
+looks at who may name `@langwatch/prisma-client/generated`, and this
+composition may, because it is the product half and every other port in it is a
+row read with an id already in hand. So a composition already holding the
+client walked straight past the boundary, and the spec that would have said so
+was tagged into silence.
+
+### The shape it moved to
+
+The read is now the model-provider feature's, composed the way that package
+already composes its other narrow read — `PostgresModelCostCatalogAdapter`,
+whose docblock argues exactly this case for span pricing:
+
+```
+composeProduct (api-production)
+  │
+  ├─ PostgresModelProviderEvidenceAdapter.create({ database, projects }).build()
+  │     │
+  │     ├─ PrismaModelProviderEvidenceRepository   ← Pick<PrismaClient,"modelProvider">
+  │     │     hasEnabledForScopes(scopes) → select { id }, no codec, cannot decode
+  │     └─ ModelProviderProjectScopeService        ← PROJECT → TEAM → ORGANIZATION
+  │
+  └─ composeApiProductCollaborators({ modelProviders: <the service above> })
+        └─ ApiOnboardingChecks.hasEnabledProvider({ projectId })
+```
+
+Three decisions in that, and each was a fork:
+
+1. **A second repository over `ModelProvider`, not a method on the first.**
+   `PrismaModelProviderRepository.create` takes a `ModelProviderCredentialCodec`
+   because every row-returning method on it decodes `customKeys` through that
+   codec. A caller who wants a boolean would have had to be handed a decrypting
+   reader to get one, and the product half holds no cipher. The new repository
+   holds no codec at all — it selects an id and maps nothing — so "this read
+   cannot leak a credential" is a property of its construction rather than a
+   promise in a comment.
+2. **Nothing was added to `ModelProviderService`.** The contract's abstract
+   class is extended by three test fakes in packages this lane does not own
+   (`trace/server`, `coding-agent/server`, `workflow/server`); a new abstract
+   member would have broken all three to answer a question none of them asks.
+3. **The port is injected, not built inside the product half.** The half holds
+   the same client and the same project directory, so it *could* have composed
+   the adapter itself — and then no test could tell the two apart. Passing it in
+   is what lets the integration test hand the composition a Prisma whose
+   `modelProvider` delegate refuses every property access.
+
+The scope cascade moved with the read, which is the second thing this fixes
+quietly: it was previously spelled out by hand in the API composition, and
+`ModelProviderProjectScopeService.getProjectScopes` is the one place the
+feature spells it. An organization-wide credential still counts toward every
+project under it — that is what the old docblock warned about — and now it says
+so once.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `packages/features/model-provider/server/src/ports/model-provider.port.ts` | **+`ModelProviderEvidenceRepository`** — one method, `hasEnabledForScopes`, and a docblock saying why it is not a method on `ModelProviderRepository` |
+| `.../repositories/prisma/prisma.model-provider-evidence.repository.ts` | **New.** `Pick<PrismaClient, "modelProvider">`, `select: { id: true }`, no codec. Empty scope list answers `false` rather than matching every row |
+| `.../services/model-provider-evidence.service.ts` | **New.** `hasEnabledProvider({ projectId })` — parse, derive scopes, one existence read. Unreadable project → `false`, for the same reason `ModelCostCatalogService` answers `[]` |
+| `.../adapters/postgres.model-provider-evidence.adapter.ts` | **New.** The typed seam, and `ModelProviderEvidenceDatabase` (declared here, not in the repository — `private-runtime-export` refuses an index re-export from `repositories/`) |
+| `.../server/src/index.ts` | Exports the adapter, the service, the port and the database type |
+| `.../services/__tests__/model-provider-evidence.service.unit.test.ts` | **New.** 4 tests: the cascade and `select: { id: true }`, no provider, unreadable project, blank id |
+| `apps/api/src/app/api-trpc-collaborators.product.composition.ts` | **+`ApiModelProviderEvidencePort`**; `modelProviders` on the options as **required** (unlike `simulations` beside it, nothing can compose this half and fail to build the reader); `hasVisibleModelProvider` deleted |
+| `apps/api/src/app/api-production.composition.ts` | `composeProduct` builds the adapter off the guarded client and the tenancy graph's project directory |
+| `apps/api/src/app/__tests__/api-trpc-collaborators.product.integration.test.ts` | Fake Prisma's `modelProvider` is a `Proxy` that throws on **any** property read; the real evidence service composed over its own client; the checklist assertion moved onto it |
+| `specs/model-providers/encrypt-custom-keys.feature` | *"All database access goes through the repository"* tagged `@integration` and rewritten as behaviour — the old steps named `repository.findAll` / `deleteByProvider`, methods this repository has never had |
+
+### Gates
+
+- `apps/api`: `vitest run src/app/__tests__/api-trpc-collaborators.product*` — **3 files / 35 tests passing**. `api-production.composition.unit.test.ts` — 38 passing. `tsc --noEmit` — **0 errors**.
+- `@langwatch/model-provider-server`: `pnpm test` — **20 files / 195 tests** (was 19 / 191). `pnpm typecheck` — **0 errors**.
+- Feature parity: `specs/model-providers/encrypt-custom-keys.feature` was one of the **48 `newInert` hard failures**; it now reports 1 enforced scenario, **bound**, 0 unbound.
+- `oxlint` over the nine touched files: the only output is two pre-existing `no-useless-fallback-in-spread` warnings in `withApiProductCollaborators`, an untouched region. `oxfmt --check`: every file that was clean at HEAD is still clean; `api-trpc-collaborators.product.composition.ts`, `api-production.composition.ts` and the package index were **already** not `oxfmt`-clean at HEAD, so they were left alone and the inserted regions were written to the formatter's shape by hand (verified by formatting a copy and diffing).
+- `architecture-lint`: the new `private-runtime-export` this pass first introduced (the index re-exporting the database type from `repositories/`) is gone. No `feature-source-layout`, `feature-source-filename`, `typed-prisma-seam` or `prisma-containment` violation names any new module.
+
+### The sabotage
+
+Restoring a direct `this.prisma.modelProvider.findFirst` in `getCheckStatus`
+fails `answers the provider step through the model-provider feature, not this
+connection` with `the checklist reached prisma.modelProvider.findFirst`. The
+guard is the fake delegate's `get` trap, so it does not depend on the shape of
+the `where` — any reach for the table at all, including one that selects
+`customKeys`, fails the same way.
+
+Worth recording that the binding nearly did not land. `@scenario` is collected
+only when the annotation is the **last** thing before the `it(` — the collector
+skips whitespace and whole comments after the match, but a `*` continuation
+line stops it — so a two-line `@scenario` pair inside a prose docblock binds
+**nothing**, silently. The scenario read as enforced-and-unbound until the
+annotation was moved to its own `/** @scenario "..." */` line. The docblock in
+this file that bound *"An organization-scoped model provider counts toward
+every project under it"* had the same defect and had never bound anything —
+that title exists in no feature file either.
+
+### The rest of the class, unfixed
+
+`grep -n "this.prisma\.\|prisma\.[a-z]*\.\(find\|create\|update\|delete\)" apps/api/src/app/*.ts`
+returns **77 sites across 13 compositions** after this pass. They are not all
+the same defect: most read `project`, `team`, `organization` or `workflow`,
+tables whose feature packages the API composes a service for anyway, and the
+port shapes there are genuinely "one row read with an id already in hand".
+
+Two carry the same *kind* of risk this pass closed — a table with a secret on
+it, read past the package that owns the secret's format:
+
+| Site | What it reads |
+| --- | --- |
+| `apps/api/src/app/api-trpc-ports.composition.ts:396` | `prisma.account.findFirst({ ..., select: { id: true, password: true } })` — the credential **password hash**, selected in an API composition. `:405` writes it, `:412` and `:427` read the same table |
+| `apps/api/src/app/api-gateway.composition.ts:362` | `prisma.virtualKey.findMany` — gateway key names, organization-fenced, so narrower than the account read |
+
+The remainder, for the record — file, model, count:
+
+`api-experiment-run` (project 1, workflow 2, workflowVersion 4, agent 1,
+evaluator 1) · `api-gateway` (project 1, organization 1, group 2,
+organizationUser 1) · `api-trpc-collaborators.analytics` (project 1) ·
+`.execution` (project 1) · `.gateway-group` (project 3, user 1, organization 1) ·
+`.identity` (user 2, organizationInvite 1, organizationUser 1) · `.org-group`
+(team 1, organizationUser 1, organizationInvite 1, user 1, project 1,
+teamUser 1) · `.product-group` (batchEvaluation 2, workflow 4, monitor 2) ·
+`.product-infra` (project 1) · `.trace-group` (project 2, cost 2) ·
+`api-trpc-ports` (workflow 11, user 4, account 4, agent 1, monitor 1,
+organization 1, organizationUser 1, project 1, workflowVersion 1) ·
+`api-usage` (organization 4, project 3, team 1).
+
+**Two are left in the file this lane owns**, deliberately:
+`api-trpc-collaborators.product.composition.ts:757` (`project.findUnique` with
+the nine-vertical include — the rollup itself, which no feature package holds)
+and `:858` (`llmPromptConfig.findFirst`, the prompt step). The second is the
+same shape as the one just fixed and would take the same three files in
+`@langwatch/prompt-server` — but no spec states an invariant over that table,
+and inventing one to justify the seam is the wrong order. It is named here so
+the next pass finds it.
+
+### What this pass did NOT do
+
+- **The other five scenarios in `encrypt-custom-keys.feature` are still untagged.** They describe the codec (AES-256-GCM, the three-segment format, the migration's idempotence), which `EncryptedModelProviderCredentialAdapter` and the legacy-migration service already test — binding them is a reading pass over those suites, not a code change, and it was not done here.
+- **`PrismaModelProviderRepository` still takes `database: object`.** It is the untyped seam the standards call out, and narrowing it touches `PostgresModelProviderAdapter` and every composition that builds it.
+- **Nothing under `platform/` was created, edited or read.**
+
+## Scheduled reports had a handler and no calendar, 2026-09-03
+
+`dev/docs/plans/inert-spec-files-census.md` (d272e436b1) filed
+`specs/monitors/report-content.feature` as BIND. It was worse than that.
+`dispatchScheduledReport` — 340 lines of Automation's own report handler at
+`packages/features/automation/server/src/services/report-dispatch.service.ts:162`
+— had **no caller anywhere in the tree**, and `git grep` at `faaa9ec333^` (the
+commit before `platform/app` was deleted) shows the same two hits it has today:
+the module and the barrel. So the loss is older than the deletion. What the
+platform held was never the handler; it was the two things around it, and both
+were in `platform/app/src/server/app-layer/presets.ts`:
+
+```
+presets.ts:2225   const scheduler = roleRunsWorkers(...) ? new SchedulerService({...}) : undefined
+presets.ts:2231   scheduler?.start()
+presets.ts:2239   schedulerRegistry.register({ targetType: REPORT_SCHEDULER_TARGET_TYPE, handler: ... })
+presets.ts:2321   void automation.reconcileReportSchedules()
+```
+
+`a332328563` moved the scheduler primitive to `@langwatch/eventing`, and
+`db03af79cd` deleted the composition root that mounted it. Nothing picked the
+mount back up: before this pass `grep -rn "SchedulerService"` over `apps/`
+returned **zero hits**. Five scenarios described a report that carries its data,
+and there was no loop to claim a due row, no registration mapping
+`reportTrigger` onto the handler, and no boot sweep.
+
+### The frozen registry does not cover this, and that is the point
+
+`apps/worker/src/features/job-registry.json` is byte-frozen and names every
+routing key on the shared `event-sourcing/jobs` queue. It carries no
+report-schedule key and it does not need one: ADR-044's calendar is a Postgres
+loop, not a queue consumer. A due `ScheduledJob` is claimed by a conditional
+`nextRunAt` update, not routed. Adding an installer would have forced a
+registry row anyway — `worker-feature-catalogue.unit.test.ts` asserts
+`pipelines.map(feature)` equals `catalogue.features` exactly — so the calendar
+rides **Automation's existing installer** instead. A report *is* an automation:
+its rows are `Trigger` rows, its message leaves through Automation's delivery,
+its fire lands in the same `TriggerSent` history the automations page reads.
+
+### Before
+
+```
+API (apps/api)                            worker (apps/worker)
+  PostgresAutomationAdapter                 AutomationWorkerFeatureInstaller
+    jobs: UnscheduledApiAutomationJobs        automations pipeline
+      upsertForTarget → REJECTS                (settlement, graph sweep, prune)
+                                             ── no SchedulerService anywhere ──
+  syncReportSchedule ✗                       dispatchScheduledReport  ← 0 callers
+        │                                            ▲
+        └──── no ScheduledJob row ever written ──────┘ never reached
+```
+
+### After
+
+```
+worker (apps/worker)
+  AutomationWorkerFeatureInstaller.install()
+    └─ createWorkerReportSchedule(...)              worker-report-schedule.composition.ts
+         ├─ PrismaScheduledJobStore(connection.client)     the durable calendar row
+         ├─ SchedulerRegistry  ← "reportTrigger" → dispatchScheduledReport
+         ├─ SchedulerService.start()   lease → fire → settleClaim   (ADR-044 §4)
+         └─ ReportScheduleService.reconcile()   create-if-missing, at boot
+                                                      │
+   deps handed to the handler, all from what this process already holds:
+     loadTrigger              PrismaTriggerRepository.tryFindById
+     loadProject              traceServices.projects (AutomationProjectIdentityPort)
+     delivery                 automationDelivery.delivery  (worker mail composition)
+     slackProvider            SlackProviderAdapter over the shared cipher
+     filterSuppressedRecipients  PostgresAutomationGraphDeliveryAdapter — the SAME
+                                 suppression rows a graph alert filters through
+     listReportTraces         TraceListService + TraceQueryClickHouse.translateFilter
+                              + toReportTraceRow, narrowed behind
+                              WorkerReportTraceListPort
+     loadReportCharts         loadReportCharts over PrismaCustomGraphRepository
+                              + createWorkerAnalytics().getTimeseries
+     recordFire               PrismaTriggerFireHistoryRepository (resolvedAt stamped,
+                              so a report can never read as a live alert)
+```
+
+Composed exactly when the process holds the typed connection **and** can send.
+A report that came due on a process with no mail is worse than a slot nobody
+claimed: the lease settles, the calendar advances, and the period it summarised
+is gone.
+
+### The reconcile is load-bearing here, not a self-heal
+
+In the platform it repaired a crash between two non-atomic writes. On this
+branch the gap is permanent in one direction: `apps/api` composes
+`PostgresAutomationAdapter` with `UnscheduledApiAutomationJobs`, whose
+`upsertForTarget` **rejects by name**
+(`api-automation.composition.ts:185`), so the tRPC report route's
+`syncReportSchedule` (`automation.api.ts:630`) cannot write a calendar row at
+all. The worker's boot sweep reads active `REPORT` triggers cross-tenant — the
+raw query already carries `-- @tenancy: report-schedule reconciliation
+cross-tenant sweep (worker boot)`, written for exactly this — and creates the
+missing rows. **That half of the chain is `apps/api`'s to close and was not
+touched by this lane**; until it is, a report authored in the UI starts firing
+after the next worker boot rather than immediately.
+
+To reuse the sweep rather than copy it, `reconcileReportSchedules` moved from
+`AutomationService` down into `ReportScheduleService.reconcile()` (which already
+held `jobs`/`clock`/`wake` and now takes `triggers`); `AutomationService`
+delegates to it in one line, so both processes run one implementation.
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/worker/src/app/worker-report-schedule.composition.ts` | **New.** `createWorkerReportSchedule` (loop + registration + boot sweep), `createWorkerReportTraceList`, `WorkerReportTraceListPort` / `ComposedWorkerReportTraceList`, and the two narrowings the calendar needs: Automation's `ScheduledJobStorePort` over Eventing's store, and `SchedulerWakePort` over `SchedulerService.publishWake` |
+| `apps/worker/src/app/worker-production.composition.ts` | Two anchored edits: composes `reportSchedule` beside `automationClock` (guarded on `options.connection && mail && automationDelivery`), and passes it to `AutomationWorkerFeatureInstaller.create` |
+| `apps/worker/src/features/automation/automation-worker-feature.installer.ts` | Optional `reportSchedule`; `install()` starts it once, the handle's `close()` stops it. `AutomationReportSchedule` exported |
+| `packages/features/automation/server/src/services/report-schedule.service.ts` | **+`reconcile()`**, moved from `AutomationService`; `create` takes `triggers` |
+| `.../services/automation.service.ts` | `reconcileReportSchedules` is now a one-line delegate |
+| `.../adapters/postgres.automation.adapter.ts` | Passes the trigger repository into `ReportScheduleService.create` |
+| `.../repositories/custom-graph.repository.ts` + `prisma/prisma.custom-graph.repository.ts` | **+`findAllByDashboardId`** — every builder panel on a dashboard, in grid order. The platform hand-wrote this `findMany` in its composition root; it belongs to the feature |
+| `.../services/report-chart.service.ts` | `CustomGraph` now the automation contract's five-field type, not the generated Prisma row — the service reads exactly those five |
+| `.../server/src/index.ts` | Exports `PrismaTriggerFireHistoryRepository`, `PrismaCustomGraphRepository`, `ReportScheduleService` |
+| `.../services/__tests__/report-dispatch.service.unit.test.ts` | **New.** 5 tests, one per bound scenario, driving the real `dispatchScheduledReport` (and the real `loadReportCharts`) through a fake mail gateway that captures the rendered subject and body |
+| `apps/worker/src/app/__tests__/worker-report-schedule.composition.unit.test.ts` | **New.** 2 tests: the translated predicate reaches the reader and rows map to report rows; an empty query sends no predicate at all |
+| `apps/worker/src/features/automation/__tests__/automation-worker-feature.installer.unit.test.ts` | **New.** 3 tests: started on install, stopped on close, started once across repeat installs |
+| `specs/monitors/report-content.feature` | Scenarios 1–5 tagged `@unit` |
+
+### Gates
+
+- `apps/worker`: `vitest run src/app src/features/automation` — **37 files / 317 tests** (was 35 / 312). `vitest run src/features` — 9 / 53. `pnpm typecheck` (both `tsconfig.json` and `tsconfig.test.json`) — **0 errors**.
+- `@langwatch/automation-server`: `pnpm test` — **31 files / 233 tests** (was 30 / 228). `pnpm typecheck` — **0 errors**.
+- Feature parity: `specs/monitors/report-content.feature` → **`5/5 scenarios bound · ✓ all bound`** (was `0/0 · ✓ all bound`, enforcing nothing).
+- `architecture-lint`: `frontend-boundary`, `port-modules`, `feature-package-boundaries`, `overengineering`, `comment-blocks`, `test-quality`, `test-colocation`, `service-quality`, `feature-catalogue`, `service-results` — 10 files / 142 tests passing.
+- `oxlint` over the 15 touched files: the only output is the seven pre-existing `no-unused-vars` import warnings in `worker-production.composition.ts`, byte-identical to the same run against `git show HEAD:` of that file. `oxfmt --check`: all 15 clean.
+
+### The sabotage
+
+Two edits to `report-dispatch.service.ts` at once — `to = fire.slot.getTime() + 1`
+and the chart branch short-circuited to `[]`. **4 of the 5 new tests failed.**
+The fifth is the empty-report scenario, which asserts delivery rather than
+window arithmetic and is correctly indifferent to both; it fails on its own
+sabotage (an early return before `deliver()`), which is what it exists to catch.
+
+### What this pass did NOT do
+
+- **The `apps/api` half of the chain is still open.** `UnscheduledApiAutomationJobs.upsertForTarget` rejects, so activating a report in the UI errors on the schedule write and the row only appears at the next worker boot sweep. That file belongs to another lane.
+- **Scenarios 6–9 of `report-content.feature` are still untagged.** They describe the drawer's layout picker and preview (`@langwatch/automation-web`), not the dispatch, and binding them is a different lane's reading pass.
+- **The calendar has no integration test against a real `ScheduledJob` table.** `PrismaScheduledJobStore` is `$queryRaw` against Postgres, so proving lease-then-settle end to end needs the datastore lane; what is proven here is that the handler renders and sends, and that the installer runs the loop for exactly as long as the feature is installed.
+- **Nothing under `platform/` was created, edited or read.**

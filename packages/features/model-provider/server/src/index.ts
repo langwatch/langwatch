@@ -7,6 +7,11 @@ export {
   type ModelCostCatalogDatabase,
 } from "./adapters/postgres.model-cost-catalog.adapter";
 export { ModelCostCatalogService } from "./services/model-cost-catalog.service";
+export {
+  PostgresModelProviderEvidenceAdapter,
+  type ModelProviderEvidenceDatabase,
+} from "./adapters/postgres.model-provider-evidence.adapter";
+export { ModelProviderEvidenceService } from "./services/model-provider-evidence.service";
 export { ModelProviderProjectScopeService } from "./services/model-provider-project-scope.service";
 export {
   ModelCostProjectPort,
@@ -19,6 +24,7 @@ export {
   ModelProviderCredentialProbePort,
   ModelProviderConnectionRateLimiter,
   ModelProviderEgressPort,
+  ModelProviderEvidenceRepository,
   ModelProviderManagedGatewayPort,
   ModelProviderRateLimitPort,
   CodexTokenRefresher,
