@@ -36124,6 +36124,8 @@ Connect the agent in this codebase to LangWatch, so test suites run from the pla
 
 Three steps: install the SDK, add the connect function where the service starts, start the service the way the user always starts it. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 Use the HTTP fallback at the bottom of this skill ONLY when the agent cannot import the SDK: the agent is written in a language with no LangWatch SDK, or you have no access to its code.
 
 ## Step 1: Set up the LangWatch CLI
@@ -36454,7 +36456,7 @@ Confirm the agent reports its traces to the same LangWatch project that runs the
 
 Ask the user for the URL where this service is deployed, and wait for the answer. A staging deployment is the recommended target: it exercises the real system without touching production data. Any URL the LangWatch backend can reach works; an internal hostname or a firewalled service does not.
 
-If the agent only runs on the user's machine, register it as below and then run `langwatch agent dev --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
+If the agent only runs on the user's machine, register it as below and then run `langwatch agent tunnel --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
 
 ### Register and run
 
@@ -37073,7 +37075,7 @@ The process on your machine reaches out to LangWatch, so there is no tunnel, no 
 The row stays after the process stops. It keeps the agent identity, the declared parameters and the run history, so the next process that connects under the same name and environment continues the same row.
 
 <Note>
-  An HTTP agent that runs on your machine is a different case: the platform calls it, so it needs a reachable URL. `langwatch agent dev` covers that, see [Other ways to connect](/agent-testing/other-ways-to-connect).
+  An HTTP agent that runs on your machine is a different case: the platform calls it, so it needs a reachable URL. `langwatch agent tunnel` covers that, see [Other ways to connect](/agent-testing/other-ways-to-connect).
 </Note>
 
 ## Compare production against your machine
@@ -37333,7 +37335,7 @@ For the full SDK reference, see the [Scenario documentation](https://langwatch.a
 ---
 title: Other Ways to Connect
 sidebarTitle: Other ways to connect
-keywords: langwatch, agent simulations, http agent, code agent, langwatch agent dev, tunnel, body template, output path, traceparent
+keywords: langwatch, agent simulations, http agent, code agent, langwatch agent tunnel, agent dev, tunnel, body template, output path, traceparent
 description: Register an agent by its HTTP endpoint, front a local process with a tunnel, or run a small piece of Python as the target, when the SDK cannot run inside your agent.
 ---
 
@@ -37344,7 +37346,7 @@ description: Register an agent by its HTTP endpoint, front a local process with 
 | Path | Use it when |
 |---|---|
 | **HTTP agent** | The agent is written in a language with no LangWatch SDK, or you cannot change its code and only have a URL. |
-| **`langwatch agent dev`** | An HTTP agent runs on your own machine and the platform needs a reachable URL for the session. |
+| **`langwatch agent tunnel`** | An HTTP agent runs on your own machine and the platform needs a reachable URL for the session. |
 | **Code agent** | The target is a few lines of glue: a credential exchange, or a call into an API that needs no repository of its own. |
 
 ## HTTP agents
@@ -37492,19 +37494,19 @@ langwatch test-suite run 'Smoke' --target http:<agent-id> --wait
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use `langwatch agent dev` below for a local process. |
+| The run fails with a connection error | The URL is not reachable from the LangWatch backend: an internal hostname, a firewall, or a stopped service. | Deploy the endpoint to a reachable URL, or use `langwatch agent tunnel` below for a local process. |
 | Every turn fails with 401 or 403 | The credential is missing or wrong: no header row or `auth` block, or the `{{ secrets.NAME }}` reference points at a secret the project does not have. | Add the header row or `auth` block, and check the secret's name and project in **Settings > Secrets**. |
 | The transcript shows empty replies or raw JSON | `outputPath` does not match the response shape, so no reply text is found. | Set `outputPath` to the JSONPath of the reply text in your endpoint's real response. |
 | Trace-dependent criteria come back inconclusive, and turns have no trace link | The server does not adopt the incoming `traceparent`, or it reports traces to a different LangWatch project. | Adopt the context as in step 4, and point the agent's tracing at the same project's API key. |
 
-## A local HTTP agent: `langwatch agent dev`
+## A local HTTP agent: `langwatch agent tunnel`
 
-`langwatch agent dev` starts a tunnel in front of a local port, points a registered HTTP agent's URL at the tunnel, and restores the previous URL when you stop it with Ctrl-C. While it runs, every scenario run against that agent calls straight into the process on your machine.
+`langwatch agent tunnel` starts a tunnel in front of a local port, points a registered HTTP agent's URL at the tunnel, and restores the previous URL when you stop it with Ctrl-C. While it runs, every scenario run against that agent calls straight into the process on your machine.
 
-A connected agent needs none of this: it reaches out from your machine, so a local process is a target with no tunnel and no URL rewrite. `agent dev` is for HTTP agents.
+A connected agent needs none of this: it reaches out from your machine, so a local process is a target with no tunnel and no URL rewrite. `agent tunnel` is for HTTP agents.
 
 ```bash
-langwatch agent dev --port 8010
+langwatch agent tunnel --port 8010
 ```
 
 ```text
@@ -37514,7 +37516,7 @@ Run your scenarios: https://app.langwatch.ai/my-project/agent-testing
 Ctrl-C restores the previous URL.
 ```
 
-With no `--agent` flag, the command lists the project's HTTP agents to pick from, and remembers the choice per project directory in `~/.langwatch/config.json`. `langwatch agent tunnel` is an alias for the same command.
+With no `--agent` flag, the command lists the project's HTTP agents to pick from, and remembers the choice per project directory in `~/.langwatch/config.json`. `langwatch agent dev` is an alias for the same command.
 
 | Flag | Effect |
 |---|---|
@@ -37527,7 +37529,7 @@ With no `--agent` flag, the command lists the project's HTTP agents to pick from
 
 ### How the tunnel is protected
 
-The tunnel URL is public, and your local agent process usually holds real model provider keys. `langwatch agent dev` mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
+The tunnel URL is public, and your local agent process usually holds real model provider keys. `langwatch agent tunnel` mints a per-session secret, fronts your local port with a proxy that rejects any request missing the `X-LangWatch-Dev-Secret` header, and writes that header onto the agent's configuration for the session. Only the platform's scenario calls send the secret. On exit, the command removes both the proxy and the header row.
 
 `--no-auth` turns the proxy off, for a server that already authenticates every request. A bring-your-own tunnel (`--tunnel-url`) also runs without the proxy, so that tunnel endpoint must supply its own access control. The agent's own configured authentication headers pass through the tunnel unchanged either way.
 
@@ -37543,7 +37545,7 @@ The default transport is a Cloudflare quick tunnel on `trycloudflare.com`. The c
 
 `--tunnel-url` swaps in your own tunnel when you hit these limits.
 
-A crash or a kill signal the process cannot catch skips the restore, and the agent keeps pointing at a dead tunnel. Calls to it then fail with an error saying the tunnel session probably ended, and the **local tunnel** badge stays visible. Run `langwatch agent dev` again to take the agent over with a fresh tunnel, or set the agent's URL back by hand in the agent editor.
+A crash or a kill signal the process cannot catch skips the restore, and the agent keeps pointing at a dead tunnel. Calls to it then fail with an error saying the tunnel session probably ended, and the **local tunnel** badge stays visible. Run `langwatch agent tunnel` again to take the agent over with a fresh tunnel, or set the agent's URL back by hand in the agent editor.
 
 ## Code agents
 
@@ -39149,7 +39151,7 @@ The parameters of a run reach the target: an HTTP agent reads them as `{{ params
 
 ## Local tunnel
 
-While `langwatch agent dev` runs, the HTTP agent points at a developer's machine, and the agents list and the run dialog show a **Local tunnel** mark on it. See [Local development](/agent-testing/other-ways-to-connect).
+While `langwatch agent tunnel` runs, the HTTP agent points at a developer's machine, and the agents list and the run dialog show a **Local tunnel** mark on it. See [Local development](/agent-testing/other-ways-to-connect).
 
 ## Targets of scenarios written in code
 
@@ -52327,6 +52329,8 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Step 1: Read the Integration Docs
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
@@ -53188,6 +53192,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -54188,6 +54194,8 @@ Connect the agent in this codebase to LangWatch, so test suites run from the pla
 
 Three steps: install the SDK, add the connect function where the service starts, start the service the way the user always starts it. Work through them in order, confirm the agent reads Online, run one test suite, then report what changed and the result.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 Use the HTTP fallback at the bottom of this skill ONLY when the agent cannot import the SDK: the agent is written in a language with no LangWatch SDK, or you have no access to its code.
 
 ## Step 1: Set up the LangWatch CLI
@@ -54518,7 +54526,7 @@ Confirm the agent reports its traces to the same LangWatch project that runs the
 
 Ask the user for the URL where this service is deployed, and wait for the answer. A staging deployment is the recommended target: it exercises the real system without touching production data. Any URL the LangWatch backend can reach works; an internal hostname or a firewalled service does not.
 
-If the agent only runs on the user's machine, register it as below and then run `langwatch agent dev --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
+If the agent only runs on the user's machine, register it as below and then run `langwatch agent tunnel --port <port> --agent <agent-id>`, which opens a tunnel to the local port and points the registered agent at it for the session. Keep it running while test suites execute; Ctrl-C restores the previous URL.
 
 ### Register and run
 
@@ -54647,6 +54655,8 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 - Focus on the specific prompt
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
+
+In Langy, do not print the code change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -55669,6 +55679,8 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only: there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation.
 
+In Langy, do not print the change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Step 1: Read the Integration Docs
 
 Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
@@ -55788,6 +55800,8 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 - Focus on the specific prompt
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
+
+In Langy, do not print the code change for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -56332,6 +56346,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 6. **Keep the judge independent of the prompt.** Grade user outcomes and verified side effects, never the agent's own rules restated. A rubric that quotes the prompt grades obedience, not quality.
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
+
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
 
 ## Plan Limits
 
@@ -59498,6 +59514,8 @@ A failing test tells you WHERE the agent fails, not that the prompt is where to 
 
 Your harness, codebase and model decide which levers exist. Full guide: [Improving your Agent](https://scenario.langwatch.ai/best-practices/improving-your-agent).
 
+In Langy, do not print the fix for the user to apply by hand: call `code_access` and follow the `code-changes` skill to make it on their machine or through GitHub.
+
 ## Plan Limits
 
 LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
@@ -60914,6 +60932,102 @@ Langy sets these up with `langwatch monitor create` and `langwatch trigger creat
 
 ---
 
+# FILE: ./langy/local-development.mdx
+
+---
+title: Local development
+description: "Share a folder on your machine with Langy: it edits your code there, runs your own toolchain, and opens the pull request from your git identity, with every command checked in the chat."
+sidebarTitle: Local development
+keywords:
+  - langy share control
+  - ai agent local folder
+  - langwatch langy cli
+---
+
+Langy reaches your code in two ways. It can open a [pull request through the GitHub App](/langy/pull-requests), or it can work in a folder you share from your machine. The shared folder is the faster path when you sit at your computer: there is no clone, the checks run with the toolchain you already have, and the pull request opens from your own `gh` login.
+
+Langy asks which way to use the first time a request needs a code change. Requests that the platform can do on its own, such as creating a scenario or an evaluation, never ask.
+
+<Info>**Also check:** [Pull requests](/langy/pull-requests) (the GitHub path), [The sandbox](/langy/security/sandbox) (where Langy itself runs), [CLI](/integration/cli) (the `langwatch` command).</Info>
+
+## How a shared folder works
+
+<Steps>
+  <Step title="Ask for a change">
+    Ask Langy for something that lives in your code: "instrument my traces", "fix the agent behind this failing scenario", "add a plan parameter to my connected agent". Langy explains what it will change and shows the code access card with two options: share your local folder, or use GitHub.
+  </Step>
+  <Step title="Run the command in the folder">
+    Pick "Share my local folder". The card shows one command. Run it in the folder you want Langy to work in:
+
+    ```bash
+    npx langwatch@latest langy --share-control
+    ```
+
+    The command signs you in when you are not signed in yet, then shows the request from your conversation and asks you to approve it in the terminal. The request expires after 15 minutes.
+  </Step>
+  <Step title="Langy works in the folder">
+    Once approved, the card shows the connected folder and the branch, and Langy starts. It explores the project, creates a branch from the latest default branch, makes the change, runs the project's own checks, commits in your git identity, pushes, and opens the pull request when `gh` is signed in. When it is not, Langy reports the branch name instead.
+  </Step>
+  <Step title="Disconnect">
+    Press Ctrl-C in the terminal to disconnect. The chat shows the folder as disconnected. The next request that needs code access asks again.
+  </Step>
+</Steps>
+
+The connection belongs to one conversation. A second code change in the same conversation uses the folder that is already connected. A new conversation asks again.
+
+{/* TODO screenshot: the code access card in the waiting state next to the terminal approve prompt */}
+
+## What Langy can do in the folder
+
+Every action runs on your machine, inside the shared folder, through the CLI. Langy cannot see or touch anything outside it.
+
+| Action | Asks first |
+|---|---|
+| Read a file, list a directory, search for text or files | No |
+| Edit a file, write a new file | No |
+| Run a read-only command (`ls`, `cat`, `git status`, `git diff`, `git log`, `node -v`, and similar) | No |
+| Run any other command (`pnpm test`, `git push`, `rm`) | Yes |
+| Read a secret file (`.env`, `*.pem`, `*.key`, `id_rsa`, `.netrc`) | Yes, even to read |
+| Reach a path outside the folder, or use `sudo` | Refused in every mode |
+
+Edits inside the folder run without a question because Langy works on its own branch: your working state and your default branch stay untouched, and the pull request is where you review the change.
+
+A refused action is not silent. The CLI tells Langy why it was refused, and Langy finds another way inside the folder or says what it could not do.
+
+## Permissions
+
+When a command needs approval, the chat shows a permission card with the command, the folder and the machine name. The terminal points you to the chat.
+
+- **Allow once** runs this command.
+- **Allow this pattern this session** runs this command and, until you disconnect, every command that starts the same way, for example `pnpm *`.
+- **Deny** refuses it. Langy does not run it again in that turn.
+
+A card that gets no answer within 10 minutes expires, and Langy ends its turn and says what it still needs.
+
+### Skip permission checks
+
+The permission card carries a switch to skip all permission checks for the rest of the connection. Refusals for paths outside the folder and for `sudo` still apply.
+
+The switch is enabled only for models your provider settings allow. Open the provider in **Settings > Model providers**, section **Advanced**, field **Models allowed to skip permission checks**: one pattern per line. The defaults allow the frontier OpenAI and Anthropic models and no others. When the conversation's model is not on the list, the switch is disabled and says so.
+
+## Remembering GitHub
+
+The code access card has a "Remember this choice" option for GitHub. With it on, later requests skip the card and show a status line, "Using GitHub", with a **Change** link that clears the choice and asks again.
+
+The same choice is visible in **Settings > Integrations**, next to the GitHub connection. A shared local folder is never remembered: it is one command away and belongs to one conversation.
+
+## What the CLI does and does not do
+
+- The connection is outbound only, from your machine to LangWatch. Nothing listens on your machine.
+- The CLI receives a key scoped to the one conversation. Ctrl-C ends it. You can also disconnect from the chat.
+- Command output returns to Langy when the command ends, capped at 64 KiB. Longer output is kept in a log file under `.langwatch/langy-logs/` in the folder, and Langy gets the path.
+- A server Langy starts in the background keeps running after the CLI exits. Langy reports its process id and log path.
+- Nothing is installed. `npx langwatch@latest` runs the CLI from the registry.
+
+Self-hosting? The CLI connects to your instance's base URL. See [Networking and egress](/self-hosting/langy/networking-and-egress#local-control-connections) for the one route your ingress must pass through.
+
+---
+
 # FILE: ./langy/models.mdx
 
 ---
@@ -61152,7 +61266,21 @@ keywords:
 
 Langy changes code in exactly one way: it opens a pull request. It pushes only to the branch it creates for that PR, never to your default or existing branches, and it never merges its own PR.
 
-<Info>**Also check:** [GitHub access](/langy/security/github-access) (the scopes and the boundary), [GitHub App setup](/self-hosting/langy/github-app) (registering the app when self-hosting), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what runs in CI on the PR).</Info>
+<Info>**Also check:** [Local development](/langy/local-development) (the same result from a folder on your machine), [GitHub access](/langy/security/github-access) (the scopes and the boundary), [GitHub App setup](/self-hosting/langy/github-app) (registering the app when self-hosting), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what runs in CI on the PR).</Info>
+
+## Two ways to reach your code
+
+The first time a request needs a code change, Langy asks how to reach the code.
+
+| | GitHub App | Shared local folder |
+|---|---|---|
+| Where the work runs | In Langy's sandbox, on a fresh clone | On your machine, in the folder you share |
+| Checks | Your CI, on the pull request | Your own toolchain, before the push |
+| Commits | The bot, with you as co-author | Your git identity |
+| Setup | Install the GitHub App once | Run one command per conversation |
+| Remembered | Yes, with "Remember this choice" | No, one conversation at a time |
+
+This page covers the GitHub App path. The shared folder is described in [Local development](/langy/local-development). Both end in a pull request that a person reviews.
 
 ## How a Langy PR is made
 
@@ -65363,6 +65491,20 @@ With `GITHUB_LANGY_HOST` set to a GitHub Enterprise Server hostname, the control
 Everything above is outbound. The one inbound path GitHub uses is the webhook, delivered to `<BASE_URL>/api/github/webhook`.
 
 It is optional. An instance GitHub cannot reach still connects and works, and reconciles late instead. For what changes, see [Restricted networks](/self-hosting/langy/github-app#restricted-networks).
+
+## Local control connections
+
+[Local development](/langy/local-development) lets a developer share a folder on their machine with Langy. The `langwatch langy --share-control` command opens one outbound connection from the developer's machine to the LangWatch app, not to the agent pod. The agent pod needs no new egress: the worker reaches the app in-cluster, on the path it already uses.
+
+| Route | Direction | Purpose |
+|---|---|---|
+| `<BASE_URL>/api/v1/langy/control/connect` | Developer machine to app, WebSocket upgrade | The live relay for file and command calls |
+| `<BASE_URL>/api/v1/langy/control/connect/*` | Developer machine to app, HTTPS | Long-poll fallback when the upgrade is refused |
+| `<BASE_URL>/api/v1/langy/control/requests` | Developer machine to app, HTTPS | List, approve and cancel control requests |
+
+An ingress that does not pass WebSocket upgrades still works: the CLI falls back to long-polling on its own. Each poll holds for up to 20 seconds, so keep the ingress read timeout at 30 seconds or more. The same timeout already applies to [connected agents](/agent-testing/connect-your-agent).
+
+The developer authenticates with their device session to approve a request, and the CLI then holds a Langy session key scoped to one conversation. The key stops working when the CLI disconnects or the conversation's workspace is disconnected from the chat.
 
 ## Enable outbound egress
 

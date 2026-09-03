@@ -437,7 +437,7 @@ func (s *streamState) applyToolStart(ev wireEvent) bool {
 		}
 	}
 	s.startedInput[ev.ID] = input
-	f, mErr := frames.ToolStart(ev.ID, ev.Name, "", "", input)
+	f, mErr := frames.ToolStart(ev.ID, ev.Name, toolmap.ToolTitle(ev.Name), "", input)
 	if mErr != nil {
 		return true
 	}
@@ -459,7 +459,7 @@ func (s *streamState) applyToolEnd(ev wireEvent) bool {
 	// A fast tool whose start was never surfaced still opens its card first,
 	// so the consumer is never asked to close a card it was never told to open.
 	if s.tools.StartIfNew(ev.ID) {
-		if f, mErr := frames.ToolStart(ev.ID, ev.Name, "", "", input); mErr == nil {
+		if f, mErr := frames.ToolStart(ev.ID, ev.Name, toolmap.ToolTitle(ev.Name), "", input); mErr == nil {
 			s.isAfterTool = true
 			if !s.emit(f) {
 				return false

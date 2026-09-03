@@ -642,6 +642,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Automatic Prompt Optimization](https://langwatch.ai/docs/langy/prompt-optimization.md): Langy scores the current prompt, duplicates it, rewrites the duplicate, runs both against your evaluator, and reports the pass rate before and after with the cost.
 - [Scenario tests and evaluations](https://langwatch.ai/docs/langy/scenario-tests-and-evals.md): What Langy produces when it tests your agent: Scenario multi-turn simulation tests and evaluations, written and run through the langwatch CLI.
 - [Pull requests](https://langwatch.ai/docs/langy/pull-requests.md): How Langy changes your code: bot-authored pull requests through a GitHub App, credited to you, reviewed by a human before merge, with the Scenario tests it wrote running in your CI.
+- [Local development](https://langwatch.ai/docs/langy/local-development.md): Share a folder on your machine with Langy: it edits your code there, runs your own toolchain, and opens the pull request from your git identity, with every command checked in the chat.
 - [Insights across your traces](https://langwatch.ai/docs/langy/insights.md): Ask Langy what changed and it analyzes patterns across thousands of your traces, compares this week to previous weeks, and can set up alerts and automations for what matters.
 
 ## Models & Cost

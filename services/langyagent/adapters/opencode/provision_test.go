@@ -588,8 +588,9 @@ func TestProvision_ConfiguresLangyBuildAgent(t *testing.T) {
 		t.Errorf("agent.build.prompt must carry the Langy persona and point at the AGENTS.md contract; got\n%s", prompt)
 	}
 
-	// Denied because the panel has no surface for them yet, not because the
-	// capability is unwanted.
+	// Subagent spawning is denied because the panel has no surface for it. The
+	// harness's own question prompt is denied because Langy asks with its own
+	// question tool, which the panel renders as a choices card.
 	for _, tool := range []string{"task", "question"} {
 		if got := cfg.Agent.Build.Permission[tool]; got != "deny" {
 			t.Errorf("agent.build.permission[%q] = %v, want %q — the panel cannot show this tool's work", tool, got, "deny")
