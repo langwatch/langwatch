@@ -1,7 +1,8 @@
 import { useChat } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
+import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 import type { LangyMessageDto } from "../data/langy.dtos";
@@ -59,6 +60,24 @@ export function useLangyChatEngine({
       // here: one calm surface only.
     },
   });
+
+  // Langy can mutate server-side state (e.g. dashboard widgets) mid-turn.
+  // Nothing else observes a turn's completion, so invalidate here, once,
+  // on the submitted/streaming -> ready/error transition — a ref (not
+  // state) tracks the previous status so this doesn't re-fire every render.
+  // Invalidating on a page with no dashboard mounted is a harmless no-op.
+  const utils = api.useUtils();
+  const previousStatusRef = useRef(status);
+  useEffect(() => {
+    const wasInFlight =
+      previousStatusRef.current === "submitted" ||
+      previousStatusRef.current === "streaming";
+    const isSettled = status === "ready" || status === "error";
+    if (wasInFlight && isSettled) {
+      void utils.dashboardWidgets.list.invalidate();
+    }
+    previousStatusRef.current = status;
+  }, [status, utils]);
 
   // useChat's setMessages identity is not guaranteed stable across renders.
   // Capture it in a ref so callers' effects key on real state changes (a
