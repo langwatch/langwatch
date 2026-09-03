@@ -930,6 +930,8 @@ Shortening a period without **Apply this change to existing data** leaves stored
 
 Retention works the same way on your own ClickHouse. Files that traces reference in object storage, for example images, are not deleted by retention.
 
+Without a license the deployment keeps the platform default of 49 days and cannot add a policy. An Enterprise license opens the same presets and custom period as the Enterprise plan.
+
 **Also check:** [Data Privacy](/platform/data-privacy) for what LangWatch stores in the first place, and [self-hosting](/self-hosting/overview) for the storage setup.
 
 ---
