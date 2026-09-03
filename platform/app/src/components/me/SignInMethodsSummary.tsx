@@ -2,7 +2,6 @@ import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { KeyRound } from "lucide-react";
 import { SettingsRowsSkeleton } from "~/components/settings/kit/SettingsSkeleton";
 import { signInMethodLabel } from "~/features/auth/logic/methodLabels";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 import { authClient } from "~/utils/auth-client";
 import RouterLink from "~/utils/compat/next-link";
@@ -49,7 +48,6 @@ import {
  * Spec: specs/settings/profile.feature
  */
 export function SignInMethodsSummary() {
-  const publicEnv = usePublicEnv();
   const identifiers = api.identity.myIdentifiers.useQuery({});
   const confirmation = api.auth.myAddressConfirmation.useQuery();
   const password = api.user.hasPassword.useQuery({});

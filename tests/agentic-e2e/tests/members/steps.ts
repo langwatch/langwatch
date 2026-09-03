@@ -34,10 +34,11 @@ export async function givenIAmOnTheMembersPage(page: Page) {
 // =============================================================================
 
 /**
- * Open the invite drawer from the members page.
+ * Open the invite drawer from the Directory's People tab. The button reads
+ * "Invite people"; the drawer it opens is still titled "Add members".
  */
 export async function whenIClickAddMembers(page: Page) {
-  await page.getByRole("button", { name: /Add members/i }).click();
+  await page.getByRole("button", { name: /Invite people/i }).click();
   // Wait for dialog - use last() for Chakra UI duplicate rendering
   await expect(
     page.getByRole("heading", { name: "Add members" }).last()
@@ -97,10 +98,12 @@ export async function whenICloseInviteLinkDialog(page: Page) {
 // =============================================================================
 
 /**
- * Assert that an email appears in the "Invites" list with an invited badge.
+ * Assert that an email appears in the People list with an invited badge. An
+ * invitation is one cut of the Directory's single list of people, so the row
+ * sits in the people list rather than in a table of its own.
  */
 export async function thenISeeSentInviteFor(page: Page, email: string) {
-  const invitesList = page.getByTestId("invites-list");
+  const invitesList = page.getByTestId("people-list");
   await expect(invitesList).toBeVisible({ timeout: 10000 });
 
   const row = invitesList.getByTestId("invite-row").filter({ hasText: email });
