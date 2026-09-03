@@ -462,6 +462,12 @@ describe("Brace-expansion budget (Finding 2)", () => {
     // Eight ten-alternative groups glued into one word is 10^8 combos, measured
     // at 6.3s / 710MB unbudgeted. The budget is counted before the product is
     // built, so this must resolve to a hold near-instantly.
+    //
+    // The brace-expansion budget now covers three adversarial shapes: this
+    // combinatorial explosion (MAX_BRACE_RESULTS/MAX_BRACE_GROUPS), a huge
+    // unenumerable/mismatched range (also these two caps, via enumerateRange),
+    // and a long run of unmatched `{` with no closing `}` anywhere (neither cap
+    // engages — MAX_BRACE_WORD_LENGTH below covers that shape directly).
     const glued = "{a,b,c,d,e,f,g,h,i,j}".repeat(8);
     const command = `langwatch dataset ${glued}`;
     const start = performance.now();
@@ -489,6 +495,49 @@ describe("Brace-expansion budget (Finding 2)", () => {
         expect.objectContaining({ kind: "unparseable", cause: "brace-expansion-budget" }),
       );
     }
+  });
+});
+
+describe("Brace-expansion word-length budget (unmatched-brace-run DoS)", () => {
+  /** @scenario A long run of unmatched braces on a langwatch argument is held quickly */
+  it("holds a langwatch argument padded with unmatched `{` in well under a linear-scan-defeating time", () => {
+    // findExpandableBrace previously rescanned to the end of the word for every
+    // unmatched `{`, an O(n^2) blow-up neither MAX_BRACE_RESULTS nor
+    // MAX_BRACE_GROUPS ever engages against (no expandable group is ever
+    // found). Measured at ~5s unbudgeted for 50,000 braces; must now resolve
+    // near-instantly via MAX_BRACE_WORD_LENGTH.
+    const glued = "{".repeat(50_000);
+    const command = `langwatch dataset list --tag ${glued}`;
+    const start = performance.now();
+    const decision = bash(command);
+    const elapsedMs = performance.now() - start;
+    expect(decision.allow).toBe(false);
+    expect(elapsedMs).toBeLessThan(100);
+    expect(findDestructiveMatches(command)).toContainEqual(
+      expect.objectContaining({ kind: "unparseable", cause: "brace-expansion-budget" }),
+    );
+  });
+
+  /** @scenario A non-langwatch command with the same unmatched-brace run is unaffected */
+  it("does not hold a non-langwatch head carrying the same unmatched-brace run", () => {
+    // The word-length budget only applies inside a langwatch invocation's
+    // argument-brace pass; an ordinary command is never routed through it.
+    const glued = "{".repeat(50_000);
+    const command = `echo ${glued}`;
+    const start = performance.now();
+    const decision = bash(command);
+    const elapsedMs = performance.now() - start;
+    expect(decision.allow).toBe(true);
+    expect(elapsedMs).toBeLessThan(100);
+  });
+
+  /** @scenario A long brace-free langwatch argument is not over-blocked */
+  it("does not hold a long langwatch argument that carries no unquoted brace", () => {
+    // The budget triggers on length ONLY when an unquoted `{` is present — a
+    // long brace-free argument (a big JSON blob, a long tag) must stay allowed.
+    const longArg = "x".repeat(2000);
+    const command = `langwatch dataset list --tag ${longArg}`;
+    expect(bash(command).allow).toBe(true);
   });
 });
 

@@ -297,6 +297,20 @@ Feature: Langy's worker-side delete gate
       # unenumerable is held, never brace-stripped.
 
     @unit
+    Scenario: A long run of unmatched braces on a langwatch argument is held quickly
+      Given a langwatch command argument padded with a long run of unmatched `{`
+        (no closing `}` anywhere in the word)
+      When the command is run as a gated bash command
+      Then the gate returns allow:false
+      And it returns quickly, without a rescan proportional to the run's length
+      # findExpandableBrace previously rescanned to the end of the word for
+      # every unmatched `{`, an O(n^2) blow-up neither the result nor the group
+      # budget ever engages against, since no expandable group is ever found.
+      # A word-length budget (MAX_BRACE_WORD_LENGTH) holds it directly, and the
+      # scan itself is now a single linear pass regardless of unmatched braces.
+      # A non-langwatch head carrying the same run is unaffected.
+
+    @unit
     Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked
       Given a langwatch or ordinary command whose brace group is suppressed by a
         backslash-escaped comma (`dele{\,}te`, `a{\,}b`) or by quoting, which
@@ -493,7 +507,7 @@ Feature: Langy's worker-side delete gate
 # AC 10: "Read-only langwatch calls pass" -> Scenario Outline: Read-only langwatch CLI calls pass without confirmation; Scenario: A quoted or escaped argument is not over-blocked, even with word-internal splices; Scenario: Routine brace expansion in a non-langwatch command is not over-blocked; Scenario: An escaped double-quote inside a double-quoted word is parsed as one argument, not held; Scenario: An unquoted shell comment does not make a command unparseable
 # AC 11: "Non-langwatch bash passes" -> Scenario Outline: Non-langwatch bash commands pass without confirmation
 # AC 12: "Block reason is actionable" -> Scenario: A block reason for an unconfirmed delete tells the agent to ask first; Scenario: A block reason for an unresolvable command tells the agent how to re-issue it; Scenario: An obfuscated command-name block names the obfuscation and says to re-issue the name plainly; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm
-# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held; Scenario: A single-element or enumerated range brace that reassembles a destructive verb is held; Scenario: A brace expansion exceeding the enumeration budget is held quickly; Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked; Scenario: The brace expander matches real bash for every handled brace form; Scenario: An awk program that concatenates a destructive command through system() is held
+# AC 13: "Write-then-execute is held unconditionally" -> Scenario: A write or edit whose content contains a destructive command is held; Scenario Outline: Executing an agent-written file is held even with a valid confirmation; Scenario: A bash native quote-splice that reassembles the CLI name is held; Scenario: A backslash- or brace-spliced command name that reassembles the CLI name is held; Scenario: A brace-expansion splice that reassembles a destructive verb or resource is held; Scenario: A single-element or enumerated range brace that reassembles a destructive verb is held; Scenario: A brace expansion exceeding the enumeration budget is held quickly; Scenario: A long run of unmatched braces on a langwatch argument is held quickly; Scenario: An escaped or quoted brace that bash leaves literal is not over-blocked; Scenario: The brace expander matches real bash for every handled brace form; Scenario: An awk program that concatenates a destructive command through system() is held
 # AC 14: "Destructive HTTP beyond literal DELETE is held" -> Scenario: A POST GraphQL delete or archive mutation...; Scenario: A PUT or PATCH soft-delete...; Scenario: A POST to a destructive action endpoint...; Scenario: A destructive HTTP block tells the agent to re-issue through the CLI, not to confirm; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (HTTP-shape delete case)
 # AC 15: "Benign HTTP to a langwatch host is NOT over-blocked" -> Scenario: A GET request to a langwatch host is not blocked; Scenario: A read or non-destructive GraphQL POST to a langwatch host is not blocked
 # AC 16: "Equals-form flag values are evaluated" -> Scenario: An equals-form flag value carrying a destructive verb is matched; Scenario Outline: Each unconfirmed bypass class is blocked at the real tool_call seam (equals-form case)

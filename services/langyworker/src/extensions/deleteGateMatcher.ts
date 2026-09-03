@@ -542,9 +542,21 @@ function verbOfToken(token: string): string | null {
  * brace-stripped. `256` results covers every real reassembled verb/resource
  * (`d{el,}ete`, `data{set,}`) with wide margin; `8` groups bounds the recursion
  * depth even when each group is tiny (`{,}` × 8 = 256).
+ *
+ * These two caps bound the COMBINATORIAL and HUGE-RANGE shapes. A third shape —
+ * a long run of `{` with no matching `}` — bypasses both, because no
+ * expandable group is ever found (`findExpandableBrace` returns null and
+ * neither cap engages): a `langwatch dataset list --tag ` argument padded with
+ * 50,000 literal `{` took ~5s synchronously in the tool_call hook, even though
+ * `findExpandableBrace` itself is now a single linear pass (previously an O(n²)
+ * rescan-from-each-`{` that was the actual cost). `MAX_BRACE_WORD_LENGTH`
+ * closes this third shape directly: a `langwatch`-argument word carrying an
+ * unquoted `{` longer than the cap is held before expansion is attempted at
+ * all, regardless of whether it would ever resolve to a real group.
  */
 const MAX_BRACE_RESULTS = 256;
 const MAX_BRACE_GROUPS = 8;
+const MAX_BRACE_WORD_LENGTH = 1024;
 
 /**
  * Split a brace body on its top-level commas, honouring nested braces and — the
@@ -599,10 +611,25 @@ function splitTopLevelCommas(body: string): string[] {
  * looks for the next `{`. Quotes and backslash escapes suppress a brace, comma,
  * or `..` the way bash does (`"{a,b}"`, `\{`, `\,` do not expand), so an
  * argument-position quoted/escaped brace is never mistaken for an expansion.
+ *
+ * Single linear pass over `text` (a stack of open-brace frames, matched as
+ * `}` closes each), not a rescan-from-every-`{`: the previous version restarted
+ * a full inner scan at every unmatched or nested `{`, which is O(n²) on a long
+ * run of unmatched braces (`{{{{{{…`, no closing `}` anywhere) — 50,000 glued
+ * `{` measured at ~5s in the synchronous tool_call hook. "First qualifying
+ * group" reduces to "leftmost brace-open position whose own matched group has
+ * a direct-level comma/range", which is exactly the leftmost-starting frame
+ * flagged `hasComma`/`hasRange` when it closes — nesting always gives an outer
+ * frame a smaller `start` than any frame it contains, so taking the minimum
+ * `start` over every closed, qualifying frame reproduces the old leftmost-scan
+ * result in one pass.
  */
 function findExpandableBrace(
   text: string,
 ): { start: number; end: number; isRange: boolean } | null {
+  type Frame = { start: number; hasComma: boolean; hasRange: boolean };
+  const stack: Frame[] = [];
+  let best: { start: number; end: number; isRange: boolean } | null = null;
   let inSingle = false;
   let inDouble = false;
   for (let i = 0; i < text.length; i += 1) {
@@ -619,44 +646,28 @@ function findExpandableBrace(
       inDouble = !inDouble;
       continue;
     }
-    if (c !== "{" || inSingle || inDouble) continue;
-    let depth = 0;
-    let hasComma = false;
-    let hasRange = false;
-    let jSingle = false;
-    let jDouble = false;
-    for (let j = i; j < text.length; j += 1) {
-      const d = text[j] ?? "";
-      if (d === "\\" && !jSingle) {
-        j += 1;
-        continue;
+    if (inSingle || inDouble) continue;
+    if (c === "{") {
+      stack.push({ start: i, hasComma: false, hasRange: false });
+    } else if (c === "}") {
+      const frame = stack.pop();
+      if (!frame) continue; // unmatched `}`: nothing to close.
+      if ((frame.hasComma || frame.hasRange) && (best === null || frame.start < best.start)) {
+        best = { start: frame.start, end: i, isRange: !frame.hasComma && frame.hasRange };
       }
-      if (d === "'" && !jDouble) {
-        jSingle = !jSingle;
-        continue;
-      }
-      if (d === '"' && !jSingle) {
-        jDouble = !jDouble;
-        continue;
-      }
-      if (jSingle || jDouble) continue;
-      if (d === "{") {
-        depth += 1;
-      } else if (d === "}") {
-        depth -= 1;
-        if (depth === 0) {
-          if (hasComma) return { start: i, end: j, isRange: false };
-          if (hasRange) return { start: i, end: j, isRange: true };
-          break; // literal `{…}`: skip it and look for the next brace group.
-        }
-      } else if (d === "," && depth === 1) {
-        hasComma = true;
-      } else if (d === "." && text[j + 1] === "." && depth === 1) {
-        hasRange = true;
+    } else if (stack.length > 0) {
+      // Only the innermost currently-open frame owns this character — the
+      // direct-level (`depth === 1` in the old scan) content of its group.
+      const top = stack[stack.length - 1];
+      if (!top) continue;
+      if (c === ",") {
+        top.hasComma = true;
+      } else if (c === "." && text[i + 1] === ".") {
+        top.hasRange = true;
       }
     }
   }
-  return null;
+  return best; // frames left open (unmatched `{`) never close, so never qualify.
 }
 
 /** Zero-pad a signed integer to `width` the way bash does for `{01..05}`. */
@@ -945,6 +956,13 @@ function classifySegment(segment: string): DestructiveMatch | null {
     for (let i = 1; i < stripped.length; i += 1) {
       const word = stripped[i];
       if (!word || !hasUnquotedBrace(word.raw)) continue;
+      // A word this long carrying an unquoted `{` is held before expansion is
+      // even attempted — closes the unmatched-brace-run DoS shape directly,
+      // independent of whether `findExpandableBrace`/`bashBraceExpand` would
+      // ever find a real group in it. See `MAX_BRACE_WORD_LENGTH`.
+      if (word.raw.length > MAX_BRACE_WORD_LENGTH) {
+        return { kind: "unparseable", segment, cause: "brace-expansion-budget" };
+      }
       const expansions = bashBraceExpand(word.raw);
       if (expansions === null) {
         // Budget overflow or an unenumerable/mismatched range: fail closed,
