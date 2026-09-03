@@ -176,7 +176,7 @@ describe("governance_cost_rollup_1d retention exemption", () => {
     const migration = readFileSync(
       join(
         process.cwd(),
-        "src/server/clickhouse/migrations/00087_create_governance_cost_rollup_1d.sql",
+        "src/server/clickhouse/migrations/00089_create_governance_cost_rollup_1d.sql",
       ),
       "utf8",
     );
