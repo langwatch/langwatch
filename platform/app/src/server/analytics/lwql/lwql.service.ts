@@ -555,6 +555,36 @@ export class LangWatchQLService {
    * more decisions to make — only the database call, the advisory diagnostics
    * over its answer, and the result both of them describe.
    */
+  /**
+   * The project's tenant capability, with a derivation failure mapped onto the
+   * API's own vocabulary.
+   *
+   * The derivation refuses two things — an unselected secret and one longer
+   * than bcrypt reads — and both throw a plain `Error`, correctly, because
+   * neither is anything a caller did. But a plain `Error` escaping here reaches
+   * the boundary as a generic "unknown error" plus a trace id, for a failure we
+   * can name precisely: this project cannot be resolved to a tenant, so there
+   * is no identity to run its SQL as. That is the same condition as a missing
+   * restricted identity and gets the same answer, with the original kept as a
+   * `reason` so the log line still says which of the two refusals fired.
+   */
+  private async tenantCapabilityFor(project: {
+    id: string;
+    lwqlKey: string;
+  }): Promise<string> {
+    try {
+      return await lwqlTenantCapability({ secret: project.lwqlKey });
+    } catch (error) {
+      logger.error(
+        { projectId: project.id, error },
+        "LangWatchQL query refused: this project's key cannot be derived into a tenant capability",
+      );
+      throw new LangWatchQLUnavailableError({
+        reasons: error instanceof Error ? [error] : [],
+      });
+    }
+  }
+
   private async executeValidated({
     executor,
     project,
@@ -585,9 +615,7 @@ export class LangWatchQLService {
       ...(Object.keys(executionParameters).length > 0
         ? { parameters: executionParameters }
         : {}),
-      tenantCapability: await lwqlTenantCapability({
-        secret: project.lwqlKey,
-      }),
+      tenantCapability: await this.tenantCapabilityFor(project),
       limits: this.limits,
     });
 

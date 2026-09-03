@@ -106,7 +106,6 @@ describe("given a project's LangWatchQL secret", () => {
           .map((secret) => lwqlTenantCapability({ secret })),
       );
 
-      // The second pass, taken in reverse, answered with the same capabilities.
       expect(warm).toEqual([...cold].reverse());
       // And no two projects share one, which is what the key map would need to
       // resolve two tenants to a single row.
