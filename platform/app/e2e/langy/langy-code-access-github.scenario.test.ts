@@ -15,7 +15,10 @@ import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { makeLangyAdapter } from "./langy-agent";
-import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
+import {
+  LANGY_CORE_RULE_CRITERIA,
+  LANGY_OPEN_PR_CRITERIA,
+} from "./langy-rules";
 import {
   getLocalWorkspace,
   setCodeAccessPreference,
@@ -61,7 +64,11 @@ describe("Langy remembers that the developer works through GitHub", () => {
                 criteria: [
                   "Langy explains, once, that it can make the change on the developer's machine or through GitHub.",
                   "After the developer picks GitHub, Langy follows the GitHub path and does not offer the folder again.",
-                  ...LANGY_CORE_RULE_CRITERIA,
+                  // The second turn IS the open-pull-request flow, so it is
+                  // graded by that flow's rubric: on a machine where the
+                  // GitHub App is not installed the platform stops the turn,
+                  // and naming that blocker is the answer.
+                  ...LANGY_OPEN_PR_CRITERIA,
                 ],
               }),
             ],
@@ -108,8 +115,7 @@ describe("Langy remembers that the developer works through GitHub", () => {
                 model,
                 criteria: [
                   "Langy does not ask how to reach the code: it already knows the developer uses GitHub.",
-                  "Langy works toward a pull request, or names the one thing that blocks it.",
-                  ...LANGY_CORE_RULE_CRITERIA,
+                  ...LANGY_OPEN_PR_CRITERIA,
                 ],
               }),
             ],

@@ -20,6 +20,7 @@ import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
 import {
   getLocalWorkspace,
   setCodeAccessPreference,
+  watchLangyConversation,
 } from "./local-control-fixture";
 import { runScenarioAndLog } from "./scenario-logger";
 
@@ -40,6 +41,10 @@ describe("Langy asks for the code only when the code has to change", () => {
       "creates the scenario and never asks how to reach the code",
       async () => {
         const langy = makeLangyAdapter();
+        // Langy may ask a question card while it works. The user simulator
+        // answers messages, not cards, so without this the turn waits on a
+        // card nobody can reach and the stream budget ends the run.
+        const watcher = watchLangyConversation({ adapter: langy });
         const before = await listScenarios();
 
         const result = await runScenarioAndLog({
@@ -69,9 +74,15 @@ describe("Langy asks for the code only when the code has to change", () => {
           },
         });
 
+        watcher.stop();
+
         const conversationId = langy.state.conversationId ?? "";
         const status = await getLocalWorkspace(conversationId);
         console.log("[layer2] tools:", langy.state.toolNames.join(", "));
+        console.log(
+          "[layer2] questions:",
+          watcher.questions.map((ask) => ask.questions[0]?.question).join(" | "),
+        );
         console.log(
           "[layer2] pendingRequest:",
           JSON.stringify(status.pendingRequest),

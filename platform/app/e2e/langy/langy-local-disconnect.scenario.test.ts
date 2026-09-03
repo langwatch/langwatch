@@ -95,7 +95,7 @@ describe("Langy notices when the shared folder goes away", () => {
                 "add type hints to the account store in this project",
               ),
               scenario.agent(),
-              async () => {
+              async (_state, executor) => {
                 const conversationId = langy.state.conversationId ?? "";
                 expect(langy.state.toolNames).toContain("code_access");
                 await waitForPendingRequest({ conversationId });
@@ -115,6 +115,12 @@ describe("Langy notices when the shared folder goes away", () => {
                   void terminal!.disconnect();
                 }, WORK_BEFORE_DISCONNECT_MS);
                 await watcher!.waitForIdle(LONG_RUN_TIMEOUT_MS);
+                // The panel started that turn, so it never passed through the
+                // adapter. Its tool record goes in front of the judge here, or
+                // everything the next reply says about it reads as ungrounded.
+                for (const message of await watcher!.lastTurnMessages()) {
+                  await executor.message(message as never);
+                }
               },
               scenario.user("what happened? is the change in?"),
               scenario.agent(),

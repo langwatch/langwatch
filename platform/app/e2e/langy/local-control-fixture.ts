@@ -407,6 +407,36 @@ export interface CliTerminal {
 }
 
 /**
+ * Cancels every control request still open for this project.
+ *
+ * A request a run never answered stays open for its whole window, and the next
+ * `langwatch langy --share-control` then opens the picker instead of waiting.
+ * Every scenario shares one project, so one run's leftovers change what the
+ * next run's command line does. Clearing them first is what a developer with
+ * one live conversation sees.
+ */
+export async function cancelOpenControlRequests(): Promise<void> {
+  const apiKey = await getCliApiKey();
+  const headers = {
+    "X-Auth-Token": apiKey,
+    "X-Project-Id": PROJECT_ID,
+    "Content-Type": "application/json",
+  };
+  const listed = await fetch(`${APP_BASE}/api/v1/langy/control/requests`, {
+    headers,
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!listed.ok) return;
+  const body = (await listed.json()) as { requests?: Array<{ id: string }> };
+  for (const request of body.requests ?? []) {
+    await fetch(
+      `${APP_BASE}/api/v1/langy/control/requests/${encodeURIComponent(request.id)}/cancel`,
+      { method: "POST", headers, signal: AbortSignal.timeout(30_000) },
+    ).catch(() => undefined);
+  }
+}
+
+/**
  * Start `langwatch langy --share-control` in the folder, in its own terminal.
  *
  * The command line waits when no request is open, so a scenario can start it
@@ -420,6 +450,7 @@ export async function startShareControl({
   label: string;
 }): Promise<CliTerminal> {
   await buildCli();
+  await cancelOpenControlRequests();
   const apiKey = await getCliApiKey();
   const sessionName = `langy-${label}-${Date.now().toString(36)}`;
   const configPath = path.join(repo.root, "..", `${sessionName}-config.json`);
@@ -453,13 +484,42 @@ export async function startShareControl({
     script,
   ]);
 
+  // Everything the terminal prints, kept on disk. tmux ends the session with
+  // the process and takes the last screen with it, so the goodbye line a test
+  // asserts on would otherwise be gone before it could be read.
+  const paneLog = path.join(repo.root, "..", `${sessionName}.log`);
+  sh("tmux", [
+    "pipe-pane",
+    "-o",
+    "-t",
+    sessionName,
+    `cat >> ${JSON.stringify(paneLog)}`,
+  ]);
+
+  // tmux ends the session with the process, and capture-pane on a session that
+  // is gone answers nothing. The last text the terminal showed is what a test
+  // asserts on after the command line exits, so every successful capture is
+  // remembered and served once the session is gone.
+  const readPaneLog = (): string => {
+    try {
+      return readFileSync(paneLog, "utf8");
+    } catch {
+      return "";
+    }
+  };
   const capture = (): string => {
     const result = spawnSync(
       "tmux",
       ["capture-pane", "-p", "-t", sessionName, "-S", "-3000"],
       { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
     );
-    return result.stdout ?? "";
+    const pane = result.stdout ?? "";
+    const logged = readPaneLog();
+    // The live pane reads best while the session is there; once it is gone the
+    // log is the only copy, and it is also the only place the last lines
+    // before the exit survive.
+    if (pane.trim() === "") return logged;
+    return logged.includes("Leaving") ? `${pane}\n${logged}` : pane;
   };
   const isRunning = (): boolean =>
     spawnSync("tmux", ["has-session", "-t", sessionName]).status === 0;
@@ -562,6 +622,31 @@ export type QuestionAnswerPicker = (question: {
   options?: Array<{ label: string }>;
 }) => string[];
 
+/** One message in the shape the scenario judge reads. */
+export type JudgeMessage =
+  | { role: "assistant"; content: string }
+  | {
+      role: "assistant";
+      content: Array<
+        | { type: "text"; text: string }
+        | {
+            type: "tool-call";
+            toolCallId: string;
+            toolName: string;
+            input: unknown;
+          }
+      >;
+    }
+  | {
+      role: "tool";
+      content: Array<{
+        type: "tool-result";
+        toolCallId: string;
+        toolName: string;
+        output: { type: "text" | "error-text"; value: string };
+      }>;
+    };
+
 /** What the watcher saw on the conversation, and what it answered. */
 export interface ConversationWatcher {
   permissions: PermissionAsk[];
@@ -583,6 +668,16 @@ export interface ConversationWatcher {
   transcript: () => Promise<string>;
   /** The text of the last assistant message. */
   lastAssistantText: () => Promise<string>;
+  /**
+   * The last assistant message as a judge reads a turn: the tool calls it made
+   * and what they answered, then its reply.
+   *
+   * A turn the panel starts on its own never passes through the scenario
+   * adapter, so nothing else puts its work in front of the judge. Feeding only
+   * the reply leaves every claim in it looking ungrounded, which is a fact
+   * about the harness and not about the answer.
+   */
+  lastTurnMessages: () => Promise<JudgeMessage[]>;
   stop: () => void;
 }
 
@@ -828,6 +923,55 @@ export function watchLangyConversation({
       .map((part) => String(part.text))
       .join("\n");
 
+  /**
+   * One stored message as the judge reads it: the tool calls and their results
+   * as their own messages, then the reply. The part type carries the tool name
+   * as `tool-<name>`, which is the panel's own shape.
+   */
+  const judgeMessagesOf = (message: {
+    role: string;
+    parts: Array<Record<string, unknown>>;
+  }): JudgeMessage[] => {
+    const calls = message.parts.filter(
+      (part) =>
+        typeof part.type === "string" &&
+        part.type.startsWith("tool-") &&
+        typeof part.toolCallId === "string",
+    );
+    const text = messageText(message);
+    if (calls.length === 0) return [{ role: "assistant", content: text }];
+    return [
+      {
+        role: "assistant",
+        content: calls.map((part) => ({
+          type: "tool-call" as const,
+          toolCallId: String(part.toolCallId),
+          toolName: String(part.type).slice("tool-".length),
+          input: part.input,
+        })),
+      },
+      {
+        role: "tool",
+        content: calls.map((part) => ({
+          type: "tool-result" as const,
+          toolCallId: String(part.toolCallId),
+          toolName: String(part.type).slice("tool-".length),
+          output: {
+            type:
+              part.state === "output-error"
+                ? ("error-text" as const)
+                : ("text" as const),
+            value:
+              typeof part.output === "string"
+                ? part.output
+                : JSON.stringify(part.output ?? ""),
+          },
+        })),
+      },
+      { role: "assistant", content: text },
+    ];
+  };
+
   return {
     permissions,
     questions,
@@ -867,6 +1011,15 @@ export function watchLangyConversation({
       );
       const last = assistant[assistant.length - 1];
       return last ? messageText(last) : "";
+    },
+    lastTurnMessages: async () => {
+      const snapshot = await readConversation();
+      const assistant = (snapshot?.messages ?? []).filter(
+        (message) => message.role === "assistant",
+      );
+      const last = assistant[assistant.length - 1];
+      if (!last) return [];
+      return judgeMessagesOf(last);
     },
     stop: () => {
       stopped = true;
