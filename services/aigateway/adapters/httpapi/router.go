@@ -1043,8 +1043,8 @@ func geminiModelFromPath(path string) string {
 }
 
 // forwardedPassthroughHeaders selects client headers safe to forward
-// upstream. Authorization + x-api-key + x-goog-api-key are dropped (the
-// gateway already resolved the VK secret and Bifrost injects the real
+// upstream. Every header extractToken accepts a virtual key on is dropped
+// (the gateway already resolved the VK secret and Bifrost injects the real
 // provider key). Hop-by-hop headers are dropped per RFC 7230 §6.1.
 func forwardedPassthroughHeaders(h http.Header) map[string]string {
 	if len(h) == 0 {
@@ -1059,6 +1059,7 @@ func forwardedPassthroughHeaders(h http.Header) map[string]string {
 		case "authorization",
 			"x-api-key",
 			"x-goog-api-key",
+			"xi-api-key",
 			"host",
 			"content-length",
 			"connection",
