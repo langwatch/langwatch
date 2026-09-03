@@ -6,6 +6,8 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { type AuthzMetricsPort, UncountedAuthzMetrics } from "../ports/authz-metrics.port";
 import type { PostgresAuthzDatabase } from "../ports/postgres-authz-database.port";
+import type { AuthzDatabase } from "../repositories/authz-read.repository";
+import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository";
 import type {
   AuthzGrantsCommandDispatcher,
   AuthzGrantsCommandSenders,
@@ -169,6 +171,15 @@ class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
 export class PostgresAuthzAdapter {
   static create(options: PostgresAuthzAdapterOptions): PostgresAuthzAdapter {
     return new PostgresAuthzAdapter(options);
+  }
+
+  /**
+   * The engine's own reader over a Postgres client, for a host that needs to
+   * see what the engine sees (the share ledger's cut-over check does). The
+   * repository stays private; this is the one door to it.
+   */
+  static createReader({ database }: { database: PostgresAuthzDatabase }) {
+    return PrismaAuthzReadRepository.create(database as unknown as AuthzDatabase);
   }
 
   private constructor(private readonly options: PostgresAuthzAdapterOptions) {}

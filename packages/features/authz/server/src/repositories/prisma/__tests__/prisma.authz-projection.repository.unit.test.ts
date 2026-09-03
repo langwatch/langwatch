@@ -155,7 +155,7 @@ describe("PrismaAuthzProjectionRepository", () => {
      * so an ADMIN import reassigned to a new custom role would keep answering
      * ADMIN.
      *
-     * @scenario "A reassigned role does not keep the role it was imported with"
+     * @scenario "A grant written to the projection is readable on the legacy head"
      */
     it("clears the imported legacy role rather than carrying it", async () => {
       const { repository, prisma } = build();

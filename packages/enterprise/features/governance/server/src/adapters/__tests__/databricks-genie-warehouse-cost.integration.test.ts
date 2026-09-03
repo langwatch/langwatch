@@ -538,10 +538,7 @@ describe("a source that names a warehouse", () => {
     );
   });
 
-  /**
-   * @scenario "A question is priced by the warehouse that answered it, not the
-   * one the connector signs in to"
-   */
+  /** @scenario "The billing query only ever runs on the configured workspace" */
   it("runs the billing query on the configured warehouse without restricting the answer to it", async () => {
     costPlan = { rows: [] };
 
@@ -903,10 +900,7 @@ describe("a source that names a warehouse", () => {
     expect(hintOf(second).costUsd).toBe("6");
   });
 
-  /**
-   * @scenario "A question seen before its bill has landed is asked about again,
-   * however far back it sits"
-   */
+  /** @scenario "A question seen before its bill has landed is held, not zeroed" */
   it("holds the watermark for a question seen but not billed yet, past the settling window", async () => {
     // The defect this whole change exists to stop. The billing query SUCCEEDS
     // and answers about the statement — the LEFT JOIN keeps it — but its hour

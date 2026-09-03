@@ -40,6 +40,8 @@ describe("ingestion template contract", () => {
     ).toBe(false);
   });
 
+  /** @scenario "The platform-template seed produces no coding-assistant rows" */
+  /** @scenario "The platform default template set ships no claude-cowork" */
   it("ships no platform defaults and retires coding-assistant rows", () => {
     expect(PLATFORM_INGESTION_TEMPLATES).toEqual([]);
     expect(RETIRED_PLATFORM_TEMPLATE_SLUGS).toEqual(

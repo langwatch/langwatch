@@ -18,7 +18,7 @@ type WebhookSendBatch = (
   context: IntentContext,
 ) => Promise<void>;
 
-class AppGovernanceWebhookPort extends GovernanceWebhookPort {
+export class AppGovernanceWebhookPort extends GovernanceWebhookPort {
   readonly maxAttempts = WEBHOOK_SEND_MAX_ATTEMPTS;
 
   private constructor(

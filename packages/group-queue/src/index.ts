@@ -14,6 +14,7 @@ export type {
   QueueSendOptions,
 } from "./contracts";
 export { defineGroupQueue } from "./definition";
+export { GroupQueueProcessor } from "./groupQueue";
 export {
   GroupQueueDependenciesAdapter,
   type GroupQueueDependenciesAdapterOptions,

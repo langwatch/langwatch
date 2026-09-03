@@ -694,3 +694,58 @@ describe("API-key service", () => {
     ).rejects.toMatchObject({ code: "project_visibility_too_wide" });
   });
 });
+
+describe("API key verification", () => {
+  describe("when a legacy key verifies", () => {
+    /** @scenario "A legacy service key states its access the first time it is used" */
+    it("mints its grant on the resolution path", async () => {
+      const legacyGrants = { mint: vi.fn() } as unknown as ApiKeyDependencies["legacyGrants"];
+      const service = createService(new MemoryApiKeys(), dependencies({ legacyGrants }));
+      const created = await service.create({
+        name: "legacy",
+        organizationId: "org-1",
+        permissionMode: "default",
+        bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org-1" }],
+      });
+
+      const verified = await service.tryVerify({ token: created.token });
+
+      expect(verified?.id).toBe(created.apiKey.id);
+      expect(legacyGrants.mint).toHaveBeenCalledWith(
+        expect.objectContaining({ id: created.apiKey.id }),
+      );
+    });
+  });
+
+  describe("when the credential does not resolve", () => {
+    it("mints nothing", async () => {
+      const legacyGrants = { mint: vi.fn() } as unknown as ApiKeyDependencies["legacyGrants"];
+      const service = createService(new MemoryApiKeys(), dependencies({ legacyGrants }));
+
+      expect(await service.tryVerify({ token: "sk-lw-x_y" })).toBeNull();
+      expect(legacyGrants.mint).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a revoked key is presented", () => {
+    it("mints nothing", async () => {
+      const legacyGrants = { mint: vi.fn() } as unknown as ApiKeyDependencies["legacyGrants"];
+      const service = createService(new MemoryApiKeys(), dependencies({ legacyGrants }));
+      const created = await service.create({
+        name: "revoked",
+        organizationId: "org-1",
+        permissionMode: "default",
+        bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org-1" }],
+      });
+      await service.revoke({
+        id: created.apiKey.id,
+        organizationId: "org-1",
+        callerUserId: null,
+        callerIsAdmin: true,
+      });
+
+      expect(await service.tryVerify({ token: created.token })).toBeNull();
+      expect(legacyGrants.mint).not.toHaveBeenCalled();
+    });
+  });
+});

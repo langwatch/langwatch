@@ -1,5 +1,9 @@
 export { AuthzService, type AuthzServiceOptions } from "./services/authz.service";
 export {
+  AuthzCollectorService,
+  type AuthzCollectorOptions,
+} from "./services/authz-collector.service";
+export {
   AuthzGrantsService,
   type AuthzGrantsServiceOptions,
 } from "./services/authz-grants.service";

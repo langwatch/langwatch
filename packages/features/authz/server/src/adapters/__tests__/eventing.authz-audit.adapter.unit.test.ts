@@ -1,6 +1,9 @@
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
   GRANT_ATTACHED_EVENT_TYPE,
+  GRANT_EVENT_SOURCES,
+  GRANT_REVOKED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
 } from "@langwatch/authz-contract";
 import { createTenantId } from "@langwatch/eventing";
@@ -70,6 +73,52 @@ function roleDefined(
 }
 
 describe("EventingAuthzAuditAdapter", () => {
+  /** @scenario "A grant a person made is recorded in the audit trail" */
+  it("writes one row in the AuditLog shape", async () => {
+    const store = new RecordingAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+
+    await adapter.handler(attached());
+
+    expect(store.attempts).toHaveLength(1);
+    expect(store.attempts[0]).toEqual({
+      id: "authz-evt-evt_2Zk",
+      createdAt: new Date(OCCURRED_AT),
+      userId: "user_admin",
+      organizationId: TENANT_ID,
+      action: "authz.grants.attach",
+      metadata: {
+        grantId: "grant_1",
+        principal: { type: "user", id: "user_alice" },
+        roleKey: "member",
+        scope: { type: "TEAM", id: "team_1" },
+        source: "grants-service",
+      },
+    });
+  });
+
+  /**
+   * Driven from the vocabulary rather than from a list of the sources that
+   * exist today: a source added to `GRANT_EVENT_SOURCES` and left out of the
+   * skip list is a change a customer made, and it audits by default. A new
+   * one that ought to be skipped has to say so.
+   * @scenario "A grant an automated surface made still reaches the audit trail"
+   */
+  it.each(
+    GRANT_EVENT_SOURCES.filter(
+      (source) => !["migration", "read-through-mint"].includes(source),
+    ),
+  )("still writes a row for %s", async (source) => {
+    const store = new RecordingAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+
+    await adapter.handler(attached({ source }));
+
+    expect(store.attempts).toHaveLength(1);
+    expect(store.attempts[0]?.metadata).toMatchObject({ source });
+  });
+
+  /** @scenario "A fact delivered twice writes one audit row" */
   it("redelivers with one event-derived row identity and one stored row", async () => {
     const store = new RecordingAuditTrailStore();
     const adapter = EventingAuthzAuditAdapter.create({ store });
@@ -99,6 +148,7 @@ describe("EventingAuthzAuditAdapter", () => {
     expect(store.attempts.map(({ organizationId }) => organizationId)).not.toContain("role_1");
   });
 
+  /** @scenario "Facts stated by the platform itself never reach the audit trail" */
   it("skips imported grant sources and both migration role actors", async () => {
     const store = new RecordingAuditTrailStore();
     const adapter = EventingAuthzAuditAdapter.create({ store });
@@ -114,6 +164,32 @@ describe("EventingAuthzAuditAdapter", () => {
     }
 
     expect(store.attempts).toHaveLength(0);
+  });
+
+  /** `grant_revoked` carries no `source`, so what makes a revocation
+   *  attributable is its actor plus its reason. Only the migration runner
+   *  is filtered by actor — a directory sync's de-enroll is a change the
+   *  customer's own directory made, and it belongs on their audit page.
+   *  @scenario "A revocation names the surface that made it without a source of its own" */
+  it("records the row, with the reason and no invented person", async () => {
+    const store = new RecordingAuditTrailStore();
+    const adapter = EventingAuthzAuditAdapter.create({ store });
+
+    await adapter.handler(
+      event(GRANT_REVOKED_EVENT_TYPE, "grant_1", {
+        grantId: "grant_1",
+        reason: "offboarded:user_dave",
+        actor: { type: "system", id: SYSTEM_ACTORS.scim },
+      }),
+    );
+
+    expect(store.attempts).toHaveLength(1);
+    expect(store.attempts[0]?.action).toBe("authz.grants.revoke");
+    expect(store.attempts[0]?.userId).toBeNull();
+    expect(store.attempts[0]?.metadata).toEqual({
+      grantId: "grant_1",
+      reason: "offboarded:user_dave",
+    });
   });
 
   it("allows only named metadata fields and never copies a resource token", async () => {

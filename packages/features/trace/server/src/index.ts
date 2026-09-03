@@ -1,3 +1,4 @@
+export { computeSpanCost } from "./services/trace-span-cost-matching.service";
 export { ClickHouseTraceAdapter } from "./adapters/clickhouse.trace.adapter";
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
 export { NullTraceListAdapter } from "./adapters/null-trace-list.adapter";

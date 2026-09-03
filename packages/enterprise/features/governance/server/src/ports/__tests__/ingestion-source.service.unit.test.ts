@@ -241,6 +241,60 @@ describe("IngestionSourceService", () => {
     expect(repository.updateInput).toBeNull();
   });
 
+  /** @scenario "Saving an unrelated change keeps the secret and the rotation window" */
+  it("keeps the stored secret and the rotation grace slot on an unrelated edit", async () => {
+    const { service, repository } = harness();
+    const rotation = { priorHash: "abc123", expiresAt: NOW + 1_000 };
+    repository.row = source({
+      parserConfig: {
+        adapter: "databricks_genie",
+        workspaceUrl: "https://adb-1.7.azuredatabricks.net",
+        credentials: "enc:v1:aaaa:bbbb:cccc",
+        _rotation: rotation,
+      },
+    });
+
+    await service.updateSource({
+      id: "source-1",
+      organizationId: "org-1",
+      name: "renamed",
+      parserConfig: {
+        adapter: "databricks_genie",
+        workspaceUrl: "https://adb-1.7.azuredatabricks.net",
+      },
+    });
+
+    expect(repository.updateInput?.parserConfig).toMatchObject({
+      credentials: "enc:v1:aaaa:bbbb:cccc",
+      _rotation: rotation,
+    });
+  });
+
+  /** @scenario "A secret cannot be kept while the destination is changed" */
+  it("refuses replaying the stored secret while also changing the destination, writing nothing", async () => {
+    const { service, repository } = harness();
+    repository.row = source({
+      parserConfig: {
+        adapter: "databricks_genie",
+        workspaceUrl: "https://adb-1.7.azuredatabricks.net",
+        credentials: "enc:v1:aaaa:bbbb:cccc",
+      },
+    });
+
+    await expect(
+      service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        parserConfig: {
+          adapter: "databricks_genie",
+          workspaceUrl: "https://attacker.example.com",
+          credentials: "enc:v1:aaaa:bbbb:cccc",
+        },
+      }),
+    ).rejects.toThrow(/stored form/);
+    expect(repository.updateInput).toBeNull();
+  });
+
   /** @scenario "The report cannot be changed once a cursor exists" */
   it("refuses a report change after the source has pulled", async () => {
     const { service, repository } = harness();
@@ -327,5 +381,201 @@ describe("IngestionSourceService", () => {
       }),
     ).rejects.toThrow(/destination must be an active project/i);
     expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The picker only ever offers projects of the admin's own organization, but
+   * the picker is not the boundary — the API is. A destination reaching
+   * update by any other route (a crafted request, a stale drawer, a script)
+   * has to be refused here, and refused by name so the admin knows which
+   * field is wrong rather than being handed a generic failure.
+   *
+   * @scenario The picker cannot offer a project of another organization
+   */
+  it("is refused when the fetched project belongs to a different organization", async () => {
+    const { service, repository, projects } = harness();
+    projects.tryGetWithTeam = vi.fn(async () => ({
+      id: "project-of-another-org",
+      name: "Someone else's project",
+      slug: "someone-elses-project",
+      archivedAt: null,
+      team: { organizationId: "org-other" },
+    })) as never;
+
+    await expect(
+      service.updateSource({
+        id: "source-1",
+        organizationId: "org-1",
+        traceProjectId: "project-of-another-org",
+      }),
+    ).rejects.toThrow(/destination must be an active project/i);
+    expect(repository.update).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Pull-mode and pure-S3 sources never receive inbound pushes, so the
+   * `lw_is_*` ingest secret is dead weight. s3_custom is the exception: it
+   * uses the webhook callback path authenticated by ingest secret.
+   *
+   * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
+   *       "Pull-source key suppression — #7616"
+   */
+  describe("pull-source key suppression (#7616)", () => {
+    describe("when createSource is called", () => {
+      /** @scenario "The rotate-secret button is hidden for non-push sources on the list" */
+      /** @scenario "The rotate-secret button is hidden for non-push sources on the detail page" */
+      it("pull type → empty sentinel hash, null secret", async () => {
+        const { service, repository } = harness();
+
+        const result = await service.createSource({
+          organizationId: "org-1",
+          sourceType: "databricks_genie",
+          name: "genie-test",
+          pullConfig: {
+            adapter: "databricks_genie",
+            workspaceUrl: "https://adb-1.7.azuredatabricks.net",
+            spaceIds: [],
+            schedule: "*/15 * * * *",
+            credentials: { token: "dapi-test-token" },
+          },
+          pullSchedule: "*/15 * * * *",
+          actorUserId: "user-1",
+        });
+
+        expect(repository.createInput?.ingestSecretHash).toBe("");
+        expect(result.ingestSecret).toBeNull();
+      });
+
+      it("pure-S3 type (openai_compliance) → empty sentinel hash, null secret", async () => {
+        const { service, repository } = harness();
+
+        const result = await service.createSource({
+          organizationId: "org-1",
+          sourceType: "openai_compliance",
+          name: "oai-compliance-test",
+          pullConfig: {
+            adapter: "openai_compliance",
+            bucketName: "test-bucket",
+            region: "us-east-1",
+            prefix: "logs/",
+            schedule: "*/30 * * * *",
+            credentials: { accessKeyId: "AKIA", secretAccessKey: "secret" },
+          },
+          pullSchedule: "*/30 * * * *",
+          actorUserId: "user-1",
+        });
+
+        expect(repository.createInput?.ingestSecretHash).toBe("");
+        expect(result.ingestSecret).toBeNull();
+      });
+
+      it("s3_custom (webhook callback) → real hash and lw_is_ secret", async () => {
+        const { service, repository } = harness();
+
+        const result = await service.createSource({
+          organizationId: "org-1",
+          sourceType: "s3_custom",
+          name: "s3-callback-test",
+          pullConfig: {
+            adapter: "s3_custom",
+            bucketName: "test-bucket",
+            region: "us-east-1",
+            prefix: "logs/",
+            schedule: "*/30 * * * *",
+            credentials: { accessKeyId: "AKIA", secretAccessKey: "secret" },
+          },
+          pullSchedule: "*/30 * * * *",
+          actorUserId: "user-1",
+        });
+
+        expect(repository.createInput?.ingestSecretHash).not.toBe("");
+        expect(result.ingestSecret).toMatch(/^lw_is_/);
+      });
+
+      it("push type → real hash and lw_is_ secret", async () => {
+        const { service, repository } = harness();
+
+        const result = await service.createSource({
+          organizationId: "org-1",
+          sourceType: "otel_generic",
+          name: "otel-test",
+          actorUserId: "user-1",
+        });
+
+        expect(repository.createInput?.ingestSecretHash).not.toBe("");
+        expect(result.ingestSecret).toMatch(/^lw_is_/);
+      });
+    });
+
+    describe("when rotateSecret is called", () => {
+      it("pull-mode source is refused", async () => {
+        const { service, repository } = harness();
+        repository.row = source({
+          id: "src_pull",
+          organizationId: "org-1",
+          sourceType: "databricks_genie",
+          ingestSecretHash: "",
+          parserConfig: { adapter: "databricks_genie" },
+          pullSchedule: "*/15 * * * *",
+        });
+
+        await expect(
+          service.rotateSecret({ id: "src_pull", organizationId: "org-1" }),
+        ).rejects.toThrow();
+      });
+
+      it("push-mode source still works", async () => {
+        const { service, repository } = harness();
+        repository.row = source({
+          id: "src_push",
+          organizationId: "org-1",
+          sourceType: "otel_generic",
+          ingestSecretHash: "existing-hash-abc",
+          parserConfig: {},
+          pullSchedule: null,
+        });
+
+        const { ingestSecret } = await service.rotateSecret({
+          id: "src_push",
+          organizationId: "org-1",
+        });
+        expect(ingestSecret).toMatch(/^lw_is_/);
+      });
+    });
+  });
+
+  describe("given a destination on a team this admin is not a member of", () => {
+    describe("when the drawer asks which destinations are still live", () => {
+      /**
+       * The drawer says an unresolvable destination is archived, and the spec
+       * promises the reverse case is never mislabelled: a project the admin
+       * simply cannot see is not gone. That promise rests entirely on this
+       * query scoping liveness to the ORGANIZATION rather than to the
+       * reader's team memberships — narrow it to the reader and every
+       * cross-team destination starts reporting as archived, sending admins
+       * to restore projects that were never archived.
+       */
+      it("scopes liveness to the organization, not to what this admin can see", async () => {
+        const { service, projects } = harness();
+        projects.listActiveByScopes = vi.fn(async () => ({
+          data: [{ id: "proj_other_team" }],
+          hasMore: false,
+        })) as never;
+
+        const live = await service.liveTraceProjectIds(
+          [{ traceProjectId: "proj_other_team" }],
+          "org-1",
+        );
+
+        expect(live.has("proj_other_team")).toBe(true);
+        expect(projects.listActiveByScopes).toHaveBeenCalledWith({
+          organizationId: "org-1",
+          organizationWide: false,
+          teamIds: [],
+          projectIds: ["proj_other_team"],
+          limit: 1,
+        });
+      });
+    });
   });
 });

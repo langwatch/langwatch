@@ -167,7 +167,7 @@ describe("GovernanceApp ingestion templates", () => {
   });
 
   describe("when the same creation arrives over each of the four surfaces", () => {
-    /** @scenario "audit rows are identical apart from metadata.surface" */
+    /** @scenario "State-changing calls emit audit rows regardless of surface" */
     it("records four writes that differ only in the surface", async () => {
       const written: CreateIngestionTemplateInput[] = [];
       const templateCreateOrg = vi.fn(async (input: CreateIngestionTemplateInput) => {

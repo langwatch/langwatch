@@ -109,4 +109,28 @@ describe("PrismaApiKeyRepository", () => {
       ).resolves.toBe(3);
     });
   });
+
+  /**
+   * ensureForProject -> ApiKeyRepository.findIngestKey once queried ApiKey
+   * WITHOUT organizationId, so the org-tenancy guard
+   * (dbOrganizationIdProtection) rejected every mint/rotate at runtime.
+   * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
+   */
+  describe("when looking up an organization's ingestion key", () => {
+    it("scopes the lookup to the caller's organization", async () => {
+      const findFirst = vi.fn(async () => null);
+      const database = { apiKey: { findFirst } } as unknown as PrismaApiKeyDatabase;
+      const repository = PrismaApiKeyRepository.create(database);
+
+      await repository.tryFindIngestKey({
+        organizationId: "org-1",
+        projectId: "project-1",
+        sourceType: "claude_code",
+      });
+
+      const [call] = findFirst.mock.calls;
+      const where = (call?.[0] as { where?: { organizationId?: string } })?.where;
+      expect(where?.organizationId).toBe("org-1");
+    });
+  });
 });

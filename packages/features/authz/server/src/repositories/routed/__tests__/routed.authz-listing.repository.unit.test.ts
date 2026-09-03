@@ -46,6 +46,10 @@ const repositoryFor = (onEventingByOrg: Record<string, boolean>) => {
 };
 
 describe("RoutedAuthzListingRepository", () => {
+  /**
+   * @scenario "A cut-over organization's access listings are served from the ledger's head"
+   * @scenario "A cut-over organization's role editor lists roles from the ledger's head"
+   */
   it("routes every single-organization listing to the projected head after cutover", async () => {
     const { legacy, eventing, repository } = repositoryFor({ "org-1": true });
 
@@ -87,6 +91,7 @@ describe("RoutedAuthzListingRepository", () => {
     expect(legacy.findOrganizationBindings).not.toHaveBeenCalled();
   });
 
+  /** @scenario "An organization that has not cut over keeps listing from the legacy tables" */
   it("routes listings to the legacy head before cutover", async () => {
     const { legacy, eventing, repository } = repositoryFor({ "org-1": false });
 
@@ -130,6 +135,7 @@ describe("RoutedAuthzListingRepository", () => {
     ]);
   });
 
+  /** @scenario "A rolled-back organization's listings return to the legacy head within the gate's cache window" */
   it("observes a rollback on the next listing call", async () => {
     const legacy = spyRepository("legacy");
     const eventing = spyRepository("eventing");

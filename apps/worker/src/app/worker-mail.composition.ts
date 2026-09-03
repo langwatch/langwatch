@@ -84,7 +84,7 @@ function ownedAwsRuntime({
  * disables proxying entirely, a leading dot or bare domain matches
  * subdomains, and an optional `:port` suffix is ignored.
  */
-class WorkerMailProxyResolver extends OutboundProxyResolverPort {
+export class WorkerMailProxyResolver extends OutboundProxyResolverPort {
   static create(config: WorkerOutboundProxyConfig): WorkerMailProxyResolver {
     return new WorkerMailProxyResolver(config);
   }

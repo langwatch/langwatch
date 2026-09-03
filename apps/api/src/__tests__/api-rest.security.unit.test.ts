@@ -137,6 +137,7 @@ describe("ApiRestSecurity", () => {
       });
     });
 
+    /** @scenario "A permission Langy is never delegated says so" */
     it("keeps Langy's never-delegable ceiling refusal distinct", async () => {
       const apiKeys = apiKeyService();
       apiKeys.tryResolveToken.mockResolvedValue({ ...currentKey, isLangySessionKey: true });
@@ -296,6 +297,7 @@ describe("ApiRestSecurity", () => {
       expect(logger.error).not.toHaveBeenCalled();
     });
 
+    /** @scenario A database failure loading the organization answers the family's server error */
     it("logs the cause when credential resolution itself fails", async () => {
       const apiKeys = apiKeyService();
       const failure = new Error("credential store unreachable");

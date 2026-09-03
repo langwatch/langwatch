@@ -110,4 +110,33 @@ describe("the webhook delivery process manager's outbox", () => {
       expect(recordedOutboxConfig()?.concurrency ?? 0).toBeGreaterThan(1);
     });
   });
+
+  /** @scenario "The retry ladder holds its last attempt inside seventy two hours" */
+  it("keeps the cumulative schedule within 72h and settles at 12h", () => {
+    let elapsed = 0;
+    const delays: number[] = [];
+    for (let attempt = 1; attempt < WEBHOOK_SEND_MAX_ATTEMPTS; attempt++) {
+      const delay = WebhookDeliveryService.retryDelayMs({ attempt });
+      delays.push(delay);
+      elapsed += delay;
+    }
+    // The final retry fires inside 72 hours of the first failure.
+    expect(elapsed).toBeLessThanOrEqual(THREE_DAYS_MS);
+    // And the ladder is not trivially short: it spans multiple days.
+    expect(elapsed).toBeGreaterThan(48 * 60 * 60 * 1000);
+    // Cadence settles at 12h once the explicit rungs are exhausted.
+    expect(delays.at(-1)).toBe(12 * 60 * 60 * 1000);
+    expect(WebhookDeliveryService.retryDelayMs({ attempt: 99 })).toBe(
+      12 * 60 * 60 * 1000,
+    );
+    // The explicit rungs are exactly the documented schedule.
+    expect(WEBHOOK_RETRY_LADDER_MS).toEqual([
+      60_000,
+      5 * 60_000,
+      30 * 60_000,
+      2 * 60 * 60_000,
+      6 * 60 * 60_000,
+      12 * 60 * 60_000,
+    ]);
+  });
 });

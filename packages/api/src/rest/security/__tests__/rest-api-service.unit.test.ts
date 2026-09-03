@@ -542,6 +542,79 @@ describe("createVersionedApp", () => {
     });
   });
 
+  describe("given an endpoint that also carries its own middleware", () => {
+    /** @scenario "An endpoint's middleware array cannot displace its declared check" */
+    it("still runs the declared permission check the framework mounted", async () => {
+      const { calls, spine } = recordingSpine();
+      const endpointMiddleware: MiddlewareHandler = async (_c, next) => {
+        calls.chain.push("endpoint-middleware");
+        await next();
+      };
+      const { service, policy } = spine.createVersionedApp({
+        name: "pkg-versioned-overwrite",
+        basePath: "/api/__pkg_versioned_overwrite",
+      });
+
+      const app = service
+        .registerRoute(
+          "get",
+          "/",
+          VERSION,
+          async () => ({ ok: true }),
+          (b) =>
+            // The overwrite that used to bypass enforcement: endpoint-level
+            // middleware declared after the policy.
+            policy("organization:manage")(b)
+              .withMiddleware(endpointMiddleware)
+              .withOutput(z.object({ ok: z.boolean() })),
+        )
+        .build();
+
+      const mounted = allRegisteredRoutes().find(
+        (route) =>
+          route.family === "__pkg_versioned_overwrite" && route.policy.kind === "permission",
+      );
+      expect(mounted).toBeDefined();
+
+      const response = await app.request(mounted!.path);
+
+      expect(response.status).toBe(200);
+      expect(calls.chain).toEqual([
+        "authenticateOrganizationThrowing",
+        "authorizeOrganizationPermissionThrowing:organization:manage",
+        "endpoint-middleware",
+      ]);
+    });
+  });
+
+  describe("given a policy that promises a permission the config does not enforce", () => {
+    /** @scenario "A registered policy that promises an unenforced permission fails the build" */
+    it("fails the build naming both halves", () => {
+      const { spine } = recordingSpine();
+      const { service, policy } = spine.createVersionedApp({
+        name: "pkg-versioned-mismatch",
+        basePath: "/api/__pkg_versioned_mismatch",
+      });
+
+      service.registerRoute(
+        "get",
+        "/",
+        VERSION,
+        async () => ({ ok: true }),
+        (b) =>
+          // The policy meta promises a permission; the opt-out that follows
+          // strips the enforcement. The runtime cross-check is the layer under test.
+          policy("organization:manage")(b)
+            .withoutPermission("policy/permission mismatch probe")
+            .withOutput(z.object({ ok: z.boolean() })),
+      );
+
+      expect(() => service.build()).toThrow(
+        /declares policy "organization:manage" but enforces "nothing"/,
+      );
+    });
+  });
+
   describe("when a route declares no policy", () => {
     /** @scenario "A versioned endpoint without an access policy fails the build" */
     it("refuses to build the family", () => {

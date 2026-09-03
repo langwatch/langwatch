@@ -73,6 +73,30 @@ describe("GatewayBudgetScopeReachService", () => {
     });
   });
 
+  describe("given a per-person (PRINCIPAL) budget", () => {
+    /** @scenario "A per-person budget anchored on a key that serves traffic carries no warning" */
+    it("carries no warning when the key names that person as its principal", () => {
+      expect(reaches("PRINCIPAL", "user-1")).toBe(true);
+    });
+
+    /** @scenario "A per-person budget anchored where no key sends traffic warns" */
+    it("warns when no key sends traffic on that person's behalf", () => {
+      expect(reaches("PRINCIPAL", "someone-else")).toBe(false);
+    });
+  });
+
+  describe("given a GROUP budget", () => {
+    /** @scenario "A group budget carries no warning when a member holds a key" */
+    it("carries no warning when a member of the group holds a key", () => {
+      expect(reaches("GROUP", "group-1")).toBe(true);
+    });
+
+    /** @scenario "A group budget warns when its members' traffic cannot be attributed to them" */
+    it("warns when its members' traffic cannot be attributed to them", () => {
+      expect(reaches("GROUP", "some-other-group")).toBe(false);
+    });
+  });
+
   describe("given an ATTRIBUTED_USER budget", () => {
     it("reaches through the virtual key", () => {
       expect(reaches("ATTRIBUTED_USER", "vk-1")).toBe(true);

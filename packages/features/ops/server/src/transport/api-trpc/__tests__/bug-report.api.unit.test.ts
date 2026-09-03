@@ -88,6 +88,7 @@ function harness({
 
 describe("BugReportTrpcApi", () => {
   describe("given a caller outside the staff list", () => {
+    /** @scenario "Non-admins cannot access bug reports" */
     it("refuses the listing and never reads a report", async () => {
       const { customerCaller, getAll, recordAudit } = harness();
 

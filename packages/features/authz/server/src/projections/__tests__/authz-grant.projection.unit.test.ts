@@ -170,4 +170,80 @@ describe("AuthzGrantProjection", () => {
       occurredAt: new Date(2),
     });
   });
+
+  /** @scenario "One grant's projection write reads only its own row" */
+  it("takes the owning organization from the event's tenant", () => {
+    const write = projection.map(
+      event(
+        GRANT_ATTACHED_EVENT_TYPE,
+        {
+          grantId: "grant_1",
+          principal: { type: "user", id: "user_1" },
+          roleKey: "custom:cr_ops",
+          scope: { type: "TEAM", id: "team_1" },
+          source: "genesis-import",
+          actor: ACTOR,
+        },
+        "grant_1",
+        1,
+      ),
+    );
+
+    expect(write).toMatchObject({
+      kind: "grant.upsert",
+      row: { id: "grant_1", organizationId: TENANT_ID },
+    });
+  });
+
+  /**
+   * The compat row reads `role = legacyRole ?? "CUSTOM"`, so a legacyRole
+   * left over from the import projected an adopted ADMIN binding as
+   * role=ADMIN after it had been moved to a different custom role. The
+   * legacy resolver's empty-permission-list fallback then answered "admin"
+   * where the legacy row said "viewer".
+   *
+   * @scenario "Reassigning a grant's role clears the role it was imported with"
+   */
+  it("does not carry the imported role onto the reassignment", () => {
+    const imported = projection.map(
+      event(
+        GRANT_ATTACHED_EVENT_TYPE,
+        {
+          grantId: "grant_1",
+          principal: { type: "user", id: "user_1" },
+          roleKey: "custom:cr_ops",
+          legacyRole: "ADMIN",
+          scope: { type: "TEAM", id: "team_1" },
+          source: "genesis-import",
+          actor: ACTOR,
+        },
+        "grant_1",
+        1,
+      ),
+    );
+    expect(imported).toMatchObject({ row: { legacyRole: "ADMIN" } });
+
+    const reassigned = projection.map(
+      event(
+        GRANT_ROLE_CHANGED_EVENT_TYPE,
+        {
+          grantId: "grant_1",
+          from: "custom:cr_ops",
+          to: "custom:cr_sre",
+          actor: ACTOR,
+        },
+        "grant_1",
+        2,
+      ),
+    );
+
+    // The write names only the role; the store clears legacyRole when it
+    // applies it, which is what the escalation turns on.
+    expect(reassigned).toEqual({
+      kind: "grant.setRole",
+      grantId: "grant_1",
+      roleKey: "custom:cr_sre",
+      occurredAt: new Date(2),
+    });
+  });
 });

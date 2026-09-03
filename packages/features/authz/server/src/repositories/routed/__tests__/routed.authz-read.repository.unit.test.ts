@@ -32,6 +32,7 @@ const repositoryFor = (selectHead: (organizationId: string) => Promise<boolean>)
 };
 
 describe("RoutedAuthzReadRepository", () => {
+  /** @scenario "A cut-over organization's checks read the ledger's own head" */
   it("routes access-bearing reads to the projected head after cutover", async () => {
     const { legacy, eventing, repository } = repositoryFor(async () => true);
     const userArgs = { userId: "alice", organizationId: "org-1" };

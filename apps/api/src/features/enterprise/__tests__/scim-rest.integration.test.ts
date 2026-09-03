@@ -28,7 +28,11 @@
  */
 import { createHash } from "node:crypto";
 
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import {
+  createAppRestSecurity,
+  getRoutePolicy,
+  type AppRestSecurity,
+} from "@langwatch/api/rest";
 import {
   EventSourcing,
   type EventSourcedQueueDefinition,
@@ -226,6 +230,58 @@ describe("given an identity provider negotiating capabilities", () => {
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
         patch: { supported: true },
       });
+    });
+  });
+
+  describe("given the SCIM discovery endpoints", () => {
+    const DISCOVERY_PATHS = [
+      "/api/scim/v2/ServiceProviderConfig",
+      "/api/scim/v2/ResourceTypes",
+      "/api/scim/v2/Schemas",
+    ] as const;
+
+    /** @scenario "SCIM discovery endpoints declare an honest public policy" */
+    it.each(DISCOVERY_PATHS)(
+      "answers %s without credentials, and declares itself public",
+      async (path) => {
+        const world = scimWorld();
+        const api = mount(world.ports);
+
+        const response = await api.get(path);
+
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as { schemas: string[] };
+        expect(body.schemas[0]).toMatch(/^urn:ietf:params:scim:/);
+
+        const policy = getRoutePolicy("GET", path)?.policy;
+        expect(policy, `${path} must declare an access policy`).toBeDefined();
+        expect(policy?.kind).toBe("public");
+        expect(policy?.kind === "public" ? policy.reason : "").toBe(
+          "SCIM discovery metadata is served without a credential so identity providers can negotiate capabilities before a token exists",
+        );
+      },
+    );
+
+    it("keeps the provisioning routes declared internal in the registry", () => {
+      // The counterpart the public declaration is only safe next to: opening
+      // discovery says nothing about Users and Groups, and this is what keeps
+      // a future edit from widening the policy to the whole family.
+      const world = scimWorld();
+      mount(world.ports);
+
+      const provisioning = getRoutePolicy("GET", "/api/scim/v2/Users")?.policy;
+
+      expect(provisioning?.kind).toBe("internal");
+    });
+
+    it("refuses an anonymous call to a provisioning route", async () => {
+      const world = scimWorld();
+      const api = mount(world.ports);
+
+      const response = await api.get("/api/scim/v2/Users");
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get("content-type")).toContain("application/scim+json");
     });
   });
 });

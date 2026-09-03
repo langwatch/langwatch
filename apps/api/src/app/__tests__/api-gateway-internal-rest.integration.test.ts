@@ -22,6 +22,7 @@ import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { AppRestSecurity } from "@langwatch/api/rest";
 import { buildGatewayCanonicalString, computeGatewaySignature } from "@langwatch/gateway-server";
+import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -83,12 +84,34 @@ function testSpendCommandSenders() {
   };
 }
 
+/**
+ * The guardrail port's collaborators: the guardrail row lookup, the monitor
+ * directory and the evaluator runtime — the same three the composition
+ * refuses the whole route without.
+ */
+function testGuardrails(options?: {
+  guardrails?: Array<{ id: string; evaluatorId: string; failureMode: string }>;
+  monitors?: Array<{ id: string; evaluatorId: string; checkType: string; parameters: unknown }>;
+  runEvaluator?: ReturnType<typeof vi.fn>;
+}) {
+  const findMany = vi.fn(async () => options?.guardrails ?? []);
+  const listEnabledGuardrailMonitors = vi.fn(async () => options?.monitors ?? []);
+  const runEvaluator =
+    options?.runEvaluator ??
+    vi.fn(async () => ({ status: "processed" as const, passed: true }));
+  return { findMany, listEnabledGuardrailMonitors, runEvaluator };
+}
+
 /** The family, built the way the process builds it. */
 function composeFamily(options: {
   changes: ReturnType<typeof testChangeEventRows>;
   spendCommands?: ReturnType<typeof testSpendCommandSenders>;
+  guardrails?: ReturnType<typeof testGuardrails>;
 }) {
-  const prisma = { gatewayChangeEvent: options.changes } as unknown as PrismaClient;
+  const prisma = {
+    gatewayChangeEvent: options.changes,
+    ...(options.guardrails ? { gatewayGuardrail: { findMany: options.guardrails.findMany } } : {}),
+  } as unknown as PrismaClient;
 
   const security: AppRestSecurity = ApiRestSecurity.create({
     apiKeys: {} as unknown as ApiKeyService,
@@ -113,6 +136,14 @@ function composeFamily(options: {
     jwtSecret: JWT_SECRET,
     encryption: AesGcmSecretEncryptionAdapter.create({ key: CREDENTIALS_SECRET }),
     ...(options.spendCommands ? { spendCommands: options.spendCommands } : {}),
+    ...(options.guardrails
+      ? {
+          monitors: {
+            listEnabledGuardrailMonitors: options.guardrails.listEnabledGuardrailMonitors,
+          } as unknown as MonitorService,
+          runEvaluator: options.guardrails.runEvaluator,
+        }
+      : {}),
   });
   if (!app) throw new Error("the composition refused a process that holds both halves");
   return app;
@@ -214,6 +245,7 @@ describe("the gateway internal control plane", () => {
       });
     });
 
+    /** @scenario "control plane answers the gateway's signed health probe" */
     it("answers the connectivity probe the data plane's status monitor polls", async () => {
       const app = composeFamily({ changes: testChangeEventRows() });
 
@@ -223,6 +255,17 @@ describe("the gateway internal control plane", () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ status: "ok" });
+    });
+
+    /** @scenario "unsigned health probes to the control plane are rejected" */
+    it("rejects a health probe without signature headers", async () => {
+      const app = composeFamily({ changes: testChangeEventRows() });
+
+      const response = await app.request(
+        new Request("http://api.test/api/internal/gateway/health"),
+      );
+
+      expect(response.status).toBe(401);
     });
   });
 
@@ -283,6 +326,93 @@ describe("the gateway internal control plane", () => {
           message: "gateway spend pipeline is not registered (ClickHouse disabled)",
         },
       });
+    });
+  });
+
+  describe("given the guardrail check endpoint", () => {
+    /** @scenario "the endpoint accepts the directions the gateway actually sends" */
+    /** @scenario "every contract direction is accepted" */
+    it.each(["request", "response", "stream_chunk"])(
+      "accepts direction %s",
+      async (direction) => {
+        const app = composeFamily({ changes: testChangeEventRows(), guardrails: testGuardrails() });
+
+        const response = await app.request(
+          signedRequest({
+            method: "POST",
+            path: "/api/internal/gateway/guardrail/check",
+            body: JSON.stringify({
+              vk_id: "vk_test",
+              project_id: "project-1",
+              direction,
+              guardrail_ids: [],
+              content: { messages: [{ role: "user", content: "hello" }] },
+            }),
+          }),
+        );
+
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as { decision: string };
+        expect(["allow", "block", "modify"]).toContain(body.decision);
+      },
+    );
+
+    /** @scenario "a direction outside the contract is rejected" */
+    it("rejects a direction outside the contract", async () => {
+      const app = composeFamily({ changes: testChangeEventRows(), guardrails: testGuardrails() });
+
+      const response = await app.request(
+        signedRequest({
+          method: "POST",
+          path: "/api/internal/gateway/guardrail/check",
+          body: JSON.stringify({
+            vk_id: "vk_test",
+            project_id: "project-1",
+            direction: "sideways",
+            guardrail_ids: [],
+          }),
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("validation_error");
+    });
+
+    /** @scenario "the verdict field is named decision, not action" */
+    it("names the verdict field decision, which is what the Go client reads", async () => {
+      const guardrails = testGuardrails({
+        guardrails: [{ id: "gr_1", evaluatorId: "eval_1", failureMode: "FAIL_CLOSED" }],
+        monitors: [{ id: "mon_1", evaluatorId: "eval_1", checkType: "langevals/basic", parameters: {} }],
+        runEvaluator: vi.fn(async () => ({
+          status: "processed" as const,
+          passed: false,
+          details: "PII detected: email",
+        })),
+      });
+      const app = composeFamily({ changes: testChangeEventRows(), guardrails });
+
+      const response = await app.request(
+        signedRequest({
+          method: "POST",
+          path: "/api/internal/gateway/guardrail/check",
+          body: JSON.stringify({
+            vk_id: "vk_test",
+            project_id: "project-1",
+            direction: "request",
+            guardrail_ids: ["gr_1"],
+            content: { messages: [{ role: "user", content: "hello" }] },
+          }),
+        }),
+      );
+
+      const body = (await response.json()) as Record<string, unknown>;
+      expect(body.decision).toBe("block");
+      expect(body).toHaveProperty("reason");
+      expect(body).toHaveProperty("policies_triggered");
+      // The Go client used to read "action". If it ever comes back, the two
+      // sides have drifted apart again and every verdict silently allows.
+      expect(body).not.toHaveProperty("action");
     });
   });
 

@@ -36,6 +36,13 @@ describe("organizationMigrates", () => {
       expect(paced({ enrolled: false })).toBe(false);
     });
   });
+
+  describe("when the installation is cloud and the migration is enrolled automatically", () => {
+    /** @scenario "A migration can declare that every organization is in its cohort" */
+    it("includes an organization nobody enrolled", () => {
+      expect(paced({ enrolledAutomatically: true, enrolled: false })).toBe(true);
+    });
+  });
 });
 
 describe("migrationRunsOnThisInstallation", () => {

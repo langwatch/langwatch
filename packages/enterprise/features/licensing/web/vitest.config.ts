@@ -10,6 +10,9 @@ export default defineConfig({
       "@langwatch/enterprise-licensing-contract": fileURLToPath(
         new URL("../contract/src/index.ts", import.meta.url),
       ),
+      "@langwatch/authz-contract": fileURLToPath(
+        new URL("../../../../features/authz/contract/src/index.ts", import.meta.url),
+      ),
     },
   },
 });

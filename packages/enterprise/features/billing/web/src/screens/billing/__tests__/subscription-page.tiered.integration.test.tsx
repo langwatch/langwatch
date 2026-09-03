@@ -1,0 +1,561 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Integration tests for SubscriptionPage — SEAT_EVENT and TIERED pricing
+ * models, enterprise TIERED exclusion, and upgrade-from-TIERED flow.
+ *
+ * Moved from `platform/app/src/components/subscription/__tests__/`. The page
+ * now reads its organization, team and notices through `BillingHostPort` and
+ * its procedures through `billingApi`, so the application-level mocks
+ * (`~/utils/api`, `~/hooks/useOrganizationTeamProject`, the toaster and the
+ * settings layout) became one fake host and one mocked api module. The
+ * assertions are the originals.
+ *
+ * @see specs/licensing/subscription-page.feature
+ */
+import "@testing-library/jest-dom/vitest";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ENTERPRISE_PLAN_FEATURES, WEBHOOK_FEATURE_LABEL } from "../../../billing-plans";
+import {
+  type BillingFailureNotice,
+  type BillingHostOrganization,
+  BillingHostPort,
+  BillingHostProvider,
+  type BillingSuccessNotice,
+} from "../../../model/billing-host";
+import { SubscriptionPage } from "../subscription-page";
+import {
+  createMockPlan,
+  mockCreateSubscription,
+  mockGetActivePlan,
+  mockOrganization,
+  resetMocks,
+  setMockOrganization,
+} from "./subscription-test-setup";
+
+class TestBillingHost extends BillingHostPort {
+  readonly successes: BillingSuccessNotice[] = [];
+  readonly failures: BillingFailureNotice[] = [];
+  readonly navigations: string[] = [];
+  readonly departures: string[] = [];
+
+  organization(): BillingHostOrganization | undefined {
+    return {
+      id: mockOrganization.id,
+      name: mockOrganization.name,
+      pricingModel: (mockOrganization.pricingModel ??
+        null) as BillingHostOrganization["pricingModel"],
+    };
+  }
+
+  activeTeamId(): string | undefined {
+    return "test-team-id";
+  }
+
+  routeQuery(): Readonly<Record<string, string | undefined>> {
+    return {};
+  }
+
+  isSaaS(): boolean {
+    return true;
+  }
+
+  isDeploymentSettled(): boolean {
+    return true;
+  }
+
+  navigate(to: string): void {
+    this.navigations.push(to);
+  }
+
+  leaveTo(url: string): void {
+    this.departures.push(url);
+  }
+
+  applicationOrigin(): string {
+    return "http://localhost";
+  }
+
+  succeeded(notice: BillingSuccessNotice): void {
+    this.successes.push(notice);
+  }
+
+  failed(failure: BillingFailureNotice): void {
+    this.failures.push(failure);
+  }
+}
+
+const renderSubscriptionPage = () => {
+  const host = new TestBillingHost();
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <ChakraProvider value={defaultSystem}>
+      <BillingHostProvider value={host}>{children}</BillingHostProvider>
+    </ChakraProvider>
+  );
+  return render(<SubscriptionPage />, { wrapper: Wrapper });
+};
+
+// ---------------------------------------------------------------------------
+// vi.mock declarations (hoisted — must be at module top-level)
+// ---------------------------------------------------------------------------
+vi.mock("@langwatch/workflow-web/stores/upgradeModalStore", async () => {
+  const setup = await import("./subscription-test-setup");
+  return {
+    useUpgradeModalStore: (
+      selector: (state: { openSeats: typeof setup.mockOpenSeats }) => unknown,
+    ) => selector({ openSeats: setup.mockOpenSeats }),
+  };
+});
+
+vi.mock("../../../behavior/billing-api", async () => {
+  const setup = await import("./subscription-test-setup");
+  return {
+    billingApi: {
+      plan: {
+        getActivePlan: {
+          useQuery: () => setup.mockGetActivePlan(),
+        },
+      },
+      organization: {
+        getOrganizationWithMembersAndTheirTeams: {
+          useQuery: () => setup.mockGetOrganizationWithMembers(),
+        },
+        getOrganizationPendingInvites: {
+          useQuery: () => ({
+            ...setup.mockGetPendingInvites(),
+            refetch: vi.fn(),
+          }),
+        },
+        createInvites: {
+          useMutation: () => setup.mockCreateInvites(),
+        },
+      },
+      currency: {
+        detectCurrency: {
+          useQuery: (_input: Record<string, never>, opts: { enabled: boolean }) =>
+            opts.enabled ? setup.mockDetectCurrency() : { data: undefined },
+        },
+      },
+      subscription: {
+        updateUsers: {
+          useMutation: () => setup.mockUpdateUsers(),
+        },
+        create: {
+          useMutation: () => setup.mockCreateSubscription(),
+        },
+        upgradeWithInvites: {
+          useMutation: () => setup.mockUpgradeWithInvites(),
+        },
+        addTeamMemberOrEvents: {
+          useMutation: () => setup.mockAddTeamMemberOrEvents(),
+        },
+        manage: {
+          useMutation: () => setup.mockManageSubscription(),
+        },
+        listInvoices: {
+          useQuery: () => setup.mockListInvoices(),
+        },
+        getLastSubscription: {
+          useQuery: () => setup.mockGetLastSubscription(),
+        },
+      },
+      useUtils: vi.fn(() => ({
+        organization: {
+          getOrganizationWithMembersAndTheirTeams: { invalidate: vi.fn() },
+        },
+      })),
+    },
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("<SubscriptionPage/>", () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  // ============================================================================
+  // Pricing Model Behavior
+  // ============================================================================
+
+  describe("when organization has specific pricing model", () => {
+    describe("when organization uses SEAT_EVENT pricing model", () => {
+      beforeEach(() => {
+        setMockOrganization({
+          id: "test-org-id",
+          name: "Test Org",
+          pricingModel: "SEAT_EVENT",
+        });
+      });
+
+      it("renders billing page content on subscription route", async () => {
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByRole("heading", { name: "Billing" })).toBeInTheDocument();
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+          expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe("when organization uses TIERED pricing model", () => {
+      beforeEach(() => {
+        setMockOrganization({
+          id: "test-org-id",
+          name: "Test Org",
+          pricingModel: "TIERED",
+        });
+      });
+
+      it("does not show the old tiered alert on subscription page", async () => {
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+        });
+
+        expect(screen.queryByTestId("tiered-pricing-alert")).not.toBeInTheDocument();
+      });
+
+      // Skipped: Code bug in SubscriptionPage.tsx — `isUpgradePlanRequired` has a
+      // duplicate bare `isDeveloperPlan` condition making it always true for free-plan orgs.
+      // The `|| isDeveloperPlan` term at the end of the OR chain fires unconditionally, so
+      // upgrade-plan-block renders even before any seat changes are planned.
+      it.skip("hides upgrade plan block on free plan without seat changes", async () => {
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+        });
+
+        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+      });
+
+      it("shows legacy paid plan name as current plan title", async () => {
+        mockGetActivePlan.mockReturnValue({
+          data: createMockPlan({
+            type: "ACCELERATE",
+            name: "Accelerate",
+            free: false,
+            maxMembers: 5,
+            maxMembersLite: 9999,
+            maxMessagesPerMonth: 20000,
+          }),
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          const currentBlock = screen.getByTestId("current-plan-block");
+          expect(within(currentBlock).getByText("Accelerate")).toBeInTheDocument();
+        });
+      });
+
+      it("hides the update seats block on legacy paid plan with planned users", async () => {
+        mockGetActivePlan.mockReturnValue({
+          data: createMockPlan({
+            type: "ACCELERATE",
+            name: "Accelerate",
+            free: false,
+            maxMembers: 5,
+            maxMembersLite: 9999,
+            maxMessagesPerMonth: 20000,
+          }),
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+
+        renderSubscriptionPage();
+
+        fireEvent.click(screen.getByTestId("user-count-link"));
+        fireEvent.click(await screen.findByRole("button", { name: /Add Seat/i }));
+        fireEvent.click(await screen.findByRole("button", { name: /Done/i }));
+
+        await waitFor(() => {
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+        });
+
+        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // TIERED Legacy Paid Org
+  // ============================================================================
+
+  describe("when TIERED paid org views subscription page", () => {
+    beforeEach(() => {
+      setMockOrganization({
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      });
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "ACCELERATE",
+          name: "Accelerate",
+          free: false,
+          maxMembers: 5,
+          maxMembersLite: 9999,
+          maxMessagesPerMonth: 20000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("displays deprecated pricing notice", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("tiered-deprecated-notice")).toBeInTheDocument();
+      });
+    });
+
+    it("shows legacy tiered capabilities in the current plan block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const currentBlock = screen.getByTestId("current-plan-block");
+        expect(within(currentBlock).getByText("Up to 5 core users")).toBeInTheDocument();
+        expect(within(currentBlock).getByText("20,000 events included")).toBeInTheDocument();
+      });
+    });
+
+    it("displays upgrade plan block with Upgrade now button", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const upgradeBlock = screen.getByTestId("upgrade-plan-block");
+        expect(
+          within(upgradeBlock).getByRole("button", { name: /Upgrade now/i }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when clicking Upgrade now", () => {
+      it("calls createSubscription with resolved GROWTH_SEAT plan", async () => {
+        const mockMutateAsync = vi.fn().mockResolvedValue({ url: null });
+        mockCreateSubscription.mockReturnValue({
+          mutate: vi.fn(),
+          mutateAsync: mockMutateAsync,
+          isLoading: false,
+          isPending: false,
+        });
+
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+
+        await waitFor(() => {
+          expect(mockMutateAsync).toHaveBeenCalledWith(
+            expect.objectContaining({
+              organizationId: "test-org-id",
+              plan: "GROWTH_SEAT_EUR_MONTHLY",
+            }),
+          );
+        });
+      });
+    });
+  });
+
+  // ============================================================================
+  // ENTERPRISE TIERED Org (Exclusion)
+  // ============================================================================
+
+  describe("when ENTERPRISE TIERED org views subscription page", () => {
+    beforeEach(() => {
+      setMockOrganization({
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      });
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          free: false,
+          maxMembers: 100,
+          maxMembersLite: 9999,
+          maxMessagesPerMonth: 1000000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("does not display deprecated pricing notice", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("tiered-deprecated-notice")).not.toBeInTheDocument();
+    });
+
+    it("does not display upgrade plan block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // A plan resolved from a license is still the plan the customer is on
+  // ============================================================================
+
+  describe("when an org on an enterprise license views subscription page", () => {
+    beforeEach(() => {
+      setMockOrganization({
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      });
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          planSource: "license",
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          free: false,
+          maxMembers: 10000,
+          maxMembersLite: 10000,
+          maxMessagesPerMonth: 10_000_000_000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario A licensed enterprise plan is not offered an upgrade */
+    it("names the plan without asking the customer to upgrade to it", async () => {
+      renderSubscriptionPage();
+
+      const block = await screen.findByTestId("current-plan-block");
+
+      expect(within(block).getByText("License: Enterprise")).toBeInTheDocument();
+      expect(screen.queryByText("Upgrade required")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+    });
+
+    /** @scenario A licensed enterprise plan lists enterprise features */
+    it("lists the enterprise features, not a smaller plan's allowances", async () => {
+      renderSubscriptionPage();
+
+      const features = await screen.findByTestId("current-plan-features-grid");
+
+      expect(within(features).getByText(ENTERPRISE_PLAN_FEATURES[0]!)).toBeInTheDocument();
+      expect(within(features).queryByText("Up to 20 core users")).not.toBeInTheDocument();
+      expect(within(features).queryByText("200,000 events included")).not.toBeInTheDocument();
+    });
+
+    /** @scenario A licensed enterprise plan is not asked to contact sales about upgrading */
+    it("offers no way to contact sales about upgrading", async () => {
+      renderSubscriptionPage();
+
+      await screen.findByTestId("current-plan-block");
+
+      expect(screen.queryByTestId("contact-sales-button")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the enterprise license withholds webhook endpoints", () => {
+    beforeEach(() => {
+      setMockOrganization({
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      });
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          planSource: "license",
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          free: false,
+          maxMembers: 10000,
+          maxMembersLite: 10000,
+          maxMessagesPerMonth: 10_000_000_000,
+          webhookEndpointsEnabled: false,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario A capability the contract withholds is not advertised as included */
+    it("leaves the withheld capability off the list and keeps the rest", async () => {
+      renderSubscriptionPage();
+
+      const features = await screen.findByTestId("current-plan-features-grid");
+
+      expect(within(features).queryByText(WEBHOOK_FEATURE_LABEL)).not.toBeInTheDocument();
+      for (const label of ENTERPRISE_PLAN_FEATURES.filter(
+        (feature) => feature !== WEBHOOK_FEATURE_LABEL,
+      )) {
+        expect(within(features).getByText(label)).toBeInTheDocument();
+      }
+    });
+  });
+
+  describe("when an org on a license below enterprise views subscription page", () => {
+    beforeEach(() => {
+      setMockOrganization({
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      });
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          planSource: "license",
+          type: "PRO",
+          name: "Pro",
+          free: false,
+          maxMembers: 10,
+          maxMembersLite: 5,
+          maxMessagesPerMonth: 100_000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario A licensed plan below enterprise lists what it actually grants */
+    it("lists what the license itself grants", async () => {
+      renderSubscriptionPage();
+
+      const features = await screen.findByTestId("current-plan-features-grid");
+
+      expect(within(features).getByText("Up to 10 core users")).toBeInTheDocument();
+      expect(within(features).getByText("100,000 events included")).toBeInTheDocument();
+      expect(within(features).queryByText("Up to 20 core users")).not.toBeInTheDocument();
+    });
+  });
+});

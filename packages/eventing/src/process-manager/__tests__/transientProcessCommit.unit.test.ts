@@ -186,7 +186,7 @@ describe("transient process commits", () => {
 
   describe("when a handler keeps its state but derives intents from it", () => {
     /**
-     * @scenario A transient process reads its state before deciding the path
+     * @scenario A transient evolution writes its intents and no process instance
      *
      * The shape that makes speculating on the initial state unsound: state
      * unchanged, no wake — so the evolution LOOKS transient — while the

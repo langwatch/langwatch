@@ -16,12 +16,15 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { computeSpanCost } from "@langwatch/trace-server";
 import { spanSchema } from "@langwatch/trace-contract";
 import {
+  GENIE_AGENT_MODEL,
   GENIE_MESSAGE_SPAN_NAME,
   GENIE_QUERY_SPAN_NAME,
   GENIE_ROUTING_PROFILE,
   GenieTraceMapper,
+  KNOWN_AGENT_IDENTITIES,
 } from "../genie-trace-mapper.adapter";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
@@ -416,5 +419,35 @@ describe("given two ingestion sources routing into one destination project", () 
       expect(again.traceId).toBe(first.traceId);
       expect(again.spanId).toBe(first.spanId);
     });
+  });
+});
+
+describe("given the pricing table (Decision 14(d) pin)", () => {
+  it("the Genie agent label resolves to no price — cost enrichment yields zero", () => {
+    const cost = computeSpanCost({
+      attrs: {},
+      model: GENIE_AGENT_MODEL,
+      promptTokens: 100_000,
+      completionTokens: 100_000,
+    });
+    expect(cost).toBe(0);
+  });
+
+  /**
+   * The pin has to cover every agent a routing profile may name, not just
+   * Genie's. The agent label became a per-source value when the mapper
+   * started serving more than one source, and a name that matched a price
+   * row would put real dollars on conversations nobody was charged for.
+   * Adding an agent to the set without checking that is what this catches.
+   */
+  /** @scenario "A source cannot name a real model as its agent" */
+  it.each([...KNOWN_AGENT_IDENTITIES])("%s resolves to no price either", (agent) => {
+    const cost = computeSpanCost({
+      attrs: {},
+      model: agent,
+      promptTokens: 100_000,
+      completionTokens: 100_000,
+    });
+    expect(cost).toBe(0);
   });
 });

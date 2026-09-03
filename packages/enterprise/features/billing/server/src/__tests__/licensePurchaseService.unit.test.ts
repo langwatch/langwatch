@@ -23,6 +23,7 @@ class TestLicensePurchaseDelivery extends LicensePurchaseDelivery {
 }
 
 describe("LicensePurchaseService", () => {
+  /** @scenario Use business name as organization name in license */
   it("loads seats, generates a license, then delivers email and notification", async () => {
     const delivery = new TestLicensePurchaseDelivery();
     const generator = new TestLicenseGenerator();

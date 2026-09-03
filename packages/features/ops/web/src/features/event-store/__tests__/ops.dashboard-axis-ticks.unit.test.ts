@@ -9,6 +9,7 @@ const formatAxisValue = (value: number): string => {
 };
 
 describe("axisTicks", () => {
+  /** @scenario "Both axes share gridlines" */
   it("divides unrelated rate and count ranges into shared intervals", () => {
     const rates = axisTicks(2_000);
     const counts = axisTicks(129_091);
@@ -54,6 +55,7 @@ describe("axisTicks", () => {
 });
 
 describe("axisWidthFor", () => {
+  /** @scenario "An axis label is never clipped" */
   it("reserves enough room for the longest rendered axis label", () => {
     const large = axisTicks(500_000);
     const small = axisTicks(20);
