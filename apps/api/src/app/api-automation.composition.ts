@@ -9,15 +9,12 @@
  * is woken here. That work is the worker's, and it composes the same feature
  * over a different half (`worker-automation-settlement.composition.ts`).
  *
- * So the eight capabilities below that belong to the running half are named
+ * So the six capabilities below that belong to the running half are named
  * absences rather than second implementations. Each refuses BY NAME at the one
  * procedure that reaches it, which is the difference between "this deployment
  * does not test-fire from its API" and a test fire that silently reports
  * success having sent nothing.
  *
- *   scheduled jobs / wake   a report schedule is stored by the worker's own
- *                           scheduler; this process reads and writes the
- *                           trigger, and refuses to move the schedule.
  *   graph notifier          a graph alert is dispatched by the worker.
  *   runaway containment     the daily ceiling is enforced where the fires
  *                           happen.
@@ -27,9 +24,18 @@
  *   dispatch errors         retryable-versus-terminal is a delivery
  *                           distinction, and nothing here delivers.
  *
- * The persist cap is the exception: it is a READ on this process — the trigger
- * list shows how much of today's ceiling each automation has spent — so it is
- * composed for real, over the same Redis counter the worker spends against.
+ * Two capabilities are the exception, and both for the same reason: they are
+ * STORAGE, not running.
+ *
+ *   persist cap             a READ on this process — the trigger list shows
+ *                           how much of today's ceiling each automation has
+ *                           spent — over the same Redis counter the worker
+ *                           spends against.
+ *   report calendar / wake  the row a saved report schedule IS, over the same
+ *                           `ScheduledJob` store the worker's loop claims
+ *                           through. Writing a calendar row is a Postgres
+ *                           write; only the loop that wakes it is the worker's,
+ *                           and this process never runs one.
  */
 import {
   AutomationPersistCapService,
@@ -45,11 +51,9 @@ import {
   AutomationTestFirePort,
   HmacUnsubscribeTokenAdapter,
   PostgresAutomationAdapter,
-  ScheduledJobStorePort,
   SchedulerWakePort,
   type AutomationPersistCapRedisPort,
   type ClaimLease,
-  type ScheduledJobRecord,
 } from "@langwatch/automation-server";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type {
@@ -57,6 +61,7 @@ import type {
   AutomationPlanProvider,
   SlackActionParams,
 } from "@langwatch/automation-contract";
+import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { MonitorService } from "@langwatch/monitor-contract";
@@ -118,9 +123,14 @@ export function composeApiAutomationApp(options: ApiAutomationCompositionOptions
   const automation = PostgresAutomationAdapter.create({
     database: options.prisma,
     verifier: HmacUnsubscribeTokenAdapter.create({ secret: options.unsubscribeSecret }),
-    jobs: new UnscheduledApiAutomationJobs(),
+    // The report calendar, on the SAME `ScheduledJob` store the worker's loop
+    // claims a due row through — Eventing's own, not a second narrowing of it,
+    // so the row this process writes on save is the row that process reads.
+    // Storing a schedule is one guarded Postgres write and needs no loop; the
+    // loop stays where the fires are.
+    jobs: new PrismaScheduledJobStore(options.prisma),
     clock,
-    wake: new UnwakeableApiScheduler(logger),
+    wake: new ApiSchedulerWake(options.redis, logger),
     projects: options.projects,
     // Nothing here evaluates a graph automation — the worker does — so the
     // charted reads a graph trigger would be measured against refuse by name
@@ -174,39 +184,31 @@ class ApiAutomationClock extends AutomationClockPort {
 }
 
 /**
- * Report schedules, as a process that runs no scheduler answers them.
+ * The cross-process wake a freshly written schedule publishes, best-effort.
  *
- * The read is the empty set rather than a refusal: a project with no schedules
- * stored HERE genuinely has none this process knows about, and the screen that
- * lists them is a read a member is entitled to. The two writes refuse, because
- * accepting a schedule nothing will ever wake is the failure that looks like
- * success.
+ * The worker's loop subscribes to it, so a report saved here comes due there
+ * without waiting for the poll backstop. Postgres is the correctness layer:
+ * the row is already written by the time this runs, so a dropped publish or an
+ * absent Redis costs the time to the worker's next sweep, never a fire.
  */
-class UnscheduledApiAutomationJobs extends ScheduledJobStorePort {
-  upsertForTarget(): Promise<void> {
-    return Promise.reject(new ApiAutomationUnavailableError("schedule automation reports"));
-  }
-
-  deactivateForTarget(): Promise<void> {
-    return Promise.reject(new ApiAutomationUnavailableError("schedule automation reports"));
-  }
-
-  findAllForProject(): Promise<ScheduledJobRecord[]> {
-    return Promise.resolve([]);
-  }
-}
-
-/** Nothing to wake: the scheduler this would nudge runs in the worker. */
-class UnwakeableApiScheduler extends SchedulerWakePort {
-  constructor(private readonly logger: Pick<Logger, "debug">) {
+class ApiSchedulerWake extends SchedulerWakePort {
+  constructor(
+    private readonly redis: RedisConnection | null,
+    private readonly logger: Pick<Logger, "debug">,
+  ) {
     super();
   }
 
   publish(): void {
-    this.logger.debug(
-      {},
-      "no automation scheduler runs in this process: the worker picks the change up on its next sweep",
-    );
+    if (!this.redis) {
+      this.logger.debug(
+        {},
+        "no Redis to wake the automation scheduler on: the worker picks the change up on its next sweep",
+      );
+      return;
+    }
+
+    SchedulerService.publishWake(this.redis as never);
   }
 }
 

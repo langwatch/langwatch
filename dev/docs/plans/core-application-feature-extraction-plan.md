@@ -16247,3 +16247,103 @@ sabotage (an early return before `deliver()`), which is what it exists to catch.
 - **Scenarios 6–9 of `report-content.feature` are still untagged.** They describe the drawer's layout picker and preview (`@langwatch/automation-web`), not the dispatch, and binding them is a different lane's reading pass.
 - **The calendar has no integration test against a real `ScheduledJob` table.** `PrismaScheduledJobStore` is `$queryRaw` against Postgres, so proving lease-then-settle end to end needs the datastore lane; what is proven here is that the handler renders and sends, and that the installer runs the loop for exactly as long as the feature is installed.
 - **Nothing under `platform/` was created, edited or read.**
+
+## The API writes the report calendar it used to refuse, 2026-09-03
+
+The entry above closed the sending half and named the half it could not reach:
+`apps/api` composed `PostgresAutomationAdapter` with
+`UnscheduledApiAutomationJobs`, whose `upsertForTarget` **rejected by name**, so
+`syncReportSchedule` (`automation.api.ts:1177` on save, `:630` on resume) wrote
+no calendar row at all. A customer who saved a report got an error on the write
+and — once the worker's boot sweep ran — a report that started sending at some
+later restart. The refusal's own reasoning was the mistake: it read the calendar
+as part of RUNNING reports. It is not. It is where a saved schedule is STORED,
+and this process is the one the customer saves on.
+
+```
+  BEFORE                                    AFTER
+  api    save report                        api    save report
+         └─ Trigger row      ✓                     ├─ Trigger row              ✓
+         └─ ScheduledJob   ✗ refused               ├─ ScheduledJob (upsert)    ✓
+                                                   └─ publish scheduler:wake   ✓
+  worker boot                                                  │
+         └─ reconcile sweep  ← the only writer    worker  loop ┘ claims · fires · settles
+         └─ loop claims · fires · settles                └─ reconcile stays, as a repair
+```
+
+What the platform composed is what this restores. `AppAutomationRuntime.build()`
+(`platform/app/src/runtime/app/features/automation.ts` at `db03af79cd^`) handed
+the adapter `new PrismaScheduledJobStore(this.database)` and an `AppSchedulerWake`
+over `SchedulerService.publishWake(redis)` — in one process, so the same object
+that wrote a row also ran the loop. Splitting the processes split those two, and
+only the loop belongs to the worker: `PrismaScheduledJobStore.upsertForTarget` is
+one `projectId`-scoped `updateMany`-then-`create`, and `deactivateForTarget` is
+one `updateMany`. Neither needs a scheduler.
+
+### One store class, so the two processes cannot disagree
+
+`apps/api` composes Eventing's `PrismaScheduledJobStore` **directly** rather than
+narrowing it the way `worker-report-schedule.composition.ts` does. The port it
+satisfies (`ScheduledJobStorePort`, three methods, no private members) is
+structural, so the store is assignable as it stands, and one class on both sides
+is the whole guarantee that a row written on save is a row the loop can claim.
+The composition test asserts against that same class, over the fake table the
+API just wrote through — a row in a shape the worker's reader could not read
+back fails there rather than as a report that silently never sends.
+
+The wake is composed for real too, over the Redis this process already holds for
+the persist ceiling. It is best-effort by construction (`publishWake(null)` is a
+no-op and a dropped publish costs only the poll backstop), so the honest absence
+it replaces was costing latency, not correctness.
+
+### The second thing found: every automation EDIT was a 500
+
+Proving "changing a report's cadence moves its one calendar row" through the real
+handler failed before it reached the calendar. `updateTriggerCommandSchema`
+(`trigger.commands.ts:30`) is `.strict()` and did not list `action`,
+`triggerKind` or `customGraphId` — and the drawer sends all three on every save,
+including edits (`automation-drawer.tsx:798`). So `AutomationService.update`
+threw `ZodError: unrecognized_keys` on an unhandled channel: an "unknown error"
+toast for editing ANY saved automation, report or not.
+
+It is an extraction loss, not a regression of this branch. Before
+`2176a15f42`, the platform's router called
+`triggers.update({ triggerId, projectId, data: { ...data } })` and those keys went
+to Prisma; the extraction reshaped the call onto a strict command schema that
+never listed them. The three keys are restored as optional, which is exactly what
+the platform wrote, and a conversion may still release its graph
+(`customGraphId: null`).
+
+### File → change
+
+| File | Change |
+| --- | --- |
+| `apps/api/src/app/api-automation.composition.ts` | `UnscheduledApiAutomationJobs` **deleted**; `jobs` is `new PrismaScheduledJobStore(options.prisma)` (`:131`). `UnwakeableApiScheduler` replaced by `ApiSchedulerWake` (`:194`), which publishes `SchedulerService.publishWake` over this process's Redis and logs the backstop when there is none. Header docblock: eight absences became six, and the calendar joins the persist cap as STORAGE the process composes for real |
+| `packages/features/automation/contract/src/trigger.commands.ts` | `updateTriggerCommandSchema` accepts optional `action`, `triggerKind`, `customGraphId` — restoring what the pre-extraction router wrote, and unbreaking every automation edit |
+| `apps/api/src/app/__tests__/api-automation.composition.integration.test.ts` | **New.** 7 tests through the real `automation.*` tRPC surface (real mount, real policy chain, real composition, real `ReportScheduleService`, real Eventing store) over a fake Postgres and a fake Redis. Every calendar assertion reads back through `PrismaScheduledJobStore` — the worker's own class |
+| `packages/features/automation/contract/src/__tests__/automation.contract.unit.test.ts` | +1 test pinning the update command's kind-conversion keys, and that a stray key is still refused |
+| `specs/automations/report-schedule-calendar.feature` | **New.** 7 `@integration` scenarios: saving schedules, saving wakes the sender, a cadence change moves the one entry, pause / resume / delete, and the automations page reading the schedule that will actually run |
+
+### Gates
+
+- `apps/api`: `vitest run src/app/__tests__/api-automation* src/app` — **46 files / 515 tests** (was 45 / 508). `tsc --noEmit` — 0 errors.
+- `@langwatch/automation-server`: `pnpm test` — 31 files / 233 tests. `pnpm typecheck` — 0 errors.
+- `@langwatch/automation-contract`: `pnpm test` — **23 files / 271 tests** (was 23 / 270). `pnpm typecheck` — 0 errors.
+- Feature parity: `specs/automations/report-schedule-calendar.feature` → **`7/7 scenarios bound · ✓ all bound`**.
+- `oxlint` over the four touched TypeScript files: clean. `oxfmt`: clean.
+
+### The sabotage
+
+Four, one per claim, each run on its own:
+
+1. `jobs` swapped back for a store whose writes go nowhere → **6 of 7 failed**. The survivor is the wake test, which is correctly indifferent to what the store did.
+2. `ApiSchedulerWake.publish` stopped publishing → **exactly the wake test failed**.
+3. `ReportScheduleService.remove` returned before deactivating → **exactly the pause and delete tests failed**.
+4. The three restored keys removed from `updateTriggerCommandSchema` → the contract test failed, and (before the fix) the cadence-change test failed with the same `unrecognized_keys` throw a customer would have got.
+
+### What this pass did NOT do
+
+- **The worker's `WorkerReportScheduleJobs` narrowing is now redundant.** `apps/api` proves the store satisfies the port as it stands, so the worker's `WorkerReportScheduleJobs` could go; that file belongs to another lane and was not touched.
+- **No datastore test.** The `ScheduledJob` writes are exercised against a fake table; `PrismaScheduledJobStore`'s raw `claim`/`settleClaim` still have no integration coverage, which stays the datastore lane's.
+- **The edit fix was not swept for siblings.** `createTriggerCommandSchema` and the other strict command schemas in that file were not audited for the same extraction-era omission.
+- **Nothing under `platform/` was created, edited or read.**
