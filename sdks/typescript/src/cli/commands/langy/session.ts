@@ -30,7 +30,12 @@ import {
 } from "./fs-ops";
 import { decide } from "./policy";
 import { RelayClient } from "./relay-client";
-import { commandOutcome, createUi, type LangyUi } from "./ui";
+import {
+  conversationLink,
+  commandOutcome,
+  createUi,
+  type LangyUi,
+} from "./ui";
 
 /** How long a Ctrl-C waits for the running work to end before it exits anyway. */
 export const SHUTDOWN_DEADLINE_MS = 5_000;
@@ -73,6 +78,11 @@ export function startLangySession(options: LangySessionOptions): LangySession {
 
   let skipPermissions = false;
   let announced = false;
+  /** The absolute link the terminal points the developer at. */
+  let conversationHref = conversationLink({
+    url: options.conversation.url,
+    endpoint: options.endpoint,
+  });
   let shuttingDown = false;
   let finished = false;
   let settle: (code: number) => void = () => undefined;
@@ -223,7 +233,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       });
       ui.permissionAsked({
         summary: decision.summary,
-        conversationUrl: options.conversation.url,
+        conversationUrl: conversationHref,
       });
       return;
     }
@@ -286,11 +296,15 @@ export function startLangySession(options: LangySessionOptions): LangySession {
           return;
         }
         announced = true;
+        conversationHref = conversationLink({
+          url: frame.conversation.url || options.conversation.url,
+          endpoint: options.endpoint,
+        });
         ui.connected({
           root,
           conversationTitle:
             frame.conversation.title || options.conversation.title,
-          conversationUrl: frame.conversation.url || options.conversation.url,
+          conversationUrl: conversationHref,
         });
         if (options.withoutGit === true) ui.noGitRepository();
       },

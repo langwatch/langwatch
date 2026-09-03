@@ -63,6 +63,29 @@ export function askedAgo(createdAt: string, now: number = Date.now()): string {
   return hours === 1 ? "asked 1 hour ago" : `asked ${hours} hours ago`;
 }
 
+/**
+ * The conversation link the terminal prints.
+ *
+ * The platform sends an absolute url. An older platform sends a path, which a
+ * terminal cannot open, so the endpoint the CLI already talks to supplies the
+ * origin.
+ */
+export function conversationLink({
+  url,
+  endpoint,
+}: {
+  url: string;
+  endpoint: string | undefined;
+}): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (!endpoint) return url;
+  try {
+    return new URL(url, endpoint).toString();
+  } catch {
+    return url;
+  }
+}
+
 /** What one call reads as: the tool and what it points at. */
 export function callLine(call: LocalCall): string {
   switch (call.tool) {

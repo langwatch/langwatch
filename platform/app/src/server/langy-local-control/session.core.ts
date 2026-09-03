@@ -15,6 +15,7 @@ import type {
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
+import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
@@ -625,9 +626,27 @@ export function connectMessage(
   return `Local folder connected: ${workspace.root} on ${hostname}${branch}`;
 }
 
-/** Where the panel opens one conversation. */
-export function conversationUrl(conversationId: string): string {
-  return `/?langyConversation=${encodeURIComponent(conversationId)}`;
+/**
+ * Where the panel opens one conversation, as a link the terminal can open.
+ *
+ * `BASE_HOST` is the external-facing origin, the same one the emails and the
+ * API's `platformUrl` build their links from. A relative path is correct in
+ * the browser and useless in a terminal, so the absolute form is what this
+ * returns. An origin that is empty or has no scheme cannot be trusted to
+ * build a link, so the path travels on its own rather than as a guess.
+ */
+export function conversationUrl(
+  conversationId: string,
+  baseHost: string | undefined = env.BASE_HOST,
+): string {
+  const path = `/?langyConversation=${encodeURIComponent(conversationId)}`;
+  const origin = (baseHost ?? "").trim().replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(origin)) return path;
+  try {
+    return new URL(path, origin).toString();
+  } catch {
+    return path;
+  }
 }
 
 /** Starts the turn through the app layer, as the acting user. */
