@@ -8,91 +8,164 @@
  * code slug, so a screen that toasted `error.message` would print
  * `validation_error` at the customer.
  *
- * DELIBERATELY MINIMAL. `platform/app/src/features/errors/logic/presentation.ts`
- * is the real registry: ~90 codes, each with a title, a description, tips and a
- * docs link, plus the tip-folding and global-handler dedup rules around it.
- * Harvesting it is its own slice. What lives here is the shape that slice will
- * fill: read the code off whichever envelope carried it, look it up, and fall
- * back to the action name plus the generic line when the code is unknown —
- * which is the same answer the full registry gives for an unregistered code.
+ * The words themselves come from `../model/errors/presentation`, the code-keyed
+ * registry (ADR-045, amendment 2026-07-21). This module used to carry a
+ * four-entry copy table of its own because the registry had not moved yet; it
+ * has, so the table is gone and every enumerated code — app, Go and node alike
+ * — resolves to the copy a customer reads everywhere else. What is left here is
+ * the three rules a TOAST applies on top of that registry:
+ *
+ *   1. Registry copy outranks the screen's `fallbackTitle`, because it names
+ *      this exact failure where the fallback only names the action.
+ *   2. A server remediation tip is folded in when it says something the
+ *      registry description did not — a toast has room for one, and for
+ *      `clickhouse_unavailable` that one is the only escalation path offered.
+ *   3. A failure with no handled payload gets ADR-045's unknown state: the
+ *      screen's own title, one calm generic line, and the trace id.
  */
 
 import { toaster } from "@langwatch/design-system/toaster";
+import {
+  explainHandledError,
+  explainUnhandledError,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "../model/errors/presentation";
+import { readEnvelopeTraceId, readHandledError } from "../model/errors/read-handled-error";
 import { UiFeedbackPort, type UiFailureNotice, type UiSuccessNotice } from "./ui-capabilities";
 
 /** How long a failure stays up: long enough to read it and copy the error id. */
 const FAILURE_DURATION_MS = 12_000;
 
-/** The line a failure we cannot name gets, and the floor under every other one. */
-export const UNKNOWN_UI_FAILURE_DESCRIPTION =
-  "Something went wrong on our side. Try again in a moment.";
-
-/** What a screen's `fallbackTitle` is replaced by when the code is known. */
-type UiFailureCopy = { title: string; description: string };
-
-/**
- * The codes this composition can already say something better about.
- *
- * Kept to the handful a moved screen actually raises. A code that is not here
- * is not a bug — it degrades to the action name and the generic line, which is
- * the honest answer rather than a guess.
- */
-export const UI_FAILURE_COPY: Readonly<Record<string, UiFailureCopy>> = {
-  insufficient_permissions: {
-    title: "You do not have access to this",
-    description: "Ask an organization admin to grant you the permission this page needs.",
-  },
-  validation_error: {
-    title: "Check the details you entered",
-    description:
-      "Some of what was submitted is not valid. Correct the highlighted fields and try again.",
-  },
-  not_found: {
-    title: "That is no longer here",
-    description: "It was removed, or the address is wrong. Go back and open it from the list.",
-  },
-  rate_limited: {
-    title: "Too many requests",
-    description: "Wait a moment and try again.",
-  },
+/** Everything a surface needs to render one failure, resolved once. */
+export type ResolvedUiFailureCopy = {
+  title: string;
+  /**
+   * The body line. Empty when a registered code's title says everything —
+   * the registry's rule is that an empty description beats padding, so this
+   * is deliberate silence rather than a gap to fill.
+   */
+  description: string;
+  /** The canonical docs page, when the server named one. */
+  docsUrl: string | undefined;
+  /**
+   * The trace id, and the ONLY technical detail a customer is offered. Raw
+   * `meta` and the reason chain stay server-side (ADR-045).
+   */
+  traceId: string | undefined;
 };
 
 /**
- * The code a failure carries, whichever boundary sent it.
+ * The words for one failure: the registry's when it knows the code, the
+ * screen's otherwise, and the generic unknown line when neither has anything.
  *
- * tRPC nests the handled payload under `data.error`; a REST route sends it flat
- * with the code in `error`. Anything else is an unhandled failure and has no
- * code to read, which is the `undefined` this returns.
- */
-export function readUiFailureCode(error: unknown): string | undefined {
-  const nested = (error as { data?: { error?: { code?: unknown } } } | null)?.data?.error?.code;
-  if (typeof nested === "string") return nested;
-  const flat = (error as { error?: unknown } | null)?.error;
-  if (typeof flat === "string") return flat;
-  return void 0;
-}
-
-/**
- * The words for one failure: the registry's when it has them, the caller's
- * otherwise, and the generic line when neither has anything.
- *
- * The registry still WINS over a caller's own description, which is the property
- * that keeps `description` from being a way to talk over registered copy. It
- * only fills the gap where there is no code to look up at all.
+ * The registry WINS over a screen's own `fallbackTitle` and `description`,
+ * which is the property that keeps a screen from talking over registered copy.
+ * They only fill the gap where there is no code to look up at all.
  */
 export function resolveUiFailureCopy({
   error,
   fallbackTitle,
+  title,
   description,
-}: UiFailureNotice): UiFailureCopy {
-  const code = readUiFailureCode(error);
-  const registered = code === void 0 ? void 0 : UI_FAILURE_COPY[code];
-  return (
-    registered ?? {
-      title: fallbackTitle,
-      description: description ?? UNKNOWN_UI_FAILURE_DESCRIPTION,
-    }
-  );
+}: UiFailureNotice): ResolvedUiFailureCopy {
+  const handled = readHandledError(error);
+
+  if (handled) {
+    const explanation = explainHandledError(handled);
+    const body = toastBody({
+      description: explanation.description,
+      tips: supplementalTips({ tips: handled.tips, description: explanation.description }),
+    });
+
+    return {
+      // Registry copy outranks the screen's fallback, because it names this
+      // exact failure where the fallback only names the action. An
+      // unrecognised code has the opposite property, so the screen wins there
+      // — and the humanised code stands behind both, for a screen that names
+      // no action at all.
+      title:
+        title ??
+        (explanation.isRegistered ? explanation.title : fallbackTitle || explanation.title),
+      // A code the registry knows keeps its own answer, empty included. A code
+      // it does not know has said nothing yet, so the screen's line — and
+      // failing that the generic one — is what stands.
+      description: explanation.isRegistered
+        ? body
+        : body || description || UNKNOWN_ERROR_PRESENTATION.description,
+      docsUrl: handled.docsUrl,
+      traceId: handled.traceId ?? readEnvelopeTraceId(error),
+    };
+  }
+
+  // No handled payload: ADR-045's "unknown", which is a correct outcome rather
+  // than a gap. The one thing still worth showing is prose a non-5xx procedure
+  // authored itself — the boundary vouches for it with `data.authored`, and
+  // replacing "You've already used this invite" with "we've been notified"
+  // tells the reader to wait for something that will never change.
+  return {
+    title: title ?? (fallbackTitle || UNKNOWN_ERROR_PRESENTATION.title),
+    description:
+      explainUnhandledError(error).description ||
+      description ||
+      UNKNOWN_ERROR_PRESENTATION.description,
+    docsUrl: void 0,
+    traceId: readEnvelopeTraceId(error),
+  };
+}
+
+/**
+ * The toast's single body line: the registry's description, plus the one
+ * remaining server tip that adds something to it.
+ *
+ * A toast has room for one tip; an inline alert, when that surface moves here,
+ * is where the rest belong.
+ */
+function toastBody({
+  description,
+  tips,
+}: {
+  description: string;
+  tips: readonly string[];
+}): string {
+  const tip = tips[0];
+  if (!description) return tip ?? "";
+  if (!tip) return description;
+
+  return /[.!?]$/.test(description) ? `${description} ${tip}` : `${description}. ${tip}`;
+}
+
+/**
+ * The tips that add something the description did not already say.
+ *
+ * Compared on a normalised form — lower-cased, punctuation flattened — because
+ * the two authorings are never character-identical: `query_timeout`'s registry
+ * description is "Narrow the time range or add a filter, then try again." and
+ * its first tip is "Narrow the time range". Dropping every tip whenever the
+ * registry had ANY description threw the escalation path away instead.
+ */
+function supplementalTips({
+  tips,
+  description,
+}: {
+  tips: readonly string[];
+  description: string;
+}): readonly string[] {
+  const target = normalise(description);
+  if (!target) return tips;
+
+  return tips.filter((tip) => {
+    const candidate = normalise(tip);
+    if (!candidate) return false;
+    return !target.includes(candidate) && !candidate.includes(target);
+  });
+}
+
+/** Words only: two sentences that say the same thing must compare equal. */
+function normalise(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 /** The toaster this feedback is rendered on, so a test can record instead. */
@@ -103,6 +176,7 @@ export type UiToaster = {
     description?: string;
     type: string;
     duration?: number;
+    meta?: Record<string, unknown>;
   }) => unknown;
 };
 
@@ -129,9 +203,13 @@ export class BrowserUiFeedback extends UiFeedbackPort {
     this.target.create({
       ...(failure.id ? { id: failure.id } : {}),
       title: copy.title,
-      description: copy.description,
+      ...(copy.description ? { description: copy.description } : {}),
       type: "error",
       duration: FAILURE_DURATION_MS,
+      // Read by the toaster's `renderMeta` (see `ui/elements/ui-error-actions`):
+      // the docs link and the copyable error id, which is the whole of the
+      // technical detail a customer is shown.
+      meta: { docsUrl: copy.docsUrl, traceId: copy.traceId },
     });
   }
 }

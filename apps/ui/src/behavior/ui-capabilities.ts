@@ -56,6 +56,17 @@ export type UiFailureNotice = {
   error: unknown;
   fallbackTitle: string;
   /**
+   * A hard override of the headline, registry entry or not.
+   *
+   * Rare, and usually a smell: where the registry's copy is wrong for a code,
+   * the fix is the registry rather than one call site. It is here because the
+   * families that moved already pass it — `useShowErrorToast` in the
+   * automations, gateway, ops and coding-agent packages all forward a `title`
+   * — and a port that quietly dropped it left those screens rendering copy
+   * nobody chose.
+   */
+  title?: string;
+  /**
    * A sentence for a refusal the SCREEN made rather than the server.
    *
    * Ignored the moment the error carries a code this composition can say
