@@ -370,50 +370,46 @@ function otherCollaborators(): AnyApiTrpcCollaborators {
      * gates the mounts chain onto a procedure. Its own suite is what proves it
      * answers.
      */
-    orgGroup: {
-      organization: stub("orgGroup.organization", {
-        signUpDataSchema: anySchema,
-        isCustomRole: () => false,
-      }),
-      organizationAuditLogCheck: passThroughMiddleware,
-      project: stub("orgGroup.project"),
-      projectChecks: {
-        create: passThroughMiddleware,
-        traceSharing: passThroughMiddleware,
-      },
-      codingAgents: stub("orgGroup.codingAgents"),
-      automation: stub("orgGroup.automation", {
-        providers: stub("orgGroup.automation.providers"),
-      }),
-      emailSuppression: stub("orgGroup.emailSuppression"),
-      enterprise: {
-        scimToken: stub("orgGroup.enterprise.scimToken"),
-        ssoConnections: stub("orgGroup.enterprise.ssoConnections"),
-      },
+    organization: stub("organization", {
+      signUpDataSchema: anySchema,
+      isCustomRole: () => false,
+    }),
+    organizationAuditLogCheck: passThroughMiddleware,
+    project: stub("project"),
+    projectChecks: {
+      create: passThroughMiddleware,
+      traceSharing: passThroughMiddleware,
     },
-    traceGroup: {
-      traces: stub("traceGroup.traces", {
-        listInputSchema: anySchema,
-        filterInputSchema: anySchema,
-        evaluatorTypeSchema: anySchema,
-        preconditionSchema: anySchema,
-      }),
-      tracesV2: stub("traceGroup.tracesV2", { traceMetadataUpdateSchema: anySchema }),
-      spans: stub("traceGroup.spans"),
-      traceEditOverlay: stub("traceGroup.traceEditOverlay"),
-      sharedTrace: stub("traceGroup.sharedTrace"),
-      savedViews: stub("traceGroup.savedViews"),
-      costs: stub("traceGroup.costs"),
-      llmModelCost: stub("traceGroup.llmModelCost"),
-      modelProvider: stub("traceGroup.modelProvider"),
-      modelProviderChecks: {
-        tenantWrite: () => passThroughMiddleware,
-        credentialProbe: passThroughMiddleware,
-      },
-      translate: stub("traceGroup.translate"),
-      httpProxy: stub("traceGroup.httpProxy"),
-      limits: stub("traceGroup.limits"),
+    codingAgents: stub("codingAgents"),
+    automation: stub("automation", {
+      providers: stub("automation.providers"),
+    }),
+    emailSuppression: stub("emailSuppression"),
+    enterprise: {
+      scimToken: stub("enterprise.scimToken"),
+      ssoConnections: stub("enterprise.ssoConnections"),
     },
+    traces: stub("traces", {
+      listInputSchema: anySchema,
+      filterInputSchema: anySchema,
+      evaluatorTypeSchema: anySchema,
+      preconditionSchema: anySchema,
+    }),
+    tracesV2: stub("tracesV2", { traceMetadataUpdateSchema: anySchema }),
+    spans: stub("spans"),
+    traceEditOverlay: stub("traceEditOverlay"),
+    sharedTrace: stub("sharedTrace"),
+    savedViews: stub("savedViews"),
+    costs: stub("costs"),
+    llmModelCost: stub("llmModelCost"),
+    modelProvider: stub("modelProvider"),
+    modelProviderChecks: {
+      tenantWrite: () => passThroughMiddleware,
+      credentialProbe: passThroughMiddleware,
+    },
+    translate: stub("translate"),
+    httpProxy: stub("httpProxy"),
+    limits: stub("limits"),
     /**
      * The six agent surfaces, stubbed with only what the record reads while it
      * is being BUILT. Their own suite is what proves they answer.
@@ -428,17 +424,15 @@ function otherCollaborators(): AnyApiTrpcCollaborators {
     governanceHome: stub("governanceHome"),
     saasBilling: false,
     github: stub("github"),
-    agentGroup: {
-      scenarios: stub("agentGroup.scenarios"),
-      langy: stub("agentGroup.langy"),
-      langyGates: {
-        refuseDemoProject: passThroughMiddleware,
-        enforceLangyAccess: passThroughMiddleware,
-      },
-      langyEgress: stub("agentGroup.langyEgress"),
-      ops: stub("agentGroup.ops"),
-      opsCheck: () => passThroughMiddleware,
+    scenarios: stub("scenarios"),
+    langy: stub("langy"),
+    langyGates: {
+      refuseDemoProject: passThroughMiddleware,
+      enforceLangyAccess: passThroughMiddleware,
     },
+    langyEgress: stub("langyEgress"),
+    ops: stub("ops"),
+    opsCheck: () => passThroughMiddleware,
     user: stub("user"),
     workflows: {
       lifecycle: stub("workflows.lifecycle"),

@@ -39,10 +39,12 @@ import type {
 } from "@langwatch/dataset-server";
 import type { ExperimentTrpcPorts } from "@langwatch/experiment-server";
 import type { BugReportTrpcPorts } from "@langwatch/ops-server";
+import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
 import type {
   GroupTrpcPorts,
   JoinRequestTrpcPorts,
   OnboardingTrpcPorts,
+  OrganizationTrpcPorts,
   TeamTrpcPorts,
 } from "@langwatch/organization-server";
 import type {
@@ -64,9 +66,40 @@ import type { GatewayTrpcPorts } from "../features/gateway/gateway-trpc.mount";
 import type { GovernanceHomeTrpcPorts } from "../features/enterprise/governance-home.mount";
 import type { DataRetentionTrpcPolicy } from "@langwatch/data-retention-server";
 import type { MonitorTrpcPorts } from "@langwatch/monitor-server";
-import type { AnyAppAgentGroupTrpcPorts } from "./app-trpc.agent-group";
-import type { AnyAppOrgGroupTrpcPorts } from "./app-trpc.org-group";
-import type { AnyAppTraceGroupTrpcPorts } from "./app-trpc.trace-group";
+import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
+import type {
+  LangyEgressTrpcPorts,
+  LangyTrpcGates,
+  LangyTrpcPorts,
+} from "@langwatch/langy-server";
+import type { OpsTrpcPorts } from "@langwatch/ops-server";
+import type { ScenarioTrpcPorts } from "@langwatch/scenario-server";
+import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AppTrpcDeclaredCheck } from "./app-trpc.policy-kit";
+import type { AutomationMountPorts } from "../features/automation/automation-trpc.mount";
+import type { EnterpriseTrpcMountPorts } from "../features/enterprise/enterprise-trpc.mount";
+import type {
+  ProjectTrpcChecks,
+  ProjectTrpcMountPorts,
+} from "../features/project/project-trpc.mount";
+import type { HttpProxyTrpcPorts } from "@langwatch/agent-server";
+import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
+import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-server";
+import type {
+  LlmModelCostTrpcPorts,
+  ModelProviderTrpcPorts,
+  TranslateTrpcPorts,
+} from "@langwatch/model-provider-server";
+import type { SharedTraceTrpcPorts } from "@langwatch/share-server";
+import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
+import type {
+  SpansTrpcPorts,
+  TraceEditOverlayTrpcPorts,
+  TraceEditOverlayVisibilityWindow,
+  TracesTrpcPorts,
+  TracesV2TrpcPorts,
+} from "@langwatch/trace-server";
+import type { ModelProviderTrpcChecks } from "../features/model-provider/model-provider-trpc.mount";
 
 /**
  * The `user.*` entries this process answers from its own Prisma connection:
@@ -135,9 +168,18 @@ export type ApiTrpcCollaborators<
   TWorkbenchState,
   TTimeseriesInputWire = unknown,
   TReadInputWire = unknown,
-  TTraceGroup extends AnyAppTraceGroupTrpcPorts = AnyAppTraceGroupTrpcPorts,
-  TOrgGroup extends AnyAppOrgGroupTrpcPorts = AnyAppOrgGroupTrpcPorts,
-  TAgentGroup extends AnyAppAgentGroupTrpcPorts = AnyAppAgentGroupTrpcPorts,
+  TListInput extends TraceLegacyListInput = TraceLegacyListInput,
+  TListInputRaw = unknown,
+  TFilterInput extends TraceLegacyFilterInput = TraceLegacyFilterInput,
+  TFilterInputRaw = unknown,
+  TPrecondition = unknown,
+  TProtections extends TraceEditOverlayVisibilityWindow = TraceEditOverlayVisibilityWindow,
+  TMetadata = unknown,
+  TMetadataRaw = unknown,
+  TSavedView = unknown,
+  TSpendRollup = unknown,
+  TApiKeyValidation = unknown,
+  TStoredKeyValidation = unknown,
   TRetentionSnapshot = unknown,
   TStorageScopeUsage = unknown,
 > = Readonly<{
@@ -240,42 +282,62 @@ export type ApiTrpcCollaborators<
    */
   team: TeamTrpcPorts;
 
-  /**
-   * The sixteen observability surfaces' ports, as one entry.
-   *
-   * Unlike every other entry here this one is not a leftover the process could
-   * not build: the API process composes the whole group for itself — the share
-   * ledger, the topic tree, the retention policy, the saved views, the spend
-   * rollup and the provider gateway all run on its own connection. What it
-   * cannot build is named INSIDE the group, by the ports its composition
-   * declares, so a deployment reads one absence per capability rather than one
-   * absence for sixteen namespaces.
-   */
-  traceGroup: TTraceGroup;
+  /** The legacy grid's two shared input schemas, the precondition engine, the span digest and redactions. */
+  traces: TracesTrpcPorts<TListInput, TListInputRaw, TFilterInput, TFilterInputRaw, TPrecondition>;
+  /** Everything the explorer reads that is another vertical's. */
+  tracesV2: Omit<TracesV2TrpcPorts<TMetadata, TMetadataRaw>, "queryTranslation">;
+  /** The caller's read-time redactions, for the waterfall and the studio span. */
+  spans: SpansTrpcPorts;
+  /** The same redactions, plus the two rules a correction is carried through. */
+  traceEditOverlay: TraceEditOverlayTrpcPorts<TProtections>;
+  /** The anonymous read's own four capabilities. */
+  sharedTrace: SharedTraceTrpcPorts;
+  /** The stored filter sets, generic in the row shape the explorer renders. */
+  savedViews: SavedViewTrpcPorts<TSavedView>;
+  /** The organization's spend, rolled up per project. */
+  costs: CostTrpcPorts<TSpendRollup>;
+  /** The cost rule's regex safety gate, the model registry's ceilings and the live span preview. */
+  llmModelCost: LlmModelCostTrpcPorts;
+  /** The outbound credential probes, the Codex device flow and the audit trail. */
+  modelProvider: ModelProviderTrpcPorts<TApiKeyValidation, TStoredKeyValidation>;
+  /** The two data-dependent gates the provider surface needs, already built. */
+  modelProviderChecks: ModelProviderTrpcChecks;
+  /** The application's provider-failure policy behind one model call. */
+  translate: TranslateTrpcPorts;
+  /** The studio's event dispatch, and the agent test's own trace write. */
+  httpProxy: HttpProxyTrpcPorts;
+  /** The usage reading and the approaching-limit notifier, over the billing store. */
+  limits: LimitsTrpcPorts;
 
-  /**
-   * The nine tenant-administration surfaces' ports, as one entry.
-   *
-   * Like the trace group and unlike everything else here, this is not a
-   * leftover the process could not build: the API composes the whole group for
-   * itself — the project application, the coding-agent reads, the automation
-   * application and the four Enterprise routers all run on its own connection.
-   * What it cannot build is named INSIDE the group, so a deployment reads one
-   * absence per capability rather than one absence for nine namespaces.
-   */
-  orgGroup: TOrgGroup;
+  /** The forty-six answers `organization.*` needs from this deployment. */
+  organization: OrganizationTrpcPorts<TSignUpDataSchema>;
+  /** The audit-log read's own `kind: "custom"` check, already built. */
+  organizationAuditLogCheck: unknown;
+  /** The six answers `project.*` needs. */
+  project: ProjectTrpcMountPorts;
+  /** `project.create`'s custom tier resolution and the trace-sharing demand. */
+  projectChecks: ProjectTrpcChecks;
+  /** What one viewer may see of one project's captured content and spend. */
+  codingAgents: CodingAgentTrpcPorts;
+  /** The three answers the automation transport reaches beyond automation's own. */
+  automation: AutomationMountPorts;
+  /** The unsubscribe pair's client address, its throttle and its audit trail. */
+  emailSuppression: EmailSuppressionTrpcPorts;
+  /** The SCIM plan gate, and the back office's connection ledger with its trail. */
+  enterprise: EnterpriseTrpcMountPorts;
 
-  /**
-   * The six agent surfaces' ports, as one entry.
-   *
-   * Like the two groups above, this is not a leftover: the API composes the
-   * scenario, suite and Langy applications for itself off its own Prisma,
-   * ClickHouse and Redis connections. What it cannot compose is named INSIDE
-   * the group — the queue-backed commands a run or a turn is STARTED with, and
-   * the operator runtime's three explorers — so a deployment reads one absence
-   * per capability rather than one absence for six namespaces.
-   */
-  agentGroup: TAgentGroup;
+  /** The two fire-and-forget signals a new test case triggers, and where a failure in either goes. */
+  scenarios: ScenarioTrpcPorts;
+  /** The message and warm budgets, the product-analytics sink, and the agent-to-page UI-action channel. */
+  langy: LangyTrpcPorts;
+  /** The two Langy gates every customer-facing procedure carries, already built. */
+  langyGates: LangyTrpcGates;
+  /** The audit trail an egress allow-list change is recorded on. */
+  langyEgress: LangyEgressTrpcPorts;
+  /** The pipeline registry, the event-log search window, the Grafana deep links and the migrations runner. */
+  ops: OpsTrpcPorts;
+  /** The operator gate, already built. */
+  opsCheck(input: { permission: AuthzPermission; throwOnDeny?: boolean }): AppTrpcDeclaredCheck;
 
   /**
    * The twenty-one AI Gateway and governance-console surfaces' ports, as one
@@ -369,7 +431,16 @@ export type AnyApiTrpcCollaborators = ApiTrpcCollaborators<
   unknown,
   unknown,
   unknown,
-  AnyAppTraceGroupTrpcPorts,
-  AnyAppOrgGroupTrpcPorts,
-  AnyAppAgentGroupTrpcPorts
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown,
+  unknown
 >;

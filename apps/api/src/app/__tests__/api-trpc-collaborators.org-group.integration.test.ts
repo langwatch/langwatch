@@ -189,29 +189,27 @@ function baseCollaborators(organizations: unknown): AnyApiTrpcCollaborators {
     prompts: stub("prompts"),
     role: stub("role", { customRolePermission: anySchema }),
     team: stub("team"),
-    traceGroup: {
-      traces: stub("traceGroup.traces", {
-        listInputSchema: anySchema,
-        filterInputSchema: anySchema,
-        evaluatorTypeSchema: anySchema,
-        preconditionSchema: anySchema,
-      }),
-      tracesV2: stub("traceGroup.tracesV2", { traceMetadataUpdateSchema: anySchema }),
-      spans: stub("traceGroup.spans"),
-      traceEditOverlay: stub("traceGroup.traceEditOverlay"),
-      sharedTrace: stub("traceGroup.sharedTrace"),
-      savedViews: stub("traceGroup.savedViews"),
-      costs: stub("traceGroup.costs"),
-      llmModelCost: stub("traceGroup.llmModelCost"),
-      modelProvider: stub("traceGroup.modelProvider"),
-      modelProviderChecks: {
-        tenantWrite: () => passThroughMiddleware,
-        credentialProbe: passThroughMiddleware,
-      },
-      translate: stub("traceGroup.translate"),
-      httpProxy: stub("traceGroup.httpProxy"),
-      limits: stub("traceGroup.limits"),
+    traces: stub("traces", {
+      listInputSchema: anySchema,
+      filterInputSchema: anySchema,
+      evaluatorTypeSchema: anySchema,
+      preconditionSchema: anySchema,
+    }),
+    tracesV2: stub("tracesV2", { traceMetadataUpdateSchema: anySchema }),
+    spans: stub("spans"),
+    traceEditOverlay: stub("traceEditOverlay"),
+    sharedTrace: stub("sharedTrace"),
+    savedViews: stub("savedViews"),
+    costs: stub("costs"),
+    llmModelCost: stub("llmModelCost"),
+    modelProvider: stub("modelProvider"),
+    modelProviderChecks: {
+      tenantWrite: () => passThroughMiddleware,
+      credentialProbe: passThroughMiddleware,
     },
+    translate: stub("translate"),
+    httpProxy: stub("httpProxy"),
+    limits: stub("limits"),
     /**
      * The agent and product-infrastructure groups, stubbed with only what the
      * record reads while it is BUILT. Their own suites are what prove they
@@ -227,19 +225,17 @@ function baseCollaborators(organizations: unknown): AnyApiTrpcCollaborators {
     governanceHome: stub("governanceHome"),
     saasBilling: false,
     github: stub("github"),
-    agentGroup: {
-      langy: stub("agentGroup.langy"),
-      langyGates: {
-        refuseDemoProject: passThroughMiddleware,
-        enforceLangyAccess: passThroughMiddleware,
-      },
-      langyEgress: stub("agentGroup.langyEgress"),
-      ops: stub("agentGroup.ops"),
-      // Read at BUILD time — the mount asks it for a middleware — so it
-      // answers one rather than being one.
-      opsCheck: () => passThroughMiddleware,
-      scenarios: stub("agentGroup.scenarios"),
+    langy: stub("langy"),
+    langyGates: {
+      refuseDemoProject: passThroughMiddleware,
+      enforceLangyAccess: passThroughMiddleware,
     },
+    langyEgress: stub("langyEgress"),
+    ops: stub("ops"),
+    // Read at BUILD time — the mount asks it for a middleware — so it
+    // answers one rather than being one.
+    opsCheck: () => passThroughMiddleware,
+    scenarios: stub("scenarios"),
     dataRetention: stub("dataRetention"),
     monitors: stub("monitors", { preconditionsSchema: anySchema }),
     user: stub("user"),
@@ -373,7 +369,8 @@ describe("given an API process composed with the org-group half of the record", 
     it("mounts all nine tenant-administration namespaces", () => {
       const { group } = composeApplication();
 
-      expect(Object.keys(group.ports).sort()).toEqual([
+      expect(Object.keys(group).sort()).toEqual([
+        "application",
         "automation",
         "codingAgents",
         "emailSuppression",

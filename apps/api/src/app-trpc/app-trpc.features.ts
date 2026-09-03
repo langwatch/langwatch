@@ -28,7 +28,17 @@ import type {
 } from "@langwatch/annotation-server";
 import type { TrpcApiMount, TrpcApiPublicMount } from "@langwatch/api/trpc";
 import type { ApiKeyTrpcContext } from "@langwatch/api-key-server";
+import type {
+  AutomationTrpcContext,
+  EmailSuppressionTrpcContext,
+  EmailSuppressionTrpcPorts,
+} from "@langwatch/automation-server";
 import type { AuthzTrpcContext } from "@langwatch/authz-server";
+import type {
+  CodingAgentTrpcContext,
+  CodingAgentTrpcPorts,
+} from "@langwatch/coding-agent-server";
+import type { EnterpriseTrpcContext } from "@langwatch/enterprise-api";
 import type {
   BatchRecordTrpcContext,
   BatchRecordTrpcPorts,
@@ -49,16 +59,65 @@ import type {
   DashboardTrpcContext,
   GraphTrpcContext,
   GraphTrpcPorts,
+  SavedViewTrpcContext,
+  SavedViewTrpcPorts,
   SavedWorkbenchChartTrpcContext,
   SavedWorkbenchChartTrpcPorts,
 } from "@langwatch/dashboard-server";
+import type { HttpProxyTrpcContext, HttpProxyTrpcPorts } from "@langwatch/agent-server";
+import type {
+  CostTrpcContext,
+  CostTrpcPorts,
+  LimitsTrpcContext,
+  LimitsTrpcPorts,
+  PlanTrpcContext,
+} from "@langwatch/entitlement-server";
+import type {
+  LlmModelCostTrpcContext,
+  LlmModelCostTrpcPorts,
+  ModelProviderTrpcContext,
+  ModelProviderTrpcPorts,
+  TranslateTrpcContext,
+  TranslateTrpcPorts,
+} from "@langwatch/model-provider-server";
+import type { PinnedTraceTrpcContext, ShareTrpcContext } from "@langwatch/share-server";
+import type { TopicTrpcContext } from "@langwatch/topic-server";
+import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
+import type {
+  SharedTraceTrpcContext,
+  SharedTraceTrpcPorts,
+  SpansTrpcContext,
+  SpansTrpcPorts,
+  TraceEditOverlayTrpcContext,
+  TraceEditOverlayTrpcPorts,
+  TraceEditOverlayVisibilityWindow,
+  TracesTrpcContext,
+  TracesTrpcPorts,
+  TracesV2TrpcContext,
+  TracesV2TrpcPorts,
+} from "@langwatch/trace-server";
 import type { EvaluationTrpcContext } from "@langwatch/evaluation-server";
 import type {
   EvaluatorTrpcContext,
   EvaluatorTrpcPorts,
 } from "@langwatch/evaluator-server";
 import type { ExperimentTrpcContext, ExperimentTrpcPorts } from "@langwatch/experiment-server";
-import type { BugReportTrpcContext, BugReportTrpcPorts } from "@langwatch/ops-server";
+import type {
+  BugReportTrpcContext,
+  BugReportTrpcPorts,
+  OpsTrpcContext,
+  OpsTrpcPorts,
+} from "@langwatch/ops-server";
+import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import type {
+  LangyEgressTrpcContext,
+  LangyEgressTrpcPorts,
+  LangyTrpcContext,
+  LangyTrpcPorts,
+  SetupSkillsTrpcContext,
+} from "@langwatch/langy-server";
+import type { ScenarioTrpcContext, ScenarioTrpcPorts } from "@langwatch/scenario-server";
+import type { SuiteTrpcContext } from "@langwatch/suite-server";
 import type {
   GroupTrpcContext,
   GroupTrpcPorts,
@@ -66,6 +125,8 @@ import type {
   JoinRequestTrpcPorts,
   OnboardingTrpcContext,
   OnboardingTrpcPorts,
+  OrganizationTrpcContext,
+  OrganizationTrpcPorts,
   PersonalWorkspaceFeaturesTrpcContext,
   TeamTrpcContext,
   TeamTrpcPorts,
@@ -77,6 +138,7 @@ import type {
   HomeTrpcPorts,
   IntegrationsChecksTrpcContext,
   IntegrationsChecksTrpcPorts,
+  ProjectTrpcContext,
 } from "@langwatch/project-server";
 import type { PromptTrpcContext, PromptTrpcPorts } from "@langwatch/prompt-server";
 import type { RoleBindingTrpcContext, RoleTrpcContext } from "@langwatch/role-server";
@@ -94,6 +156,7 @@ import type {
 } from "@langwatch/workflow-server";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 import type { ZodTypeAny } from "zod";
+import type { AppTrpcDeclaredCheck, AppTrpcPolicyKit } from "./app-trpc.policy-kit";
 
 import {
   createAnalyticsTrpcRouter,
@@ -140,19 +203,29 @@ import {
   createExportTrpcRouter,
   type ExportTrpcContext,
 } from "../features/export/export-trpc.mount";
-import { createBugReportTrpcRouter } from "../features/ops/ops-trpc.mount";
+import { createBugReportTrpcRouter, createOpsTrpcRouter } from "../features/ops/ops-trpc.mount";
 import { createPresenceTrpcRouter } from "../features/presence/presence-trpc.mount";
 import {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,
   createOnboardingTrpcRouter,
+  createOrganizationTrpcRouter,
   createPersonalWorkspaceFeaturesTrpcRouter,
   createTeamTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
 import {
   createHomeTrpcRouter,
   createIntegrationsChecksTrpcRouter,
+  createProjectTrpcRouter,
+  type ProjectTrpcChecks,
+  type ProjectTrpcMountPorts,
 } from "../features/project/project-trpc.mount";
+import {
+  createAutomationTrpcRouter,
+  createEmailSuppressionTrpcRouter,
+  type AutomationMountPorts,
+} from "../features/automation/automation-trpc.mount";
+import { createCodingAgentTrpcRouter } from "../features/coding-agent/coding-agent-trpc.mount";
 import {
   createPromptTagTrpcRouter,
   createPromptTrpcRouter,
@@ -177,6 +250,10 @@ import {
   type EnterpriseBillingTrpcContext,
 } from "../features/enterprise/enterprise-billing-trpc.mount";
 import {
+  createEnterpriseTrpcRouters,
+  type EnterpriseTrpcMountPorts,
+} from "../features/enterprise/enterprise-trpc.mount";
+import {
   createEnterpriseGovernanceTrpcRouters,
   type EnterpriseGovernanceMountContext,
 } from "../features/enterprise/enterprise-governance-trpc.mount";
@@ -191,20 +268,40 @@ import {
   type GatewayTrpcPorts,
 } from "../features/gateway/gateway-trpc.mount";
 import {
-  createAppAgentGroupTrpcFeatures,
-  type AnyAppAgentGroupTrpcPorts,
-  type AppAgentGroupTrpcContext,
-} from "./app-trpc.agent-group";
+  createLangyEgressTrpcRouter,
+  createLangyTrpcRouter,
+  type LangyTrpcGates,
+} from "../features/langy/langy-trpc.mount";
+import { createSetupSkillsTrpcRouter } from "../features/langy/setup-skills-trpc.mount";
+import { createScenarioTrpcRouter } from "../features/scenario/scenario-trpc.mount";
+import { createSuiteTrpcRouter } from "../features/suite/suite-trpc.mount";
+import { createHttpProxyTrpcRouter } from "../features/agent/http-proxy-trpc.mount";
+import { createSavedViewTrpcRouter } from "../features/dashboard/dashboard-trpc.mount";
 import {
-  createAppOrgGroupTrpcFeatures,
-  type AnyAppOrgGroupTrpcPorts,
-  type AppOrgGroupTrpcContext,
-} from "./app-trpc.org-group";
+  createCostTrpcRouter,
+  createLimitsTrpcRouter,
+  createPlanTrpcRouter,
+} from "../features/entitlement/entitlement-trpc.mount";
 import {
-  createAppTraceGroupTrpcFeatures,
-  type AnyAppTraceGroupTrpcPorts,
-  type AppTraceGroupTrpcContext,
-} from "./app-trpc.trace-group";
+  createLlmModelCostTrpcRouter,
+  createModelProviderTrpcRouter,
+  type ModelProviderTrpcChecks,
+} from "../features/model-provider/model-provider-trpc.mount";
+import { createTranslateTrpcRouter } from "../features/model-provider/translate-trpc.mount";
+import {
+  createPinnedTraceTrpcRouter,
+  createShareTrpcRouter,
+} from "../features/share/share-trpc.mount";
+import { createTopicTrpcRouter } from "../features/topic/topic-trpc.mount";
+import {
+  createSpansTrpcRouter,
+  createTraceEditOverlayTrpcRouter,
+  createTracesTrpcRouter,
+} from "../features/trace/trace-trpc.mount";
+import {
+  createSharedTraceTrpcRouter,
+  createTracesV2TrpcRouter,
+} from "../features/trace/traces-v2-trpc.mount";
 
 /**
  * The capabilities these surfaces reach that their own feature packages do not
@@ -234,9 +331,18 @@ export interface AppTrpcFeaturePorts<
   TPublishedComponent,
   TTimeseriesInputWire = unknown,
   TReadInputWire = unknown,
-  TTraceGroup extends AnyAppTraceGroupTrpcPorts = AnyAppTraceGroupTrpcPorts,
-  TOrgGroup extends AnyAppOrgGroupTrpcPorts = AnyAppOrgGroupTrpcPorts,
-  TAgentGroup extends AnyAppAgentGroupTrpcPorts = AnyAppAgentGroupTrpcPorts,
+  TListInput extends TraceLegacyListInput = TraceLegacyListInput,
+  TListInputRaw = unknown,
+  TFilterInput extends TraceLegacyFilterInput = TraceLegacyFilterInput,
+  TFilterInputRaw = unknown,
+  TPrecondition = unknown,
+  TProtections extends TraceEditOverlayVisibilityWindow = TraceEditOverlayVisibilityWindow,
+  TMetadata = unknown,
+  TMetadataRaw = unknown,
+  TSavedView = unknown,
+  TSpendRollup = unknown,
+  TApiKeyValidation = unknown,
+  TStoredKeyValidation = unknown,
   TRetentionSnapshot = unknown,
   TStorageScopeUsage = unknown,
 > {
@@ -264,37 +370,60 @@ export interface AppTrpcFeaturePorts<
    * and the evaluator replication a monitor copy carries with it.
    */
   monitors: MonitorTrpcPorts;
-  /**
-   * The six surfaces an AGENT is written, watched and driven through, as one
-   * entry.
-   *
-   * Same reason the trace and organization groups are one entry each: they are
-   * one graph — every one of them either drives an agent or reads what an agent
-   * did — and one entry keeps their ports in {@link AppAgentGroupTrpcPorts}
-   * rather than on this interface, which five other halves of the record also
-   * edit. Three of the browser's ten subscriptions are inside it.
-   */
-  agentGroup: TAgentGroup;
-  /**
-   * The nine tenant-administration surfaces, as one entry.
-   *
-   * Same reason the trace group is one entry: they are one graph — every one
-   * of them is a write against the tenant rather than against what the tenant
-   * recorded — and one entry keeps their ports in
-   * {@link AppOrgGroupTrpcPorts} rather than on this interface, which five
-   * other halves of the record also edit.
-   */
-  orgGroup: TOrgGroup;
-  /**
-   * The sixteen observability surfaces, as one entry.
-   *
-   * They are one graph — every one of them either reads the trace application
-   * or reads something a trace read is measured against — and one entry is what
-   * keeps their twelve type parameters in
-   * {@link AppTraceGroupTrpcPorts} rather than on this interface, which four
-   * other halves of the record also edit.
-   */
-  traceGroup: TTraceGroup;
+  /** The two fire-and-forget signals a new test case triggers, and where a failure in either goes. */
+  scenarios: ScenarioTrpcPorts;
+  /** The message and warm budgets, the product-analytics sink, and the agent-to-page UI-action channel. */
+  langy: LangyTrpcPorts;
+  /** The two Langy gates every customer-facing procedure carries, already built. */
+  langyGates: LangyTrpcGates;
+  /** The audit trail an egress allow-list change is recorded on. */
+  langyEgress: LangyEgressTrpcPorts;
+  /** The pipeline registry, the event-log search window, the Grafana deep links and the migrations runner. */
+  ops: OpsTrpcPorts;
+  /** The operator gate, already built. */
+  opsCheck(input: { permission: AuthzPermission; throwOnDeny?: boolean }): AppTrpcDeclaredCheck;
+  /** The forty-six answers `organization.*` needs from this deployment. */
+  organization: OrganizationTrpcPorts<TSignUpDataSchema>;
+  /** The audit-log read's own `kind: "custom"` check, already built. */
+  organizationAuditLogCheck: unknown;
+  /** The six answers `project.*` needs. */
+  project: ProjectTrpcMountPorts;
+  /** `project.create`'s custom tier resolution and the trace-sharing demand. */
+  projectChecks: ProjectTrpcChecks;
+  /** What one viewer may see of one project's captured content and spend. */
+  codingAgents: CodingAgentTrpcPorts;
+  /** The three answers the automation transport reaches beyond automation's own. */
+  automation: AutomationMountPorts;
+  /** The unsubscribe pair's client address, its throttle and its audit trail. */
+  emailSuppression: EmailSuppressionTrpcPorts;
+  /** The SCIM plan gate, and the back office's connection ledger with its trail. */
+  enterprise: EnterpriseTrpcMountPorts;
+  /** The legacy grid's two shared input schemas, the precondition engine, the span digest and redactions. */
+  traces: TracesTrpcPorts<TListInput, TListInputRaw, TFilterInput, TFilterInputRaw, TPrecondition>;
+  /** Everything the explorer reads that is another vertical's. */
+  tracesV2: Omit<TracesV2TrpcPorts<TMetadata, TMetadataRaw>, "queryTranslation">;
+  /** The caller's read-time redactions, for the waterfall and the studio span. */
+  spans: SpansTrpcPorts;
+  /** The same redactions, plus the two rules a correction is carried through. */
+  traceEditOverlay: TraceEditOverlayTrpcPorts<TProtections>;
+  /** The anonymous read's own four capabilities. */
+  sharedTrace: SharedTraceTrpcPorts;
+  /** The stored filter sets, generic in the row shape the explorer renders. */
+  savedViews: SavedViewTrpcPorts<TSavedView>;
+  /** The organization's spend, rolled up per project. */
+  costs: CostTrpcPorts<TSpendRollup>;
+  /** The cost rule's regex safety gate, the model registry's ceilings and the live span preview. */
+  llmModelCost: LlmModelCostTrpcPorts;
+  /** The outbound credential probes, the Codex device flow and the audit trail. */
+  modelProvider: ModelProviderTrpcPorts<TApiKeyValidation, TStoredKeyValidation>;
+  /** The two data-dependent gates the provider surface needs, already built. */
+  modelProviderChecks: ModelProviderTrpcChecks;
+  /** The application's provider-failure policy behind one model call. */
+  translate: TranslateTrpcPorts;
+  /** The studio's event dispatch, and the agent test's own trace write. */
+  httpProxy: HttpProxyTrpcPorts;
+  /** The usage reading and the approaching-limit notifier, over the billing store. */
+  limits: LimitsTrpcPorts;
   /**
    * One namespace, three transports, two owners — so one entry with a group
    * per transport inside it.
@@ -540,17 +669,42 @@ export function createAppTrpcFeatures<
     UserTrpcContext &
     WorkflowOptimizationTrpcContext &
     WorkflowTrpcContext &
-    AppAgentGroupTrpcContext &
+    LangyEgressTrpcContext &
+    LangyTrpcContext &
+    OpsTrpcContext &
+    ScenarioTrpcContext &
+    SetupSkillsTrpcContext &
+    SuiteTrpcContext &
     EnterpriseBillingTrpcContext &
     EnterpriseGovernanceMountContext &
     GatewayTrpcContext &
     GovernanceHomeTrpcContext &
     GithubTrpcContext &
-    AppOrgGroupTrpcContext &
+    AutomationTrpcContext &
+    CodingAgentTrpcContext &
+    EmailSuppressionTrpcContext &
+    EnterpriseTrpcContext &
+    OrganizationTrpcContext &
+    ProjectTrpcContext &
     DataRetentionTrpcContext &
     MonitorTrpcContext &
     StoredObjectTrpcContext &
-    AppTraceGroupTrpcContext,
+    CostTrpcContext &
+    HttpProxyTrpcContext &
+    LimitsTrpcContext &
+    LlmModelCostTrpcContext &
+    ModelProviderTrpcContext &
+    PinnedTraceTrpcContext &
+    PlanTrpcContext &
+    SavedViewTrpcContext &
+    ShareTrpcContext &
+    SharedTraceTrpcContext &
+    SpansTrpcContext &
+    TopicTrpcContext &
+    TraceEditOverlayTrpcContext &
+    TracesTrpcContext &
+    TracesV2TrpcContext &
+    TranslateTrpcContext,
   TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
   TRoot extends AnyTRPCRootTypes,
   TAnnotationPorts extends AnnotationTrpcPorts,
@@ -570,9 +724,18 @@ export function createAppTrpcFeatures<
   TPublishedComponent,
   TTimeseriesInputWire = unknown,
   TReadInputWire = unknown,
-  TTraceGroup extends AnyAppTraceGroupTrpcPorts = AnyAppTraceGroupTrpcPorts,
-  TOrgGroup extends AnyAppOrgGroupTrpcPorts = AnyAppOrgGroupTrpcPorts,
-  TAgentGroup extends AnyAppAgentGroupTrpcPorts = AnyAppAgentGroupTrpcPorts,
+  TListInput extends TraceLegacyListInput = TraceLegacyListInput,
+  TListInputRaw = unknown,
+  TFilterInput extends TraceLegacyFilterInput = TraceLegacyFilterInput,
+  TFilterInputRaw = unknown,
+  TPrecondition = unknown,
+  TProtections extends TraceEditOverlayVisibilityWindow = TraceEditOverlayVisibilityWindow,
+  TMetadata = unknown,
+  TMetadataRaw = unknown,
+  TSavedView = unknown,
+  TSpendRollup = unknown,
+  TApiKeyValidation = unknown,
+  TStoredKeyValidation = unknown,
   TRetentionSnapshot = unknown,
   TStorageScopeUsage = unknown,
 >(options: {
@@ -595,9 +758,18 @@ export function createAppTrpcFeatures<
     TPublishedComponent,
     TTimeseriesInputWire,
     TReadInputWire,
-    TTraceGroup,
-    TOrgGroup,
-    TAgentGroup,
+    TListInput,
+    TListInputRaw,
+    TFilterInput,
+    TFilterInputRaw,
+    TPrecondition,
+    TProtections,
+    TMetadata,
+    TMetadataRaw,
+    TSavedView,
+    TSpendRollup,
+    TApiKeyValidation,
+    TStoredKeyValidation,
     TRetentionSnapshot,
     TStorageScopeUsage
   >;
@@ -605,6 +777,7 @@ export function createAppTrpcFeatures<
   const { mount, ports } = options;
   const gateway = createGatewayTrpcRouters({ ...mount, ports: ports.gateway });
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
+  const enterprise = createEnterpriseTrpcRouters({ ...mount, ports: ports.enterprise });
   const billing = createEnterpriseBillingTrpcRouters({
     ...mount,
     saasBilling: ports.saasBilling,
@@ -614,22 +787,97 @@ export function createAppTrpcFeatures<
   const { personalDashboard } = governance;
 
   return {
-    // The sixteen observability surfaces, spread in whole. They are built by
-    // their own module rather than listed here: one graph, one entry, and one
-    // place their type parameters live. Both trace subscriptions are inside
-    // that spread, which is what makes them watchable over `/api/sse` — the
-    // lane resolves a path against a caller built from THIS record.
-    ...createAppTraceGroupTrpcFeatures({ mount, ports: ports.traceGroup }),
-    // The nine tenant-administration surfaces, spread in whole for the same
-    // reason the sixteen above are: one graph, one entry, and one place their
-    // ports live. Four of them are Enterprise, and they arrive through the
-    // single composition seam a core process may see them through.
-    ...createAppOrgGroupTrpcFeatures({ mount, ports: ports.orgGroup }),
-    // The six agent surfaces, spread in whole for the same reason. Their three
-    // subscriptions are inside that spread, which is what makes them watchable
-    // over `/api/sse`: the lane resolves a path against a caller built from
-    // THIS record.
-    ...createAppAgentGroupTrpcFeatures({ mount, ports: ports.agentGroup }),
+    costs: createCostTrpcRouter({ ...mount, ports: ports.costs }),
+    httpProxy: createHttpProxyTrpcRouter({ ...mount, ports: ports.httpProxy }),
+    limits: createLimitsTrpcRouter({ ...mount, ports: ports.limits }),
+    llmModelCost: createLlmModelCostTrpcRouter({ ...mount, ports: ports.llmModelCost }),
+    modelProvider: createModelProviderTrpcRouter({
+      ...mount,
+      ports: ports.modelProvider,
+      checks: ports.modelProviderChecks,
+    }),
+    // Both share surfaces take no ports: a link and a pin are rows this
+    // deployment owns outright, reached through `ctx.app.share`.
+    pinnedTrace: createPinnedTraceTrpcRouter(mount),
+    // What this organization is on. No ports either — the plan is resolved off
+    // the application slice, because ONE answer to "which plan" is the whole
+    // point of a plan provider.
+    plan: createPlanTrpcRouter(mount),
+    savedViews: createSavedViewTrpcRouter({ ...mount, ports: ports.savedViews }),
+    share: createShareTrpcRouter(mount),
+    // ADR-057's single anonymous trace read. It takes the process's PUBLIC
+    // procedure and a `noPermission` declaration rather than a permission: the
+    // share token in the input is the whole authorization, and the declaration
+    // is what keeps the procedure reviewable rather than merely unchecked.
+    sharedTrace: createSharedTraceTrpcRouter({
+      ...mount,
+      publicProcedure: mount.publicProcedure,
+      ports: ports.sharedTrace,
+    }),
+    spans: createSpansTrpcRouter({ ...mount, ports: ports.spans }),
+    topics: createTopicTrpcRouter(mount),
+    traceEditOverlay: createTraceEditOverlayTrpcRouter({
+      ...mount,
+      ports: ports.traceEditOverlay,
+    }),
+    // Carries `onTraceUpdate`. In the record rather than beside it: a
+    // subscription mounted beside the record would be callable over
+    // `/api/trpc` and un-watchable over `/api/sse`.
+    traces: createTracesTrpcRouter({ ...mount, ports: ports.traces }),
+    // Carries `onDiscoverUpdate`, for the same reason.
+    tracesV2: createTracesV2TrpcRouter({ ...mount, ports: ports.tracesV2 }),
+    translate: createTranslateTrpcRouter({ ...mount, ports: ports.translate }),
+    automation: createAutomationTrpcRouter({ ...mount, ports: ports.automation }),
+    codingAgents: createCodingAgentTrpcRouter({ ...mount, ports: ports.codingAgents }),
+    // The unsubscribe pair arrives from a mail client with no session, so this
+    // one takes the process's PUBLIC procedure as well. In the record rather
+    // than beside it for the same reason every other public surface here is:
+    // a namespace mounted outside the list would serve traffic from outside
+    // every audit that reads it.
+    emailSuppression: createEmailSuppressionTrpcRouter({
+      ...mount,
+      publicProcedure: mount.publicProcedure,
+      ports: ports.emailSuppression,
+    }),
+    license: enterprise.license,
+    licenseEnforcement: enterprise.licenseEnforcement,
+    organization: createOrganizationTrpcRouter({
+      ...mount,
+      auditLogCheck: ports.organizationAuditLogCheck,
+      ports: ports.organization,
+    }),
+    project: createProjectTrpcRouter({
+      ...mount,
+      ports: ports.project,
+      checks: ports.projectChecks,
+    }),
+    scimToken: enterprise.scimToken,
+    ssoConnections: enterprise.ssoConnections,
+    // Carries `onConversationUpdate` and `onTurnStream`. In the record rather
+    // than beside it: a subscription mounted beside the record would be
+    // callable over `/api/trpc` and un-watchable over `/api/sse`.
+    langy: createLangyTrpcRouter({ ...mount, ports: ports.langy, gates: ports.langyGates }),
+    // Beside the conversation surface because both carry the same two gates
+    // and the same application; the wire name stays `langyEgress`.
+    langyEgress: createLangyEgressTrpcRouter({
+      ...mount,
+      ports: ports.langyEgress,
+      gates: ports.langyGates,
+    }),
+    ops: createOpsTrpcRouter({
+      root: mount.root,
+      protectedProcedure: mount.protectedProcedure,
+      policy: opsPolicyKit(mount.middlewares, ports.opsCheck),
+      ports: ports.ops,
+    }),
+    // Carries `onSimulationUpdate`, for the same reason.
+    scenarios: createScenarioTrpcRouter({ ...mount, ports: ports.scenarios }),
+    // Takes no ports: the catalogue is a compiled artifact the Langy package
+    // holds, so there is nothing for a deployment to answer.
+    setupSkills: createSetupSkillsTrpcRouter(mount),
+    // Takes no ports either — a suite, its folders and its runs are all read
+    // through `ctx.app.suites`.
+    suites: createSuiteTrpcRouter(mount),
     dataRetention: createDataRetentionTrpcRouter({ ...mount, ports: ports.dataRetention }),
     monitors: createMonitorTrpcRouter({ ...mount, ports: ports.monitors }),
     // No ports: the probe reads `ctx.app.storedObjectApp` and nothing else.
@@ -789,5 +1037,42 @@ export function createAppTrpcFeatures<
       personalDashboard,
     ),
     workflow: createWorkflowTrpcRouter({ ...mount, ports: ports.workflows.lifecycle }),
+  };
+}
+
+/**
+ * The operator chain, assembled from the process's own middlewares plus the
+ * one gate a declaration cannot describe.
+ *
+ * Everything but `checkOpsPermission` is the SAME middleware every other
+ * procedure on this root carries — the tracer, the logger, the handled-error
+ * shaping, the scope-lineage guard, the fail-closed backstop and the audit
+ * row — read straight off the mount rather than restated, so the operator
+ * surface cannot drift into a chain of its own.
+ */
+function opsPolicyKit(
+  middlewares: TrpcApiMount<never, never, never>["middlewares"],
+  opsCheck: (input: {
+    permission: AuthzPermission;
+    throwOnDeny?: boolean;
+  }) => AppTrpcDeclaredCheck,
+): AppTrpcPolicyKit {
+  return {
+    tracerMiddleware: middlewares.tracer,
+    loggerMiddleware: middlewares.logger,
+    handledErrorMiddleware: middlewares.handledError,
+    enforcePermissionCheck: middlewares.enforceCheck,
+    auditLogMutations: middlewares.auditMutations,
+    scopeLineageGuard: (declaration) =>
+      middlewares.scopeLineageGuard(declaration as AuthzDeclaration),
+    checkDeclaredPermission: ({ permission }) =>
+      middlewares.declaredCheck({ kind: "permission", permission }),
+    declaredNoPermission: ({ reason, allow }) =>
+      middlewares.declaredCheck({
+        kind: "no-permission",
+        reason,
+        ...(allow ? { allow: { ...allow } } : {}),
+      }),
+    checkOpsPermission: opsCheck,
   };
 }

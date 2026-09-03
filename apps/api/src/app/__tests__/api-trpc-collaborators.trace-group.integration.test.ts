@@ -30,13 +30,13 @@ import { ApiApplication } from "../../api.application";
 import { ApiRestSecurity } from "../../api-rest.security";
 import type { AnyApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
-import type { AnyAppTraceGroupTrpcPorts } from "../../app-trpc/app-trpc.trace-group";
 import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse";
 import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
 import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
 import {
   composeApiTraceGroupCollaborators,
   LoggedApiTraceGroupAbsence,
+  type ApiTraceGroupPorts,
   type ApiTraceReadStackPort,
 } from "../api-trpc-collaborators.trace-group.composition";
 import { ApiRateLimitInfrastructure } from "../../platform/infrastructure/api-rate-limit.infrastructure";
@@ -175,7 +175,7 @@ function testApplication(broadcast: PresenceEmitterPort): ApiTrpcFeatureApplicat
 }
 
 /** The group's ports, every one of them a fake this suite can observe. */
-function testTraceGroupPorts(): AnyAppTraceGroupTrpcPorts {
+function testTraceGroupPorts(): ApiTraceGroupPorts {
   const protections = { visibilityCutoffMs: null, canSeeCosts: true };
   return {
     traces: stub("traces", {
@@ -210,7 +210,7 @@ function testTraceGroupPorts(): AnyAppTraceGroupTrpcPorts {
     translate: { wrapAiCall: (_feature: unknown, call: () => unknown) => call() },
     httpProxy: stub("httpProxy"),
     limits: stub("limits", { getUsageStats: async () => ({ currentMonthMessagesCount: 3 }) }),
-  } as unknown as AnyAppTraceGroupTrpcPorts;
+  } as unknown as ApiTraceGroupPorts;
 }
 
 /**
@@ -296,25 +296,23 @@ function testCollaborators(broadcast: PresenceEmitterPort): AnyApiTrpcCollaborat
      * the mounts chain onto a procedure. Their own suite is what proves they
      * answer.
      */
-    orgGroup: {
-      organization: stub("orgGroup.organization", {
-        signUpDataSchema: anySchema,
-        isCustomRole: () => false,
-      }),
-      organizationAuditLogCheck: passthroughCheck,
-      project: stub("orgGroup.project"),
-      projectChecks: { create: passthroughCheck, traceSharing: passthroughCheck },
-      codingAgents: stub("orgGroup.codingAgents"),
-      automation: stub("orgGroup.automation", {
-        providers: stub("orgGroup.automation.providers"),
-      }),
-      emailSuppression: stub("orgGroup.emailSuppression"),
-      enterprise: {
-        scimToken: stub("orgGroup.enterprise.scimToken"),
-        ssoConnections: stub("orgGroup.enterprise.ssoConnections"),
-      },
+    organization: stub("organization", {
+      signUpDataSchema: anySchema,
+      isCustomRole: () => false,
+    }),
+    organizationAuditLogCheck: passthroughCheck,
+    project: stub("project"),
+    projectChecks: { create: passthroughCheck, traceSharing: passthroughCheck },
+    codingAgents: stub("codingAgents"),
+    automation: stub("automation", {
+      providers: stub("automation.providers"),
+    }),
+    emailSuppression: stub("emailSuppression"),
+    enterprise: {
+      scimToken: stub("enterprise.scimToken"),
+      ssoConnections: stub("enterprise.ssoConnections"),
     },
-    traceGroup: testTraceGroupPorts(),
+    ...testTraceGroupPorts(),
     /**
      * The six agent surfaces, stubbed with only what the record reads while it
      * is being BUILT. Their own suite is what proves they answer.
@@ -329,19 +327,17 @@ function testCollaborators(broadcast: PresenceEmitterPort): AnyApiTrpcCollaborat
     governanceHome: stub("governanceHome"),
     saasBilling: false,
     github: stub("github"),
-    agentGroup: {
-      scenarios: stub("agentGroup.scenarios"),
-      langy: stub("agentGroup.langy"),
-      langyGates: {
-        refuseDemoProject: passthroughCheck,
-        enforceLangyAccess: passthroughCheck,
-      },
-      langyEgress: stub("agentGroup.langyEgress"),
-      ops: stub("agentGroup.ops"),
-      // Read at BUILD time — the mount asks it for a middleware — so it
-      // answers one rather than being one.
-      opsCheck: () => passthroughCheck,
+    scenarios: stub("scenarios"),
+    langy: stub("langy"),
+    langyGates: {
+      refuseDemoProject: passthroughCheck,
+      enforceLangyAccess: passthroughCheck,
     },
+    langyEgress: stub("langyEgress"),
+    ops: stub("ops"),
+    // Read at BUILD time — the mount asks it for a middleware — so it
+    // answers one rather than being one.
+    opsCheck: () => passthroughCheck,
     user: stub("user"),
     workflows: {
       lifecycle: stub("workflows.lifecycle"),
@@ -836,7 +832,7 @@ describe("given an API process that composed the real observability collaborator
     const group = composeRealGroup(clickHouse);
     const collaborators = {
       ...testCollaborators(broadcast),
-      traceGroup: group.ports,
+      ...group.ports,
       application: {
         ...testApplication(broadcast),
         traces: group.traces,
@@ -1200,7 +1196,7 @@ describe("given the anonymous share read composed on this process", () => {
 
     const collaborators = {
       ...testCollaborators(broadcast),
-      traceGroup: group.ports,
+      ...group.ports,
       application: {
         ...testApplication(broadcast),
         traces,

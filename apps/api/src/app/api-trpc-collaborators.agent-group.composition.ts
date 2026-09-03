@@ -174,8 +174,9 @@ import {
 } from "./api-agent-pipelines.composition";
 import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
-import type { AppAgentGroupTrpcPorts } from "../app-trpc/app-trpc.agent-group";
 import type { ApiAuditPort } from "../api-request.policy";
+import type { AppTrpcDeclaredCheck } from "../app-trpc/app-trpc.policy-kit";
+import type { LangyTrpcGates } from "../features/langy/langy-trpc.mount";
 import { ApiAgentTestConnectedDispatchAdapter } from "../features/agent/agent-test-connected-dispatch.adapter";
 import { ApiAgentTestOwnershipAdapter } from "../features/agent/agent-test-ownership.adapter";
 
@@ -371,10 +372,28 @@ export type ApiAgentGroupCollaboratorsOptions = Readonly<{
   report?: ApiAgentGroupAbsenceReport;
 }>;
 
+/**
+ * The six tRPC ports {@link ApiTrpcCollaborators} mounts individually.
+ *
+ * Nested here rather than flattened onto {@link ApiAgentGroupCollaborators}
+ * itself: this half also carries the `scenarios`, `langy` and `ops`
+ * APPLICATION slices under those exact names, and a port and an application
+ * slice cannot share one key on one object. `withApiAgentGroupCollaborators`
+ * is where the two meet — it spreads these six INTO the flat record, and the
+ * application slices into `application` beside them.
+ */
+type ApiAgentGroupPorts = Readonly<{
+  scenarios: ScenarioTrpcPorts;
+  langy: LangyTrpcPorts;
+  langyGates: LangyTrpcGates;
+  langyEgress: LangyEgressTrpcPorts;
+  ops: OpsTrpcPorts;
+  opsCheck(input: { permission: AuthzPermission; throwOnDeny?: boolean }): AppTrpcDeclaredCheck;
+}>;
+
 /** The application slices and the port group this half owns, composed together. */
 export type ApiAgentGroupCollaborators = Readonly<{
-  /** The `agentGroup` entry of {@link ApiTrpcCollaborators}. */
-  ports: AppAgentGroupTrpcPorts;
+  ports: ApiAgentGroupPorts;
   /** For `ctx.app.scenarios`. */
   scenarios: ScenarioApp;
   /**
@@ -568,7 +587,12 @@ export function withApiAgentGroupCollaborators(
   if (!base || !group) return base;
   return {
     ...base,
-    agentGroup: group.ports,
+    scenarios: group.ports.scenarios,
+    langy: group.ports.langy,
+    langyGates: group.ports.langyGates,
+    langyEgress: group.ports.langyEgress,
+    ops: group.ports.ops,
+    opsCheck: group.ports.opsCheck,
     application: {
       ...base.application,
       scenarios: group.scenarios,

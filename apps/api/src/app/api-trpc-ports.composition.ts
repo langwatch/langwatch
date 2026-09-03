@@ -347,35 +347,38 @@ export function createApiTrpcPorts<
 
     team: collaborators.team,
 
-    /**
-     * The sixteen observability surfaces, forwarded whole.
-     *
-     * Nothing is lifted out of this group onto the process's own connection the
-     * way the workflow and user row reads were: the group is COMPOSED against
-     * that connection already, by `composeApiTraceGroupCollaborators`, which is
-     * also where each capability it cannot build names its own absence.
-     */
-    traceGroup: collaborators.traceGroup,
+    traces: collaborators.traces,
+    tracesV2: collaborators.tracesV2,
+    spans: collaborators.spans,
+    traceEditOverlay: collaborators.traceEditOverlay,
+    sharedTrace: collaborators.sharedTrace,
+    savedViews: collaborators.savedViews,
+    costs: collaborators.costs,
+    llmModelCost: collaborators.llmModelCost,
+    modelProvider: collaborators.modelProvider,
+    modelProviderChecks: collaborators.modelProviderChecks,
+    translate: collaborators.translate,
+    httpProxy: collaborators.httpProxy,
+    limits: collaborators.limits,
 
     dataRetention: collaborators.dataRetention,
     monitors: collaborators.monitors,
 
-    /**
-     * The nine tenant-administration surfaces, forwarded whole, for the same
-     * reason the sixteen above are: the group is COMPOSED against this
-     * process's connection already, by `composeApiOrgGroupCollaborators`,
-     * which is also where each capability it cannot build names its own
-     * absence.
-     */
-    orgGroup: collaborators.orgGroup,
+    organization: collaborators.organization,
+    organizationAuditLogCheck: collaborators.organizationAuditLogCheck,
+    project: collaborators.project,
+    projectChecks: collaborators.projectChecks,
+    codingAgents: collaborators.codingAgents,
+    automation: collaborators.automation,
+    emailSuppression: collaborators.emailSuppression,
+    enterprise: collaborators.enterprise,
 
-    /**
-     * The six agent surfaces, forwarded whole, for the same reason: the group
-     * is COMPOSED against this process's Prisma, ClickHouse and Redis already,
-     * by `composeApiAgentGroupCollaborators`, which is also where each
-     * capability it cannot build names its own absence.
-     */
-    agentGroup: collaborators.agentGroup,
+    scenarios: collaborators.scenarios,
+    langy: collaborators.langy,
+    langyGates: collaborators.langyGates,
+    langyEgress: collaborators.langyEgress,
+    ops: collaborators.ops,
+    opsCheck: collaborators.opsCheck,
 
     gateway: collaborators.gateway,
     governanceHome: collaborators.governanceHome,

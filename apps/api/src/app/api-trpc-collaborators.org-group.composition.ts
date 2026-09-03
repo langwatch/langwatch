@@ -128,10 +128,11 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { ShareService } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
+import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
 import type { ApiAuditPort } from "../api-request.policy";
 import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication, ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
-import type { AnyAppOrgGroupTrpcPorts } from "../app-trpc/app-trpc.org-group";
+import type { AutomationMountPorts } from "../features/automation/automation-trpc.mount";
 import type { EnterpriseTrpcMountPorts } from "../features/enterprise/enterprise-trpc.mount";
 import type {
   ProjectTrpcChecks,
@@ -337,8 +338,22 @@ export type ApiOrgGroupCollaborators = Readonly<{
     ApiTrpcFeatureApplication,
     "automation" | "codingAgentApp" | "licensing" | "projects" | "scimApp" | "usageLimits"
   >;
-  /** The `orgGroup` entry of {@link ApiTrpcCollaborators}. */
-  ports: AnyAppOrgGroupTrpcPorts;
+  /** The forty-six answers `organization.*` needs from this deployment. */
+  organization: OrganizationTrpcPorts<typeof signUpDataSchema>;
+  /** The audit-log read's own `kind: "custom"` check, already built. */
+  organizationAuditLogCheck: unknown;
+  /** The six answers `project.*` needs. */
+  project: ProjectTrpcMountPorts;
+  /** `project.create`'s custom tier resolution and the trace-sharing demand. */
+  projectChecks: ProjectTrpcChecks;
+  /** What one viewer may see of one project's captured content and spend. */
+  codingAgents: CodingAgentTrpcPorts;
+  /** The three answers the automation transport reaches beyond automation's own. */
+  automation: AutomationMountPorts;
+  /** The unsubscribe pair's client address, its throttle and its audit trail. */
+  emailSuppression: EmailSuppressionTrpcPorts;
+  /** The SCIM plan gate, and the back office's connection ledger with its trail. */
+  enterprise: EnterpriseTrpcMountPorts;
 }>;
 
 /** Composes the org-group half from this process's own graph. */
@@ -388,47 +403,45 @@ export function composeApiOrgGroupCollaborators(
       projects: projectApp,
       ...enterpriseApplication(options, logger),
     },
-    ports: {
-      organization: organizationPorts(options, logger),
-      organizationAuditLogCheck: auditLogCheck(options.authz),
-      project: projectPorts(options, logger),
-      projectChecks: projectChecks(options.authz),
-      codingAgents: codingAgentPorts(options),
-      automation: {
-        rateLimit: (input) => options.rateLimit(input),
-        listSlackChannels: () =>
-          Promise.reject(
-            new ApiCapabilityUnavailableError(
-              "Slack transport, so it cannot list a workspace's channels",
-            ),
+    organization: organizationPorts(options, logger),
+    organizationAuditLogCheck: auditLogCheck(options.authz),
+    project: projectPorts(options, logger),
+    projectChecks: projectChecks(options.authz),
+    codingAgents: codingAgentPorts(options),
+    automation: {
+      rateLimit: (input) => options.rateLimit(input),
+      listSlackChannels: () =>
+        Promise.reject(
+          new ApiCapabilityUnavailableError(
+            "Slack transport, so it cannot list a workspace's channels",
           ),
-        providers: {
-          actionParamsSchemaFor: (action) => providers.actionParamsSchemaFor(action),
-          persistActionParamsFor: (action, args) => providers.persistActionParamsFor(action, args),
-          redactActionParamsFor: (action, params) =>
-            providers.redactActionParamsFor(action, params),
-          decryptSlackBotToken: (actionParams) => providers.decryptSlackBotToken(actionParams),
-          decryptWebhookHeaders: (stored) => providers.decryptWebhookHeaders(stored),
-          decryptWebhookSigningSecrets: (stored) => providers.decryptWebhookSigningSecrets(stored),
-        },
+        ),
+      providers: {
+        actionParamsSchemaFor: (action) => providers.actionParamsSchemaFor(action),
+        persistActionParamsFor: (action, args) => providers.persistActionParamsFor(action, args),
+        redactActionParamsFor: (action, params) =>
+          providers.redactActionParamsFor(action, params),
+        decryptSlackBotToken: (actionParams) => providers.decryptSlackBotToken(actionParams),
+        decryptWebhookHeaders: (stored) => providers.decryptWebhookHeaders(stored),
+        decryptWebhookSigningSecrets: (stored) => providers.decryptWebhookSigningSecrets(stored),
       },
-      emailSuppression: {
-        clientIp: (ctx) => (ctx as { clientIp?: () => string }).clientIp?.(),
-        rateLimit: (input) => options.rateLimit(input),
-        recordAudit: async (entry) => {
-          await options.audit?.record({
-            actorId: entry.userId,
-            path: entry.action,
-            input: {
-              ...(entry.projectId === undefined ? {} : { projectId: entry.projectId }),
-              ...((entry.args ?? {}) as Record<string, unknown>),
-            },
-            error: null,
-          });
-        },
-      },
-      enterprise: enterprisePorts(options, logger),
     },
+    emailSuppression: {
+      clientIp: (ctx) => (ctx as { clientIp?: () => string }).clientIp?.(),
+      rateLimit: (input) => options.rateLimit(input),
+      recordAudit: async (entry) => {
+        await options.audit?.record({
+          actorId: entry.userId,
+          path: entry.action,
+          input: {
+            ...(entry.projectId === undefined ? {} : { projectId: entry.projectId }),
+            ...((entry.args ?? {}) as Record<string, unknown>),
+          },
+          error: null,
+        });
+      },
+    },
+    enterprise: enterprisePorts(options, logger),
   };
 }
 
@@ -1256,7 +1269,14 @@ export function withApiOrgGroupCollaborators(
   if (!base || !group) return base;
   return {
     ...base,
-    orgGroup: group.ports,
+    organization: group.organization,
+    organizationAuditLogCheck: group.organizationAuditLogCheck,
+    project: group.project,
+    projectChecks: group.projectChecks,
+    codingAgents: group.codingAgents,
+    automation: group.automation,
+    emailSuppression: group.emailSuppression,
+    enterprise: group.enterprise,
     application: {
       ...base.application,
       ...group.application,

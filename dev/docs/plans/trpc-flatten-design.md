@@ -2,8 +2,10 @@
 
 **Written:** 2026-09-03. **Reviewed:** same day, `trpc-flatten-review.md` — approve
 with fixes; the fix list and the executable work list live there. **Status:**
-fix list items 1, 2, 4, 5 done; fan-out step A1 (`app-trpc.product-infra.ts`)
-done; steps A2–A4, B, C, D not started this pass — see "Deviations" below.
+fix list items 1, 2, 4, 5 done; fan-out steps A1–A4 done and verified (all four
+mounting-group files deleted; `AppTrpcFeaturePorts` and `ApiTrpcCollaborators`
+are now flat, one entry per feature, no group bags); steps B, C, D not started
+this pass — see "Deviations" below.
 Ruling from Alex: "the groups of apis is weird, no? why not just register each
 one independently?" — approved. Every feature registers its tRPC router
 independently: one entry per feature, no group halves, no
@@ -24,50 +26,76 @@ procedures (precondition for the api-maps retirement, option E).
 ## Deviations
 
 Executed in order: fix list items 1, 2, 4, 5 (item 3 was already a separate
-concern; item 6 is the design-doc edit this file itself is), then fan-out
-step A1. Stopped after A1 and did not start A2–A4, B, C or D in this pass.
+concern; item 6 is the design-doc edit this file itself is), fan-out step A1
+(prior pass), then A2 (org-group), A3 (agent-group) and A4 (trace-group) this
+pass. Stopped after A4 and did not start B, C or D.
 
-**Why.** A1 (`app-trpc.product-infra.ts`, the smallest of the four remaining
-mounting files at 115 lines with two port entries) touched 20 files end to
-end: the two `AppTrpcFeaturePorts`/`ApiTrpcCollaborators` interfaces, the
-composition file, `api-trpc-ports.composition.ts`, `REQUIRED_COLLABORATORS`,
-the barrel `app-trpc/index.ts`, and eleven test fixtures across the other nine
-composition groups' own integration suites (every group's test fixture stubs
-the *whole* `AppTrpcFeaturePorts` record, so a flattened entry ripples into
-every other group's test file even though its own composition is untouched).
-A2 (org-group, 9 namespaces, 209 lines), A3 (agent-group, 6 namespaces, 244
-lines) and A4 (trace-group, 16 namespaces, 322 lines, 13 ports entries) are
-each larger than A1 on both axes — more namespaces and more ports fields to
-thread through the same 20-file blast radius — and Step B is a rewrite of the
-~4,000-line `api-production.composition.ts` fold chain plus ten
-`api-trpc-collaborators.*.composition.ts` files, replacing every
-`withApi*Collaborators` fold and the `sealApiTrpcCollaborators` runtime check
-with one typed object literal. Completing A2–A4, B, C and D correctly, with a
-green `test:unit src/app-trpc src/app` after each, is several more passes of
-the size A1 and fix 1 already were, and this pass's remaining budget did not
-cover it.
+**Why.** Step B is a rewrite of the ~4,000-line `api-production.composition.ts`
+fold chain plus ten `api-trpc-collaborators.*.composition.ts` files, replacing
+every `withApi*Collaborators` fold and the `sealApiTrpcCollaborators` runtime
+check with one typed object literal — a change of a different shape and risk
+than A, and the review's own plan calls it out as one change rather than ten.
+It also lands in `api-production.composition.ts`, which another concurrent
+lane (connected-agent composition, Slice 7) is about to touch additively; this
+pass coordinated with that lane and stopped at the boundary rather than start
+a large rewrite of a file both were converging on. C and D depend on B (D
+needs both B and C), so they wait too. This pass's remaining budget did not
+cover B, C and D on top of A2–A4.
 
-**State left in.** A1's flattening is complete and verified (see below) — no
-half-migrated state. `AppTrpcFeaturePorts` now has `gateway`, `governanceHome`,
-`saasBilling`, `dataRetention`, `monitors` as top-level entries plus
-`github`, and `orgGroup`, `agentGroup`, `traceGroup` still as ports bags exactly
-as the review found them. The next agent should pick up at A2 (org-group) in
-the same shape A1 used: flatten the mounting file, thread the new top-level
-ports entries through the collaborators interface, the one composition file,
-`api-trpc-ports.composition.ts`, `REQUIRED_COLLABORATORS`, and every test
-fixture across the other composition-group suites that stubs the whole ports
-record (`grep -rl "orgGroup:" apps/api/src --include='*.test.ts'`).
+**A2–A4, what changed.** Same shape as A1, three more times, at increasing
+size: org-group (9 namespaces, `app-trpc.org-group.ts` deleted, 209 lines),
+agent-group (6 namespaces, `app-trpc.agent-group.ts` deleted, 244 lines),
+trace-group (16 namespaces, `app-trpc.trace-group.ts` deleted, 322 lines, 12
+type parameters absorbed into `AppTrpcFeaturePorts`/`ApiTrpcCollaborators`
+directly). Two of the three composition-half structs
+(`ApiAgentGroupCollaborators`, `ApiTraceGroupCollaborators`) already carried a
+same-named APPLICATION slice for some of their ports (`scenarios`, `langy`,
+`ops` for agent-group; `traces` for trace-group) — a port and an application
+slice cannot share one key on one object, so those two composition files keep
+a small nested `ports` struct internally (`ApiAgentGroupPorts`,
+`ApiTraceGroupPorts`, documented in place) and only their `withApi*Collaborators`
+fold spreads the port keys onto the flat record; `ApiTrpcCollaborators` and
+`AppTrpcFeaturePorts` themselves have no bag anywhere. org-group's half had no
+such collision and flattens all the way through, matching the gateway/product-infra
+reference exactly.
 
-**Verification actually run.** `pnpm --filter @langwatch/platform-api test:unit
-src/app-trpc src/app`: after fix list + A1, 366 of 366 tests that ran passed
-(15 test files fail to *collect* — a `Cannot find package
-'@langwatch/scenario-contract'`/`'@langwatch/suite-server'` module-resolution
-error from concurrent lanes restructuring the scenario/suite/agent packages,
-reproducible before this pass's edits and unrelated to any file this pass
-touched — confirmed by the failing set changing shape between two consecutive
-runs while the error message itself changed from `suite-server` to
-`scenario-contract`). `pnpm --filter @langwatch/architecture-lint test`: 596
-of 596 tests passed, 44 files.
+**Verification.** After A2: `test:unit src/app-trpc` 41/41, `test:unit
+src/app` 528/528 (one org-group assertion updated to read the flat keys off
+the half's return instead of a nested `ports`). After A4: `test:unit
+src/app-trpc` 37/37 collected of 3 files (`app-trpc.features.unit.test.ts`
+fails to *collect* — see below), `test:unit src/app` 393/393 collected of 38
+files; the trace-group integration suite's real `/api/trpc` calls
+(`traces.getById`, `tracesV2.newCount`, `costs.getAggregatedCostsForOrganization`,
+`plan.getActivePlan`, etc.) all ran and passed. 11 suites in `src/app` and
+`src/app-rest` fail to collect on `Cannot find package '@langwatch/task'
+imported from .../packages/features/topic/server/src/tasks/topic-clustering-run.task.ts`
+— `packages/features/topic/server/src/tasks/` is untracked, uncommitted work
+from a concurrent lane; the package exists in the workspace
+(`packages/task`) but isn't declared as a dependency in
+`packages/features/topic/server/package.json` yet, so no `pnpm install`
+fixes it. Reproducible before and unrelated to any file this pass touched —
+same class of concurrent-lane collection failure the previous pass's log
+describes for `scenario-contract`/`suite-server`. `pnpm --filter
+@langwatch/architecture-lint test`: 608/609, one unrelated failure
+(`tests/no-binary-source-files.test.ts`, flags a NUL byte in
+`packages/features/coding-agent/server/src/repositories/__tests__/coding-agent-session-clickhouse-dedup.unit.test.ts`,
+also uncommitted work from a concurrent lane, not one of the three
+`tests/frontend-ui-boundaries.test.ts` failures this lane was told to ignore).
+
+**State left in.** A1–A4's flattening is complete and verified — no
+half-migrated state. `AppTrpcFeaturePorts` and `ApiTrpcCollaborators` are now
+fully flat: every namespace's ports are top-level entries, no `orgGroup`,
+`agentGroup`, `traceGroup`, `productInfra` or `gatewayGroup` bag anywhere, and
+all four remaining `app-trpc.*-group.ts` mounting files are deleted (only
+`app-trpc.features.ts`, `app-trpc.collaborators.ts`, `app-trpc.context.ts`,
+`app-trpc.declared-check.ts`, `app-trpc.policy.ts`, `app-trpc.policy-kit.ts`,
+`app-trpc.sse.ts`, `app-trpc.types.ts` and `index.ts` remain in `app-trpc/`).
+The next agent should pick up at Step B: the ten `composeApi*Collaborators`
+functions stay, the ten `withApi*Collaborators` folds and
+`sealApiTrpcCollaborators` in `api-production.composition.ts` go, replaced by
+one `composeApiTrpcCollaborators(halves, gapLogger)` call. Check in with
+whichever lane is then working `api-production.composition.ts` before
+starting — coordinate the same way this pass did.
 
 ## Two group mechanisms, not one
 

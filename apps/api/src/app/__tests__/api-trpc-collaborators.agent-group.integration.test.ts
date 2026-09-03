@@ -251,68 +251,62 @@ function baseCollaborators(): AnyApiTrpcCollaborators {
     prompts: stub("prompts"),
     role: stub("role", { customRolePermission: anySchema }),
     team: stub("team"),
-    traceGroup: {
-      traces: stub("traceGroup.traces", {
-        listInputSchema: anySchema,
-        filterInputSchema: anySchema,
-        evaluatorTypeSchema: anySchema,
-        preconditionSchema: anySchema,
-      }),
-      tracesV2: stub("traceGroup.tracesV2", { traceMetadataUpdateSchema: anySchema }),
-      spans: stub("traceGroup.spans"),
-      traceEditOverlay: stub("traceGroup.traceEditOverlay"),
-      sharedTrace: stub("traceGroup.sharedTrace"),
-      savedViews: stub("traceGroup.savedViews"),
-      costs: stub("traceGroup.costs"),
-      llmModelCost: stub("traceGroup.llmModelCost"),
-      modelProvider: stub("traceGroup.modelProvider"),
-      modelProviderChecks: {
-        tenantWrite: () => passThroughMiddleware,
-        credentialProbe: passThroughMiddleware,
-      },
-      translate: stub("traceGroup.translate"),
-      httpProxy: stub("traceGroup.httpProxy"),
-      limits: stub("traceGroup.limits"),
+    traces: stub("traces", {
+      listInputSchema: anySchema,
+      filterInputSchema: anySchema,
+      evaluatorTypeSchema: anySchema,
+      preconditionSchema: anySchema,
+    }),
+    tracesV2: stub("tracesV2", { traceMetadataUpdateSchema: anySchema }),
+    spans: stub("spans"),
+    traceEditOverlay: stub("traceEditOverlay"),
+    sharedTrace: stub("sharedTrace"),
+    savedViews: stub("savedViews"),
+    costs: stub("costs"),
+    llmModelCost: stub("llmModelCost"),
+    modelProvider: stub("modelProvider"),
+    modelProviderChecks: {
+      tenantWrite: () => passThroughMiddleware,
+      credentialProbe: passThroughMiddleware,
     },
+    translate: stub("translate"),
+    httpProxy: stub("httpProxy"),
+    limits: stub("limits"),
     /**
      * The agent and product-infrastructure groups, stubbed with only what the
      * record reads while it is BUILT: the two Langy gates and the operator
      * check the mounts chain onto a procedure. Their own suites are what prove
      * they answer.
      */
-    agentGroup: {
-      langy: stub("agentGroup.langy"),
-      langyGates: {
-        refuseDemoProject: passThroughMiddleware,
-        enforceLangyAccess: passThroughMiddleware,
-      },
-      langyEgress: stub("agentGroup.langyEgress"),
-      ops: stub("agentGroup.ops"),
-      opsCheck: () => passThroughMiddleware,
-      scenarios: stub("agentGroup.scenarios"),
+    langy: stub("langy"),
+    langyGates: {
+      refuseDemoProject: passThroughMiddleware,
+      enforceLangyAccess: passThroughMiddleware,
     },
+    langyEgress: stub("langyEgress"),
+    ops: stub("ops"),
+    opsCheck: () => passThroughMiddleware,
+    scenarios: stub("scenarios"),
     /**
      * The nine tenant-administration surfaces and the three infrastructure
      * ones, stubbed with only what the record reads while it is being BUILT.
      * Their own suites are what prove they answer.
      */
-    orgGroup: {
-      organization: stub("orgGroup.organization", { signUpDataSchema: anySchema }),
-      organizationAuditLogCheck: passThroughMiddleware,
-      project: stub("orgGroup.project"),
-      projectChecks: {
-        create: passThroughMiddleware,
-        tenantWrite: () => passThroughMiddleware,
-        traceSharing: () => passThroughMiddleware,
-      },
-      codingAgents: stub("orgGroup.codingAgents"),
-      automation: stub("orgGroup.automation"),
-      emailSuppression: stub("orgGroup.emailSuppression"),
-      enterprise: {
-        scimToken: stub("orgGroup.enterprise.scimToken"),
-        ssoConnections: stub("orgGroup.enterprise.ssoConnections"),
-        saasBilling: false,
-      },
+    organization: stub("organization", { signUpDataSchema: anySchema }),
+    organizationAuditLogCheck: passThroughMiddleware,
+    project: stub("project"),
+    projectChecks: {
+      create: passThroughMiddleware,
+      tenantWrite: () => passThroughMiddleware,
+      traceSharing: () => passThroughMiddleware,
+    },
+    codingAgents: stub("codingAgents"),
+    automation: stub("automation"),
+    emailSuppression: stub("emailSuppression"),
+    enterprise: {
+      scimToken: stub("enterprise.scimToken"),
+      ssoConnections: stub("enterprise.ssoConnections"),
+      saasBilling: false,
     },
     /**
      * The gateway group and the GitHub door, stubbed with only what the record

@@ -111,9 +111,10 @@ import {
   type TracesV2TrpcPorts,
 } from "@langwatch/trace-server";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
+import type { CostTrpcPorts } from "@langwatch/entitlement-server";
+import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
 import type { AnyApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
-import type { AnyAppTraceGroupTrpcPorts } from "../app-trpc/app-trpc.trace-group";
 import type { ModelProviderTrpcChecks } from "../features/model-provider/model-provider-trpc.mount";
 
 // ---------------------------------------------------------------------------
@@ -342,12 +343,34 @@ export type ApiTraceGroupCollaborators = Readonly<{
   modelProviders: ModelProviderApp;
   /** For `ctx.app.planProvider`. */
   planProvider: Pick<PlanProvider, "getActivePlan">;
-  /** The `traceGroup` entry of {@link ApiTrpcCollaborators}. */
   ports: ApiTraceGroupPorts;
 }>;
 
-/** The group's ports, with the shapes this process's own reads answer with. */
-export type ApiTraceGroupPorts = AnyAppTraceGroupTrpcPorts;
+/**
+ * The thirteen tRPC ports {@link ApiTrpcCollaborators} mounts individually.
+ *
+ * Nested here rather than flattened onto {@link ApiTraceGroupCollaborators}
+ * itself: this half also carries the `traces` APPLICATION slice under that
+ * exact name, and a port and an application slice cannot share one key on one
+ * object. `withApiTraceGroupCollaborators` is where the two meet — it spreads
+ * these thirteen INTO the flat record, and the application slice into
+ * `application` beside them.
+ */
+export type ApiTraceGroupPorts = Readonly<{
+  traces: TracesTrpcPorts<TraceLegacyListInput, unknown, TraceLegacyFilterInput, unknown, unknown>;
+  tracesV2: Omit<TracesV2TrpcPorts<unknown, unknown>, "queryTranslation">;
+  spans: SpansTrpcPorts;
+  traceEditOverlay: TraceEditOverlayTrpcPorts<Protections>;
+  sharedTrace: SharedTraceTrpcPorts;
+  savedViews: SavedViewTrpcPorts<unknown>;
+  costs: CostTrpcPorts<unknown>;
+  llmModelCost: LlmModelCostTrpcPorts;
+  modelProvider: ModelProviderTrpcPorts<unknown, unknown>;
+  modelProviderChecks: ModelProviderTrpcChecks;
+  translate: TranslateTrpcPorts;
+  httpProxy: HttpProxyTrpcPorts;
+  limits: LimitsTrpcPorts;
+}>;
 
 /** One project's spend, as the billing screen groups it. */
 export type ApiProjectSpendRollup = Readonly<{
@@ -587,7 +610,19 @@ export function withApiTraceGroupCollaborators(
   if (!base || !group) return undefined;
   return {
     ...base,
-    traceGroup: group.ports,
+    traces: group.ports.traces,
+    tracesV2: group.ports.tracesV2,
+    spans: group.ports.spans,
+    traceEditOverlay: group.ports.traceEditOverlay,
+    sharedTrace: group.ports.sharedTrace,
+    savedViews: group.ports.savedViews,
+    costs: group.ports.costs,
+    llmModelCost: group.ports.llmModelCost,
+    modelProvider: group.ports.modelProvider,
+    modelProviderChecks: group.ports.modelProviderChecks,
+    translate: group.ports.translate,
+    httpProxy: group.ports.httpProxy,
+    limits: group.ports.limits,
     application: {
       ...base.application,
       traces: group.traces,

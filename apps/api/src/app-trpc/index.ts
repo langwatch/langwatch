@@ -94,12 +94,6 @@ export {
 export { createDataRetentionTrpcRouter } from "../features/data-retention/data-retention-trpc.mount";
 export { createMonitorTrpcRouter } from "../features/monitor/monitor-trpc.mount";
 export {
-  createAppTraceGroupTrpcFeatures,
-  type AnyAppTraceGroupTrpcPorts,
-  type AppTraceGroupTrpcContext,
-  type AppTraceGroupTrpcPorts,
-} from "./app-trpc.trace-group";
-export {
   permissionPolicy,
   policyForCheck,
   type AppTrpcDeclaredCheck,
