@@ -1,0 +1,23 @@
+{
+  "skill_name": "feature-wire",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "The dataset package has a REST app but hitting /api/v1/datasets returns 404 on the api process.",
+      "expected_output": "Finds the missing entry in app-rest.packaged-families.ts, gates the family on its service being built, names the absence otherwise, adds or extends the composition test, and does not regenerate the OpenAPI document.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Install the annotation-queue screen from @langwatch/annotation-web into apps/ui at /:project/annotations/queue.",
+      "expected_output": "Adds the catalogue.json use, the private apps/ui feature folder with a routes file wrapping host, chrome and guard in that order, the installed-ui-features registration, the route-table key, feature-map.json, and runs the two install guard tests.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Make the worker run the new dataset-normalization command.",
+      "expected_output": "Adds an installer or extends the area's installer, the catalogue entry, and calls out the job-registry.json change as deliberate; proves routability with the capability-mount test.",
+      "files": []
+    }
+  ]
+}
