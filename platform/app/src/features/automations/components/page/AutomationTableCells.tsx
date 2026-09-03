@@ -624,7 +624,7 @@ export function AutomationRow({
                 projectId={projectId}
                 automationId={trigger.id}
                 automationName={trigger.name}
-                workspaceName={slackWorkspaceName}
+                workspaceName={slackWorkspaceName ?? null}
                 canSwitch={canSwitchSlackToken}
               />
             ) : null}
