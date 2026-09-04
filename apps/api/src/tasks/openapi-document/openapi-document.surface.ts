@@ -34,6 +34,8 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { createApiKeysRestApp } from "@langwatch/api-key-server";
+import type { ConnectedAgentRuntime, LongPollTransport } from "@langwatch/agent-server";
+import type { AuthRestPorts } from "@langwatch/auth-server";
 import { createGatewayPlatformRestApp, createGatewaySpendRestApp } from "@langwatch/gateway-server";
 import type { GovernanceIngestRestPorts } from "@langwatch/enterprise-governance-server";
 import { monitorApiMappingsSchema } from "@langwatch/monitor-contract";
@@ -142,6 +144,20 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
     services: {
       agentCache: refuse("The agent cache"),
       agents: refuse("Agents"),
+      // Layers `/api/v1/agents/connect/*` and `/:id/call` onto the family
+      // above (ADR-128). Production supplies it whenever connected agents
+      // composed (`api-packaged-rest.composition.ts:171-173`); a stand-in
+      // that omitted it would silently drop four documented operations.
+      agentsV1: () => ({
+        connectedRuntime: refuse<ConnectedAgentRuntime>("The connected-agent runtime"),
+        connect: {
+          transport: refuse<LongPollTransport>("The long-poll transport"),
+        },
+        call: {
+          runtime: refuse<ConnectedAgentRuntime>("The connected-agent runtime"),
+          assertRunnable: refuse<Promise<void>>("Connected-agent runnability checks"),
+        },
+      }),
       apiKeys: refuse("API keys"),
       authzGrants: refuse("The grants ledger"),
       automation: refuse("Automations"),
@@ -298,6 +314,19 @@ function processPorts(): ApiProcessRestPorts {
     github: opaque(),
     authCliDeviceFlow: opaque(),
     governanceCli: opaque(),
+    // The Better Auth family. It publishes no `describeRoute`, so omitting
+    // it loses no operation — but it is in the served route table this
+    // surface's "removed" list reads, so the prefix must be present too.
+    auth: {
+      betterAuth: refuse("The Better Auth instance"),
+      revokeBrowserSession: refuse<Promise<void>>("Browser session revocation"),
+      resolveSession: refuse("Browser session resolution") as never,
+      tryFindProjectSlugByToken: refuse<Promise<string | null>>("Legacy token project lookup"),
+      featureFlags: refuse("The feature-flag store"),
+      database: refuse("The member directory") as AuthRestPorts["database"],
+      baseUrl: PUBLIC_BASE_URL,
+      federatedLogout: refuse<Promise<string | null>>("Federated logout"),
+    },
     // The SCIM 2.0 provisioning surface. Both families are described: the
     // fifteen protocol operations are the frozen document's largest single
     // block, and the Auth0 intake carries no `describeRoute`, so mounting it
