@@ -89,9 +89,12 @@ describe("createLangyConversationTitleGenerator", () => {
       const generate = createLangyConversationTitleGenerator({
         messages: messages(),
         resolveModel: resolver(() => {
-          throw new ModelNotConfiguredError({
-            feature: "langy.conversation_title",
-          });
+          throw new ModelNotConfiguredError(
+            "langy.conversation_title",
+            "FAST",
+            "Langy chat titles",
+            "project_1",
+          );
         }),
       });
 

@@ -20,12 +20,15 @@ import {
   wrapWords,
 } from "../ui";
 
+/** The colour escapes, built rather than typed, so the source holds no ESC. */
+const ANSI_COLOURS = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+
 /** A writer that keeps the lines, with the colours stripped. */
 function recordingWriter() {
   const lines: string[] = [];
   return {
     lines,
-    line: (text: string) => lines.push(text.replace(/\u001b\[[0-9;]*m/g, "")),
+    line: (text: string) => lines.push(text.replace(ANSI_COLOURS, "")),
   };
 }
 

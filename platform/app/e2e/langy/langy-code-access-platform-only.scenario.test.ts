@@ -82,7 +82,9 @@ describe("Langy asks for the code only when the code has to change", () => {
         console.log("[layer2] tools:", langy.state.toolNames.join(", "));
         console.log(
           "[layer2] questions:",
-          watcher.questions.map((ask) => ask.questions[0]?.question).join(" | "),
+          watcher.questions
+            .map((ask) => ask.questions[0]?.question)
+            .join(" | "),
         );
         console.log(
           "[layer2] pendingRequest:",

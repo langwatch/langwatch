@@ -1815,10 +1815,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       // `--json` and `--jq` are global, so they never reach the command's own
       // options. They are read here and passed on, or the refusal below would
       // miss them now that the format gate lets this command through.
-      const globals = command.optsWithGlobals() as {
-        json?: unknown;
-        jq?: unknown;
-      };
+      const globals: { json?: unknown; jq?: unknown } =
+        command.optsWithGlobals();
       const { langyCommand: impl } = await import("./commands/langy/index.js");
       return impl({
         ...options,

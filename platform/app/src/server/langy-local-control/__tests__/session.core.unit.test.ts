@@ -73,9 +73,7 @@ describe("conversationTitle", () => {
     });
 
     it("cuts a name with no spaces at the limit", () => {
-      expect(conversationTitle("x".repeat(80))).toBe(
-        `${"x".repeat(60)}\u2026`,
-      );
+      expect(conversationTitle("x".repeat(80))).toBe(`${"x".repeat(60)}\u2026`);
     });
   });
 });

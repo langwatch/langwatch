@@ -133,7 +133,9 @@ describe("Langy changes a connected agent through the shared folder", () => {
                     "[layer2] reply:",
                     await watcher!
                       .lastAssistantText()
-                      .catch((error: unknown) => `unreadable: ${String(error)}`),
+                      .catch(
+                        (error: unknown) => `unreadable: ${String(error)}`,
+                      ),
                   );
                 }
                 expect(langy.state.toolNames).toContain("code_access");

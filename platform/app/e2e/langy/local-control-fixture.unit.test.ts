@@ -104,7 +104,9 @@ describe("questionAnswerNote", () => {
     it("carries the question and the option that was picked", () => {
       const note = questionAnswerNote({
         waitId: "wait_2",
-        questions: [{ question: "Which branch?", options: [{ label: "main" }] }],
+        questions: [
+          { question: "Which branch?", options: [{ label: "main" }] },
+        ],
         answered: [{ question: "Which branch?", selected: ["main"] }],
         turnId: "langyturn_1",
       });
