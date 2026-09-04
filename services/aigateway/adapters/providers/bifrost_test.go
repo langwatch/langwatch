@@ -9,6 +9,9 @@ import (
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/tidwall/gjson"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -527,7 +530,7 @@ func TestCredentialToBifrostKey_BedrockHonorsAWSStyleKeys(t *testing.T) {
 			"aws_region_name":       "us-east-1",
 		},
 	}
-	k := credentialToBifrostKey(cred, bfschemas.Bedrock)
+	k := credentialToBifrostKey(cred, bfschemas.Bedrock, nil)
 	if k.BedrockKeyConfig == nil {
 		t.Fatal("BedrockKeyConfig is nil")
 	}
@@ -594,7 +597,7 @@ func TestCredentialToBifrostKey_VLLM(t *testing.T) {
 		ProviderID: domain.ProviderCustom,
 		Extra:      map[string]string{"base_url": "http://llm-server:8000/v1"},
 	}
-	key := credentialToBifrostKey(cred, bfschemas.VLLM)
+	key := credentialToBifrostKey(cred, bfschemas.VLLM, nil)
 
 	if key.VLLMKeyConfig == nil {
 		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
@@ -618,7 +621,7 @@ func TestCredentialToBifrostKey_DeepSeekDefaultsBaseURL(t *testing.T) {
 		ID:         "mp-ds",
 		ProviderID: domain.ProviderDeepSeek,
 		APIKey:     "sk-ds",
-	}, bfschemas.VLLM)
+	}, bfschemas.VLLM, nil)
 
 	if key.VLLMKeyConfig == nil {
 		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
@@ -650,7 +653,7 @@ func TestCredentialToBifrostKey_Azure_EndpointFromApiBase(t *testing.T) {
 		Extra:         map[string]string{"api_base": "https://acme.openai.azure.com"},
 		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
 	}
-	key := credentialToBifrostKey(cred, bfschemas.Azure)
+	key := credentialToBifrostKey(cred, bfschemas.Azure, nil)
 
 	if key.AzureKeyConfig == nil {
 		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
@@ -678,7 +681,7 @@ func TestCredentialToBifrostKey_Azure_EndpointAndDeploymentsMapToKey(t *testing.
 		Extra:         map[string]string{"api_base": "https://acme.openai.azure.com"},
 		DeploymentMap: map[string]string{"gpt-5-mini": "gpt5mini-deploy"},
 	}
-	key := credentialToBifrostKey(cred, bfschemas.Azure)
+	key := credentialToBifrostKey(cred, bfschemas.Azure, nil)
 
 	if key.AzureKeyConfig == nil {
 		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
@@ -689,6 +692,42 @@ func TestCredentialToBifrostKey_Azure_EndpointAndDeploymentsMapToKey(t *testing.
 	if got := key.Aliases.Resolve("gpt-5-mini"); got != "gpt5mini-deploy" {
 		t.Fatalf("Aliases.Resolve(gpt-5-mini) = %q, want the mapped deployment; "+
 			"v1.5 resolves model->deployment via Key.Aliases", got)
+	}
+}
+
+// A caller-supplied api_version (still sent by the control plane, see
+// config_wire.go) is dropped by bifrost v1.5 (no per-key api-version field),
+// but must not panic and must not block the rest of the key build — and the
+// drop must be observable via a warning log, so a customer's pinned version
+// silently ignored is at least visible in logs.
+func TestCredentialToBifrostKey_Azure_APIVersionOverrideWarnsAndIsDropped(t *testing.T) {
+	core, logs := observer.New(zapcore.WarnLevel)
+	logger := zap.New(core)
+
+	cred := domain.Credential{
+		ID:         "mp-azure",
+		ProviderID: domain.ProviderAzure,
+		APIKey:     "az-key",
+		Extra: map[string]string{
+			"api_base":    "https://acme.openai.azure.com",
+			"api_version": "2023-05-15",
+		},
+	}
+	key := credentialToBifrostKey(cred, bfschemas.Azure, logger)
+
+	if key.AzureKeyConfig == nil {
+		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
+	}
+	if got := key.AzureKeyConfig.Endpoint.Val; got != "https://acme.openai.azure.com" {
+		t.Fatalf("AzureKeyConfig.Endpoint = %q, want the api_base endpoint even with api_version set", got)
+	}
+
+	entries := logs.FilterMessage("azure api_version override is ignored: bifrost v1.5 sets api-version itself").All()
+	if len(entries) != 1 {
+		t.Fatalf("want 1 warning about the dropped api_version override, got %d", len(entries))
+	}
+	if got := entries[0].ContextMap()["api_version"]; got != "2023-05-15" {
+		t.Fatalf("warning api_version field = %v, want 2023-05-15", got)
 	}
 }
 

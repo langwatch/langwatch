@@ -115,6 +115,7 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		Account: &account{
 			anthropicCompat: compatEndpoints,
 			openAIBaseURL:   opts.OpenAIBackendURL,
+			logger:          opts.Logger,
 		},
 		InitialPoolSize: pool,
 		Logger:          &bifrostLogger{logger: opts.Logger},
@@ -1203,6 +1204,9 @@ type account struct {
 	// openAIBaseURL redirects bifrost's native OpenAI provider to a local
 	// server in tests. Empty in production. See BifrostOptions.OpenAIBackendURL.
 	openAIBaseURL string
+	// logger is passed to credentialToBifrostKey for the dropped
+	// api_version warning. May be nil.
+	logger *zap.Logger
 }
 
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
@@ -1214,7 +1218,7 @@ func (a *account) GetKeysForProvider(ctx context.Context, provider bfschemas.Mod
 	if cred.ID == "" {
 		return nil, fmt.Errorf("no credential on context for provider %s", provider)
 	}
-	key := credentialToBifrostKey(cred, provider)
+	key := credentialToBifrostKey(cred, provider, a.logger)
 	return []bfschemas.Key{key}, nil
 }
 
@@ -1301,8 +1305,19 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 	return cfg, nil
 }
 
-// credentialToBifrostKey converts a domain.Credential into bifrost's Key format.
-func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProvider) bfschemas.Key {
+// credentialToBifrostKey converts a domain.Credential into bifrost's Key
+// format. logger may be nil (e.g. bare tests); used only to warn on a
+// dropped api_version override.
+// warnIgnoredAzureAPIVersion logs when a caller supplied an Azure api_version
+// override that bifrost v1.5 no longer forwards. logger may be nil.
+func warnIgnoredAzureAPIVersion(cred domain.Credential, logger *zap.Logger) {
+	if v := cred.Extra["api_version"]; v != "" && logger != nil {
+		logger.Warn("azure api_version override is ignored: bifrost v1.5 sets api-version itself",
+			zap.String("api_version", v))
+	}
+}
+
+func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProvider, logger *zap.Logger) bfschemas.Key {
 	k := bfschemas.Key{
 		ID:     cred.ID,
 		Name:   cred.ID,
@@ -1326,13 +1341,12 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		// with an empty endpoint → Bifrost "endpoint not set" (#5760). Mirrors the
 		// dual-name tolerance credBaseURL already applies to vLLM.
 		endpoint := credExtra(cred, "endpoint", "api_base")
+		// bifrost v1.5 dropped the per-key api-version field; the Azure
+		// provider now injects its own and a caller-supplied override is
+		// no longer forwarded (see the warning below).
+		warnIgnoredAzureAPIVersion(cred, logger)
 		// bifrost v1.5 moved model->deployment mapping off AzureKeyConfig onto
-		// Key.Aliases, resolved uniformly via Aliases.Resolve. api-version is no
-		// longer a per-key field: the Azure provider injects its own
-		// (DefaultAzureAPIVersion for classic /deployments/, "preview" for the
-		// responses API), and only when absent — so the empty-api-version shape
-		// #5760 guarded against is unreachable, but a caller-supplied api_version
-		// override is no longer forwarded.
+		// Key.Aliases, resolved uniformly via Aliases.Resolve.
 		k.Aliases = bfschemas.KeyAliases(cred.DeploymentMap)
 		k.AzureKeyConfig = &bfschemas.AzureKeyConfig{
 			Endpoint: envVar(endpoint),
