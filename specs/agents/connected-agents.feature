@@ -125,6 +125,38 @@ Feature: Connected agents
     When a run targets "connected:ghost@production"
     Then the run is refused as an invalid target reference
 
+  @unit
+  Scenario: A name with no environment means the agent in development
+    Given "support-agent" registered in development and in production, with a process connected in both
+    When a run targets "connected:support-agent"
+    Then the target resolves to the development agent's id
+
+  @unit
+  Scenario: A name with no environment falls back to the one other environment with a process connected
+    Given "support-agent" registered in development and in production, with a process connected in production only
+    When a run targets "connected:support-agent"
+    Then the target resolves to the production agent's id
+
+  @unit
+  Scenario: A name with no environment is refused when no process is connected anywhere
+    Given "support-agent" registered in development and in production, with no process connected
+    When a run targets "connected:support-agent"
+    Then the run is refused with "agent_environment_unresolved"
+    And the refusal names the agent and the environments it is registered in
+
+  @unit
+  Scenario: A name with no environment is refused when several other environments have a process connected
+    Given "support-agent" registered in staging and in production, with a process connected in both
+    When a run targets "connected:support-agent"
+    Then the run is refused with "agent_environment_unresolved"
+    And the refusal names the environments that are online
+
+  @unit
+  Scenario: A name with no environment that matches no connected agent is read as an id
+    Given no connected agent named "agent_1"
+    When a run targets "connected:agent_1"
+    Then the reference is left as written
+
   # ---------------------------------------------------------------------------
   # Presence
   # ---------------------------------------------------------------------------

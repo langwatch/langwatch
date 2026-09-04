@@ -14,11 +14,13 @@ import type {
   AgentRepository,
 } from "../../agents/agent.repository";
 import type { SuiteRunService } from "../../app-layer/suites/suite-run.service";
+import type { AgentPresence } from "../../connected-agents/presence.read";
 import type { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
 import type { ScenarioParameterDefinition } from "../../scenarios/parameters";
 import type { ScenarioRepository } from "../../scenarios/scenario.repository";
 import {
   assertConnectedAgentsRunnable,
+  type ConnectedTargetReads,
   resolveConnectedReferences,
 } from "../connected-targets";
 import type { SuiteRepository } from "../suite.repository";
@@ -95,6 +97,7 @@ function serviceWith({
     ),
     findNamesByIds: vi.fn(async () => []),
     findConnectedByNameAndEnvironment: vi.fn(async () => []),
+    findConnectedByName: vi.fn(async () => []),
   };
   const scenarioRepository = {
     findManyIncludingArchived: vi.fn(async ({ ids }: { ids: string[] }) =>
@@ -346,7 +349,8 @@ describe("resolveConnectedReferences", () => {
   ];
   const agents = {
     findConnectedByNameAndEnvironment: vi.fn(async () => rows),
-  } as unknown as Pick<AgentRepository, "findConnectedByNameAndEnvironment">;
+    findConnectedByName: vi.fn(async () => []),
+  } as unknown as ConnectedTargetReads;
 
   describe("when the actor owns a row of that name and environment", () => {
     it("picks the actor's own row over the shared one", async () => {
@@ -380,10 +384,13 @@ describe("resolveConnectedReferences", () => {
   });
 
   describe("when the reference is an id", () => {
-    it("leaves it as written without a read", async () => {
+    /** @scenario "A name with no environment that matches no connected agent is read as an id" */
+    it("leaves it as written when no connected agent carries that name", async () => {
       const reads = {
         findConnectedByNameAndEnvironment: vi.fn(async () => []),
+        findConnectedByName: vi.fn(async () => []),
       };
+      const presence = vi.fn(async () => new Map<string, AgentPresence>());
 
       const targets = await resolveConnectedReferences({
         targets: [
@@ -393,13 +400,149 @@ describe("resolveConnectedReferences", () => {
         projectId,
         actor: undefined,
         agents: reads,
+        presence,
       });
 
       expect(targets.map((target) => target.referenceId)).toEqual([
         "agent_1",
         "agent_2@x",
       ]);
+      expect(reads.findConnectedByName).toHaveBeenCalledWith({
+        projectId,
+        name: "agent_1",
+      });
       expect(reads.findConnectedByNameAndEnvironment).not.toHaveBeenCalled();
+      expect(presence).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the reference is a name with no environment", () => {
+    const row = ({
+      id,
+      environment,
+      ownerUserId = null,
+    }: {
+      id: string;
+      environment: string;
+      ownerUserId?: string | null;
+    }) => ({ id, environment, ownerUserId });
+
+    const readsOf = (rows: ReturnType<typeof row>[]) =>
+      ({
+        findConnectedByNameAndEnvironment: vi.fn(async () => []),
+        findConnectedByName: vi.fn(async () => rows),
+      }) as unknown as ConnectedTargetReads;
+
+    const presenceOf = (onlineIds: string[]) =>
+      vi.fn(
+        async ({ agents }: { agents: { id: string }[] }) =>
+          new Map<string, AgentPresence>(
+            agents.map(({ id }) => [
+              id,
+              {
+                status: onlineIds.includes(id) ? "online" : "offline",
+                instances: [],
+              },
+            ]),
+          ),
+      );
+
+    const resolve = ({
+      rows,
+      online,
+      actor,
+    }: {
+      rows: ReturnType<typeof row>[];
+      online: string[];
+      actor?: { id: string; label: "user" };
+    }) =>
+      resolveConnectedReferences({
+        targets: [{ type: "connected", referenceId: "support-agent" }],
+        projectId,
+        actor,
+        agents: readsOf(rows),
+        presence: presenceOf(online),
+      });
+
+    /** @scenario "A name with no environment means the agent in development" */
+    it("picks the development agent when a process is connected there", async () => {
+      const [target] = await resolve({
+        rows: [
+          row({ id: "agent_prod", environment: "production" }),
+          row({ id: "agent_dev", environment: "development" }),
+        ],
+        online: ["agent_prod", "agent_dev"],
+      });
+
+      expect(target?.referenceId).toBe("agent_dev");
+    });
+
+    it("picks the actor's own development row over a teammate's", async () => {
+      const [target] = await resolve({
+        rows: [
+          row({ id: "agent_theirs", environment: "development", ownerUserId: "u_2" }),
+          row({ id: "agent_mine", environment: "development", ownerUserId: "u_1" }),
+        ],
+        online: ["agent_theirs", "agent_mine"],
+        actor: { id: "u_1", label: "user" },
+      });
+
+      expect(target?.referenceId).toBe("agent_mine");
+    });
+
+    /** @scenario "A name with no environment falls back to the one other environment with a process connected" */
+    it("falls back to the one other environment with a process connected", async () => {
+      const [target] = await resolve({
+        rows: [
+          row({ id: "agent_prod", environment: "production" }),
+          row({ id: "agent_dev", environment: "development" }),
+        ],
+        online: ["agent_prod"],
+      });
+
+      expect(target?.referenceId).toBe("agent_prod");
+    });
+
+    /** @scenario "A name with no environment is refused when no process is connected anywhere" */
+    it("refuses when no process is connected anywhere, naming the environments", async () => {
+      const failure = await resolve({
+        rows: [
+          row({ id: "agent_prod", environment: "production" }),
+          row({ id: "agent_dev", environment: "development" }),
+        ],
+        online: [],
+      }).catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        code: "agent_environment_unresolved",
+        httpStatus: 422,
+        meta: {
+          agentName: "support-agent",
+          registeredEnvironments: ["production", "development"],
+          onlineEnvironments: [],
+        },
+      });
+      expect((failure as Error).message).toContain("support-agent");
+      expect((failure as Error).message).toContain("production and development");
+    });
+
+    /** @scenario "A name with no environment is refused when several other environments have a process connected" */
+    it("refuses when several environments besides development are online", async () => {
+      const failure = await resolve({
+        rows: [
+          row({ id: "agent_staging", environment: "staging" }),
+          row({ id: "agent_prod", environment: "production" }),
+        ],
+        online: ["agent_staging", "agent_prod"],
+      }).catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        code: "agent_environment_unresolved",
+        meta: { onlineEnvironments: ["staging", "production"] },
+      });
+      expect((failure as Error).message).toContain(
+        "connected:support-agent@staging",
+      );
     });
   });
 });

@@ -503,6 +503,20 @@ const presentations = {
         : "Check the agent's configuration and test it again.";
     },
   },
+  agent_environment_unresolved: {
+    title: "Name the environment of this agent",
+    describe: (error) => {
+      const name = str(error, "agentName", "the agent");
+      const online = strList(error, "onlineEnvironments");
+      const registered = strList(error, "registeredEnvironments");
+      if (online.length > 1) {
+        return `${name} is online in ${online.join(", ")}. Name one of them, as connected:${name}@${online[0]}.`;
+      }
+      const where =
+        registered.length > 0 ? ` It is registered in ${registered.join(", ")}.` : "";
+      return `No process running ${name} is connected.${where} Start the process, or name the environment as connected:${name}@<environment>.`;
+    },
+  },
   agent_not_found: {
     title: "Agent not found",
     describe: () =>
