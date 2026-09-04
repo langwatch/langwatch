@@ -97,7 +97,7 @@ export class CallDispatcher {
   private readonly firstTurnPollMs: number;
   private readonly resultPollMs: number;
   private readonly waiters = new Map<string, Waiter[]>();
-  private readonly instanceOfCall = new Map<string, string>();
+  private readonly instanceOfCall = new Map<string, { projectId: string; instanceId: string }>();
   private subscriptions: Unsubscribe[] | null = null;
 
   constructor(options: CallDispatcherOptions) {
@@ -121,8 +121,10 @@ export class CallDispatcher {
       this.store.subscribe(INSTANCE_GONE_CHANNEL, (raw) => {
         const gone = parse(instanceGoneSchema, raw);
         if (!gone) return;
-        for (const [callId, instanceId] of this.instanceOfCall) {
-          if (instanceId === gone.instanceId) this.wake(callId, { kind: "gone" });
+        for (const [callId, held] of this.instanceOfCall) {
+          if (held.instanceId === gone.instanceId && held.projectId === gone.projectId) {
+            this.wake(callId, { kind: "gone" });
+          }
         }
       }),
     ]);
@@ -212,7 +214,7 @@ export class CallDispatcher {
     excluded: string[];
     now: () => number;
   }): Promise<LiveInstance> {
-    const pinKey = threadPinKey(agent.id, call.threadId);
+    const pinKey = threadPinKey(projectId, agent.id, call.threadId);
     const pinned = agent.isSticky ? await this.store.get(pinKey) : null;
 
     const waitUntil = now() + this.firstTurnGraceMs;
@@ -307,8 +309,14 @@ export class CallDispatcher {
   > {
     const { callId, deadlineAt } = envelope;
 
-    this.instanceOfCall.set(callId, instance.instanceId);
-    await this.registry.incrementInflight(instance.instanceId);
+    this.instanceOfCall.set(callId, {
+      projectId,
+      instanceId: instance.instanceId,
+    });
+    await this.registry.incrementInflight({
+      projectId,
+      instanceId: instance.instanceId,
+    });
 
     try {
       // Inside the try, so a store that refuses the write still gives the
@@ -327,6 +335,7 @@ export class CallDispatcher {
       }
 
       const outcome = await this.waitForResult({
+        projectId,
         callId,
         deadlineAt,
         signal,
@@ -334,22 +343,22 @@ export class CallDispatcher {
       });
       switch (outcome.kind) {
         case "result":
-          return await this.readAnswer({ instance, envelope, isSticky });
+          return await this.readAnswer({ projectId, instance, envelope, isSticky });
         case "gone": {
           // The frame reached a socket. Whether the instance acknowledged it
           // or not, the function may have started, so the turn is not placed
           // again. A frame that never left says so through the result, which
           // `readAnswer` reads.
           await this.retire({ projectId, instance, agentId: envelope.agentId });
-          const result = await this.readResult(callId);
+          const result = await this.readResult({ projectId, callId });
           if (result?.undelivered) return { kind: "retry" };
           return { kind: "disconnected" };
         }
         case "timeout":
-          await this.cancel({ callId, instanceId: instance.instanceId });
+          await this.cancel({ projectId, callId, instanceId: instance.instanceId });
           throw new AgentCallTimeoutError({ timeoutMs });
         case "aborted":
-          await this.cancel({ callId, instanceId: instance.instanceId });
+          await this.cancel({ projectId, callId, instanceId: instance.instanceId });
           throw abortError(signal);
         case "ack":
           throw new Error("ack is never a terminal outcome");
@@ -357,8 +366,11 @@ export class CallDispatcher {
     } finally {
       this.instanceOfCall.delete(callId);
       this.waiters.delete(callId);
-      await this.registry.decrementInflight(instance.instanceId);
-      await this.store.zrem(pendingKey(instance.instanceId), callId);
+      await this.registry.decrementInflight({
+        projectId,
+        instanceId: instance.instanceId,
+      });
+      await this.store.zrem(pendingKey(projectId, instance.instanceId), callId);
     }
   }
 
@@ -386,25 +398,27 @@ export class CallDispatcher {
       instanceId: instance.instanceId,
     };
 
-    await this.store.set(callKey(callId), JSON.stringify(stored), ttlSeconds);
+    await this.store.set(callKey(projectId, callId), JSON.stringify(stored), ttlSeconds);
     await this.store.zadd({
-      key: pendingKey(instance.instanceId),
+      key: pendingKey(projectId, instance.instanceId),
       score: deadlineAt,
       member: callId,
       ttlSeconds,
     });
     return this.store.publish(
-      instanceChannel(instance.instanceId),
+      instanceChannel(projectId, instance.instanceId),
       JSON.stringify({ call: callId } satisfies InstanceNudge),
     );
   }
 
   /** Reads a delivered result as the answer, a retry or a disconnect. */
   private async readAnswer({
+    projectId,
     instance,
     envelope,
     isSticky,
   }: {
+    projectId: string;
     instance: LiveInstance;
     envelope: CallEnvelope;
     isSticky: boolean;
@@ -414,7 +428,7 @@ export class CallDispatcher {
     | { kind: "disconnected" }
   > {
     const { callId } = envelope;
-    const result = await this.readResult(callId);
+    const result = await this.readResult({ projectId, callId });
     if (result?.undelivered) {
       // The frame never left the platform, so the function did not start.
       return { kind: "retry" };
@@ -430,7 +444,7 @@ export class CallDispatcher {
     }
     await this.pinThread({
       isSticky,
-      pinKey: threadPinKey(envelope.agentId, envelope.threadId),
+      pinKey: threadPinKey(projectId, envelope.agentId, envelope.threadId),
       instanceId: instance.instanceId,
     });
     return {
@@ -449,11 +463,13 @@ export class CallDispatcher {
 
   /** Waits for a result nudge, a gone signal, the deadline or an abort. */
   private waitForResult({
+    projectId,
     callId,
     deadlineAt,
     signal,
     now,
   }: {
+    projectId: string;
     callId: string;
     deadlineAt: number;
     signal?: AbortSignal;
@@ -489,7 +505,7 @@ export class CallDispatcher {
       // reconnecting when the gateway published never sees the message.
       const poll = async () => {
         if (settled) return;
-        const result = await this.store.get(resultKey(callId)).catch(() => null);
+        const result = await this.store.get(resultKey(projectId, callId)).catch(() => null);
         if (result) {
           finish({ kind: "result" });
           return;
@@ -504,24 +520,26 @@ export class CallDispatcher {
     for (const waiter of this.waiters.get(callId) ?? []) waiter.resolve(outcome);
   }
 
-  private async readResult(callId: string) {
-    const raw = await this.store.get(resultKey(callId));
+  private async readResult({ projectId, callId }: { projectId: string; callId: string }) {
+    const raw = await this.store.get(resultKey(projectId, callId));
     return raw ? parse(storedResultSchema, raw) : null;
   }
 
   /** Tells the instance to stop, and forgets the call. */
   private async cancel({
+    projectId,
     callId,
     instanceId,
   }: {
+    projectId: string;
     callId: string;
     instanceId: string;
   }): Promise<void> {
     await this.store.publish(
-      instanceChannel(instanceId),
+      instanceChannel(projectId, instanceId),
       JSON.stringify({ cancel: callId } satisfies InstanceNudge),
     );
-    await this.store.del(callKey(callId));
+    await this.store.del(callKey(projectId, callId));
   }
 
   /** Drops an instance the dispatcher found gone from presence. */

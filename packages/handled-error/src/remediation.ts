@@ -391,6 +391,11 @@ const registry = {
   agent_call_failed: {
     tips: ["Fix the error the function raised, then test again; the process logs carry the stack"],
   },
+  agent_call_foreign_project: {
+    tips: [
+      "The instance name in the register frame is shared with another project's instance; let the SDK mint it, or give this process its own instance name",
+    ],
+  },
   agent_disconnected: {
     tips: [
       "The turn is never sent again once the call reached the process, since the function may have side effects; start the process again and run again",

@@ -53,7 +53,7 @@ function build({ pollWaitMs }: { pollWaitMs: number }) {
 /** A session as the register route would have stored it. */
 async function seedSession(store: ReturnType<typeof createMemoryStateStore>) {
   await store.set(
-    httpSessionKey(token),
+    httpSessionKey(projectId, token),
     JSON.stringify({
       token,
       instanceId,
@@ -97,9 +97,9 @@ async function parkCall(store: ReturnType<typeof createMemoryStateStore>, callId
     },
   };
   const ttl = 60 + 60;
-  await store.set(callKey(callId), JSON.stringify(stored), ttl);
+  await store.set(callKey(projectId, callId), JSON.stringify(stored), ttl);
   await store.zadd({
-    key: pendingKey(instanceId),
+    key: pendingKey(projectId, instanceId),
     score: deadlineAt,
     member: callId,
     ttlSeconds: ttl,

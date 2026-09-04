@@ -7,6 +7,7 @@
  */
 
 import {
+  AgentCallForeignProjectError,
   AgentPayloadTooLargeError,
   AgentRegisterRefusedError,
   type AgentService,
@@ -319,7 +320,7 @@ export class AgentSessionCore {
    * which case the call is refused for that instance here and now.
    */
   async readCallForSession(session: SessionInfo, callId: string): Promise<StoredCall | null> {
-    const raw = await this.runtime.store.get(callKey(callId));
+    const raw = await this.runtime.store.get(callKey(session.projectId, callId));
     if (!raw) return null;
     let stored: StoredCall;
     try {
@@ -328,9 +329,9 @@ export class AgentSessionCore {
       logger.warn({ callId }, "envelope could not be read, dropping the call");
       return null;
     }
+    this.assertOwnProject(session, stored);
     if (
       stored.instanceId !== session.instanceId ||
-      stored.projectId !== session.projectId ||
       !session.agentIds.has(stored.envelope.agentId)
     ) {
       // An instance only ever sees calls for the agents it registered itself.
@@ -356,7 +357,7 @@ export class AgentSessionCore {
    * run the turn on another instance. The function cannot have started.
    */
   async undeliver(session: SessionInfo, callId: string): Promise<void> {
-    const stored = await this.readStoredCall(callId);
+    const stored = await this.readStoredCall(session, callId);
     if (!stored || stored.instanceId !== session.instanceId) return;
     await this.writeResult({
       stored,
@@ -370,15 +371,19 @@ export class AgentSessionCore {
 
   /** The instance started the function: the call can no longer be retried elsewhere. */
   async ack(session: SessionInfo, callId: string): Promise<void> {
-    const stored = await this.readStoredCall(callId);
+    const stored = await this.readStoredCall(session, callId);
     if (!stored || stored.instanceId !== session.instanceId) return;
-    await this.runtime.store.set(callAckKey(callId), "1", ttlOf(stored, this.now()));
+    await this.runtime.store.set(
+      callAckKey(session.projectId, callId),
+      "1",
+      ttlOf(stored, this.now()),
+    );
     await this.nudgeReply(stored, { callId, kind: "ack" });
   }
 
   /** The instance answered: the result lands under its cap or as a payload error. */
   async result(session: SessionInfo, frame: ResultFrame): Promise<void> {
-    const stored = await this.readStoredCall(frame.callId);
+    const stored = await this.readStoredCall(session, frame.callId);
     if (!stored || stored.instanceId !== session.instanceId) return;
     const violation = resultCapViolation({
       output: frame.output,
@@ -428,7 +433,7 @@ export class AgentSessionCore {
       now: this.now(),
     });
     for (const callId of activeCallIds) {
-      const stored = await this.readStoredCall(callId);
+      const stored = await this.readStoredCall(session, callId);
       if (!stored || stored.instanceId !== session.instanceId) continue;
       await this.writeResult({
         stored,
@@ -448,14 +453,35 @@ export class AgentSessionCore {
     );
   }
 
-  async readStoredCall(callId: string): Promise<StoredCall | null> {
-    const raw = await this.runtime.store.get(callKey(callId));
+  async readStoredCall(session: SessionInfo, callId: string): Promise<StoredCall | null> {
+    const raw = await this.runtime.store.get(callKey(session.projectId, callId));
     if (!raw) return null;
+    let stored: StoredCall;
     try {
-      return storedCallSchema.parse(JSON.parse(raw));
+      stored = storedCallSchema.parse(JSON.parse(raw));
     } catch {
       return null;
     }
+    this.assertOwnProject(session, stored);
+    return stored;
+  }
+
+  /**
+   * The instance id is chosen by the connecting process, so a session may
+   * name an instance another project registered. A call is only ever the
+   * session's own when the envelope carries the credential's project.
+   */
+  private assertOwnProject(session: SessionInfo, stored: StoredCall): void {
+    if (stored.projectId === session.projectId) return;
+    logger.warn(
+      {
+        callId: stored.envelope.callId,
+        instanceId: session.instanceId,
+        projectId: session.projectId,
+      },
+      "a session referred to a call of another project, refusing it",
+    );
+    throw new AgentCallForeignProjectError({ callId: stored.envelope.callId });
   }
 
   private async writeResult({
@@ -466,7 +492,7 @@ export class AgentSessionCore {
     result: StoredResult;
   }): Promise<void> {
     await this.runtime.store.set(
-      resultKey(stored.envelope.callId),
+      resultKey(stored.projectId, stored.envelope.callId),
       JSON.stringify(result),
       RESULT_TTL_SECONDS,
     );

@@ -97,51 +97,54 @@ async function connectInstance({
     meta: meta(instanceId, maxConcurrency),
     agentIds,
   });
-  const unsubscribe = await runtime.store.subscribe(instanceChannel(instanceId), (raw) => {
-    const nudge = JSON.parse(raw) as { call?: string; cancel?: string };
-    if (nudge.cancel) {
-      cancelled.push(nudge.cancel);
-      return;
-    }
-    const callId = nudge.call!;
-    received.push(callId);
-    void (async () => {
-      const stored = storedCallSchema.parse(
-        JSON.parse((await runtime.store.get(callKey(callId)))!),
-      );
-      await behavior(callId, {
-        ack: async () => {
-          await runtime.store.set(callAckKey(callId), "1", 60);
-          await runtime.store.publish(
-            replyChannel(stored.replyTo),
-            JSON.stringify({ callId, kind: "ack" }),
-          );
-        },
-        result: async (result) => {
-          await runtime.store.set(
-            resultKey(callId),
-            JSON.stringify({ instanceId, ...result }),
-            RESULT_TTL_SECONDS,
-          );
-          await runtime.store.publish(
-            replyChannel(stored.replyTo),
-            JSON.stringify({ callId, kind: "result" }),
-          );
-        },
-        gone: async () => {
-          await runtime.registry.deregister({
-            projectId,
-            instanceId,
-            agentIds,
-          });
-          await runtime.store.publish(
-            INSTANCE_GONE_CHANNEL,
-            JSON.stringify({ instanceId, projectId }),
-          );
-        },
-      });
-    })();
-  });
+  const unsubscribe = await runtime.store.subscribe(
+    instanceChannel(projectId, instanceId),
+    (raw) => {
+      const nudge = JSON.parse(raw) as { call?: string; cancel?: string };
+      if (nudge.cancel) {
+        cancelled.push(nudge.cancel);
+        return;
+      }
+      const callId = nudge.call!;
+      received.push(callId);
+      void (async () => {
+        const stored = storedCallSchema.parse(
+          JSON.parse((await runtime.store.get(callKey(projectId, callId)))!),
+        );
+        await behavior(callId, {
+          ack: async () => {
+            await runtime.store.set(callAckKey(projectId, callId), "1", 60);
+            await runtime.store.publish(
+              replyChannel(stored.replyTo),
+              JSON.stringify({ callId, kind: "ack" }),
+            );
+          },
+          result: async (result) => {
+            await runtime.store.set(
+              resultKey(projectId, callId),
+              JSON.stringify({ instanceId, ...result }),
+              RESULT_TTL_SECONDS,
+            );
+            await runtime.store.publish(
+              replyChannel(stored.replyTo),
+              JSON.stringify({ callId, kind: "result" }),
+            );
+          },
+          gone: async () => {
+            await runtime.registry.deregister({
+              projectId,
+              instanceId,
+              agentIds,
+            });
+            await runtime.store.publish(
+              INSTANCE_GONE_CHANNEL,
+              JSON.stringify({ instanceId, projectId }),
+            );
+          },
+        });
+      })();
+    },
+  );
   cleanups.push(unsubscribe);
   return { received, cancelled };
 }
@@ -376,7 +379,7 @@ describe("CallDispatcher", () => {
         maxConcurrency: 1,
         behavior: async () => {},
       });
-      await runtime.registry.incrementInflight("inst_1");
+      await runtime.registry.incrementInflight({ projectId, instanceId: "inst_1" });
 
       await expect(
         runtime.dispatcher.dispatch({
@@ -399,7 +402,7 @@ describe("CallDispatcher", () => {
         maxConcurrency: 2,
         behavior: async () => {},
       });
-      await runtime.registry.incrementInflight("inst_busy");
+      await runtime.registry.incrementInflight({ projectId, instanceId: "inst_busy" });
       const idle = await connectInstance({
         instanceId: "inst_idle",
         maxConcurrency: 2,

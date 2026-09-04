@@ -191,11 +191,15 @@ export class ConnectGateway {
     };
     this.sessions.add(session);
     session.unsubscribe = await this.core.runtime.store.subscribe(
-      instanceChannel(info.instanceId),
+      instanceChannel(info.projectId, info.instanceId),
       (message) => void this.onInstanceNudge(session, message),
     );
 
-    ws.on("message", (data) => void this.onFrame(session, data));
+    ws.on("message", (data) => {
+      void this.onFrame(session, data).catch((error: unknown) => {
+        logger.warn({ error, instanceId: info.instanceId }, "frame refused");
+      });
+    });
     ws.on("pong", () => {
       session.isAlive = true;
       session.pongs += 1;
@@ -223,7 +227,7 @@ export class ConnectGateway {
   /** Sends every call still pending for this instance. */
   private async deliverPending(session: Session): Promise<void> {
     const callIds = await this.core.runtime.store.zrangebyscore(
-      pendingKey(session.info.instanceId),
+      pendingKey(session.info.projectId, session.info.instanceId),
       this.core.now(),
     );
     for (const callId of callIds) {

@@ -66,7 +66,7 @@ export class InstanceRegistry {
     now?: number;
   }): Promise<void> {
     await this.store.hset(
-      instanceMetaKey(meta.instanceId),
+      instanceMetaKey(meta.projectId, meta.instanceId),
       fieldsOf({ meta, agentIds }),
       PRESENCE_TTL_SECONDS,
     );
@@ -107,24 +107,27 @@ export class InstanceRegistry {
           ttlSeconds: PRESENCE_TTL_SECONDS,
         }),
       ),
-      this.touchMeta({ instanceId, agentIds, meta }),
+      this.touchMeta({ projectId, instanceId, agentIds, meta }),
     ]);
   }
 
   /** Extends the meta hash without rewriting it, or restores it from `meta`. */
   private async touchMeta({
+    projectId,
     instanceId,
     agentIds,
     meta,
   }: {
+    projectId: string;
     instanceId: string;
     agentIds: string[];
     meta: InstanceMeta | undefined;
   }): Promise<void> {
-    const current = await this.store.hgetall(instanceMetaKey(instanceId));
+    const key = instanceMetaKey(projectId, instanceId);
+    const current = await this.store.hgetall(key);
     const fields = current ?? (meta ? fieldsOf({ meta, agentIds }) : null);
     if (fields) {
-      await this.store.hset(instanceMetaKey(instanceId), fields, PRESENCE_TTL_SECONDS);
+      await this.store.hset(key, fields, PRESENCE_TTL_SECONDS);
     }
   }
 
@@ -149,7 +152,7 @@ export class InstanceRegistry {
         this.store.zaddLowerIfPresent(instanceSetKey(projectId, agentId), retiredScore, instanceId),
       ),
     );
-    await this.store.del(instanceMetaKey(instanceId));
+    await this.store.del(instanceMetaKey(projectId, instanceId));
   }
 
   /** The live instances of one agent, with their in-flight counts. */
@@ -169,8 +172,8 @@ export class InstanceRegistry {
     const live = await Promise.all(
       instanceIds.map(async (instanceId) => {
         const [fields, inflightRaw] = await Promise.all([
-          this.store.hgetall(instanceMetaKey(instanceId)),
-          this.store.get(inflightKey(instanceId)),
+          this.store.hgetall(instanceMetaKey(projectId, instanceId)),
+          this.store.get(inflightKey(projectId, instanceId)),
         ]);
         if (!fields) return null;
         return {
@@ -200,17 +203,35 @@ export class InstanceRegistry {
   }
 
   /** The agent ids one instance registered, read off its meta hash. */
-  async agentIdsOf(instanceId: string): Promise<string[]> {
-    const fields = await this.store.hgetall(instanceMetaKey(instanceId));
+  async agentIdsOf({
+    projectId,
+    instanceId,
+  }: {
+    projectId: string;
+    instanceId: string;
+  }): Promise<string[]> {
+    const fields = await this.store.hgetall(instanceMetaKey(projectId, instanceId));
     return fields?.agentIds ? fields.agentIds.split(",").filter(Boolean) : [];
   }
 
-  async incrementInflight(instanceId: string): Promise<number> {
-    return this.store.incr(inflightKey(instanceId), INFLIGHT_TTL_SECONDS);
+  async incrementInflight({
+    projectId,
+    instanceId,
+  }: {
+    projectId: string;
+    instanceId: string;
+  }): Promise<number> {
+    return this.store.incr(inflightKey(projectId, instanceId), INFLIGHT_TTL_SECONDS);
   }
 
-  async decrementInflight(instanceId: string): Promise<number> {
-    return this.store.decr(inflightKey(instanceId));
+  async decrementInflight({
+    projectId,
+    instanceId,
+  }: {
+    projectId: string;
+    instanceId: string;
+  }): Promise<number> {
+    return this.store.decr(inflightKey(projectId, instanceId));
   }
 }
 

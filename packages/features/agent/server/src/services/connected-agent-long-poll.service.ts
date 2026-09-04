@@ -194,7 +194,7 @@ export class LongPollTransport {
     // out again, the way a socket re-register skips them.
     for (const callId of frame.instance.inFlightCallIds) {
       await this.core.runtime.store.setIfAbsent(
-        callDeliveredKey(callId),
+        callDeliveredKey(session.projectId, callId),
         "1",
         DELIVERED_TTL_SECONDS,
       );
@@ -300,8 +300,8 @@ export class LongPollTransport {
   /** Releases every waiting poll and every watch; sessions stay in the store. */
   async close(): Promise<void> {
     this.closed = true;
-    for (const [instanceId, watch] of this.watches) {
-      this.watches.delete(instanceId);
+    for (const [watchKey, watch] of this.watches) {
+      this.watches.delete(watchKey);
       clearTimeout(watch.expiry);
       for (const waiter of watch.waiters) waiter({ cancel: "" });
       await watch.unsubscribe();
@@ -327,7 +327,9 @@ export class LongPollTransport {
   }): Promise<{ session: SessionInfo; stored: StoredSession }> {
     const resolved = await this.core.authenticate(credentials);
     if (!token) throw new AgentSessionUnknownError();
-    const raw = await this.core.runtime.store.get(httpSessionKey(token));
+    // Read under the credential's own project: a token minted in another
+    // project names no session here, whatever instance it registered.
+    const raw = await this.core.runtime.store.get(httpSessionKey(resolved.project.id, token));
     if (!raw) throw new AgentSessionUnknownError();
     const parsed = storedSessionSchema.safeParse(JSON.parse(raw));
     if (!parsed.success || parsed.data.projectId !== resolved.project.id) {
@@ -348,7 +350,7 @@ export class LongPollTransport {
 
   private async saveSession(stored: StoredSession): Promise<void> {
     await this.core.runtime.store.set(
-      httpSessionKey(stored.token),
+      httpSessionKey(stored.projectId, stored.token),
       JSON.stringify(stored),
       HTTP_SESSION_TTL_SECONDS,
     );
@@ -373,16 +375,23 @@ export class LongPollTransport {
   }): Promise<(CallFrame | CancelFrame)[]> {
     const store = this.core.runtime.store;
     const frames: (CallFrame | CancelFrame)[] = [];
-    const pending = await store.zrangebyscore(pendingKey(session.instanceId), this.core.now());
+    const pending = await store.zrangebyscore(
+      pendingKey(session.projectId, session.instanceId),
+      this.core.now(),
+    );
     for (const callId of pending) {
       if (inFlight.has(callId)) continue;
-      const claimed = await store.setIfAbsent(callDeliveredKey(callId), "1", DELIVERED_TTL_SECONDS);
+      const claimed = await store.setIfAbsent(
+        callDeliveredKey(session.projectId, callId),
+        "1",
+        DELIVERED_TTL_SECONDS,
+      );
       if (!claimed) continue;
       const call = await this.core.readCallForSession(session, callId);
       if (call) frames.push(this.core.callFrame(call));
     }
     for (const callId of inFlight) {
-      if (await store.get(callKey(callId))) continue;
+      if (await store.get(callKey(session.projectId, callId))) continue;
       // The dispatcher deletes the envelope when it cancels a call.
       frames.push({ type: "cancel", protocol: PROTOCOL_VERSION, callId });
     }
@@ -420,7 +429,8 @@ export class LongPollTransport {
 
   /** Subscribes this pod to the instance's channel, or extends the watch it holds. */
   private async ensureWatch(session: SessionInfo): Promise<Watch> {
-    const existing = this.watches.get(session.instanceId);
+    const watchKey = watchKeyOf(session);
+    const existing = this.watches.get(watchKey);
     if (existing) {
       existing.session = session;
       existing.expiry.refresh();
@@ -430,12 +440,12 @@ export class LongPollTransport {
       session,
       unsubscribe: async () => undefined,
       waiters: new Set(),
-      expiry: setTimeout(() => void this.expireWatch(session.instanceId), this.watchTtlMs),
+      expiry: setTimeout(() => void this.expireWatch(watchKey), this.watchTtlMs),
     };
     watch.expiry.unref();
-    this.watches.set(session.instanceId, watch);
+    this.watches.set(watchKey, watch);
     watch.unsubscribe = await this.core.runtime.store.subscribe(
-      instanceChannel(session.instanceId),
+      instanceChannel(session.projectId, session.instanceId),
       (raw) => {
         let nudge: InstanceNudge;
         try {
@@ -454,31 +464,41 @@ export class LongPollTransport {
    * is gone and the calls it held fail now; otherwise only this pod's
    * watch is dropped.
    */
-  private async expireWatch(instanceId: string): Promise<void> {
-    const watch = this.watches.get(instanceId);
+  private async expireWatch(watchKey: string): Promise<void> {
+    const watch = this.watches.get(watchKey);
     if (!watch) return;
-    this.watches.delete(instanceId);
+    this.watches.delete(watchKey);
     await watch.unsubscribe();
-    const live = await this.core.runtime.store.hgetall(instanceMetaKey(instanceId));
+    const { projectId, instanceId } = watch.session;
+    const live = await this.core.runtime.store.hgetall(instanceMetaKey(projectId, instanceId));
     if (live) return;
-    const pending = await this.core.runtime.store.zrangebyscore(pendingKey(instanceId), 0);
+    const pending = await this.core.runtime.store.zrangebyscore(
+      pendingKey(projectId, instanceId),
+      0,
+    );
     logger.info({ instanceId }, "instance stopped polling, retiring it");
     await this.core.retire(watch.session, pending);
   }
 
   private async deregister(stored: StoredSession, session: SessionInfo): Promise<void> {
     const store = this.core.runtime.store;
-    await store.del(httpSessionKey(stored.token));
-    const watch = this.watches.get(session.instanceId);
+    await store.del(httpSessionKey(stored.projectId, stored.token));
+    const watchKey = watchKeyOf(session);
+    const watch = this.watches.get(watchKey);
     if (watch) {
-      this.watches.delete(session.instanceId);
+      this.watches.delete(watchKey);
       clearTimeout(watch.expiry);
       for (const waiter of watch.waiters) waiter({ cancel: "" });
       await watch.unsubscribe();
     }
-    const pending = await store.zrangebyscore(pendingKey(session.instanceId), 0);
+    const pending = await store.zrangebyscore(pendingKey(session.projectId, session.instanceId), 0);
     await this.core.retire(session, pending);
   }
+}
+
+/** A watch is per instance of one project: the instance id is client-chosen. */
+function watchKeyOf(session: SessionInfo): string {
+  return `${session.projectId}:${session.instanceId}`;
 }
 
 /**

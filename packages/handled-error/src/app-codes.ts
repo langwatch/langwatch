@@ -23,6 +23,7 @@
 export const APP_ERROR_CODES = [
   "agent_busy",
   "agent_call_failed",
+  "agent_call_foreign_project",
   "agent_call_timeout",
   "agent_dev_tunnel_unreachable",
   "agent_disconnected",
@@ -252,6 +253,9 @@ export const APP_ERROR_CODES = [
   "license_signing_key_not_pem",
   "lite_member_restricted",
   "lite_member_viewer_only",
+  "live_stream_cross_site_blocked",
+  "live_stream_not_found",
+  "live_stream_unsupported_procedure",
   "llm_upstream_error",
   "lwql_granularity_parameter_type",
   "lwql_granularity_requires_window",

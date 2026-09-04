@@ -537,6 +537,11 @@ const presentations = {
     describe: () =>
       "The decorated function raised an error. The process logs carry the stack, and the run shows what it said.",
   },
+  agent_call_foreign_project: {
+    title: "This call belongs to another project",
+    describe: () =>
+      "The connected agent instance answering this call is registered in a different project, so the answer was not accepted. Let the SDK choose the instance name, or give the process its own.",
+  },
   agent_disconnected: {
     title: "The agent disconnected mid-call",
     describe: () =>
@@ -1298,6 +1303,25 @@ const presentations = {
       const scope = teamName ? ` in "${teamName}"` : "";
       return `A Lite Member seat allows the Viewer role only${scope}. Leave the role as Viewer, or move them to a full member seat to give them more.`;
     },
+  },
+  live_stream_cross_site_blocked: {
+    // fault: customer. A live update channel is opened by the app itself; a
+    // request that arrives from another site is either a stale bookmark or an
+    // attempt to open one on the person's behalf.
+    title: "This live update channel can only be opened from LangWatch",
+    describe: () => "Open the page in LangWatch and the live updates start on their own.",
+  },
+  live_stream_not_found: {
+    // fault: customer. The address is wrong, which the caller can fix.
+    title: "There is nothing to stream at that address",
+    describe: () => "Check the name of the live update channel and try again.",
+  },
+  live_stream_unsupported_procedure: {
+    // fault: customer. The address exists but is not a live update channel, so
+    // the caller wanted the regular API instead.
+    title: "That is not a live update channel",
+    describe: () =>
+      "Only live updates can be streamed. Call this one through the regular API instead.",
   },
   already_organization_member: {
     // An invite form takes several addresses at once, so the address has to be

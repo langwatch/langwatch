@@ -214,6 +214,25 @@ export class AgentSessionUnknownError extends HandledError {
   }
 }
 
+/**
+ * A session named a call that belongs to another project. The instance id is
+ * client-chosen, so this is the fence that keeps one project's calls out of
+ * another project's session.
+ */
+export class AgentCallForeignProjectError extends HandledError {
+  declare readonly code: "agent_call_foreign_project";
+
+  constructor({ callId }: { callId: string }) {
+    super("agent_call_foreign_project", "This call belongs to another project.", {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { callId },
+      ...remediation("agent_call_foreign_project"),
+    });
+    this.name = "AgentCallForeignProjectError";
+  }
+}
+
 /** A body, a result or a session is above its cap. */
 export class AgentPayloadTooLargeError extends HandledError {
   declare readonly code: "agent_payload_too_large";

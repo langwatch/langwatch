@@ -646,3 +646,41 @@ Feature: Connected agents
       When it posts a body above the frame cap
       Then it is refused with "agent_payload_too_large"
       And the message names the limit and no measured size
+
+  # ---------------------------------------------------------------------------
+  # Project isolation
+  # ---------------------------------------------------------------------------
+
+  Rule: An instance only ever reaches the calls of its own project
+
+    # The instance id travels in the register frame, so it is chosen by the
+    # connecting process and is not unique across projects. Every key of an
+    # instance, a call and a session therefore carries the project id, and a
+    # frame that names a call of another project is refused rather than taken.
+
+    @unit
+    Scenario: A call key of one project never names another project's call
+      Given the same call id in two projects
+      When the key of each call is built
+      Then the two keys differ
+      And each key carries its own project id
+
+    @unit
+    Scenario: An ack for a call of another project is refused
+      Given an instance registered in one project with the instance id of another project's instance
+      When it acknowledges a call that belongs to the other project
+      Then the frame is refused with "agent_call_foreign_project"
+      And the call is not marked as started
+
+    @unit
+    Scenario: An ack for a call of the instance's own project is taken
+      Given an instance with a call of its own project waiting for it
+      When it acknowledges that call
+      Then the call is marked as started
+
+    @unit
+    Scenario: A poll from another project leaves the calls of an instance untouched
+      Given a call parked for an instance of one project
+      When a process of another project polls with the same instance id
+      Then the poll answers with no frame
+      And the parked call is still waiting and carries no result
