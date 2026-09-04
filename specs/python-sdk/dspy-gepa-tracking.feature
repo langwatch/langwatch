@@ -69,3 +69,16 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
     Given examples buffered through track_metric
     When log_step is called without examples
     Then the step carries the buffered examples and the buffer is empty afterwards
+
+  @unit
+  Scenario: A step that could not be sent goes out with the next one
+    Given the platform answers 502 to the step post
+    When log_step is called and the post fails after its retries
+    Then the step stays in the buffer
+    And the next log_step that gets through posts both steps
+
+  @unit
+  Scenario: The steps a failed post left behind are sent when the run ends
+    Given a step still in the buffer after a failed post
+    When GEPA reports on_optimization_end
+    Then the buffered steps are posted and the buffer is empty

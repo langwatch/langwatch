@@ -25,7 +25,7 @@ from dspy.teleprompt import (
     GEPA,
 )
 import dspy.teleprompt.copro_optimizer as copro_optimizer
-from gepa.core.callbacks import ValsetEvaluatedEvent
+from gepa.core.callbacks import OptimizationEndEvent, ValsetEvaluatedEvent
 from dspy.signatures.signature import SignatureMeta
 from dspy.primitives.prediction import Prediction, Completions
 from dspy.primitives.example import Example
@@ -394,7 +394,7 @@ class LangWatchDSPy:
         self.llm_calls_buffer = []
         self.send_steps()
 
-    @retry(tries=3, delay=0.5)
+    @retry(tries=5, delay=1, backoff=2)
     def send_steps(self):
         data_list = json.loads(
             json.dumps(self.steps_buffer, cls=SerializableAndPydanticEncoder)
@@ -807,6 +807,11 @@ class LangWatchGEPACallback:
         self.optimizer = optimizer
         self.student = student
         self.valset = valset
+
+    def on_optimization_end(self, event: OptimizationEndEvent) -> None:
+        """Send the steps a failed post left behind, once the run is over."""
+        if langwatch_dspy.steps_buffer:
+            langwatch_dspy.send_steps()
 
     def on_valset_evaluated(self, event: ValsetEvaluatedEvent) -> None:
         langwatch_dspy.log_step(
