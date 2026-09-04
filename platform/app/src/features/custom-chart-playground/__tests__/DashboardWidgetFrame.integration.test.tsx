@@ -62,7 +62,10 @@ describe("a placed dashboard widget", () => {
     periodMock.mockReturnValue(period(1_000, 2_000));
     executorMock.mockReturnValue({
       executeQuery: vi.fn(),
-      params: { timeWindow: { start: 1_000, end: 2_000 }, granularitySeconds: 3600 },
+      params: {
+        timeWindow: { start: 1_000, end: 2_000 },
+        granularitySeconds: 3600,
+      },
     });
 
     render(
@@ -71,16 +74,15 @@ describe("a placed dashboard widget", () => {
           id="graph_1"
           graph={GRAPH}
           projectId="project_1"
+          projectSlug="proj"
           maxHeight={300}
         />
       </ChakraProvider>,
     );
 
-    expect(executorMock).toHaveBeenCalledWith(
-      "project_1",
-      GRAPH.queries,
-      { timeWindow: { start: 1_000, end: 2_000 } },
-    );
+    expect(executorMock).toHaveBeenCalledWith("project_1", GRAPH.queries, {
+      timeWindow: { start: 1_000, end: 2_000 },
+    });
   });
 
   /** @scenario "A placed dashboard widget follows the dashboard's period control" */
@@ -88,7 +90,10 @@ describe("a placed dashboard widget", () => {
     periodMock.mockReturnValue(period(1_000, 2_000));
     executorMock.mockReturnValue({
       executeQuery: vi.fn(),
-      params: { timeWindow: { start: 1_000, end: 2_000 }, granularitySeconds: 3600 },
+      params: {
+        timeWindow: { start: 1_000, end: 2_000 },
+        granularitySeconds: 3600,
+      },
     });
 
     const { rerender } = render(
@@ -97,6 +102,7 @@ describe("a placed dashboard widget", () => {
           id="graph_1"
           graph={GRAPH}
           projectId="project_1"
+          projectSlug="proj"
           maxHeight={300}
         />
       </ChakraProvider>,
@@ -109,15 +115,14 @@ describe("a placed dashboard widget", () => {
           id="graph_1"
           graph={GRAPH}
           projectId="project_1"
+          projectSlug="proj"
           maxHeight={300}
         />
       </ChakraProvider>,
     );
 
-    expect(executorMock).toHaveBeenLastCalledWith(
-      "project_1",
-      GRAPH.queries,
-      { timeWindow: { start: 5_000, end: 9_000 } },
-    );
+    expect(executorMock).toHaveBeenLastCalledWith("project_1", GRAPH.queries, {
+      timeWindow: { start: 5_000, end: 9_000 },
+    });
   });
 });

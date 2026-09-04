@@ -18,9 +18,9 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import {
+  type QueryParameterRowVM,
   QueryParametersPanel,
   reservedPrefixProblem,
-  type QueryParameterRowVM,
 } from "~/components/analytics/QueryParametersPanel";
 import { RESERVED_PARAMETERS } from "~/server/analytics/dashboardWidgetDefinition";
 

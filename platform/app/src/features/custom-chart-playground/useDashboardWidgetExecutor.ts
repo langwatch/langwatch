@@ -23,12 +23,13 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { createLangWatchQLExecute } from "~/features/analytics-query/logic/lwqlExecute";
+import type { LangWatchQLParameterValue } from "~/features/analytics-query/logic/lwqlRequestState";
 import { explainAnyError, readHandledError } from "~/features/errors";
-import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import {
   type DashboardWidgetQuery,
   validateDashboardWidgetQueryParams,
 } from "~/server/analytics/dashboardWidgetDefinition";
+import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import { api } from "~/utils/api";
 
 import type {
@@ -80,7 +81,8 @@ export function useDashboardWidgetExecutor(
     return { start: end - 24 * 60 * 60 * 1000, end };
   });
   const pageWindow = overrides?.timeWindow ?? mountWindow;
-  const granularitySeconds = overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
+  const granularitySeconds =
+    overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
   const execute = useMemo(
     () => createLangWatchQLExecute({ utils, projectId }),
     [utils, projectId],
@@ -94,7 +96,7 @@ export function useDashboardWidgetExecutor(
   const runValidated = useCallback(
     async (
       query: Pick<DashboardWidgetQuery, "sql">,
-      params: Readonly<Record<string, unknown>>,
+      params: Readonly<Record<string, LangWatchQLParameterValue>>,
       signal?: AbortSignal,
     ): Promise<ChartQueryResult> => {
       const result = await execute(

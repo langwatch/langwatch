@@ -189,7 +189,9 @@ describe("given a statement and the window a surface is showing", () => {
     /** @scenario "A statement declaring only one reserved period parameter is given that one" */
     it("binds the one it declared and sends no value for the other", () => {
       const resolved = resolveLangWatchQLTimeWindow({
-        declared: [{ name: "dashboard_context_period_start", type: "DateTime" }],
+        declared: [
+          { name: "dashboard_context_period_start", type: "DateTime" },
+        ],
         timeWindow: WINDOW,
       });
 
@@ -291,7 +293,9 @@ describe("given a request that reaches for a name the surface owns", () => {
         });
 
       expect(codeOf(run)).toBe("lwql_reserved_parameter_supplied");
-      expect(metaOf(run)).toEqual({ parameters: ["dashboard_context_period_start"] });
+      expect(metaOf(run)).toEqual({
+        parameters: ["dashboard_context_period_start"],
+      });
     });
 
     /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
@@ -312,12 +316,16 @@ describe("given a request that reaches for a name the surface owns", () => {
     it("refuses, naming the declaration to rewrite", () => {
       const run = () =>
         resolveLangWatchQLTimeWindow({
-          declared: [{ name: "dashboard_context_period_start", type: "String" }],
+          declared: [
+            { name: "dashboard_context_period_start", type: "String" },
+          ],
           timeWindow: WINDOW,
         });
 
       expect(codeOf(run)).toBe("lwql_reserved_parameter_type");
-      expect(metaOf(run)).toEqual({ parameters: ["dashboard_context_period_start"] });
+      expect(metaOf(run)).toEqual({
+        parameters: ["dashboard_context_period_start"],
+      });
     });
 
     /**
@@ -329,8 +337,12 @@ describe("given a request that reaches for a name the surface owns", () => {
       expect(
         codeOf(() =>
           resolveLangWatchQLTimeWindow({
-            declared: [{ name: "dashboard_context_period_start", type: "String" }],
-            parameters: { dashboard_context_period_start: "2020-01-01 00:00:00" },
+            declared: [
+              { name: "dashboard_context_period_start", type: "String" },
+            ],
+            parameters: {
+              dashboard_context_period_start: "2020-01-01 00:00:00",
+            },
           }),
         ),
       ).toBe("lwql_reserved_parameter_type");

@@ -79,24 +79,15 @@ vi.mock(
   }),
 );
 
-vi.mock(
-  "~/features/custom-chart-playground/DashboardWidgetFrame",
-  () => ({
-    DashboardWidgetFrame: ({
-      id,
-      graph,
-    }: {
-      id: string;
-      graph: unknown;
-    }) => (
-      <div
-        data-testid="dashboard-widget"
-        data-id={id}
-        data-graph={JSON.stringify(graph)}
-      />
-    ),
-  }),
-);
+vi.mock("~/features/custom-chart-playground/DashboardWidgetFrame", () => ({
+  DashboardWidgetFrame: ({ id, graph }: { id: string; graph: unknown }) => (
+    <div
+      data-testid="dashboard-widget"
+      data-id={id}
+      data-graph={JSON.stringify(graph)}
+    />
+  ),
+}));
 
 import {
   DASHBOARD_SRCDOC_CHART_KIND,
@@ -263,9 +254,7 @@ describe("a dashboard grid card", () => {
         DASHBOARD_WIDGET_PAYLOAD,
       );
       expect(screen.queryByTestId("builder-graph")).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("workbench-widget"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("workbench-widget")).not.toBeInTheDocument();
     });
 
     /** @scenario "A dashboard widget card is not offered an alert it cannot evaluate" */

@@ -226,8 +226,12 @@ describe("the LangWatchQL schema browser", () => {
       it("names both reserved parameters and the half-open interval they describe", () => {
         renderBrowser();
 
-        const note = screen.getByText(/Declare \{dashboard_context_period_start:DateTime\}/);
-        expect(note).toHaveTextContent("{dashboard_context_period_end:DateTime}");
+        const note = screen.getByText(
+          /Declare \{dashboard_context_period_start:DateTime\}/,
+        );
+        expect(note).toHaveTextContent(
+          "{dashboard_context_period_end:DateTime}",
+        );
         expect(note).toHaveTextContent(
           ">= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}",
         );

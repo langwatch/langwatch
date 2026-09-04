@@ -6,13 +6,13 @@
  */
 
 import {
+  type QueryParameterRowVM,
   QueryParametersPanel,
   reservedPrefixProblem,
-  type QueryParameterRowVM,
 } from "~/components/analytics/QueryParametersPanel";
 import {
-  RESERVED_PARAMETERS,
   type DashboardWidgetQueryParameterDeclaration,
+  RESERVED_PARAMETERS,
 } from "~/server/analytics/dashboardWidgetDefinition";
 
 const TYPE_OPTIONS = [

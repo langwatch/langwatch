@@ -61,6 +61,7 @@ import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/la
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { featureFlagService } from "~/server/featureFlag";
+import type { FeatureFlagKey } from "~/server/featureFlag/registry";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "~/server/prompt-config/prompt.service";
 import { LANGY_SKILLS } from "~/shared/langy/langySkills";
@@ -285,7 +286,10 @@ async function resolveDisabledSkillIds({
     flagsToCheck.map(async (flag) => {
       try {
         if (
-          await featureFlagService.isEnabled(flag, {
+          // `flag` comes from a skill's own generated `feature-flag`
+          // front-matter (a plain string at the JSON boundary) — not a
+          // literal, so it can't be typed as `FeatureFlagKey` at its source.
+          await featureFlagService.isEnabled(flag as FeatureFlagKey, {
             distinctId: userId,
             projectId,
             organizationId,

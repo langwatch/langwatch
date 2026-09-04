@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 /**
  * Seed realistic synthetic traffic through the real collector so analytics
  * charts look alive on a dev box.
@@ -160,7 +161,10 @@ const LABEL_SETS = [
 ];
 
 const USERS = Array.from({ length: 18 }, (_, i) => `demo-user-${i + 1}`);
-const CUSTOMERS = Array.from({ length: 10 }, (_, i) => `demo-customer-${i + 1}`);
+const CUSTOMERS = Array.from(
+  { length: 10 },
+  (_, i) => `demo-customer-${i + 1}`,
+);
 
 // pre-build a pool of threads (some multi-trace) to feed avg-traces/thread
 const THREAD_POOL = Array.from({ length: 120 }, (_, i) => ({

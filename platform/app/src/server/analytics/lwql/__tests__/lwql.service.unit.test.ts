@@ -518,7 +518,9 @@ describe("given the LangWatchQL service", () => {
       }
 
       expect(
-        executor.calls.map((call) => call.parameters?.dashboard_context_period_start),
+        executor.calls.map(
+          (call) => call.parameters?.dashboard_context_period_start,
+        ),
       ).toEqual(["2026-02-20 00:00:00", "2026-03-20 00:00:00"]);
     });
 
@@ -536,7 +538,9 @@ describe("given the LangWatchQL service", () => {
         });
 
       expect(await codeOf(run)).toBe("lwql_reserved_parameter_supplied");
-      expect(await metaOf(run)).toEqual({ parameters: ["dashboard_context_period_start"] });
+      expect(await metaOf(run)).toEqual({
+        parameters: ["dashboard_context_period_start"],
+      });
       expect(
         executor.calls,
         "a chart that pinned its own window reached the database",
@@ -597,7 +601,12 @@ describe("given the LangWatchQL service", () => {
             sql: PERIOD_SQL,
           }),
         ),
-      ).toEqual({ parameters: ["dashboard_context_period_end", "dashboard_context_period_start"] });
+      ).toEqual({
+        parameters: [
+          "dashboard_context_period_end",
+          "dashboard_context_period_start",
+        ],
+      });
       expect(executor.calls).toHaveLength(0);
 
       // Saving is not running: the window belongs to whoever later renders the

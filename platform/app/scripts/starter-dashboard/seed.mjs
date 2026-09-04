@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 /**
  * Starter dashboard: one-shot populates an "Analytics starter" dashboard
  * with 8 widgets pulled from the north-star-widgets and legacy-parity-widgets
@@ -123,7 +124,9 @@ async function ensureWidgets(items) {
   for (const { pack, file, definition } of items) {
     const existing = existingByName.get(definition.name);
     if (existing) {
-      console.log(`skip   ${pack}/${file} — "${definition.name}" already exists`);
+      console.log(
+        `skip   ${pack}/${file} — "${definition.name}" already exists`,
+      );
       results.push(existing);
       continue;
     }
@@ -132,7 +135,9 @@ async function ensureWidgets(items) {
       code: definition.code,
       queries: definition.queries,
     });
-    console.log(`create ${pack}/${file} — "${definition.name}" -> ${created.id}`);
+    console.log(
+      `create ${pack}/${file} — "${definition.name}" -> ${created.id}`,
+    );
     results.push(created);
   }
   return results;

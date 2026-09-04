@@ -12,7 +12,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   ChartFrameDashboardContext,
   ChartFrameParamsSnapshot,
-  ChartFrameTheme,
 } from "./bridge/bridgeProtocol";
 import {
   CHART_FRAME_MAX_HEIGHT_PX,

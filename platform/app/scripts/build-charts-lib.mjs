@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Bundles `src/features/custom-chart-playground/bridge/chartsLib/index.ts`
  * into a plain-JS IIFE string and writes it as the generated
@@ -64,7 +65,9 @@ export function buildChartsLibScript(): string {
 `;
 
   writeFileSync(OUT_FILE, source);
-  console.log(`Wrote ${path.relative(APP, OUT_FILE)} (${script.length} bytes bundled)`);
+  console.log(
+    `Wrote ${path.relative(APP, OUT_FILE)} (${script.length} bytes bundled)`,
+  );
 }
 
 main().catch((error) => {

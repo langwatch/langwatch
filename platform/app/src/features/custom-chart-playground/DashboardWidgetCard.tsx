@@ -61,7 +61,10 @@ const noopLog = () => {
 };
 
 /** Cheap and correct at this scale: a widget's queries are a handful of small objects. */
-function queriesEqual(a: DashboardWidgetQuery[], b: DashboardWidgetQuery[]): boolean {
+function queriesEqual(
+  a: DashboardWidgetQuery[],
+  b: DashboardWidgetQuery[],
+): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
@@ -146,8 +149,12 @@ export function DashboardWidgetCard({
     return () => clearTimeout(timer);
   }, [draftCode, draftQueries]);
 
-  const { executeQuery, runStandalone, params: hostParams, lastRuns } =
-    useDashboardWidgetExecutor(projectId, previewQueries, { timeWindow });
+  const {
+    executeQuery,
+    runStandalone,
+    params: hostParams,
+    lastRuns,
+  } = useDashboardWidgetExecutor(projectId, previewQueries, { timeWindow });
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 
   // Known host-side at this boundary, mirroring DashboardWidgetFrame's own
@@ -163,7 +170,14 @@ export function DashboardWidgetCard({
       projectId,
       widgetName: widget.name,
     }),
-    [hostParams, colorMode, widget.id, widget.dashboardId, projectId, widget.name],
+    [
+      hostParams,
+      colorMode,
+      widget.id,
+      widget.dashboardId,
+      projectId,
+      widget.name,
+    ],
   );
 
   // Every declared parameter's default, deduped by name across the widget's

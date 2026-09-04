@@ -509,7 +509,9 @@ describe("the LangWatchQL workbench", () => {
         expect(
           within(parameters).queryByText("Give these parameters a value"),
         ).toBeNull();
-        expect(parameters).not.toHaveTextContent("dashboard_context_granularity_seconds");
+        expect(parameters).not.toHaveTextContent(
+          "dashboard_context_granularity_seconds",
+        );
       });
 
       /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
@@ -517,7 +519,9 @@ describe("the LangWatchQL workbench", () => {
         harness.mutation.mockRejectedValue(
           handledErrorEnvelope({
             code: "lwql_parameter_missing",
-            meta: { parameters: ["dashboard_context_granularity_seconds", "since"] },
+            meta: {
+              parameters: ["dashboard_context_granularity_seconds", "since"],
+            },
           }),
         );
 
@@ -531,7 +535,9 @@ describe("the LangWatchQL workbench", () => {
         // reserved name must not take the rest of the refusal with it.
         expect(alert).toHaveTextContent("Give these parameters a value");
         expect(alert).toHaveTextContent("since");
-        expect(alert).not.toHaveTextContent("dashboard_context_granularity_seconds");
+        expect(alert).not.toHaveTextContent(
+          "dashboard_context_granularity_seconds",
+        );
       });
 
       /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
@@ -768,7 +774,9 @@ describe("the LangWatchQL workbench", () => {
           harness.mutation.mockRejectedValue(
             handledErrorEnvelope({
               code: "lwql_parameter_missing",
-              meta: { parameters: ["dashboard_context_granularity_seconds", "since"] },
+              meta: {
+                parameters: ["dashboard_context_granularity_seconds", "since"],
+              },
             }),
           );
           fireEvent.click(screen.getByRole("button", { name: "Run query" }));
@@ -783,7 +791,9 @@ describe("the LangWatchQL workbench", () => {
           const alert = await within(parameters).findByRole("alert");
           expect(alert).toHaveTextContent("Give these parameters a value");
           expect(alert).toHaveTextContent("since");
-          expect(alert).not.toHaveTextContent("dashboard_context_granularity_seconds");
+          expect(alert).not.toHaveTextContent(
+            "dashboard_context_granularity_seconds",
+          );
         });
       });
     });
@@ -793,12 +803,12 @@ describe("the LangWatchQL workbench", () => {
       it("shows that window in the spelling the database is bound with", async () => {
         await renderWorkbench();
 
-        expect(screen.getByLabelText("dashboard_context_period_start")).toHaveValue(
-          "2026-02-20 00:00:00",
-        );
-        expect(screen.getByLabelText("dashboard_context_period_end")).toHaveValue(
-          "2026-02-27 00:00:00",
-        );
+        expect(
+          screen.getByLabelText("dashboard_context_period_start"),
+        ).toHaveValue("2026-02-20 00:00:00");
+        expect(
+          screen.getByLabelText("dashboard_context_period_end"),
+        ).toHaveValue("2026-02-27 00:00:00");
       });
 
       /** @scenario "The workbench fills the period parameters from the page's period selector" */
@@ -808,12 +818,12 @@ describe("the LangWatchQL workbench", () => {
           endDate: "2026-03-08T06:30:00.000Z",
         });
 
-        expect(screen.getByLabelText("dashboard_context_period_start")).toHaveValue(
-          "2026-03-01 00:00:00",
-        );
-        expect(screen.getByLabelText("dashboard_context_period_end")).toHaveValue(
-          "2026-03-08 06:30:00",
-        );
+        expect(
+          screen.getByLabelText("dashboard_context_period_start"),
+        ).toHaveValue("2026-03-01 00:00:00");
+        expect(
+          screen.getByLabelText("dashboard_context_period_end"),
+        ).toHaveValue("2026-03-08 06:30:00");
       });
     });
 
@@ -822,9 +832,12 @@ describe("the LangWatchQL workbench", () => {
       it("sends the override on every run, and never as a named parameter", async () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
-        fireEvent.change(screen.getByLabelText("dashboard_context_period_start"), {
-          target: { value: "2026-02-24 09:00:00" },
-        });
+        fireEvent.change(
+          screen.getByLabelText("dashboard_context_period_start"),
+          {
+            target: { value: "2026-02-24 09:00:00" },
+          },
+        );
 
         fireEvent.click(screen.getByRole("button", { name: "Run query" }));
         await screen.findByTestId("lwql-result-summary");
@@ -837,7 +850,9 @@ describe("the LangWatchQL workbench", () => {
         };
         for (const call of harness.mutation.mock.calls) {
           expect(call[1].timeWindow).toEqual(overridden);
-          expect(call[1].parameters ?? {}).not.toHaveProperty("dashboard_context_period_start");
+          expect(call[1].parameters ?? {}).not.toHaveProperty(
+            "dashboard_context_period_start",
+          );
         }
       });
 
@@ -845,9 +860,12 @@ describe("the LangWatchQL workbench", () => {
       it("goes back to the page's period when the override is dropped", async () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
-        fireEvent.change(screen.getByLabelText("dashboard_context_period_start"), {
-          target: { value: "2026-02-24 09:00:00" },
-        });
+        fireEvent.change(
+          screen.getByLabelText("dashboard_context_period_start"),
+          {
+            target: { value: "2026-02-24 09:00:00" },
+          },
+        );
 
         fireEvent.click(
           screen.getByRole("button", { name: "Use the page period" }),
@@ -867,16 +885,22 @@ describe("the LangWatchQL workbench", () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
 
-        fireEvent.change(screen.getByLabelText("dashboard_context_period_start"), {
-          target: { value: "2026-02-30 12:00:00" },
-        });
+        fireEvent.change(
+          screen.getByLabelText("dashboard_context_period_start"),
+          {
+            target: { value: "2026-02-30 12:00:00" },
+          },
+        );
         expect(
           screen.getByRole("button", { name: "Run query" }),
         ).toBeDisabled();
 
-        fireEvent.change(screen.getByLabelText("dashboard_context_period_start"), {
-          target: { value: "2026-02-24 09:00:00" },
-        });
+        fireEvent.change(
+          screen.getByLabelText("dashboard_context_period_start"),
+          {
+            target: { value: "2026-02-24 09:00:00" },
+          },
+        );
         expect(screen.getByRole("button", { name: "Run query" })).toBeEnabled();
       });
     });
@@ -892,9 +916,12 @@ describe("the LangWatchQL workbench", () => {
 
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
-        fireEvent.change(screen.getByLabelText("dashboard_context_period_start"), {
-          target: { value: "2026-02-24 09:00:00" },
-        });
+        fireEvent.change(
+          screen.getByLabelText("dashboard_context_period_start"),
+          {
+            target: { value: "2026-02-24 09:00:00" },
+          },
+        );
         expect(screen.getByText("Set for this query")).toBeInTheDocument();
 
         await userEvent.click(screen.getByTestId("open-saved-chart"));

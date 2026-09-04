@@ -39,11 +39,12 @@ afterEach(() => {
 describe("a card's Edit menu item", () => {
   describe("given a dashboard widget", () => {
     /** @scenario "A dashboard widget card's Edit action opens the playground page" */
-    it("is labelled \"Open in playground\" and navigates to the playground page", async () => {
+    it('is labelled "Open in playground" and navigates to the playground page', async () => {
       const user = userEvent.setup();
       render(
         <GraphCardMenu
           graphId="graph_1"
+          projectId="project_test"
           projectSlug="proj"
           colSpan={1}
           rowSpan={1}
@@ -64,11 +65,12 @@ describe("a card's Edit menu item", () => {
   });
 
   describe("given a workbench chart", () => {
-    it("is labelled \"Open in workbench\" and navigates to the workbench, not the playground", async () => {
+    it('is labelled "Open in workbench" and navigates to the workbench, not the playground', async () => {
       const user = userEvent.setup();
       render(
         <GraphCardMenu
           graphId="graph_1"
+          projectId="project_test"
           projectSlug="proj"
           colSpan={1}
           rowSpan={1}
@@ -89,11 +91,12 @@ describe("a card's Edit menu item", () => {
   });
 
   describe("given a builder graph", () => {
-    it("is labelled \"Edit Graph\" and navigates to the builder editor", async () => {
+    it('is labelled "Edit Graph" and navigates to the builder editor', async () => {
       const user = userEvent.setup();
       render(
         <GraphCardMenu
           graphId="graph_1"
+          projectId="project_test"
           projectSlug="proj"
           colSpan={1}
           rowSpan={1}

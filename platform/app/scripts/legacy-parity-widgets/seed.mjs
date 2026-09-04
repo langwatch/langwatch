@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 /**
  * Seeds the 8 "Legacy: *" parity widgets into a project's custom-chart
  * playground via the REST API, so the golden set can be recreated (or

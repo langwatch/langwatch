@@ -26,8 +26,8 @@ import {
 import { Plus, Trash2 } from "lucide-react";
 
 import {
-  FieldTypeSelect,
   type FieldTypeOption,
+  FieldTypeSelect,
 } from "~/prompts/components/ui/FieldTypeSelect";
 import { VariableTypeIcon } from "~/prompts/components/ui/VariableTypeIcon";
 import {
@@ -220,7 +220,12 @@ export function QueryParametersPanel({
   return (
     <VStack align="stretch" gap={3} width="full">
       <Box>
-        <Text fontSize="11px" fontWeight="600" color="fg.muted" marginBottom={1}>
+        <Text
+          fontSize="11px"
+          fontWeight="600"
+          color="fg.muted"
+          marginBottom={1}
+        >
           Dashboard context · provided by the dashboard · read-only
         </Text>
         <Stack gap={1}>
@@ -237,7 +242,12 @@ export function QueryParametersPanel({
       </Box>
 
       <Box>
-        <Text fontSize="11px" fontWeight="600" color="fg.muted" marginBottom={1}>
+        <Text
+          fontSize="11px"
+          fontWeight="600"
+          color="fg.muted"
+          marginBottom={1}
+        >
           Parameters · declared by you
         </Text>
         <Stack gap={2}>

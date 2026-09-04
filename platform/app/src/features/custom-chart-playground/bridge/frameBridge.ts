@@ -73,7 +73,9 @@ export interface CreateFrameBridgeOptions {
 
 export interface FrameBridge {
   /** Pushes new dashboard context into the frame (`lw:dashboard-context-change`). */
-  postDashboardContextChange(dashboardContext: ChartFrameDashboardContext): void;
+  postDashboardContextChange(
+    dashboardContext: ChartFrameDashboardContext,
+  ): void;
   /** Detaches everything. Safe to call twice. */
   dispose(): void;
 }
@@ -81,8 +83,14 @@ export interface FrameBridge {
 export function createFrameBridge(
   options: CreateFrameBridgeOptions,
 ): FrameBridge {
-  const { iframe, executeQuery, onLog, onHeightChange, onNavigate, onTeardown } =
-    options;
+  const {
+    iframe,
+    executeQuery,
+    onLog,
+    onHeightChange,
+    onNavigate,
+    onTeardown,
+  } = options;
 
   let port: MessagePort | null = null;
   let initialized = false;

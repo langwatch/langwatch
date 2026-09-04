@@ -73,7 +73,8 @@ export type LangWatchQLTimeWindowParameter =
  * and making the multiplier the bound parameter is what leaves the surface
  * one value to inject.
  */
-export const LWQL_PERIOD_GRANULARITY_PARAMETER = "dashboard_context_granularity_seconds";
+export const LWQL_PERIOD_GRANULARITY_PARAMETER =
+  "dashboard_context_granularity_seconds";
 
 /**
  * Every reserved name the surface owns: the two window bounds and the

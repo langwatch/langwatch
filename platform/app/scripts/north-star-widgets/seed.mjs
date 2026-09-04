@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck
 /**
  * North-star: seeds the 10 "North-star: *" widgets into a project's
  * custom-chart playground via the REST API, so the golden set can be

@@ -4,8 +4,8 @@ import {
   DASHBOARD_SRCDOC_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
 } from "~/server/analytics/chartKinds";
-import { lwqlEnabled } from "~/server/analytics/lwql/access";
 import { customChartPlaygroundEnabled } from "~/server/analytics/dashboard-widgets/access";
+import { lwqlEnabled } from "~/server/analytics/lwql/access";
 
 /**
  * The kinds that can sit on a dashboard grid when EVERY optional chart
@@ -63,5 +63,7 @@ export async function placeableKindFilter({
   if (await customChartPlaygroundEnabled({ prisma, projectId })) {
     kinds.push(DASHBOARD_SRCDOC_CHART_KIND);
   }
-  return kinds.length > 1 ? { kind: { in: kinds } } : { kind: BUILDER_CHART_KIND };
+  return kinds.length > 1
+    ? { kind: { in: kinds } }
+    : { kind: BUILDER_CHART_KIND };
 }

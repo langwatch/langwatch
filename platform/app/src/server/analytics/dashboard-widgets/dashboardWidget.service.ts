@@ -32,8 +32,8 @@ import type {
 import { DASHBOARD_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
-  type DashboardWidgetQuery,
   type DashboardWidgetDefinition,
+  type DashboardWidgetQuery,
   dashboardWidgetDefinitionSchema,
 } from "~/server/analytics/dashboardWidgetDefinition";
 

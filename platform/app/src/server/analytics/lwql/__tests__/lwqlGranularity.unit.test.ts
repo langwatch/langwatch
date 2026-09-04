@@ -139,7 +139,10 @@ describe("resolveLangWatchQLGranularity", () => {
     ])("refuses %s at run as well as save", (type) => {
       expect(() =>
         resolveLangWatchQLGranularity({
-          declared: [...PERIOD, { name: "dashboard_context_granularity_seconds", type }],
+          declared: [
+            ...PERIOD,
+            { name: "dashboard_context_granularity_seconds", type },
+          ],
           timeWindow: WINDOW,
           granularitySeconds: 60,
         }),

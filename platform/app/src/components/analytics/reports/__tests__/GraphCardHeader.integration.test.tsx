@@ -59,6 +59,7 @@ function renderHeader({ trigger = null }: RenderOptions = {}) {
         includePrevious: false,
         timeScale: "full",
       }}
+      projectId="project_test"
       projectSlug="proj"
       colSpan={1}
       rowSpan={1}

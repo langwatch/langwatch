@@ -24,6 +24,7 @@
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
+import { env } from "~/env.mjs";
 import { lwqlConnectionFromEnv } from "../server/analytics/lwql/executor";
 import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../server/analytics/lwql/lwqlKeyMap.repository";
 import {
@@ -50,7 +51,6 @@ import {
 } from "../server/analytics/lwql/views";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
-import { env } from "~/env.mjs";
 
 const logger = createLogger("langwatch:task:provisionLwql");
 

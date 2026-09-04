@@ -33,11 +33,11 @@ import { z } from "zod";
 import type { Project } from "~/generated/prisma/client";
 
 import { customChartPlaygroundEnabled } from "~/server/analytics/dashboard-widgets/access";
-import { CustomChartPlaygroundNotEnabledError } from "~/server/analytics/dashboard-widgets/errors";
 import {
   type DashboardWidget,
   DashboardWidgetService,
 } from "~/server/analytics/dashboard-widgets/dashboardWidget.service";
+import { CustomChartPlaygroundNotEnabledError } from "~/server/analytics/dashboard-widgets/errors";
 import { dashboardWidgetQuerySchema } from "~/server/analytics/dashboardWidgetDefinition";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";

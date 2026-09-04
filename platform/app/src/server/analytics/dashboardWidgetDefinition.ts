@@ -75,8 +75,7 @@ export const RESERVED_PARAMETERS = [
   {
     name: "dashboard_context_granularity_seconds",
     type: "UInt32",
-    description:
-      "Suggested bucket size in seconds for the selected range.",
+    description: "Suggested bucket size in seconds for the selected range.",
   },
 ] as const;
 
@@ -201,7 +200,7 @@ export function validateDashboardWidgetQueryParams(
   );
   if (undeclared.length > 0) {
     const [first] = undeclared;
-    if (first && first.startsWith(DASHBOARD_CONTEXT_PARAMETER_PREFIX)) {
+    if (first?.startsWith(DASHBOARD_CONTEXT_PARAMETER_PREFIX)) {
       return {
         ok: false,
         error: {
@@ -268,5 +267,9 @@ function resolveDeclaredParam(
       },
     };
   }
-  return { ok: true, value };
+  // `typeof value !== declaration.type` above already proved `value` is one
+  // of the three JS primitives `DashboardWidgetQueryParamValue` allows — the
+  // `declaration.type` union isn't a literal, so TS can't narrow `unknown`
+  // through it on its own.
+  return { ok: true, value: value as DashboardWidgetQueryParamValue };
 }
