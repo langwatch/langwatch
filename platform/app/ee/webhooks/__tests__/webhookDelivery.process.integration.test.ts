@@ -21,6 +21,7 @@ import {
 } from "vitest";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -44,6 +45,7 @@ import {
   type WebhookDeliveryProcessDeps,
   type WebhookDeliveryState,
   webhookDeliveryPM,
+  webhookRetryDelayMs,
 } from "../process-manager/webhookDelivery.process";
 import { WebhookEndpointService } from "../webhookEndpoint.service";
 import { WebhookHealthService } from "../webhookHealth.service";
@@ -70,7 +72,10 @@ let team: Team;
 let project: Project;
 let endpointId: string;
 
-const endpoints = new WebhookEndpointService({ prisma });
+const endpoints = new WebhookEndpointService({
+  prisma,
+  processStore: new PrismaProcessStore(prisma),
+});
 
 let store: InMemoryProcessStore;
 let service: ProcessManagerService<WebhookDeliveryState>;
@@ -344,6 +349,8 @@ beforeEach(() => {
       }).config,
     ),
     processNames: [WEBHOOK_DELIVERY_PROCESS_NAME],
+    // The production ladder, so retry timing under test is the shipped one.
+    retryDelayMs: webhookRetryDelayMs,
   });
   sendWebhookMock.mockReset();
   sendWebhookMock.mockResolvedValue({
@@ -635,13 +642,13 @@ describe("webhook delivery via the transactional inbox", () => {
     });
   });
 
-  /** @scenario A disabled endpoint drains its queue without posting */
-  it("drops the batch without posting when the endpoint is disabled", async () => {
+  /** @scenario A disabled endpoint keeps its queued batches unsent */
+  it("keeps the batch queued without posting when the endpoint is disabled", async () => {
     const requestId = `req-${nanoid(8)}`;
     await consume(admittedEnvelope(requestId));
     await consume(confirmedEnvelope(requestId));
     // Level 1 fans out while the endpoint is ACTIVE; the disable lands
-    // between fan-out and the send, which is the case the drain covers.
+    // between fan-out and the send, which is the case a pause covers.
     await drainOutbox(1);
 
     await endpoints.disable({
@@ -651,14 +658,95 @@ describe("webhook delivery via the transactional inbox", () => {
     try {
       await drainOutbox();
       expect(sendWebhookMock).not.toHaveBeenCalled();
+      // The receiver is expected back: the batch waits on the ladder
+      // instead of draining, so nothing the customer queued is lost.
       const sends = await sendMessagesFor(endpointId);
-      expect(sends[0]!.status).toBe("dispatched");
+      expect(sends[0]!.status).toBe("pending");
+      expect(sends[0]!.attempts).toBeGreaterThanOrEqual(1);
     } finally {
       await endpoints.enable({
         organizationId: organization.id,
         endpointId,
       });
     }
+  });
+
+  /** @scenario A deleted endpoint discards its queued batches */
+  it("drains the batch without posting when the endpoint is deleted", async () => {
+    const doomed = await endpoints.create({
+      organizationId: organization.id,
+      url: "https://receiver.example.com/hooks",
+      enabledEvents: ["gateway.request.completed"],
+      maxBatchDelayMs: 0,
+    });
+    const requestId = `req-${nanoid(8)}`;
+    await consume(admittedEnvelope(requestId));
+    await consume(confirmedEnvelope(requestId));
+    await drainOutbox(1);
+
+    await endpoints.archive({
+      organizationId: organization.id,
+      endpointId: doomed.endpoint.id,
+    });
+    await drainOutbox();
+
+    // The customer asked us to stop: acknowledging the batch honours that.
+    const sends = await sendMessagesFor(doomed.endpoint.id);
+    expect(sends.length).toBeGreaterThanOrEqual(1);
+    for (const send of sends) expect(send.status).toBe("dispatched");
+    const posted = sendWebhookMock.mock.calls.filter(
+      (call) => call[0].endpointId === doomed.endpoint.id,
+    );
+    expect(posted).toHaveLength(0);
+  });
+
+  /** @scenario Re-enabling an endpoint revives its parked batches */
+  it("requeues an endpoint's dead batches with a fresh budget on enable", async () => {
+    // This service shares the process manager's store, so enable() can see
+    // the dead rows the ladder parked there.
+    const revivingEndpoints = new WebhookEndpointService({
+      prisma,
+      processStore: store,
+    });
+    const requestId = `req-${nanoid(8)}`;
+    await consume(admittedEnvelope(requestId));
+    await consume(confirmedEnvelope(requestId));
+    await drainOutbox(1);
+
+    await endpoints.disable({
+      organizationId: organization.id,
+      endpointId,
+    });
+    try {
+      // The pause outlives the ladder: the batch parks as dead.
+      const [leased] = await store.leaseDueMessages({
+        now: clock + 120_000,
+        limit: 10,
+        leaseDurationMs: 30_000,
+        processNames: [WEBHOOK_DELIVERY_PROCESS_NAME],
+      });
+      await store.markFailed({
+        identity: {
+          processName: leased!.processName,
+          projectId: leased!.projectId,
+          messageKey: leased!.messageKey,
+        },
+        leaseToken: leased!.leaseToken,
+        now: clock + 120_000,
+        nextAttemptAt: clock + 120_000,
+        dead: true,
+      });
+      expect((await sendMessagesFor(endpointId))[0]!.status).toBe("dead");
+    } finally {
+      await revivingEndpoints.enable({
+        organizationId: organization.id,
+        endpointId,
+      });
+    }
+
+    const sends = await sendMessagesFor(endpointId);
+    expect(sends[0]!.status).toBe("pending");
+    expect(sends[0]!.attempts).toBe(0);
   });
 
   /** @scenario Envelopes coalesce into one signed batch up to the endpoint's size */
@@ -771,7 +859,14 @@ describe("webhook delivery via the transactional inbox", () => {
       }
       await drainOutbox(1);
       // Capped: the three newcomers buffered instead of new POSTs.
-      expect((await endpointStream(endpointId))?.state.pending).toHaveLength(3);
+      const capped = await endpointStream(endpointId);
+      expect(capped?.state.pending).toHaveLength(3);
+      // And the wake is armed for when the laddered retry next becomes due
+      // (60s ± jitter), not a short-recheck poll that rewrites the row every
+      // few hundred milliseconds for the whole wait.
+      const laddered = (await sendMessagesFor(endpointId))[0]!;
+      expect(capped?.nextWakeAt).toBe(laddered.nextAttemptAt);
+      expect(capped!.nextWakeAt! - clock).toBeGreaterThan(30_000);
 
       // The receiver recovers; the retry ladder's next attempt succeeds and
       // frees the slot, and the wake flushes the accumulated three as ONE
@@ -781,7 +876,8 @@ describe("webhook delivery via the transactional inbox", () => {
         body: "ok",
         eventId: "x",
       });
-      clock += 61_000;
+      // Past the ladder step at its full +20% jitter, so the retry is due.
+      clock += 80_000;
       await drainOutbox(2);
       expect(await wakeEndpoint(endpointId)).toBe(true);
       await drainOutbox();

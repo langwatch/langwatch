@@ -738,7 +738,10 @@ secured.access(requires("gatewaySpend:manage")).post(
     const organization = c.get("organization") as Organization;
     const body = c.req.valid("json");
 
-    const endpoints = new WebhookEndpointService({ prisma });
+    const endpoints = new WebhookEndpointService({
+      prisma,
+      processStore: new PrismaProcessStore(prisma),
+    });
     const endpoint = await endpoints.getDeliverable({
       organizationId: organization.id,
       endpointId: body.endpoint_id,

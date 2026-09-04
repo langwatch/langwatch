@@ -30,7 +30,9 @@ import {
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { decrypt, encrypt } from "~/utils/encryption";
 import type { WebhookDestinationKind } from "~/utils/webhookDestinations";
+import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import { isValidEventSelector } from "./eventRegistry";
+import { endpointStreamRef } from "./process-manager/webhookDelivery.process";
 
 const logger = createLogger("langwatch:webhooks:endpoint-service");
 
@@ -591,6 +593,13 @@ function newSecret(): string {
 export interface WebhookEndpointDeps {
   prisma: PrismaClient;
   /**
+   * The delivery outbox, for the one thing endpoint lifecycle owes it:
+   * reviving batches that retired while the endpoint was disabled. Narrowed
+   * to the single method so the CRUD service never grows into a second
+   * delivery engine.
+   */
+  processStore: Pick<ProcessStore, "requeueDeadMessages">;
+  /**
    * Called when the 72h streak flips an endpoint to DISABLED. The transport
    * (email, in-app) is the caller's; the service guarantees the call fires
    * exactly once per auto-disable transition.
@@ -752,9 +761,15 @@ export class WebhookEndpointService {
 
   /**
    * Re-enable a disabled endpoint. Clears the failure streak so the 72h
-   * clock restarts from the next failure, not from history. Events that
-   * accrued while disabled are NOT re-sent automatically; the replay
-   * surface covers the gap window.
+   * clock restarts from the next failure, not from history.
+   *
+   * Batches that were already minted before the disable stayed queued while
+   * it lasted — a paused batch retries until the ladder runs out, then parks
+   * as dead — so re-enabling revives the parked ones with a fresh attempt
+   * budget and lets the pending ones flow on their next attempt. Nothing the
+   * customer queued is lost to the pause. Events that arrived DURING the
+   * disable were never appended (a disabled endpoint subscribes to nothing);
+   * the replay surface covers that window.
    */
   async enable(params: {
     organizationId: string;
@@ -770,6 +785,18 @@ export class WebhookEndpointService {
         failingSince: null,
       },
     });
+    const ref = endpointStreamRef(params);
+    const revived = await this.deps.processStore.requeueDeadMessages({
+      ...ref,
+      messageKeyPrefix: "send:",
+      now: Date.now(),
+    });
+    if (revived > 0) {
+      logger.info(
+        { endpointId: params.endpointId, revived },
+        "webhook endpoint re-enabled; parked batches requeued",
+      );
+    }
     return toView(updated);
   }
 
@@ -819,6 +846,33 @@ export class WebhookEndpointService {
       },
     });
     return endpoint ? toView(endpoint) : null;
+  }
+
+  /**
+   * Whether a frozen batch may ship, and when it may not, WHY.
+   *
+   * `getDeliverable` answers one question with a null that covers two very
+   * different situations, and a caller holding undelivered events has to tell
+   * them apart. An endpoint the customer deleted is gone, and the events they
+   * asked us to stop sending go with it. An endpoint that is merely disabled —
+   * including one our own auto-disable turned off after a failing streak — is
+   * a receiver that is expected back, and dropping its queue is throwing away
+   * events nobody chose to lose.
+   */
+  async getDeliveryDisposition(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<
+    | { state: "deliverable"; endpoint: WebhookEndpointView }
+    | { state: "paused" }
+    | { state: "gone" }
+  > {
+    const endpoint = await this.deps.prisma.webhookEndpoint.findFirst({
+      where: { id: params.endpointId, organizationId: params.organizationId },
+    });
+    if (!endpoint || endpoint.archivedAt !== null) return { state: "gone" };
+    if (endpoint.status !== "ACTIVE") return { state: "paused" };
+    return { state: "deliverable", endpoint: toView(endpoint) };
   }
 
   /**

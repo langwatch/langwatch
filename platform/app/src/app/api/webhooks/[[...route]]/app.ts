@@ -48,7 +48,10 @@ import { handleWebhookApiError } from "./error-handler";
 
 patchZodOpenapi();
 
-const endpoints = new WebhookEndpointService({ prisma });
+const endpoints = new WebhookEndpointService({
+  prisma,
+  processStore: new PrismaProcessStore(prisma),
+});
 const health = new WebhookHealthService({
   endpoints,
   processStore: new PrismaProcessStore(prisma),
