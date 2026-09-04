@@ -66,8 +66,8 @@ import { getLangWatchQLService } from "~/server/analytics/lwql/lwql.service";
 import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
-import type { Permission } from "../../rbac";
 import type { Protections } from "../../../traces/protections";
+import type { Permission } from "../../rbac";
 import { createInnerTRPCContext } from "../../trpc";
 import { savedWorkbenchChartsRouter } from "../analytics/savedWorkbenchCharts";
 
