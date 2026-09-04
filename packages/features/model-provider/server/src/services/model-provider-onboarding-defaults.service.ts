@@ -32,17 +32,31 @@ export class ModelProviderOnboardingDefaultsService {
     }
 
     for (const scope of input.scopes) {
-      if (await this.options.defaults.tryFindByScope(scope)) {
+      const organizationId = await this.options.scopes.getOrganizationIdForScope(scope);
+      const existing = await this.options.defaults.tryFindByScope(scope);
+      if (!existing) {
+        await this.options.defaults.save({
+          id: this.options.ids.generate({ type: "default" }),
+          organizationId,
+          config,
+          scopes: [scope],
+          authorId: null,
+        });
         continue;
       }
-      const organizationId = await this.options.scopes.getOrganizationIdForScope(scope);
-      await this.options.defaults.save({
-        id: this.options.ids.generate({ type: "default" }),
-        organizationId,
-        config,
-        scopes: [scope],
-        authorId: null,
-      });
+      // Per role, additive only: a role the scope already carries stays as the
+      // user set it, so a second provider never replaces a configured choice.
+      for (const [key, model] of Object.entries(config)) {
+        if (existing.config[key] !== undefined) continue;
+        await this.options.defaults.set({
+          id: this.options.ids.generate({ type: "default" }),
+          organizationId,
+          scope,
+          key,
+          model,
+          authorId: null,
+        });
+      }
     }
   }
 }

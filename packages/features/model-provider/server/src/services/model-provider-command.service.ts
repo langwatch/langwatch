@@ -82,7 +82,7 @@ export class ModelProviderCommandService {
     });
     const saved = await this.saveProvider(provider, existing, routingHandle);
 
-    await this.seedNewProvider(existing, saved);
+    await this.seedOnboardingDefaults(existing, saved);
     await this.saveProjectDefault(parsed);
     return saved;
   }
@@ -402,11 +402,12 @@ export class ModelProviderCommandService {
     }
   }
 
-  private async seedNewProvider(
+  /** A row created disabled, or turned off and back on, is seeded on the enable flip. */
+  private async seedOnboardingDefaults(
     existing: ModelProvider | null,
     saved: ModelProvider,
   ): Promise<void> {
-    if (!existing) {
+    if (!existing || (saved.enabled && !existing.enabled)) {
       await this.options.onboardingDefaults.seed({
         provider: saved.provider,
         scopes: saved.scopes,

@@ -79,6 +79,7 @@ describe("<ModelSelector/>", () => {
   describe("given the reported production repro: an azure custom model with a configured display name", () => {
     describe("when the prompt configuration model selector lists its options", () => {
       /** @scenario The reported production surface shows the configured display name */
+      /** @scenario Shared model pickers show the configured display name */
       it("lists the azure custom model by its configured display name", () => {
         renderSelector();
 

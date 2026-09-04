@@ -315,6 +315,41 @@ describe("VariablesSection", () => {
 
       expect(onChange).toHaveBeenCalledWith([{ identifier: "context", type: "str" }]);
     });
+
+    // specs/prompts/locked-input-variable.feature: the default "input"
+    // variable is not special-cased by the component — nothing here locks
+    // it, so an LLM-judge prompt that only needs response/context can drop
+    // the unused "input" instead of mapping a value it never reads.
+    describe("given the default input variable, with no lockedVariables set", () => {
+      /** @scenario Input variable can be deleted like any other */
+      it("removes the input variable like any other variable", async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        const variables: Variable[] = [{ identifier: "input", type: "str" }];
+        renderComponent({ variables, onChange });
+
+        await user.click(screen.getByTestId("remove-variable-input"));
+
+        expect(onChange).toHaveBeenCalledWith([]);
+      });
+
+      /** @scenario Input variable can be renamed */
+      it("renames the input variable", async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        const variables: Variable[] = [{ identifier: "input", type: "str" }];
+        renderComponent({ variables, onChange, showMappings: false });
+
+        await user.click(screen.getByText("input"));
+        const inputs = screen.getAllByRole("textbox");
+        const editInput = inputs.find((el) => (el as HTMLInputElement).value === "input")!;
+        await user.clear(editInput);
+        await user.type(editInput, "response");
+        fireEvent.blur(editInput);
+
+        expect(onChange).toHaveBeenCalledWith([{ identifier: "response", type: "str" }]);
+      });
+    });
   });
 
   describe("mapping UI", () => {

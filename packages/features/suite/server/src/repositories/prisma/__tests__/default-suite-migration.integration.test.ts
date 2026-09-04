@@ -142,7 +142,14 @@ describe.skipIf(!databaseUrl)("The Default suite migration", () => {
 
   afterAll(async () => {
     try {
-      if (teamId) await database().team.deleteMany({ where: { id: teamId } });
+      if (teamId) {
+        const projects = await database().project.findMany({ where: { teamId }, select: { id: true } });
+        const projectIds = projects.map((project) => project.id);
+        await database().scenario.deleteMany({ where: { projectId: { in: projectIds } } });
+        await database().simulationSuite.deleteMany({ where: { projectId: { in: projectIds } } });
+        await database().project.deleteMany({ where: { teamId } });
+        await database().team.deleteMany({ where: { id: teamId } });
+      }
       if (organizationId) await database().organization.deleteMany({ where: { id: organizationId } });
     } finally {
       await connection?.closeOnce();
