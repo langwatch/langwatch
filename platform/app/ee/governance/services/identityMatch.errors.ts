@@ -2,9 +2,10 @@
 
 /**
  * What the match engine refuses to do, said in words the reviewer can act on
- * (ADR-128 §12).
+ * (ADR-128 §12) — plus the domain's shared reading of Postgres refusing a
+ * duplicate, which the discovery repository leans on too.
  *
- * Both of these are races rather than mistakes: a review queue is read by
+ * The error classes are races rather than mistakes: a review queue is read by
  * people, and between reading it and clicking, the world moves. The whole point
  * of naming them is that the loser of such a race should be told what happened,
  * not handed a trace id.
@@ -91,9 +92,9 @@ const UNIQUE_VIOLATION = "23505";
 /**
  * Prisma's own code for the same refusal: the client wraps a unique violation
  * as a `PrismaClientKnownRequestError` with `code: "P2002"` and buries the
- * SQLSTATE underneath. `IdentityMatch` has no other unique rule a write could
- * trip (the primary key is a fresh nanoid), so `P2002` on these writes means
- * the one-open-link index and nothing else.
+ * SQLSTATE underneath. Which unique rule tripped is the caller's knowledge —
+ * the one-open-link index for `IdentityMatch` writes, the (organization,
+ * provider, actor) key for discovered-person writes.
  */
 const PRISMA_UNIQUE_VIOLATION = "P2002";
 
