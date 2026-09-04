@@ -11,17 +11,30 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UiCapabilityContextProvider, type UiSessionPort } from "../ui-capabilities";
+import { UiCapabilityContextProvider, UiSessionPort } from "../ui-capabilities";
 import { UiRpcContextProvider, type UiRpcPort } from "../ui-rpc";
 import { useUiOrganizationFacts } from "../ui-organization-facts";
 
+class StubSession extends UiSessionPort {
+  currentUser() {
+    return null;
+  }
+  activeScope() {
+    return { organizationId: "organization-1", projectId: null };
+  }
+  hasPermission(): boolean {
+    return true;
+  }
+  isSettled(): boolean {
+    return true;
+  }
+  featureFlag(): boolean | undefined {
+    return false;
+  }
+}
+
 function stubSession(): UiSessionPort {
-  return {
-    currentUser: () => null,
-    activeScope: () => ({ organizationId: "organization-1", projectId: null }),
-    hasPermission: () => true,
-    isSettled: () => true,
-  } as UiSessionPort;
+  return new StubSession();
 }
 
 function stubRpc(planQuery: () => Promise<unknown>): UiRpcPort {

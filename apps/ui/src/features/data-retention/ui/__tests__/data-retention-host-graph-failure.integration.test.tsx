@@ -85,7 +85,7 @@ class SilentTitle extends UiDocumentTitlePort {
 
 class SignedInSession extends UiSessionPort {
   currentUser() {
-    return { id: "user-1", name: "Reader", email: "reader@example.com" };
+    return { id: "user-1", name: "Reader", email: "reader@example.com", image: null };
   }
   activeScope(): UiActiveScope {
     return { organizationId: "org-1", projectId: "project-1" };

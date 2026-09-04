@@ -101,7 +101,7 @@ export function ModelProviderHost({ children }: { children: ReactNode }) {
           params,
           query: reading.query,
           drawerOpenParam: DRAWER_OPEN_PARAM,
-          setQuery: (next, options) => route.setQuery(next, options),
+          setQuery: (next) => route.setQuery(next),
         }),
     }),
     [

@@ -207,7 +207,7 @@ export function ApiKeyHost({ children }: { children: ReactNode }) {
           drawer,
           params,
           openParam: DRAWER_OPEN_PARAM,
-          setQuery: (next, options) => route.setQuery(next, options),
+          setQuery: (next) => route.setQuery(next),
         }),
       lookupDeviceCode: lookupCliDeviceCode,
       approveDeviceCode: approveCliDeviceCode,
