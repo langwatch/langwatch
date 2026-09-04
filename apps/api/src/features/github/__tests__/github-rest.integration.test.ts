@@ -228,6 +228,25 @@ describe("given a GitHub webhook delivery", () => {
       expect(world.webhookEvents).toEqual([{ action: "deleted", installationId: "7" }]);
     });
   });
+
+  describe("when a pull_request delivery has nothing this instance can act on", () => {
+    /** @scenario "Every announcement is acknowledged, applied or not" */
+    it("acks the delivery without applying it", async () => {
+      const world = githubWorld({ parsesPullRequestEvent: false });
+      const api = mount(world);
+      const body = JSON.stringify({ action: "opened", pull_request: { number: 7 } });
+
+      const response = await api.fetch("/api/github/webhook", {
+        method: "POST",
+        headers: { "x-hub-signature-256": sign(body), "x-github-event": "pull_request" },
+        body,
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ received: true });
+      expect(world.appliedPullRequestEvents).toEqual([]);
+    });
+  });
 });
 
 describe("given a process composing the GitHub door", () => {
@@ -278,17 +297,20 @@ function githubWorld(
     session?: { id: string } | null;
     webhookSecret?: string;
     refuseForeignInstallation?: boolean;
+    parsesPullRequestEvent?: boolean;
   } = {},
 ) {
   const permissionProbes: string[] = [];
   const recorded: { installationId: string; organizationId: string; flowStartedAt: number }[] = [];
   const audited: { userId: string; organizationId: string; action: string }[] = [];
   const webhookEvents: { action: string; installationId: string }[] = [];
+  const appliedPullRequestEvents: unknown[] = [];
   const world = {
     permissionProbes,
     recorded,
     audited,
     webhookEvents,
+    appliedPullRequestEvents,
     sessionReads: 0,
     ports: undefined as unknown as GithubRestPorts,
   };
@@ -322,8 +344,11 @@ function githubWorld(
     },
     popupErrorHtml: () => "<html>error</html>",
     popupResponseHtml: () => "<html>ok</html>",
-    tryParsePullRequestEvent: () => null,
-    applyPullRequestEvent: async () => {},
+    tryParsePullRequestEvent: (payload: unknown) =>
+      options.parsesPullRequestEvent === false ? null : (payload as never),
+    applyPullRequestEvent: async (event: unknown) => {
+      appliedPullRequestEvents.push(event);
+    },
     handleWebhookEvent: async (input: { action: string; installationId: string }) => {
       webhookEvents.push(input);
     },

@@ -167,7 +167,7 @@ describe("PrismaGithubPullRequestsRepository", () => {
    * asked about.
    */
   describe("the cross-organization sweep read", () => {
-    /** @scenario "The sweep reads a bounded page of branches demanded recently" */
+    /** @scenario "Rechecks stop for branches with no recent session activity" */
     it("asks only for unmapped branches that are due and recently demanded", async () => {
       const { calls, repository } = recordingDatabase();
       const now = new Date("2026-08-08T00:00:00.000Z");

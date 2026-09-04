@@ -36,7 +36,7 @@ function serviceWith(input: {
 }
 
 describe("Coding Agent installation backfill", () => {
-  /** @scenario "a completed GitHub installation backfills recent session branches" */
+  /** @scenario "Connecting GitHub backfills recent branches" */
   it("reads each organization project in its bounded recent window and asks GitHub once per canonical branch", async () => {
     const sessions = new TestSessions();
     sessions.recentRowsByTenant.set("project-a", [

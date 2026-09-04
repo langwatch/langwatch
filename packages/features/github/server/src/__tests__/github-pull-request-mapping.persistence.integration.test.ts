@@ -19,6 +19,7 @@ import { type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service";
 import {
   TestOrganizationService,
   TestProjectService,
@@ -326,6 +327,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     expect(projects.pullRequestActivity[0]?.projectId).toBe(projectId);
   });
 
+  /** @scenario "An empty answer arms the negative cache" */
   it("backs off an empty branch and does not make a second GitHub call inside the recorded wait", async () => {
     const { github, http } = harness();
     http.setPulls([]);
@@ -375,6 +377,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     });
   });
 
+  /** @scenario "A late delivery about an earlier state does not roll the pull request back" */
   it("uses webhook facts immediately and leaves the newer merged snapshot intact when an old delivery arrives late", async () => {
     const { github, http } = harness();
 
@@ -675,6 +678,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     ]);
   });
 
+  /** @scenario "A pull request opened after the session went quiet is still found" */
   it("rechecks a due, recently demanded empty branch without renewing its demand timestamp", async () => {
     const { github, http } = harness();
     http.setPulls([]);
@@ -709,6 +713,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     });
   });
 
+  /** @scenario "A branch with no session demand for a week leaves the sweep" */
   it("leaves an abandoned branch out of the periodic recheck", async () => {
     const { github, http } = harness();
     http.setPulls([]);
@@ -726,6 +731,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     expect(http.listingUrls).toHaveLength(1);
   });
 
+  /** @scenario "A linked pull request stays after its branch goes quiet" */
   it("prunes abandoned bookkeeping but preserves mapped pull requests and maps the branch again on demand", async () => {
     const { github, http } = harness();
     http.setPulls([pullRequest({ number: 79 })]);
@@ -752,6 +758,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     });
   });
 
+  /** @scenario "A new session on a branch brings its next question forward" */
   it("brings a live branch down from its longest empty-answer wait without repeating the GitHub call", async () => {
     const { github, http } = harness();
     http.setPulls([]);
@@ -781,6 +788,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     expect(check?.lastRequestedAt.getTime()).toBeGreaterThan(Date.now() - 60_000);
   });
 
+  /** @scenario "The announcement clears the branch's backoff" */
   it("resets an empty-branch backoff on a webhook without lowering an existing branch pull-request count", async () => {
     const { github, http } = harness();
     const headBranch = "feat/announcement";
@@ -833,6 +841,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     });
   });
 
+  /** @scenario "A listing that answers after a newer announcement does not roll it back" */
   it("keeps a newer webhook snapshot when an older GitHub listing finishes after it", async () => {
     const { github, http } = harness();
     let releaseListing: () => void = () => undefined;
@@ -928,5 +937,120 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
       prUpdatedAt: new Date("2026-08-20T16:00:00.000Z"),
       mappedAt: initialMapping?.mappedAt,
     });
+  });
+
+  /** @scenario "A pull request opened on a branch is linked without waiting for a recheck" */
+  it("stores a webhook-announced pull request without listing the branch", async () => {
+    const { github, http } = harness();
+    const headBranch = "feat/announced-direct";
+
+    await github.applyPullRequestEvent(
+      webhook({
+        action: "opened",
+        headBranch,
+        state: "open",
+        title: "Announced",
+        updatedAt: "2026-08-20T12:00:00.000Z",
+      }),
+    );
+
+    expect(http.listingUrls).toHaveLength(0);
+    await expect(storedFor(github, headBranch)).resolves.toEqual([
+      expect.objectContaining({ prNumber: 41, state: "open" }),
+    ]);
+  });
+
+  /** @scenario "A pull request that merges is announced as merged" */
+  it("turns the stored pull request from open into merged", async () => {
+    const { github } = harness();
+    const headBranch = "feat/merges";
+    await github.applyPullRequestEvent(
+      webhook({
+        action: "opened",
+        headBranch,
+        state: "open",
+        title: "Before merge",
+        updatedAt: "2026-08-20T12:00:00.000Z",
+      }),
+    );
+    const mergedAt = "2026-08-20T13:00:00.000Z";
+
+    await github.applyPullRequestEvent(
+      webhook({
+        action: "closed",
+        headBranch,
+        state: "closed",
+        title: "Merged",
+        updatedAt: mergedAt,
+        mergedAt,
+        closedAt: mergedAt,
+      }),
+    );
+
+    const [stored] = await storedFor(github, headBranch);
+    expect(stored).toMatchObject({ state: "closed", prMergedAt: new Date(mergedAt) });
+    expect(
+      GithubPullRequestStatusService.deriveStatus({
+        mergedAt: stored?.prMergedAt ?? null,
+        state: stored?.state ?? "",
+        draft: false,
+      }),
+    ).toBe("merged");
+  });
+
+  /** @scenario "A redelivered announcement changes nothing" */
+  it("leaves one unchanged pull request after a duplicate delivery", async () => {
+    const { github } = harness();
+    const headBranch = "feat/redelivered";
+    const event = webhook({
+      action: "opened",
+      headBranch,
+      number: 83,
+      state: "open",
+      title: "Redelivered",
+      updatedAt: "2026-08-20T12:00:00.000Z",
+    });
+
+    await github.applyPullRequestEvent(event);
+    const first = await storedFor(github, headBranch);
+    await github.applyPullRequestEvent(event);
+    const second = await storedFor(github, headBranch);
+
+    expect(second).toHaveLength(1);
+    expect(second[0]?.prNumber).toBe(first[0]?.prNumber);
+    expect(second[0]?.title).toBe(first[0]?.title);
+    expect(second[0]?.mappedAt.getTime()).toBe(first[0]?.mappedAt.getTime());
+  });
+
+  /** @scenario "A branch whose announcement never arrived is still linked by the recheck" */
+  it("is still linked by the sweep when no announcement is delivered at all", async () => {
+    const { github, http } = harness();
+    const headBranch = "feat/missed-hook";
+    http.setPulls([]);
+    await github.requestBranchMapping(branchRequest(headBranch));
+    http.setPulls([pullRequest({ number: 99 })]);
+    await database().githubBranchPullRequestCheck.updateMany({
+      where: { organizationId, headBranch },
+      data: { recheckAfter: new Date(Date.now() - 1000) },
+    });
+
+    await expect(github.recheckDueBranches()).resolves.toBe(1);
+
+    await expect(storedFor(github, headBranch)).resolves.toEqual([
+      expect.objectContaining({ prNumber: 99 }),
+    ]);
+  });
+
+  /** @scenario "Repeated folds on one branch still ask GitHub once per backoff" */
+  it("still asks GitHub once however many sessions fold inside the window", async () => {
+    const { github, http } = harness();
+    http.setPulls([]);
+    const request = branchRequest("feat/busy");
+
+    await github.requestBranchMapping(request);
+    await github.requestBranchMapping(request);
+    await github.requestBranchMapping(request);
+
+    expect(http.listingUrls).toHaveLength(1);
   });
 });

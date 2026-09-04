@@ -50,6 +50,7 @@ const query = {
 describe("Coding Agent pull-request usage", () => {
   /** @scenario "A project without the cost permission returns tokens with no cost" */
   /** @scenario "The organization-wide read carries the cost split and the per-model totals" */
+  /** @scenario "The page rolls up tokens and cost per pull request" */
   it("leaves post-merge sessions out and preserves nullable price and billed splits", async () => {
     const github = new TestGithubService();
     github.pullRequests = [

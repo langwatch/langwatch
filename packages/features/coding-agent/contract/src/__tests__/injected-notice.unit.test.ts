@@ -58,6 +58,7 @@ describe("classifyPromptText", () => {
     expect(multiline.notices[0]?.label).toBe("task notification: Monitor event fired twice");
   });
 
+  /** @scenario "A plain system notification marker is drawn back too" */
   it("handles the plain system marker and an unclosed block", () => {
     const marker = classifyPromptText(
       "[SYSTEM NOTIFICATION - NOT USER INPUT]\n<summary>Rate limit reset</summary>\nContinue.",
