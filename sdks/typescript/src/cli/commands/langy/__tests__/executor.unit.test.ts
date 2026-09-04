@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BASH_OUTPUT_CAP_BYTES } from "../../../../agent/local-control-protocol";
 import { LocalCallFailure } from "../errors";
 import {
+  collapseProgressRedraws,
   excludeLogDirFromGit,
   killGroup,
   logPathFor,
@@ -261,6 +262,33 @@ describe("given a shared folder", () => {
       const command = startCommand({ command: "echo hi", root, callId: "call-9" });
       const output = await command.result;
       expect(output.exitCode).toBe(0);
+    });
+  });
+});
+
+describe("collapseProgressRedraws", () => {
+  describe("when a line was redrawn many times", () => {
+    /** @scenario "A progress display is read as its last line, not every redraw" */
+    it("keeps the last state of the line, the way the terminal shows it", () => {
+      const spinner = "\rframe 1\rframe 2\rframe 3 done";
+
+      expect(collapseProgressRedraws(`start\n${spinner}\nend`)).toBe(
+        "start\nframe 3 done\nend",
+      );
+    });
+  });
+
+  describe("when the last redraw is blank", () => {
+    it("keeps the last one that wrote something", () => {
+      expect(collapseProgressRedraws("working\rdone\r")).toBe("done");
+    });
+  });
+
+  describe("when nothing was redrawn", () => {
+    it("returns the text untouched", () => {
+      expect(collapseProgressRedraws("2 passed\n1 warning\n")).toBe(
+        "2 passed\n1 warning\n",
+      );
     });
   });
 });

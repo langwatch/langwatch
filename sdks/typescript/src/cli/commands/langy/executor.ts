@@ -126,6 +126,31 @@ export function excludeLogDirFromGit(root: string): void {
   }
 }
 
+/**
+ * One line of captured output as a terminal would show it.
+ *
+ * A progress display rewrites the same line over and over, each redraw
+ * separated by a carriage return. Kept as written, a two-minute test run
+ * spends the whole output budget on spinner frames and the result the agent
+ * actually needs is what gets cut. The last redraw of a line is what the
+ * developer would see, so it is what Langy reads.
+ */
+export function collapseProgressRedraws(text: string): string {
+  if (!text.includes("\r")) return text;
+  return text
+    .split("\n")
+    .map((line) => {
+      if (!line.includes("\r")) return line;
+      const redraws = line.split("\r");
+      for (let index = redraws.length - 1; index >= 0; index -= 1) {
+        const redraw = redraws[index] ?? "";
+        if (redraw.trim() !== "") return redraw;
+      }
+      return "";
+    })
+    .join("\n");
+}
+
 /** Text captured from one stream, under a budget shared with the other. */
 class CappedText {
   private chunks: string[] = [];
@@ -138,12 +163,13 @@ class CappedText {
       this.truncated = true;
       return;
     }
-    if (chunk.byteLength <= this.budget.remaining) {
-      this.budget.remaining -= chunk.byteLength;
-      this.chunks.push(chunk.toString("utf8"));
+    const text = Buffer.from(collapseProgressRedraws(chunk.toString("utf8")));
+    if (text.byteLength <= this.budget.remaining) {
+      this.budget.remaining -= text.byteLength;
+      this.chunks.push(text.toString("utf8"));
       return;
     }
-    this.chunks.push(chunk.subarray(0, this.budget.remaining).toString("utf8"));
+    this.chunks.push(text.subarray(0, this.budget.remaining).toString("utf8"));
     this.budget.remaining = 0;
     this.truncated = true;
   }

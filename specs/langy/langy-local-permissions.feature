@@ -86,6 +86,13 @@ Feature: The CLI decides what Langy may run on the developer's machine
       And Langy receives the output in the same turn
       And the card reads allowed
 
+    @unit
+    Scenario: A progress display is read as its last line, not every redraw
+      Given a command that redraws one line while it works
+      When Langy receives its output
+      Then only the last state of that line is kept
+      And the result of the command is not cut to make room for the redraws
+
     @integration
     Scenario: A session grant silences the next matching command
       Given I allowed the package manager pattern for this session
