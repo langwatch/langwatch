@@ -6,7 +6,7 @@ import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.re
 const TENANT = "tenant_1";
 
 function build(rows: Record<string, unknown>[]) {
-  const query = vi.fn(async () => ({ json: async () => rows }));
+  const query = vi.fn(async (_input: { query: string }) => ({ json: async () => rows }));
   const repository = EvaluationRunClickHouseReadRepository.create({
     resolveClient: async () => ({ query }) as never,
     retentionFloor: { getFloorMs: async () => 0 },
@@ -41,7 +41,7 @@ describe("EvaluationRunClickHouseReadRepository.findTraceEvaluations", () => {
 
       const result = await repository.findTraceEvaluations({ tenantId: TENANT, traceIds: ["trace_1"] });
 
-      const sql = String((query.mock.calls[0]?.[0] as { query: string }).query);
+      const sql = query.mock.calls[0]?.[0]?.query ?? "";
       for (const column of ["ScheduledAt", "StartedAt", "CompletedAt"]) {
         expect(sql).toContain(`toUnixTimestamp64Milli(runs.${column}) AS ${column}`);
       }
