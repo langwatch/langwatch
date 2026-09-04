@@ -22,8 +22,10 @@ from dspy.teleprompt import (
     BootstrapFewShotWithRandomSearch,
     COPRO,
     MIPROv2,
+    GEPA,
 )
 import dspy.teleprompt.copro_optimizer as copro_optimizer
+from gepa.core.callbacks import ValsetEvaluatedEvent
 from dspy.signatures.signature import SignatureMeta
 from dspy.primitives.prediction import Prediction, Completions
 from dspy.primitives.example import Example
@@ -125,6 +127,23 @@ class DSPyPredictor(BaseModel):
 class DSPyOptimizer(BaseModel):
     name: str
     parameters: Any
+
+
+def metric_score(result: Any) -> float:
+    """The number in a metric result.
+
+    A metric returns a bool or a float, or, for GEPA, a `dspy.Prediction`
+    (or a dict) carrying `score` next to the written `feedback`.
+    """
+    if isinstance(result, (bool, int, float)):
+        return float(result)
+    if isinstance(result, dict):
+        return float(result["score"])
+    return float(result.score)
+
+
+def example_store(value: Any) -> Any:
+    return value._store if hasattr(value, "_store") else value
 
 
 class DSPyStep(BaseModel):
@@ -234,6 +253,7 @@ class LangWatchDSPy:
             BootstrapFewShotWithRandomSearch: LangWatchTrackedBootstrapFewShotWithRandomSearch,
             COPRO: LangWatchTrackedCOPRO,
             MIPROv2: LangWatchTrackedMIPROv2,
+            GEPA: LangWatchTrackedGEPA,
         }
 
         if optimizer.__class__ in METRIC_TRACKING_CLASSMAP:
@@ -325,9 +345,9 @@ class LangWatchDSPy:
 
             self.examples_buffer.append(
                 DSPyExample(
-                    example=example._store if hasattr(example, "_store") else example,
-                    pred=pred._store if hasattr(pred, "_store") else pred,
-                    score=float(score),
+                    example=example_store(example),
+                    pred=example_store(pred),
+                    score=metric_score(score),
                     trace=(
                         [DSPyTrace(input=t[1], pred=t[2]) for t in trace]
                         if trace
@@ -348,7 +368,14 @@ class LangWatchDSPy:
         score: float,
         label: str,
         predictors: List[DSPyPredictor],
+        examples: Optional[List[DSPyExample]] = None,
     ):
+        """Send one step of the run.
+
+        The step carries the examples buffered by the tracked metric since the
+        previous step, unless `examples` is given, in which case those are sent
+        and the buffer is discarded either way.
+        """
         step = DSPyStep(
             run_id=self.run_id or "unknown",
             experiment_slug=self.experiment_slug or "unknown",
@@ -357,7 +384,7 @@ class LangWatchDSPy:
             label=label,
             optimizer=optimizer,
             predictors=predictors,
-            examples=self.examples_buffer,
+            examples=self.examples_buffer if examples is None else examples,
             llm_calls=self.llm_calls_buffer,
             workflow_version_id=self.workflow_version_id,
             timestamps=Timestamps(created_at=int(time.time() * 1000)),
@@ -692,6 +719,155 @@ class LangWatchTrackedMIPROv2(MIPROv2):
             yield
         finally:
             Evaluate.__call__ = original_evaluate_call
+
+
+class LangWatchTrackedGEPA(GEPA):
+    """GEPA with every validation pass logged as a step.
+
+    GEPA reports through the `gepa` callback protocol: `on_valset_evaluated`
+    fires for the seed program and for every candidate that reaches a full
+    validation pass, with the candidate's instructions, the average score and
+    the score and output of each validation example. The step index is the
+    candidate index GEPA assigned, so the seed is step 0.
+    """
+
+    def patch(self):
+        self.metric_fn = self._track_metric(self.metric_fn)
+
+    def compile(self, student, **kwargs):
+        valset = kwargs.get("valset") or kwargs.get("trainset") or []
+        with self._patch_callbacks(student=student, valset=list(valset)):
+            return super().compile(student, **kwargs)
+
+    def _track_metric(self, metric_fn: Callable) -> Callable:
+        """Buffer the example and the score of every evaluation.
+
+        GEPA calls the metric with (gold, pred, trace, pred_name, pred_trace)
+        and reads the `feedback` of the returned Prediction, so the result is
+        passed through untouched. A call with a `pred_name` asks for feedback
+        on an example the evaluation already scored, so it is not buffered.
+        """
+
+        def wrapped(gold, pred, trace=None, pred_name=None, pred_trace=None, *args, **kwargs):
+            result = metric_fn(gold, pred, trace, pred_name, pred_trace, *args, **kwargs)
+
+            if pred_name is None:
+                langwatch_dspy.examples_buffer.append(
+                    DSPyExample(
+                        example=example_store(gold),
+                        pred=example_store(pred),
+                        score=metric_score(result),
+                        trace=None,
+                    )
+                )
+
+            return result
+
+        return wrapped
+
+    @contextmanager
+    def _patch_callbacks(self, *, student: dspy.Module, valset: List[Example]):
+        original_gepa_kwargs = self.gepa_kwargs
+        callbacks = list(original_gepa_kwargs.get("callbacks") or [])
+        callbacks.append(
+            LangWatchGEPACallback(optimizer=self, student=student, valset=valset)
+        )
+        self.gepa_kwargs = {**original_gepa_kwargs, "callbacks": callbacks}
+
+        try:
+            yield
+        finally:
+            self.gepa_kwargs = original_gepa_kwargs
+
+    def parameters(self) -> dict:
+        return {
+            "max_metric_calls": self.max_metric_calls,
+            "reflection_minibatch_size": self.reflection_minibatch_size,
+            "candidate_selection_strategy": self.candidate_selection_strategy,
+            "use_merge": self.use_merge,
+            "num_threads": self.num_threads,
+            "reflection_lm": (
+                self.reflection_lm.model
+                if isinstance(self.reflection_lm, dspy.LM)
+                else None
+            ),
+        }
+
+
+class LangWatchGEPACallback:
+    """The `gepa` callback that turns a validation pass into a step."""
+
+    def __init__(
+        self,
+        *,
+        optimizer: LangWatchTrackedGEPA,
+        student: dspy.Module,
+        valset: List[Example],
+    ):
+        self.optimizer = optimizer
+        self.student = student
+        self.valset = valset
+
+    def on_valset_evaluated(self, event: ValsetEvaluatedEvent) -> None:
+        langwatch_dspy.log_step(
+            optimizer=DSPyOptimizer(
+                name=GEPA.__name__, parameters=self.optimizer.parameters()
+            ),
+            index=str(event["candidate_idx"]),
+            score=float(event["average_score"]),
+            label="score",
+            predictors=self.candidate_predictors(event["candidate"]),
+            examples=self.candidate_examples(event),
+        )
+
+    def candidate_predictors(self, candidate: dict) -> List[DSPyPredictor]:
+        """The program's predictors with the candidate's instructions.
+
+        A GEPA candidate maps predictor name to instructions text; the
+        predictor itself, with its signature fields and demos, comes from the
+        student, so the step shows the same shape as the other optimizers.
+        """
+        predictors = []
+        for name, predictor in self.student.named_predictors():
+            candidate_predictor = predictor.deepcopy()
+            if name in candidate:
+                candidate_predictor.signature = predictor.signature.with_instructions(
+                    candidate[name]
+                )
+            predictors.append(DSPyPredictor(name=name, predictor=candidate_predictor))
+        return predictors
+
+    def candidate_examples(
+        self, event: ValsetEvaluatedEvent
+    ) -> Optional[List[DSPyExample]]:
+        """The validation results of the candidate, one per example.
+
+        GEPA reports no outputs for the seed program, and by then the metric
+        buffer holds exactly the seed's validation pass, so None lets
+        `log_step` take the buffer. For every other candidate the buffer also
+        holds the minibatch evaluations that led to it, so the step is built
+        from the event instead.
+        """
+        outputs = event.get("outputs_by_val_id")
+        if not outputs:
+            return None
+
+        examples = []
+        for val_id, score in event["scores_by_val_id"].items():
+            example = (
+                self.valset[val_id]
+                if isinstance(val_id, int) and val_id < len(self.valset)
+                else val_id
+            )
+            examples.append(
+                DSPyExample(
+                    example=example_store(example),
+                    pred=example_store(outputs.get(val_id)),
+                    score=float(score),
+                    trace=None,
+                )
+            )
+        return examples
 
 
 class LangWatchTrackedEvaluate(Evaluate):
