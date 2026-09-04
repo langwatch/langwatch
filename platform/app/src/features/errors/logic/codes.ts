@@ -88,6 +88,7 @@ export const APP_ERROR_CODES = [
   "dataset_name_taken",
   "dataset_not_ready",
   "dataset_stale_columns",
+  "dataset_too_large_to_search",
   "dspy_step_not_found",
   "duplicate_invite",
   "email_already_registered",

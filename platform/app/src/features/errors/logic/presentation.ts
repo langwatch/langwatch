@@ -2171,6 +2171,15 @@ const presentations = {
     describe: () =>
       "Reload to pick up the current columns, then make your change again.",
   },
+  dataset_too_large_to_search: {
+    // A limit, not a breakage: the search would have had to read more of the
+    // dataset than one search reads. Saying so beats returning the matches
+    // found before giving up, which reads as a complete answer and is not one.
+    // Paging still works, so the copy points at the way through.
+    title: "This dataset is too large to search",
+    describe: () =>
+      "Page through the rows, or split the dataset into smaller ones.",
+  },
   storage_not_writable: {
     // fault: platform. Storage for this deployment was never provisioned, so
     // retrying changes nothing and there is no customer-side setting to fix.

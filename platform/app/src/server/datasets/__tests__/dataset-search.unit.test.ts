@@ -1,0 +1,157 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  DATASET_SEARCH_MAX_ROWS,
+  matchesDatasetSearch,
+  measureRowsBytes,
+  normalizeDatasetSearch,
+} from "../dataset-search";
+
+describe("normalizeDatasetSearch()", () => {
+  it("treats a blank search as no search at all", () => {
+    expect(normalizeDatasetSearch(undefined)).toBeUndefined();
+    expect(normalizeDatasetSearch("")).toBeUndefined();
+    expect(normalizeDatasetSearch("   ")).toBeUndefined();
+  });
+
+  it("trims the search so stray whitespace does not change the matches", () => {
+    expect(normalizeDatasetSearch("  escalation  ")).toBe("escalation");
+  });
+});
+
+describe("matchesDatasetSearch()", () => {
+  const entry = {
+    conversation_id: "conv_0390",
+    input: "The customer asked for an Escalation to a manager",
+    expected_output: "Escalate to tier 2",
+    turns: 4,
+    resolved: false,
+    metadata: { channel: "email" },
+    unanswered: null,
+  };
+
+  it("matches a cell value", () => {
+    expect(matchesDatasetSearch({ entry: entry, search: "manager" })).toBe(
+      true,
+    );
+  });
+
+  /** @scenario Search matches regardless of letter case */
+  it("matches regardless of letter case", () => {
+    expect(matchesDatasetSearch({ entry: entry, search: "escalation" })).toBe(
+      true,
+    );
+    expect(matchesDatasetSearch({ entry: entry, search: "ESCALATION" })).toBe(
+      true,
+    );
+  });
+
+  /** @scenario A word that only appears in a column name matches nothing */
+  it("does not match a word that only appears in a column name", () => {
+    // Matching column names too would make "id" return every row of a dataset
+    // with a `conversation_id` column — a result the user cannot explain from
+    // what is on screen.
+    expect(
+      matchesDatasetSearch({
+        entry: { escalation: "none" },
+        search: "escalation",
+      }),
+    ).toBe(false);
+  });
+
+  it("matches inside non-string values rather than skipping them", () => {
+    expect(matchesDatasetSearch({ entry: entry, search: "4" })).toBe(true);
+    expect(matchesDatasetSearch({ entry: entry, search: "false" })).toBe(true);
+    expect(matchesDatasetSearch({ entry: entry, search: "email" })).toBe(true);
+  });
+
+  it("does not match null or missing values", () => {
+    expect(
+      matchesDatasetSearch({
+        entry: { a: null, b: undefined },
+        search: "null",
+      }),
+    ).toBe(false);
+  });
+
+  it("reports no match when nothing contains the text", () => {
+    expect(matchesDatasetSearch({ entry: entry, search: "refund" })).toBe(
+      false,
+    );
+  });
+
+  it("survives an entry that is not an object", () => {
+    // `adaptS3JsonlRecord` assigns `entry` straight from a JSONL line with no
+    // shape check (datasetRecord.utils.ts:248), so a line of `null` — or a bare
+    // scalar — reaches this predicate. Ordinary paging tolerates such a row and
+    // renders it blank; a search must not be the one path that throws on data
+    // the rest of the editor survives, because it fails the WHOLE search, not
+    // the one row.
+    expect(() =>
+      matchesDatasetSearch({ entry: null as never, search: "escalation" }),
+    ).not.toThrow();
+    expect(
+      matchesDatasetSearch({ entry: null as never, search: "escalation" }),
+    ).toBe(false);
+    expect(
+      matchesDatasetSearch({ entry: undefined as never, search: "escalation" }),
+    ).toBe(false);
+    expect(
+      matchesDatasetSearch({
+        entry: "escalation" as never,
+        search: "escalation",
+      }),
+    ).toBe(false);
+    expect(matchesDatasetSearch({ entry: 42 as never, search: "4" })).toBe(
+      false,
+    );
+  });
+});
+
+describe("measureRowsBytes()", () => {
+  it("grows with the content of the rows, not their count", () => {
+    // The whole reason the byte limit exists next to the row limit: one wide
+    // row can cost more than many narrow ones, and a count cannot tell them
+    // apart.
+    const oneWideRow = [{ text: "x".repeat(10_000) }];
+    const manyNarrowRows = Array.from({ length: 20 }, () => ({ text: "x" }));
+
+    expect(measureRowsBytes(oneWideRow)).toBeGreaterThan(
+      measureRowsBytes(manyNarrowRows),
+    );
+  });
+
+  it("counts bytes rather than characters", () => {
+    // A running total compared against a byte ceiling has to be in bytes.
+    // `String.length` counts UTF-16 units, so a multi-byte character would be
+    // undercounted and a dataset of them could read past the limit.
+    const measured = measureRowsBytes([{ text: "é€𝄞" }]);
+
+    expect(measured).toBeGreaterThan(JSON.stringify([{ text: "é€𝄞" }]).length);
+  });
+
+  it("reports no rows as no bytes", () => {
+    // A chunk that came back empty cost nothing to hold, and must not push a
+    // scan any closer to a refusal.
+    expect(measureRowsBytes([])).toBe(2); // "[]"
+  });
+
+  it("still reports a cost for rows it cannot serialise", () => {
+    // Unreachable from the scan, which parses its rows out of JSONL. But zero
+    // would make an unmeasurable chunk free and buy passage for every chunk
+    // after it, so the floor is one byte a row rather than nothing.
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+
+    expect(measureRowsBytes([cyclic, cyclic])).toBe(2);
+  });
+});
+
+describe("DATASET_SEARCH_MAX_ROWS", () => {
+  it("caps how many rows one search will read", () => {
+    // Rows rather than bytes: legacy postgres-backed datasets carry a null
+    // `sizeBytes`, so a byte cap would never fire for them, and the real cost
+    // of an s3_jsonl search is chunk reads, not heap.
+    expect(DATASET_SEARCH_MAX_ROWS).toBe(50_000);
+  });
+});
