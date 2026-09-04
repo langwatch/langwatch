@@ -840,6 +840,24 @@ export function permissionAnswerNote(ask: PermissionAsk): string {
   return `[developer allowed once in the panel: ${ask.summary}]`;
 }
 
+/**
+ * What a scenario is told when the turn it was about to grade failed.
+ *
+ * A failed turn stores no answer of its own, and taking the answer before it
+ * puts the previous turn in front of the judge, which reads as a pass. The run
+ * ends here instead, with the reason the record holds.
+ */
+export function turnFailureMessage({
+  turnId,
+  failure,
+}: {
+  turnId?: string;
+  failure: string;
+}): string {
+  const named = turnId ? `Turn ${turnId}` : "The last turn";
+  return `${named} failed, so there is no answer to grade: ${failure}`;
+}
+
 /** The line that says what the developer answered on a question card. */
 export function questionAnswerNote(ask: QuestionAsk): string {
   const answers = ask.answered
@@ -1065,6 +1083,8 @@ export function watchLangyConversation({
 
   const readConversation = async (): Promise<{
     currentTurnId: string | null;
+    /** The last turn's failure, as the record stored it, or null. */
+    lastError: string | null;
     messages: Array<{
       id: string;
       role: string;
@@ -1154,14 +1174,6 @@ export function watchLangyConversation({
     ];
   };
 
-  const lastAnswer = async (): Promise<StoredMessage | null> => {
-    const snapshot = await readConversation();
-    const assistant = ((snapshot?.messages ?? []) as StoredMessage[]).filter(
-      (message) => message.role === "assistant",
-    );
-    return assistant[assistant.length - 1] ?? null;
-  };
-
   /**
    * Read a turn's answer, waiting for it to be stored.
    *
@@ -1176,26 +1188,32 @@ export function watchLangyConversation({
     turnId?: string;
     timeoutMs?: number;
   }): Promise<StoredMessage | null> => {
-    if (!turnId) return await lastAnswer();
-    try {
-      return await waitFor({
-        what: `the stored answer of turn ${turnId}`,
-        timeoutMs,
-        intervalMs: 1_000,
-        read: async () => {
-          const snapshot = await readConversation();
-          return answerOfTurn(
-            (snapshot?.messages ?? []) as StoredMessage[],
-            turnId,
-          );
-        },
-      });
-    } catch (error) {
-      // A turn that failed stores no answer of its own. The last answer is
-      // then the best the judge can be given, which is what this read did
-      // before it could name a turn.
-      console.log(`[fixture] no stored answer for ${turnId}: ${String(error)}`);
-      return await lastAnswer();
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const snapshot = await readConversation().catch(() => null);
+      const messages = (snapshot?.messages ?? []) as StoredMessage[];
+      const answer = turnId
+        ? answerOfTurn(messages, turnId)
+        : (messages.filter((message) => message.role === "assistant").pop() ??
+          null);
+      // A named turn that stored its answer is readable whatever happened
+      // after it. Without a name, the last answer is only this turn's answer
+      // while the conversation has not failed.
+      if (answer && (turnId || !snapshot?.lastError)) return answer;
+      if (snapshot?.lastError) {
+        throw new Error(
+          turnFailureMessage({ turnId, failure: snapshot.lastError }),
+        );
+      }
+      if (Date.now() > deadline) {
+        if (!turnId) return null;
+        throw new Error(
+          `Turn ${turnId} stored no answer within ${Math.round(
+            timeoutMs / 1000,
+          )}s, and the conversation records no failure for it`,
+        );
+      }
+      await sleep(1_000);
     }
   };
 
@@ -1232,9 +1250,14 @@ export function watchLangyConversation({
     },
     transcript: async () => {
       const snapshot = await readConversation();
-      return (snapshot?.messages ?? [])
+      const body = (snapshot?.messages ?? [])
         .map((message) => `### ${message.role}\n\n${messageText(message)}`)
         .join("\n\n");
+      // The failure is part of what happened, so it is read where the rest of
+      // the conversation is read.
+      return snapshot?.lastError
+        ? `${body}\n\n### turn failed\n\n${snapshot.lastError}`
+        : body;
     },
     lastAssistantText: async (input = {}) => {
       const answer = await readTurnAnswer(input);

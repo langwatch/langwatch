@@ -12,6 +12,7 @@ import {
   permissionAnswerNote,
   questionAnswerNote,
   type StoredMessage,
+  turnFailureMessage,
 } from "./local-control-fixture";
 
 const TURN = "langyturn_783c8761d92af366b9b8da09f8920c21";
@@ -155,6 +156,28 @@ describe("demoReposToPrune", () => {
       expect(demoReposToPrune({ existing: folders, keep: 1 })).toEqual([
         "leftover",
       ]);
+    });
+  });
+});
+
+describe("turnFailureMessage", () => {
+  describe("when the turn a scenario was grading failed", () => {
+    it("names the turn and carries the reason the record stored", () => {
+      const message = turnFailureMessage({
+        turnId: TURN,
+        failure: '{"kind":"langy_worker_stopped"}',
+      });
+
+      expect(message).toContain(TURN);
+      expect(message).toContain("langy_worker_stopped");
+    });
+  });
+
+  describe("when no turn was named", () => {
+    it("still says a turn failed, so none is graded in its place", () => {
+      expect(turnFailureMessage({ failure: "out of memory" })).toBe(
+        "The last turn failed, so there is no answer to grade: out of memory",
+      );
     });
   });
 });
