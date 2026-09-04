@@ -11,8 +11,8 @@
  *                      DECLARED permission, so the whole chain runs.
  *   workflow.getAll    a row read the composition lifted onto this process's
  *                      own Prisma connection, plus the AuthZ probe beside it.
- *   bugReports.getAll  a collaborator read, with the audit row this process
- *                      writes before the caller sees the transcript.
+ *   bugReports.getAll  a feature the process composed itself, with the audit
+ *                      row it writes before the caller sees the transcript.
  *   publicEnv          the signed-out door, on the PUBLIC procedure.
  */
 import { AuthService } from "@langwatch/auth-contract";
@@ -36,6 +36,7 @@ import {
   NoApiTrpcFeatures,
 } from "../../api.application";
 import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy";
+import { composeBugReportFeature } from "../../features/bug-report/bug-report.composition";
 import {
   AuthSessionApiAuthenticationAdapter,
   BetterAuthBrowserSessionTransportAdapter,
@@ -148,12 +149,16 @@ const workflowRow = {
 
 const dashboardRow = { id: "dashboard-1", name: "Overview", graphCount: 0 };
 
-const bugReportPage = { items: [{ id: "report-1" }], total: 1 };
-
 function testPrisma() {
   const findMany = vi.fn(async () => [workflowRow]);
   return {
-    client: { workflow: { findMany } } as unknown as PrismaClient,
+    client: {
+      workflow: { findMany },
+      bugReport: {
+        findMany: vi.fn(async () => [{ id: "report-1" }]),
+        count: vi.fn(async () => 1),
+      },
+    } as unknown as PrismaClient,
     findMany,
   };
 }
@@ -223,10 +228,6 @@ function testCollaborators(overrides: Record<string, unknown> = {}) {
     application: testApplication(),
     annotation: stub("annotation"),
     auth: testAuthApp(),
-    bugReports: {
-      getAll: async () => bugReportPage,
-      getById: async () => null,
-    },
     dataPrivacy: stub("dataPrivacy"),
     evaluations: stub("evaluations", { mappingsSchema: anySchema }),
     experiments: stub("experiments", { workbenchStateSchema: anySchema }),
@@ -325,14 +326,17 @@ function composeApplication(
 ) {
   const prisma = testPrisma();
   const audit = new RecordingAudit();
+  const infrastructure = {
+    ...stubInfrastructureEntitlements(),
+    prisma: prisma.client,
+    authz: testAuthz(),
+    audit,
+  };
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: stubComposedFeatures(),
-    infrastructure: {
-      ...stubInfrastructureEntitlements(),
-      prisma: prisma.client,
-      authz: testAuthz(),
-      audit,
-    },
+    // The support inbox composes itself off the same infrastructure, so the
+    // audit row below is the one that composition writes.
+    composed: { ...stubComposedFeatures(), bugReport: composeBugReportFeature({ infrastructure }) },
+    infrastructure,
     collaborators: testCollaborators(),
   });
   if (!features) throw new Error("the record refused to compose against its test collaborators");

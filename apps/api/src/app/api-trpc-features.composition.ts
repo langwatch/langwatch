@@ -25,6 +25,7 @@ import type { ComposedApiFeatures } from "../app-trpc/app-trpc.composed";
 import {
   ApiTrpcCollaboratorsAbsence,
   type ApiTrpcCollaborators,
+  type ApiTrpcCollaboratorGapReport,
 } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "../app-trpc/app-trpc.features";
@@ -32,11 +33,6 @@ import { createApiTrpcPorts } from "./api-trpc-ports.composition";
 import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
-import {
-  type ApiProductCollaborators,
-  type ApiTrpcCollaboratorGapReport,
-} from "./api-trpc-collaborators.product.composition";
-import type { ApiTraceGroupCollaborators } from "./api-trpc-collaborators.trace-group.composition";
 
 /**
  * Everything the record is composed from: the shared infrastructure a feature
@@ -48,13 +44,8 @@ import type { ApiTraceGroupCollaborators } from "./api-trpc-collaborators.trace-
  * service; no collaborators means it composed none of what the record reaches.
  */
 export type ApiTrpcFeaturesCompositionOptions<
-  TBugReport,
-  TBugReportPage,
-  TCheckStatus,
   TMappingsIn,
   TMappingsOut,
-  TPrivacyRule,
-  TPrivacySnapshot,
   TSignUpDataSchema extends ZodTypeAny,
   TWorkbenchState,
 > = Readonly<{
@@ -63,13 +54,8 @@ export type ApiTrpcFeaturesCompositionOptions<
   composed: ComposedApiFeatures;
   collaborators:
     | ApiTrpcCollaborators<
-        TBugReport,
-        TBugReportPage,
-        TCheckStatus,
         TMappingsIn,
         TMappingsOut,
-        TPrivacyRule,
-        TPrivacySnapshot,
         TSignUpDataSchema,
         TWorkbenchState
       >
@@ -102,13 +88,8 @@ class MembershipDisabledError extends HandledError {
 }
 
 export class ApiTrpcFeaturesComposition<
-  TBugReport,
-  TBugReportPage,
-  TCheckStatus,
   TMappingsIn,
   TMappingsOut,
-  TPrivacyRule,
-  TPrivacySnapshot,
   TSignUpDataSchema extends ZodTypeAny,
   TWorkbenchState,
 > extends ApiTrpcFeaturesPort {
@@ -124,36 +105,21 @@ export class ApiTrpcFeaturesComposition<
    * collaborator set is not negotiable for the reason its own docblock gives.
    */
   static tryCompose<
-    TBugReport,
-    TBugReportPage,
-    TCheckStatus,
     TMappingsIn,
     TMappingsOut,
-    TPrivacyRule,
-    TPrivacySnapshot,
     TSignUpDataSchema extends ZodTypeAny,
     TWorkbenchState,
   >(
     options: ApiTrpcFeaturesCompositionOptions<
-      TBugReport,
-      TBugReportPage,
-      TCheckStatus,
       TMappingsIn,
       TMappingsOut,
-      TPrivacyRule,
-      TPrivacySnapshot,
       TSignUpDataSchema,
       TWorkbenchState
     >,
   ):
     | ApiTrpcFeaturesComposition<
-        TBugReport,
-        TBugReportPage,
-        TCheckStatus,
         TMappingsIn,
         TMappingsOut,
-        TPrivacyRule,
-        TPrivacySnapshot,
         TSignUpDataSchema,
         TWorkbenchState
       >
@@ -179,13 +145,8 @@ export class ApiTrpcFeaturesComposition<
     private readonly infrastructure: ApiTrpcInfrastructure,
     private readonly composed: ComposedApiFeatures,
     private readonly collaborators: ApiTrpcCollaborators<
-      TBugReport,
-      TBugReportPage,
-      TCheckStatus,
       TMappingsIn,
       TMappingsOut,
-      TPrivacyRule,
-      TPrivacySnapshot,
       TSignUpDataSchema,
       TWorkbenchState
     >,
@@ -267,13 +228,13 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
 }
 
 /**
- * The five halves {@link composeApiTrpcCollaborators} reads into one flat
+ * The three halves {@link composeApiTrpcCollaborators} reads into one flat
  * {@link ApiTrpcCollaborators} record. Each is `undefined` exactly when the
  * process composed nothing for it — see that half's own composing function
  * for why it can be missing.
  */
 /**
- * The same five once every one of them is present.
+ * The same three once every one of them is present.
  *
  * `Required<>` is not this: it strips the `?` a member does not have and leaves
  * the `| undefined` a member does, so the whole record read below stayed
@@ -284,10 +245,8 @@ type ComposedApiTrpcCollaboratorHalves = {
 };
 
 export type ApiTrpcCollaboratorHalves = Readonly<{
-  product: ApiProductCollaborators | undefined;
   identity: ApiIdentityCollaborators | undefined;
   execution: ApiExecutionCollaborators | undefined;
-  traceGroup: ApiTraceGroupCollaborators | undefined;
   orgGroup: ApiOrgGroupCollaborators | undefined;
 }>;
 
@@ -303,6 +262,13 @@ export type ApiTrpcCollaboratorHalves = Readonly<{
 export type ApiTrpcFeatureApplicationSlices = Pick<
   ApiTrpcFeatureApplication,
   | "analytics"
+  | "dataRetention"
+  | "planProvider"
+  | "share"
+  | "topics"
+  | "traces"
+  | "modelProviders"
+  | "annotations"
   | "authzApp"
   | "dashboard"
   | "dataset"
@@ -326,7 +292,7 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
 >;
 
 /**
- * Reads all five collaborator halves into ONE flat {@link ApiTrpcCollaborators}
+ * Reads all three collaborator halves into ONE flat {@link ApiTrpcCollaborators}
  * record, or refuses by name.
  *
  * All-or-nothing, replacing the ten `withApi*Collaborators` folds and the
@@ -356,37 +322,22 @@ export function composeApiTrpcCollaborators(
     return undefined;
   }
   const {
-    product,
     identity,
     execution,
-    traceGroup,
     orgGroup,
   } = halves as ComposedApiTrpcCollaboratorHalves;
 
   return {
     application: {
-      annotations: product.annotations,
       ...identity.application,
       workflows: execution.workflows,
       experiments: execution.experiments,
       evaluations: execution.evaluations,
       // `projects` is the ORG group's: `...orgGroup.application` below carries
       // it and overwrote the product group's reader in this slot, silently.
-      traces: traceGroup.traces,
-      share: traceGroup.share,
-      dataRetention: traceGroup.dataRetention,
-      topics: traceGroup.topics,
-      modelProviders: traceGroup.modelProviders,
-      planProvider: traceGroup.planProvider,
       ...orgGroup.application,
       ...application,
     },
-
-    annotation: product.annotationPorts,
-    bugReports: product.bugReportPorts,
-    dataPrivacy: product.dataPrivacyPorts,
-    integrationsChecks: product.integrationsChecksPorts,
-
 
     auth: identity.auth,
     group: identity.group,
@@ -400,19 +351,6 @@ export function composeApiTrpcCollaborators(
     evaluations: execution.evaluationPorts,
 
 
-    traces: traceGroup.ports.traces,
-    tracesV2: traceGroup.ports.tracesV2,
-    spans: traceGroup.ports.spans,
-    traceEditOverlay: traceGroup.ports.traceEditOverlay,
-    sharedTrace: traceGroup.ports.sharedTrace,
-    savedViews: traceGroup.ports.savedViews,
-    costs: traceGroup.ports.costs,
-    llmModelCost: traceGroup.ports.llmModelCost,
-    modelProvider: traceGroup.ports.modelProvider,
-    modelProviderChecks: traceGroup.ports.modelProviderChecks,
-    translate: traceGroup.ports.translate,
-    httpProxy: traceGroup.ports.httpProxy,
-    limits: traceGroup.ports.limits,
 
     organization: orgGroup.organization,
     organizationAuditLogCheck: orgGroup.organizationAuditLogCheck,

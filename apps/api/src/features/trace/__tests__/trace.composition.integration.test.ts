@@ -25,38 +25,46 @@ import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
 import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
-import { ApiRestSecurity } from "../../api-rest.security";
-import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse";
-import { sameOriginSseInit } from "../../app-trpc/__tests__/support/sse-browser-request";
-import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../../api.application";
+import { ApiRestSecurity } from "../../../api-rest.security";
+import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse";
+import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
-} from "../api-trpc-features.composition";
+} from "../../../app/api-trpc-features.composition";
 import {
-  composeApiTraceGroupCollaborators,
-  LoggedApiTraceGroupAbsence,
-  type ApiTraceGroupCollaborators,
-  type ApiTraceGroupPorts,
+  composeTraceFeature,
+  LoggedApiTraceAbsence,
+  type ComposedTraceFeature,
+  type ApiTracePorts,
   type ApiTraceReadStackPort,
-} from "../api-trpc-collaborators.trace-group.composition";
+} from "../trace.composition";
 import {
   stubApplicationSlices,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
   testHalves,
-} from "./api-trpc-collaborators.test-halves";
-import { ApiRateLimitInfrastructure } from "../../platform/infrastructure/api-rate-limit.infrastructure";
+} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+import { ApiRateLimitInfrastructure } from "../../../platform/infrastructure/api-rate-limit.infrastructure";
 import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
-import { composeApiModelProviderHost } from "../api-model-provider-host.composition";
-import { composeApiStudioHost } from "../api-studio-host.composition";
-import { composeApiTraceReadStack } from "../api-trace-read-stack.composition";
-import { composeApiPlanProvider, composeApiUsageStats } from "../api-usage.composition";
+import { composeApiTraceReadStack } from "../../../app/api-trace-read-stack.composition";
+import { composeApiPlanProvider, composeApiUsageStats } from "../../../app/api-usage.composition";
+import { composeSavedViewFeature } from "../../dashboard/saved-view.composition";
+import { composeShareFeature } from "../../share/share.composition";
+import { composeTopicFeature } from "../../topic/topic.composition";
 import {
-  HttpWorkflowStudioStreamAdapter,
-  WorkflowStudioDispatchService,
-} from "@langwatch/workflow-server";
+  createSpansTrpcRouter,
+  createTraceEditOverlayTrpcRouter,
+  createTracesTrpcRouter,
+} from "../trace-trpc.mount";
+import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "../traces-v2-trpc.mount";
+import {
+  ApiUsageStatsPort,
+  composeSpendFeature,
+} from "../../entitlement/spend.composition";
+import type { LimitsTrpcPorts } from "@langwatch/entitlement-server";
 
 /**
  * The sixteen namespaces this half owns, as the wire names them.
@@ -162,7 +170,7 @@ function testTraceApp(broadcast: PresenceEmitterPort): TraceApp {
 }
 
 /** The group's ports, every one of them a fake this suite can observe. */
-function testTraceGroupPorts(): ApiTraceGroupPorts {
+function testTraceGroupPorts(): ApiTracePorts {
   const protections = { visibilityCutoffMs: null, canSeeCosts: true };
   return {
     traces: stub("traces", {
@@ -186,8 +194,6 @@ function testTraceGroupPorts(): ApiTraceGroupPorts {
       isTraceNotFound: () => false,
       tryGetShareViewerProtections: async () => null,
     }),
-    savedViews: { savedViews: stub("savedViews", { getAll: async () => [{ id: "view-1" }] }) },
-    costs: { readOrganizationSpend: async () => [{ project: { id: "project-1" }, costs: [] }] },
     llmModelCost: stub("llmModelCost", { isSafeRegex: () => true, getModelLimits: () => null }),
     modelProvider: stub("modelProvider", { recordAudit: () => undefined }),
     modelProviderChecks: {
@@ -196,8 +202,7 @@ function testTraceGroupPorts(): ApiTraceGroupPorts {
     },
     translate: { wrapAiCall: (_feature: unknown, call: () => unknown) => call() },
     httpProxy: stub("httpProxy"),
-    limits: stub("limits", { getUsageStats: async () => ({ currentMonthMessagesCount: 3 }) }),
-  } as unknown as ApiTraceGroupPorts;
+  } as unknown as ApiTracePorts;
 }
 
 /**
@@ -232,23 +237,32 @@ function testAuthz(): AuthzService {
 }
 
 /**
- * The trace-group half, faked: the application slices this half fills, plus
- * its port group. Passed to `composeApiTrpcCollaborators` as the one real
- * half under test; the other nine come from the shared stub halves.
+ * The trace feature, faked at its PORTS: the application slice it publishes,
+ * the plan reading beside it and the five port groups. The routers are the
+ * REAL mounts over those ports, which is what makes the calls below go through
+ * the process's own root rather than through a stub.
  */
-function testTraceGroupHalf(broadcast: PresenceEmitterPort): ApiTraceGroupCollaborators {
+function testTraceGroupHalf(broadcast: PresenceEmitterPort): ComposedTraceFeature {
+  const ports = testTraceGroupPorts();
   return {
+    routers: (mount) => ({
+      traces: createTracesTrpcRouter({ ...mount, ports: ports.traces }),
+      tracesV2: createTracesV2TrpcRouter({ ...mount, ports: ports.tracesV2 }),
+      spans: createSpansTrpcRouter({ ...mount, ports: ports.spans }),
+      traceEditOverlay: createTraceEditOverlayTrpcRouter({
+        ...mount,
+        ports: ports.traceEditOverlay,
+      }),
+      sharedTrace: createSharedTraceTrpcRouter({
+        ...mount,
+        publicProcedure: mount.publicProcedure,
+        ports: ports.sharedTrace,
+      }),
+    }),
     traces: testTraceApp(broadcast),
-    share: { listForResource: async () => [{ id: "share-1", token: "tok" }] },
-    dataRetention: { listByProject: async () => [{ traceId: "trace-1" }] },
-    topics: { getAll: async () => [{ id: "topic-1", name: "Refunds" }] },
-    modelProviders: {
-      getForProject: async () => ({}),
-      listCosts: async () => [{ id: "cost-1", model: "gpt-5-mini" }],
-    },
     planProvider: { getActivePlan: async () => ({ type: "OPEN_SOURCE", name: "Developer" }) },
-    ports: testTraceGroupPorts(),
-  } as unknown as ApiTraceGroupCollaborators;
+    ports,
+  } as unknown as ComposedTraceFeature;
 }
 
 /** A REST security whose credential services are never reached on this lane. */
@@ -263,18 +277,52 @@ function subscriptionSecurity() {
 
 function composeApplication() {
   const { broadcast, emitterFor } = testBroadcast();
+  // The two features that left this half and now compose themselves, over the
+  // same doubles the ports used to carry: one saved view, and one project's
+  // spend taken against one usage reading.
+  const infrastructure = {
+    ...stubInfrastructureEntitlements(),
+    prisma: {
+      // The adapter seeds a project's default views before it lists them, so
+      // every write answers rather than only the read this asserts on.
+      savedView: new Proxy(
+        {},
+        {
+          get: (_target, method) => async () =>
+            method === "findMany"
+              ? [{ id: "view-1", filters: {}, projectId: "project-1" }]
+              : method === "count"
+                ? 0
+                : { count: 0 },
+        },
+      ),
+      project: { findMany: async () => [{ id: "project-1" }] },
+      cost: { groupBy: async () => [{ projectId: "project-1", costType: "TRACE_CHECK" }] },
+    } as unknown as PrismaClient,
+    authz: testAuthz(),
+    audit: undefined,
+  };
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: stubComposedFeatures(),
-    infrastructure: {
-      ...stubInfrastructureEntitlements(),
-      prisma: {} as unknown as PrismaClient,
-      authz: testAuthz(),
-      audit: undefined,
+    composed: {
+      ...stubComposedFeatures(),
+      trace: testTraceGroupHalf(broadcast),
+      savedView: composeSavedViewFeature({ infrastructure }),
+      spend: composeSpendFeature({
+        infrastructure,
+        usage: new (class extends ApiUsageStatsPort {
+          ports() {
+            return stub<LimitsTrpcPorts>("limits", {
+              getUsageStats: async () => ({ currentMonthMessagesCount: 3 }),
+            });
+          }
+        })(),
+      }),
     },
-    collaborators: composeApiTrpcCollaborators(
-      testHalves({ traceGroup: testTraceGroupHalf(broadcast) }, broadcast),
-      stubApplicationSlices(),
-    ),
+    infrastructure,
+    collaborators: composeApiTrpcCollaborators(testHalves({}, broadcast), {
+      ...stubApplicationSlices(),
+      traces: testTraceGroupHalf(broadcast).traces,
+    }),
   });
   if (!features) throw new Error("the record refused to compose against its test collaborators");
 
@@ -424,25 +472,9 @@ describe("given an API process composed with the observability collaborators", (
           expect(body).toMatchObject({ result: { data: { json: { traceId: "trace-1" } } } }),
       ],
       [
-        "share.listForResource",
-        { projectId: "project-1", resourceType: "TRACE", resourceId: "trace-1" },
-        (body) => expect(body).toMatchObject({ result: { data: { json: [{ id: "share-1" }] } } }),
-      ],
-      [
-        "pinnedTrace.listByProject",
-        { projectId: "project-1" },
-        (body) =>
-          expect(body).toMatchObject({ result: { data: { json: [{ traceId: "trace-1" }] } } }),
-      ],
-      [
         "savedViews.getAll",
         { projectId: "project-1" },
         (body) => expect(body).toMatchObject({ result: { data: { json: [{ id: "view-1" }] } } }),
-      ],
-      [
-        "topics.getAll",
-        { projectId: "project-1" },
-        (body) => expect(body).toMatchObject({ result: { data: { json: [{ id: "topic-1" }] } } }),
       ],
       [
         "costs.getAggregatedCostsForOrganization",
@@ -453,27 +485,12 @@ describe("given an API process composed with the observability collaborators", (
           }),
       ],
       [
-        "llmModelCost.getAllForProject",
-        { projectId: "project-1" },
-        (body) => expect(body).toMatchObject({ result: { data: { json: [{ id: "cost-1" }] } } }),
-      ],
-      [
-        "modelProvider.getAllForProject",
-        { projectId: "project-1" },
-        (body) => expect(body).toMatchObject({ result: { data: { json: {} } } }),
-      ],
-      [
         "limits.getUsage",
         { organizationId: "org-1" },
         (body) =>
           expect(body).toMatchObject({
             result: { data: { json: { currentMonthMessagesCount: 3 } } },
           }),
-      ],
-      [
-        "plan.getActivePlan",
-        { organizationId: "org-1" },
-        (body) => expect(body).toMatchObject({ result: { data: { json: { name: "Developer" } } } }),
       ],
     ];
 
@@ -542,22 +559,18 @@ describe("given an API process composed with the observability collaborators", (
 });
 
 describe("given a process that composed no trace read stack", () => {
-  function composeGroup(report?: LoggedApiTraceGroupAbsence) {
+  function composeGroup(report?: LoggedApiTraceAbsence) {
     const { broadcast, emitterFor } = testBroadcast();
-    const group = composeApiTraceGroupCollaborators({
+    const group = composeTraceFeature({
       prisma: {} as unknown as PrismaClient,
       authz: testAuthz(),
-      grants: stub<AuthzGrantsService>("grants"),
       projects: stub<ProjectService>("projects"),
-      organizations: stub("organizations"),
       broadcast,
-      defaultRetentionDays: 49,
+      peers: { share: stub("share"), topics: stub("topics") },
       resolveClickHouseClient: null,
-      redis: null,
       // Permissive here on purpose: this suite is about what a process with no
       // read stack REFUSES. The counter's own behaviour is the last suite.
       rateLimit: async () => ({ allowed: true }),
-      modelProviders: undefined,
       processName: "langwatch-api",
       ...(report ? { report } : {}),
     });
@@ -578,23 +591,13 @@ describe("given a process that composed no trace read stack", () => {
     expect(group.traces.getTenantEmitter("project-1")).toBe(emitterFor("project-1"));
   });
 
-  it("answers a cost-rule pattern conservatively rather than allowing everything", () => {
-    const { group } = composeGroup();
-
-    expect(group.ports.llmModelCost.isSafeRegex("^gpt-5")).toBe(true);
-    expect(group.ports.llmModelCost.isSafeRegex("(a+)+$")).toBe(false);
-  });
-
   it("names every capability it did not compose", () => {
     const warn = vi.fn();
 
-    composeGroup(LoggedApiTraceGroupAbsence.create({ warn }));
+    composeGroup(LoggedApiTraceAbsence.create({ warn }));
 
     expect(warn.mock.calls.map(([data]) => (data as { capability: string }).capability)).toEqual([
       "trace-reads",
-      "model-provider-host",
-      "studio",
-      "usage",
       "plans",
     ]);
   });
@@ -668,25 +671,21 @@ describe("given an API process that composed the real observability collaborator
   function composeRealGroup(clickHouse: ReturnType<typeof testClickHouse>) {
     const { broadcast } = testBroadcast();
     const prisma = testPrisma();
-    return composeApiTraceGroupCollaborators({
+    return composeTraceFeature({
       prisma,
       authz: testAuthz(),
-      grants: stub<AuthzGrantsService>("grants"),
       projects: {
         tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
         tryGetById: async () => ({ id: "project-1" }),
       } as unknown as ProjectService,
-      organizations: stub("organizations"),
       broadcast,
-      defaultRetentionDays: 49,
+      peers: { share: stub("share"), topics: stub("topics") },
       resolveClickHouseClient: clickHouse.resolveClient,
-      redis: null,
       // As above: this suite drives the ClickHouse reads, not the anonymous
       // share read's throttle.
       rateLimit: async () => ({ allowed: true }),
-      modelProviders: undefined,
       processName: "langwatch-api",
-      traceReadsFrom: ({ dataRetention, topics }) =>
+      traceReadsFrom: () =>
         composeApiTraceReadStack({
           prisma,
           resolveClickHouseClient: clickHouse.resolveClient,
@@ -712,34 +711,32 @@ describe("given an API process that composed the real observability collaborator
               }),
           },
           plans,
-          dataRetention,
-          topics,
+          dataRetention: stub("dataRetention"),
+          topics: stub("topics"),
           modelProviders: undefined,
           executionProxyBaseUrl: "http://127.0.0.1:5561",
           processName: "langwatch-api",
         }),
-      modelProviderHost: composeApiModelProviderHost({
-        egress: { blockLocal: true, allowedHosts: [], verifyTls: true },
-        environment: {},
-        processName: "langwatch-api",
-      }),
-      studio: composeApiStudioHost({
-        nlpServiceUrl: undefined,
-        modelProviders: undefined,
-        processName: "langwatch-api",
-      }),
-      usage: composeApiUsageStats({
-        prisma,
-        plans,
-        // Both routings, as the process publishes them: the trace rollup is
-        // keyed by project and the billable-events rollup by organization.
-        clickhouse: {
-          resolveClient: clickHouse.resolveClient,
-          resolveOrganizationClient: clickHouse.resolveClient,
-        },
-        processName: "langwatch-api",
-      }),
       plans,
+    });
+  }
+
+  /**
+   * The usage reading, composed for real over the same connection and the same
+   * ClickHouse the group reads: what the panel reports is a real count taken
+   * against a real plan rather than a fake.
+   */
+  function composeRealUsage(clickHouse: ReturnType<typeof testClickHouse>) {
+    return composeApiUsageStats({
+      prisma: testPrisma(),
+      plans,
+      // Both routings, as the process publishes them: the trace rollup is
+      // keyed by project and the billable-events rollup by organization.
+      clickhouse: {
+        resolveClient: clickHouse.resolveClient,
+        resolveOrganizationClient: clickHouse.resolveClient,
+      },
+      processName: "langwatch-api",
     });
   }
 
@@ -748,18 +745,23 @@ describe("given an API process that composed the real observability collaborator
     const { broadcast } = testBroadcast();
     const group = composeRealGroup(clickHouse);
     const collaborators = composeApiTrpcCollaborators(
-      testHalves({ traceGroup: group }, broadcast),
-      stubApplicationSlices(),
+      testHalves({}, broadcast),
+      { ...stubApplicationSlices(), traces: group.traces, planProvider: group.planProvider },
     );
 
+    const infrastructure = {
+      ...stubInfrastructureEntitlements(),
+      prisma: testPrisma(),
+      authz: testAuthz(),
+      audit: undefined,
+    };
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      composed: stubComposedFeatures(),
-      infrastructure: {
-        ...stubInfrastructureEntitlements(),
-        prisma: {} as unknown as PrismaClient,
-        authz: testAuthz(),
-        audit: undefined,
+      composed: {
+        ...stubComposedFeatures(),
+        trace: group,
+        spend: composeSpendFeature({ infrastructure, usage: composeRealUsage(clickHouse) }),
       },
+      infrastructure,
       collaborators,
     });
     if (!features) throw new Error("the record refused to compose against its real collaborators");
@@ -880,33 +882,6 @@ describe("given an API process that composed the real observability collaborator
     });
   });
 
-  describe("when a model's ceilings are read through the real handler", () => {
-    it("answers the registry's own limits rather than null", async () => {
-      const clickHouse = testClickHouse([]);
-      const { application } = composeRealApplication(clickHouse);
-
-      const { status, body } = await callTrpc(application, "llmModelCost.getModelLimits", {
-        projectId: "project-1",
-        model: "openai/gpt-5-mini",
-      });
-
-      expect(status).toBe(200);
-      expect(body).toMatchObject({
-        result: { data: { json: { maxInputTokens: expect.any(Number) } } },
-      });
-    });
-  });
-
-  describe("when a catastrophic-backtracking pattern is checked", () => {
-    it("uses the package's real gate rather than the conservative stand-in", () => {
-      const clickHouse = testClickHouse([]);
-      const group = composeRealGroup(clickHouse);
-
-      expect(group.ports.llmModelCost.isSafeRegex("^gpt-5")).toBe(true);
-      expect(group.ports.llmModelCost.isSafeRegex("(a+)+$")).toBe(false);
-    });
-  });
-
   describe("when the usage panel and the plan banner are read through the real handler", () => {
     it("answers a real reading taken against a real plan", async () => {
       const clickHouse = testClickHouse([]);
@@ -924,58 +899,6 @@ describe("given an API process that composed the real observability collaborator
     });
   });
 
-  describe("when the studio dispatches an event to an engine that answers", () => {
-    it("relays the engine's own server events back to the watcher", async () => {
-      const frames = [
-        'data: {"type":"component_state_change","payload":{"component_id":"node-1"}}\n\n',
-        'data: {"type":"done","payload":{}}\n\n',
-      ];
-      const encoder = new TextEncoder();
-      const engine = vi.fn(async () => ({
-        body: new ReadableStream<Uint8Array>({
-          start(controller) {
-            for (const frame of frames) controller.enqueue(encoder.encode(frame));
-            controller.close();
-          },
-        }),
-      })) as unknown as typeof fetch;
-
-      const seen: Array<{ type: string }> = [];
-      const dispatch = WorkflowStudioDispatchService.create({
-        stream: HttpWorkflowStudioStreamAdapter.create({
-          serviceUrl: "http://127.0.0.1:5561",
-          fetch: engine,
-        }),
-        modelProviders: { getForProject: async () => ({}) } as never,
-      });
-
-      await dispatch.postEvent({
-        projectId: "project-1",
-        event: { type: "execute_flow", payload: { node_id: "node-1" } } as never,
-        onEvent: (event) => seen.push(event as { type: string }),
-      });
-
-      expect(seen.map((event) => event.type)).toEqual(["component_state_change", "done"]);
-    });
-  });
-
-  describe("when the studio is asked for on a process that composed no gateway", () => {
-    it("refuses the dispatch by name rather than dispatching without one", async () => {
-      const clickHouse = testClickHouse([]);
-      const group = composeRealGroup(clickHouse);
-
-      await expect(
-        group.ports.httpProxy.postStudioEvent(undefined, {
-          projectId: "project-1",
-          event: { type: "is_alive", payload: {} } as never,
-          onEvent: noop,
-        }),
-      ).rejects.toMatchObject({
-        code: "service_unavailable",
-        meta: { capability: "the studio event dispatch" },
-      });
-    });
-  });
 });
 
 /**
@@ -1074,23 +997,19 @@ describe("given the anonymous share read composed on this process", () => {
     const limiter = ApiRateLimitInfrastructure.create();
     const metered: Array<{ key: string; windowSeconds: number; max: number }> = [];
     const { broadcast } = testBroadcast();
-    const group = composeApiTraceGroupCollaborators({
+    const group = composeTraceFeature({
       prisma: testPrisma(),
       authz: testAuthz(),
-      grants: stub<AuthzGrantsService>("grants"),
       projects: stub<ProjectService>("projects"),
-      organizations: stub("organizations"),
       broadcast,
-      defaultRetentionDays: 49,
+      peers: { share: stub("share"), topics: stub("topics") },
       resolveClickHouseClient: null,
-      redis: null,
       // The shape `api-production.composition.ts` passes: the process's ONE
       // counter, reached through the same one-line lambda.
       rateLimit: (input) => {
         metered.push(input);
         return limiter.consume(input);
       },
-      modelProviders: undefined,
       processName: "langwatch-api",
       traceReads: shareReadStack(),
     });
@@ -1109,12 +1028,12 @@ describe("given the anonymous share read composed on this process", () => {
     });
 
     const collaborators = composeApiTrpcCollaborators(
-      testHalves({ traceGroup: group }, broadcast),
-      stubApplicationSlices(),
+      testHalves({}, broadcast),
+      { ...stubApplicationSlices(), traces: group.traces, planProvider: group.planProvider },
     );
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      composed: stubComposedFeatures(),
+      composed: { ...stubComposedFeatures(), trace: group },
       infrastructure: {
         ...stubInfrastructureEntitlements(),
         prisma: {} as unknown as PrismaClient,

@@ -1,5 +1,5 @@
 /**
- * Stub builders for the nine collaborator halves a per-half integration test
+ * Stub builders for the collaborator halves a per-half integration test
  * is NOT exercising, plus the shared `stub()` proxy every one of those tests
  * already used to fake a namespace's build-time surface.
  *
@@ -33,11 +33,20 @@ import { refusingHomeFeature } from "../../features/project/home.composition";
 import { refusingRoleFeature } from "../../features/role/role.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
+import { refusingBugReportFeature } from "../../features/bug-report/bug-report.composition";
+import { refusingAnnotationFeature } from "../../features/annotation/annotation.composition";
+import { refusingSavedViewFeature } from "../../features/dashboard/saved-view.composition";
+import { refusingSpendFeature } from "../../features/entitlement/spend.composition";
+import { refusingHttpProxyFeature } from "../../features/agent/http-proxy.composition";
+import { refusingModelProviderFeature } from "../../features/model-provider/model-provider.composition";
+import { refusingShareFeature } from "../../features/share/share.composition";
+import { refusingTopicFeature } from "../../features/topic/topic.composition";
+import { refusingTraceFeature } from "../../features/trace/trace.composition";
+import { refusingDataPrivacyFeature } from "../../features/data-privacy/data-privacy.composition";
+import { refusingIntegrationsChecksFeature } from "../../features/project/integrations-checks.composition";
 import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed";
 import type { ApiIdentityCollaborators } from "../api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "../api-trpc-collaborators.org-group.composition";
-import type { ApiProductCollaborators } from "../api-trpc-collaborators.product.composition";
-import type { ApiTraceGroupCollaborators } from "../api-trpc-collaborators.trace-group.composition";
 
 const anySchema = z.any();
 const passThroughMiddleware = ({ next }: { next: () => unknown }) => next();
@@ -58,6 +67,25 @@ export function stub<T>(group: string, buildTime: Record<string, unknown> = {}):
     },
     has: () => true,
   }) as T;
+}
+
+/**
+ * The plan lookup and the flag store the record's own compositions read, as a
+ * suite that drives neither supplies them: every organization is on the free
+ * plan and inside every rollout, so a feature gated on either still MOUNTS and
+ * a suite asserting on the gate itself overrides them.
+ */
+export function stubInfrastructureEntitlements(): Pick<
+  ApiTrpcInfrastructure,
+  "plans" | "featureFlags" | "saasBilling"
+> {
+  return {
+    plans: { getActivePlan: async () => ({ type: "FREE" }) as never },
+    featureFlags: stub("featureFlags", { isEnabled: async () => true }),
+    // Self-hosted, so the two Enterprise billing namespaces mount as the empty
+    // routers of the same served type. A suite asserting on billing overrides it.
+    saasBilling: false,
+  };
 }
 
 /**
@@ -112,73 +140,6 @@ export function stubExecutionHalf(): ApiExecutionCollaborators {
   });
 }
 
-export function stubTraceGroupHalf(): ApiTraceGroupCollaborators {
-  return stub<ApiTraceGroupCollaborators>("traceGroup", {
-    traces: stub("app.traces"),
-    share: stub("app.share"),
-    dataRetention: stub("app.dataRetention"),
-    topics: stub("app.topics"),
-    modelProviders: stub("app.modelProviders"),
-    planProvider: stub("app.planProvider"),
-    ports: {
-      traces: stub("traces", {
-        listInputSchema: anySchema,
-        filterInputSchema: anySchema,
-        evaluatorTypeSchema: anySchema,
-        preconditionSchema: anySchema,
-      }),
-      tracesV2: stub("tracesV2", { traceMetadataUpdateSchema: anySchema }),
-      spans: stub("spans"),
-      traceEditOverlay: stub("traceEditOverlay"),
-      sharedTrace: stub("sharedTrace"),
-      savedViews: stub("savedViews"),
-      costs: stub("costs"),
-      llmModelCost: stub("llmModelCost"),
-      modelProvider: stub("modelProvider"),
-      modelProviderChecks: {
-        tenantWrite: () => passThroughMiddleware,
-        credentialProbe: passThroughMiddleware,
-      },
-      translate: stub("translate"),
-      httpProxy: stub("httpProxy"),
-      limits: stub("limits"),
-    },
-  });
-}
-
-/**
- * The plan lookup and the flag store the record's own compositions read, as a
- * suite that drives neither supplies them: every organization is on the free
- * plan and inside every rollout, so a feature gated on either still MOUNTS and
- * a suite asserting on the gate itself overrides them.
- */
-export function stubInfrastructureEntitlements(): Pick<
-  ApiTrpcInfrastructure,
-  "plans" | "featureFlags" | "saasBilling"
-> {
-  return {
-    plans: { getActivePlan: async () => ({ type: "FREE" }) as never },
-    featureFlags: stub("featureFlags", { isEnabled: async () => true }),
-    // Self-hosted, so the two Enterprise billing namespaces mount as the empty
-    // routers of the same served type. A suite asserting on billing overrides it.
-    saasBilling: false,
-  };
-}
-
-export function stubProductHalf(): ApiProductCollaborators {
-  return stub<ApiProductCollaborators>("product", {
-    annotations: stub("app.annotations"),
-    annotationPorts: stub("annotation", {
-      writeTraceSuggestion: passThroughMiddleware,
-    }),
-    bugReportPorts: stub("bugReports"),
-    dataPrivacyPorts: stub("dataPrivacy"),
-    integrationsChecksPorts: stub("integrationsChecks"),
-    traceCommands: stub("product.traceCommands"),
-  });
-}
-
-
 export function stubOrgGroupHalf(): ApiOrgGroupCollaborators {
   return stub<ApiOrgGroupCollaborators>("orgGroup", {
     application: {
@@ -219,6 +180,13 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
     gateway: stub("app.gateway"),
     github: stub("app.github"),
     analytics: stub("app.analytics"),
+    modelProviders: stub("app.modelProviders"),
+    dataRetention: stub("app.dataRetention"),
+    planProvider: stub("app.planProvider", { getActivePlan: async () => ({ type: "FREE" }) }),
+    share: stub("app.share"),
+    topics: stub("app.topics"),
+    traces: stub("app.traces"),
+    annotations: stub("app.annotations"),
     authzApp: stub("app.authzApp"),
     permissions: stub("app.permissions"),
     roles: stub("app.roles"),
@@ -271,11 +239,22 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     home: refusingHomeFeature(),
     role: refusingRoleFeature(),
     storedObject: refusingStoredObjectFeature(),
+    bugReport: refusingBugReportFeature(),
+    annotation: refusingAnnotationFeature(),
+    savedView: refusingSavedViewFeature(),
+    spend: refusingSpendFeature(),
+    httpProxy: refusingHttpProxyFeature(),
+    modelProvider: refusingModelProviderFeature(),
+    share: refusingShareFeature(),
+    topic: refusingTopicFeature(),
+    trace: refusingTraceFeature(),
+    dataPrivacy: refusingDataPrivacyFeature(),
+    integrationsChecks: refusingIntegrationsChecksFeature(),
   };
 }
 
 /**
- * All ten halves, stubbed by default. Pass the half(s) a test actually
+ * All four halves, stubbed by default. Pass the half(s) a test actually
  * composes as overrides — the rest stay stubbed so the full record still
  * builds. `broadcast` seeds the identity half's tenant emitter; give it the
  * same `EventEmitter` a subscription test emits on.
@@ -285,10 +264,8 @@ export function testHalves(
   broadcast: EventEmitter = new EventEmitter(),
 ): ApiTrpcCollaboratorHalves {
   return {
-    product: stubProductHalf(),
     identity: stubIdentityHalf(broadcast),
     execution: stubExecutionHalf(),
-    traceGroup: stubTraceGroupHalf(),
     orgGroup: stubOrgGroupHalf(),
     ...overrides,
   };

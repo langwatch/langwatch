@@ -17,7 +17,6 @@
 import type { ApiTrpcFeatureMount } from "../api.application";
 import type { ApiTrpcInfrastructure } from "./app-trpc.infrastructure";
 import type { ComposedApiFeatures } from "./app-trpc.composed";
-import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
 
 import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
 
@@ -25,28 +24,13 @@ import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
 
 
 import type { AuthApp } from "@langwatch/auth-server";
-import type { DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
 import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
-import type { HttpProxyTrpcPorts } from "@langwatch/agent-server";
 import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-server";
-import type {
-  LlmModelCostTrpcPorts,
-  ModelProviderTrpcPorts,
-  TranslateTrpcPorts,
-} from "@langwatch/model-provider-server";
 
+import type { TraceEditOverlayVisibilityWindow } from "@langwatch/trace-server";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
-import type {
-  SharedTraceTrpcPorts,
-  SpansTrpcPorts,
-  TraceEditOverlayTrpcPorts,
-  TraceEditOverlayVisibilityWindow,
-  TracesTrpcPorts,
-  TracesV2TrpcPorts,
-} from "@langwatch/trace-server";
 
 import type { ExperimentTrpcPorts } from "@langwatch/experiment-server";
-import type { BugReportTrpcPorts } from "@langwatch/ops-server";
 
 import type {
   GroupTrpcPorts,
@@ -56,17 +40,12 @@ import type {
 } from "@langwatch/organization-server";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
 
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatch/workflow-server";
 
 import type { ZodTypeAny } from "zod";
 
-import {
-  createAnnotationScoreTrpcRouter,
-  createAnnotationTrpcRouter,
-} from "../features/annotation/annotation-trpc.mount";
 import { composeApiKeyTrpcRouter } from "../features/api-key/api-key.composition";
 import {
   createFrontDoorTrpcRouter,
@@ -76,16 +55,11 @@ import { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount";
 import { createDatasetRecordTrpcRouter } from "../features/dataset/dataset-trpc.mount";
 import { createDashboardTrpcRouter } from "../features/dashboard/dashboard-trpc.mount";
 import {
-  createDataPrivacyTrpcRouter,
-  type DataPrivacyTrpcChecks,
-} from "../features/data-privacy/data-privacy-trpc.mount";
-import {
   createEvaluationTrpcRouter,
   type EvaluationMountPorts,
 } from "../features/evaluation/evaluation-trpc.mount";
 import { createExperimentTrpcRouter } from "../features/experiment/experiment-trpc.mount";
 import { createExportTrpcRouter } from "../features/export/export-trpc.mount";
-import { createBugReportTrpcRouter } from "../features/ops/ops-trpc.mount";
 import { createPresenceTrpcRouter } from "../features/presence/presence-trpc.mount";
 import {
   createGroupTrpcRouter,
@@ -95,7 +69,6 @@ import {
   createPersonalWorkspaceFeaturesTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
 import {
-  createIntegrationsChecksTrpcRouter,
   createProjectTrpcRouter,
   type ProjectTrpcChecks,
   type ProjectTrpcMountPorts,
@@ -121,33 +94,12 @@ import {
 } from "../features/enterprise/enterprise-trpc.mount";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition";
-import { createHttpProxyTrpcRouter } from "../features/agent/http-proxy-trpc.mount";
-import { createSavedViewTrpcRouter } from "../features/dashboard/dashboard-trpc.mount";
 import {
-  createCostTrpcRouter,
-  createLimitsTrpcRouter,
   createPlanTrpcRouter,
 } from "../features/entitlement/entitlement-trpc.mount";
 import {
-  createLlmModelCostTrpcRouter,
-  createModelProviderTrpcRouter,
   type ModelProviderTrpcChecks,
 } from "../features/model-provider/model-provider-trpc.mount";
-import { createTranslateTrpcRouter } from "../features/model-provider/translate-trpc.mount";
-import {
-  createPinnedTraceTrpcRouter,
-  createShareTrpcRouter,
-} from "../features/share/share-trpc.mount";
-import { createTopicTrpcRouter } from "../features/topic/topic-trpc.mount";
-import {
-  createSpansTrpcRouter,
-  createTraceEditOverlayTrpcRouter,
-  createTracesTrpcRouter,
-} from "../features/trace/trace-trpc.mount";
-import {
-  createSharedTraceTrpcRouter,
-  createTracesV2TrpcRouter,
-} from "../features/trace/traces-v2-trpc.mount";
 
 /**
  * The capabilities these surfaces reach that their own feature packages do not
@@ -160,14 +112,8 @@ import {
  * process binds them once here, the way it supplies the mount itself.
  */
 export interface AppTrpcFeaturePorts<
-  TAnnotationPorts extends AnnotationTrpcPorts,
-  TBugReport,
-  TBugReportPage,
-  TCheckStatus,
   TMappingsIn,
   TMappingsOut,
-  TPrivacyRule,
-  TPrivacySnapshot,
   TSignUpDataSchema extends ZodTypeAny,
   TWorkbenchState,
   TWorkflowVersion,
@@ -201,46 +147,6 @@ export interface AppTrpcFeaturePorts<
   emailSuppression: EmailSuppressionTrpcPorts;
   /** The SCIM plan gate, and the back office's connection ledger with its trail. */
   enterprise: EnterpriseTrpcMountPorts;
-  /** The legacy grid's two shared input schemas, the precondition engine, the span digest and redactions. */
-  traces: TracesTrpcPorts<TListInput, TListInputRaw, TFilterInput, TFilterInputRaw, TPrecondition>;
-  /** Everything the explorer reads that is another vertical's. */
-  tracesV2: Omit<TracesV2TrpcPorts<TMetadata, TMetadataRaw>, "queryTranslation">;
-  /** The caller's read-time redactions, for the waterfall and the studio span. */
-  spans: SpansTrpcPorts;
-  /** The same redactions, plus the two rules a correction is carried through. */
-  traceEditOverlay: TraceEditOverlayTrpcPorts<TProtections>;
-  /** The anonymous read's own four capabilities. */
-  sharedTrace: SharedTraceTrpcPorts;
-  /** The stored filter sets, generic in the row shape the explorer renders. */
-  savedViews: SavedViewTrpcPorts<TSavedView>;
-  /** The organization's spend, rolled up per project. */
-  costs: CostTrpcPorts<TSpendRollup>;
-  /** The cost rule's regex safety gate, the model registry's ceilings and the live span preview. */
-  llmModelCost: LlmModelCostTrpcPorts;
-  /** The outbound credential probes, the Codex device flow and the audit trail. */
-  modelProvider: ModelProviderTrpcPorts<TApiKeyValidation, TStoredKeyValidation>;
-  /** The two data-dependent gates the provider surface needs, already built. */
-  modelProviderChecks: ModelProviderTrpcChecks;
-  /** The application's provider-failure policy behind one model call. */
-  translate: TranslateTrpcPorts;
-  /** The studio's event dispatch, and the agent test's own trace write. */
-  httpProxy: HttpProxyTrpcPorts;
-  /** The usage reading and the approaching-limit notifier, over the billing store. */
-  limits: LimitsTrpcPorts;
-  /**
-   * The annotation queue rows, the trace reads that resolve an item's content
-   * for a reviewer, the correction overlay a suggested output is carried into,
-   * and the trace-side record of "a human commented on this". Generic over the
-   * concrete group because those return types are what the client sees.
-   */
-  annotation: TAnnotationPorts;
-  /**
-   * The support inbox and the audit trail every read of it is written to. The
-   * reports themselves are a global table with no tenant column, filed against
-   * the product by `langwatch report` and the MCP tool, so the process reads
-   * them the way it reads any other back-office resource.
-   */
-  bugReports: BugReportTrpcPorts<TBugReportPage, TBugReport>;
   /**
    * The composed auth application BOTH signed-out doors answer from — the
    * front door and `publicEnv` beside it. One instance rather than two,
@@ -248,27 +154,6 @@ export interface AppTrpcFeaturePorts<
    * for the whole deployment and the two doors must never disagree.
    */
   auth: AuthApp;
-  /**
-   * The privacy settings surface's three answers: the snapshot the screen
-   * renders, and the two writes.
-   *
-   * All three are the application's rather than the feature's, and for the
-   * same reason. The snapshot is assembled from the organization, department,
-   * team and group storage the data-privacy package may not reach and filtered
-   * by the caller's permission at each tier; both writes first anchor the
-   * target scope to the project's organization and then probe the permission
-   * that tier demands. What the package owns is the wire: the tiers, the
-   * durable configuration parser, and the two failures a caller can act on.
-   */
-  dataPrivacy: DataPrivacyTrpcPorts<TPrivacySnapshot, TPrivacyRule>;
-  /**
-   * The declarations those two writes are checked under, already built.
-   *
-   * They are middlewares rather than descriptions because each one CLAIMS
-   * which assertion enforces the project id, and the declaration sweep counts
-   * a claim as coverage. A claim has to be written where the enforcement is.
-   */
-  dataPrivacyScopeChecks: DataPrivacyTrpcChecks;
   /**
    * The trace-mapping registry, the project's Azure Safety credentials, this
    * install's evaluator inventory and environment, the trace evaluation
@@ -286,12 +171,6 @@ export interface AppTrpcFeaturePorts<
   group: GroupTrpcPorts;
   /** The verification ceremony that spends the caller's own record. */
   identity: IdentityTrpcPorts;
-  /**
-   * The project setup rollup the onboarding surfaces render: nine other
-   * verticals' evidence plus the project's own two columns, fanned out by the
-   * process because no one feature package holds it.
-   */
-  integrationsChecks: IntegrationsChecksTrpcPorts<TCheckStatus>;
   /**
    * The join-request service, composed over the identity ledger, the
    * membership writer that emits authorization grants, the organization's join
@@ -358,14 +237,8 @@ export interface AppTrpcFeaturePorts<
  * on.
  */
 export function createAppTrpcFeatures<
-  TAnnotationPorts extends AnnotationTrpcPorts,
-  TBugReport,
-  TBugReportPage,
-  TCheckStatus,
   TMappingsIn,
   TMappingsOut,
-  TPrivacyRule,
-  TPrivacySnapshot,
   TSignUpDataSchema extends ZodTypeAny,
   TWorkbenchState,
   TWorkflowVersion,
@@ -398,14 +271,8 @@ export function createAppTrpcFeatures<
    */
   composed: ComposedApiFeatures;
   ports: AppTrpcFeaturePorts<
-    TAnnotationPorts,
-    TBugReport,
-    TBugReportPage,
-    TCheckStatus,
     TMappingsIn,
     TMappingsOut,
-    TPrivacyRule,
-    TPrivacySnapshot,
     TSignUpDataSchema,
     TWorkbenchState,
     TWorkflowVersion,
@@ -428,6 +295,11 @@ export function createAppTrpcFeatures<
   const gateway = composed.gateway.router(mount);
   const langyRouters = composed.langy.routers(mount);
   const scenarioRouters = composed.scenario.routers(mount);
+  const annotationRouters = composed.annotation.routers(mount);
+  const spendRouters = composed.spend.routers(mount);
+  const modelProviderRouters = composed.modelProvider.routers(mount);
+  const traceRouters = composed.trace.routers(mount);
+  const shareRouters = composed.share.routers(mount);
   const analyticsRouters = composed.analytics.routers(mount);
   const datasetRouters = composed.dataset.routers(mount);
   const roleRouters = composed.role.routers(mount);
@@ -442,46 +314,35 @@ export function createAppTrpcFeatures<
   const { personalDashboard } = governance;
 
   return {
-    costs: createCostTrpcRouter({ ...mount, ports: ports.costs }),
-    httpProxy: createHttpProxyTrpcRouter({ ...mount, ports: ports.httpProxy }),
-    limits: createLimitsTrpcRouter({ ...mount, ports: ports.limits }),
-    llmModelCost: createLlmModelCostTrpcRouter({ ...mount, ports: ports.llmModelCost }),
-    modelProvider: createModelProviderTrpcRouter({
-      ...mount,
-      ports: ports.modelProvider,
-      checks: ports.modelProviderChecks,
-    }),
+    costs: spendRouters.costs,
+    httpProxy: composed.httpProxy.router(mount),
+    limits: spendRouters.limits,
+    llmModelCost: modelProviderRouters.llmModelCost,
+    modelProvider: modelProviderRouters.modelProvider,
     // Both share surfaces take no ports: a link and a pin are rows this
     // deployment owns outright, reached through `ctx.app.share`.
-    pinnedTrace: createPinnedTraceTrpcRouter(mount),
+    pinnedTrace: shareRouters.pinnedTrace,
     // What this organization is on. No ports either — the plan is resolved off
     // the application slice, because ONE answer to "which plan" is the whole
     // point of a plan provider.
     plan: createPlanTrpcRouter(mount),
-    savedViews: createSavedViewTrpcRouter({ ...mount, ports: ports.savedViews }),
-    share: createShareTrpcRouter(mount),
+    savedViews: composed.savedView.router(mount),
+    share: shareRouters.share,
     // ADR-057's single anonymous trace read. It takes the process's PUBLIC
     // procedure and a `noPermission` declaration rather than a permission: the
     // share token in the input is the whole authorization, and the declaration
     // is what keeps the procedure reviewable rather than merely unchecked.
-    sharedTrace: createSharedTraceTrpcRouter({
-      ...mount,
-      publicProcedure: mount.publicProcedure,
-      ports: ports.sharedTrace,
-    }),
-    spans: createSpansTrpcRouter({ ...mount, ports: ports.spans }),
-    topics: createTopicTrpcRouter(mount),
-    traceEditOverlay: createTraceEditOverlayTrpcRouter({
-      ...mount,
-      ports: ports.traceEditOverlay,
-    }),
+    sharedTrace: traceRouters.sharedTrace,
+    spans: traceRouters.spans,
+    topics: composed.topic.router(mount),
+    traceEditOverlay: traceRouters.traceEditOverlay,
     // Carries `onTraceUpdate`. In the record rather than beside it: a
     // subscription mounted beside the record would be callable over
     // `/api/trpc` and un-watchable over `/api/sse`.
-    traces: createTracesTrpcRouter({ ...mount, ports: ports.traces }),
+    traces: traceRouters.traces,
     // Carries `onDiscoverUpdate`, for the same reason.
-    tracesV2: createTracesV2TrpcRouter({ ...mount, ports: ports.tracesV2 }),
-    translate: createTranslateTrpcRouter({ ...mount, ports: ports.translate }),
+    tracesV2: traceRouters.tracesV2,
+    translate: modelProviderRouters.translate,
     automation: createAutomationTrpcRouter({ ...mount, ports: ports.automation }),
     codingAgents: createCodingAgentTrpcRouter({ ...mount, ports: ports.codingAgents }),
     // The unsubscribe pair arrives from a mail client with no session, so this
@@ -568,8 +429,11 @@ export function createAppTrpcFeatures<
     // so the whole namespace is one entry in this list, and so nothing outside
     // it can add a fourth door onto the same name.
     analytics: analyticsRouters.analytics,
-    annotation: createAnnotationTrpcRouter({ ...mount, ports: ports.annotation }),
-    annotationScore: createAnnotationScoreTrpcRouter(mount),
+    // A reviewer's comments, their scores and the queues they travel in,
+    // composed by the feature itself over this process's connection, its
+    // ClickHouse and the trace-side senders it registered once.
+    annotation: annotationRouters.annotation,
+    annotationScore: annotationRouters.annotationScore,
     apiKey: composeApiKeyTrpcRouter({ mount, infrastructure }),
     // What the caller may do at one scope, as the product reports their own
     // standing back to them. It takes no ports: the answer comes from the same
@@ -577,7 +441,10 @@ export function createAppTrpcFeatures<
     // second one here would be a second answer to one question.
     authz: createAuthzTrpcRouter(mount),
     batchRecord: datasetRouters.batchRecord,
-    bugReports: createBugReportTrpcRouter({ ...mount, ports: ports.bugReports }),
+    // The support inbox, composed by the feature itself: the reports are a
+    // global table with no tenant column, read by the back office under the
+    // staff declaration the package writes.
+    bugReports: composed.bugReport.router(mount),
     dashboards: createDashboardTrpcRouter(mount),
     // A project's datasets and the rows inside them: two wire names for one
     // application, because the rows are only reachable through the dataset
@@ -585,11 +452,10 @@ export function createAppTrpcFeatures<
     // what one contains.
     dataset: datasetRouters.dataset,
     datasetRecord: createDatasetRecordTrpcRouter(mount),
-    dataPrivacy: createDataPrivacyTrpcRouter({
-      ...mount,
-      ports: ports.dataPrivacy,
-      checks: ports.dataPrivacyScopeChecks,
-    }),
+    // The scoped privacy rules, composed by the feature itself: the cascade is
+    // resolved through the project and organization directories, and both
+    // writes anchor the target scope before they authorize it.
+    dataPrivacy: composed.dataPrivacy.router(mount),
     evaluations: createEvaluationTrpcRouter({
       ...mount,
       prisma: ports.prisma,
@@ -623,10 +489,10 @@ export function createAppTrpcFeatures<
     github: composeGithubTrpcRouter({ mount, infrastructure }),
     home: composed.home.router(mount),
     identity: createIdentityTrpcRouter({ ...mount, ports: ports.identity }),
-    integrationsChecks: createIntegrationsChecksTrpcRouter({
-      ...mount,
-      ports: ports.integrationsChecks,
-    }),
+    // The setup checklist, composed by the feature itself: nine other
+    // verticals' evidence plus the project's own two columns, and no one
+    // feature package holds it.
+    integrationsChecks: composed.integrationsChecks.router(mount),
     joinRequests: createJoinRequestTrpcRouter({ ...mount, ports: ports.joinRequests }),
     // The sign-up ceremony, beside the `organization.createAndAssign` it is
     // built on: same package, same questionnaire schema, same opt-out reason.

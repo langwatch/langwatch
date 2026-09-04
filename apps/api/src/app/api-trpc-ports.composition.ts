@@ -28,7 +28,6 @@
  * and a port that answered `unknown` would hand the pages `unknown`.
  */
 import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
-import { PostgresAnnotationQueueAdapter } from "@langwatch/annotation-server";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { pMapLimited } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -111,14 +110,9 @@ export type ApiTrpcPortsCompositionOptions = Readonly<{
  * what this connection returns.
  */
 export function createApiTrpcPorts<
-  TBugReport,
-  TBugReportPage,
-  TCheckStatus,
   TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
-  TPrivacyRule,
-  TPrivacySnapshot,
   TReadInput extends AnalyticsReadInput,
   TSignUpDataSchema extends ZodTypeAny,
   TTimeseriesInput extends AnalyticsTimeseriesInput,
@@ -128,14 +122,9 @@ export function createApiTrpcPorts<
 >(
   options: ApiTrpcPortsCompositionOptions & {
     collaborators: ApiTrpcCollaborators<
-      TBugReport,
-      TBugReportPage,
-      TCheckStatus,
       TFilterField,
       TMappingsIn,
       TMappingsOut,
-      TPrivacyRule,
-      TPrivacySnapshot,
       TReadInput,
       TSignUpDataSchema,
       TTimeseriesInput,
@@ -164,85 +153,7 @@ export function createApiTrpcPorts<
 
   return {
 
-    annotation: {
-      // Queue rows are Postgres, and the packaged adapter is what reads them.
-      queues: () => PostgresAnnotationQueueAdapter.create({ database: prisma }).build(),
-
-      // A suggested output rewrites the trace itself, so it is carried over
-      // only for a caller who may also update annotations. The declared check
-      // on the procedure covers the annotation; this covers the correction.
-      probeProjectPermission,
-
-      toQueueSlug: annotationQueueSlug,
-
-      ...collaborators.annotation,
-    },
-
-    /**
-     * The support inbox, and the audit trail every read of it is written to.
-     *
-     * Unlike the API-key sink above this one is AWAITED: the row is the record
-     * of who opened somebody's transcript, and it is written before they see
-     * it.
-     */
-    bugReports: {
-      ...collaborators.bugReports,
-      recordAudit: async (entry: {
-        userId: string;
-        action: string;
-        args?: Readonly<Record<string, unknown>>;
-        targetKind: string;
-        targetId?: string;
-      }) => {
-        await audit?.record({
-          actorId: entry.userId,
-          path: entry.action,
-          input: {
-            ...(entry.args ?? {}),
-            targetKind: entry.targetKind,
-            ...(entry.targetId === undefined ? {} : { targetId: entry.targetId }),
-          },
-          error: null,
-        });
-      },
-    },
-
     auth: collaborators.auth,
-
-    dataPrivacy: collaborators.dataPrivacy,
-
-    /**
-     * What each rule write claims about the project id it accepts, written
-     * where the enforcement is.
-     *
-     * Neither is a permission the runtime can resolve from the input: the id
-     * that decides the answer is the TARGET scope's, and which tier that is
-     * only becomes known once the scope has been anchored to this project's
-     * organization. So the check is declared as resolver-authorized and the
-     * sentence names what the port above actually runs.
-     */
-    dataPrivacyScopeChecks: {
-      write: mount.middlewares.declaredCheck({
-        kind: "service-authorized",
-        reason:
-          "the data-privacy port anchors the scope to this project's organization and then authorizes the write at the target scope's own tier",
-        permissions: ["project:update"],
-        enforces: {
-          projectId:
-            "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the write",
-        },
-      }),
-      removal: mount.middlewares.declaredCheck({
-        kind: "service-authorized",
-        reason:
-          "the data-privacy port anchors the scope to this project's organization and then authorizes the removal at the target scope's own tier",
-        permissions: ["project:update"],
-        enforces: {
-          projectId:
-            "assertScopeBelongsToProjectOrganization anchors the scope to this project's organization; assertCanWriteDataPrivacyScope authorizes the removal",
-        },
-      }),
-    },
 
     evaluations: collaborators.evaluations,
 
@@ -295,8 +206,6 @@ export function createApiTrpcPorts<
 
     identity: collaborators.identity,
 
-    integrationsChecks: collaborators.integrationsChecks,
-
     joinRequests: {
       ...collaborators.joinRequests,
       listUserNames: (_ctx: unknown, { userIds }: Readonly<{ userIds: readonly string[] }>) =>
@@ -319,19 +228,6 @@ export function createApiTrpcPorts<
 
 
 
-    traces: collaborators.traces,
-    tracesV2: collaborators.tracesV2,
-    spans: collaborators.spans,
-    traceEditOverlay: collaborators.traceEditOverlay,
-    sharedTrace: collaborators.sharedTrace,
-    savedViews: collaborators.savedViews,
-    costs: collaborators.costs,
-    llmModelCost: collaborators.llmModelCost,
-    modelProvider: collaborators.modelProvider,
-    modelProviderChecks: collaborators.modelProviderChecks,
-    translate: collaborators.translate,
-    httpProxy: collaborators.httpProxy,
-    limits: collaborators.limits,
 
 
     organization: collaborators.organization,
@@ -653,20 +549,4 @@ export function createApiTrpcPorts<
       },
     },
   };
-}
-
-/**
- * The slug `/annotations/<slug>` addresses, for a queue name.
- *
- * Written here rather than imported: the platform's helper took a whole
- * slugify library for one call, and the rule is two substitutions — the
- * underscore a queue name may carry becomes a dash, and everything that is not
- * a URL-safe word character collapses to one.
- */
-function annotationQueueSlug(name: string): string {
-  return name
-    .replace("_", "-")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 }

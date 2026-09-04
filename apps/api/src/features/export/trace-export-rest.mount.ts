@@ -32,7 +32,7 @@ import {
 import { z } from "zod";
 
 import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session";
-import type { ApiTraceReadStackPort } from "../../app/api-trpc-collaborators.trace-group.composition";
+import type { ApiTraceReadStackPort } from "../trace/trace.composition";
 
 /**
  * A download request as a caller sends it: the trace package's own shape plus

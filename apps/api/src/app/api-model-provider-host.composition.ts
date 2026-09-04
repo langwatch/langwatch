@@ -29,7 +29,7 @@ import {
   type TranslateTrpcPorts,
 } from "@langwatch/model-provider-server";
 import { HandledError } from "@langwatch/handled-error";
-import { ApiModelProviderHostPort } from "./api-trpc-collaborators.trace-group.composition";
+import { ApiModelProviderHostPort } from "../features/model-provider/model-provider.composition";
 
 /** Everything the outbound half is composed from. */
 export type ApiModelProviderHostOptions = Readonly<{

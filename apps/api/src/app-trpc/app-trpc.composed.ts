@@ -12,6 +12,17 @@
  */
 import type { ComposedGatewayFeature } from "../features/gateway/gateway.composition";
 import type { ComposedLangyFeature } from "../features/langy/langy.composition";
+import type { ComposedBugReportFeature } from "../features/bug-report/bug-report.composition";
+import type { ComposedDataPrivacyFeature } from "../features/data-privacy/data-privacy.composition";
+import type { ComposedAnnotationFeature } from "../features/annotation/annotation.composition";
+import type { ComposedSavedViewFeature } from "../features/dashboard/saved-view.composition";
+import type { ComposedSpendFeature } from "../features/entitlement/spend.composition";
+import type { ComposedHttpProxyFeature } from "../features/agent/http-proxy.composition";
+import type { ComposedModelProviderFeature } from "../features/model-provider/model-provider.composition";
+import type { ComposedShareFeature } from "../features/share/share.composition";
+import type { ComposedTopicFeature } from "../features/topic/topic.composition";
+import type { ComposedTraceFeature } from "../features/trace/trace.composition";
+import type { ComposedIntegrationsChecksFeature } from "../features/project/integrations-checks.composition";
 import type { ComposedOpsFeature } from "../features/ops/ops.composition";
 import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition";
 import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition";
@@ -74,6 +85,37 @@ export type ComposedApiFeatures = Readonly<{
   dataRetention: ComposedDataRetentionFeature;
   /** One namespace and the `ctx.app.monitors` slice the monitor REST family reads. */
   monitor: ComposedMonitorFeature;
+  /** One namespace: the support inbox the back office reads. */
+  bugReport: ComposedBugReportFeature;
+  /** One namespace: the privacy rules a project's scopes are redacted under. */
+  dataPrivacy: ComposedDataPrivacyFeature;
+  /** One namespace: the setup checklist the onboarding screens render. */
+  integrationsChecks: ComposedIntegrationsChecksFeature;
+  /**
+   * Two namespaces and the `ctx.app.annotations` slice the annotation REST
+   * family reads. Here rather than in the record's literal for that reason.
+   */
+  annotation: ComposedAnnotationFeature;
+  /** One namespace: the stored filter sets the explorer offers. */
+  savedView: ComposedSavedViewFeature;
+  /** Two namespaces: an organization's spend, and the allowance it is taken against. */
+  spend: ComposedSpendFeature;
+  /** One namespace: the studio's outbound dispatch and the agent test's trace write. */
+  httpProxy: ComposedHttpProxyFeature;
+  /**
+   * Three namespaces and the `ctx.app.modelProviders` slice every other surface
+   * reads a provider through.
+   */
+  modelProvider: ComposedModelProviderFeature;
+  /** Two namespaces and the `ctx.app.share` ledger every share door reads. */
+  share: ComposedShareFeature;
+  /** One namespace and the `ctx.app.topics` reader the grid labels rows from. */
+  topic: ComposedTopicFeature;
+  /**
+   * Five namespaces, the `ctx.app.traces` application and the read stack the
+   * public REST trace doors take directly.
+   */
+  trace: ComposedTraceFeature;
   /**
    * One namespace, the `ctx.app.storedObjectApp` slice two REST families read,
    * and the content-addressed byte store the scenario-event door writes through.

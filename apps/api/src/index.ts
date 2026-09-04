@@ -29,19 +29,56 @@ export {
   type ApiOwnedRestFeaturePorts,
   type ApiProductionCompositionOptions,
 } from "./app/api-production.composition";
+/** A project's captured traffic, and the five surfaces it is read through. */
+export {
+  ApiTraceAbsenceReport,
+  ApiTraceReadStackPort,
+  composeTraceFeature,
+  LoggedApiTraceAbsence,
+  refusingTraceFeature,
+  type ApiTracePorts,
+  type ComposedTraceFeature,
+  type TraceFeatureOptions,
+} from "./features/trace/trace.composition";
+/** The links a project shares outside itself, and the topics its traces carry. */
+export {
+  composeShareFeature,
+  refusingShareFeature,
+  type ComposedShareFeature,
+} from "./features/share/share.composition";
+export {
+  composeTopicFeature,
+  refusingTopicFeature,
+  type ComposedTopicFeature,
+} from "./features/topic/topic.composition";
+/** An organization's spend, and the allowance it is taken against. */
+export {
+  ApiUsageStatsPort,
+  composeSpendFeature,
+  refusingSpendFeature,
+  type ApiProjectSpendRollup,
+  type ComposedSpendFeature,
+} from "./features/entitlement/spend.composition";
+/** The studio's outbound dispatch and the agent test's own trace write. */
+export {
+  ApiStudioHostPort,
+  composeHttpProxyFeature,
+  refusingHttpProxyFeature,
+  type ComposedHttpProxyFeature,
+} from "./features/agent/http-proxy.composition";
+/** The model providers a tenant attaches, and the cost rules they are priced by. */
 export {
   ApiModelProviderHostPort,
-  ApiStudioHostPort,
-  ApiTraceGroupAbsenceReport,
-  ApiTraceReadStackPort,
-  ApiUsageStatsPort,
-  composeApiTraceGroupCollaborators,
-  LoggedApiTraceGroupAbsence,
-  type ApiProjectSpendRollup,
-  type ApiTraceGroupCollaborators,
-  type ApiTraceGroupCollaboratorsOptions,
-  type ApiTraceGroupPorts,
-} from "./app/api-trpc-collaborators.trace-group.composition";
+  composeModelProviderFeature,
+  refusingModelProviderFeature,
+  type ComposedModelProviderFeature,
+} from "./features/model-provider/model-provider.composition";
+/** The stored filter sets the explorer offers. */
+export {
+  composeSavedViewFeature,
+  refusingSavedViewFeature,
+  type ComposedSavedViewFeature,
+} from "./features/dashboard/saved-view.composition";
 /**
  * The AI Gateway, composed as its own feature: one application for its six
  * tRPC namespaces, its `ctx.app` slice and its two REST families.

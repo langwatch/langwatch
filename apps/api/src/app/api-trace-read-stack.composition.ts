@@ -145,7 +145,7 @@ import {
 } from "@langwatch/trace-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
-import { ApiTraceReadStackPort } from "./api-trpc-collaborators.trace-group.composition";
+import { ApiTraceReadStackPort } from "../features/trace/trace.composition";
 
 /** Everything the read stack is composed from. */
 export type ApiTraceReadStackOptions = Readonly<{

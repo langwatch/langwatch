@@ -33,7 +33,7 @@ import {
   UnconfiguredWorkflowStudioStreamAdapter,
   WorkflowStudioDispatchService,
 } from "@langwatch/workflow-server";
-import { ApiStudioHostPort } from "./api-trpc-collaborators.trace-group.composition";
+import { ApiStudioHostPort } from "../features/agent/http-proxy.composition";
 
 /** One command sender on the process's own eventing registration. */
 export type ApiStudioTraceIngest = Readonly<{

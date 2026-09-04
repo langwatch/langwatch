@@ -45,7 +45,7 @@ import { fromZodError } from "zod-validation-error";
 import { z } from "zod";
 
 import { API_TRACE_LIST_INPUT } from "../../app/api-trace-read-stack.composition";
-import type { ApiTraceReadStackPort } from "../../app/api-trpc-collaborators.trace-group.composition";
+import type { ApiTraceReadStackPort } from "./trace.composition";
 import type { ApiHandlerManagedCredentialPort } from "../../app-rest/app-rest.process-features";
 
 /**

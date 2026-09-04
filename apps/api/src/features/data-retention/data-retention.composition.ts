@@ -19,6 +19,7 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import {
+  PrismaDataRetentionAdapter,
   DataRetentionAdministratorPort,
   DataRetentionPermissionsPort,
   DataRetentionPlanPort,
@@ -77,7 +78,13 @@ export class LoggedApiDataRetentionAbsence extends ApiDataRetentionAbsenceReport
  * The SAME slice `ctx.app.ops` carries, so "who may switch retention off" and
  * "who sees the operator sidebar" can never be two answers.
  */
-export type DataRetentionPeers = Readonly<{ ops: ApiTrpcFeatureApplication["ops"] }>;
+export type DataRetentionPeers = Readonly<{
+  ops: ApiTrpcFeatureApplication["ops"];
+  /** Resolves a project's organization and team, for a scoped rule. */
+  projects: Parameters<typeof PrismaDataRetentionAdapter.create>[0]["projects"];
+  /** Resolves a team's organization, for an organization-scoped rule. */
+  organizations: Parameters<typeof PrismaDataRetentionAdapter.create>[0]["organizations"];
+}>;
 
 /** Everything the retention policy is composed from besides its peer. */
 export type DataRetentionFeatureCollaborators = Readonly<{
@@ -91,29 +98,59 @@ export type DataRetentionFeatureCollaborators = Readonly<{
   report?: ApiDataRetentionAbsenceReport;
 }>;
 
-/** The namespace, built over the composed policy. */
+/** The namespace, the composed policy, and the service every reader shares. */
 export type ComposedDataRetentionFeature = Readonly<{
   router(mount: ApiTrpcFeatureMount): ReturnType<typeof createDataRetentionTrpcRouter>;
+  /**
+   * For `ctx.app.dataRetention`, and for every other surface a retention window
+   * bounds: the trace read stack's own floor, a share link's expiry and the
+   * storage meter all read THIS service. A second adapter would be a second
+   * answer to how long a project keeps what it captured.
+   */
+  service: DataRetentionService;
 }>;
 
 /** Composes the retention surface over this process's own graph. */
 export function composeDataRetentionFeature(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: DataRetentionPeers;
-  dataRetention: DataRetentionService;
+  /** The floor a project with no policy of its own is bounded by. */
+  defaultRetentionDays: number;
+  /** The meter's counters; `null` runs them uncached. */
+  redis: Parameters<typeof PrismaDataRetentionAdapter.create>[0]["redis"];
+  /** The application's own ClickHouse, or `null` where the process composed none. */
+  resolveClickHouseClient: Parameters<
+    typeof PrismaDataRetentionAdapter.create
+  >[0]["resolveClickHouseClient"];
+  /**
+   * A finished retention service, where the host supplies one.
+   *
+   * It WINS over the adapter below, which is how a test names the service it
+   * wants without standing up a database — the same seam the trace read stack
+   * offers.
+   */
+  dataRetention?: DataRetentionService;
   report?: ApiDataRetentionAbsenceReport;
 }): ComposedDataRetentionFeature {
+  const service = options.dataRetention ?? PrismaDataRetentionAdapter.create({
+    database: options.infrastructure.prisma,
+    projects: options.peers.projects,
+    organizations: options.peers.organizations,
+    defaultRetentionDays: options.defaultRetentionDays,
+    redis: options.redis,
+    resolveClickHouseClient: options.resolveClickHouseClient,
+  });
   const collaborators: DataRetentionFeatureCollaborators = {
     prisma: options.infrastructure.prisma,
     authz: options.infrastructure.authz,
     plans: options.infrastructure.plans,
-    dataRetention: options.dataRetention,
+    dataRetention: service,
     ops: options.peers.ops,
     ...(options.report ? { report: options.report } : {}),
   };
   const ports = composeRetentionPolicy(collaborators);
 
-  return { router: (mount) => createDataRetentionTrpcRouter({ ...mount, ports }) };
+  return { service, router: (mount) => createDataRetentionTrpcRouter({ ...mount, ports }) };
 }
 
 /**
@@ -136,7 +173,20 @@ export function refusingDataRetentionFeature(): ComposedDataRetentionFeature {
     },
   ) as DataRetentionTrpcPolicy<RetentionPolicySnapshot, StorageScopeUsage>;
 
-  return { router: (mount) => createDataRetentionTrpcRouter({ ...mount, ports }) };
+  return {
+    router: (mount) => createDataRetentionTrpcRouter({ ...mount, ports }),
+    service: new Proxy(
+      {},
+      {
+        get:
+          () =>
+          (): never => {
+            throw new ApiDataRetentionUnavailableError("The retention window");
+          },
+        has: () => true,
+      },
+    ) as DataRetentionService,
+  };
 }
 
 /** A capability this deployment did not compose, refused by name. */

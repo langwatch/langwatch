@@ -99,7 +99,7 @@ import { PostgresNotificationAdapter } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PricingModel, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ApiMailComposition } from "./api-mail.composition";
-import { ApiUsageStatsPort } from "./api-trpc-collaborators.trace-group.composition";
+import { ApiUsageStatsPort } from "../features/entitlement/spend.composition";
 
 /** What the plan provider is composed from. */
 export type ApiPlanProviderOptions = Readonly<{

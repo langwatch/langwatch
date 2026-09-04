@@ -67,6 +67,17 @@ import { refusingFeatureFlagFeature } from "../../feature-flag/feature-flag.comp
 import { refusingMonitorFeature } from "../../monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../stored-object/stored-object.composition";
+import { refusingBugReportFeature } from "../../bug-report/bug-report.composition";
+import { refusingDataPrivacyFeature } from "../../data-privacy/data-privacy.composition";
+import { refusingIntegrationsChecksFeature } from "../../project/integrations-checks.composition";
+import { refusingAnnotationFeature } from "../../annotation/annotation.composition";
+import { refusingSavedViewFeature } from "../../dashboard/saved-view.composition";
+import { refusingSpendFeature } from "../../entitlement/spend.composition";
+import { refusingHttpProxyFeature } from "../../agent/http-proxy.composition";
+import { refusingModelProviderFeature } from "../../model-provider/model-provider.composition";
+import { refusingShareFeature } from "../../share/share.composition";
+import { refusingTopicFeature } from "../../topic/topic.composition";
+import { refusingTraceFeature } from "../../trace/trace.composition";
 import { refusingOpsFeature } from "../../ops/ops.composition";
 import { refusingHomeFeature } from "../../project/home.composition";
 import { refusingRoleFeature } from "../../role/role.composition";
@@ -233,6 +244,17 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       home: refusingHomeFeature(),
       role: refusingRoleFeature(),
       storedObject: refusingStoredObjectFeature(),
+      bugReport: refusingBugReportFeature(),
+      dataPrivacy: refusingDataPrivacyFeature(),
+      integrationsChecks: refusingIntegrationsChecksFeature(),
+      annotation: refusingAnnotationFeature(),
+      savedView: refusingSavedViewFeature(),
+      spend: refusingSpendFeature(),
+      httpProxy: refusingHttpProxyFeature(),
+      modelProvider: refusingModelProviderFeature(),
+      share: refusingShareFeature(),
+      topic: refusingTopicFeature(),
+      trace: refusingTraceFeature(),
     },
     infrastructure,
     collaborators: composeApiTrpcCollaborators(testHalves(), {

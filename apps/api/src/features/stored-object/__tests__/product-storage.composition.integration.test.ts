@@ -447,7 +447,14 @@ function composeHalf(
   });
   const dataRetention = composeDataRetentionFeature({
     infrastructure,
-    peers: { ops: { isAdmin: () => false } as never },
+    peers: {
+      ops: { isAdmin: () => false } as never,
+      projects: {} as never,
+      organizations: {} as never,
+    },
+    defaultRetentionDays: 49,
+    redis: null,
+    resolveClickHouseClient: null,
     dataRetention: testDataRetention(),
   });
 

@@ -17,7 +17,6 @@
  * decisions — the part the audits read.
  */
 
-import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
@@ -44,6 +43,17 @@ import { refusingHomeFeature } from "../../features/project/home.composition";
 import { refusingRoleFeature } from "../../features/role/role.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
+import { refusingBugReportFeature } from "../../features/bug-report/bug-report.composition";
+import { refusingDataPrivacyFeature } from "../../features/data-privacy/data-privacy.composition";
+import { refusingIntegrationsChecksFeature } from "../../features/project/integrations-checks.composition";
+import { refusingAnnotationFeature } from "../../features/annotation/annotation.composition";
+import { refusingSavedViewFeature } from "../../features/dashboard/saved-view.composition";
+import { refusingSpendFeature } from "../../features/entitlement/spend.composition";
+import { refusingHttpProxyFeature } from "../../features/agent/http-proxy.composition";
+import { refusingModelProviderFeature } from "../../features/model-provider/model-provider.composition";
+import { refusingShareFeature } from "../../features/share/share.composition";
+import { refusingTopicFeature } from "../../features/topic/topic.composition";
+import { refusingTraceFeature } from "../../features/trace/trace.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
 import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
 
@@ -94,7 +104,6 @@ const middlewares: AppTrpcPolicyMiddlewares = {
  * refusal there could not be mounted at all.
  */
 function refusingPorts(): AppTrpcFeaturePorts<
-  AnnotationTrpcPorts,
   Record<string, unknown>,
   Record<string, unknown>,
   Record<string, unknown>,
@@ -127,17 +136,11 @@ function refusingPorts(): AppTrpcFeaturePorts<
     );
 
   return {
-    annotation: refuseEvery("annotation"),
     bugReports: refuseEvery("bugReports"),
     auth: refuseEvery("auth"),
-    dataPrivacy: refuseEvery("dataPrivacy"),
     // Read while the two writes are BUILT — the policy chain lifts each
     // declaration off the middleware it is handed — so these are declared
     // checks rather than refusals.
-    dataPrivacyScopeChecks: {
-      write: refusingCheck("dataPrivacyScopeChecks.write"),
-      removal: refusingCheck("dataPrivacyScopeChecks.removal"),
-    },
     evaluations: {
       ...(refuseEvery("evaluations") as object),
       mappingsSchema: z.object({ mapping: z.record(z.string(), z.unknown()) }),
@@ -149,7 +152,6 @@ function refusingPorts(): AppTrpcFeaturePorts<
     group: refuseEvery("group"),
     home: refuseEvery("home"),
     identity: refuseEvery("identity"),
-    integrationsChecks: refuseEvery("integrationsChecks"),
     joinRequests: refuseEvery("joinRequests"),
     // The questionnaire schema is read while the surface is BUILT — it becomes
     // `initializeOrganization`'s own input parser — so it is a real schema
@@ -309,6 +311,17 @@ function buildFeatures() {
       home: refusingHomeFeature(),
       role: refusingRoleFeature(),
       storedObject: refusingStoredObjectFeature(),
+      bugReport: refusingBugReportFeature(),
+      dataPrivacy: refusingDataPrivacyFeature(),
+      integrationsChecks: refusingIntegrationsChecksFeature(),
+      annotation: refusingAnnotationFeature(),
+      savedView: refusingSavedViewFeature(),
+      spend: refusingSpendFeature(),
+      httpProxy: refusingHttpProxyFeature(),
+      modelProvider: refusingModelProviderFeature(),
+      share: refusingShareFeature(),
+      topic: refusingTopicFeature(),
+      trace: refusingTraceFeature(),
     },
     // The features that compose themselves take this rather than a ports
     // entry; every member refuses, for the same reason the ports do.

@@ -36,7 +36,7 @@ import {
   composeApiTraceIngest,
   type ApiTraceIngestAllowance,
 } from "../../../app/api-trace-ingest.composition";
-import type { ApiTraceReadStackPort } from "../../../app/api-trpc-collaborators.trace-group.composition";
+import type { ApiTraceReadStackPort } from "../trace.composition";
 
 const PROJECT = {
   id: "project-1",

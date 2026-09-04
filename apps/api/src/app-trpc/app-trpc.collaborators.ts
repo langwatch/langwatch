@@ -26,11 +26,8 @@
  * process that has them mounts all twenty-two. Nothing in between, and nothing
  * silently degraded — see {@link ApiTrpcCollaboratorsAbsence}.
  */
-import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
 import type { AuthApp } from "@langwatch/auth-server";
-import type { DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
 import type { ExperimentTrpcPorts } from "@langwatch/experiment-server";
-import type { BugReportTrpcPorts } from "@langwatch/ops-server";
 import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
 import type {
   GroupTrpcPorts,
@@ -38,7 +35,6 @@ import type {
   OnboardingTrpcPorts,
   OrganizationTrpcPorts,
 } from "@langwatch/organization-server";
-import type { IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatch/workflow-server";
 import type { ZodTypeAny } from "zod";
@@ -54,24 +50,10 @@ import type {
   ProjectTrpcChecks,
   ProjectTrpcMountPorts,
 } from "../features/project/project-trpc.mount";
-import type { HttpProxyTrpcPorts } from "@langwatch/agent-server";
 import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
 import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-server";
-import type {
-  LlmModelCostTrpcPorts,
-  ModelProviderTrpcPorts,
-  TranslateTrpcPorts,
-} from "@langwatch/model-provider-server";
+import type { TraceEditOverlayVisibilityWindow } from "@langwatch/trace-server";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
-import type {
-  SharedTraceTrpcPorts,
-  SpansTrpcPorts,
-  TraceEditOverlayTrpcPorts,
-  TraceEditOverlayVisibilityWindow,
-  TracesTrpcPorts,
-  TracesV2TrpcPorts,
-} from "@langwatch/trace-server";
-import type { ModelProviderTrpcChecks } from "../features/model-provider/model-provider-trpc.mount";
 
 /**
  * The `user.*` entries this process answers from its own Prisma connection:
@@ -122,17 +104,9 @@ type ApiOwnedExperimentPorts =
   | "tryFindWorkflow"
   | "resolveAuthorNames";
 
-/** The `annotation.*` entries answered by the packaged Postgres adapter and AuthZ. */
-type ApiOwnedAnnotationPorts = "queues" | "probeProjectPermission" | "toQueueSlug";
-
 export type ApiTrpcCollaborators<
-  TBugReport,
-  TBugReportPage,
-  TCheckStatus,
   TMappingsIn,
   TMappingsOut,
-  TPrivacyRule,
-  TPrivacySnapshot,
   TSignUpDataSchema extends ZodTypeAny,
   TWorkbenchState,
   TListInput extends TraceLegacyListInput = TraceLegacyListInput,
@@ -152,23 +126,15 @@ export type ApiTrpcCollaborators<
    * The application slices every packaged surface reads off `ctx.app`.
    *
    * They arrive whole rather than one per feature: a request carries ONE
-   * application, and a process that could hand a different `annotations` to
-   * the annotation surface than to the queueing behind it would have two.
+   * application, and a process that could hand a different slice to one
+   * surface than to the one beside it would have two.
    */
   application: ApiTrpcFeatureApplication;
-
-  /** Everything an annotation needs from the TRACE side, and nothing else. */
-  annotation: Omit<AnnotationTrpcPorts, ApiOwnedAnnotationPorts>;
 
   /** The composed auth application both signed-out doors answer from. */
   auth: AuthApp;
 
 
-
-  /** The support inbox itself; the audit trail beside it is this process's. */
-  bugReports: Omit<BugReportTrpcPorts<TBugReportPage, TBugReport>, "recordAudit">;
-
-  dataPrivacy: DataPrivacyTrpcPorts<TPrivacySnapshot, TPrivacyRule>;
 
   evaluations: EvaluationMountPorts<TMappingsIn, TMappingsOut>;
 
@@ -180,8 +146,6 @@ export type ApiTrpcCollaborators<
 
   identity: IdentityTrpcPorts;
 
-  integrationsChecks: IntegrationsChecksTrpcPorts<TCheckStatus>;
-
   joinRequests: Omit<JoinRequestTrpcPorts, "listUserNames">;
 
   onboarding: OnboardingTrpcPorts<TSignUpDataSchema>;
@@ -189,32 +153,6 @@ export type ApiTrpcCollaborators<
 
 
 
-  /** The legacy grid's two shared input schemas, the precondition engine, the span digest and redactions. */
-  traces: TracesTrpcPorts<TListInput, TListInputRaw, TFilterInput, TFilterInputRaw, TPrecondition>;
-  /** Everything the explorer reads that is another vertical's. */
-  tracesV2: Omit<TracesV2TrpcPorts<TMetadata, TMetadataRaw>, "queryTranslation">;
-  /** The caller's read-time redactions, for the waterfall and the studio span. */
-  spans: SpansTrpcPorts;
-  /** The same redactions, plus the two rules a correction is carried through. */
-  traceEditOverlay: TraceEditOverlayTrpcPorts<TProtections>;
-  /** The anonymous read's own four capabilities. */
-  sharedTrace: SharedTraceTrpcPorts;
-  /** The stored filter sets, generic in the row shape the explorer renders. */
-  savedViews: SavedViewTrpcPorts<TSavedView>;
-  /** The organization's spend, rolled up per project. */
-  costs: CostTrpcPorts<TSpendRollup>;
-  /** The cost rule's regex safety gate, the model registry's ceilings and the live span preview. */
-  llmModelCost: LlmModelCostTrpcPorts;
-  /** The outbound credential probes, the Codex device flow and the audit trail. */
-  modelProvider: ModelProviderTrpcPorts<TApiKeyValidation, TStoredKeyValidation>;
-  /** The two data-dependent gates the provider surface needs, already built. */
-  modelProviderChecks: ModelProviderTrpcChecks;
-  /** The application's provider-failure policy behind one model call. */
-  translate: TranslateTrpcPorts;
-  /** The studio's event dispatch, and the agent test's own trace write. */
-  httpProxy: HttpProxyTrpcPorts;
-  /** The usage reading and the approaching-limit notifier, over the billing store. */
-  limits: LimitsTrpcPorts;
 
   /** The forty-six answers `organization.*` needs from this deployment. */
   organization: OrganizationTrpcPorts<TSignUpDataSchema>;
@@ -250,6 +188,11 @@ export type ApiTrpcCollaborators<
     >;
   }>;
 }>;
+
+/** What a set is missing, and therefore why the record is not mountable. */
+export abstract class ApiTrpcCollaboratorGapReport {
+  abstract incomplete(missing: readonly string[]): void;
+}
 
 /**
  * Reports the composition decision a missing collaborator set would otherwise
