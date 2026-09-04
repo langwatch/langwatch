@@ -632,7 +632,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     // gateway sends — if the two ever disagreed, every query would succeed and
     // return nothing, which reads exactly like a tenant with no data.
     await harness.admin.insert({
-      table: `${database}.${harness.names.keyMapTable}`,
+      table: `${facts}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
       values: [openProject, gatedProject].map((project) => ({
         KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),

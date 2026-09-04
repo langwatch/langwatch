@@ -311,7 +311,7 @@ describe("given the /api/v1/query REST family", () => {
     // gateway sends. Populating it is a deployment concern; here it is two
     // rows.
     await harness.admin.insert({
-      table: `${database}.${harness.names.keyMapTable}`,
+      table: `${facts}.${harness.names.keyMapTable}`,
       format: "JSONEachRow",
       values: [projectA, projectB].map((project) => ({
         KeyHash: lwqlTenantCapability({ secret: project.lwqlKey }),
