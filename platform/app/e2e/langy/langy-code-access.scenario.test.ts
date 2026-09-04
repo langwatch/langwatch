@@ -53,7 +53,7 @@ describe("Langy reaches the code through the shared folder", () => {
   }, 1_200_000);
 
   afterAll(async () => {
-    await teardown({ terminal, watcher });
+    await teardown({ terminal, watcher, repo });
   });
 
   describe("when the user asks for tracing and shares the folder", () => {

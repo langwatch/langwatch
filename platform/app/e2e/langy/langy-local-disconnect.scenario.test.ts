@@ -55,7 +55,7 @@ describe("Langy notices when the shared folder goes away", () => {
   }, 900_000);
 
   afterAll(async () => {
-    await teardown({ terminal, watcher });
+    await teardown({ terminal, watcher, repo });
   });
 
   describe("when the command line exits mid-task", () => {

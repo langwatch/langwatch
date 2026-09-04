@@ -9,7 +9,9 @@ import { describe, expect, it } from "vitest";
 import {
   answerOfTurn,
   demoReposToPrune,
+  listeningPids,
   permissionAnswerNote,
+  pidsRunningIn,
   questionAnswerNote,
   type StoredMessage,
   turnFailureMessage,
@@ -178,6 +180,54 @@ describe("turnFailureMessage", () => {
       expect(turnFailureMessage({ failure: "out of memory" })).toBe(
         "The last turn failed, so there is no answer to grade: out of memory",
       );
+    });
+  });
+});
+
+describe("listeningPids", () => {
+  const lsofOutput = [
+    "COMMAND   PID    USER   FD   TYPE DEVICE SIZE/OFF NODE NAME",
+    "python  40321 rogerio    7u  IPv4 0x1234      0t0  TCP *:8765 (LISTEN)",
+    "python  40321 rogerio    8u  IPv6 0x5678      0t0  TCP *:8765 (LISTEN)",
+    "node    40999 rogerio    3u  IPv4 0x9abc      0t0  TCP *:8765 (LISTEN)",
+    "",
+  ].join("\n");
+
+  describe("when processes hold the scenario's port", () => {
+    it("names each one once, so the teardown ends both", () => {
+      expect(listeningPids(lsofOutput)).toEqual([40321, 40999]);
+    });
+  });
+
+  describe("when nothing holds the port", () => {
+    it("names none", () => {
+      expect(listeningPids("")).toEqual([]);
+    });
+  });
+});
+
+describe("pidsRunningIn", () => {
+  const lsofOutput = [
+    "p40321",
+    "fcwd",
+    "n/tmp/scenario-repos/code-access-1/app",
+    "p40999",
+    "fcwd",
+    "n/tmp/scenario-repos/code-access-11",
+    "p41000",
+    "fcwd",
+    "n/Users/rogerio",
+    "",
+  ].join("\n");
+
+  describe("when a process runs from the scenario's folder", () => {
+    it("names it, and leaves a folder that only shares its prefix alone", () => {
+      expect(
+        pidsRunningIn({
+          lsofOutput,
+          root: "/tmp/scenario-repos/code-access-1",
+        }),
+      ).toEqual([40321]);
     });
   });
 });

@@ -63,7 +63,7 @@ describe("Langy changes a connected agent through the shared folder", () => {
   }, 1_800_000);
 
   afterAll(async () => {
-    await teardown({ terminal, watcher, app });
+    await teardown({ terminal, watcher, app, repo });
   });
 
   describe("when the agent runs from the shared folder", () => {

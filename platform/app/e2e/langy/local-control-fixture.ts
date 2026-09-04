@@ -1556,15 +1556,121 @@ export async function readAgent(name: string): Promise<{
   );
 }
 
+/**
+ * The process ids listening on one port, out of `lsof -nP -iTCP:<port>`.
+ *
+ * `-t` is not used because the same output is parsed for a person reading the
+ * log, and because an empty answer must read as "nothing there" rather than as
+ * a parse that went wrong.
+ */
+export function listeningPids(lsofOutput: string): number[] {
+  const pids = new Set<number>();
+  for (const line of lsofOutput.split("\n").slice(1)) {
+    const pid = Number.parseInt(line.trim().split(/\s+/)[1] ?? "", 10);
+    if (Number.isInteger(pid)) pids.add(pid);
+  }
+  return [...pids];
+}
+
+/**
+ * The process ids whose working directory is inside one folder, out of
+ * `lsof -d cwd -Fpn`.
+ *
+ * The field output is a stream of records: `p<pid>`, then `f<fd>`, then
+ * `n<path>`. A process is this run's when the path it names is the folder or
+ * anything under it.
+ */
+export function pidsRunningIn({
+  lsofOutput,
+  root,
+}: {
+  lsofOutput: string;
+  root: string;
+}): number[] {
+  const pids = new Set<number>();
+  let current: number | null = null;
+  for (const line of lsofOutput.split("\n")) {
+    if (line.startsWith("p")) {
+      const pid = Number.parseInt(line.slice(1), 10);
+      current = Number.isInteger(pid) ? pid : null;
+      continue;
+    }
+    if (!line.startsWith("n") || current === null) continue;
+    const cwd = line.slice(1);
+    if (cwd === root || cwd.startsWith(`${root}/`)) pids.add(current);
+  }
+  return [...pids];
+}
+
+/** Read one lsof invocation, or nothing when lsof is absent or finds nobody. */
+function lsof(args: string[]): string {
+  return (
+    spawnSync("lsof", args, { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 })
+      .stdout ?? ""
+  );
+}
+
+/** End one process, its group first, so a shell takes its children with it. */
+function endProcess(pid: number): void {
+  if (pid <= 1 || pid === process.pid || pid === process.ppid) return;
+  for (const signal of ["SIGTERM", "SIGKILL"] as const) {
+    try {
+      process.kill(-pid, signal);
+    } catch {
+      try {
+        process.kill(pid, signal);
+      } catch {
+        return;
+      }
+    }
+  }
+}
+
+/**
+ * Everything this run started on the machine, ended.
+ *
+ * A background process Langy starts outlives the command line on purpose
+ * (specs/typescript-sdk/cli-langy-share-control.feature), so the scenario has
+ * to end it itself. Left alone, the demo server of one run holds its port and
+ * serves a folder that the next run has already deleted.
+ */
+export function killScenarioProcesses({
+  port,
+  root,
+}: {
+  port?: number;
+  root?: string;
+}): void {
+  const pids = new Set<number>();
+  if (port) {
+    for (const pid of listeningPids(
+      lsof(["-nP", `-iTCP:${port}`, "-sTCP:LISTEN"]),
+    )) {
+      pids.add(pid);
+    }
+  }
+  if (root) {
+    for (const pid of pidsRunningIn({
+      lsofOutput: lsof(["-d", "cwd", "-Fpn"]),
+      root,
+    })) {
+      pids.add(pid);
+    }
+  }
+  for (const pid of pids) endProcess(pid);
+}
+
 /** Everything a scenario opened, closed in the order that leaves nothing behind. */
 export async function teardown({
   terminal,
   watcher,
   app,
+  repo,
 }: {
   terminal?: CliTerminal;
   watcher?: ConversationWatcher;
   app?: DemoApp;
+  repo?: DemoRepo;
 }): Promise<void> {
   app?.stop();
   watcher?.stop();
@@ -1572,6 +1678,10 @@ export async function teardown({
     await terminal.disconnect().catch(() => undefined);
     terminal.stop();
   }
+  killScenarioProcesses({
+    ...(app ? { port: app.port } : {}),
+    ...(repo ? { root: repo.root } : {}),
+  });
 }
 
 /** The terminal capture, for the scenario transcript. */

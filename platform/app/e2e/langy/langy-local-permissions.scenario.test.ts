@@ -58,7 +58,7 @@ describe("Langy stays inside the folder and takes the developer's answer", () =>
   }, 900_000);
 
   afterAll(async () => {
-    await teardown({ terminal, watcher });
+    await teardown({ terminal, watcher, repo });
   });
 
   describe("when the shared folder is connected", () => {
