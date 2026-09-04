@@ -56,6 +56,14 @@ Feature: Langy persists across in-project navigation
     Then the composer holds keyboard focus and I can type at once
 
   @unit
+  Scenario: A new chat reads nothing from the conversation it left
+    Given the Langy panel is open on a conversation whose last turn failed
+    When I start a new chat
+    Then the new chat shows none of that conversation's messages
+    And it does not report that conversation's failure
+    And it does not say Langy is working
+
+  @unit
   Scenario: Starting a new chat is what I come back to
     Given I had a conversation open and then started a new chat
     When I reload the window

@@ -122,19 +122,27 @@ export function useLangyMessages(
     }
   }, [conversationRead, conversationId]);
 
+  // With no conversation open there is nothing to read. `keepPreviousData`
+  // exists to smooth the switch BETWEEN two conversations, but after New chat
+  // it keeps handing back the conversation just left: its messages, its
+  // in-flight flag and its last error. The panel then reported all three about
+  // a conversation the reader had already walked away from — the composer said
+  // Langy was working and the column showed the old turn's failure.
+  const data = conversationId ? query.data : undefined;
+
   return {
-    messages: (query.data?.messages ?? []) as LangyMessageDto[],
-    lastError: query.data?.lastError ?? null,
-    isTurnInFlight: query.data?.isTurnInFlight ?? false,
-    inFlightTurnId: query.data?.inFlightTurnId ?? null,
-    shouldAskFeedback: query.data?.shouldAskFeedback ?? false,
-    eventCursor: query.data?.eventCursor ?? null,
-    currentTurnId: query.data?.currentTurnId ?? null,
-    lastModel: query.data?.lastModel ?? null,
-    isLoading: query.isLoading,
-    isFetching: query.isFetching,
-    isError: query.isError,
-    error: query.error,
+    messages: (data?.messages ?? []) as LangyMessageDto[],
+    lastError: data?.lastError ?? null,
+    isTurnInFlight: data?.isTurnInFlight ?? false,
+    inFlightTurnId: data?.inFlightTurnId ?? null,
+    shouldAskFeedback: data?.shouldAskFeedback ?? false,
+    eventCursor: data?.eventCursor ?? null,
+    currentTurnId: data?.currentTurnId ?? null,
+    lastModel: data?.lastModel ?? null,
+    isLoading: !!conversationId && query.isLoading,
+    isFetching: !!conversationId && query.isFetching,
+    isError: !!conversationId && query.isError,
+    error: conversationId ? query.error : null,
     refetch: () => void query.refetch(),
   };
 }
