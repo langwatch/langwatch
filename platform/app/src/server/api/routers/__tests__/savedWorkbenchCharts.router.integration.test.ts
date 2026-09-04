@@ -67,7 +67,7 @@ import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-c
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import type { Permission } from "../../rbac";
-import type { Protections } from "../../traces/protections";
+import type { Protections } from "../../../traces/protections";
 import { createInnerTRPCContext } from "../../trpc";
 import { savedWorkbenchChartsRouter } from "../analytics/savedWorkbenchCharts";
 

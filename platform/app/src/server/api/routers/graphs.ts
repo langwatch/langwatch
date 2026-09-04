@@ -321,9 +321,12 @@ export const graphsRouter = createTRPCRouter({
 
   updateLayout: protectedProcedure
     .input(
-      z
-        .object({ projectId: z.string(), graphId: z.string() })
-        .and(layoutSchema),
+      chartGridPlacementSchema
+        .extend({ projectId: z.string(), graphId: z.string() })
+        .refine(fitsChartGridWidth, {
+          message: "gridColumn + colSpan must not exceed the grid's columns",
+          path: ["colSpan"],
+        }),
     )
     .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {

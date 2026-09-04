@@ -244,9 +244,12 @@ describe("ChartGrid", () => {
         drag(header, { dx: 0, dy: 4 * (ROW_PX + GAP_PX), steps: 8 });
 
         const next = committed(onPlacementsCommit);
-        expect(next.a.colSpan).toBe(4);
-        expect(next.a.rowSpan).toBe(3);
-        expect(next.a.gridRow).toBeGreaterThan(next.b.gridRow);
+        const a = next.a;
+        const b = next.b;
+        if (!a || !b) throw new Error("expected a and b to be committed");
+        expect(a.colSpan).toBe(4);
+        expect(a.rowSpan).toBe(3);
+        expect(a.gridRow).toBeGreaterThan(b.gridRow);
       });
     });
 

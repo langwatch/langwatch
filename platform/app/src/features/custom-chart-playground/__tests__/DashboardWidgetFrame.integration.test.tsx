@@ -86,6 +86,7 @@ describe("a placed dashboard widget", () => {
           id="graph_1"
           graph={GRAPH}
           projectId="project_1"
+          projectSlug="project"
           maxHeight={300}
         />
       </ChakraProvider>,
@@ -113,6 +114,7 @@ describe("a placed dashboard widget", () => {
           id="graph_1"
           graph={GRAPH}
           projectId="project_1"
+          projectSlug="project"
           maxHeight={300}
         />
       </ChakraProvider>,
@@ -125,6 +127,7 @@ describe("a placed dashboard widget", () => {
           id="graph_1"
           graph={GRAPH}
           projectId="project_1"
+          projectSlug="project"
           maxHeight={300}
         />
       </ChakraProvider>,

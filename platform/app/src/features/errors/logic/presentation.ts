@@ -1120,16 +1120,6 @@ const presentations = {
     describe: () =>
       "This project has the custom chart playground enabled, which turns off creating or editing dashboard graphs. Use the playground to build a chart instead.",
   },
-  dashboard_widget_definition_invalid: {
-    title: "This widget couldn't be read",
-    describe: () =>
-      "The stored definition of this dashboard widget is not in a shape we can load. This is on our side, not something you changed; contact support with the widget name so we can repair it.",
-  },
-  dashboard_widget_not_found: {
-    title: "Dashboard widget not found",
-    describe: () =>
-      "This widget no longer exists in the project. It may have been deleted; refresh the dashboard to see the current set.",
-  },
   custom_role_not_found: {
     title: "Custom role not found",
     describe: () => "It may have been deleted. Reload to see the current list.",

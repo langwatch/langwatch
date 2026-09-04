@@ -81,7 +81,7 @@ function mulberry32(seed) {
 }
 const rand = process.env.SEED
   ? mulberry32(Number(process.env.SEED))
-  : Math.random;
+  : () => crypto.randomInt(0, 2 ** 48) / 2 ** 48;
 
 function randInt(min, max) {
   return Math.floor(rand() * (max - min + 1)) + min;
