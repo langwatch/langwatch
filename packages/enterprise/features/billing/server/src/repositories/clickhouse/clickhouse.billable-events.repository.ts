@@ -39,6 +39,8 @@ export interface BillableEventsClickHouseClient {
     query: string;
     query_params?: Record<string, unknown>;
     format?: DataFormat;
+    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
+    unscoped?: { reason: string };
   }): Promise<{ json(): Promise<unknown> }>;
 }
 
@@ -81,6 +83,10 @@ export class BillableEventsClickHouseRepository extends BillableEventsRepository
         endDate: input.endDate,
       },
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "Organization-wide billing meter: billable events are counted per organization, across every project it owns.",
+      },
     });
     return parseTotal(await result.json());
   }
@@ -105,6 +111,10 @@ export class BillableEventsClickHouseRepository extends BillableEventsRepository
         endDate: input.endDate,
       },
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "Organization-wide billing meter: billable events are counted per organization, across every project it owns.",
+      },
     });
     return parseTotal(await result.json());
   }
@@ -160,6 +170,10 @@ export class BillableEventsClickHouseRepository extends BillableEventsRepository
         endDate: input.endDate,
       },
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "Organization-wide billing meter: billable events are counted per organization, across every project it owns.",
+      },
     });
     return parseByProject(await result.json());
   }
@@ -184,6 +198,10 @@ export class BillableEventsClickHouseRepository extends BillableEventsRepository
         endDate: input.endDate,
       },
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "Organization-wide billing meter: billable events are counted per organization, across every project it owns.",
+      },
     });
     return parseByProject(await result.json());
   }

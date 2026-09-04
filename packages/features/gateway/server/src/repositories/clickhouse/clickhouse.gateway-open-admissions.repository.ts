@@ -84,6 +84,10 @@ export class ClickHouseGatewayOpenAdmissionsRepository extends GatewayOpenAdmiss
         maxRows: MAX_OPEN_ADMISSIONS_PER_SWEEP,
       },
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "Install-wide settlement sweep: it finds every request left at admitted past its grace on this instance, and each settle it triggers is scoped to that row's own tenant.",
+      },
     });
 
     return await result.json<OpenAdmission>();

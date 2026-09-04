@@ -22,6 +22,7 @@ import {
   ClickHouseClientFactory,
   ClickHouseConfigService,
   ClickHouseConnectionService,
+  ClickHouseManagedClientLogger,
   ClickHouseManagedClientService,
   ClickHouseManagedClientTelemetry,
   ClickHouseNotConfiguredError,
@@ -144,6 +145,27 @@ class LoggingClickHouseTelemetry extends ClickHouseManagedClientTelemetry {
   }
 }
 
+/**
+ * Where the client's own decisions are written, the tenant-scope refusal
+ * included. Passing it is what turns that refusal from a thrown error nobody
+ * sees into a line naming the table and the head of the statement.
+ */
+class ApiManagedClickHouseLogger extends ClickHouseManagedClientLogger {
+  private readonly logger: Logger = createLogger("langwatch:api:clickhouse");
+
+  info(fields: Record<string, unknown>, message: string): void {
+    this.logger.info(fields, message);
+  }
+
+  warn(fields: Record<string, unknown>, message: string): void {
+    this.logger.warn(fields, message);
+  }
+
+  error(fields: Record<string, unknown>, message: string): void {
+    this.logger.error(fields, message);
+  }
+}
+
 /** The composed policy stack, built once and applied to every endpoint alike. */
 const apiManagedClickHouseClientFactory: ClickHouseClientFactory<
   ClickHouseClient & ClickHouseVendorClient
@@ -154,6 +176,7 @@ const apiManagedClickHouseClientFactory: ClickHouseClientFactory<
   resilience: VendorClientResiliencePolicy.create(),
   telemetry: new LoggingClickHouseTelemetry(),
   overloadErrorFactory: new ApiOverloadErrorFactory(),
+  logger: new ApiManagedClickHouseLogger(),
 });
 
 export class ApiClickHouseInfrastructure {

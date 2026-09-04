@@ -107,6 +107,38 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       Then it uses the operator's number
       And it does not warn that the budget is exceeded
 
+  # The client is where tenant scoping can be made unavoidable. In this schema
+  # no identifier other than the tenant is unique across customers, so a read
+  # that forgets its WHERE clause does not return too much - it returns somebody
+  # else's rows, with the right shape and no error. The guard sits outermost on
+  # the client every repository already calls, so it costs nothing when it
+  # refuses and cannot be reached around. A statement that genuinely spans
+  # tenants - a system table, an operator sweep, a billing meter - says so at the
+  # call site in a written reason, which a reviewer sees as an added string
+  # rather than as a silent omission.
+  Rule: Every statement names its tenant, or says in writing why it does not
+
+    @unit
+    Scenario: A statement that names its tenant runs
+      Given a read whose WHERE clause binds the tenant as a parameter
+      When the repository issues it
+      Then it reaches the server unchanged
+
+    @unit
+    Scenario: A statement that names no tenant is refused, and the refusal names the table
+      Given a read with no tenant predicate at all
+      When the repository issues it
+      Then the client refuses it before it reaches the server
+      And the refusal names the table and the beginning of the statement
+      And it is recorded as an error for the engineer who wrote the query
+
+    @unit
+    Scenario: A statement that declares why it spans tenants runs
+      Given a read that genuinely spans tenants and carries a written reason
+      When the repository issues it
+      Then the client lets it through
+      And the reason does not travel to the server as part of the request
+
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object
     Given a service needs data that lives in ClickHouse

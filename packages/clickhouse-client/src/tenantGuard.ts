@@ -233,17 +233,64 @@ export function checkTenantScope({
   return null;
 }
 
+/**
+ * The tenant predicate forms the repositories genuinely write.
+ *
+ * Wider than {@link BOUND_TENANT_PREDICATE} on purpose: that one backs the
+ * `QueryRequest` path, where the bound value is also checked against the
+ * caller's tenant and so has to name exactly one parameter. This one runs at
+ * the vendor-client seam, where there is no claimed tenant to compare against
+ * and a statement may legitimately scope to a list of projects
+ * (`TenantId IN {ids:Array(String)}`) or, on the stored-object tables, to the
+ * column's other name.
+ */
+const SCOPED_PREDICATE =
+  /(?:^|[\s.(])(?:TenantId|tenant_id|project_id|ProjectId)\s*(?:=|IN)\s*\(?\s*\{\s*[A-Za-z_][A-Za-z0-9_]*\s*:/i;
+
+const LITERAL_PREDICATE =
+  /(?:^|[\s.(])(?:TenantId|tenant_id|project_id|ProjectId)\s*=\s*(?:'[^']*'|"[^"]*")/i;
+
+/**
+ * Returns the reason a statement names no tenant, or null when it names one.
+ *
+ * Text only: no parameters, no claimed tenant. It exists for the seam the
+ * repositories actually call - the wrapped vendor client, which is handed a
+ * built SQL string and a bag of parameters and has no idea whose request it is
+ * serving. The disjunction rule is deliberately not applied here. A statement
+ * whose only predicate sits inside a subquery, with an `OR` in the outer
+ * query, is a false positive at this seam, and refusing a working production
+ * read is worse than missing a weakening `OR` that {@link checkTenantScope}
+ * still catches wherever a tenant is claimed.
+ */
+export function checkStatementTenantScope({ sql }: { sql: string }): TenantScopeViolation | null {
+  const statement = maskNonCode(sql);
+  if (SCOPED_PREDICATE.test(statement)) return null;
+  return LITERAL_PREDICATE.test(statement)
+    ? { kind: "literal-predicate" }
+    : { kind: "missing-predicate" };
+}
+
+/** The first table the statement names, for the refusal message. */
+export function tableNamedBy(sql: string): string {
+  const match =
+    /(?:^|[\s(])(?:FROM|INSERT\s+INTO|ALTER\s+TABLE|OPTIMIZE\s+TABLE)\s+([A-Za-z_][A-Za-z0-9_.]*)/i.exec(
+      maskNonCode(sql),
+    );
+  return match?.[1] ?? "unknown";
+}
+
 export class TenantScopeError extends Error {
   constructor(
     public readonly violation: TenantScopeViolation,
     public readonly tenantId: string,
   ) {
-    super(`${describe(violation)} (tenant "${tenantId}")`);
+    super(`${describeTenantScopeViolation(violation)} (tenant "${tenantId}")`);
     this.name = "TenantScopeError";
   }
 }
 
-function describe(violation: TenantScopeViolation): string {
+/** The sentence a refusal reads out, shared by both guards. */
+export function describeTenantScopeViolation(violation: TenantScopeViolation): string {
   switch (violation.kind) {
     case "missing-predicate":
       return "Statement has no `TenantId = {param:String}` predicate. No other id in this schema is unique across tenants, so this would read another tenant's rows. Add the predicate, or declare `unscoped: { reason }` if the statement genuinely spans tenants.";

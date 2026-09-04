@@ -52,6 +52,7 @@ export {
   createResilientVendorClient,
   withClickHouseDefaultQuerySettings,
   withClickHouseStatementLimit,
+  withClickHouseTenantScope,
   DEFAULT_CLICKHOUSE_IDLE_SOCKET_TTL_MS,
   DEFAULT_CLICKHOUSE_REQUEST_TIMEOUT_MS,
   DEFAULT_MIN_STATEMENT_QUEUE_DEPTH,
@@ -64,6 +65,7 @@ export type {
   ClickHouseStatementOperation,
   ClickHouseVendorClient,
   ClickHouseVendorClientOptions,
+  UnscopedStatementDeclaration,
 } from "./managed-client";
 export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool";
 export {
@@ -115,7 +117,14 @@ export {
   VendorClientResilience,
   VendorClientResiliencePolicy,
 } from "./vendorClient";
-export { checkTenantScope, TenantGuard, TenantScopeError } from "./tenantGuard";
+export {
+  checkStatementTenantScope,
+  checkTenantScope,
+  describeTenantScopeViolation,
+  tableNamedBy,
+  TenantGuard,
+  TenantScopeError,
+} from "./tenantGuard";
 export type {
   QueryErrorDescriptor,
   QueryOutcome,

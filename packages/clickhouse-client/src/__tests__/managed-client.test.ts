@@ -100,7 +100,7 @@ describe("ClickHouseManagedClientService", () => {
 
     const client = service.create(input);
     await client.query({
-      query: "SELECT 1",
+      query: "SELECT 1 FROM traces WHERE TenantId = {tenantId:String}",
       clickhouse_settings: { max_execution_time: 10 },
     });
 
@@ -118,7 +118,7 @@ describe("ClickHouseManagedClientService", () => {
     const raw = factory.clients[0];
     if (raw === undefined) throw new Error("Expected a raw vendor client");
     expect(raw.query).toHaveBeenCalledWith({
-      query: "SELECT 1",
+      query: "SELECT 1 FROM traces WHERE TenantId = {tenantId:String}",
       clickhouse_settings: {
         max_bytes_before_external_group_by: 500_000_000,
         max_execution_time: 10,
@@ -149,7 +149,7 @@ describe("ClickHouseManagedClientService", () => {
     if (raw === undefined) throw new Error("Expected a raw vendor client");
     raw.query.mockRejectedValueOnce(new Error("cluster busy"));
 
-    await expect(client.query({ query: "SELECT 1" })).resolves.toEqual({ ok: true });
+    await expect(client.query({ query: "SELECT 1 FROM traces WHERE TenantId = {tenantId:String}" })).resolves.toEqual({ ok: true });
 
     expect(raw.query).toHaveBeenCalledTimes(2);
   });
@@ -165,7 +165,7 @@ describe("ClickHouseManagedClientService", () => {
       overloadErrorFactory: new PassthroughOverloadErrorFactory(),
     });
     const client = service.create(input);
-    await client.query({ query: "SELECT 1" });
+    await client.query({ query: "SELECT 1 FROM traces WHERE TenantId = {tenantId:String}" });
     await client.close();
 
     expect(ports.registered).toEqual(["org-1"]);
@@ -249,9 +249,9 @@ describe("ClickHouseManagedClientService", () => {
         }),
     );
 
-    const first = client.query({ query: "SELECT 1" });
+    const first = client.query({ query: "SELECT 1 FROM traces WHERE TenantId = {tenantId:String}" });
     await vi.waitFor(() => expect(raw.query).toHaveBeenCalledOnce());
-    await expect(client.query({ query: "SELECT 2" })).rejects.toBeInstanceOf(QueueFullError);
+    await expect(client.query({ query: "SELECT 2 FROM traces WHERE TenantId = {tenantId:String}" })).rejects.toBeInstanceOf(QueueFullError);
     release?.();
     await first;
 

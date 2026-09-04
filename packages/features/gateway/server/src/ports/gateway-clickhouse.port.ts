@@ -23,6 +23,8 @@ export type GatewayClickHouseClient = {
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
     clickhouse_settings?: Record<string, string | number | boolean | undefined>;
+    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
+    unscoped?: { reason: string };
   }): Promise<{ json<T = unknown>(): Promise<T[]> }>;
   insert(input: {
     table: string;

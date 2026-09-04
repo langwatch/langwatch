@@ -113,6 +113,10 @@ export async function discoverAffectedAggregates({
     `,
     query_params: params,
     format: "JSONEachRow",
+    unscoped: {
+      reason:
+        "Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant predicate is present only in the first case.",
+    },
   });
 
   return (await result.json()) as DiscoveredAggregateWithEventTypes[];
@@ -152,6 +156,10 @@ export async function countEventsForAggregates({
     `,
     query_params: params,
     format: "JSONEachRow",
+    unscoped: {
+      reason:
+        "Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant predicate is present only in the first case.",
+    },
   });
 
   const rows = (await result.json()) as { totalEvents: string }[];

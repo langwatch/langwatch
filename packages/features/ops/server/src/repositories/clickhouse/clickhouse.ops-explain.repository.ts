@@ -1,5 +1,18 @@
 import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
 
+/**
+ * The one call this repository makes, as it asks for it. Narrower than the
+ * driver client so the fleet-wide EXPLAIN can carry its `unscoped` reason.
+ */
+export interface OpsExplainQueryClient {
+  query(input: {
+    query: string;
+    format: "JSONEachRow";
+    clickhouse_settings?: ClickHouseSettings;
+    unscoped?: { reason: string };
+  }): Promise<{ json(): Promise<unknown[]> }>;
+}
+
 export interface OpsExplainClientResolution {
   client: ClickHouseClient;
   /** True when the dedicated `langwatch_ops` readonly user is not
@@ -45,7 +58,7 @@ export class OpsExplainClickHouseRepository {
     wrappedQuery,
     guardrails,
   }: {
-    client: ClickHouseClient;
+    client: OpsExplainQueryClient;
     wrappedQuery: string;
     guardrails?: ClickHouseSettings;
   }): Promise<unknown[]> {
@@ -53,6 +66,10 @@ export class OpsExplainClickHouseRepository {
       query: wrappedQuery,
       format: "JSONEachRow",
       ...(guardrails ? { clickhouse_settings: guardrails } : {}),
+      unscoped: {
+        reason:
+          "Operator EXPLAIN: the fleet-wide query-plan endpoint runs as the read-only ops user and is deliberately outside the tenant-scoped access pattern.",
+      },
     });
     return result.json();
   }

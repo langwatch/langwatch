@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { AggregateSearchResult } from "@langwatch/ops-contract";
 import type {
   AggregateDiscoveryRow,
@@ -6,10 +5,23 @@ import type {
   RawEventRow,
 } from "../../ports/event-explorer.repository";
 
-export class EventExplorerClickHouseRepository implements EventExplorerRepository {
-  private readonly client: ClickHouseClient;
+/**
+ * The read this repository issues, as it asks for it. Narrower than the driver
+ * client so an operator-wide statement can carry its `unscoped` reason.
+ */
+export interface EventExplorerClickHouseClient {
+  query(input: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format: "JSONEachRow";
+    unscoped?: { reason: string };
+  }): Promise<{ json(): Promise<unknown> }>;
+}
 
-  constructor(client: ClickHouseClient) {
+export class EventExplorerClickHouseRepository implements EventExplorerRepository {
+  private readonly client: EventExplorerClickHouseClient;
+
+  constructor(client: EventExplorerClickHouseClient) {
     this.client = client;
   }
 
@@ -59,6 +71,10 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
       `,
       query_params: queryParams,
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "Operator event explorer: the tenant filter is optional because an operator searches across tenants to find the aggregate to replay.",
+      },
     });
 
     const rows = (await result.json()) as Array<{
@@ -142,6 +158,10 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
       `,
       query_params: queryParams,
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "Operator event explorer: the tenant filter is optional because an operator searches across tenants to find the aggregate to replay.",
+      },
     });
 
     const rows = (await result.json()) as Array<{

@@ -39,6 +39,8 @@ export interface MetricClickHouseClient {
     query_params?: Record<string, unknown>;
     format?: DataFormat;
     clickhouse_settings?: ClickHouseSettings;
+    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
+    unscoped?: { reason: string };
   }): Promise<{ json<T = unknown>(): Promise<T[]> }>;
 }
 

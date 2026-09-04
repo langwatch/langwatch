@@ -43,6 +43,10 @@ export class ClickHouseStoredObjectOwnerRepository extends StoredObjectOwnerRepo
         `,
           query_params: { id },
           format: "JSONEachRow",
+          unscoped: {
+            reason:
+              "Legacy id-only delivery lookup: the request carries a stored-object id and nothing else, so this read is what resolves which project owns it.",
+          },
         });
         const rows = await result.json<StoredObjectOwnerRow>();
         const row = rows[0];

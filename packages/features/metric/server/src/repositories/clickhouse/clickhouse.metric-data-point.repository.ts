@@ -238,6 +238,10 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
         ...(query.metricName ? { metricName: query.metricName } : {}),
       },
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "Organization-wide usage rollup: billing counts every project the organization owns, so OrganizationId is the scope and TenantId narrows it only when one project was asked for.",
+      },
     });
 
     const rows = await result.json<Record<string, string>>();

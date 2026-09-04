@@ -26,6 +26,8 @@ export type RetentionClickHouseClient = {
     query: string;
     query_params: QueryParams;
     format: "JSONEachRow";
+    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
+    unscoped?: { reason: string };
   }): Promise<{ json(): Promise<unknown> }>;
 };
 
@@ -105,6 +107,10 @@ export class ClickHouseRetroactiveRetentionRepository extends RetroactiveRetenti
       `,
       query_params: tenantFilterParams(input.projectId),
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "system.mutations carries no tenant column: the project is matched inside the recorded mutation command instead, which is what tenantFilterSql does.",
+      },
     });
 
     return this.parseRows(await result.json());
@@ -142,6 +148,10 @@ export class ClickHouseRetroactiveRetentionRepository extends RetroactiveRetenti
       `,
       query_params: { tables: input.tables, ...tenantFilterParams(input.projectId) },
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "system.mutations carries no tenant column: the project is matched inside the recorded mutation command instead, which is what tenantFilterSql does.",
+      },
     });
 
     return this.parseRows(await result.json());

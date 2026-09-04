@@ -47,6 +47,8 @@ export interface EventingClickHouseReplayClient {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
+    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
+    unscoped?: { reason: string };
   }): Promise<EventingClickHouseStreamingQueryResult>;
   command(request: { query: string; query_params?: Record<string, unknown> }): Promise<unknown>;
 }

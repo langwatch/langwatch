@@ -42,6 +42,8 @@ export interface StorageStatsClickHouseClient {
   query(input: {
     query: string;
     query_params?: Record<string, readonly string[]>;
+    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
+    unscoped?: { reason: string };
   }): Promise<{ json<Row>(): Promise<{ data: Row[] }> }>;
 }
 
@@ -135,6 +137,10 @@ export class StorageStatsCollectionService {
         GROUP BY table
       `,
       query_params: { tables: [...MONITORED_TABLES] },
+      unscoped: {
+        reason:
+          "system.parts carries no tenant column: this is per-table storage size for the operator's dashboards.",
+      },
     });
     const tableRows = await tables.json<{
       table: string;
@@ -167,6 +173,10 @@ export class StorageStatsCollectionService {
           SELECT name, total_space, free_space, (total_space - free_space) as used_space
           FROM system.disks
         `,
+        unscoped: {
+          reason:
+            "system.disks carries no tenant column: this is the instance's disk capacity.",
+        },
       });
       const rows = await disks.json<{
         name: string;
@@ -208,6 +218,10 @@ export class StorageStatsCollectionService {
           FROM system.backup_log
           GROUP BY status
         `,
+        unscoped: {
+          reason:
+            "system.backup_log carries no tenant column: this is the instance's backup history.",
+        },
       });
       const rows = await backups.json<{
         status: string;

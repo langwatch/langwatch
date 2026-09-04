@@ -3,6 +3,8 @@ export type StoredObjectOwnerClickHouseClient = Readonly<{
     query: string;
     query_params: Record<string, string>;
     format: "JSONEachRow";
+    /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
+    unscoped?: { reason: string };
   }): Promise<{
     json<Result>(): Promise<Result[]>;
   }>;

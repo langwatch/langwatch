@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   type StalledHistoricalRun,
   type StalledSimulationRunRepository,
@@ -35,12 +34,27 @@ const NON_TERMINAL_STATUSES = ["QUEUED", "PENDING", "IN_PROGRESS"] as const;
  * its own run's tenant — the same "system sweeps" carve-out the deleted boot
  * reconciler documented.
  */
+/**
+ * The one read this sweep issues, as it asks for it. Narrower than the driver
+ * client so the install-wide statement can carry its `unscoped` reason.
+ */
+export interface StalledSimulationRunClickHouseClient {
+  query(input: {
+    query: string;
+    query_params: Record<string, unknown>;
+    format: "JSONEachRow";
+    unscoped?: { reason: string };
+  }): Promise<{ json<Row>(): Promise<Row[]> }>;
+}
+
 export class ClickHouseStalledSimulationRunRepository implements StalledSimulationRunRepository {
-  static create(client: ClickHouseClient): ClickHouseStalledSimulationRunRepository {
+  static create(
+    client: StalledSimulationRunClickHouseClient,
+  ): ClickHouseStalledSimulationRunRepository {
     return new ClickHouseStalledSimulationRunRepository(client);
   }
 
-  constructor(private readonly client: ClickHouseClient) {}
+  constructor(private readonly client: StalledSimulationRunClickHouseClient) {}
 
   async findStalledRuns({
     now,
@@ -83,6 +97,10 @@ export class ClickHouseStalledSimulationRunRepository implements StalledSimulati
         maxRows: MAX_ROWS,
       },
       format: "JSONEachRow",
+      unscoped: {
+        reason:
+          "Install-wide stalled-run sweep: a backfill has no single tenant to scope to, and each terminal write it triggers is scoped to that run's own tenant.",
+      },
     });
 
     const rows = await result.json<StalledHistoricalRun>();

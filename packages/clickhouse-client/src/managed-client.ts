@@ -6,6 +6,11 @@ import {
 import type { AbortSignalLike } from "./query";
 import { ConcurrencyLimiter, QueueFullError, type LimiterStats } from "./rateLimit";
 import {
+  checkStatementTenantScope,
+  describeTenantScopeViolation,
+  tableNamedBy,
+} from "./tenantGuard";
+import {
   VendorClientResiliencePolicy,
   type VendorClientPolicy,
   type VendorClientResilienceOptions,
@@ -49,6 +54,7 @@ export abstract class ClickHouseVendorClientFactory<Client extends ClickHouseVen
 export abstract class ClickHouseManagedClientLogger {
   abstract info(fields: Record<string, unknown>, message: string): void;
   abstract warn(fields: Record<string, unknown>, message: string): void;
+  abstract error(fields: Record<string, unknown>, message: string): void;
 }
 
 export abstract class ClickHouseManagedClientTelemetry {
@@ -133,8 +139,72 @@ export class ClickHouseManagedClientService<
       minimumStatementQueueDepth: this.options.minimumStatementQueueDepth,
       statementWaitTimeoutMs: this.options.statementWaitTimeoutMs,
     });
-    return withClickHouseDefaultQuerySettings(limited, this.options.defaultQuerySettings);
+    const defaulted = withClickHouseDefaultQuerySettings(
+      limited,
+      this.options.defaultQuerySettings,
+    );
+    return withClickHouseTenantScope({
+      client: defaulted,
+      instance: input.instance,
+      logger: this.options.logger,
+    });
   }
+}
+
+/**
+ * A statement that genuinely spans tenants, and the written reason it does.
+ *
+ * The same shape `QueryRequest.unscoped` already carries, declared here too
+ * because the repositories reach ClickHouse through the vendor client's own
+ * `query({ query, query_params })` call rather than through `QueryRequest`.
+ * It never reaches the driver: the guard reads it and strips it.
+ */
+export interface UnscopedStatementDeclaration {
+  reason: string;
+}
+
+/**
+ * Refuses a `query` whose SQL names no tenant, outermost of every policy so a
+ * statement that must not run never spends a slot or a socket. The refusal is
+ * a plain `Error`: a bug in a query we wrote, logged with table and statement
+ * head. `insert` is not checked; every row carries its own `TenantId`.
+ */
+export function withClickHouseTenantScope<Client extends ClickHouseVendorClient>({
+  client,
+  instance,
+  logger,
+}: {
+  client: Client;
+  instance: string;
+  logger?: ClickHouseManagedClientLogger | undefined;
+}): Client {
+  return new Proxy(client, {
+    get(target, property) {
+      if (property !== "query") return Reflect.get(target, property, target);
+      // Async, so a refusal arrives as a rejected promise like every other
+      // failure on this call rather than as a synchronous throw the caller's
+      // `.catch` would miss.
+      return async (params: unknown) => {
+        const { unscoped, ...forwarded } = recordOf(params);
+        const sql = typeof forwarded.query === "string" ? forwarded.query : "";
+        if (unscoped === undefined) {
+          const violation = checkStatementTenantScope({ sql });
+          if (violation !== null) {
+            const table = tableNamedBy(sql);
+            const head = sql.trim().slice(0, 80);
+            logger?.error(
+              { instance, table, violation: violation.kind, statement: head },
+              "Refused a ClickHouse statement: it names no tenant",
+            );
+            throw new Error(
+              `ClickHouse statement on table "${table}" is not tenant-scoped: ${head} — ${describeTenantScopeViolation(violation)}`,
+            );
+          }
+        }
+        return target.query(forwarded);
+      };
+    },
+  });
 }
 
 export interface ClickHouseStatementLimitOptions<Client extends ClickHouseVendorClient> {
