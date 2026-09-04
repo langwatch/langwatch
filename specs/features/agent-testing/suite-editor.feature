@@ -147,6 +147,26 @@ Feature: The test suite editor
     And the evaluator editor opens on the one that is there
 
   @integration
+  Scenario: An evaluator created from the list lands its editor on the suite editor
+    Given the evaluator list is open from the suite editor
+    When "New Evaluator" is chosen and "SQL Query Equivalence" is created
+    Then it is attached with inferred mappings
+    And its editor opens on top of the suite editor, so back and save land there
+
+  @integration
+  Scenario: An evaluator created from the list that needs no mapping lands on the suite editor
+    Given the evaluator list is open from the suite editor
+    When "New Evaluator" is chosen and "PII Leak Scanner" is created
+    Then it is attached with the conversation inferred
+    And the suite editor is back with no editor on top
+
+  @integration
+  Scenario: Cancelling the evaluator list returns to the suite editor
+    Given the evaluator list is open from the suite editor
+    When the list is cancelled
+    Then the suite editor is back with its draft intact
+
+  @integration
   Scenario: A pill with a missing mapping is marked
     Given an attached evaluator whose required input reads nothing
     When the evaluators section is read

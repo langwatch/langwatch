@@ -438,6 +438,7 @@ async function evaluateAttachment({
     inputs: evaluatorInputSpecsOf(evaluator),
     run: context.run,
     scenario: context.scenario,
+    finalAttempt: context.finalAttempt,
   });
   if (resolved.kind === "pending" && !context.finalAttempt) {
     throw new TraceDataPendingError(resolved.details);

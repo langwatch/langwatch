@@ -98,6 +98,14 @@ Feature: Evaluators run on scenario runs
     Then the run records a failed result with the details "no retrieved contexts in the trace"
 
   @unit
+  Scenario: An optional input the trace cannot give is left out
+    Given a score judge whose optional contexts input maps to the trace contexts
+    And a trace with no rag span
+    When the run is evaluated
+    Then the judge runs without contexts
+    And the result is not failed for the missing contexts
+
+  @unit
   Scenario: Trace data that has not arrived yet is retried with a growing delay
     Given an evaluator that reads the trace
     And the run's spans have not arrived

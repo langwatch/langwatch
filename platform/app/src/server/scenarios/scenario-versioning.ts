@@ -104,8 +104,21 @@ export function snapshotFieldsOf(
     judgeModel: scenario.judgeModel,
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
-    fields: scenario.fields ?? null,
+    fields: fieldValuesOrNull(scenario.fields),
   };
+}
+
+/**
+ * A scenario with no field values stores either null (never given any) or an
+ * empty record (cleared); the snapshot keeps one spelling so the two never
+ * diff as a change.
+ */
+function fieldValuesOrNull(
+  fields: Prisma.JsonValue | null,
+): Prisma.JsonValue | null {
+  if (fields === null || typeof fields !== "object" || Array.isArray(fields))
+    return fields;
+  return Object.keys(fields).length === 0 ? null : fields;
 }
 
 /**

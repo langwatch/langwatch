@@ -459,18 +459,24 @@ function useSuiteAttachments({
   /**
    * What a pick does: an evaluator already attached opens its editor, a new
    * one is attached with inferred mappings and opens its editor when an
-   * input still needs a person. The list is replaced in the stack either
-   * way, so back from the editor lands on the suite editor.
+   * input still needs a person.
+   *
+   * A pick from the list replaces the list in the stack, so back from the
+   * editor lands on the suite editor. An evaluator created from the list
+   * arrives once the stack is already back on the suite editor, so its
+   * editor is pushed on top and nothing goes back.
    */
   const attach = useCallback(
-    (evaluator: EvaluatorWithFields) => {
+    (evaluator: EvaluatorWithFields, origin: "list" | "created" = "list") => {
       const draft = useSuiteEditorStore.getState().draft;
       if (!draft) return;
+      const navigation =
+        origin === "list" ? { replaceCurrentInStack: true } : undefined;
       const already = draft.evaluators.find(
         (attachment) => attachment.evaluatorId === evaluator.id,
       );
       if (already) {
-        edit(already, evaluator, { replaceCurrentInStack: true });
+        edit(already, evaluator, navigation);
         return;
       }
       const attachment = newAttachment({ evaluator, ctx });
@@ -480,18 +486,21 @@ function useSuiteAttachments({
         evaluators: [...current.evaluators, attachment],
       }));
       if (opensOnAttach({ attachment, evaluator })) {
-        edit(attachment, evaluator, { replaceCurrentInStack: true });
+        edit(attachment, evaluator, navigation);
         return;
       }
-      goBack();
+      if (origin === "list") goBack();
     },
     [ctx, edit, update, goBack],
   );
 
   const add = useCallback(() => {
-    setFlowCallbacks("evaluatorList", { onSelect: attach });
-    // A person may create an evaluator from the list. Once it is saved, it
-    // is attached like a picked one, and the flow lands back on this drawer.
+    setFlowCallbacks("evaluatorList", {
+      onSelect: (evaluator) => attach(evaluator, "list"),
+    });
+    // A person may create an evaluator from the list. Once it is saved, the
+    // stack is reset to this drawer and the evaluator is attached like a
+    // picked one, so its editor sits on top of the suite editor.
     setFlowCallbacks(
       "evaluatorEditor",
       createEvaluatorEditorCallbacks({
@@ -507,13 +516,13 @@ function useSuiteAttachments({
               { resetStack: true },
             );
           }
-          if (evaluator) attach(evaluator);
+          if (evaluator) attach(evaluator, "created");
           return true;
         },
       }),
     );
-    openDrawer("evaluatorList");
-  }, [attach, openDrawer, utils, projectId, testSuiteId]);
+    openDrawer("evaluatorList", { onClose: goBack });
+  }, [attach, openDrawer, goBack, utils, projectId, testSuiteId]);
 
   return useMemo(
     () => ({

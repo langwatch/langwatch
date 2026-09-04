@@ -393,7 +393,9 @@ describe("the suite editor drawer", () => {
       expect(
         screen.getByTestId("suite-evaluators-section"),
       ).toBeInTheDocument();
-      expect(mockOpenDrawer).toHaveBeenCalledWith("evaluatorList");
+      expect(mockOpenDrawer).toHaveBeenCalledWith("evaluatorList", {
+        onClose: mockGoBack,
+      });
       expect(flowCallbacksStore.evaluatorList?.onSelect).toEqual(
         expect.any(Function),
       );
@@ -556,6 +558,86 @@ describe("the suite editor drawer", () => {
       expect(props).toMatchObject({
         evaluatorId: "eval_pii",
         mappingsConfig: { initialMappings: {} },
+      });
+    });
+  });
+
+  describe("when an evaluator is created from the list", () => {
+    const saveCreated = async (evaluator: { id: string; name: string }) => {
+      mockEvaluatorFetch.mockResolvedValue(
+        [SQL_EVALUATOR, PII_EVALUATOR].find((e) => e.id === evaluator.id),
+      );
+      await act(async () => {
+        await (
+          flowCallbacksStore.evaluatorEditor!.onSave as (
+            saved: { id: string; name: string },
+          ) => Promise<boolean>
+        )(evaluator);
+      });
+    };
+
+    /** @scenario "An evaluator created from the list lands its editor on the suite editor" */
+    it("resets the stack to the suite editor and stacks the new attachment's editor on it", async () => {
+      const user = userEvent.setup();
+      openEditor(
+        storedSuite({ fields: [{ identifier: "golden_sql", type: "text" }] }),
+      );
+      await user.click(
+        await screen.findByTestId("customize-chip-suite-evaluators"),
+      );
+      mockOpenDrawer.mockClear();
+
+      await saveCreated({ id: "eval_sql", name: "SQL Query Equivalence" });
+
+      expect(draft()?.evaluators[0]).toMatchObject({
+        evaluatorId: "eval_sql",
+        mappings: {
+          expected_output: { sourceId: "scenario", path: ["fields", "golden_sql"] },
+        },
+      });
+      const [reset, editor] = mockOpenDrawer.mock.calls;
+      expect(reset).toEqual([
+        SUITE_EDITOR_DRAWER,
+        { testSuiteId: "suite_1" },
+        { resetStack: true },
+      ]);
+      expect(editor?.[0]).toBe("evaluatorEditor");
+      // Pushed, not replacing: back from the editor lands on the suite editor.
+      expect(editor?.[2]).toBeUndefined();
+      expect(mockGoBack).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An evaluator created from the list that needs no mapping lands on the suite editor" */
+    it("attaches an evaluator that needs no mapping and stays on the suite editor", async () => {
+      const user = userEvent.setup();
+      openEditor();
+      await user.click(
+        await screen.findByTestId("customize-chip-suite-evaluators"),
+      );
+      mockOpenDrawer.mockClear();
+
+      await saveCreated({ id: "eval_pii", name: "PII Leak Scanner" });
+
+      expect(draft()?.evaluators[0]).toMatchObject({
+        evaluatorId: "eval_pii",
+        mappings: {
+          input: { sourceId: "conversation", path: ["first_user_message"] },
+        },
+      });
+      expect(mockOpenDrawer).toHaveBeenCalledTimes(1);
+      expect(mockOpenDrawer.mock.calls[0]?.[0]).toBe(SUITE_EDITOR_DRAWER);
+      expect(mockGoBack).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Cancelling the evaluator list returns to the suite editor" */
+    it("opens the list with a way back to the suite editor", async () => {
+      const user = userEvent.setup();
+      openEditor();
+      await user.click(
+        await screen.findByTestId("customize-chip-suite-evaluators"),
+      );
+      expect(mockOpenDrawer).toHaveBeenLastCalledWith("evaluatorList", {
+        onClose: mockGoBack,
       });
     });
   });

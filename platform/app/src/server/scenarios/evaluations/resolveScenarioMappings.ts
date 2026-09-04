@@ -264,17 +264,22 @@ export type ResolvedAttachmentInputs =
  * not arrived (the worker retries), then a value the run cannot give at all.
  * An optional input with no mapping is left out; a required one with no
  * mapping is reported as skipped, since the evaluator cannot run without it.
+ * An optional input the run cannot give is left out the same way, and one
+ * whose trace has not arrived is left out on the last attempt.
  */
 export function resolveAttachmentInputs({
   attachment,
   inputs,
   run,
   scenario,
+  finalAttempt = false,
 }: {
   attachment: Pick<EvaluatorAttachment, "mappings">;
   inputs: EvaluatorInputSpec[];
   run: RunInputs;
   scenario: ScenarioInputs;
+  /** True when no later attempt will wait for the trace. */
+  finalAttempt?: boolean;
 }): ResolvedAttachmentInputs {
   const data: Record<string, ResolvedValue> = {};
   let firstPending: string | undefined;
@@ -296,9 +301,11 @@ export function resolveAttachmentInputs({
       case "skipped":
         return { kind: "skipped", details: resolved.details };
       case "pending":
+        if (!input.required && finalAttempt) break;
         firstPending ??= resolved.details;
         break;
       case "failed":
+        if (!input.required) break;
         firstFailed ??= resolved.details;
         break;
     }

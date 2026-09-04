@@ -352,3 +352,65 @@ describe("storedInputsOf", () => {
     });
   });
 });
+
+describe("resolveAttachmentInputs with an optional trace input", () => {
+  const inputs = [
+    { id: "output", required: true },
+    { id: "contexts", required: false },
+  ];
+  const attachment: Pick<EvaluatorAttachment, "mappings"> = {
+    mappings: {
+      output: {
+        type: "source",
+        sourceId: "conversation",
+        path: ["last_agent_message"],
+      },
+      contexts: { type: "source", sourceId: "trace", path: ["contexts"] },
+    },
+  };
+
+  describe("when the spans arrived and hold no rag span", () => {
+    /** @scenario "An optional input the trace cannot give is left out" */
+    it("leaves contexts out and is ready", () => {
+      const run = {
+        messages,
+        spans: [toolCall({ startedAt: 1, input: "x", output: "y" })],
+        hasTraces: true,
+      };
+      expect(
+        resolveAttachmentInputs({ attachment, inputs, run, scenario }),
+      ).toEqual({
+        kind: "ready",
+        data: { output: "There were 12 refunds." },
+      });
+    });
+  });
+
+  describe("when the spans have not arrived", () => {
+    const run = { messages, spans: [], hasTraces: true };
+
+    it("waits for the trace before the last attempt", () => {
+      expect(
+        resolveAttachmentInputs({ attachment, inputs, run, scenario }),
+      ).toEqual({
+        kind: "pending",
+        details: "no retrieved contexts in the trace",
+      });
+    });
+
+    it("leaves contexts out on the last attempt", () => {
+      expect(
+        resolveAttachmentInputs({
+          attachment,
+          inputs,
+          run,
+          scenario,
+          finalAttempt: true,
+        }),
+      ).toEqual({
+        kind: "ready",
+        data: { output: "There were 12 refunds." },
+      });
+    });
+  });
+});
