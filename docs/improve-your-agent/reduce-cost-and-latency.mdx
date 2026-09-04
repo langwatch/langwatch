@@ -5,11 +5,11 @@ keywords: langwatch, reduce cost, reduce latency, cheaper model, model compariso
 description: Run the same test suite on two models side by side, read the pass rate, the cost and the reply latency of each, and keep the cheaper model only where the pass rate holds.
 ---
 
-The cost of an agent is the tokens per turn times the turns per conversation times the price of the model. Latency also depends on tool time, prompt caching and the provider's speed, so measure it on a run instead of deriving it. Test the model first: it is the lever with the largest effect on both numbers and the largest risk to quality, and one comparison run of the suite gives you the pass rate, the cost and the latency of each model side by side.
+The cost of an agent is the tokens per turn, times the turns per conversation, times the price of the model. Latency has more inputs than that, since tool time, prompt caching and the provider's speed all go into it, so measure it on a run instead of deriving it. Test the model first: it is the lever with the largest effect on both numbers and also the largest risk to quality, and one comparison run of the suite gives you the pass rate, the cost and the latency of each model side by side.
 
 ## Step 1: Declare the model as a run parameter
 
-A [connected agent](/agent-testing/connect-your-agent) declares its run parameters in the signature of the function. A `Literal` becomes a closed option list in the run dialog:
+A [connected agent](/agent-testing/connect-your-agent) declares its run parameters in the signature of the function, and a `Literal` becomes a closed option list in the run dialog:
 
 <Tabs>
   <Tab title="Python">
@@ -66,26 +66,26 @@ langwatch test-suite run "Returns" \
 
 ## Step 3: Read the comparison
 
-The run detail has one column per target. The column of the declared default model is labelled with the agent only, the other one with `model=gpt-5-mini`. Decide from the four charts above the table: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**.
+The run detail has one column per target: the column with the declared default model is labelled with the agent only, and the other one with `model=gpt-5-mini`. Decide from the four charts above the table, **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**.
 
 <Frame caption="One column per model. The pass rate must hold; the cost and the latency should drop.">
 <img className="block" src="/images/improve-your-agent/model-comparison-run-detail.png" alt="A comparison run of the same agent on gpt-5 and on gpt-5-mini, with the four charts and one column per model" />
 </Frame>
 
-Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, open that conversation and read which criterion failed. Then route that kind of request to the larger model in your code, or keep the larger model for everything, and rerun.
+Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, open that conversation and read which criterion failed, then either route that kind of request to the larger model in your code or keep the larger model for everything, and rerun.
 
-For example, on the six-scenario Returns suite of the example with three repeats, gpt-5-mini answered a conversation in 28 seconds against 54 seconds for gpt-5 and cost $0.036 against $0.046, and it failed the scenario where the customer gives a wrong order number twice out of three, because it never asked the question that leads to the right order.
+For example, on the six-scenario Returns suite of the example with three repeats, gpt-5-mini answered a conversation in 28 seconds against 54 seconds for gpt-5 and cost $0.036 against $0.046, but it failed the scenario where the customer gives a wrong order number twice out of three times, because it never asked the question that leads to the right order.
 
 ## Step 4: The other levers
 
 After the model, in order of effect:
 
 - **Turns.** Every avoided turn removes a whole prompt from the bill. See [Reduce turns](/improve-your-agent/reduce-turns).
-- **Context size.** The system prompt, the tool list and the history are paid on every turn. Open a trace and read the input tokens of the first and the last call of the conversation, then shorten the prompt or trim the history and compare.
-- **Prompt caching.** The providers charge cached input tokens at a fraction of the price. Keep the static part of the prompt first and identical across calls.
-- **Provider.** The `provider-cost-comparison` skill prices the traffic in your traces on other providers and tells you whether one is cheaper.
+- **Context size.** The system prompt, the tool list and the history are paid for on every turn, so open a trace, read the input tokens of the first and the last call of the conversation, and then shorten the prompt or trim the history and compare.
+- **Prompt caching.** Providers charge cached input tokens at a fraction of the price, and you get the cache by keeping the static part of the prompt first and identical across calls.
+- **Provider.** The `provider-cost-comparison` skill prices the traffic in your traces on other providers and tells you whether one of them would be cheaper.
 
-Every lever gets the same gate: a comparison run of the suite before you keep it.
+Every lever goes through the same gate: a comparison run of the suite before you keep it.
 
 ## Do it with Langy
 
@@ -109,9 +109,9 @@ npx skills add langwatch/skills/provider-cost-comparison
 
 ## Common failures
 
-- **The cost reads "across 3 of 6 runs".** The runs without a cost have no traces linked. See [Linking your traces](/agent-testing/linking-your-traces).
-- **The pass rate is the same and the cost went up.** The cheaper model took more turns. Read the turns in the conversations before you decide, and see [Reduce turns](/improve-your-agent/reduce-turns).
-- **The option list does not show the model.** The agent connected before the parameter was added. Restart the agent process; the platform reads the parameters when it connects.
-- **Runs end as `agent_busy` on the development side.** A development agent takes one call at a time by default and the run sends three. Register it with `concurrency=3` or start three instances.
+- **The cost reads "across 3 of 6 runs".** The runs without a cost have no traces linked: see [Linking your traces](/agent-testing/linking-your-traces).
+- **The pass rate is the same and the cost went up.** The cheaper model took more turns, so read the turns in the conversations before you decide, and see [Reduce turns](/improve-your-agent/reduce-turns).
+- **The option list does not show the model.** The agent connected before the parameter was added. Restart the agent process, because the platform reads the parameters when it connects.
+- **Runs end as `agent_busy` on the development side.** A development agent takes one call at a time by default and the run sends three at once, so register it with `concurrency=3` or start three instances.
 
 <Info>**Also check:** [Compare agents](/agent-testing/compare-agents), [Run parameters](/agent-testing/run-parameters), [Results](/agent-testing/results).</Info>
