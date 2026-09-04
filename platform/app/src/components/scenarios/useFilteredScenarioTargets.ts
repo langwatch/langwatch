@@ -11,6 +11,7 @@
  */
 
 import { useMemo } from "react";
+import { OFFLINE_AGENT_SELECT_COPY } from "~/components/agents/offlineAgentCopy";
 import { explainHandledError } from "~/features/errors";
 import { targetLabelOf } from "~/server/suites/target-key";
 import type { TargetValue } from "./TargetSelector";
@@ -52,10 +53,6 @@ export type ScenarioAgent<T extends AgentLike = AgentLike> = T & {
   /** False for a development agent of another person and for an offline agent. */
   isRunnable: boolean;
 };
-
-/** Why an offline connected agent cannot be picked or tested. */
-export const OFFLINE_AGENT_COPY =
-  "This agent is offline. Start the process that runs it and try again.";
 
 /** True when this agent is a connected agent that no process is holding. */
 export function isOfflineAgent(
@@ -165,7 +162,7 @@ export function ownerOnlyCopy(ownerName?: string | null): string {
 }
 
 /**
- * Why an agent cannot be picked, in the words the refusal itself uses.
+ * Why an agent cannot be picked as a run target.
  *
  * A development agent of another person can never be run by the reader, so
  * that reason comes first even when the agent is offline too.
@@ -175,6 +172,8 @@ export function notRunnableCopy(agent: {
   owner?: { name: string | null } | null;
   isOffline?: boolean;
 }): string {
-  if (agent.isOffline && !agent.isTeammateOwned) return OFFLINE_AGENT_COPY;
+  if (agent.isOffline && !agent.isTeammateOwned) {
+    return OFFLINE_AGENT_SELECT_COPY;
+  }
   return ownerOnlyCopy(agent.owner?.name);
 }

@@ -186,7 +186,7 @@ Feature: Connected agents in the product
   Scenario: An offline agent says on hover why it cannot be tested
     Given an offline connected agent
     When the pointer rests on the Test button
-    Then a tooltip says the agent is offline and to start the process that runs it
+    Then a tooltip says the agent is offline and to start the process that runs it to be able to test it
 
   @integration
   Scenario: The drawer sends one test turn to the agent
@@ -234,7 +234,7 @@ Feature: Connected agents in the product
   Scenario: An offline connected agent says why on hover
     Given a connected agent no process is holding
     When the pointer rests on its card
-    Then it says the agent is offline
+    Then it says the agent is offline and to start the process that runs it to be able to select it
 
   @integration
   Scenario: The scenario target selector draws an offline agent disabled

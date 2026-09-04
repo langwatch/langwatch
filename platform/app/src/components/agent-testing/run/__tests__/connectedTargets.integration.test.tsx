@@ -14,6 +14,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { OFFLINE_AGENT_SELECT_COPY } from "~/components/agents/offlineAgentCopy";
 import { scenarioAgentsOf } from "~/components/scenarios/useFilteredScenarioTargets";
 import { OfflineTargetsNotice } from "../OfflineTargetsNotice";
 import type { RunDialogAgent } from "../RunTargetPicker";
@@ -200,7 +201,7 @@ describe("connected agents in the run dialog", () => {
       await user.hover(screen.getByTestId("run-dialog-agent-agent_off"));
 
       expect(await screen.findByRole("tooltip")).toHaveTextContent(
-        "This agent is offline",
+        OFFLINE_AGENT_SELECT_COPY,
       );
     });
   });

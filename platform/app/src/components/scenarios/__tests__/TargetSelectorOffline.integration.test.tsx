@@ -48,6 +48,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+import { OFFLINE_AGENT_SELECT_COPY } from "~/components/agents/offlineAgentCopy";
 import { TargetSelector, type TargetValue } from "../TargetSelector";
 
 describe("<TargetSelector/> with an offline connected agent", () => {
@@ -75,7 +76,7 @@ describe("<TargetSelector/> with an offline connected agent", () => {
       expect(offline).toHaveAttribute("aria-disabled", "true");
       await user.hover(offline);
       expect(await screen.findByRole("tooltip")).toHaveTextContent(
-        "This agent is offline",
+        OFFLINE_AGENT_SELECT_COPY,
       );
       await user.click(offline);
       expect(onChange).not.toHaveBeenCalled();

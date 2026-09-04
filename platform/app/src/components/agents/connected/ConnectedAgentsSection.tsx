@@ -14,7 +14,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Bot, ExternalLink, Laptop, Play, User } from "lucide-react";
 import { LuTrash2 } from "react-icons/lu";
-import { OFFLINE_AGENT_COPY } from "~/components/scenarios/useFilteredScenarioTargets";
+import { OFFLINE_AGENT_TEST_COPY } from "~/components/agents/offlineAgentCopy";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
@@ -157,7 +157,7 @@ function TestAgentItem({
 }) {
   const isOffline = agent.status === "offline";
   return (
-    <Tooltip content={OFFLINE_AGENT_COPY} disabled={!isOffline}>
+    <Tooltip content={OFFLINE_AGENT_TEST_COPY} disabled={!isOffline}>
       <Menu.Item
         value="test"
         disabled={isOffline}
