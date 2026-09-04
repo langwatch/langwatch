@@ -17,7 +17,7 @@
  * repo and cannot be reached from single-repo CI — a real boundary, left to the
  * PR thread.
  *
- * @see ../../../../../../../infra/clickhouse-serverless/internal/render/lwql.go
+ * @see ../../../../../../../../infra/clickhouse-serverless/internal/render/lwql.go
  * @see ../lwqlViews.ts — the catalog the manifest mirrors
  * @see ../../provisioning/catalogStatements.ts — lwqlSourceTables, the canonical source-table derivation
  */
