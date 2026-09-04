@@ -1,21 +1,18 @@
 /**
- * Unit tests for the orchestrator's storage-dispatch helpers.
- *
- *   - the judge model recorded for an evaluator target, pinned from the run
- *     rather than read live off today's evaluator config
- *   - what a non-processed evaluation may carry into storage: no score, no
- *     label, no verdict, but the money it really spent
- *
+ * Unit tests for the result-dispatch helpers: the judge model recorded for
+ * an evaluator target (pinned from the run, not read live), and what a
+ * non-processed evaluation may carry into storage — no score, but the money it spent.
  * @see specs/experiments/comparison.feature
  */
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { TypedAgent } from "@langwatch/agent-contract";
-import {
-  buildEvaluatorResultDispatch,
-  buildTargetMetadata,
-} from "../experiment-run-orchestrator.service";
+import { ExperimentResultDispatchService } from "../experiment-result-dispatch.service";
+
+const dispatches = ExperimentResultDispatchService.create();
+const buildTargetMetadata = dispatches.buildTargetMetadata.bind(dispatches);
+const buildEvaluatorResultDispatch = dispatches.buildEvaluatorResultDispatch.bind(dispatches);
 
 const emptyAgents = new Map<string, TypedAgent>();
 

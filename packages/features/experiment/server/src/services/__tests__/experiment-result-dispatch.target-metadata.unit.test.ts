@@ -1,21 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { promptLoadKey } from "../experiment-execution-data.service";
-import { buildTargetMetadata } from "../experiment-run-orchestrator.service";
+import { ExperimentResultDispatchService } from "../experiment-result-dispatch.service";
+
+const dispatches = ExperimentResultDispatchService.create();
+const buildTargetMetadata = dispatches.buildTargetMetadata.bind(dispatches);
 
 /**
- * Which model gets RECORDED on the run.
- *
- * Stored rather than read live, because an evaluator's config can be edited
- * afterwards and reading it at display time would retroactively reattribute
- * every historical run to whatever is configured today.
- *
- * That makes an unsaved local edit the interesting case: execution honours it
- * (`workflowBuilder` resolves `localEvaluatorConfig?.settings ?? dbConfig`), so
- * a recorder that ignored it would run on one model and record another — and
- * the recorded one is what feeds the leaderboard's self-preference check,
- * which would then report independence from a model that never judged.
- *
+ * Which model gets RECORDED on the run — stored rather than read live, so
+ * an evaluator's config edited afterwards does not retroactively
+ * reattribute a historical run to today's config.
  * @see specs/experiments/comparison-leaderboard.feature
  * @see specs/experiments-v3/evaluation-execution.feature
  */
@@ -68,18 +62,9 @@ describe("buildTargetMetadata — the judge model recorded on a run", () => {
 
   describe("given an unsaved edit whose settings name no model", () => {
     /**
-     * Records nothing, and that is the correct answer rather than a gap.
-     *
-     * `workflowBuilder` resolves `localEvaluatorConfig?.settings ?? dbConfig
-     * ?.settings ?? {}` — the local object REPLACES the saved one wholesale,
-     * it is not merged field by field. So a local config naming no model does
-     * not run on the saved model either; the evaluator's own default applies
-     * downstream. Falling back to the saved model here would read as the more
-     * helpful behaviour and would be a lie about what ran.
-     *
-     * This is pinned because "fall back per field" is the intuitive
-     * expectation, and acting on it would silently break the one invariant
-     * this function exists to hold: recorded is what executed.
+     * `localEvaluatorConfig` REPLACES the saved config wholesale, not
+     * merged field by field, so a local config naming no model does not
+     * fall back to the saved model — the evaluator's own default applies.
      */
     it("records nothing, matching what execution resolves", () => {
       const meta = build({

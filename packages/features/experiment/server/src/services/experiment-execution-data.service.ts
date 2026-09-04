@@ -248,6 +248,9 @@ export type LoadedWorkflow = {
   dsl: StudioWorkflow;
 };
 
+/** DB evaluator rows a run has loaded, keyed by their own id. */
+export type LoadedEvaluators = Map<string, { id: string; name: string; config: unknown }>;
+
 /**
  * Cache key for a loaded workflow. Two targets that pin the same workflow to
  * different versions must not share a loaded DSL, so the key includes the
