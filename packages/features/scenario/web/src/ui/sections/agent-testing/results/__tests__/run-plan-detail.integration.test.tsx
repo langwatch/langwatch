@@ -12,11 +12,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  ScenarioRunStatus,
-  Verdict,
-  type ScenarioRunData,
-} from "@langwatch/scenario-contract";
+import { ScenarioRunStatus, Verdict, type ScenarioRunData } from "@langwatch/scenario-contract";
 import { getSuiteSetId, targetKeyOf } from "@langwatch/suite-contract";
 import { NOT_IN_RUN_LABEL } from "../comparison-results-row";
 import { RunPlanDetail } from "../run-plan-detail";
@@ -63,7 +59,16 @@ const mockGetSuiteById = vi.hoisted(() =>
     },
   })),
 );
-const mockGetAgents = vi.hoisted(() => vi.fn(() => ({ data: [] })));
+/** Kept loose on purpose: this mock stands in for `api.agents.getAll.useQuery`, and an
+ * empty array literal with no annotation infers `never[]`, which then refuses every
+ * fixture `mockReturnValue` supplies later in the file. */
+const mockGetAgents = vi.hoisted(() =>
+  vi.fn(
+    (): {
+      data: Array<{ id: string; name: string; type: string; environment?: string | null }>;
+    } => ({ data: [] }),
+  ),
+);
 
 vi.mock("../../../../../behavior/scenario-api", () => ({
   api: {
@@ -187,9 +192,7 @@ vi.mock("@langwatch/model-provider-web/components/ModelSelector", async (importO
             isCustom: false,
           }
         : undefined,
-      groupedByProvider: model
-        ? [{ provider: model.split("/")[0] ?? "", models: [] }]
-        : [],
+      groupedByProvider: model ? [{ provider: model.split("/")[0] ?? "", models: [] }] : [],
       isLoading: false,
     }),
   };
@@ -269,11 +272,7 @@ function threeBatches(): ScenarioRunData[] {
   ];
 }
 
-function setRuns(
-  runs: ScenarioRunData[],
-  hasMore = false,
-  nextCursor?: string,
-) {
+function setRuns(runs: ScenarioRunData[], hasMore = false, nextCursor?: string) {
   mockGetSuiteRunData.mockReturnValue({
     data: { runs, scenarioSetIds: {}, hasMore, nextCursor, changed: true },
     isLoading: false,
@@ -282,9 +281,7 @@ function setRuns(
   });
 }
 
-function renderDetail(
-  overrides: Partial<React.ComponentProps<typeof RunPlanDetail>> = {},
-) {
+function renderDetail(overrides: Partial<React.ComponentProps<typeof RunPlanDetail>> = {}) {
   const props: React.ComponentProps<typeof RunPlanDetail> = {
     plan: suitePlan,
     batchRunId: null,
@@ -355,9 +352,7 @@ describe("<RunPlanDetail/>", () => {
 
     const entry = screen.getByTestId("runs-sidebar-item-batch_3");
     expect(within(entry).getByText("Run #3")).toBeInTheDocument();
-    expect(
-      within(entry).getByText("switched judge to the stricter criterion"),
-    ).toBeInTheDocument();
+    expect(within(entry).getByText("switched judge to the stricter criterion")).toBeInTheDocument();
     expect(within(entry).getByText("2h ago")).toBeInTheDocument();
     expect(within(entry).getByText("100%")).toBeInTheDocument();
   });
@@ -378,9 +373,7 @@ describe("<RunPlanDetail/>", () => {
     renderDetail();
 
     const entry = screen.getByTestId("runs-sidebar-item-batch_2");
-    expect(
-      within(entry).queryByTestId("runs-sidebar-item-batch_2-note"),
-    ).not.toBeInTheDocument();
+    expect(within(entry).queryByTestId("runs-sidebar-item-batch_2-note")).not.toBeInTheDocument();
   });
 
   /** @scenario "A long note is shortened in the sidebar and readable in full on hover" */
@@ -399,15 +392,11 @@ describe("<RunPlanDetail/>", () => {
 
     const entry = screen.getByTestId("runs-sidebar-item-batch_2");
     expect(entry).toHaveAttribute("data-selected", "true");
-    expect(screen.getByTestId("runs-sidebar-item-batch_3")).not.toHaveAttribute(
-      "data-selected",
-    );
+    expect(screen.getByTestId("runs-sidebar-item-batch_3")).not.toHaveAttribute("data-selected");
 
     const title = within(entry).getByTestId("runs-sidebar-item-batch_2-title");
     expect(title.querySelectorAll("[class*='circle']")).toHaveLength(0);
-    expect(
-      within(entry).getByTestId("runs-sidebar-item-batch_2-result"),
-    ).toBeInTheDocument();
+    expect(within(entry).getByTestId("runs-sidebar-item-batch_2-result")).toBeInTheDocument();
   });
 
   /** @scenario "The runs sidebar loads more runs on request" */
@@ -452,9 +441,7 @@ describe("<RunPlanDetail/>", () => {
     await user.click(loadMore);
 
     expect(screen.getByTestId("runs-sidebar-item-batch_0")).toBeInTheDocument();
-    expect(screen.getAllByTestId(/^runs-sidebar-item-batch_\d+$/)).toHaveLength(
-      4,
-    );
+    expect(screen.getAllByTestId(/^runs-sidebar-item-batch_\d+$/)).toHaveLength(4);
   });
 
   /** @scenario "The results read as a table by default" */
@@ -513,9 +500,7 @@ describe("<RunPlanDetail/>", () => {
     );
 
     expect(
-      within(screen.getByTestId("run-results-table")).getByText(
-        "6.3s · $0.004200",
-      ),
+      within(screen.getByTestId("run-results-table")).getByText("6.3s · $0.004200"),
     ).toBeInTheDocument();
   });
 
@@ -526,9 +511,7 @@ describe("<RunPlanDetail/>", () => {
     renderDetail();
 
     await user.click(screen.getByRole("button", { name: /^Actions for / }));
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Edit scenario" }),
-    );
+    await user.click(await screen.findByRole("menuitem", { name: "Edit scenario" }));
 
     expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingCaseEditor", {
       scenarioId: "scen_7",
@@ -546,9 +529,7 @@ describe("<RunPlanDetail/>", () => {
     expect(
       await screen.findByRole("menuitem", { name: "Open the conversation" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: "Rerun this scenario" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Rerun this scenario" })).toBeInTheDocument();
   });
 
   /** @scenario "A run plan is run again from the header of its results" */
@@ -556,9 +537,7 @@ describe("<RunPlanDetail/>", () => {
     const user = userEvent.setup();
     renderDetail();
 
-    expect(
-      screen.getByRole("button", { name: "Edit run plan" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit run plan" })).toBeInTheDocument();
     await user.click(screen.getByTestId("run-plan-button"));
 
     const dialog = await screen.findByTestId("run-dialog");
@@ -574,9 +553,7 @@ describe("<RunPlanDetail/>", () => {
     const edit = within(line).getByTestId("edit-run-plan-button");
     const run = within(line).getByTestId("run-plan-button");
     expect(edit).toHaveTextContent("Edit run plan");
-    expect(
-      edit.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(edit.compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     await user.click(edit);
     expect(props.onEditPlan).toHaveBeenCalledWith("suite_1");
@@ -599,9 +576,7 @@ describe("<RunPlanDetail/>", () => {
     });
 
     expect(screen.queryByTestId("run-plan-button")).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("edit-run-plan-button"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("edit-run-plan-button")).not.toBeInTheDocument();
   });
 
   /** @scenario "Only the selected run is shown, not every previous run" */
@@ -623,9 +598,7 @@ describe("<RunPlanDetail/>", () => {
 
     const table = screen.getByTestId("run-results-table");
     expect(within(table).getByText("Older scenario")).toBeInTheDocument();
-    expect(
-      within(table).queryByText("Newest scenario"),
-    ).not.toBeInTheDocument();
+    expect(within(table).queryByText("Newest scenario")).not.toBeInTheDocument();
     expect(screen.getByTestId("runs-sidebar-item-batch_3")).toBeInTheDocument();
   });
 
@@ -642,9 +615,7 @@ describe("<RunPlanDetail/>", () => {
     expect(within(line).getByTestId("run-plan-button")).toBeInTheDocument();
 
     const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
-    expect(
-      within(sidebar).getByRole("button", { name: /Results/ }),
-    ).toBeInTheDocument();
+    expect(within(sidebar).getByRole("button", { name: /Results/ })).toBeInTheDocument();
   });
 
   /** @scenario "The run header reads the run, then the pass block, then the note" */
@@ -656,12 +627,8 @@ describe("<RunPlanDetail/>", () => {
     const pass = within(line).getByTestId("run-metrics-summary");
     const note = within(line).getByTestId("run-summary-note");
 
-    expect(
-      number.compareDocumentPosition(pass) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      pass.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(number.compareDocumentPosition(pass) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pass.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   /** @scenario "The runs sidebar holds only the back link and the run list" */
@@ -669,9 +636,7 @@ describe("<RunPlanDetail/>", () => {
     renderDetail();
 
     const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
-    expect(
-      within(sidebar).getByRole("button", { name: /Results/ }),
-    ).toBeInTheDocument();
+    expect(within(sidebar).getByRole("button", { name: /Results/ })).toBeInTheDocument();
     expect(within(sidebar).getByText("Run #3")).toBeInTheDocument();
 
     expect(within(sidebar).queryByText("Checkout")).not.toBeInTheDocument();
@@ -727,12 +692,8 @@ describe("<RunPlanDetail/>", () => {
     renderDetail();
 
     const line = screen.getByTestId("run-summary-line");
-    expect(within(line).getByTestId("run-plan-button")).toHaveTextContent(
-      RUN_AGAIN_LABEL,
-    );
-    expect(
-      within(line).queryByRole("button", { name: "Run" }),
-    ).not.toBeInTheDocument();
+    expect(within(line).getByTestId("run-plan-button")).toHaveTextContent(RUN_AGAIN_LABEL);
+    expect(within(line).queryByRole("button", { name: "Run" })).not.toBeInTheDocument();
   });
 
   /** @scenario "The header line does not repeat when the run started" */
@@ -747,9 +708,7 @@ describe("<RunPlanDetail/>", () => {
     expect(within(sidebar).getAllByText("2h ago").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
-    expect(screen.getByTestId("run-settings-started")).toHaveTextContent(
-      "2h ago",
-    );
+    expect(screen.getByTestId("run-settings-started")).toHaveTextContent("2h ago");
   });
 
   /** @scenario "The run header shows the note of the selected run" */
@@ -768,9 +727,7 @@ describe("<RunPlanDetail/>", () => {
     const user = userEvent.setup();
     renderDetail();
 
-    await user.click(
-      screen.getByRole("button", { name: "Grid, watch the conversations" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Grid, watch the conversations" }));
 
     expect(useAgentTestingStore.getState().viewMode).toBe("grid");
     expect(screen.getByTestId("scenario-grid")).toBeInTheDocument();
@@ -786,9 +743,7 @@ describe("<RunPlanDetail/>", () => {
     const user = userEvent.setup();
     renderDetail();
 
-    await user.click(
-      screen.getByRole("button", { name: "Grid, watch the conversations" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Grid, watch the conversations" }));
 
     const grid = screen.getByTestId("scenario-grid");
     expect(grid).toHaveStyle({ padding: "0px" });
@@ -945,14 +900,10 @@ describe("<RunPlanDetail/>", () => {
       .mockResolvedValue(new Response("", { status: 200 }));
     renderDetail();
 
-    await user.click(
-      screen.getByRole("button", { name: "More actions for Checkout" }),
-    );
+    await user.click(screen.getByRole("button", { name: "More actions for Checkout" }));
     await user.click(await screen.findByTestId("export-runs-button"));
     const dialog = await screen.findByRole("dialog");
-    expect(
-      within(dialog).getByText("Export Scenario Runs"),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Export Scenario Runs")).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("button", { name: /Export/i }));
 
@@ -987,9 +938,7 @@ describe("<RunPlanDetail/>", () => {
     const user = userEvent.setup();
     const { props } = renderDetail({ batchRunId: "batch_just_started" });
 
-    expect(
-      screen.getByText("Waiting for the first result"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Waiting for the first result")).toBeInTheDocument();
     expect(screen.queryByText("No run in this period")).not.toBeInTheDocument();
     const pendingRow = screen.getByTestId("runs-sidebar-pending");
     expect(pendingRow).toHaveTextContent("Starting");
@@ -1063,15 +1012,11 @@ describe("<RunPlanDetail/>", () => {
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
     const block = screen.getByTestId("run-settings-block");
-    expect(within(block).getByTestId("run-settings-started")).toHaveTextContent(
-      "2h ago",
-    );
+    expect(within(block).getByTestId("run-settings-started")).toHaveTextContent("2h ago");
     const parameter = within(block).getByText("region = eu-central");
     expect(parameter.tagName).toBe("CODE");
 
-    expect(within(block).getByTestId("run-settings-repeat")).toHaveTextContent(
-      "3 times",
-    );
+    expect(within(block).getByTestId("run-settings-repeat")).toHaveTextContent("3 times");
 
     const simulator = within(block).getByTestId("run-settings-simulator");
     expect(simulator).toHaveTextContent("gpt-5-mini");
@@ -1091,11 +1036,9 @@ describe("<RunPlanDetail/>", () => {
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
     const block = screen.getByTestId("run-settings-block");
-    const rows = [
-      "run-settings-started",
-      "run-settings-simulator",
-      "run-settings-judge",
-    ].map((testId) => within(block).getByTestId(testId));
+    const rows = ["run-settings-started", "run-settings-simulator", "run-settings-judge"].map(
+      (testId) => within(block).getByTestId(testId),
+    );
 
     const startedHeight = window.getComputedStyle(rows[0]!).minHeight;
     expect(startedHeight).not.toBe("");
@@ -1138,9 +1081,7 @@ describe("<RunPlanDetail/>", () => {
   /** @scenario "The judge always reads, and a run that named no model reads the project default" */
   it("reads the judge as the project default on a run that stamped no model", async () => {
     const user = userEvent.setup();
-    setRuns(
-      configuredBatch({ targetReferenceId: "agent_1", targetType: "http" }),
-    );
+    setRuns(configuredBatch({ targetReferenceId: "agent_1", targetType: "http" }));
     renderDetail();
 
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
@@ -1150,9 +1091,7 @@ describe("<RunPlanDetail/>", () => {
     expect(judge).toHaveTextContent("Project default model");
     expect(judge).not.toHaveTextContent(/no model/i);
     expect(PROJECT_DEFAULT_MODEL).toBe("Project default model");
-    expect(
-      within(block).queryByTestId("run-settings-simulator"),
-    ).not.toBeInTheDocument();
+    expect(within(block).queryByTestId("run-settings-simulator")).not.toBeInTheDocument();
   });
 
   /** @scenario "A run with no parameters and no repeat reads neither" */
@@ -1172,12 +1111,8 @@ describe("<RunPlanDetail/>", () => {
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
     const block = screen.getByTestId("run-settings-block");
-    expect(
-      within(block).queryByTestId("run-settings-parameters"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(block).queryByTestId("run-settings-repeat"),
-    ).not.toBeInTheDocument();
+    expect(within(block).queryByTestId("run-settings-parameters")).not.toBeInTheDocument();
+    expect(within(block).queryByTestId("run-settings-repeat")).not.toBeInTheDocument();
     expect(within(block).getByTestId("run-settings-judge")).toBeInTheDocument();
   });
 
@@ -1197,9 +1132,9 @@ describe("<RunPlanDetail/>", () => {
 
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
-    const started = within(
-      screen.getByTestId("run-settings-block"),
-    ).getByTestId("run-settings-started");
+    const started = within(screen.getByTestId("run-settings-block")).getByTestId(
+      "run-settings-started",
+    );
     expect(started).toHaveTextContent("2h ago");
     expect(screen.getAllByTestId("run-settings-started")).toHaveLength(1);
     expect(started.textContent?.trim().endsWith("You")).toBe(true);
@@ -1225,9 +1160,9 @@ describe("<RunPlanDetail/>", () => {
 
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
-    const started = within(
-      screen.getByTestId("run-settings-block"),
-    ).getByTestId("run-settings-started");
+    const started = within(screen.getByTestId("run-settings-block")).getByTestId(
+      "run-settings-started",
+    );
     expect(started).toHaveTextContent("Omar Haddad");
     expect(started).not.toHaveTextContent("You");
     expect(started).not.toHaveTextContent("user_omar");
@@ -1253,9 +1188,9 @@ describe("<RunPlanDetail/>", () => {
 
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
-    const started = within(
-      screen.getByTestId("run-settings-block"),
-    ).getByTestId("run-settings-started");
+    const started = within(screen.getByTestId("run-settings-block")).getByTestId(
+      "run-settings-started",
+    );
     expect(started).toHaveTextContent("2h ago");
     expect(started).not.toHaveTextContent("Unknown");
     expect(started).not.toHaveTextContent("user_departed");
@@ -1278,9 +1213,9 @@ describe("<RunPlanDetail/>", () => {
 
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
-    const started = within(
-      screen.getByTestId("run-settings-block"),
-    ).getByTestId("run-settings-started");
+    const started = within(screen.getByTestId("run-settings-block")).getByTestId(
+      "run-settings-started",
+    );
     expect(started.textContent?.trim().endsWith("2h ago")).toBe(true);
   });
 
@@ -1298,9 +1233,9 @@ describe("<RunPlanDetail/>", () => {
 
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
-    const started = within(
-      screen.getByTestId("run-settings-block"),
-    ).getByTestId("run-settings-started");
+    const started = within(screen.getByTestId("run-settings-block")).getByTestId(
+      "run-settings-started",
+    );
     expect(started).toHaveTextContent("2h ago");
     expect(started).not.toHaveTextContent("You");
     expect(started).not.toHaveTextContent("Unknown");
@@ -1323,9 +1258,9 @@ describe("<RunPlanDetail/>", () => {
 
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
-    const started = within(
-      screen.getByTestId("run-settings-block"),
-    ).getByTestId("run-settings-started");
+    const started = within(screen.getByTestId("run-settings-block")).getByTestId(
+      "run-settings-started",
+    );
     expect(started).toHaveTextContent("CLI");
     expect(started).not.toHaveTextContent("user_omar");
     expect(started).not.toHaveTextContent("Omar Haddad");
@@ -1350,13 +1285,9 @@ describe("<RunPlanDetail/>", () => {
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
 
     expect(
-      within(screen.getByTestId("run-summary-line")).getByTestId(
-        "run-summary-note",
-      ),
+      within(screen.getByTestId("run-summary-line")).getByTestId("run-summary-note"),
     ).toHaveTextContent("switched judge to the stricter criterion");
-    expect(screen.getByTestId("run-settings-block")).not.toHaveTextContent(
-      "switched judge",
-    );
+    expect(screen.getByTestId("run-settings-block")).not.toHaveTextContent("switched judge");
   });
 
   it("opens the run detail drawer when a result row is chosen", async () => {
@@ -1394,9 +1325,7 @@ describe("<RunPlanDetail/>", () => {
     });
     renderDetail();
 
-    expect(
-      screen.queryByTestId("runs-sidebar-pending"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("runs-sidebar-pending")).not.toBeInTheDocument();
   });
 });
 
@@ -1415,13 +1344,10 @@ describe("<RunPlanDetail/> on a comparison run", () => {
 
   /** A hex colour as jsdom reads it back off a computed style. */
   const rgbOf = (hex: string) => {
-    const [r, g, b] = [1, 3, 5].map((at) =>
-      Number.parseInt(hex.slice(at, at + 2), 16),
-    );
+    const [r, g, b] = [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
     return `rgb(${r}, ${g}, ${b})`;
   };
-  const tokenVar = (token: string) =>
-    `var(--chakra-colors-${token.replace(".", "-")})`;
+  const tokenVar = (token: string) => `var(--chakra-colors-${token.replace(".", "-")})`;
 
   /** One run of a scenario against a target, keyed the way the platform keys it. */
   function runAgainst({
@@ -1546,16 +1472,13 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     expect(columns[1]).toHaveTextContent("prod-agent");
 
     const dotOf = (column: HTMLElement) =>
-      window.getComputedStyle(within(column).getByTestId("target-dot"))
-        .backgroundColor;
+      window.getComputedStyle(within(column).getByTestId("target-dot")).backgroundColor;
     expect(dotOf(columns[0]!)).toBe(rgbOf(TARGET_COLORS[0]!));
     expect(dotOf(columns[1]!)).toBe(rgbOf(TARGET_COLORS[1]!));
 
     const row = within(table).getByTestId("comparison-row-scen_1");
     expect(row).toHaveTextContent("Angry refund request");
-    expect(
-      within(row).queryByRole("button", { name: /Actions for/ }),
-    ).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
   });
 
   /** @scenario "Each target column carries its own summary" */
@@ -1564,18 +1487,12 @@ describe("<RunPlanDetail/> on a comparison run", () => {
 
     const dev = screen.getByTestId(`comparison-column-${DEV}`);
     const prod = screen.getByTestId(`comparison-column-${PROD}`);
-    expect(within(dev).getByTestId("run-metrics-summary")).toHaveTextContent(
-      "50%",
-    );
-    expect(within(prod).getByTestId("run-metrics-summary")).toHaveTextContent(
-      "100%",
-    );
+    expect(within(dev).getByTestId("run-metrics-summary")).toHaveTextContent("50%");
+    expect(within(prod).getByTestId("run-metrics-summary")).toHaveTextContent("100%");
 
     const header = screen.getByTestId("run-summary-run");
     expect(header).toHaveTextContent("Run #2");
-    expect(
-      within(header).queryByTestId("run-metrics-summary"),
-    ).not.toBeInTheDocument();
+    expect(within(header).queryByTestId("run-metrics-summary")).not.toBeInTheDocument();
   });
 
   /** @scenario "A cell reads one line per run of its scenario and target" */
@@ -1606,9 +1523,7 @@ describe("<RunPlanDetail/> on a comparison run", () => {
       expect(line).toHaveTextContent("6.3s · $0.004200");
     }
 
-    await user.click(
-      within(cell).getByTestId("comparison-run-batch_3_d1_again"),
-    );
+    await user.click(within(cell).getByTestId("comparison-run-batch_3_d1_again"));
     expect(mockOpenDrawer).toHaveBeenCalledWith(
       "scenarioRunDetail",
       expect.objectContaining({
@@ -1621,17 +1536,15 @@ describe("<RunPlanDetail/> on a comparison run", () => {
 
   /** @scenario "A scenario with no run for a target reads not in run" */
   it("says not in run in the cell of a target the scenario never ran against", () => {
-    setRuns(
-      comparisonBatch().filter((run) => run.scenarioRunId !== "batch_3_p2"),
-    );
+    setRuns(comparisonBatch().filter((run) => run.scenarioRunId !== "batch_3_p2"));
     renderDetail();
 
-    expect(
-      screen.getByTestId(`comparison-cell-scen_2-${PROD}`),
-    ).toHaveTextContent(NOT_IN_RUN_LABEL);
-    expect(
-      screen.getByTestId(`comparison-cell-scen_2-${DEV}`),
-    ).not.toHaveTextContent(NOT_IN_RUN_LABEL);
+    expect(screen.getByTestId(`comparison-cell-scen_2-${PROD}`)).toHaveTextContent(
+      NOT_IN_RUN_LABEL,
+    );
+    expect(screen.getByTestId(`comparison-cell-scen_2-${DEV}`)).not.toHaveTextContent(
+      NOT_IN_RUN_LABEL,
+    );
   });
 
   /** @scenario "A run that is still going keeps its status in the cell" */
@@ -1659,21 +1572,14 @@ describe("<RunPlanDetail/> on a comparison run", () => {
 
   /** @scenario "The charts of a comparison run put the targets next to each other" */
   it("draws the four charts with one bar per target, and the runs oldest first", () => {
-    setRuns([
-      ...comparisonBatch("batch_3", NOW),
-      ...comparisonBatch("batch_2", NOW - 86_400_000),
-    ]);
+    setRuns([...comparisonBatch("batch_3", NOW), ...comparisonBatch("batch_2", NOW - 86_400_000)]);
     renderDetail();
 
     const charts = screen.getByTestId("comparison-charts");
     const header = screen.getByTestId("run-summary-line");
     const table = screen.getByTestId("comparison-results-table");
-    expect(
-      header.compareDocumentPosition(charts) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(
-      charts.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(header.compareDocumentPosition(charts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(charts.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     expect(charts).toHaveTextContent("Pass rate");
     expect(charts).toHaveTextContent("Total cost");
@@ -1683,19 +1589,13 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     const passRate = screen.getByTestId("comparison-chart-pass-rate");
     const bars = within(passRate).getAllByTestId("mini-bar");
     expect(bars).toHaveLength(2);
-    expect(window.getComputedStyle(bars[0]!).backgroundColor).toBe(
-      rgbOf(TARGET_COLORS[0]!),
-    );
-    expect(window.getComputedStyle(bars[1]!).backgroundColor).toBe(
-      rgbOf(TARGET_COLORS[1]!),
-    );
+    expect(window.getComputedStyle(bars[0]!).backgroundColor).toBe(rgbOf(TARGET_COLORS[0]!));
+    expect(window.getComputedStyle(bars[1]!).backgroundColor).toBe(rgbOf(TARGET_COLORS[1]!));
     expect(passRate).toHaveTextContent("50%");
     expect(passRate).toHaveTextContent("100%");
 
     const overRuns = screen.getByTestId("comparison-chart-pass-rate-over-runs");
-    const groups = within(overRuns).getAllByTestId(
-      /^comparison-chart-pass-rate-over-runs-group-/,
-    );
+    const groups = within(overRuns).getAllByTestId(/^comparison-chart-pass-rate-over-runs-group-/);
     expect(groups.map((group) => group.dataset.testid)).toEqual([
       "comparison-chart-pass-rate-over-runs-group-batch_2",
       "comparison-chart-pass-rate-over-runs-group-batch_3",
@@ -1725,57 +1625,41 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     renderDetail();
 
     const passRate = screen.getByTestId("comparison-chart-pass-rate");
-    expect(within(passRate).getByTitle("dev-agent")).toHaveTextContent(
-      "default",
+    expect(within(passRate).getByTitle("dev-agent")).toHaveTextContent("default");
+    expect(within(passRate).getByTitle("dev-agent · model=gpt-5-mini")).toHaveTextContent(
+      "model=gpt-5-mini",
     );
-    expect(
-      within(passRate).getByTitle("dev-agent · model=gpt-5-mini"),
-    ).toHaveTextContent("model=gpt-5-mini");
     expect(passRate).not.toHaveTextContent("dev-agent");
 
     setRuns(comparisonBatch());
     cleanup();
     renderDetail();
     const byName = screen.getByTestId("comparison-chart-pass-rate");
-    expect(within(byName).getByTitle("dev-agent")).toHaveTextContent(
-      "dev-agent",
-    );
-    expect(within(byName).getByTitle("prod-agent")).toHaveTextContent(
-      "prod-agent",
-    );
+    expect(within(byName).getByTitle("dev-agent")).toHaveTextContent("dev-agent");
+    expect(within(byName).getByTitle("prod-agent")).toHaveTextContent("prod-agent");
   });
 
   /** @scenario "A single-target run carries no comparison charts" */
   /** @scenario "A single-target run reads as before" */
   it("reads a single-target run as a plain table with the summary in the header and no charts", async () => {
     const user = userEvent.setup();
-    setRuns(
-      comparisonBatch().filter((run) => run.scenarioRunId.includes("_d")),
-    );
+    setRuns(comparisonBatch().filter((run) => run.scenarioRunId.includes("_d")));
     renderDetail();
 
     expect(screen.queryByTestId("comparison-charts")).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("comparison-results-table"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("comparison-results-table")).not.toBeInTheDocument();
     const table = screen.getByTestId("run-results-table");
     expect(within(table).getByText("Passed (1/1)")).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("run-summary-run")).getByTestId(
-        "run-metrics-summary",
-      ),
+      within(screen.getByTestId("run-summary-run")).getByTestId("run-metrics-summary"),
     ).toHaveTextContent("50%");
 
     await user.click(screen.getByRole("button", { name: "Show run settings" }));
     const targets = screen.getByTestId("run-settings-targets");
-    expect(
-      within(targets).getAllByTestId(/^run-settings-target-/),
-    ).toHaveLength(1);
+    expect(within(targets).getAllByTestId(/^run-settings-target-/)).toHaveLength(1);
     expect(targets).toHaveTextContent("dev-agent");
     expect(targets).not.toHaveTextContent("locale");
-    expect(screen.getByTestId("run-settings-parameters")).toHaveTextContent(
-      "locale = de",
-    );
+    expect(screen.getByTestId("run-settings-parameters")).toHaveTextContent("locale = de");
   });
 
   /** @scenario "An older run with no target key reads as one column" */
@@ -1794,9 +1678,7 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     expect(screen.getByTestId("run-results-table")).toBeInTheDocument();
     expect(screen.queryByTestId("comparison-charts")).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("run-summary-run")).getByTestId(
-        "run-metrics-summary",
-      ),
+      within(screen.getByTestId("run-summary-run")).getByTestId("run-metrics-summary"),
     ).toBeInTheDocument();
   });
 
@@ -1812,16 +1694,13 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     ]);
     const legend = screen.getByTestId(`comparison-grid-legend-${PROD}`);
     expect(legend).toHaveTextContent("prod-agent");
-    expect(
-      window.getComputedStyle(within(legend).getByTestId("target-dot"))
-        .backgroundColor,
-    ).toBe(rgbOf(TARGET_COLORS[1]!));
+    expect(window.getComputedStyle(within(legend).getByTestId("target-dot")).backgroundColor).toBe(
+      rgbOf(TARGET_COLORS[1]!),
+    );
     expect(
       within(sections[0]!)
         .getByTestId("scenario-grid")
-        .querySelectorAll(
-          "[data-testid^='scenario-grid-card'], article, button",
-        ).length,
+        .querySelectorAll("[data-testid^='scenario-grid-card'], article, button").length,
     ).toBeGreaterThan(0);
   });
 
@@ -1837,16 +1716,11 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     expect(result).not.toHaveTextContent("passed");
 
     const [dev, prod] = within(result).getAllByTestId("pass-rate-text");
-    expect(window.getComputedStyle(dev!).color).toBe(
-      tokenVar(passRateColor(50)),
-    );
-    expect(window.getComputedStyle(prod!).color).toBe(
-      tokenVar(passRateColor(100)),
-    );
+    expect(window.getComputedStyle(dev!).color).toBe(tokenVar(passRateColor(50)));
+    expect(window.getComputedStyle(prod!).color).toBe(tokenVar(passRateColor(100)));
     expect(
-      window.getComputedStyle(
-        screen.getByTestId(`runs-sidebar-item-batch_3-target-dot-${DEV}`),
-      ).backgroundColor,
+      window.getComputedStyle(screen.getByTestId(`runs-sidebar-item-batch_3-target-dot-${DEV}`))
+        .backgroundColor,
     ).toBe(rgbOf(TARGET_COLORS[0]!));
   });
 
@@ -1902,13 +1776,11 @@ describe("<RunPlanDetail/> on a comparison run", () => {
     const chip = within(lines[1]!).getByText("model = gpt-5-mini");
     expect(chip.tagName).toBe("CODE");
 
-    expect(
-      screen.queryByTestId("run-settings-parameters"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-settings-parameters")).not.toBeInTheDocument();
 
-    expect(
-      screen.getByTestId(`comparison-column-${DEV_MINI}`),
-    ).toHaveTextContent("dev-agent · model=gpt-5-mini");
+    expect(screen.getByTestId(`comparison-column-${DEV_MINI}`)).toHaveTextContent(
+      "dev-agent · model=gpt-5-mini",
+    );
   });
 });
 
@@ -1941,24 +1813,19 @@ describe("<RunsSidebarEntry/>", () => {
       { wrapper: Wrapper },
     );
 
-    const colorOf = (element: Element) =>
-      window.getComputedStyle(element).color;
-    const backgroundOf = (element: Element) =>
-      window.getComputedStyle(element).backgroundColor;
+    const colorOf = (element: Element) => window.getComputedStyle(element).color;
+    const backgroundOf = (element: Element) => window.getComputedStyle(element).backgroundColor;
 
     const ninety = screen.getByTestId("entry-90-result");
     const sixty = screen.getByTestId("entry-60-result");
     const ninetyText = within(ninety).getByTestId("pass-rate-text");
     const sixtyText = within(sixty).getByTestId("pass-rate-text");
 
-    const tokenVar = (token: string) =>
-      `var(--chakra-colors-${token.replace(".", "-")})`;
+    const tokenVar = (token: string) => `var(--chakra-colors-${token.replace(".", "-")})`;
     expect(colorOf(ninetyText)).toBe(tokenVar(passRateColor(90)));
     expect(colorOf(sixtyText)).toBe(tokenVar(passRateColor(60)));
     expect(colorOf(ninetyText)).toBe(colorOf(sixtyText));
 
-    expect(backgroundOf(screen.getByTestId("entry-90-result-dot"))).toBe(
-      colorOf(ninetyText),
-    );
+    expect(backgroundOf(screen.getByTestId("entry-90-result-dot"))).toBe(colorOf(ninetyText));
   });
 });

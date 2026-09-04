@@ -7,11 +7,61 @@ import { describe, expect, it } from "vitest";
 import {
   configurationKey,
   duplicateSuiteTargets,
+  normalizePlanScope,
   scopeKey,
   sortSuiteTargets,
 } from "../plan-config";
 import { declaredDefaults, targetSortKey, withCanonicalOverrides } from "../target-key";
 import type { SuiteTarget } from "../suite";
+
+describe("normalizePlanScope", () => {
+  describe("when the scope names every active test suite of the project", () => {
+    /** @scenario "An archived suite does not have to be named for a scope to be exhaustive" */
+    it("becomes the all scope, since an archived suite is never in the active list", () => {
+      const scope = normalizePlanScope({
+        scope: { mode: "test_suites", testSuiteIds: ["active"] },
+        activeTestSuiteIds: ["active"],
+      });
+
+      expect(scope).toEqual({ mode: "all" });
+    });
+  });
+
+  describe("when the scope names some but not all active test suites", () => {
+    /** @scenario "A scope naming some but not all suites stays a test suites scope" */
+    it("stays a test suites scope naming those test suites", () => {
+      const scope = normalizePlanScope({
+        scope: { mode: "test_suites", testSuiteIds: ["b", "a"] },
+        activeTestSuiteIds: ["a", "b", "c"],
+      });
+
+      expect(scope).toEqual({ mode: "test_suites", testSuiteIds: ["a", "b"] });
+    });
+  });
+
+  describe("when the scope names no test suite", () => {
+    /** @scenario "A test suites scope naming no suite is not treated as everything" */
+    it("stays a test suites scope naming none", () => {
+      const scope = normalizePlanScope({
+        scope: { mode: "test_suites", testSuiteIds: [] },
+        activeTestSuiteIds: ["a", "b"],
+      });
+
+      expect(scope).toEqual({ mode: "test_suites", testSuiteIds: [] });
+    });
+  });
+
+  describe("when the scope is not a test suites scope", () => {
+    it("leaves it alone", () => {
+      expect(
+        normalizePlanScope({
+          scope: { mode: "labels", labels: ["smoke"] },
+          activeTestSuiteIds: ["a"],
+        }),
+      ).toEqual({ mode: "labels", labels: ["smoke"] });
+    });
+  });
+});
 
 describe("sortSuiteTargets", () => {
   describe("when the same targets arrive in either order", () => {
@@ -20,9 +70,7 @@ describe("sortSuiteTargets", () => {
       const dev: SuiteTarget = { type: "http", referenceId: "dev-agent" };
       const prod: SuiteTarget = { type: "http", referenceId: "prod-agent" };
 
-      expect(sortSuiteTargets([prod, dev])).toEqual(
-        sortSuiteTargets([dev, prod]),
-      );
+      expect(sortSuiteTargets([prod, dev])).toEqual(sortSuiteTargets([dev, prod]));
       expect(sortSuiteTargets([prod, dev])).toEqual([dev, prod]);
     });
   });
@@ -226,9 +274,7 @@ describe("scopeKey", () => {
     });
 
     it("reads the same list in either order as one scope", () => {
-      expect(
-        scopeKey({ scope: { mode: "scenarios" }, scenarioIds: ["b", "a"] }),
-      ).toBe(
+      expect(scopeKey({ scope: { mode: "scenarios" }, scenarioIds: ["b", "a"] })).toBe(
         scopeKey({ scope: { mode: "scenarios" }, scenarioIds: ["a", "b"] }),
       );
     });
@@ -236,9 +282,7 @@ describe("scopeKey", () => {
 
   describe("when the scope is a test suites scope", () => {
     it("reads the same test suites in either order as one scope", () => {
-      expect(
-        scopeKey({ scope: { mode: "test_suites", testSuiteIds: ["b", "a"] } }),
-      ).toBe(
+      expect(scopeKey({ scope: { mode: "test_suites", testSuiteIds: ["b", "a"] } })).toBe(
         scopeKey({ scope: { mode: "test_suites", testSuiteIds: ["a", "b"] } }),
       );
     });
@@ -256,9 +300,7 @@ describe("configurationKey", () => {
 
   describe("when two runs of one plan differ only by parameters", () => {
     it("gives them different keys, so both are listed", () => {
-      expect(
-        configurationKey({ config: base, parameters: { tier: "gold" } }),
-      ).not.toBe(
+      expect(configurationKey({ config: base, parameters: { tier: "gold" } })).not.toBe(
         configurationKey({ config: base, parameters: { tier: "silver" } }),
       );
     });

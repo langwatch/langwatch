@@ -9,7 +9,7 @@ import type {
 
 export abstract class SuiteRepository {
   abstract create(input: CreateSuiteCommand & { id: string; slug: string }): Promise<Suite>;
-  abstract list(input: { projectId: string }): Promise<Suite[]>;
+  abstract list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]>;
   abstract resolveDynamicRunMembership(input: SuiteIdInput): Promise<string[]>;
   /**
    * The scenarios a scope covers, resolved directly against the project
@@ -17,9 +17,10 @@ export abstract class SuiteRepository {
    * plan row exists at all. A hand-picked scope is not dynamic and never
    * reaches here; the caller already has its list.
    */
-  abstract resolveScopeMembership(input: { projectId: string; scope: SuiteScope }): Promise<
-    string[]
-  >;
+  abstract resolveScopeMembership(input: {
+    projectId: string;
+    scope: SuiteScope;
+  }): Promise<string[]>;
   abstract tryFindById(input: SuiteIdInput): Promise<Suite | null>;
   abstract tryFindBySlug(input: { projectId: string; slug: string }): Promise<Suite | null>;
   abstract saveManagedRunAll(input: {

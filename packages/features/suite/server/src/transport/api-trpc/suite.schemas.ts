@@ -3,7 +3,12 @@
  */
 import { modelOverrideSchema } from "@langwatch/model-provider-contract";
 import { runNoteSchema, runParameterValuesSchema } from "@langwatch/scenario-contract";
-import { MAX_PLAN_NAME_LENGTH, suiteScopeSchema, suiteTargetSchema } from "@langwatch/suite-contract";
+import {
+  MAX_PLAN_NAME_LENGTH,
+  runPlanConfigSchema as suiteRunPlanConfigSchema,
+  suiteScopeSchema,
+  suiteTargetSchema,
+} from "@langwatch/suite-contract";
 import { z } from "zod";
 
 export type { SuiteTarget } from "@langwatch/suite-contract";
@@ -63,18 +68,14 @@ export const updateSuiteSchema = projectSchema.extend({
 });
 
 /**
- * A run plan's config, as the `runPlan` mutation takes it: the rule the run
- * covers, the targets it goes against, and the two simulation model
- * overrides — everything the plan row is created or replaced with.
+ * The contract's run plan config, tightened at the door: `simulatorModel` and
+ * `judgeModel` take the same catalog-checked shape the rest of the model
+ * surface uses rather than a bare string. Extends rather than re-declares, so
+ * `repeatCount`'s cap can never drift from `MAX_REPEAT_COUNT`.
  */
-export const runPlanConfigSchema = z.object({
-  scope: suiteScopeSchema,
-  targets: z.array(suiteTargetSchema),
-  repeatCount: z.number().int().min(1).max(100).optional(),
+export const runPlanConfigSchema = suiteRunPlanConfigSchema.extend({
   simulatorModel: modelOverrideSchema.nullish(),
   judgeModel: modelOverrideSchema.nullish(),
-  /** The scenarios a hand-picked scope covers; ignored by every other. */
-  scenarioIds: z.array(z.string()).optional(),
 });
 
 /**

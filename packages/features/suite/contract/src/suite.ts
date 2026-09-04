@@ -183,7 +183,7 @@ export type RunPlanConfigInput = z.infer<typeof runPlanConfigSchema>;
 export const suiteRunPlanInputSchema = suiteRunInputSchema
   .omit({ id: true })
   .extend({
-    name: z.string().trim().min(1).max(MAX_PLAN_NAME_LENGTH),
+    name: z.string().trim().min(1).max(MAX_PLAN_NAME_LENGTH).optional(),
     config: runPlanConfigSchema,
   })
   .strict();

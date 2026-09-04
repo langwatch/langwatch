@@ -15,7 +15,7 @@ import type {
 
 /** The sole cross-feature capability for suite definitions. */
 export abstract class SuiteService {
-  abstract list(input: { projectId: string }): Promise<Suite[]>;
+  abstract list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]>;
   abstract get(input: SuiteIdInput): Promise<Suite>;
   abstract tryGet(input: SuiteIdInput): Promise<Suite | null>;
   abstract create(input: CreateSuiteCommand): Promise<Suite>;

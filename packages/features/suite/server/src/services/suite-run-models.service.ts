@@ -43,19 +43,15 @@ export class SuiteRunModelsService {
 
     try {
       const uniqueIds = Array.from(new Set(scenarioIds));
-      const choiceEntries = await Promise.all(
-        uniqueIds.map(async (id): Promise<[string, RunModelChoice]> => {
-          const scenario = await scenarios.tryGetById({ id, projectId });
-          return [
-            id,
-            {
-              simulatorModel: scenario?.simulatorModel ?? null,
-              judgeModel: scenario?.judgeModel ?? null,
-            },
-          ];
-        }),
+      // One read for the whole batch: a 200-scenario "all" plan is one round
+      // trip at queue time, not 200.
+      const rows = await scenarios.getModelChoices({ ids: uniqueIds, projectId });
+      const choiceById = new Map<string, RunModelChoice>(
+        rows.map((row) => [
+          row.id,
+          { simulatorModel: row.simulatorModel, judgeModel: row.judgeModel },
+        ]),
       );
-      const choiceById = new Map(choiceEntries);
 
       // One project default per role for the whole batch: every scenario of it
       // asks the same question of the same project.
@@ -65,9 +61,7 @@ export class SuiteRunModelsService {
           defaults.get(featureKey) ??
           modelProviders.tryGetResolvedDefault({ projectId, featureKey }).then((resolution) => {
             if (!resolution) {
-              throw new Error(
-                `No model configured for "${featureKey}" (project: ${projectId}).`,
-              );
+              throw new Error(`No model configured for "${featureKey}" (project: ${projectId}).`);
             }
             return resolution.model;
           });

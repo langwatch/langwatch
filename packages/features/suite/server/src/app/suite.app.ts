@@ -101,13 +101,43 @@ export class SuiteApp {
   // -- reads -----------------------------------------------------------------
 
   /** The project's run plans. */
-  list(input: { projectId: string }): Promise<Suite[]> {
+  list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {
     return this.dependencies.suites.list(input);
   }
 
   /** The project's test-suite testSuites. */
-  listTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]> {
+  listTestSuites(input: {
+    projectId: string;
+    includeArchived?: boolean;
+  }): Promise<ScenarioTestSuite[]> {
     return this.dependencies.scenarios.listTestSuites(input);
+  }
+
+  /**
+   * The active scenarios among the given ids, named, in the order given. An
+   * archived scenario is left out — it holds no run history worth naming
+   * here — and one the project no longer names is left out too.
+   */
+  async resolveActiveScenarioNames(input: {
+    scenarioIds: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    if (input.scenarioIds.length === 0) return [];
+    const states = await this.dependencies.scenarios.getReferenceStates({
+      ids: input.scenarioIds,
+      projectId: input.projectId,
+    });
+    const activeIds = new Set(states.filter((state) => !state.archivedAt).map((state) => state.id));
+    if (activeIds.size === 0) return [];
+    const names = await this.dependencies.scenarios.getNamesByIds({
+      ids: [...activeIds],
+      projectId: input.projectId,
+    });
+    const nameById = new Map(names.map((row) => [row.id, row.name]));
+    return input.scenarioIds.flatMap((id) => {
+      const name = nameById.get(id);
+      return activeIds.has(id) && name !== undefined ? [{ id, name }] : [];
+    });
   }
 
   /**

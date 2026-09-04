@@ -1,7 +1,10 @@
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { isUniqueConstraintError } from "@langwatch/prisma-client";
 import {
+  CLI_EPHEMERAL_LABEL,
   parseSuiteScope,
+  planNameKey,
+  PLAN_NAME_LOCK_PREFIX,
   suiteSchema,
   SuiteNotFoundError,
   type CreateSuiteCommand,
@@ -12,6 +15,15 @@ import {
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
 import { SuiteRepository } from "../suite.repository";
+
+/**
+ * Max wall-clock the locked transaction may run, the wait for the lock
+ * included. The body is three small queries; the budget is for the queue in
+ * front of it when many runs of one plan name start together — Prisma's 5s
+ * default fails the tail of that queue.
+ */
+const PLAN_NAME_TXN_TIMEOUT_MS = 15_000;
+const PLAN_NAME_TXN_MAX_WAIT_MS = 10_000;
 
 function mapSuite(row: unknown): Suite {
   const parsed = suiteSchema.parse(row);
@@ -77,9 +89,13 @@ export class PrismaSuiteRepository extends SuiteRepository {
     return mapSuite(row);
   }
 
-  async list(input: { projectId: string }): Promise<Suite[]> {
+  async list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {
     const rows = await this.database.simulationSuite.findMany({
-      where: { projectId: input.projectId, kind: "run_plan", archivedAt: null },
+      where: {
+        projectId: input.projectId,
+        kind: "run_plan",
+        ...(input.includeArchived ? {} : { archivedAt: null }),
+      },
       orderBy: { updatedAt: "desc" },
     });
     return rows.map(mapSuite);
@@ -140,10 +156,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
     });
   }
 
-  async resolveScopeMembership(input: {
-    projectId: string;
-    scope: SuiteScope;
-  }): Promise<string[]> {
+  async resolveScopeMembership(input: { projectId: string; scope: SuiteScope }): Promise<string[]> {
     if (input.scope.mode === "scenarios") return [];
     if (input.scope.mode === "all") {
       const scenarios = await this.database.scenario.findMany({
@@ -189,52 +202,59 @@ export class PrismaSuiteRepository extends SuiteRepository {
     const baseSlug = slugify(input.name) || "run-plan";
 
     const resolveUnderLock = () =>
-      this.database.$transaction(async (transaction) => {
-        const lockKey = `suite-plan-name:${input.projectId}:${input.name.trim().toLowerCase()}`;
-        await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      this.database.$transaction(
+        async (transaction) => {
+          const lockKey = `${PLAN_NAME_LOCK_PREFIX}${input.projectId}:${planNameKey(input.name)}`;
+          await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
 
-        const existing = await transaction.simulationSuite.findFirst({
-          where: {
-            projectId: input.projectId,
-            kind: "run_plan",
-            archivedAt: null,
-            name: { equals: input.name.trim(), mode: "insensitive" },
-          },
-          orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
-        });
-        if (existing) {
-          const row = await transaction.simulationSuite.update({
-            where: { id: existing.id, projectId: input.projectId },
-            data: storedConfig,
+          const existing = await transaction.simulationSuite.findFirst({
+            where: {
+              projectId: input.projectId,
+              kind: "run_plan",
+              archivedAt: null,
+              name: { equals: input.name.trim(), mode: "insensitive" },
+              // The command line's throwaway rows are archived as soon as the
+              // run is queued: joining one attaches this run to a plan about
+              // to disappear from every list.
+              NOT: { labels: { has: CLI_EPHEMERAL_LABEL } },
+            },
+            orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
           });
-          return { suite: mapSuite(row), created: false };
-        }
+          if (existing) {
+            const row = await transaction.simulationSuite.update({
+              where: { id: existing.id, projectId: input.projectId },
+              data: storedConfig,
+            });
+            return { suite: mapSuite(row), created: false };
+          }
 
-        const slugRows = await transaction.simulationSuite.findMany({
-          where: {
-            projectId: input.projectId,
-            slug: { startsWith: baseSlug },
-            archivedAt: null,
-          },
-          select: { slug: true },
-        });
-        const slug = nextAvailableSlug(
-          baseSlug,
-          slugRows.map((candidate) => candidate.slug),
-        );
-        const row = await transaction.simulationSuite.create({
-          data: {
-            id: input.id,
-            projectId: input.projectId,
-            name: input.name.trim(),
-            slug,
-            kind: "run_plan",
-            labels: [],
-            ...storedConfig,
-          },
-        });
-        return { suite: mapSuite(row), created: true };
-      });
+          const slugRows = await transaction.simulationSuite.findMany({
+            where: {
+              projectId: input.projectId,
+              slug: { startsWith: baseSlug },
+              archivedAt: null,
+            },
+            select: { slug: true },
+          });
+          const slug = nextAvailableSlug(
+            baseSlug,
+            slugRows.map((candidate) => candidate.slug),
+          );
+          const row = await transaction.simulationSuite.create({
+            data: {
+              id: input.id,
+              projectId: input.projectId,
+              name: input.name.trim(),
+              slug,
+              kind: "run_plan",
+              labels: [],
+              ...storedConfig,
+            },
+          });
+          return { suite: mapSuite(row), created: true };
+        },
+        { timeout: PLAN_NAME_TXN_TIMEOUT_MS, maxWait: PLAN_NAME_TXN_MAX_WAIT_MS },
+      );
 
     try {
       return await resolveUnderLock();

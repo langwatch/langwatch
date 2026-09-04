@@ -78,3 +78,10 @@ export {
  * delegation are the feature's.
  */
 export { createSuiteRestApp } from "./transport/api-rest/suite.api";
+/**
+ * The two v1 REST families, split by what they publish: a run plan is what
+ * you run, a test suite is what it runs against. Both are served from the
+ * same {@link SuiteApp} the tRPC surface and `/api/suites` are.
+ */
+export { createRunPlansV1RestApp } from "./transport/api-rest/run-plans-v1.api";
+export { createTestSuitesV1RestApp } from "./transport/api-rest/test-suites-v1.api";

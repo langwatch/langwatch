@@ -7,12 +7,12 @@
  * `specs/suites/run-plan-identity-by-name.feature`'s `@integration` scenarios,
  * not covered here.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 import {
-  AllScenariosArchivedError,
+  SuiteScopeEmptyError,
   SuiteTargetsRequiredError,
   type RunPlanConfigInput,
   type Suite,
@@ -50,14 +50,22 @@ function baseSuite(overrides: Partial<Suite> = {}): Suite {
 function buildService(overrides: {
   repository?: Partial<SuiteRepository>;
   scenarios?: Partial<ScenarioService>;
+  agents?: Partial<AgentService>;
 }) {
+  // Spied so a refusal test can assert the plan row was never touched: a
+  // refused run must resolve entirely from the config it was sent, never
+  // read or write the stored row.
+  const findOrCreatePlanByName = vi.fn(
+    overrides.repository?.findOrCreatePlanByName ??
+      (async ({ id, projectId: pid, name, scope, targets }) => ({
+        suite: baseSuite({ id, projectId: pid, name, scope, targets }),
+        created: true,
+      })),
+  );
   const repository: SuiteRepository = {
     resolveScopeMembership: async () => [],
-    findOrCreatePlanByName: async ({ id, projectId: pid, name, scope, targets }) => ({
-      suite: baseSuite({ id, projectId: pid, name, scope, targets }),
-      created: true,
-    }),
     ...overrides.repository,
+    findOrCreatePlanByName,
   } as SuiteRepository;
 
   const scenarios: ScenarioService = {
@@ -89,9 +97,11 @@ function buildService(overrides: {
   const agents: AgentService = {
     getReferenceStates: async ({ ids }: { ids: string[] }) =>
       ids.map((id) => ({ id, archivedAt: null })),
+    getNamesByIds: async ({ ids }: { ids: string[] }) => ids.map((id) => ({ id, name: id })),
+    ...overrides.agents,
   } as unknown as AgentService;
 
-  return SuiteService.create({
+  const service = SuiteService.create({
     repository,
     scenarios,
     agents,
@@ -100,6 +110,7 @@ function buildService(overrides: {
     runRepository: {} as SuiteRunReadRepository,
     generateId: () => "suite-generated-1",
   });
+  return { service, findOrCreatePlanByName };
 }
 
 const config: RunPlanConfigInput = {
@@ -111,7 +122,7 @@ const config: RunPlanConfigInput = {
 describe("SuiteService.runPlan", () => {
   describe("when everything resolves", () => {
     it("writes the plan and queues the run", async () => {
-      const service = buildService({});
+      const { service } = buildService({});
 
       const result = await service.runPlan({
         projectId,
@@ -129,8 +140,9 @@ describe("SuiteService.runPlan", () => {
   });
 
   describe("when the config names no target", () => {
+    /** @scenario "A run refused for naming no target creates no plan" */
     it("refuses before touching the plan row", async () => {
-      const service = buildService({});
+      const { service, findOrCreatePlanByName } = buildService({});
 
       await expect(
         service.runPlan({
@@ -141,33 +153,31 @@ describe("SuiteService.runPlan", () => {
           idempotencyKey: "idem-1",
         }),
       ).rejects.toThrow(SuiteTargetsRequiredError);
+      expect(findOrCreatePlanByName).not.toHaveBeenCalled();
     });
   });
 
-  describe("when every named scenario is archived", () => {
+  describe("when the scope covers no scenario", () => {
+    /** @scenario "A run refused for covering no scenario creates no plan" */
     it("refuses before touching the plan row", async () => {
-      const service = buildService({
-        scenarios: {
-          getReferenceStates: async ({ ids }: { ids: string[] }) =>
-            ids.map((id) => ({ id, archivedAt: new Date() })),
-        },
-      });
+      const { service, findOrCreatePlanByName } = buildService({});
 
       await expect(
         service.runPlan({
           projectId,
           organizationId: "org-1",
           name: "Refunds prod-agent",
-          config,
+          config: { ...config, scope: { mode: "labels", labels: ["checkout"] } },
           idempotencyKey: "idem-1",
         }),
-      ).rejects.toThrow(AllScenariosArchivedError);
+      ).rejects.toThrow(SuiteScopeEmptyError);
+      expect(findOrCreatePlanByName).not.toHaveBeenCalled();
     });
   });
 
   describe("when the name matches an existing plan", () => {
     it("joins it and reports it was not created", async () => {
-      const service = buildService({
+      const { service } = buildService({
         repository: {
           findOrCreatePlanByName: async ({ projectId: pid, name, scope, targets }) => ({
             suite: baseSuite({ id: "existing-suite", projectId: pid, name, scope, targets }),
@@ -186,6 +196,46 @@ describe("SuiteService.runPlan", () => {
 
       expect(result.suiteId).toBe("existing-suite");
       expect(result.created).toBe(false);
+    });
+  });
+
+  describe("when the caller sends no name", () => {
+    /** @scenario "A run started with no name is named after its scope and targets" */
+    it("derives one from the scope label and the target names", async () => {
+      const { service, findOrCreatePlanByName } = buildService({
+        scenarios: {
+          getNamesByIds: async () => [{ id: "scenario-1", name: "Refund flow" }],
+        },
+      });
+
+      const result = await service.runPlan({
+        projectId,
+        organizationId: "org-1",
+        config: { ...config, scope: { mode: "scenarios" } },
+        idempotencyKey: "idem-1",
+      });
+
+      expect(result.planName).toBe("Refund flow agent-1");
+      expect(findOrCreatePlanByName).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Refund flow agent-1" }),
+      );
+    });
+
+    describe("when the scope covers every scenario", () => {
+      it("names the plan after the project's whole run", async () => {
+        const { service } = buildService({
+          repository: { resolveScopeMembership: async () => ["scenario-1"] },
+        });
+
+        const result = await service.runPlan({
+          projectId,
+          organizationId: "org-1",
+          config: { ...config, scope: { mode: "all" }, scenarioIds: undefined },
+          idempotencyKey: "idem-1",
+        });
+
+        expect(result.planName).toBe("All test cases agent-1");
+      });
     });
   });
 });
