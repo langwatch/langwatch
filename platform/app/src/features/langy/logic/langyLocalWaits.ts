@@ -38,7 +38,9 @@ export interface LangyLiveWait {
   callId?: string;
   summary?: string;
   pattern?: string;
+  patterns?: string[];
   reason?: string;
+  timeoutSeconds?: number;
   skipOffered?: boolean;
   workspaceName?: string;
   hostname?: string;
@@ -56,7 +58,16 @@ export interface LangyPermissionCardData {
   command: string;
   /** The pattern a session grant would cover, when one is offered. */
   pattern: string | null;
+  /**
+   * Every pattern one session grant covers. A chain that fetches and then
+   * checks out grants both, and the button has to name both: one click gave
+   * away more than the first pattern, and the session's grants are readable
+   * nowhere else.
+   */
+  patterns: string[];
   reason: string | null;
+  /** The seconds after which the command is stopped, or null with no limit. */
+  timeoutSeconds: number | null;
   skipOffered: boolean;
   workspaceName: string | null;
   hostname: string | null;
@@ -142,7 +153,9 @@ function mergeDurable({
     decision: next.decision ?? known.decision,
     command: next.command || known.command,
     pattern: next.pattern ?? known.pattern,
+    patterns: next.patterns.length > 0 ? next.patterns : known.patterns,
     reason: next.reason ?? known.reason,
+    timeoutSeconds: next.timeoutSeconds ?? known.timeoutSeconds,
   };
 }
 
@@ -173,6 +186,24 @@ export function langyPermissionCards(
   return [...cards.values()].filter((card) => card.command !== "");
 }
 
+/**
+ * The patterns to name, given what a source carries.
+ *
+ * A record written before the ask carried its whole list holds one pattern,
+ * and that one pattern is then the whole answer: the card names what it knows
+ * rather than nothing at all.
+ */
+function patternsOf({
+  patterns,
+  pattern,
+}: {
+  patterns?: readonly string[] | null | undefined;
+  pattern?: string | null | undefined;
+}): string[] {
+  if (patterns && patterns.length > 0) return [...patterns];
+  return pattern ? [pattern] : [];
+}
+
 /** One permission card as the durable record holds it. */
 function fromDurable(wait: LangyTurnWait): LangyPermissionCardData {
   return {
@@ -181,11 +212,29 @@ function fromDurable(wait: LangyTurnWait): LangyPermissionCardData {
     decision: readDecision(wait.decision),
     command: wait.summary ?? "",
     pattern: wait.pattern,
+    patterns: patternsOf({ patterns: wait.patterns, pattern: wait.pattern }),
     reason: wait.reason,
+    timeoutSeconds: wait.timeoutSeconds ?? null,
     skipOffered: wait.skipOffered,
     workspaceName: wait.workspaceName,
     hostname: wait.hostname,
   };
+}
+
+/** The patterns to name for a card both sides describe: the durable list first. */
+function mergePatterns({
+  durable,
+  entry,
+}: {
+  durable: LangyPermissionCardData | undefined;
+  entry: LangyLiveWait;
+}): string[] {
+  const known = patternsOf({
+    patterns: durable?.patterns,
+    pattern: durable?.pattern,
+  });
+  if (known.length > 0) return known;
+  return patternsOf({ patterns: entry.patterns, pattern: entry.pattern });
 }
 
 /**
@@ -207,7 +256,9 @@ function withLive(
     decision: durable?.decision ?? readDecision(entry.decision),
     command: durable?.command || (entry.summary ?? ""),
     pattern: durable?.pattern ?? entry.pattern ?? null,
+    patterns: mergePatterns({ durable, entry }),
     reason: durable?.reason ?? entry.reason ?? null,
+    timeoutSeconds: durable?.timeoutSeconds ?? entry.timeoutSeconds ?? null,
     skipOffered: durable?.skipOffered ?? entry.skipOffered ?? false,
     workspaceName: durable?.workspaceName ?? entry.workspaceName ?? null,
     hostname: durable?.hostname ?? entry.hostname ?? null,

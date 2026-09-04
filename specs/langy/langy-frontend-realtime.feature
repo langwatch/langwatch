@@ -203,6 +203,20 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Then Langy shows the connect card or empty state
     And it does not show a red error
 
+  @unit
+  Scenario: A platform failure to read the conversation is never told as Langy being slow
+    Given the conversation record cannot be read because the platform is unavailable
+    Then the panel says the conversation could not be loaded, and offers to try again
+    And the words come from the shared error copy for that code
+    And nothing on screen says Langy is slow or stuck
+
+  @unit
+  Scenario: A conversation that was never created stops reading as one on its way
+    Given the history read answers not found for a conversation this tab just created
+    Then the read counts as the record lagging the create, for a short grace only
+    And after that grace the panel says the conversation is not available
+    And a conversation the record has confirmed never reads as lagging
+
   @integration
   Scenario: An unknown error stays calm and traceable
     When a turn fails with an error Langy does not recognise

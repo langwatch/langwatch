@@ -31,6 +31,7 @@ const messagesInvalidate = vi.fn(() => Promise.resolve());
 const listInvalidate = vi.fn(() => Promise.resolve());
 const listCancel = vi.fn(() => Promise.resolve());
 const eventsAfterFetch = vi.fn();
+const recordInvalidate = vi.fn(() => Promise.resolve());
 
 // The callback the coordinator hands the SSE listener — driving it is how a
 // test delivers a freshness signal through the real hook logic.
@@ -47,6 +48,7 @@ vi.mock("~/utils/api", () => ({
     useUtils: () => ({
       langy: {
         messages: { invalidate: messagesInvalidate },
+        localRecord: { invalidate: recordInvalidate },
         list: { cancel: listCancel, invalidate: listInvalidate },
         conversationEventsAfter: { fetch: eventsAfterFetch },
       },
@@ -167,6 +169,7 @@ describe("the open conversation's catch-up from the recorded tail", () => {
     listInvalidate.mockClear();
     listCancel.mockClear();
     eventsAfterFetch.mockReset();
+    recordInvalidate.mockClear();
     capturedOnUpdate = null;
     // A fresh page load: `scopeAnnounced` is never persisted, and without
     // clearing it a repeated same-scope reset is a deliberate no-op that would
@@ -476,6 +479,32 @@ describe("the open conversation's catch-up from the recorded tail", () => {
         // `Composer.tsx` gates sending on exactly this: canSend requires the
         // turn phase to be idle.
         expect(useLangyStore.getState().turnPhase).toBe("idle");
+      });
+    });
+  });
+
+  describe("given the developer's folder connected with no turn running", () => {
+    describe("when the signal for it lands", () => {
+      /** @scenario "The card reads connected within seconds of the terminal saying so" */
+      it("reads the conversation's record again, without waiting for a turn to end", async () => {
+        // The connect writes its event and starts a turn, so nothing this tab
+        // is folding settles for as long as that turn runs. The record is the
+        // only thing that knows the folder is there.
+        snapshotLoads(at(100, "evt_a"));
+        eventsAfterFetch.mockResolvedValue(
+          tail([accepted({ id: "evt_b", createdAt: 200 })], at(200, "evt_b")),
+        );
+        renderHook(() => useLangyFreshness(CONVERSATION_ID));
+
+        deliverSignal(at(200, "evt_b"));
+
+        await waitFor(() =>
+          expect(recordInvalidate).toHaveBeenCalledWith({
+            projectId: PROJECT_ID,
+            conversationId: CONVERSATION_ID,
+          }),
+        );
+        expect(messagesInvalidate).not.toHaveBeenCalled();
       });
     });
   });

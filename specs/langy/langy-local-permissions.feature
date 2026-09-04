@@ -74,9 +74,23 @@ Feature: The CLI decides what Langy may run on the developer's machine
       And no part of it is left off the side of the card
 
     @integration
+    Scenario: The session grant button names every pattern the click covers
+      Given a permission card for a chain that fetches and then checks out a branch
+      Then the session grant button names the pattern of every part the answer covers
+      And it never names only the first part of the chain
+
+    @integration
     Scenario: A pattern grant names the pattern it covers on the settled card
       Given I allowed a pattern for the session
       Then the settled card names the pattern the grant covers
+      And a card allowed once reads that I allowed the command once
+      And a denied card reads that I denied the command
+      And no settled card reads only that I answered it
+
+    @integration
+    Scenario: The card names the time limit the command runs under
+      Given a permission card for a command that runs with a time limit
+      Then the card says after how long the command is stopped
 
     @integration
     Scenario: Allowing once runs the command and returns its output
@@ -207,6 +221,21 @@ Feature: The CLI decides what Langy may run on the developer's machine
       When Langy runs a command that changes into a directory outside the folder, or names one with a directory flag
       Then the command is refused
       And the pushback names the folder that is allowed
+
+    @unit
+    Scenario: A quoted string a command prints is not judged a path
+      When Langy prints a quoted string with printf or echo
+      Then the quoted string is read as text and not as a path
+      And the command is not refused for leaving the folder
+      And a quoted path given to a command that reads files is still checked
+      And the target of a redirect is still checked
+
+    @unit
+    Scenario: A refusal names the argument it judged a path
+      When a command is refused for naming a path outside the folder
+      Then the refusal names the argument it read as a path
+      And it says where that argument points
+      And it names the folder that is allowed
 
     @unit
     Scenario: Privilege escalation is refused

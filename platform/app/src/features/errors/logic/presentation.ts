@@ -458,7 +458,11 @@ const presentations = {
     },
   },
   clickhouse_unavailable: {
-    title: "Search is temporarily unavailable",
+    // Every surface that reads the analytics store raises this code: a trace
+    // search, an analytics graph, and a Langy conversation, whose messages
+    // live there too. The words have to be true on all of them, so they name
+    // the failure rather than one surface's name for it.
+    title: "This could not be loaded right now",
     describe: () => "We're on it. Try again in a moment.",
   },
   clickhouse_overloaded: {

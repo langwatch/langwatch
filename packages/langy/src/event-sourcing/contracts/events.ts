@@ -457,8 +457,16 @@ export const langyUserWaitPermissionPayloadSchema = z.object({
   summary: z.string(),
   /** What "allow for this session" would grant. */
   pattern: z.string(),
+  /**
+   * Every pattern one "allow for this session" answer grants. A chain that
+   * fetches and then checks out grants both, and the card's button names all
+   * of them, so the answer and the words on it cover the same ground.
+   */
+  patterns: z.array(z.string()).optional(),
   /** Why the call is not read-only, in one line. */
   reason: z.string(),
+  /** The seconds after which the command is stopped, when it runs under one. */
+  timeoutSeconds: z.number().optional(),
   /** Whether the card may offer the skip toggle at all. */
   skipOffered: z.boolean(),
   /** The folder the command would run in. */

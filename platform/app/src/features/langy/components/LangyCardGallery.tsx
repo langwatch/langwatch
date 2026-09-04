@@ -173,7 +173,7 @@ export function LangyCardGallery() {
           CARD_TAXONOMY): every card Langy renders is one of these five weights,
           and the ramp is the point — warmth is earned, spent only on `ask` and
           `spotlight`, so the low-weight receipts never shout. */}
-      <Section title="Card taxonomy — by intent, quietest to loudest">
+      <Section title="Card taxonomy, by intent, quietest to loudest">
         <LangyCard
           intent="activity"
           overline="Working"
@@ -252,7 +252,7 @@ export function LangyCardGallery() {
           `skill` tool (which rendered "Skill"), and neither shape appeared here,
           so the gallery showed a kit that looked fine while the product did not.
           Every frame below is now one the agent genuinely emits. */}
-      <Section title="Activity — real frames from the live stream">
+      <Section title="Activity, real frames from the live stream">
         <LangyToolActivity
           message={toolMessage([
             {
@@ -291,7 +291,7 @@ export function LangyCardGallery() {
       {/* ADR-060: the model-emitted block channel — every derived kind, the
           failed disclosure, and every choices state, all interactive. The
           streaming playground feeds the REAL preview reducer chunk by chunk. */}
-      <Section title="Model-emitted blocks — derived cards and choices (ADR-060)">
+      <Section title="Model-emitted blocks: derived cards and choices (ADR-060)">
         <LangyDerivedCardsTestingGround />
       </Section>
 
@@ -303,7 +303,7 @@ export function LangyCardGallery() {
         <LangyLocalControlGallery />
       </Section>
 
-      <Section title="Capabilities — reads">
+      <Section title="Capabilities that read">
         {/* The trace-sample card, fed the REAL search-result shape the CLI's
             `--format json` emits: `{ traces: [...Trace], pagination: {
             totalHits } }`, where a Trace carries `timestamps.started_at`,
@@ -448,7 +448,7 @@ export function LangyCardGallery() {
         />
       </Section>
 
-      <Section title="Capabilities — writes">
+      <Section title="Capabilities that write">
         <LangyCapabilityRenderer
           call={call("langwatch.evaluator.create", {
             id: "eval_new",
@@ -492,7 +492,7 @@ export function LangyCardGallery() {
           metrics={[{ label: "Traces", value: 1204 }]}
           segment={{ index: 7, total: 11 }}
         />
-        <LangyRecoveringLine message="Langy restarted — picking your reply back up…" />
+        <LangyRecoveringLine message="Langy restarted. Picking your reply back up…" />
       </Section>
 
       <Section title="GitHub">
@@ -653,7 +653,9 @@ function LangyLocalControlGallery() {
     decision: null,
     command: "pnpm typecheck",
     pattern: "pnpm *",
+    patterns: ["pnpm *"],
     reason: "Runs the project's own type check before I commit",
+    timeoutSeconds: 300,
     skipOffered: true,
     workspaceName: "acme-app",
     hostname: "rogerio-mbp",

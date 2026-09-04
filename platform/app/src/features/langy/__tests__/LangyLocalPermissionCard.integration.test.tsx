@@ -21,7 +21,13 @@ vi.mock("~/utils/api", () => ({
   api: {
     langy: {
       answerLocalPermission: {
-        useMutation: () => ({ mutate: answerPermission, isPending: false }),
+        useMutation: () => ({
+          mutate: (input: unknown, options?: { onSuccess?: () => void }) => {
+            answerPermission(input);
+            options?.onSuccess?.();
+          },
+          isPending: false,
+        }),
       },
       setLocalPolicy: {
         useMutation: () => ({ mutate: setLocalPolicy, isPending: false }),
@@ -35,6 +41,7 @@ import {
   SKIP_NOT_ALLOWED_HINT,
 } from "../components/LangyLocalPermissionCard";
 import type { LangyPermissionCardData } from "../logic/langyLocalWaits";
+import { useLangyLocalControlStore } from "../stores/langyLocalControlStore";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -48,7 +55,9 @@ const PENDING: LangyPermissionCardData = {
   decision: null,
   command: "pnpm typecheck",
   pattern: "pnpm *",
+  patterns: ["pnpm *"],
   reason: "Runs the project's own type check before I commit",
+  timeoutSeconds: null,
   skipOffered: true,
   workspaceName: "acme-app",
   hostname: "rogerio-mbp",
@@ -205,11 +214,77 @@ describe("given a long command chain", () => {
     expect(getComputedStyle(block as Element).whiteSpace).toBe("pre-wrap");
     expect(getComputedStyle(block as Element).overflowX).not.toBe("auto");
   });
+
+  /** @scenario "The session grant button names every pattern the click covers" */
+  it("names every pattern the one session grant covers", () => {
+    renderCard({
+      card: {
+        ...PENDING,
+        command:
+          "git fetch origin && git checkout -b langy/tracing origin/main",
+        pattern: "git fetch",
+        patterns: ["git fetch", "git checkout"],
+      },
+    });
+
+    expect(
+      screen.getByText('Allow "git fetch" and "git checkout" this session'),
+    ).toBeDefined();
+    expect(screen.queryByText('Allow "git fetch" this session')).toBeNull();
+  });
+
+  /** @scenario "A pattern grant names the pattern it covers on the settled card" */
+  it("says what the session grant covered once the card settles", () => {
+    renderCard({
+      card: {
+        ...PENDING,
+        status: "answered",
+        decision: "allow_pattern",
+        patterns: ["git fetch", "git checkout", "git push"],
+      },
+    });
+
+    expect(
+      screen.getByText(
+        'You allowed "git fetch", "git checkout" and "git push" for the session',
+      ),
+    ).toBeDefined();
+    expect(screen.queryByText("You answered this card")).toBeNull();
+  });
+});
+
+describe("given a command that runs under a time limit", () => {
+  /** @scenario "The card names the time limit the command runs under" */
+  it("says after how long the command is stopped", () => {
+    renderCard({ card: { ...PENDING, timeoutSeconds: 300 } });
+
+    expect(
+      screen.getByText("Stops after 5 minutes if it has not finished."),
+    ).toBeDefined();
+  });
+
+  it("says nothing about a limit when the command runs under none", () => {
+    renderCard();
+    expect(screen.queryByText(/Stops after/)).toBeNull();
+  });
+});
+
+describe("when the answer is sent", () => {
+  /** @scenario "A pattern grant names the pattern it covers on the settled card" */
+  it("settles the card with the decision, before the record carries it back", () => {
+    renderCard();
+    fireEvent.click(screen.getByText('Allow "pnpm *" this session'));
+
+    expect(useLangyLocalControlStore.getState().waits["wait-1"]).toMatchObject({
+      status: "answered",
+      decision: "allow_pattern",
+    });
+  });
 });
 
 describe("given the command line offered no session grant", () => {
   it("offers only the single answer and the denial", () => {
-    renderCard({ card: { ...PENDING, pattern: null } });
+    renderCard({ card: { ...PENDING, pattern: null, patterns: [] } });
 
     expect(screen.getByText("Allow once")).toBeDefined();
     expect(screen.queryByText(/this session$/)).toBeNull();

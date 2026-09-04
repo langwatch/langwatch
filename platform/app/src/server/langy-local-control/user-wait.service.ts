@@ -61,7 +61,11 @@ export const storedUserWaitSchema = z.object({
   callId: z.string().optional(),
   summary: z.string().optional(),
   pattern: z.string().optional(),
+  /** Every pattern one session grant covers, first one first. */
+  patterns: z.array(z.string()).optional(),
   reason: z.string().optional(),
+  /** The seconds after which the command is stopped, when it runs under one. */
+  timeoutSeconds: z.number().optional(),
   skipOffered: z.boolean().optional(),
   workspaceName: z.string().optional(),
   hostname: z.string().optional(),
@@ -71,6 +75,19 @@ export const storedUserWaitSchema = z.object({
   answeredBy: z.string().optional(),
 });
 export type StoredUserWait = z.infer<typeof storedUserWaitSchema>;
+
+/**
+ * The fields that were given, with every absent one left out of the object.
+ *
+ * A wait carries only what its ask supplied, and a field that is written as
+ * `undefined` is not the same as a field that is not there: it is what the
+ * stored record and the live entry are both typed for.
+ */
+function given<T extends object>(fields: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+}
 
 /** The durable half, as two command dispatches this service does not own. */
 export interface UserWaitEvents {
@@ -152,7 +169,9 @@ export class UserWaitService {
     callId: string;
     summary: string;
     pattern: string;
+    patterns: string[];
     reason: string;
+    timeoutSeconds?: number;
     skipOffered: boolean;
     workspaceName: string;
     hostname: string;
@@ -176,7 +195,11 @@ export class UserWaitService {
         callId: params.callId,
         summary: params.summary,
         pattern: params.pattern,
+        patterns: params.patterns,
         reason: params.reason,
+        ...(params.timeoutSeconds === undefined
+          ? {}
+          : { timeoutSeconds: params.timeoutSeconds }),
         skipOffered: params.skipOffered,
         workspaceName: params.workspaceName,
         hostname: params.hostname,
@@ -454,15 +477,19 @@ export class UserWaitService {
       entry: {
         waitId: wait.waitId,
         callId: wait.callId,
-        ...(wait.toolCallId ? { toolCallId: wait.toolCallId } : {}),
         summary: wait.summary ?? "",
         pattern: wait.pattern ?? "",
+        patterns: wait.patterns ?? [],
         reason: wait.reason ?? "",
         skipOffered: wait.skipOffered ?? false,
         workspaceName: wait.workspaceName ?? "",
         hostname: wait.hostname ?? "",
         status: wait.state,
-        ...(wait.decision ? { decision: wait.decision } : {}),
+        ...given({
+          toolCallId: wait.toolCallId,
+          timeoutSeconds: wait.timeoutSeconds,
+          decision: wait.decision,
+        }),
       },
     });
   }
@@ -491,7 +518,9 @@ export class UserWaitService {
     callId,
     summary,
     pattern,
+    patterns,
     reason,
+    timeoutSeconds,
     skipOffered,
     workspaceName,
     hostname,
@@ -506,7 +535,9 @@ export class UserWaitService {
     callId?: string;
     summary?: string;
     pattern?: string;
+    patterns?: string[];
     reason?: string;
+    timeoutSeconds?: number;
     skipOffered?: boolean;
     workspaceName?: string;
     hostname?: string;
@@ -518,20 +549,24 @@ export class UserWaitService {
       projectId,
       conversationId,
       turnId,
-      ...(toolCallId ? { toolCallId } : {}),
       kind,
       state: "pending",
       createdAt,
       expiresAt: createdAt + budgetMs,
       lastKeepaliveAt: createdAt,
-      ...(callId ? { callId } : {}),
-      ...(summary !== undefined ? { summary } : {}),
-      ...(pattern !== undefined ? { pattern } : {}),
-      ...(reason !== undefined ? { reason } : {}),
-      ...(skipOffered !== undefined ? { skipOffered } : {}),
-      ...(workspaceName !== undefined ? { workspaceName } : {}),
-      ...(hostname !== undefined ? { hostname } : {}),
-      ...(questions !== undefined ? { questions } : {}),
+      ...given({
+        toolCallId,
+        callId,
+        summary,
+        pattern,
+        patterns,
+        reason,
+        timeoutSeconds,
+        skipOffered,
+        workspaceName,
+        hostname,
+        questions,
+      }),
     };
   }
 

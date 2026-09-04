@@ -32,26 +32,57 @@ export const SKIP_NOT_ALLOWED_HINT =
   "This model is not allowed to skip permission checks. Check the allowed models list in the provider settings.";
 
 /**
+ * The patterns as one phrase: "git fetch" and "git checkout".
+ *
+ * Every pattern, never the first one alone. One click on the session grant
+ * covers each part of the chain that is not read-only, and the session's
+ * grants are readable nowhere else, so a button that named one of three was
+ * giving away two the reader never saw.
+ */
+export function langyPatternList(patterns: readonly string[]): string {
+  const quoted = patterns
+    .filter((pattern) => pattern !== "")
+    .map((pattern) => `"${pattern}"`);
+  if (quoted.length === 0) return "";
+  if (quoted.length === 1) return quoted[0]!;
+  return `${quoted.slice(0, -1).join(", ")} and ${quoted[quoted.length - 1]!}`;
+}
+
+/**
  * What the settled card says the reader did. A pattern grant NAMES the
- * pattern: it covers every future command that matches it, and the session's
- * grants are readable nowhere else, so "this pattern" left the reader with no
- * way to know what they had given away.
+ * patterns: they cover every future command that matches them, and the
+ * session's grants are readable nowhere else, so "this pattern" left the
+ * reader with no way to know what they had given away.
  */
 export function langyDecisionLabel({
   decision,
-  pattern,
+  patterns,
 }: {
   decision: LangyPermissionDecision | null;
-  pattern: string | null;
+  patterns: readonly string[];
 }): string {
   if (decision === "allow_once") return "You allowed this command once";
   if (decision === "deny") return "You denied this command";
   if (decision === "allow_pattern") {
-    return pattern
-      ? `You allowed "${pattern}" for the session`
+    const named = langyPatternList(patterns);
+    return named
+      ? `You allowed ${named} for the session`
       : "You allowed this pattern for the session";
   }
   return "You answered this card";
+}
+
+/**
+ * The time limit in the reader's words: "5 minutes", "90 seconds". Whole
+ * minutes read as minutes, and anything else reads as seconds, so the card
+ * never rounds a limit the command actually runs under.
+ */
+export function langyTimeLimitText(seconds: number): string {
+  if (seconds >= 60 && seconds % 60 === 0) {
+    const minutes = seconds / 60;
+    return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  }
+  return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
 }
 
 export interface LangyLocalPermissionCardProps {
@@ -133,6 +164,15 @@ export function LangyLocalPermissionCard({
           </Text>
         ) : null}
 
+        {/* The limit the command runs under. A command that reached it came
+            back with nothing to show and no reason the reader could see. */}
+        {card.timeoutSeconds ? (
+          <Text textStyle="2xs" color="fg.subtle">
+            Stops after {langyTimeLimitText(card.timeoutSeconds)} if it has not
+            finished.
+          </Text>
+        ) : null}
+
         {pending ? (
           <PendingAnswers
             projectId={projectId}
@@ -140,8 +180,8 @@ export function LangyLocalPermissionCard({
             card={card}
             skipAllowed={skipAllowed}
             skipPermissions={skipPermissions}
-            onSettled={() =>
-              settleWait({ waitId: card.waitId, status: "answered" })
+            onSettled={(decision) =>
+              settleWait({ waitId: card.waitId, status: "answered", decision })
             }
             onFailure={setFailure}
           />
@@ -174,11 +214,10 @@ function PendingAnswers({
   card: LangyPermissionCardData;
   skipAllowed: boolean;
   skipPermissions: boolean;
-  onSettled: () => void;
+  onSettled: (decision: LangyPermissionDecision) => void;
   onFailure: (message: string | null) => void;
 }) {
   const answer = api.langy.answerLocalPermission.useMutation({
-    onSuccess: onSettled,
     onError: (error) =>
       onFailure(
         describeError({ error, fallbackTitle: "Could not send your answer" }),
@@ -194,9 +233,15 @@ function PendingAnswers({
       ),
   });
 
+  // The decision travels with the settle: the durable record needs a moment to
+  // carry it back, and until it does the card would say only that it was
+  // answered, which is the one thing the reader already knows.
   const decide = (decision: LangyPermissionDecision) => {
     onFailure(null);
-    answer.mutate({ projectId, conversationId, waitId: card.waitId, decision });
+    answer.mutate(
+      { projectId, conversationId, waitId: card.waitId, decision },
+      { onSuccess: () => onSettled(decision) },
+    );
   };
 
   return (
@@ -210,14 +255,14 @@ function PendingAnswers({
         >
           Allow once
         </Button>
-        {card.pattern ? (
+        {card.patterns.length > 0 ? (
           <Button
             size="xs"
             variant="outline"
             loading={answer.isPending}
             onClick={() => decide("allow_pattern")}
           >
-            Allow &quot;{card.pattern}&quot; this session
+            Allow {langyPatternList(card.patterns)} this session
           </Button>
         ) : null}
         <Button
@@ -264,7 +309,7 @@ function Outcome({ card }: { card: LangyPermissionCardData }) {
         <Text textStyle="2xs" color="fg.muted">
           {langyDecisionLabel({
             decision: card.decision,
-            pattern: card.pattern,
+            patterns: card.patterns,
           })}
         </Text>
       </HStack>

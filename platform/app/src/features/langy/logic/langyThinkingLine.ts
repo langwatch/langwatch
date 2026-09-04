@@ -203,7 +203,7 @@ function waitingLine({
     return (
       silenceEscalation({
         elapsedMs,
-        stuckText: "Langy still hasn't answered — it may be stuck.",
+        stuckText: "Langy still has not answered. It may be stuck.",
       }) ?? { text: "Thinking…", tone: "waiting", allowWhimsy: false }
     );
   }
@@ -212,7 +212,7 @@ function waitingLine({
   // worker that has not started, and we must not pretend otherwise.
   const escalated = silenceEscalation({
     elapsedMs,
-    stuckText: "Langy still hasn't started — it may be stuck.",
+    stuckText: "Langy still has not started. It may be stuck.",
   });
   if (escalated) return escalated;
 
@@ -318,7 +318,7 @@ export function langyThinkingLine({
       input: tool.input,
     });
     return {
-      text: detail ? `${title} — ${detail}` : title,
+      text: detail ? `${title}: ${detail}` : title,
       tone: "working",
       allowWhimsy: false,
     };

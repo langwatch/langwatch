@@ -78,8 +78,17 @@ Feature: Langy works in a folder shared from the developer's machine
       Given an approved control request
       And no turn is in flight
       When the CLI connects
-      Then a user message reads that the local folder is connected, with the path and the branch
+      Then a user message reads that the local folder is connected, naming the folder and the machine
+      And that message does not repeat the whole path the card already shows
       And Langy starts working on the change it offered
+
+    @integration
+    Scenario: The card reads connected within seconds of the terminal saying so
+      Given an approved control request
+      And no turn is in flight
+      When the CLI connects
+      Then the update signal makes the panel read the conversation's record again
+      And the card reads connected without waiting for the next turn to end
 
     @integration
     Scenario: Connecting while a turn runs does not start a second turn
@@ -200,6 +209,14 @@ Feature: Langy works in a folder shared from the developer's machine
       When Langy makes a local call
       Then the tool result says no folder is connected and names the code access step
       And Langy asks for code access instead of retrying
+
+    @unit
+    Scenario: A command stopped at its time limit says the limit and how to raise it
+      Given a connected folder
+      When a command runs for longer than its time limit and is stopped
+      Then the result says the command was stopped at that limit
+      And it says the command can be asked for again with a longer time limit
+      And it says the longest limit a command may ask for
 
     @integration
     Scenario: A long command keeps its turn alive

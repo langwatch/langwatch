@@ -284,6 +284,12 @@ export const permissionRequiredFrameSchema = versioned.extend({
   skipOffered: z.boolean(),
   /** Set for a command: every segment of the chain, in the order it runs. */
   segments: z.array(commandSegmentSchema).max(50).optional(),
+  /**
+   * The seconds after which the command is stopped, so the card can name the
+   * limit before the reader allows it. Absent for a call that runs under none,
+   * and absent from a command line that predates the field.
+   */
+  timeoutSeconds: z.number().int().positive().max(3600).optional(),
 });
 export type PermissionRequiredFrame = z.infer<
   typeof permissionRequiredFrameSchema

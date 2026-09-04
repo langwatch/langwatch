@@ -80,6 +80,14 @@ Feature: Langy asks how to reach the customer's code, once
       Then the card still shows the command and the countdown
 
     @integration
+    Scenario: A card that cannot read the folder state says so and offers to try again
+      Given the read of my folder state fails
+      When the code access card renders
+      Then the card says the folder state could not be read
+      And the card offers to try again
+      And the card never keeps its loading line for a read that failed
+
+    @integration
     Scenario: Only the newest code access card can be answered
       Given Langy asked for code access earlier in this conversation
       When Langy asks again

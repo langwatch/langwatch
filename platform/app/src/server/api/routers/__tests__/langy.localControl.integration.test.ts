@@ -133,6 +133,7 @@ async function permissionCard(): Promise<{ waitId: string; callId: string }> {
     callId: call.callId,
     summary: "pnpm typecheck",
     pattern: "pnpm *",
+    patterns: ["pnpm *"],
     reason: "not on the read-only list",
     skipOffered: true,
     workspaceName: "acme-app",

@@ -146,7 +146,7 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
     retry: true,
     attempts: WORKER_RESTART_WAITS.length,
     delayMs: schedule(WORKER_RESTART_WAITS),
-    recoveringMessage: "Langy restarted — picking up where it left off…",
+    recoveringMessage: "Langy restarted. Picking up where it left off…",
   },
 
   // The turn blew its budget. Worth exactly one more go: if the question is

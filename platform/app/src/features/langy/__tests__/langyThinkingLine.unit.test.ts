@@ -113,7 +113,7 @@ describe("langyThinkingLine", () => {
         elapsedMs: THINKING_STUCK_MS,
         workerReady: true,
       });
-      expect(line?.text).toBe("Langy still hasn't answered — it may be stuck.");
+      expect(line?.text).toBe("Langy still has not answered. It may be stuck.");
       expect(line?.tone).toBe("stuck");
     });
 

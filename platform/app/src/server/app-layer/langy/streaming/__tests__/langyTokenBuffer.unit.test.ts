@@ -218,6 +218,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
             callId: "call_1",
             summary: "uv sync",
             pattern: "uv",
+            patterns: ["uv"],
             reason: "Installs packages",
             skipOffered: true,
             workspaceName: "acme-app",

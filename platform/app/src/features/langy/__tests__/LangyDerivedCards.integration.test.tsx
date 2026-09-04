@@ -315,7 +315,7 @@ describe("given a question the conversation moved past", () => {
       screen.getByText("Which agent should this scenario run against?"),
     ).toBeDefined();
     expect(
-      screen.getByText("The conversation moved on — this question is closed."),
+      screen.getByText("The conversation moved on. This question is closed."),
     ).toBeDefined();
     fireEvent.click(screen.getByText("Staging agent"));
     expect(onChoiceSelect).not.toHaveBeenCalled();

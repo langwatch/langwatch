@@ -188,6 +188,12 @@ export function LangyCodeAccessCard(props: LangyCodeAccessCardProps) {
 
   if (superseded) return <SupersededState />;
   const data = workspace.data;
+  // A read that failed is not a read that is still running. Rendering the
+  // loading line for both left the card saying it was checking, for ever,
+  // with no error, no retry and no way to answer the question.
+  if (workspace.isError && !data) {
+    return <UnreadableState error={workspace.error} onRetry={refetch} />;
+  }
   if (workspace.isLoading || !data) return <LoadingState />;
   return <CodeAccessBody {...props} folder={data} onRefetch={refetch} />;
 }
@@ -272,6 +278,40 @@ function LoadingState() {
           Checking how I can reach your code
         </Text>
       </HStack>
+    </CardShell>
+  );
+}
+
+/**
+ * The one query behind every state of this card failed.
+ *
+ * The words are the shared registry's, keyed on the error's own code, so a
+ * platform failure reads as a platform failure and a conversation that is gone
+ * says so. The card offers the read again, because that is the only thing that
+ * moves this on.
+ */
+function UnreadableState({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry: () => void;
+}) {
+  return (
+    <CardShell>
+      <VStack align="stretch" gap={2}>
+        <Text textStyle="xs" color="fg" role="alert">
+          {describeError({
+            error,
+            fallbackTitle: "I could not check how to reach your code",
+          })}
+        </Text>
+        <HStack gap={2}>
+          <Button size="xs" variant="outline" onClick={onRetry}>
+            Try again
+          </Button>
+        </HStack>
+      </VStack>
     </CardShell>
   );
 }

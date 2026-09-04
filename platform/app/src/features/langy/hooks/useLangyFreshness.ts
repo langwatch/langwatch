@@ -45,6 +45,18 @@ export function useLangyFreshness(activeConversationId: string | null): void {
           cursor: signal.cursor ?? null,
         });
         if (signal.conversationId === activeConversationId) {
+          // The open conversation's RECORD (ADR-129): every card of every turn,
+          // and whether the folder is connected. It is not part of the turn
+          // fold, so the catch-up below never refreshes it, and the folder
+          // connecting starts no turn this browser is watching. Without this
+          // the code access card sat on "waiting for you to approve in the
+          // terminal" until the turn that the connect itself started ended,
+          // which is a cold worker and a whole answer away. One small read per
+          // signal batch, which the debounce already caps.
+          void trpcUtils.langy.localRecord.invalidate({
+            projectId,
+            conversationId: signal.conversationId,
+          });
           // The OPEN conversation's live path (ADR-059): the signal carries
           // the projection's CURSOR; `catchUpConversationFold` compares it
           // with the local fold's and, when behind, fetches the durable event

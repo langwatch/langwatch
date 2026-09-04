@@ -97,6 +97,7 @@ function startPermission() {
     callId: "lcall_1",
     summary: "pnpm typecheck",
     pattern: "pnpm *",
+    patterns: ["pnpm *"],
     reason: "The command is not on the read-only list.",
     skipOffered: true,
     workspaceName: "acme-app",

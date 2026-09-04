@@ -458,7 +458,11 @@ export class LocalControlSessionCore {
       callId: call.callId,
       summary: frame.summary,
       pattern: frame.pattern,
+      patterns: grantedPatterns(frame),
       reason: frame.reason,
+      ...(frame.timeoutSeconds === undefined
+        ? {}
+        : { timeoutSeconds: frame.timeoutSeconds }),
       // The command line always offers the switch; whether the card may show
       // it is the platform's answer, and it is the model that decides.
       skipOffered: frame.skipOffered && (await this.maySkip(session)),
@@ -687,13 +691,37 @@ function eventWorkspace(
   };
 }
 
-/** The message the connected folder starts the next turn with. */
+/**
+ * Every pattern one "allow for this session" answer grants.
+ *
+ * The command line grants a pattern for every part of the chain that is not
+ * read-only, so a card that named only `frame.pattern` told the reader about
+ * the first of them and gave away the rest. The segments the ask carries are
+ * the whole list; a command line that sends none leaves the one pattern.
+ */
+export function grantedPatterns(frame: PermissionRequiredFrame): string[] {
+  const fromSegments = (frame.segments ?? [])
+    .filter((segment) => !segment.readOnly)
+    .map((segment) => segment.pattern)
+    .filter((pattern) => pattern !== "");
+  const patterns = fromSegments.length > 0 ? fromSegments : [frame.pattern];
+  return [...new Set(patterns)].filter((pattern) => pattern !== "");
+}
+
+/**
+ * The message the connected folder starts the next turn with.
+ *
+ * The folder NAME, not its path. The code access card above this line already
+ * carries the whole path, the machine and the branch, and a message that
+ * repeated all three filled a third of the panel with the same sentence twice.
+ * The model reads the path off the workspace facts the code access tool hands
+ * it, so nothing is lost by saying it once.
+ */
 export function connectMessage(
-  workspace: { root: string; gitBranch?: string },
+  workspace: { name: string; root: string },
   hostname: string,
 ): string {
-  const branch = workspace.gitBranch ? `, branch ${workspace.gitBranch}` : "";
-  return `Local folder connected: ${workspace.root} on ${hostname}${branch}`;
+  return `Local folder connected: ${workspace.name || workspace.root} on ${hostname}`;
 }
 
 /** The line the transcript carries when the folder goes away. */

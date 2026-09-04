@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const setPreference = vi.fn();
 const refetchWorkspace = vi.fn();
 let workspaceData: unknown = null;
+let workspaceError: unknown = null;
 let githubInstallations: Array<{
   installationId: string;
   accountLogin: string;
@@ -41,7 +42,9 @@ vi.mock("~/utils/api", () => ({
       getLocalWorkspace: {
         useQuery: () => ({
           data: workspaceData,
-          isLoading: workspaceData === null,
+          isLoading: workspaceData === null && workspaceError === null,
+          isError: workspaceError !== null,
+          error: workspaceError,
           refetch: refetchWorkspace,
         }),
       },
@@ -74,6 +77,7 @@ afterEach(cleanup);
 beforeEach(() => {
   setPreference.mockClear();
   refetchWorkspace.mockClear();
+  workspaceError = null;
   githubInstallations = [{ installationId: "i1", accountLogin: "acme" }];
   // The local-folder pick persists per browser, so one test's click would
   // otherwise open the next test's card already waiting.
@@ -327,6 +331,32 @@ describe("given the folder is connected", () => {
         "Connected: /Users/rogerio/Projects/acme-app on rogerio-mbp, branch main",
       ),
     ).toBeDefined();
+  });
+});
+
+describe("given the read of the folder state fails", () => {
+  beforeEach(() => {
+    workspaceData = null;
+    // The shape a tRPC client error carries a handled error in. The card reads
+    // the words off the shared registry, keyed on this code.
+    workspaceError = {
+      data: {
+        error: { code: "langy_conversation_not_found", httpStatus: 404 },
+      },
+    };
+  });
+
+  /** @scenario "A card that cannot read the folder state says so and offers to try again" */
+  it("says the read failed, in the shared words, and offers the read again", () => {
+    renderCard();
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("Conversation not found");
+    expect(alert.textContent).toContain("no longer available");
+    expect(screen.queryByText("Checking how I can reach your code")).toBeNull();
+
+    fireEvent.click(screen.getByText("Try again"));
+    expect(refetchWorkspace).toHaveBeenCalledTimes(1);
   });
 });
 

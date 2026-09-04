@@ -72,6 +72,8 @@ interface LangyLocalControlState {
     waitId: string;
     kind?: LangyLiveWait["kind"];
     status: LangyLiveWait["status"];
+    /** What the reader answered, so the settled card can say it at once. */
+    decision?: string;
   }) => void;
   /** Open another conversation: everything here belonged to the last one. */
   reset: (conversationId: string | null) => void;
@@ -125,10 +127,19 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>(
       });
     },
 
-    settleWait: ({ waitId, kind = "permission", status }) => {
+    settleWait: ({ waitId, kind = "permission", status, decision }) => {
       const state = get();
       const wait = state.waits[waitId] ?? { waitId, kind, status: "pending" };
-      set({ waits: { ...state.waits, [waitId]: { ...wait, status } } });
+      set({
+        waits: {
+          ...state.waits,
+          [waitId]: {
+            ...wait,
+            status,
+            ...(decision === undefined ? {} : { decision }),
+          },
+        },
+      });
     },
 
     reset: (conversationId) =>

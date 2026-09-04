@@ -109,7 +109,9 @@ import { langyDraftToRestore } from "../logic/langyDraftRecovery";
 import { catchUpConversationFold } from "../logic/langyDurableCatchUp";
 import {
   explainLangyError,
+  isLangyConversationPending,
   isStaleLangyHistoryRead,
+  LANGY_CONVERSATION_PENDING_GRACE_MS,
   readLangyStreamError,
   readLangyTrpcError,
   resolveLiveTurnError,
@@ -1283,16 +1285,34 @@ function LangyPanel({
   );
   const suppressedNotFoundRef = useRef(false);
 
+  // How long a not-found read is read as the projection lagging the create
+  // (see `isLangyConversationPending`).
+  const [notFoundGraceIsOver, setNotFoundGraceIsOver] = useState(false);
+  useEffect(() => {
+    setNotFoundGraceIsOver(false);
+    if (!hasHistoryError || !isActiveConversationUnconfirmed) return;
+    const timer = setTimeout(
+      () => setNotFoundGraceIsOver(true),
+      LANGY_CONVERSATION_PENDING_GRACE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [hasHistoryError, isActiveConversationUnconfirmed, activeConversationId]);
+
   const historyErrorPresentation = useMemo(() => {
     if (!hasHistoryError) return null;
     const domain = readLangyTrpcError(historyError);
     // Not-found for a conversation THIS tab just minted is the projection
-    // lagging the accepted create — "not yet", never an error. The card would
+    // lagging the accepted create: "not yet", never an error. The card would
     // claim a conversation doesn't exist moments before its turn is accepted;
-    // render nothing and let the confirmation drive the refetch below.
+    // render nothing and let the confirmation drive the refetch below. Only
+    // while the grace holds, though: a conversation that stays unreadable is
+    // one the reader has to be told about.
     if (
-      domain?.code === "langy_conversation_not_found" &&
-      isActiveConversationUnconfirmed
+      isLangyConversationPending({
+        code: domain?.code,
+        unconfirmed: isActiveConversationUnconfirmed,
+        graceIsOver: notFoundGraceIsOver,
+      })
     ) {
       suppressedNotFoundRef.current = true;
       return null;
@@ -1306,7 +1326,12 @@ function LangyPanel({
       render: "card" as const,
       action: { label: "Try again", kind: "retry" as const },
     };
-  }, [hasHistoryError, historyError, isActiveConversationUnconfirmed]);
+  }, [
+    hasHistoryError,
+    historyError,
+    isActiveConversationUnconfirmed,
+    notFoundGraceIsOver,
+  ]);
 
   // Confirmation arrived (a signal named the conversation, or a read
   // succeeded) while the history query still holds the suppressed not-found —
@@ -1570,7 +1595,7 @@ function LangyPanel({
       kind: "langy_conversations_unavailable",
       title: "Recent conversations aren't loading",
       description:
-        "Chatting still works — your past conversations will be back once they can be reached again.",
+        "Chatting still works. Your past conversations will be back once they can be reached again.",
       render: "card" as const,
       action: { label: "Try again", kind: "retry" as const },
     };
@@ -2292,6 +2317,34 @@ function LangyPanel({
     cursor: snapshotEventCursor,
   });
   const recordWaits = localRecord.waits;
+
+  /**
+   * The conversation's record could not be read.
+   *
+   * This is the read the cards come from, and it is the read that fails when
+   * the event store is unavailable: a permission card raised for a turn this
+   * browser was not watching then never reaches the screen. Silence made the
+   * panel say the only other thing it knew, which was that Langy had not
+   * answered yet, so a platform failure was reported to the reader as Langy
+   * being slow. The words come from the shared registry keyed on the code the
+   * failure carries, and the action is the read again.
+   */
+  const recordFailed = localRecord.isError;
+  const recordError = localRecord.error;
+  const recordErrorPresentation = useMemo(() => {
+    if (!recordFailed) return null;
+    const domain = readLangyTrpcError(recordError);
+    if (domain) return explainLangyError(domain);
+    return {
+      kind: "langy_record_unavailable",
+      title: "This conversation could not be loaded",
+      description:
+        "Anything it is waiting for you to answer is not on screen. Try again in a moment.",
+      render: "card" as const,
+      action: { label: "Try again", kind: "retry" as const },
+    };
+  }, [recordFailed, recordError]);
+
   const permissionCards = useMemo(
     () =>
       langyPermissionCards({
@@ -3185,6 +3238,26 @@ function LangyPanel({
                             </chakra.button>
                           )}
                         </HStack>
+                      ) : null}
+                      {/* The conversation's own record could not be read, so a
+                          card it is waiting on is not on screen. It sits above
+                          the transcript rather than over it: the messages are
+                          real, and the reader has to know a question may be
+                          missing from them. Suppressed while a failed history
+                          read already owns the column, which says the same
+                          thing louder. */}
+                      {recordErrorPresentation && !blockingHistoryError ? (
+                        <VStack
+                          data-testid="langy-record-unavailable"
+                          align="stretch"
+                          paddingX={floating ? "19px" : "14px"}
+                          paddingTop={floating ? "19px" : "14px"}
+                        >
+                          <LangyError
+                            presentation={recordErrorPresentation}
+                            onAction={() => localRecord.refetch()}
+                          />
+                        </VStack>
                       ) : null}
                       {showCardGallery ? (
                         <LangyCardGallery />

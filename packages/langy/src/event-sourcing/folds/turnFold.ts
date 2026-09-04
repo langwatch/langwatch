@@ -104,7 +104,11 @@ export type LangyTurnWait = {
   callId: string | null;
   summary: string | null;
   pattern: string | null;
+  /** Every pattern one session grant covers, first one first. */
+  patterns: string[];
   reason: string | null;
+  /** The seconds after which the command is stopped, or null when it has no limit. */
+  timeoutSeconds: number | null;
   skipOffered: boolean;
   workspaceName: string | null;
   hostname: string | null;
@@ -132,7 +136,11 @@ export const langyTurnWaitSchema = z.object({
   callId: z.string().nullable(),
   summary: z.string().nullable(),
   pattern: z.string().nullable(),
+  // Records written before the card named every pattern carry none, and they
+  // read back as a card whose one pattern is the whole answer.
+  patterns: z.array(z.string()).default([]),
   reason: z.string().nullable(),
+  timeoutSeconds: z.number().nullable().default(null),
   skipOffered: z.boolean(),
   workspaceName: z.string().nullable(),
   hostname: z.string().nullable(),
@@ -187,7 +195,9 @@ function pendingWait(data: LangyUserWaitStartedEventData): LangyTurnWait {
     callId: permission?.callId ?? null,
     summary: permission?.summary ?? null,
     pattern: permission?.pattern ?? null,
+    patterns: permission?.patterns ?? [],
     reason: permission?.reason ?? null,
+    timeoutSeconds: permission?.timeoutSeconds ?? null,
     skipOffered: permission?.skipOffered ?? false,
     workspaceName: permission?.workspaceName ?? null,
     hostname: permission?.hostname ?? null,

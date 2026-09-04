@@ -556,13 +556,16 @@ describe("given an approved control request", () => {
     });
 
     /** @scenario "Connecting starts the next turn on its own" */
-    it("starts one turn that names the folder and the branch", async () => {
+    it("starts one turn that names the folder and the machine, and not the path", async () => {
       const key = await approvedSessionKey(podA);
       const { cli } = await shareFolder(podA, key);
       await expect.poll(() => startedTurns.length, { timeout: 5_000 }).toBe(1);
 
+      // The card beside this line already carries the whole path, the machine
+      // and the branch. Saying all three again filled the panel with the same
+      // sentence twice.
       expect(startedTurns[0]?.text).toBe(
-        "Local folder connected: /Users/dev/acme-app on rogerio-mbp, branch main",
+        "Local folder connected: acme-app on rogerio-mbp",
       );
       expect(startedTurns[0]?.idempotencyKey).toMatch(/^local-connect:lcr_/);
 
@@ -770,6 +773,56 @@ describe("given a folder shared with the conversation", () => {
       expect((await podA.runtime.dispatcher.read(call.callId))?.state).toBe(
         "awaiting_permission",
       );
+    });
+
+    /** @scenario "The session grant button names every pattern the click covers" */
+    it("carries every pattern of the chain, and the limit the command runs under", async () => {
+      const call = await podA.runtime.dispatcher.start({
+        projectId,
+        conversationId,
+        turnId,
+        call: {
+          tool: "local_bash",
+          params: {
+            command: "git fetch origin && git checkout -b langy/x origin/main",
+          },
+        },
+        timeoutMs: 30_000,
+      });
+      await cli.next("call");
+      cli.send({
+        type: "permission_required",
+        callId: call.callId,
+        summary: "git fetch origin && git checkout -b langy/x origin/main",
+        pattern: "git fetch",
+        reason: "changes the git repository and reaches the network",
+        skipOffered: true,
+        timeoutSeconds: 300,
+        segments: [
+          {
+            command: "git fetch origin",
+            pattern: "git fetch",
+            readOnly: false,
+          },
+          {
+            command: "git checkout -b langy/x origin/main",
+            pattern: "git checkout",
+            readOnly: false,
+          },
+        ],
+      });
+
+      await expect
+        .poll(() => liveEntries.filter((e) => e.kind === "local_permission"), {
+          timeout: 5_000,
+        })
+        .toHaveLength(1);
+      expect(
+        liveEntries.find((e) => e.kind === "local_permission")?.payload,
+      ).toMatchObject({
+        patterns: ["git fetch", "git checkout"],
+        timeoutSeconds: 300,
+      });
     });
 
     /** @scenario "A model outside the allowed list cannot skip" */

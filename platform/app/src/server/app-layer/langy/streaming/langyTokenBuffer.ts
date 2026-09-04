@@ -101,7 +101,11 @@ export type LangyStreamEntry =
       toolCallId?: string;
       summary: string;
       pattern: string;
+      /** Every pattern one session grant covers, first one first. */
+      patterns: string[];
       reason: string;
+      /** The seconds after which the command is stopped, when it has a limit. */
+      timeoutSeconds?: number;
       skipOffered: boolean;
       workspaceName: string;
       hostname: string;

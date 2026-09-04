@@ -24,6 +24,16 @@ export interface LangyLocalRecordResult {
   waits: LangyRecordWait[];
   /** Whether the record's last word on the folder was that it connected. */
   workspaceConnected: boolean;
+  /**
+   * The read itself failed, so the cards this record carries are not on
+   * screen and the panel cannot know whether any are waiting. Never quieter
+   * than a success: the panel says so and offers the read again.
+   */
+  isError: boolean;
+  /** The failure, for the shared error copy to name it. */
+  error: unknown;
+  /** Read the record again, which is what the panel's retry does. */
+  refetch: () => void;
 }
 
 const NO_WAITS: LangyRecordWait[] = [];
@@ -70,5 +80,8 @@ export function useLangyLocalRecord({
   return {
     waits: (data?.waits ?? NO_WAITS) as LangyRecordWait[],
     workspaceConnected: data?.workspaceConnected ?? false,
+    isError: !!conversationId && query.isError,
+    error: conversationId ? query.error : null,
+    refetch: () => void refetch(),
   };
 }
