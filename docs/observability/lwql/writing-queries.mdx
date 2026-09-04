@@ -1,0 +1,189 @@
+---
+title: "Writing LWQL Queries"
+description: "The LangWatchQL dialect, schema discovery, bound parameters, time windows, result limits, and error codes"
+sidebarTitle: Writing queries
+keywords: langwatchql, lwql, sql, clickhouse, query, parameters, schema
+---
+
+LWQL is ClickHouse SQL, restricted to a single read-only `SELECT`. If you know ClickHouse — or standard SQL plus a few ClickHouse idioms like `toStartOfDay`, `countIf`, and `quantile` — you know LWQL.
+
+## Start with the schema
+
+Everything you can query is published by the schema endpoint, scoped to what your key can see:
+
+```bash
+curl "https://app.langwatch.ai/api/v1/projects/$PROJECT_ID/analytics/schema" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY"
+```
+
+For every dataset it returns:
+
+- **`columns`** — each with its ClickHouse `type`, a one-line `description`, its `unit` where it has one (`ms`, `USD`, `tokens`, `tokens/s`), the permission `gates` that unlock it, and `available` — whether *your* key holds them.
+- **`grain`** — what one row is (e.g. "one row per (TenantId, TraceId), latest version only"). Joins should match the full grain of the wider side, or you'll multiply rows.
+- **`joinKeys`** — the columns another dataset can be joined on.
+- **`timeColumn`** — the column to filter for partition pruning. Always constrain it.
+- **`freshness`** — how far behind live writes the dataset can be.
+- **`exampleSql`** — a runnable query to start from.
+
+The response also carries a top-level `database` — the analytics database your deployment configured — and each dataset's `name` and `exampleSql` are qualified with it (`langwatch_lwql.traces`, `FROM langwatch_lwql.traces`).
+
+You don't have to repeat that qualification. Reference datasets by their bare name (`FROM traces`) and they resolve to the same database, which is why the two spellings you'll see are equivalent.
+
+## Run a query
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/v1/projects/$PROJECT_ID/analytics/query/clickhouse" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d @- <<'EOF'
+{
+  "sql": "SELECT toStartOfDay(OccurredAt) AS Day, count() AS Traces, round(sum(TotalCost), 4) AS CostUSD FROM traces WHERE OccurredAt >= {since:DateTime} GROUP BY Day ORDER BY Day",
+  "parameters": { "since": "2026-08-01 00:00:00" }
+}
+EOF
+```
+
+The request body:
+
+| Field | Type | Notes |
+|---|---|---|
+| `sql` | string, required | One `SELECT` statement, up to 50,000 characters. Sent to the database exactly as written — never rewritten. |
+| `parameters` | object, optional | Values for the bound parameters the SQL declares. Scalars only: string, number, boolean, or null. |
+| `timeWindow` | `{ start, end }`, optional | The reporting period, as ISO strings, epoch milliseconds, or dates. Fills the reserved `period_start` / `period_end` parameters — see below. |
+
+The response:
+
+| Field | Meaning |
+|---|---|
+| `columns` | Output columns with their ClickHouse types, using your aliases |
+| `rows` | One JSON object per row |
+| `statistics` | `elapsedMs`, `rowsRead`, `bytesRead` (physical scan cost), and `rowsReturned` |
+| `truncated` | `true` when a response ceiling cut the result short — never silent |
+| `followsTimeWindow` | Whether the statement declared the reserved time-window parameters |
+| `diagnostics` | Advisory notes about the result (see below). Never a rejection. |
+
+## Bound parameters
+
+Use ClickHouse's typed parameter syntax rather than interpolating values into the SQL string:
+
+```sql
+SELECT count() AS Errors
+FROM traces
+WHERE OccurredAt >= {since:DateTime}
+  AND ContainsErrorStatus = {has_error:Bool}
+```
+
+Every parameter the statement declares must have a value in `parameters`, or the request is refused with `lwql_parameter_missing` — including the exact names that are missing, so an agent can repair its own request.
+
+### The reserved time window
+
+Two parameter names are reserved: `{period_start:DateTime}` and `{period_end:DateTime}`. They are filled from the request's `timeWindow`, never from `parameters` — supplying either under `parameters` is refused (`lwql_reserved_parameter_supplied`), and declaring them as anything but a date-time type is refused too (`lwql_reserved_parameter_type`).
+
+```json
+{
+  "sql": "SELECT count() AS Traces FROM traces WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}",
+  "timeWindow": { "start": "2026-08-01T00:00:00Z", "end": "2026-08-18T00:00:00Z" }
+}
+```
+
+The interval is half-open: `[period_start, period_end)`. Writing your statements against these two names makes them portable — the same SQL answers for whatever period the caller (a dashboard, a script, an agent) supplies, and the response's `followsTimeWindow` tells the consumer the statement was offered the period.
+
+## What's allowed — and what isn't
+
+Allowed: a single `SELECT`, optionally with `WITH`; joins; CTEs, subqueries and `UNION` (up to 8 levels of nesting); aggregates, `-If`/`DISTINCT` combinators, and window functions; array, map, and JSON access; bound parameters.
+
+Refused, always with a structured violation rather than a database error:
+
+- Anything that writes or defines: `INSERT`, `ALTER`, `CREATE`, `DROP`, ...
+- `SETTINGS` in any position
+- Table functions — **all** of them, refused positionally rather than by a name list, so `numbers(10)` is refused just as `url(...)` is
+- The `system` and `information_schema` databases
+- Functions outside the allowlist — the allowlist covers the aggregation, date/time, string, array, map, JSON, and math functions analytics questions need, and omits introspection (`currentUser`, `hostName`, `version`, `getSetting`, ...) by construction
+- Columns your permissions gate (see [Privacy & RBAC](/observability/lwql/privacy-and-rbac))
+
+## Limits
+
+Two layers of ceilings apply, and they behave differently:
+
+**Database ceilings** (fixed per query; exceeding them fails the query with a coded error):
+
+| Ceiling | Default | Error code |
+|---|---|---|
+| Execution time | 10 s | HTTP 504 — no specific code (see the 5xx warning below) |
+| Memory | 1 GB | `query_memory_exceeded` (HTTP 422) |
+| Rows / bytes scanned | 1B rows / 10 GB | `query_scan_limit_exceeded` (HTTP 422) |
+
+**Response ceilings** (truncate rather than fail; always flagged):
+
+| Ceiling | Default |
+|---|---|
+| Rows returned | 10,000 |
+| Response size | ~8 MB |
+
+When you hit a scan or timeout ceiling, narrow the time filter on the dataset's `timeColumn` — it prunes partitions — or move to a pre-aggregated `*_by_minute` dataset. When you hit a response ceiling, aggregate more or paginate with `ORDER BY ... LIMIT ... OFFSET`.
+
+## Diagnostics
+
+Diagnostics are advisory notes about a result that ran successfully but deserves a second look. They never reject a query, and an empty list means no known issue was detected — not that the answer is the one you meant.
+
+| Code | What it flags |
+|---|---|
+| `RESULT_TRUNCATED` | A response ceiling cut the answer short |
+| `POSSIBLE_FANOUT` | A join repeats one dataset's rows once per row of another — aggregates may be inflated |
+| `UNBOUNDED_TIME_RANGE` | A dataset was read with no filter on its time column — the whole history was scanned |
+| `MISSING_TIME_BUCKETS` | A time-bucketed answer skips buckets inside the range it covers (charts will silently connect the gap) |
+| `INCOMPLETE_COMPARISON_PERIOD` | A period-over-period comparison includes an unfinished or unequal period |
+
+## Error codes
+
+Every failure comes back in the same envelope, with the fields nested under
+`error`:
+
+```json
+{
+  "error": {
+    "type": "https://langwatch.ai/errors/lwql_not_permitted",
+    "code": "lwql_not_permitted",
+    "message": "The statement names something this query may not read",
+    "meta": {
+      "violations": [
+        { "code": "TABLE_NOT_ALLOWED", "detail": "unknown dataset \"internal_billing\"" }
+      ]
+    },
+    "trace_id": "0af7651916cd43dd8448eb211c80319c",
+    "span_id": "b7ad6b7169203331"
+  }
+}
+```
+
+So branch on `error.code`, not `code` — and read `error.meta`, not `meta`.
+
+Every 4xx carries a stable `code`:
+
+| HTTP | Code | Meaning | Fix |
+|---|---|---|---|
+| 400 | `lwql_unparseable` | The statement isn't valid SQL | `error.meta.violations` gives the parse failure |
+| 400 | `lwql_not_permitted` | The statement names a dataset, column, or function outside the allowlist | `error.meta.violations` says exactly what was refused |
+| 400 | `lwql_parameter_missing` | The SQL declares parameters the request didn't supply (`error.meta.parameters` names them) | Add the values |
+| 400 | `lwql_reserved_parameter_supplied` | `period_start`/`period_end` sent under `parameters` | Move them to `timeWindow` |
+| 400 | `lwql_reserved_parameter_type` | A reserved parameter declared as a non-date-time | Declare `:DateTime` |
+| 401 | `invalid_credentials` | Bad or missing API key | Check `X-Auth-Token` |
+| 403 | `lwql_not_enabled` | LWQL isn't enabled for this project | Ask your admin, or [contact us](/support) |
+| 404 | `not_found` | The project id in the URL isn't one this key can reach | Check the id — an existing project you cannot see answers identically to one that doesn't exist |
+| 422 | `query_scan_limit_exceeded` | The query would read more than the scan ceiling | Filter the time column, or use a `*_by_minute` dataset |
+| 422 | `query_memory_exceeded` | The query exceeded the memory ceiling | Narrow or pre-aggregate — retrying as-is will fail identically |
+
+<Warning>
+  **5xx responses carry no specific code.** Anything the server treats as its
+  own fault collapses to `"code": "internal_error"` with a generic message,
+  deliberately — a server-side failure must not leak internals to a caller.
+  A query that timed out (504) and a deployment with no LangWatchQL identity
+  provisioned (503) are therefore indistinguishable by `error.code`.
+
+  Branch on the **HTTP status** for these, not the code: a 504 is worth
+  retrying with a narrower query, a 503 usually means the deployment isn't
+  set up — see [Self-hosted setup](/observability/lwql/self-hosted) — and
+  retrying it will not help. Quote `error.trace_id` when you ask us about one.
+</Warning>
+
+Error messages never name hosts, credentials, physical tables, or server internals — what you get is what's safe to show and enough to act on.
