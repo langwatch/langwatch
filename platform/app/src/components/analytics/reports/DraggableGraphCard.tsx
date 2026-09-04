@@ -1,28 +1,23 @@
 import { Box, Card } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
-import { usePeriodSelector } from "~/components/PeriodSelector";
-import { toaster } from "~/components/ui/toaster";
 import { LangWatchQLDashboardWidget } from "~/features/analytics-query/components/LangWatchQLDashboardWidget";
 import { DashboardWidgetFrame } from "~/features/custom-chart-playground/DashboardWidgetFrame";
 import {
   type DashboardWidgetDraft,
   DashboardWidgetInPlaceEditor,
 } from "~/features/custom-chart-playground/DashboardWidgetInPlaceEditor";
-import { describeError } from "~/features/errors";
 import { chartGridCardHeightPx } from "~/server/analytics/chartGrid";
 import {
   DASHBOARD_SRCDOC_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
 } from "~/server/analytics/chartKinds";
-import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
 import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
 import type { FilterField } from "~/server/filters/types";
-import { api } from "~/utils/api";
 import { GraphCardHeader } from "./GraphCardHeader";
+import { useDraggableGraphCard } from "./useDraggableGraphCard";
 
 interface GraphData {
   id: string;
@@ -70,123 +65,35 @@ export function DraggableGraphCard({
   onGranularityChange,
   isDeleting,
 }: DraggableGraphCardProps) {
-  const isWorkbenchChart = graph.kind === WORKBENCH_SQL_CHART_KIND;
-  const isDashboardWidget = graph.kind === DASHBOARD_SRCDOC_CHART_KIND;
-
   // A dashboard widget is edited in place: the menu's Edit opens the same
   // drawer the create flow uses, over this exact row's `graph` column. Every
   // write (a rename from the title, a save from the drawer) goes through one
-  // mutation and one pair of invalidations.
-  const utils = api.useUtils();
-  const updateWidget = api.dashboardWidgets.update.useMutation();
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const { period } = usePeriodSelector();
-  // Epoch milliseconds, not the `Date`s themselves: two `Date`s for the same
-  // instant are never `Object.is`-equal, so the executor would refetch on
-  // every render (the same reasoning DashboardWidgetFrame applies).
-  const timeWindow = useMemo(
-    () => ({
-      start: period.startDate.getTime(),
-      end: period.endDate.getTime(),
-    }),
-    [period.startDate, period.endDate],
-  );
-  // The row as a draft seed; unparsable rows get no editor, matching the
-  // frame's own "could not be read" fallback.
-  const persistedWidget = useMemo((): DashboardWidgetDraft | null => {
-    if (!isDashboardWidget) return null;
-    const parsed = dashboardWidgetDefinitionSchema.safeParse(graph.graph);
-    return parsed.success
-      ? {
-          name: graph.name,
-          code: parsed.data.code,
-          queries: parsed.data.queries,
-        }
-      : null;
-  }, [isDashboardWidget, graph.graph, graph.name]);
-
-  const saveWidget = (
-    draft: DashboardWidgetDraft,
-    options?: { onSuccess?: () => void },
-  ) => {
-    updateWidget.mutate(
-      { projectId, id: graph.id, ...draft },
-      {
-        onSuccess: () => {
-          void utils.graphs.getAll.invalidate();
-          void utils.dashboardWidgets.list.invalidate({ projectId });
-          options?.onSuccess?.();
-        },
-        onError: (error) =>
-          toaster.create({
-            title: "Couldn't save this widget",
-            description: describeError({ error }),
-            type: "error",
-            duration: 5000,
-          }),
-      },
-    );
-  };
-
-  // A standalone rename, straight from the card's own title, resaves the
-  // widget's CURRENT persisted code/queries, never whatever draft might be
-  // sitting in the drawer, so renaming here can never smuggle in an
-  // unrelated in-progress edit.
-  const handleRename = (newName: string) => {
-    if (!persistedWidget) return;
-    saveWidget({ ...persistedWidget, name: newName });
-  };
+  // mutation and one pair of invalidations — all owned by this hook.
+  const {
+    isEditOpen,
+    openEditor,
+    closeEditor,
+    timeWindow,
+    persistedWidget,
+    saveWidget,
+    handleRename,
+    isSaving,
+  } = useDraggableGraphCard({ graph, projectId });
 
   return (
     <Box height="full" minWidth={0}>
-      <Card.Root
-        height="full"
-        minWidth={0}
-        borderRadius="xl"
-        boxShadow="0 1px 2px rgba(16,16,32,0.04)"
-      >
-        <Card.Body
-          height="full"
-          display="flex"
-          flexDirection="column"
-          minWidth={0}
-          overflow="hidden"
-          paddingX={4}
-          paddingTop="10px"
-          paddingBottom={3}
-        >
-          <GraphCardHeader
-            graphId={graph.id}
-            name={graph.name}
-            graph={graph.graph}
-            projectId={projectId}
-            projectSlug={projectSlug}
-            dashboardId={dashboardId}
-            filters={graph.filters}
-            trigger={graph.trigger}
-            isWorkbenchChart={isWorkbenchChart}
-            isDashboardWidget={isDashboardWidget}
-            {...(graph.granularitySeconds == null
-              ? {}
-              : { granularitySeconds: graph.granularitySeconds })}
-            {...(persistedWidget
-              ? { onRename: handleRename, onEdit: () => setIsEditOpen(true) }
-              : {})}
-            {...(onGranularityChange ? { onGranularityChange } : {})}
-            onDelete={onDelete}
-            isDeleting={isDeleting}
-          />
-
-          <Box flex={1} minHeight={0}>
-            <GraphCardChartArea
-              graph={graph}
-              projectId={projectId}
-              projectSlug={projectSlug}
-              dashboardId={dashboardId}
-            />
-          </Box>
-        </Card.Body>
-      </Card.Root>
+      <GraphCardBody
+        graph={graph}
+        projectId={projectId}
+        projectSlug={projectSlug}
+        dashboardId={dashboardId}
+        persistedWidget={persistedWidget}
+        onRename={handleRename}
+        onEdit={openEditor}
+        onGranularityChange={onGranularityChange}
+        onDelete={onDelete}
+        isDeleting={isDeleting}
+      />
 
       {persistedWidget && (
         <DashboardWidgetInPlaceEditor
@@ -196,12 +103,89 @@ export function DraggableGraphCard({
           projectId={projectId}
           projectSlug={projectSlug}
           timeWindow={timeWindow}
-          isSaving={updateWidget.isPending}
-          onClose={() => setIsEditOpen(false)}
+          isSaving={isSaving}
+          onClose={closeEditor}
           onSave={saveWidget}
         />
       )}
     </Box>
+  );
+}
+
+/** The card chrome plus its routed chart body — presentation only. */
+function GraphCardBody({
+  graph,
+  projectId,
+  projectSlug,
+  dashboardId,
+  persistedWidget,
+  onRename,
+  onEdit,
+  onGranularityChange,
+  onDelete,
+  isDeleting,
+}: {
+  graph: GraphData;
+  projectId: string;
+  projectSlug: string;
+  dashboardId?: string;
+  persistedWidget: DashboardWidgetDraft | null;
+  onRename: (newName: string) => void;
+  onEdit: () => void;
+  onGranularityChange?: (granularitySeconds: number) => void;
+  onDelete: () => void;
+  isDeleting: boolean;
+}) {
+  const isWorkbenchChart = graph.kind === WORKBENCH_SQL_CHART_KIND;
+  const isDashboardWidget = graph.kind === DASHBOARD_SRCDOC_CHART_KIND;
+
+  return (
+    <Card.Root
+      height="full"
+      minWidth={0}
+      borderRadius="xl"
+      boxShadow="0 1px 2px rgba(16,16,32,0.04)"
+    >
+      <Card.Body
+        height="full"
+        display="flex"
+        flexDirection="column"
+        minWidth={0}
+        overflow="hidden"
+        paddingX={4}
+        paddingTop="10px"
+        paddingBottom={3}
+      >
+        <GraphCardHeader
+          graphId={graph.id}
+          name={graph.name}
+          graph={graph.graph}
+          projectId={projectId}
+          projectSlug={projectSlug}
+          dashboardId={dashboardId}
+          filters={graph.filters}
+          trigger={graph.trigger}
+          isWorkbenchChart={isWorkbenchChart}
+          isDashboardWidget={isDashboardWidget}
+          {...(graph.granularitySeconds == null
+            ? {}
+            : { granularitySeconds: graph.granularitySeconds })}
+          {...(persistedWidget ? { onRename, onEdit } : {})}
+          {...(onGranularityChange ? { onGranularityChange } : {})}
+          onDelete={onDelete}
+          isDeleting={isDeleting}
+        />
+
+        <Box flex={1} minHeight={0}>
+          <GraphCardChartArea
+            graph={graph}
+            projectId={projectId}
+            projectSlug={projectSlug}
+            dashboardId={dashboardId}
+          />
+        </Box>
+      </Card.Body>
+    </Card.Root>
   );
 }
 

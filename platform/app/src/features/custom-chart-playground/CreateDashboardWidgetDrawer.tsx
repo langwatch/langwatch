@@ -12,29 +12,19 @@
  * its save path disabled while the custom-chart-playground is enabled — see
  * `saved_workbench_charts_disabled_for_playground` — so this is the only
  * "create a new chart" entry point that still works from a dashboard.
+ *
+ * All draft/preview/mutation state lives in `useCreateDashboardWidgetDrawer`;
+ * this component only assembles the drawer and its preview frame.
  */
 
-import { useEffect, useMemo, useState } from "react";
-
-import { useColorMode } from "~/components/ui/color-mode";
-import { toaster } from "~/components/ui/toaster";
-import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
-import { api } from "~/utils/api";
-import type { ChartFrameDashboardContext } from "./bridge/bridgeProtocol";
 import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer";
-import { declaredParamDefaults } from "./paramsSnapshot";
-import { STARTER_WIDGET_CODE, STARTER_WIDGET_QUERIES } from "./presets";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
-import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
-import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
+import { useCreateDashboardWidgetDrawer } from "./useCreateDashboardWidgetDrawer";
 
 const noopLog = () => {
   // Intentionally empty — same reasoning as DashboardWidgetCard: the
   // playground surfaces frame output in the chart itself, no log panel.
 };
-
-/** How long the draft sits idle before the chart preview re-mounts. */
-const PREVIEW_DEBOUNCE_MS = 600;
 
 /** The drawer's own chart preview isn't grid-constrained — a fixed, generous height. */
 const DRAWER_PREVIEW_HEIGHT_PX = 320;
@@ -55,91 +45,32 @@ export function CreateDashboardWidgetDrawer({
   projectSlug,
   dashboardId,
 }: CreateDashboardWidgetDrawerProps) {
-  const { colorMode } = useColorMode();
-  const utils = api.useUtils();
-  const createWidget = api.dashboardWidgets.create.useMutation();
-  const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
-
-  const [drawerTab, setDrawerTab] = useState<"code" | "queries">("code");
-  const [draftName, setDraftName] = useState("New widget");
-  const [draftCode, setDraftCode] = useState(STARTER_WIDGET_CODE);
-  const [draftQueries, setDraftQueries] = useState<DashboardWidgetQuery[]>(
-    STARTER_WIDGET_QUERIES,
-  );
-
-  // A fresh starter draft every time the drawer opens — otherwise a second
-  // "+ Add chart" would resume whatever was left over from an abandoned
-  // first attempt.
-  useEffect(() => {
-    if (open) {
-      setDrawerTab("code");
-      setDraftName("New widget");
-      setDraftCode(STARTER_WIDGET_CODE);
-      setDraftQueries(STARTER_WIDGET_QUERIES);
-    }
-  }, [open]);
-
-  // The chart's own view of the draft, updated only after typing settles —
-  // same debounce reasoning as DashboardWidgetCard.
-  const [previewCode, setPreviewCode] = useState(STARTER_WIDGET_CODE);
-  const [previewQueries, setPreviewQueries] = useState<DashboardWidgetQuery[]>(
-    STARTER_WIDGET_QUERIES,
-  );
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPreviewCode(draftCode);
-      setPreviewQueries(draftQueries);
-    }, PREVIEW_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [draftCode, draftQueries]);
-
   const {
+    drawerTab,
+    setDrawerTab,
+    draftName,
+    setDraftName,
+    draftCode,
+    setDraftCode,
+    draftQueries,
+    setDraftQueries,
+    previewCode,
+    previewQueries,
     executeQuery,
     runStandalone,
-    params: hostParams,
     lastRuns,
-  } = useDashboardWidgetExecutor(projectId, previewQueries);
-
-  // Mirrors DashboardWidgetFrame's own dashboardContext build.
-  const dashboardContext: ChartFrameDashboardContext = useMemo(
-    () => ({
-      timeWindow: hostParams.timeWindow,
-      granularitySeconds: hostParams.granularitySeconds,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      theme: colorMode === "dark" ? "dark" : "light",
-      projectId,
-    }),
-    [hostParams, colorMode, projectId],
-  );
-  const paramsSnapshot = useMemo(
-    () => declaredParamDefaults(previewQueries),
-    [previewQueries],
-  );
-
-  const handleSave = () => {
-    createWidget.mutate(
-      {
-        projectId,
-        ...(dashboardId ? { dashboardId } : {}),
-        name: draftName,
-        code: draftCode,
-        queries: draftQueries,
-      },
-      {
-        onSuccess: () => {
-          void utils.graphs.getAll.invalidate();
-          void utils.dashboardWidgets.list.invalidate({ projectId });
-          onClose();
-        },
-        onError: () =>
-          toaster.create({
-            title: "Error creating widget",
-            type: "error",
-            duration: 3000,
-          }),
-      },
-    );
-  };
+    dashboardContext,
+    paramsSnapshot,
+    onNavigate,
+    isSaving,
+    handleSave,
+  } = useCreateDashboardWidgetDrawer({
+    open,
+    onClose,
+    projectId,
+    projectSlug,
+    dashboardId,
+  });
 
   return (
     <DashboardWidgetEditDrawer
@@ -153,7 +84,7 @@ export function CreateDashboardWidgetDrawer({
       lastRuns={lastRuns}
       onRun={runStandalone}
       isDirty
-      isSaving={createWidget.isPending}
+      isSaving={isSaving}
       onClose={onClose}
       onSave={handleSave}
       activeTab={drawerTab}

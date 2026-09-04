@@ -107,6 +107,40 @@ function ensureParamTokenStyles() {
   document.head.appendChild(style);
 }
 
+/** Which of the three token classes a `{name:Type}` param falls into. */
+function classifyParamToken(name: string, declared: Set<string>): string {
+  if (RESERVED_PARAM_NAMES.has(name)) return PARAM_TOKEN_CLASS_RESERVED;
+  return declared.has(name)
+    ? PARAM_TOKEN_CLASS_DECLARED
+    : PARAM_TOKEN_CLASS_UNDECLARED;
+}
+
+/** Every bound-param token in the model, decorated by its class. */
+function buildParamDecorations(
+  model: editor.ITextModel,
+  declaredParamNames: string[] | undefined,
+): editor.IModelDeltaDecoration[] {
+  const declared = new Set(declaredParamNames ?? []);
+  const text = model.getValue();
+  const decorations: editor.IModelDeltaDecoration[] = [];
+  for (const match of text.matchAll(BOUND_PARAM_PATTERN)) {
+    const name = match[1];
+    if (!name || match.index === undefined) continue;
+    const startPos = model.getPositionAt(match.index);
+    const endPos = model.getPositionAt(match.index + match[0].length);
+    decorations.push({
+      range: {
+        startLineNumber: startPos.lineNumber,
+        startColumn: startPos.column,
+        endLineNumber: endPos.lineNumber,
+        endColumn: endPos.column,
+      },
+      options: { inlineClassName: classifyParamToken(name, declared) },
+    });
+  }
+  return decorations;
+}
+
 interface DashboardWidgetCodeEditorProps {
   /** Monaco's "typescript" language id highlights JSX/TSX too. */
   language: "typescript" | "sql";
@@ -141,30 +175,7 @@ export function DashboardWidgetCodeEditor({
     const model = ed.getModel();
     if (!model) return;
 
-    const declared = new Set(declaredParamNames ?? []);
-    const text = model.getValue();
-    const newDecorations: editor.IModelDeltaDecoration[] = [];
-    for (const match of text.matchAll(BOUND_PARAM_PATTERN)) {
-      const name = match[1];
-      if (!name || match.index === undefined) continue;
-      const startPos = model.getPositionAt(match.index);
-      const endPos = model.getPositionAt(match.index + match[0].length);
-      const className = RESERVED_PARAM_NAMES.has(name)
-        ? PARAM_TOKEN_CLASS_RESERVED
-        : declared.has(name)
-          ? PARAM_TOKEN_CLASS_DECLARED
-          : PARAM_TOKEN_CLASS_UNDECLARED;
-      newDecorations.push({
-        range: {
-          startLineNumber: startPos.lineNumber,
-          startColumn: startPos.column,
-          endLineNumber: endPos.lineNumber,
-          endColumn: endPos.column,
-        },
-        options: { inlineClassName: className },
-      });
-    }
-
+    const newDecorations = buildParamDecorations(model, declaredParamNames);
     if (!decorationsRef.current) {
       decorationsRef.current = ed.createDecorationsCollection(newDecorations);
     } else {

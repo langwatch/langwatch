@@ -19,7 +19,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Play, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 import { formatNumber } from "~/utils/formatNumber";
 
@@ -27,6 +26,10 @@ import { DashboardWidgetCodeEditor } from "./DashboardWidgetCodeEditor";
 import { DashboardWidgetQueryParamsEditor } from "./DashboardWidgetQueryParamsEditor";
 import { DashboardWidgetQueryResultView } from "./DashboardWidgetQueryResultView";
 import type { QueryLastRun } from "./useDashboardWidgetExecutor";
+import {
+  type EditableQueryName,
+  useEditableQueryName,
+} from "./useEditableQueryName";
 
 /** The one-line "683 rows · 53ms" (or error) a collapsed row shows without expanding. */
 function runSummary(run: QueryLastRun | undefined): string | null {
@@ -67,33 +70,7 @@ export function DashboardWidgetQueryRow({
   lastRun,
 }: DashboardWidgetQueryRowProps) {
   const summary = runSummary(lastRun);
-
-  // Click-to-edit, same pattern as EditableWidgetName — but hand-rolled
-  // rather than reused: that component is sized for a card title (a
-  // tooltip, a fading pencil icon), and an `<input>` can't nest inside
-  // `Accordion.ItemTrigger` (it renders a `<button>`), so the name lives as
-  // a SIBLING of the trigger rather than inside it. The trigger itself
-  // shrinks to just the chevron — the one thing that still toggles the row.
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [draftName, setDraftName] = useState(query.name);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isEditingName && nameInputRef.current) {
-      nameInputRef.current.focus();
-      nameInputRef.current.select();
-    }
-  }, [isEditingName]);
-
-  const startEditingName = () => {
-    setDraftName(query.name);
-    setIsEditingName(true);
-  };
-
-  const commitName = () => {
-    if (draftName !== query.name) onChange({ ...query, name: draftName });
-    setIsEditingName(false);
-  };
+  const nameEdit = useEditableQueryName({ query, onChange });
 
   return (
     <Card.Root size="sm" width="full" marginBottom={3}>
@@ -112,37 +89,14 @@ export function DashboardWidgetQueryRow({
               {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </Accordion.ItemTrigger>
 
-            {isEditingName ? (
-              <Input
-                ref={nameInputRef}
-                size="xs"
-                fontFamily="mono"
-                value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                onBlur={commitName}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitName();
-                  if (e.key === "Escape") setIsEditingName(false);
-                }}
-                placeholder="query name — the LW.query(name, params) handle"
-                borderColor={nameError ? "red.400" : undefined}
-                width="auto"
-                minWidth="140px"
-              />
-            ) : (
-              <Span
-                fontFamily="mono"
-                fontSize="13px"
-                truncate
-                cursor="pointer"
-                onClick={startEditingName}
-              >
-                {query.name || "(unnamed query)"}
-              </Span>
-            )}
+            <QueryNameField
+              edit={nameEdit}
+              queryName={query.name}
+              nameError={nameError}
+            />
 
             <Spacer />
-            {!isEditingName && summary && (
+            {!nameEdit.isEditingName && summary && (
               <Text
                 fontSize="11px"
                 color={lastRun?.error ? "red.500" : "fg.muted"}
@@ -204,5 +158,55 @@ export function DashboardWidgetQueryRow({
         </Card.Body>
       </Accordion.Item>
     </Card.Root>
+  );
+}
+
+/**
+ * Click-to-edit query name, same pattern as EditableWidgetName — but
+ * hand-rolled rather than reused: that component is sized for a card title (a
+ * tooltip, a fading pencil icon), and an `<input>` can't nest inside
+ * `Accordion.ItemTrigger` (it renders a `<button>`), so the name lives as a
+ * SIBLING of the trigger rather than inside it. The trigger itself shrinks to
+ * just the chevron — the one thing that still toggles the row.
+ */
+function QueryNameField({
+  edit,
+  queryName,
+  nameError,
+}: {
+  edit: EditableQueryName;
+  queryName: string;
+  nameError: string | null;
+}) {
+  if (edit.isEditingName) {
+    return (
+      <Input
+        ref={edit.inputRef}
+        size="xs"
+        fontFamily="mono"
+        value={edit.draftName}
+        onChange={(e) => edit.setDraftName(e.target.value)}
+        onBlur={edit.commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") edit.commit();
+          if (e.key === "Escape") edit.cancel();
+        }}
+        placeholder="query name — the LW.query(name, params) handle"
+        borderColor={nameError ? "red.400" : undefined}
+        width="auto"
+        minWidth="140px"
+      />
+    );
+  }
+  return (
+    <Span
+      fontFamily="mono"
+      fontSize="13px"
+      truncate
+      cursor="pointer"
+      onClick={edit.startEditing}
+    >
+      {queryName || "(unnamed query)"}
+    </Span>
   );
 }

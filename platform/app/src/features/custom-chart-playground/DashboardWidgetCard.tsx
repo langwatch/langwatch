@@ -15,27 +15,30 @@
  * rather than the draft itself: the frame is a full remount (fresh CDN
  * scripts, a fresh Babel compile) on every identity change, and doing that on
  * every keystroke would be exactly as janky as it sounds.
+ *
+ * All of that state lives in `useDashboardWidgetCard`; this file is the card's
+ * presentation, split into a header, a preview and the edit drawer.
  */
 
 import { Box, Button, Card, HStack } from "@chakra-ui/react";
 import { Clock } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import { CHART_GRID_DRAG_HANDLE_CLASS } from "~/components/analytics/reports/ChartGrid";
 import { GraphCardMenu } from "~/components/analytics/reports/GraphCardMenu";
-import { useColorMode } from "~/components/ui/color-mode";
 import { Menu } from "~/components/ui/menu";
 import { chartGridCardHeightPx } from "~/server/analytics/chartGrid";
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 
-import type { ChartFrameDashboardContext } from "./bridge/bridgeProtocol";
 import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer";
 import { EditableWidgetName } from "./EditableWidgetName";
 import { FrameDiagnosticBadge } from "./FrameDiagnosticBadge";
-import { declaredParamDefaults } from "./paramsSnapshot";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
-import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
-import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
-import { useFrameDiagnostic } from "./useFrameDiagnostic";
+import {
+  type DashboardWidgetCardViewModel,
+  RANGE_LABEL,
+  RANGE_MS,
+  type RangeKey,
+  useDashboardWidgetCard,
+} from "./useDashboardWidgetCard";
 
 /** A dashboard widget as the grid renders it. */
 export interface DashboardWidget {
@@ -61,35 +64,9 @@ const rowSpanHeight = (rowSpan: number): number =>
 /** The drawer's own chart preview isn't grid-constrained — a fixed, generous height. */
 const DRAWER_PREVIEW_HEIGHT_PX = 320;
 
-/** How long the drawer's draft sits idle before the chart preview re-mounts. */
-const PREVIEW_DEBOUNCE_MS = 600;
-
 // The playground surfaces frame output in the chart itself; no log panel.
 const noopLog = () => {
   // Intentionally empty.
-};
-
-/** Cheap and correct at this scale: a widget's queries are a handful of small objects. */
-function queriesEqual(
-  a: DashboardWidgetQuery[],
-  b: DashboardWidgetQuery[],
-): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
-/** Session time-range chip options — unpersisted, pure React state. */
-const RANGE_MS = {
-  "1h": 3_600_000,
-  "24h": 86_400_000,
-  "7d": 604_800_000,
-  "30d": 2_592_000_000,
-} as const;
-type RangeKey = keyof typeof RANGE_MS;
-const RANGE_LABEL: Record<RangeKey, string> = {
-  "1h": "Last 1h",
-  "24h": "Last 24h",
-  "7d": "Last 7d",
-  "30d": "Last 30d",
 };
 
 interface DashboardWidgetCardProps {
@@ -119,127 +96,7 @@ export function DashboardWidgetCard({
   isDeleting,
   isSaving,
 }: DashboardWidgetCardProps) {
-  const { colorMode } = useColorMode();
-
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [drawerTab, setDrawerTab] = useState<"code" | "queries">("code");
-  const [draftName, setDraftName] = useState(widget.name);
-  const [draftCode, setDraftCode] = useState(widget.code);
-  const [draftQueries, setDraftQueries] = useState(widget.queries);
-
-  const [rangeKey, setRangeKey] = useState<RangeKey>("24h");
-  // Memo on rangeKey only — a fresh {start, end} identity every render would
-  // loop the executor's refetch.
-  const timeWindow = useMemo(() => {
-    const end = Date.now();
-    return { start: end - RANGE_MS[rangeKey], end };
-  }, [rangeKey]);
-
-  // Reseed the drafts whenever the persisted record changes underneath them:
-  // a save from this card, or a refetch.
-  useEffect(() => {
-    setDraftName(widget.name);
-    setDraftCode(widget.code);
-    setDraftQueries(widget.queries);
-  }, [widget.name, widget.code, widget.queries]);
-
-  // The chart's own view of the draft, updated only after typing settles —
-  // see the file header for why this can't just be draftCode/draftQueries.
-  const [previewCode, setPreviewCode] = useState(widget.code);
-  const [previewQueries, setPreviewQueries] = useState(widget.queries);
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPreviewCode(draftCode);
-      setPreviewQueries(draftQueries);
-    }, PREVIEW_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [draftCode, draftQueries]);
-
-  const {
-    executeQuery,
-    runStandalone,
-    params: hostParams,
-    lastRuns,
-  } = useDashboardWidgetExecutor(projectId, previewQueries, { timeWindow });
-  const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
-
-  // Known host-side at this boundary, mirroring DashboardWidgetFrame's own
-  // dashboardContext build — timezone reads the browser's own zone.
-  const dashboardContext: ChartFrameDashboardContext = useMemo(
-    () => ({
-      timeWindow: hostParams.timeWindow,
-      granularitySeconds: hostParams.granularitySeconds,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      theme: colorMode === "dark" ? "dark" : "light",
-      widgetId: widget.id,
-      dashboardId: widget.dashboardId ?? undefined,
-      projectId,
-      widgetName: widget.name,
-    }),
-    [
-      hostParams,
-      colorMode,
-      widget.id,
-      widget.dashboardId,
-      projectId,
-      widget.name,
-    ],
-  );
-
-  // Every declared parameter's default, deduped by name across the widget's
-  // preview queries — mirrors DashboardWidgetFrame's own paramsSnapshot.
-  const paramsSnapshot = useMemo(
-    () => declaredParamDefaults(previewQueries),
-    [previewQueries],
-  );
-
-  // A compile or render error the widget reports is shown on the card.
-  const { diagnostic, onLog } = useFrameDiagnostic({ resetKey: previewCode });
-
-  const isDirty =
-    draftName !== widget.name ||
-    draftCode !== widget.code ||
-    !queriesEqual(draftQueries, widget.queries);
-
-  const handleSave = () => {
-    onSave(
-      {
-        id: widget.id,
-        name: draftName,
-        code: draftCode,
-        queries: draftQueries,
-      },
-      { onSuccess: () => setIsDrawerOpen(false) },
-    );
-  };
-
-  // A standalone rename, straight from the card's own title — deliberately
-  // resaves the widget's CURRENT persisted code/queries, not whatever draft
-  // might be sitting in the (closed) drawer, so renaming here can never
-  // smuggle in an unrelated in-progress edit.
-  const handleRename = (newName: string) => {
-    onSave({
-      id: widget.id,
-      name: newName,
-      code: widget.code,
-      queries: widget.queries,
-    });
-  };
-
-  const openCodeTab = () => {
-    setDrawerTab("code");
-    setIsDrawerOpen(true);
-  };
-
-  // Reverts the draft AND closes — covers Cancel, the drawer's own close
-  // trigger, and clicking outside it, so none of the three can leave a
-  // discarded edit sitting in the draft for the next open to reveal.
-  const handleClose = () => {
-    setDraftName(widget.name);
-    setDraftCode(widget.code);
-    setDraftQueries(widget.queries);
-    setIsDrawerOpen(false);
-  };
+  const vm = useDashboardWidgetCard({ widget, projectId, projectSlug, onSave });
 
   return (
     <Box height="full" minWidth={0}>
@@ -260,111 +117,165 @@ export function DashboardWidgetCard({
           paddingBottom={3}
           gap={2}
         >
-          <HStack
-            className={CHART_GRID_DRAG_HANDLE_CLASS}
-            minWidth={0}
-            cursor="grab"
-            _active={{ cursor: "grabbing" }}
-            marginBottom={1}
-          >
-            <Box flex={1} minWidth={0}>
-              <EditableWidgetName
-                name={widget.name}
-                id={widget.id}
-                onRename={handleRename}
-                fontSize="sm"
-                fontWeight="bold"
-                truncate
-              />
-            </Box>
-
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button variant="ghost" size="xs">
-                  <Clock /> {RANGE_LABEL[rangeKey]}
-                </Button>
-              </Menu.Trigger>
-              <Menu.Content>
-                {(Object.keys(RANGE_MS) as RangeKey[]).map((key) => (
-                  <Menu.Item
-                    key={key}
-                    value={key}
-                    onClick={() => setRangeKey(key)}
-                  >
-                    {RANGE_LABEL[key]}
-                    {key === rangeKey && " ✓"}
-                  </Menu.Item>
-                ))}
-              </Menu.Content>
-            </Menu.Root>
-
-            <GraphCardMenu
-              graphId={widget.id}
-              projectId={projectId}
-              projectSlug={projectSlug}
-              dashboardId={widget.dashboardId ?? undefined}
-              isDashboardWidget
-              showAddToDashboard
-              onEdit={openCodeTab}
-              onDelete={onDelete}
-              isDeleting={isDeleting}
-            />
-          </HStack>
+          <CardHeader
+            vm={vm}
+            widget={widget}
+            projectId={projectId}
+            projectSlug={projectSlug}
+            onDelete={onDelete}
+            isDeleting={isDeleting}
+          />
 
           {/* Not rendered while the drawer is open — the drawer mounts its
               own copy of this same frame instead, so there is never more
               than one live iframe (and one LW.query dispatch) running the
               same preview at once. */}
-          {!isDrawerOpen && (
-            <Box flex={1} minHeight={0} position="relative">
-              <SandboxedChartFrame
-                key={`${previewCode}\u0000${JSON.stringify(previewQueries)}`}
-                code={previewCode}
-                executeQuery={executeQuery}
-                dashboardContext={dashboardContext}
-                params={paramsSnapshot}
-                onLog={onLog}
-                onNavigate={onNavigate}
-                maxHeight={rowSpanHeight(widget.rowSpan)}
-              />
-              <FrameDiagnosticBadge diagnostic={diagnostic} />
-            </Box>
-          )}
+          {!vm.isDrawerOpen && <CardPreview vm={vm} widget={widget} />}
         </Card.Body>
       </Card.Root>
 
-      <DashboardWidgetEditDrawer
-        open={isDrawerOpen}
-        id={widget.id}
-        name={draftName}
-        onNameChange={setDraftName}
-        code={draftCode}
-        queries={draftQueries}
-        onCodeChange={setDraftCode}
-        onQueriesChange={setDraftQueries}
-        lastRuns={lastRuns}
-        onRun={runStandalone}
-        isDirty={isDirty}
-        isSaving={isSaving}
-        onClose={handleClose}
-        onSave={handleSave}
-        activeTab={drawerTab}
-        onTabChange={setDrawerTab}
-        chart={
-          isDrawerOpen ? (
-            <SandboxedChartFrame
-              key={`${previewCode}\u0000${JSON.stringify(previewQueries)}`}
-              code={previewCode}
-              executeQuery={executeQuery}
-              dashboardContext={dashboardContext}
-              params={paramsSnapshot}
-              onLog={noopLog}
-              onNavigate={onNavigate}
-              maxHeight={DRAWER_PREVIEW_HEIGHT_PX}
-            />
-          ) : null
-        }
-      />
+      <CardEditDrawer vm={vm} widget={widget} isSaving={isSaving} />
     </Box>
+  );
+}
+
+/** The card's drag-handle header: title, session range picker, edit/delete menu. */
+function CardHeader({
+  vm,
+  widget,
+  projectId,
+  projectSlug,
+  onDelete,
+  isDeleting,
+}: {
+  vm: DashboardWidgetCardViewModel;
+  widget: DashboardWidget;
+  projectId: string;
+  projectSlug: string;
+  onDelete: () => void;
+  isDeleting: boolean;
+}) {
+  return (
+    <HStack
+      className={CHART_GRID_DRAG_HANDLE_CLASS}
+      minWidth={0}
+      cursor="grab"
+      _active={{ cursor: "grabbing" }}
+      marginBottom={1}
+    >
+      <Box flex={1} minWidth={0}>
+        <EditableWidgetName
+          name={widget.name}
+          id={widget.id}
+          onRename={vm.handleRename}
+          fontSize="sm"
+          fontWeight="bold"
+          truncate
+        />
+      </Box>
+
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button variant="ghost" size="xs">
+            <Clock /> {RANGE_LABEL[vm.rangeKey]}
+          </Button>
+        </Menu.Trigger>
+        <Menu.Content>
+          {(Object.keys(RANGE_MS) as RangeKey[]).map((key) => (
+            <Menu.Item
+              key={key}
+              value={key}
+              onClick={() => vm.setRangeKey(key)}
+            >
+              {RANGE_LABEL[key]}
+              {key === vm.rangeKey && " ✓"}
+            </Menu.Item>
+          ))}
+        </Menu.Content>
+      </Menu.Root>
+
+      <GraphCardMenu
+        graphId={widget.id}
+        projectId={projectId}
+        projectSlug={projectSlug}
+        dashboardId={widget.dashboardId ?? undefined}
+        isDashboardWidget
+        showAddToDashboard
+        onEdit={vm.openCodeTab}
+        onDelete={onDelete}
+        isDeleting={isDeleting}
+      />
+    </HStack>
+  );
+}
+
+/** The card's live chart preview and any diagnostic the frame reports. */
+function CardPreview({
+  vm,
+  widget,
+}: {
+  vm: DashboardWidgetCardViewModel;
+  widget: DashboardWidget;
+}) {
+  return (
+    <Box flex={1} minHeight={0} position="relative">
+      <SandboxedChartFrame
+        key={`${vm.previewCode}\u0000${JSON.stringify(vm.previewQueries)}`}
+        code={vm.previewCode}
+        executeQuery={vm.executeQuery}
+        dashboardContext={vm.dashboardContext}
+        params={vm.paramsSnapshot}
+        onLog={vm.onLog}
+        onNavigate={vm.onNavigate}
+        maxHeight={rowSpanHeight(widget.rowSpan)}
+      />
+      <FrameDiagnosticBadge diagnostic={vm.diagnostic} />
+    </Box>
+  );
+}
+
+/** The widget's edit drawer, with its own copy of the live preview frame. */
+function CardEditDrawer({
+  vm,
+  widget,
+  isSaving,
+}: {
+  vm: DashboardWidgetCardViewModel;
+  widget: DashboardWidget;
+  isSaving: boolean;
+}) {
+  return (
+    <DashboardWidgetEditDrawer
+      open={vm.isDrawerOpen}
+      id={widget.id}
+      name={vm.draftName}
+      onNameChange={vm.setDraftName}
+      code={vm.draftCode}
+      queries={vm.draftQueries}
+      onCodeChange={vm.setDraftCode}
+      onQueriesChange={vm.setDraftQueries}
+      lastRuns={vm.lastRuns}
+      onRun={vm.runStandalone}
+      isDirty={vm.isDirty}
+      isSaving={isSaving}
+      onClose={vm.handleClose}
+      onSave={vm.handleSave}
+      activeTab={vm.drawerTab}
+      onTabChange={vm.setDrawerTab}
+      chart={
+        vm.isDrawerOpen ? (
+          <SandboxedChartFrame
+            key={`${vm.previewCode}\u0000${JSON.stringify(vm.previewQueries)}`}
+            code={vm.previewCode}
+            executeQuery={vm.executeQuery}
+            dashboardContext={vm.dashboardContext}
+            params={vm.paramsSnapshot}
+            onLog={noopLog}
+            onNavigate={vm.onNavigate}
+            maxHeight={DRAWER_PREVIEW_HEIGHT_PX}
+          />
+        ) : null
+      }
+    />
   );
 }

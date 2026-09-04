@@ -101,88 +101,16 @@ export function DashboardWidgetEditDrawer({
               {chart}
             </Box>
           )}
-          <Tabs.Root
-            value={activeTab}
-            onValueChange={(e) => onTabChange(e.value as "code" | "queries")}
-            colorPalette="orange"
-            size="sm"
-            display="flex"
-            flexDirection="column"
-            flex={1}
-            minHeight={0}
-          >
-            {/* Same Tabs setup as the HTTP agent's Body/Auth toggle
-                (`components/agents/http/HttpConfigEditor.tsx`) — a bottom
-                border on the list plus `colorPalette` is enough for Chakra's
-                own recipe to show the selected tab; no hand-rolled
-                `Tabs.Indicator`. */}
-            <Tabs.List
-              flexShrink={0}
-              alignItems="center"
-              borderBottomWidth="1px"
-              borderColor="border"
-            >
-              <Tabs.Trigger value="code">Code</Tabs.Trigger>
-              <Tabs.Trigger value="queries">
-                Queries ({queries.length})
-              </Tabs.Trigger>
-              <Spacer />
-              {activeTab === "queries" && (
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={() =>
-                    onQueriesChange([
-                      ...queries,
-                      { name: nextQueryName(queries), sql: "" },
-                    ])
-                  }
-                >
-                  <Plus size={14} /> Add query
-                </Button>
-              )}
-            </Tabs.List>
-
-            <Tabs.Content
-              value="code"
-              flex={1}
-              minHeight={0}
-              display="flex"
-              flexDirection="column"
-              paddingTop={3}
-            >
-              <Box
-                flex={1}
-                minHeight={0}
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="md"
-                overflow="hidden"
-              >
-                <DashboardWidgetCodeEditor
-                  language="typescript"
-                  value={code}
-                  onChange={onCodeChange}
-                />
-              </Box>
-            </Tabs.Content>
-
-            <Tabs.Content
-              value="queries"
-              flex={1}
-              minHeight={0}
-              display="flex"
-              flexDirection="column"
-              paddingTop={3}
-            >
-              <DashboardWidgetQueriesPanel
-                queries={queries}
-                onChange={onQueriesChange}
-                lastRuns={lastRuns}
-                onRun={onRun}
-              />
-            </Tabs.Content>
-          </Tabs.Root>
+          <WidgetEditTabs
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+            code={code}
+            onCodeChange={onCodeChange}
+            queries={queries}
+            onQueriesChange={onQueriesChange}
+            lastRuns={lastRuns}
+            onRun={onRun}
+          />
         </Drawer.Body>
         <Drawer.Footer flexShrink={0}>
           <Button variant="outline" onClick={onClose} disabled={isSaving}>
@@ -199,5 +127,119 @@ export function DashboardWidgetEditDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/** The Code / Queries tab switcher and its two full-height panels. */
+function WidgetEditTabs({
+  activeTab,
+  onTabChange,
+  code,
+  onCodeChange,
+  queries,
+  onQueriesChange,
+  lastRuns,
+  onRun,
+}: {
+  activeTab: "code" | "queries";
+  onTabChange: (tab: "code" | "queries") => void;
+  code: string;
+  onCodeChange: (code: string) => void;
+  queries: DashboardWidgetQuery[];
+  onQueriesChange: (queries: DashboardWidgetQuery[]) => void;
+  lastRuns: Record<string, QueryLastRun>;
+  onRun: (query: DashboardWidgetQuery) => Promise<void>;
+}) {
+  return (
+    <Tabs.Root
+      value={activeTab}
+      onValueChange={(e) => onTabChange(e.value as "code" | "queries")}
+      colorPalette="orange"
+      size="sm"
+      display="flex"
+      flexDirection="column"
+      flex={1}
+      minHeight={0}
+    >
+      {/* Same Tabs setup as the HTTP agent's Body/Auth toggle
+          (`components/agents/http/HttpConfigEditor.tsx`) — a bottom
+          border on the list plus `colorPalette` is enough for Chakra's
+          own recipe to show the selected tab; no hand-rolled
+          `Tabs.Indicator`. */}
+      <Tabs.List
+        flexShrink={0}
+        alignItems="center"
+        borderBottomWidth="1px"
+        borderColor="border"
+      >
+        <Tabs.Trigger value="code">Code</Tabs.Trigger>
+        <Tabs.Trigger value="queries">Queries ({queries.length})</Tabs.Trigger>
+        <Spacer />
+        {activeTab === "queries" && (
+          <AddQueryButton queries={queries} onQueriesChange={onQueriesChange} />
+        )}
+      </Tabs.List>
+
+      <Tabs.Content
+        value="code"
+        flex={1}
+        minHeight={0}
+        display="flex"
+        flexDirection="column"
+        paddingTop={3}
+      >
+        <Box
+          flex={1}
+          minHeight={0}
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="md"
+          overflow="hidden"
+        >
+          <DashboardWidgetCodeEditor
+            language="typescript"
+            value={code}
+            onChange={onCodeChange}
+          />
+        </Box>
+      </Tabs.Content>
+
+      <Tabs.Content
+        value="queries"
+        flex={1}
+        minHeight={0}
+        display="flex"
+        flexDirection="column"
+        paddingTop={3}
+      >
+        <DashboardWidgetQueriesPanel
+          queries={queries}
+          onChange={onQueriesChange}
+          lastRuns={lastRuns}
+          onRun={onRun}
+        />
+      </Tabs.Content>
+    </Tabs.Root>
+  );
+}
+
+/** Appends a fresh, uniquely-named empty query to the list. */
+function AddQueryButton({
+  queries,
+  onQueriesChange,
+}: {
+  queries: DashboardWidgetQuery[];
+  onQueriesChange: (queries: DashboardWidgetQuery[]) => void;
+}) {
+  return (
+    <Button
+      size="xs"
+      variant="ghost"
+      onClick={() =>
+        onQueriesChange([...queries, { name: nextQueryName(queries), sql: "" }])
+      }
+    >
+      <Plus size={14} /> Add query
+    </Button>
   );
 }
