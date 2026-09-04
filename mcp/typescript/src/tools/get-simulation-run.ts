@@ -1,4 +1,5 @@
 import { getSimulationRun as apiGetSimulationRun } from "../langwatch-api-simulation-runs.js";
+import { formatEvaluations } from "./format-suite-details.js";
 
 /**
  * Handles the platform_get_simulation_run MCP tool invocation.
@@ -47,6 +48,7 @@ export async function handleGetSimulationRun(params: {
     if (run.results.error) {
       lines.push(`**Error**: ${run.results.error}`);
     }
+    lines.push(...formatEvaluations(run.results.evaluations));
   }
 
   if (run.messages && run.messages.length > 0) {

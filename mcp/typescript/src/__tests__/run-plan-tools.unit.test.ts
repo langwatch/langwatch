@@ -472,3 +472,90 @@ describe("handleArchiveRunPlan()", () => {
     });
   });
 });
+
+describe("handleRunPlan() with plan evaluators", () => {
+  /** @scenario "Agent runs a plan with its own evaluators" */
+  it("sends the attachments inside the configuration, with an id and a gate settled", async () => {
+    mockRunRunPlan.mockResolvedValue({
+      scheduled: true,
+      batchRunId: "batch_1",
+      setId: "set_1",
+      jobCount: 1,
+      skippedArchived: { scenarios: [], targets: [] },
+      items: [],
+      runPlanId: "plan_1",
+      planName: "Nightly",
+      created: true,
+      platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/nightly",
+    });
+
+    await handleRunPlan({
+      scope: { mode: "all" },
+      targets: [{ type: "http", referenceId: "agent_abc" }],
+      evaluators: [
+        {
+          evaluatorId: "evaluator_pii",
+          required: false,
+          mappings: {
+            input: { type: "source", sourceId: "conversation", path: ["transcript"] },
+          },
+        },
+      ],
+    });
+
+    expect(mockRunRunPlan).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          evaluators: [
+            {
+              id: expect.stringMatching(/^att_/),
+              evaluatorId: "evaluator_pii",
+              required: false,
+              mappings: {
+                input: { type: "source", sourceId: "conversation", path: ["transcript"] },
+              },
+            },
+          ],
+        }),
+      }),
+    );
+  });
+});
+
+describe("handleGetRunPlan() with evaluators", () => {
+  /** @scenario "Agent reads a run plan that carries evaluators" */
+  it("lists each evaluator with its gate and its mappings", async () => {
+    mockGetRunPlan.mockResolvedValue({
+      id: "plan_1",
+      name: "Nightly",
+      slug: "nightly",
+      scope: { mode: "all" },
+      scenarioIds: [],
+      targets: [{ type: "http", referenceId: "agent_abc" }],
+      repeatCount: 1,
+      simulatorModel: null,
+      judgeModel: null,
+      labels: [],
+      archivedAt: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z",
+      platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/nightly",
+      evaluators: [
+        {
+          id: "att_pii",
+          evaluatorId: "evaluator_pii",
+          required: false,
+          mappings: {
+            input: { type: "source", sourceId: "conversation", path: ["transcript"] },
+          },
+        },
+      ],
+    });
+
+    const result = await handleGetRunPlan({ id: "plan_1" });
+
+    expect(result).toContain("## Evaluators");
+    expect(result).toContain("evaluator_pii (reports only, attachment att_pii)");
+    expect(result).toContain("input: conversation.transcript");
+  });
+});

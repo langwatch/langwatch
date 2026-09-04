@@ -1,4 +1,4 @@
-import { createTestSuite as apiCreateTestSuite } from "../langwatch-api-test-suites.js";
+import { updateTestSuite as apiUpdateTestSuite } from "../langwatch-api-test-suites.js";
 import {
   type EvaluatorAttachmentInput,
   type SuiteField,
@@ -10,15 +10,21 @@ import {
 } from "./format-suite-details.js";
 
 /**
- * Handles the platform_create_test_suite MCP tool invocation.
+ * Handles the platform_update_test_suite MCP tool invocation.
+ *
+ * Any of the name, the fields and the evaluators. A field list or an
+ * evaluator list replaces the one the suite holds; a key left out keeps
+ * what the suite has.
  */
-export async function handleCreateTestSuite(params: {
-  name: string;
+export async function handleUpdateTestSuite(params: {
+  id: string;
+  name?: string;
   fields?: SuiteField[];
   evaluators?: EvaluatorAttachmentInput[];
 }): Promise<string> {
-  const suite = await apiCreateTestSuite({
-    name: params.name,
+  const suite = await apiUpdateTestSuite({
+    id: params.id,
+    ...(params.name !== undefined ? { name: params.name } : {}),
     ...(params.fields !== undefined ? { fields: params.fields } : {}),
     ...(params.evaluators !== undefined
       ? { evaluators: toWireAttachments(params.evaluators) }
@@ -26,18 +32,14 @@ export async function handleCreateTestSuite(params: {
   });
 
   return [
-    `Test suite "${suite.name}" created.`,
+    `Test suite "${suite.name}" updated.`,
     "",
     `**ID**: ${suite.id}`,
     `**Slug**: ${suite.slug}`,
-    `**View**: ${suite.platformUrl}`,
+    `**Scenarios**: ${suite.scenarioCount}`,
     ...formatSuiteFields(suite.fields),
     ...formatEvaluatorAttachments(suite.evaluators),
     "",
-    `> File scenarios in it with \`platform_create_scenario\` or \`platform_update_scenario\`, passing testSuiteId \`${suite.id}\`${
-      suite.fields && suite.fields.length > 0
-        ? ` and a value per field under \`fields\``
-        : ""
-    }.`,
+    `**View**: ${suite.platformUrl}`,
   ].join("\n");
 }

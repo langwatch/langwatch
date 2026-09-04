@@ -1,4 +1,5 @@
 import { makeRequest } from "./langwatch-api.js";
+import type { ScenarioFieldValues } from "./schemas/suite-fields.js";
 
 // --- Scenario types ---
 
@@ -10,6 +11,8 @@ export interface ScenarioSummary {
   labels: string[];
   /** The test suite this scenario is filed in, null when it is unfiled. */
   testSuiteId?: string | null;
+  /** The scenario's value for each field its test suite declares. */
+  fields?: ScenarioFieldValues;
 }
 
 export interface ScenarioArchiveResponse {
@@ -39,6 +42,7 @@ export async function createScenario(data: {
   criteria?: string[];
   labels?: string[];
   testSuiteId?: string | null;
+  fields?: ScenarioFieldValues;
 }): Promise<ScenarioSummary> {
   return makeRequest("POST", "/api/scenarios", data) as Promise<ScenarioSummary>;
 }
@@ -51,6 +55,7 @@ export async function updateScenario(params: {
   criteria?: string[];
   labels?: string[];
   testSuiteId?: string | null;
+  fields?: ScenarioFieldValues;
 }): Promise<ScenarioSummary> {
   const { id, ...data } = params;
   return makeRequest(
