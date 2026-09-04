@@ -169,6 +169,14 @@ describe("Langy reaches the code through the shared folder", () => {
         expect(diff).toMatch(/app\/agent\.py|app\/main\.py/);
         // A branch with no commit of its own is a promise, not a change.
         expect(repo.log().length).toBeGreaterThan(1);
+        // The push reached the remote. `gh pr create` cannot run without a
+        // GitHub account, so the branch on the remote is how far the pull
+        // request path can go here, and it has to get that far.
+        console.log(
+          "[layer2] remote branches:",
+          repo.remoteBranches().join(", "),
+        );
+        expect(repo.remoteBranches()).toContain(branch);
         // The project's own checks ran on the machine before the commit.
         expect(capture).toMatch(/bash .*(pytest|uv run|python)/);
         // The pull request step was attempted. `gh` is not signed in on a test

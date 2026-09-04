@@ -245,6 +245,10 @@ export interface DemoRepo {
   status: () => string;
   read: (relativePath: string) => string;
   exists: (relativePath: string) => boolean;
+  /** The bare repository `origin` points at, beside the working copy. */
+  remote: string;
+  /** Every branch that reached the remote, so a push is a fact and not a claim. */
+  remoteBranches: () => string[];
   /** Any git command, for a read a helper above does not cover. */
   git: (args: string[]) => string;
 }
@@ -345,19 +349,21 @@ export function demoReposToPrune({
   return stamped.slice(Math.max(0, keep)).map((entry) => entry.folder);
 }
 
-/** Delete every demo repository but the most recent few. */
+/** Delete every demo repository but the most recent few, remotes included. */
 async function pruneDemoRepos(): Promise<void> {
   const entries = await fs
     .readdir(SCENARIO_REPO_DIR, { withFileTypes: true })
     .catch(() => []);
   const folders = entries
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && !entry.name.endsWith(".git"))
     .map((entry) => entry.name);
   for (const folder of demoReposToPrune({ existing: folders })) {
-    await fs.rm(path.join(SCENARIO_REPO_DIR, folder), {
-      recursive: true,
-      force: true,
-    });
+    for (const target of [folder, `${folder}.git`]) {
+      await fs.rm(path.join(SCENARIO_REPO_DIR, target), {
+        recursive: true,
+        force: true,
+      });
+    }
   }
 }
 
@@ -387,6 +393,17 @@ export async function createDemoRepo({
   git(["config", "commit.gpgsign", "false"]);
   git(["add", "-A"]);
   git(["commit", "-m", "chore: the ACME support agent"]);
+
+  // A repository with no remote makes `git push` exit 128, and the pull
+  // request path can then never finish in a scenario. A bare repository beside
+  // the working copy is a remote that behaves like one, without a network and
+  // without a GitHub account. `gh pr create` still cannot run against it,
+  // which is the part the scenarios already tolerate.
+  const remote = `${root}.git`;
+  await fs.rm(remote, { recursive: true, force: true });
+  sh("git", ["init", "--bare", "--initial-branch=main", remote]);
+  git(["remote", "add", "origin", remote]);
+  git(["push", "-u", "origin", "main"]);
 
   if (install) {
     if (language === "python") {
@@ -420,6 +437,14 @@ export async function createDemoRepo({
         ? readFileSync(path.join(root, relativePath), "utf8")
         : "",
     exists: (relativePath: string) => existsSync(path.join(root, relativePath)),
+    remote,
+    remoteBranches: () =>
+      sh("git", ["for-each-ref", "--format=%(refname:short)", "refs/heads"], {
+        cwd: remote,
+      })
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
     git,
   };
 }
