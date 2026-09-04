@@ -572,3 +572,22 @@ URL scheme and should not ride on a restructure branch.
 
 Not decided; nothing implemented either way. The one remaining gap outside this,
 `GET /api/traces/{traceId}/transcript`, waits on a composed `LogService`.
+
+## 21. Retire the flat REST error body in favour of the canonical envelope (added 2026-09-04)
+
+A restore lane received an instruction to "get rid of legacy REST error
+rendering, only HandledError now". The non-breaking reading is done: every
+legacy body is now rendered by one path from `HandledError.serialize()`, with
+tips, docs link, fault and reasons, and the wire shape is unchanged.
+
+The breaking reading is retiring the flat `{ error, message }` body itself.
+Today `errorEnvelope` defaults to `legacy` (`packages/api/src/rest/security/rest-api-service.ts:231`);
+eight families opt into `canonical`; every other REST family publishes the
+flat shape, the scenario "An external contract wins over cross-transport
+symmetry" pins it, and both SDKs parse it. Retiring it is a versioned
+deprecation across about twenty families plus the SDKs, not a lane-sized
+change.
+
+**Recommendation:** keep the flat body as the default for this branch; plan
+the envelope migration as its own ADR with a date version, after the
+restructure lands. Not decided.
