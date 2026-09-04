@@ -1977,10 +1977,14 @@ Rule: Event rows drill down into their metric values
 
   # The vote is stored as 1 / 0 / -1, which reads as nothing in a sidebar.
   # Only the label is humanised — the value the filter carries stays the
-  # stored string, so the round-trip is unaffected.
-  Scenario: A metric value with no human name shows its stored string
-    Given "thumbs_up_down" events also carry "event.metrics.latency_bucket" with value "p95"
-    Then the drilldown lists that value as "p95"
+  # stored string, so the round-trip is unaffected. Every other metric,
+  # named by whoever sent it, has no such mapping and shows as stored.
+  # (Metric values are numbers everywhere — see `eventSchema.metrics`, a
+  # record of string to number — so "as stored" always means a decimal.)
+  Scenario: A metric with no human name shows its stored value
+    Given "checkout_survey" events carry "event.metrics.stars" with value "4"
+    When the user expands the "checkout_survey" row in the Event name section
+    Then the drilldown lists that value as "4"
 
   Scenario: Clicking a vote value applies a single event-attribute filter
     When the user clicks the vote value shown as "thumbs down" in the thumbs_up_down drilldown

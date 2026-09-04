@@ -72,20 +72,6 @@ describe("EventDrilldown", () => {
       expect(screen.queryByText("-1")).not.toBeInTheDocument();
     });
 
-    /** @scenario "A metric value with no human name shows its stored string" */
-    it("keeps a value with no human name as its stored string", () => {
-      renderDrilldown({
-        item: buildItem([
-          {
-            key: "event.metrics.latency_bucket",
-            values: [{ value: "p95", count: 4 }],
-          },
-        ]),
-      });
-
-      expect(screen.getByText("p95")).toBeInTheDocument();
-    });
-
     it("strips the event.metrics. prefix from the group header only", () => {
       renderDrilldown();
 
@@ -163,6 +149,29 @@ describe("EventDrilldown", () => {
       ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "stars 1 — click to filter" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given an event whose metric has no human name", () => {
+    /** @scenario "A metric with no human name shows its stored value" */
+    it("shows the stored value", () => {
+      // Metric values are numbers on every path — `eventSchema.metrics` is a
+      // record of string to number — so the unlabelled case is a decimal, not
+      // some free-form string. Ingest rejects a string with a 400.
+      renderDrilldown({
+        item: {
+          value: "checkout_survey",
+          label: "checkout_survey",
+          count: 1,
+          eventMetrics: [
+            { key: "event.metrics.stars", values: [{ value: "4", count: 1 }] },
+          ],
+        },
+      });
+
+      expect(
+        screen.getByRole("button", { name: "stars 4 — click to filter" }),
       ).toBeInTheDocument();
     });
   });
