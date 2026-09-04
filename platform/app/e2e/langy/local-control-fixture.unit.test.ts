@@ -6,7 +6,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { answerOfTurn, type StoredMessage } from "./local-control-fixture";
+import {
+  answerOfTurn,
+  permissionAnswerNote,
+  questionAnswerNote,
+  type StoredMessage,
+} from "./local-control-fixture";
 
 const TURN = "langyturn_783c8761d92af366b9b8da09f8920c21";
 
@@ -48,6 +53,65 @@ describe("answerOfTurn", () => {
       ];
 
       expect(answerOfTurn(messages, TURN)?.role).toBe("assistant");
+    });
+  });
+});
+
+describe("permissionAnswerNote", () => {
+  const ask = {
+    waitId: "wait_1",
+    callId: "call_1",
+    summary: "uv run pytest",
+    pattern: "uv run pytest*",
+    reason: "run the tests",
+    skipOffered: false,
+    turnId: "langyturn_1",
+    askedAt: 0,
+  };
+
+  describe("when the developer allows the pattern for the session", () => {
+    it("names the pattern, which is what the next turn relies on", () => {
+      const note = permissionAnswerNote({ ...ask, decision: "allow_pattern" });
+
+      expect(note).toContain("uv run pytest*");
+      expect(note).toContain("for this session");
+    });
+  });
+
+  describe("when the developer allows one command", () => {
+    it("says the grant covered that command only", () => {
+      expect(permissionAnswerNote({ ...ask, decision: "allow_once" })).toBe(
+        "[developer allowed once in the panel: uv run pytest]",
+      );
+    });
+  });
+
+  describe("when the developer denies", () => {
+    it("says so, so a later run of the same command reads as a violation", () => {
+      expect(
+        permissionAnswerNote({
+          ...ask,
+          summary: "rm -rf tests",
+          decision: "deny",
+        }),
+      ).toBe("[developer denied in the panel: rm -rf tests]");
+    });
+  });
+});
+
+describe("questionAnswerNote", () => {
+  describe("when the developer picks an option", () => {
+    it("carries the question and the option that was picked", () => {
+      const note = questionAnswerNote({
+        waitId: "wait_2",
+        questions: [{ question: "Which branch?", options: [{ label: "main" }] }],
+        answered: [{ question: "Which branch?", selected: ["main"] }],
+        turnId: "langyturn_1",
+      });
+
+      expect(note).toBe(
+        '[developer answered in the panel: "Which branch?" -> main]',
+      );
     });
   });
 });

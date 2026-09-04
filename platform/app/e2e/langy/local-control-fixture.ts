@@ -683,6 +683,19 @@ export type JudgeMessage =
 export interface ConversationWatcher {
   permissions: PermissionAsk[];
   questions: QuestionAsk[];
+  /**
+   * The answers the developer has given on cards since the last drain, one
+   * line each, and empties the list.
+   *
+   * The fixture answers a card through the panel's own mutation, which is
+   * exactly what the developer does and exactly why the judge cannot see it:
+   * the conversation it grades holds Langy's messages and tool results, and
+   * the answer never appears in either. A criterion about what Langy did AFTER
+   * a grant or a denial then has nothing to read. Feed these lines into the
+   * scenario after each turn to put the developer's side of the card in the
+   * record.
+   */
+  drainAnswerNotes: () => string[];
   /** `connected` and `disconnected` entries, in order. */
   workspaceEvents: Array<{ state: string; name: string; root: string }>;
   /** Every turn the watcher observed, in the order it observed them. */
@@ -757,6 +770,31 @@ export function answerOfTurn(
       (message) => message.role === "assistant" && message.id.endsWith(turnId),
     ) ?? null
   );
+}
+
+/**
+ * The line that says what the developer answered on a permission card.
+ *
+ * Written in the developer's own voice, and bracketed, so the judge reads it
+ * as an action taken in the panel rather than as something said in the chat.
+ */
+export function permissionAnswerNote(ask: PermissionAsk): string {
+  if (ask.decision === "deny") {
+    return `[developer denied in the panel: ${ask.summary}]`;
+  }
+  if (ask.decision === "allow_pattern") {
+    const pattern = ask.pattern || ask.summary;
+    return `[developer allowed the pattern \`${pattern}\` for this session in the panel: ${ask.summary}]`;
+  }
+  return `[developer allowed once in the panel: ${ask.summary}]`;
+}
+
+/** The line that says what the developer answered on a question card. */
+export function questionAnswerNote(ask: QuestionAsk): string {
+  const answers = ask.answered
+    .map((answer) => `"${answer.question}" -> ${answer.selected.join(", ")}`)
+    .join("; ");
+  return `[developer answered in the panel: ${answers}]`;
 }
 
 interface StreamEntry {
@@ -854,6 +892,8 @@ export function watchLangyConversation({
   const answeredWaits = new Set<string>();
   const watchedTurns = new Set<string>();
   const controller = new AbortController();
+  /** What the developer answered, waiting to be put in front of the judge. */
+  let answerNotes: string[] = [];
   let stopped = false;
 
   const decide = (summary: string): "allow_once" | "allow_pattern" | "deny" => {
@@ -874,7 +914,7 @@ export function watchLangyConversation({
     answeredWaits.add(waitId);
     const summary = String(entry.summary ?? "");
     const decision = decide(summary);
-    permissions.push({
+    const ask: PermissionAsk = {
       waitId,
       callId: String(entry.callId ?? ""),
       summary,
@@ -884,7 +924,9 @@ export function watchLangyConversation({
       decision,
       turnId,
       askedAt: Date.now(),
-    });
+    };
+    permissions.push(ask);
+    answerNotes.push(permissionAnswerNote(ask));
     const cookie = await getSessionCookie();
     await trpcMutate({
       cookie,
@@ -919,7 +961,14 @@ export function watchLangyConversation({
         answerQuestion?.(question) ??
         (question.options?.[0]?.label ? [question.options[0].label] : []),
     }));
-    questions.push({ waitId, questions: asked, answered: answers, turnId });
+    const ask: QuestionAsk = {
+      waitId,
+      questions: asked,
+      answered: answers,
+      turnId,
+    };
+    questions.push(ask);
+    answerNotes.push(questionAnswerNote(ask));
     const cookie = await getSessionCookie();
     await trpcMutate({
       cookie,
@@ -1102,6 +1151,11 @@ export function watchLangyConversation({
   return {
     permissions,
     questions,
+    drainAnswerNotes: () => {
+      const notes = answerNotes;
+      answerNotes = [];
+      return notes;
+    },
     workspaceEvents,
     turnIds,
     turnsStartedWithoutUs: (knownTurnIds) =>
