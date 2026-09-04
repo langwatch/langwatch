@@ -131,3 +131,8 @@ overview scenario. Bind or retire when the lint end-state is designed.
 - **Langy turns REST tests.** `packages/features/langy/server/src/transport/api-rest/langy-turns.api.ts`
   has no test file; main's `langy-api-wait-mode` / `langy-api-refusal-chain` tests need a
   harness in the current factory shape. 7 scenarios in `langy/langy-api-key-turns.feature`.
+- **Langy derived-stats bar comparison.** Main rendered a per-reading bar
+  (`derived-stat-bar`, `data-best`) for a stats card comparing readings on one scale;
+  today's `DerivedStatsBody` delegates to `StreamingStatCard`, which has no bar.
+  `langy/langy-derived-stats-presentation.feature` "The bar comparison marks the
+  leading reading". `isComparableSeries` in `langy-stat-figure.ts` has no consumer.
