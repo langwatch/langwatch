@@ -440,6 +440,7 @@ async def test_angry_customer_billing_error():
             "The agent must acknowledge the frustration before pivoting to "
             "logistics, stay calm, and queue a refund."
         ),
+
         agents=[
             scenario.PipecatAgentAdapter(
                 url=BOT_WS_URL,
@@ -461,6 +462,7 @@ async def test_angry_customer_billing_error():
                     scenario.effects.phone_quality(),
                 ],
             ),
+
             scenario.JudgeAgent(criteria=[
                 "The agent acknowledged the customer's frustration before asking for account info",
                 "The agent stayed calm and did not match the customer's hostility",
@@ -544,6 +546,7 @@ describe("Voice agent: angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
+
         // The adapter drives an OpenAI Realtime session with the same
         // config your production agent uses. Importing from production
         // source keeps the test aligned with what is actually deployed.
@@ -552,6 +555,7 @@ describe("Voice agent: angry billing", () => {
           instructions: AGENT_INSTRUCTIONS,
           tools: AGENT_TOOLS,
         }),
+
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
           persona:
@@ -564,6 +568,7 @@ describe("Voice agent: angry billing", () => {
             voice.effects.phoneQuality(),
           ],
         }),
+
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
@@ -605,12 +610,14 @@ describe("Voice agent: angry billing (Pipecat WS)", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
+
         // Connects to the user's ALREADY-RUNNING bot over WebSocket.
         scenario.pipecatAgent({
           url: BOT_WS_URL,
           audioFormat: "mulaw",
           sampleRate: 8000,
         }),
+
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
           persona:
@@ -623,6 +630,7 @@ describe("Voice agent: angry billing (Pipecat WS)", () => {
             voice.effects.phoneQuality(),
           ],
         }),
+
         scenario.judgeAgent({
           criteria: [
             "The agent acknowledged the customer's frustration before asking for account info",
