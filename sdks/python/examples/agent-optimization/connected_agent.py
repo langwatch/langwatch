@@ -80,15 +80,17 @@ EXPLICIT_CREATE_RETURN_DESCRIPTION = (
 
 def _tool_schemas() -> list[dict[str, Any]]:
     """The tool list sent to the model, in the contract this process runs."""
-    weak = os.environ.get("RETURNS_AGENT_TOOL_DESCRIPTIONS", "explicit") == "weak"
+    is_weak_tool_contract = (
+        os.environ.get("RETURNS_AGENT_TOOL_DESCRIPTIONS", "explicit") == "weak"
+    )
     reason_property: dict[str, Any] = (
         {"type": "string"}
-        if weak
+        if is_weak_tool_contract
         else {"type": "string", "enum": list(REASONS)}
     )
     refund_method_property: dict[str, Any] = (
         {"type": "string"}
-        if weak
+        if is_weak_tool_contract
         else {"type": "string", "enum": list(REFUND_METHODS)}
     )
 
@@ -111,7 +113,7 @@ def _tool_schemas() -> list[dict[str, Any]]:
                 "name": "check_return_eligibility",
                 "description": (
                     WEAK_ELIGIBILITY_DESCRIPTION
-                    if weak
+                    if is_weak_tool_contract
                     else EXPLICIT_ELIGIBILITY_DESCRIPTION
                 ),
                 "parameters": {
@@ -130,7 +132,7 @@ def _tool_schemas() -> list[dict[str, Any]]:
                 "name": "create_return",
                 "description": (
                     WEAK_CREATE_RETURN_DESCRIPTION
-                    if weak
+                    if is_weak_tool_contract
                     else EXPLICIT_CREATE_RETURN_DESCRIPTION
                 ),
                 "parameters": {
