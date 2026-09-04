@@ -2,6 +2,34 @@
 
 End-to-end tests for LangWatch using Playwright, designed to be authored and maintained with AI assistance.
 
+## The product journey
+
+`tests/journey/product-journey.spec.ts` is the browser walk of the whole
+product: sign-up, onboarding, a model provider, an HTTP agent, a code
+evaluator, a monitor that runs it on every trace, a suite, a scenario, a run,
+its verdict, the run's trace with the evaluator's result on it, a workflow, a
+prompt, and three error paths. It is bound scenario by scenario to
+`specs/e2e/browser-product-journey.feature` through `// @scenario "<title>"`.
+
+Run it from the repository root:
+
+```bash
+pnpm test:e2e
+```
+
+That boots a stack on port 5600 through `dev/tests/e2e-stack` when nothing is
+already serving there, starts the loopback echo agent the journey's HTTP agent
+talks to, runs the suite, and puts both back down. A stack already answering at
+`BASE_URL` is used as it stands — which is what CI does, and what a developer
+with `pnpm dev` running gets.
+
+The journey signs up its own account, so it runs as its own Playwright project
+(`--project=journey`) with no shared storage state, serially, one browser
+context for all thirteen legs. Legs that need a live model provider skip with
+the reason `OPENAI_API_KEY not set` when that variable is absent from the shell
+running the suite: a self-hosted organization gets no provider from the
+environment, so the journey adds one through `/settings/model-providers`.
+
 ## Quick Start
 
 ```bash

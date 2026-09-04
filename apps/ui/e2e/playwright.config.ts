@@ -1,20 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
-import fs from "fs";
-import path from "path";
 
-// Check if auth.json exists, if not, throw an error
-const authFilePath = path.join(__dirname, "auth.json");
-if (!fs.existsSync(authFilePath)) {
-  throw new Error(
-    `
-    Authentication state file (auth.json) not found. Please run the authentication script first with: npm run test:e2e:save-auth-state
-    If you have already run the authentication script, please check that the file exists at ${authFilePath}
-    If the file exists, please check that you are running the tests from the root of the project.
-
-    IMPORTANT: DO NOT COMMIT THE auth.json FILE TO GIT.
-    `,
-  );
-}
+// The product journey lives in dev/tests/agentic-e2e now, and it signs up its
+// own account, so nothing here reads a hand-saved auth.json any more.
 /*
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
@@ -51,8 +38,6 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
     // baseURL: 'http://127.0.0.1:3000',
 
-    // Load the auth state from the auth.json file
-    storageState: authFilePath,
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
     screenshot: "only-on-failure",

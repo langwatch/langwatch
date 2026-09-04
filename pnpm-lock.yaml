@@ -865,6 +865,9 @@ importers:
       '@ai-sdk/openai':
         specifier: ^3.0.79
         version: 3.0.79(zod@4.4.3)
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/feature-flag/contract
       '@langwatch/platform-api':
         specifier: workspace:*
         version: link:../api
@@ -1219,10 +1222,29 @@ importers:
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   dev/tests/agentic-e2e:
+    dependencies:
+      '@langwatch/e2e-stack':
+        specifier: workspace:*
+        version: link:../e2e-stack
     devDependencies:
       '@playwright/test':
         specifier: ^1.57.0
         version: 1.61.1
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  dev/tests/e2e-stack:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
 
   mcp/typescript:
     dependencies:
@@ -6718,6 +6740,12 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
+      '@langwatch/model-provider-web':
+        specifier: workspace:*
+        version: link:../../model-provider/web
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -7787,6 +7815,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../automation/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../eventing
@@ -7875,6 +7906,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../redis-client
+      '@langwatch/suite-server':
+        specifier: workspace:*
+        version: link:../../suite/server
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../test-harness

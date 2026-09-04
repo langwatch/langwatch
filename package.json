@@ -25,7 +25,7 @@
     "test:unit": "pnpm --filter @langwatch/platform-api --filter @langwatch/worker --filter @langwatch/ui test:unit",
     "test:component": "node -e \"console.error('No component lane outside the monolith yet: apps/{api,worker,ui} each ship one vitest.config.ts and no jsdom lane. Run pnpm test:unit, or the package suite you mean.'); process.exit(1)\"",
     "test:integration": "node -e \"console.error('No datastore lane outside the monolith yet: only @langwatch/coding-agent-server declares test:integration. Run that package directly, or pnpm test:unit.'); process.exit(1)\"",
-    "test:e2e": "node -e \"console.error('No e2e lane yet: the Playwright suite went with the monolith and has no packaged home. dev/tests/agentic-e2e is the surviving end-to-end harness — run it from there.'); process.exit(1)\"",
+    "test:e2e": "E2E_STACK_PORT=5600 BASE_URL=http://localhost:5600 pnpm --filter langwatch-e2e-tests test",
     "test:cli": "pnpm --filter @langwatch/server test",
     "test:sdk": "pnpm --filter langwatch test",
     "typecheck": "pnpm --filter @langwatch/platform-api --filter @langwatch/worker --filter @langwatch/ui typecheck",

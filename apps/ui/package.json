@@ -56,9 +56,7 @@
     "build": "NODE_ENV=production vite build --configLoader runner",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
-    "test:unit": "vitest run",
-    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
-    "test:e2e:save-auth-state": "tsx e2e/save-auth-state.ts"
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@better-auth/passkey": "1.7.1",

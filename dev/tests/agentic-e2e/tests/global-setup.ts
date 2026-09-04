@@ -1,13 +1,34 @@
 /**
  * Global Setup for E2E Tests
  *
- * Runs before all tests to validate the environment is ready.
- * Fails fast with helpful error messages if prerequisites are missing.
+ * Boots what the suite needs and validates it is ready before any test runs.
+ *
+ * A stack that already answers at BASE_URL is used as it stands — that is CI,
+ * which boots its own, and a developer who left `pnpm dev` running. Otherwise
+ * the shared helper starts one on `E2E_STACK_PORT` and this file puts it back
+ * down afterwards.
+ *
+ * The journey's target agent starts here too: a run has to complete, so the
+ * address the HTTP agent names must answer.
  */
+import { startStack, type RunningStack } from "@langwatch/e2e-stack";
+
+import { startEchoAgent, type EchoAgent } from "./journey/echo-agent";
+import { JOURNEY_MODEL_ID } from "./journey/journey.constants";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
+const STACK_PORT = Number(process.env.E2E_STACK_PORT ?? "5600");
 const MAX_RETRIES = 30;
 const RETRY_DELAY_MS = 2000;
+
+async function alreadyServing(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: "GET", signal: AbortSignal.timeout(5000) });
+    return response.ok || response.status === 302;
+  } catch {
+    return false;
+  }
+}
 
 async function waitForApp(): Promise<void> {
   console.log(`\n🔍 Checking app availability at ${BASE_URL}...`);
@@ -39,11 +60,8 @@ async function waitForApp(): Promise<void> {
 
   throw new Error(
     `\n❌ App not available at ${BASE_URL} after ${MAX_RETRIES} attempts.\n\n` +
-      `Make sure the app is running:\n` +
-      `  1. cd to the repository root\n` +
-      `  2. PORT=5570 pnpm dev\n\n` +
-      `Or check if infrastructure is running:\n` +
-      `  docker compose -f compose.test.yml ps\n`,
+      `Run the suite from the repository root with \`pnpm test:e2e\`, which boots\n` +
+      `the stack itself, or start one yourself with \`PORT=5600 pnpm dev\`.\n`,
   );
 }
 
@@ -85,56 +103,35 @@ async function waitForApi(): Promise<void> {
   );
 }
 
-function validateEnvironment(): void {
-  console.log("\n🔍 Validating environment configuration...");
-
-  const warnings: string[] = [];
-
-  // These env vars are used by the langwatch app, not the test runner
-  // But we can check that they look reasonable if set
-  const appEnvVars = ["DATABASE_URL", "REDIS_URL", "NEXTAUTH_SECRET"];
-
-  // In CI, these should be set by the workflow
-  // Locally, the .env file should have them
-  if (process.env.CI) {
-    console.log("  Running in CI environment");
-  } else {
-    console.log("  Running locally");
-
-    // Check if common test ports are being used (indicates test env)
-    const dbUrl = process.env.DATABASE_URL ?? "";
-    const redisUrl = process.env.REDIS_URL ?? "";
-
-    if (dbUrl.includes(":5432") && !dbUrl.includes(":5433")) {
-      warnings.push(
-        "DATABASE_URL uses default port 5432 - consider using test port 5433 to avoid conflicts",
-      );
-    }
-    if (redisUrl.includes(":6379") && !redisUrl.includes(":6380")) {
-      warnings.push(
-        "REDIS_URL uses default port 6379 - consider using test port 6380 to avoid conflicts",
-      );
-    }
-  }
-
-  if (warnings.length > 0) {
-    console.log("\n⚠️  Warnings:");
-    warnings.forEach((w) => console.log(`   - ${w}`));
-  }
-
-  console.log("✅ Environment configuration looks good\n");
-}
-
-export default async function globalSetup(): Promise<void> {
+export default async function globalSetup(): Promise<() => Promise<void>> {
   console.log("\n" + "=".repeat(60));
   console.log("E2E Test Global Setup");
   console.log("=".repeat(60));
 
-  validateEnvironment();
+  let stack: RunningStack | null = null;
+  if (await alreadyServing(BASE_URL)) {
+    console.log(`\n✅ Using the stack already serving at ${BASE_URL}`);
+  } else {
+    console.log(`\n🚀 No stack at ${BASE_URL}; starting one on port ${STACK_PORT}...`);
+    stack = await startStack({
+      port: STACK_PORT,
+      env: { LANGWATCH_DEFAULT_MODEL: JOURNEY_MODEL_ID },
+    });
+  }
+
   await waitForApp();
   await waitForApi();
+
+  const echo: EchoAgent = await startEchoAgent();
+  process.env.E2E_ECHO_AGENT_URL = echo.url;
+  console.log(`✅ Echo agent listening at ${echo.url}`);
 
   console.log("\n" + "=".repeat(60));
   console.log("Global setup complete, starting tests...");
   console.log("=".repeat(60) + "\n");
+
+  return async () => {
+    await echo.stop();
+    await stack?.stop();
+  };
 }

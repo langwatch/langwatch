@@ -1,0 +1,22 @@
+{
+  "name": "@langwatch/e2e-stack",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Boots one local LangWatch stack for an end-to-end suite, or hands back the one the environment already names.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "typescript": "^7.0.2"
+  }
+}

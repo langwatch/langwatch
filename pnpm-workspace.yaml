@@ -24,6 +24,7 @@ packages:
   - "services/langyworker"
   - "skills"
   - "dev/tests/agentic-e2e"
+  - "dev/tests/e2e-stack"
 
 # pnpm 10 already defaults this to false. It is stated explicitly because the
 # six-root merge is what made it load-bearing: sdks/typescript/ is the package

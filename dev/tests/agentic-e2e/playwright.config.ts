@@ -76,9 +76,26 @@ export default defineConfig({
       testMatch: /.*\.setup\.ts/,
     },
 
+    /* The product journey - signs up its own account, so no shared state */
+    {
+      name: "journey",
+      testDir: "./tests/journey",
+      // A simulation run is queued, forked and judged, so the legs that wait on
+      // one need minutes, not the suite's default minute.
+      timeout: 600000,
+      use: {
+        ...devices["Desktop Chrome"],
+        // The journey drives a dev-mode stack that compiles a route's chunk on
+        // first request, on a machine that is usually running other work.
+        actionTimeout: 30000,
+        navigationTimeout: 120000,
+      },
+    },
+
     /* Main test project - uses authenticated state */
     {
       name: "chromium",
+      testIgnore: ["**/journey/**"],
       use: {
         ...devices["Desktop Chrome"],
         storageState: AUTH_FILE,

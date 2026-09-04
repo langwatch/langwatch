@@ -4,9 +4,15 @@
   "private": true,
   "scripts": {
     "test": "playwright test",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@langwatch/e2e-stack": "workspace:*"
   },
   "devDependencies": {
-    "@playwright/test": "^1.57.0"
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^22.15.3",
+    "typescript": "^7.0.2"
   }
 }
