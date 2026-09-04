@@ -39,9 +39,79 @@ export type SpanIngestionStatus =
   // "dropped" (parse/age failures) so the counts stay legible.
   | "filtered";
 
+/**
+ * Why a span was rejected at ingestion. Used to break the rejected count down
+ * by parser reason on the ingestion tracer span (issue #5898 acceptance
+ * criterion 5). Only meaningful for `dropped`/`failed` statuses; absent on
+ * success/dedup/filtered paths.
+ */
+export type SpanDropReason =
+  | "validation"
+  | "age"
+  | "queue";
+
 export interface SpanIngestionResult {
   status: SpanIngestionStatus;
   error?: string;
+  dropReason?: SpanDropReason;
+}
+
+/**
+ * Cap the error message we surface in `partialSuccess.errorMessage` so a single
+ * bad batch with hundreds of malformed spans cannot blow the response size or
+ * swallow the actionable prefix in a wall of repeated text. The OTLP spec lets
+ * receivers truncate `partialSuccess.errorMessage` arbitrarily; we keep the
+ * first few distinct errors verbatim and append "+N more" if there are more.
+ */
+const MAX_DISTINCT_ERRORS_IN_RESPONSE = 5;
+const MAX_SINGLE_ERROR_CHARS = 500;
+
+/**
+ * Stable, public-safe messages surfaced in `partialSuccess.errorMessage` per
+ * rejection reason. Raw exception messages (Redis/queue `error.message`, Zod
+ * parse diagnostics) are intentionally NOT reflected here — a customer holding
+ * an ingest key can deliberately trigger queue failures and would otherwise
+ * receive infrastructure/library details. The raw error is retained in
+ * `this.logger.error` and `otelSpanRef.addEvent("span_ingestion_error")` for
+ * server-side debugging.
+ */
+const PUBLIC_REJECTION_MESSAGE: Record<SpanDropReason, string> = {
+  validation: "span validation failed",
+  age: "span start time is more than 31 days in the past",
+  queue: "ingestion queue error",
+};
+
+function truncateError(msg: string): string {
+  if (msg.length <= MAX_SINGLE_ERROR_CHARS) return msg;
+  return `${msg.slice(0, MAX_SINGLE_ERROR_CHARS - 3)}...`;
+}
+
+/**
+ * Build a bounded error message from the per-span error list. De-duplicates
+ * first because a misconfigured SDK will often produce the same parse error
+ * for every span in a batch, then truncates each individual error and caps the
+ * count. The result is what callers see in `partialSuccess.errorMessage`.
+ *
+ * Exported so the bounding contract can be unit-tested without a tRPC client.
+ */
+export function buildBoundedErrorMessage(errors: string[]): string {
+  // Preserve insertion order while de-duplicating. A batch that fails the same
+  // way 200 times should still surface one entry, not 200.
+  const seen = new Set<string>();
+  const distinct: string[] = [];
+  for (const e of errors) {
+    if (!seen.has(e)) {
+      seen.add(e);
+      distinct.push(e);
+    }
+  }
+  if (distinct.length === 0) return "";
+  const shown = distinct.slice(0, MAX_DISTINCT_ERRORS_IN_RESPONSE).map(truncateError);
+  const remaining = distinct.length - shown.length;
+  if (remaining > 0) {
+    return `${shown.join("; ")}; +${remaining} more`;
+  }
+  return shown.join("; ");
 }
 
 /** An OtlpSpan whose ID fields have been normalized to hex strings. */
@@ -133,6 +203,12 @@ class SpanIngestionTally {
   private deduped = 0;
   private filtered = 0;
   private failed = 0;
+  // Per-reason breakdown of rejected spans (issue #5898 acceptance
+  // criterion 5). The set of keys is closed (validation/age/queue) so a
+  // numeric counter per key is enough — no need for a Map.
+  private rejectedByValidation = 0;
+  private rejectedByAge = 0;
+  private rejectedByQueue = 0;
   private readonly errors: string[] = [];
   private readonly failureErrors: string[] = [];
 
@@ -143,6 +219,8 @@ class SpanIngestionTally {
         break;
       case "dropped":
         this.dropped++;
+        if (result.dropReason === "validation") this.rejectedByValidation++;
+        else if (result.dropReason === "age") this.rejectedByAge++;
         break;
       case "deduped":
         this.deduped++;
@@ -152,6 +230,7 @@ class SpanIngestionTally {
         break;
       case "failed":
         this.failed++;
+        if (result.dropReason === "queue") this.rejectedByQueue++;
         if (result.error) this.failureErrors.push(result.error);
         break;
     }
@@ -164,6 +243,22 @@ class SpanIngestionTally {
     span.setAttribute("spans.ingestion.drops", this.dropped);
     span.setAttribute("spans.ingestion.deduped", this.deduped);
     span.setAttribute("spans.ingestion.filtered", this.filtered);
+    // Rejected-span breakdown by rejection reason. Emitted as separate
+    // attributes so dashboards can sum any slice without parsing a JSON
+    // blob, and so the existing `spans.ingestion.drops`/`failures`
+    // attributes stay back-compatible.
+    span.setAttribute(
+      "spans.ingestion.rejected.by_reason.validation",
+      this.rejectedByValidation,
+    );
+    span.setAttribute(
+      "spans.ingestion.rejected.by_reason.age",
+      this.rejectedByAge,
+    );
+    span.setAttribute(
+      "spans.ingestion.rejected.by_reason.queue",
+      this.rejectedByQueue,
+    );
   }
 
   toResult(): TraceRequestCollectionResult {
@@ -348,7 +443,8 @@ export class TraceRequestCollectionService {
       );
       return {
         status: "failed",
-        error: error instanceof Error ? error.message : String(error),
+        error: PUBLIC_REJECTION_MESSAGE.queue,
+        dropReason: "queue",
       };
     }
   }
@@ -376,9 +472,19 @@ export class TraceRequestCollectionService {
       );
     }
     if (!spanParseResult.data) {
+      const fieldPaths = [
+        ...new Set(
+          (spanParseResult.error?.issues ?? [])
+            .map((issue) => issue.path.join("."))
+            .filter((path) => path.length > 0),
+        ),
+      ].sort();
       return {
         status: "dropped",
-        error: `span validation failed: ${spanParseResult.error?.message ?? "unknown"}`,
+        error: fieldPaths.length
+          ? `${PUBLIC_REJECTION_MESSAGE.validation}: ${fieldPaths.join(", ")}`
+          : PUBLIC_REJECTION_MESSAGE.validation,
+        dropReason: "validation",
       };
     }
 
@@ -392,7 +498,8 @@ export class TraceRequestCollectionService {
     if (startTimeUnixMs < now - SPAN_MAX_PAST_MS) {
       return {
         status: "dropped",
-        error: "span start time is more than 31 days in the past",
+        error: PUBLIC_REJECTION_MESSAGE.age,
+        dropReason: "age",
       };
     }
 
