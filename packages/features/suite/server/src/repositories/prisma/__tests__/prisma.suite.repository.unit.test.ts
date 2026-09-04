@@ -167,3 +167,47 @@ describe("PrismaSuiteRepository.list", () => {
     });
   });
 });
+
+describe("PrismaSuiteRepository.findOrCreatePlanByName", () => {
+  describe("when the plan already exists under that name", () => {
+    /** @scenario "Starting a run holds the plan-name lock past the tenancy guard" */
+    it("takes an advisory lock the tenancy guard lets through, keyed by the project", async () => {
+      const { repository, executeRaw, findFirst, update } = build();
+      findFirst.mockResolvedValue({ id: "suite_1", kind: "run_plan", name: "Refunds", slug: "refunds" });
+      update.mockResolvedValue({
+        id: "suite_1",
+        projectId: "project_1",
+        name: "Refunds",
+        slug: "refunds",
+        description: null,
+        kind: "run_plan",
+        scope: { mode: "scenarios" },
+        targets: [],
+        repeatCount: 1,
+        simulatorModel: null,
+        judgeModel: null,
+        scenarioIds: [],
+        labels: [],
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+        archivedAt: null,
+      });
+
+      await repository.findOrCreatePlanByName({
+        id: "suite_new",
+        projectId: "project_1",
+        name: "Refunds",
+        scope: { mode: "scenarios" },
+        targets: [],
+        scenarioIds: ["scenario_1"],
+        config: {},
+      });
+
+      const sql = rawSqlFrom(executeRaw);
+      expect(sql).toMatch(/^-- @tenancy: /);
+      expect(sql).toContain("pg_advisory_xact_lock");
+      expect(String(executeRaw.mock.calls[0]?.[1])).toContain("project_1");
+    });
+  });
+});
+

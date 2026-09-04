@@ -35,11 +35,11 @@ const TRACE_EVALUATION_COLUMNS_LIGHT = [
   "Label",
   "Details",
   "Error",
-  "ScheduledAt",
-  "StartedAt",
-  "CompletedAt",
+  "toUnixTimestamp64Milli(ScheduledAt) AS ScheduledAt",
+  "toUnixTimestamp64Milli(StartedAt) AS StartedAt",
+  "toUnixTimestamp64Milli(CompletedAt) AS CompletedAt",
   "LastProcessedEventId",
-  "UpdatedAt",
+  "toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt",
 ].join(", ");
 const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
 const logger = createLogger("langwatch:evaluation:clickhouse.evaluation-run-read");

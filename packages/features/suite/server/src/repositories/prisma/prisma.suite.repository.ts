@@ -205,7 +205,8 @@ export class PrismaSuiteRepository extends SuiteRepository {
       this.database.$transaction(
         async (transaction) => {
           const lockKey = `${PLAN_NAME_LOCK_PREFIX}${input.projectId}:${planNameKey(input.name)}`;
-          await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+          await transaction.$executeRaw`-- @tenancy: advisory lock only, the key is project-bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
 
           const existing = await transaction.simulationSuite.findFirst({
             where: {
@@ -305,7 +306,8 @@ export class PrismaSuiteRepository extends SuiteRepository {
   }): Promise<Suite> {
     const row = await this.database.$transaction(async (transaction) => {
       const lockKey = `suite-managed:${input.projectId}:${input.label}`;
-      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      await transaction.$executeRaw`-- @tenancy: advisory lock only, the key is project-bounded
+SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
       const existing = await transaction.simulationSuite.findFirst({
         where: {

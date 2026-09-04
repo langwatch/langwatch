@@ -183,3 +183,11 @@ Feature: A test suite groups scenarios
     Then the change is refused with "suite_scope_not_allowed"
     When the suite editor tries to name the scenarios directly
     Then the change is refused with "validation_error"
+
+  # The list route sends includeArchived; the service parsed the whole input
+  # through a strict id schema and refused the key it then read.
+  @unit
+  Scenario: Listing test suites with archived ones included answers
+    Given a project with archived and active test suites
+    When the test suites are listed with archived ones included
+    Then the repository is asked for that project with archived suites included

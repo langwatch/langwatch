@@ -261,7 +261,9 @@ export class ScenarioService extends ScenarioServiceContract {
     projectId: string;
     includeArchived?: boolean;
   }): Promise<ScenarioTestSuite[]> {
-    const { projectId } = scenarioIdInputSchema.pick({ projectId: true }).parse(input);
+    const { projectId } = scenarioIdInputSchema
+      .pick({ projectId: true })
+      .parse({ projectId: input.projectId });
     return this.options.repository.findTestSuites({
       projectId,
       includeArchived: input.includeArchived,
