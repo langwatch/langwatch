@@ -13,6 +13,8 @@ import {
 import { useMemo, type ReactNode } from "react";
 import { DRAWER_OPEN_PARAM } from "../../../drawers";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { openPlatformDrawer } from "../../behavior/model-provider-open-platform-drawer";
 
 type OrganizationGraphEntry = {
@@ -30,6 +32,13 @@ export function ModelProviderHost({ children }: { children: ReactNode }) {
   const activeScope = session.activeScope();
 
   const organizations = modelProviderApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `organization` below is
+  // read off this query, so a refusal left the model provider screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your model providers",
+  });
 
   const organization = useMemo(
     () =>
@@ -107,6 +116,9 @@ export function ModelProviderHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <ModelProviderHostProvider value={host}>{children}</ModelProviderHostProvider>;
 }

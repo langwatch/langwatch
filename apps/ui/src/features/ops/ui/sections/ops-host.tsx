@@ -9,6 +9,8 @@ import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiAddress } from "../../../../behavior/ui-address";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 
 /** The grant the Ops workspace is behind. */
 export const OPS_VIEW_PERMISSION = "ops:view";
@@ -22,6 +24,13 @@ export function OpsHost({ children }: { children: ReactNode }) {
   const asPath = useUiAddress();
 
   const organizations = opsApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `project` below is read
+  // off this query, so a refusal left the ops screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load ops",
+  });
 
   /** The project the address is about, and the key it ingests with — resolved from the one graph read, `undefined` with none in scope. */
   const project = useMemo(() => {
@@ -65,6 +74,9 @@ export function OpsHost({ children }: { children: ReactNode }) {
     }),
     [project, reading, asPath, sharedInstall, session, route, navigation, feedback],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <OpsHostProvider value={host}>{children}</OpsHostProvider>;
 }

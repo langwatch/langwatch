@@ -13,6 +13,8 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { notifyDatasetSuccess } from "../../behavior/dataset-success-notice";
 import { datasetCopyTargets } from "../../model/dataset-copy-targets";
 
@@ -22,6 +24,13 @@ export function DatasetHost({ children }: { children: ReactNode }) {
   const { isLiteMember } = useUiOrganizationFacts();
 
   const organizations = datasetApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `project` below is read
+  // off this query, so a refusal left the datasets screen empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your datasets",
+  });
 
   /** The project the address is about, resolved from the one graph read rather than a second query. */
   const project = useMemo(() => {
@@ -67,6 +76,9 @@ export function DatasetHost({ children }: { children: ReactNode }) {
     }),
     [project, session, isLiteMember, copyTargets, reading, route, navigation, feedback],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <DatasetHostProvider value={host}>{children}</DatasetHostProvider>;
 }

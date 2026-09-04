@@ -16,6 +16,8 @@ import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { UiProjectSwitcher } from "../../../chrome";
 
 export function ProjectHost({ children }: { children: ReactNode }) {
@@ -25,6 +27,14 @@ export function ProjectHost({ children }: { children: ReactNode }) {
   const scope = session.activeScope();
 
   const organizations = projectApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `organization` and
+  // `project` below are read off this query, so a refusal left the settings
+  // screen empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your project settings",
+  });
 
   const organization: ProjectHostOrganization | undefined = useMemo(
     () => (organizations.data ?? []).find((candidate) => candidate.id === scope.organizationId),
@@ -56,6 +66,9 @@ export function ProjectHost({ children }: { children: ReactNode }) {
     }),
     [organization, project, isLiteMember, session, feedback, openDrawer],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <ProjectHostProvider value={host}>{children}</ProjectHostProvider>;
 }

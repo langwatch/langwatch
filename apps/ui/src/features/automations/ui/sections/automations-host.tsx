@@ -14,6 +14,8 @@ import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { resolveUiFailureCopy } from "../../../../behavior/ui-feedback";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { resolveAutomationsDrawerAddress } from "../../behavior/automations-drawer-address";
 import { DRAWER_OPEN_PARAM } from "../../../drawers";
 
@@ -35,6 +37,13 @@ export function AutomationsHost({ children }: { children: ReactNode }) {
   const scope = session.activeScope();
 
   const organizations = automationApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `placement` below is read
+  // off this query, so a refusal left the automations screen empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your automations",
+  });
 
   /** The organization, team and project the address is about, resolved from the one graph read rather than three. */
   const placement = useMemo(() => {
@@ -105,6 +114,9 @@ export function AutomationsHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <AutomationHostProvider value={host}>{children}</AutomationHostProvider>;
 }

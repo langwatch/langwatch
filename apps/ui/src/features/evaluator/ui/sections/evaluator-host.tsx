@@ -12,7 +12,9 @@ import {
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { uiCopyTargets } from "../../../../model/ui-copy-targets";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { overlayQuery } from "../../behavior/evaluator-overlay-address";
 
 /** The grant a replication target is judged by. Evaluators live under evaluations. */
@@ -23,6 +25,13 @@ export function EvaluatorHost({ children }: { children: ReactNode }) {
   const scope = session.activeScope();
 
   const organizations = evaluatorApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `project` below is read
+  // off this query, so a refusal left the evaluators screen empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your evaluators",
+  });
 
   /** The project the address is about, resolved from the one graph read rather than a second query. */
   const project = useMemo(() => {
@@ -60,6 +69,9 @@ export function EvaluatorHost({ children }: { children: ReactNode }) {
     }),
     [project, session, copyTargets, reading, route, feedback],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <EvaluatorHostProvider value={host}>{children}</EvaluatorHostProvider>;
 }

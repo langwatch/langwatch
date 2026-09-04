@@ -15,6 +15,8 @@ import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { resolveUiFailureCopy } from "../../../../behavior/ui-feedback";
 import { useUiRpc } from "../../../../behavior/ui-rpc";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { openAgentEditor, openConnectedAgentDrawer } from "../../behavior/agent-editor";
 import { TrpcAgentBrowserAdapter } from "../../behavior/trpc-agent-browser.adapter";
 import { agentCopyTargets } from "../../model/agent-copy-targets";
@@ -25,6 +27,13 @@ export function AgentHost({ children }: { children: ReactNode }) {
   const rpc = useUiRpc();
 
   const organizations = agentApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: the project below is read
+  // off this query, so a refusal left the agents screen empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your agents",
+  });
 
   const agents = useMemo(() => TrpcAgentBrowserAdapter.create(rpc), [rpc]);
 
@@ -85,6 +94,9 @@ export function AgentHost({ children }: { children: ReactNode }) {
     }),
     [project, agents, copyTargets, reading, route, navigation, feedback],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <AgentManagementHostProvider value={host}>{children}</AgentManagementHostProvider>;
 }

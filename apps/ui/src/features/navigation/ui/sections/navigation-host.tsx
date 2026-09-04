@@ -32,9 +32,10 @@ import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
 import { selectAmbientTeam, userCanOpenTeam } from "../../../../behavior/ui-scope-resolution";
 import { useUiScopeMemory } from "../../../../behavior/ui-scope-storage";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { signOutUi } from "../../../../behavior/ui-session-client";
 import { useUiRouteReading } from "../../../../behavior/ui-scope-route";
-import { UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { readNavigationFeatureFlag } from "../../behavior/navigation-feature-flag";
 import { rememberNavigationScope } from "../../behavior/navigation-remember-scope";
 
@@ -144,6 +145,14 @@ export function NavigationHostSection({
   const address = useUiAddress();
 
   const organizations = navigationApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: every scope answer below
+  // (and every screen this shell wraps) is read off this query, so a
+  // refusal left the whole chrome empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your workspace",
+  });
 
   const graph = useMemo(
     () => toNavigationOrganizations((organizations.data ?? []) as OrganizationsRead),
@@ -373,6 +382,9 @@ export function NavigationHostSection({
       openDrawerByName,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return (
     <NavigationHostProvider value={host}>

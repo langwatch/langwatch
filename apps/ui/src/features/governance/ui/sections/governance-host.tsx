@@ -12,6 +12,8 @@ import {
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { resolveGovernanceOrganization } from "../../behavior/governance-organization-lookup";
 
 /**
@@ -33,6 +35,14 @@ export function GovernanceHost({ children }: { children: ReactNode }) {
   const organizationId = scope.organizationId;
 
   const organizations = governanceApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `organization` below is
+  // read off this query, so a refusal left the governance screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your governance settings",
+  });
+
   const usage = governanceApi.limits.getUsage.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
@@ -74,6 +84,9 @@ export function GovernanceHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <GovernanceHostProvider value={host}>{children}</GovernanceHostProvider>;
 }

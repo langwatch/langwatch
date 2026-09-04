@@ -16,6 +16,8 @@ import {
   useUiOrganizationFacts,
   useUiPlatformAdmin,
 } from "../../../../behavior/ui-organization-facts";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 
 type OrganizationGraphEntry = {
   id: string;
@@ -34,6 +36,13 @@ export function DataRetentionHost({ children }: { children: ReactNode }) {
   const isPlatformAdmin = useUiPlatformAdmin();
 
   const organizations = dataRetentionApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `organization` below is
+  // read off this query, so a refusal left the data retention screen empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your data retention settings",
+  });
 
   const organization = useMemo(
     () =>
@@ -100,6 +109,9 @@ export function DataRetentionHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <DataRetentionHostProvider value={host}>{children}</DataRetentionHostProvider>;
 }

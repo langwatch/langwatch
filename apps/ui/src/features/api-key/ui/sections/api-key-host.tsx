@@ -23,6 +23,8 @@ import {
   lookupCliDeviceCode,
 } from "../../../../behavior/ui-cli-device-flow";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { DRAWER_OPEN_PARAM } from "../../../drawers";
 import { copyToClipboard } from "../../behavior/api-key-clipboard";
 import { recordLeadSourceIfAbsent } from "../../behavior/api-key-lead-source";
@@ -83,6 +85,14 @@ export function ApiKeyHost({ children }: { children: ReactNode }) {
 
   const organizations = apiKeyApi.organization.getAll.useQuery({ isDemo: false });
   const graph = organizations.data as OrganizationGraphEntry[] | undefined;
+
+  // A refused graph is a state, not an empty one: the scope and every
+  // resolved project below is read off this query, so a refusal left the
+  // API key screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your API keys",
+  });
 
   const organization = useMemo(
     () => graph?.find((candidate) => candidate.id === activeScope.organizationId),
@@ -220,6 +230,9 @@ export function ApiKeyHost({ children }: { children: ReactNode }) {
       navigation,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <ApiKeyHostProvider value={host}>{children}</ApiKeyHostProvider>;
 }

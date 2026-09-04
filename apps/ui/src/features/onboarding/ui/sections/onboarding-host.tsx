@@ -18,7 +18,9 @@ import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { uiLeaveTo } from "../../../../behavior/ui-departure";
 import { copyToClipboard } from "../../behavior/onboarding-copy-to-clipboard";
 import { useUiPrefersReducedMotion } from "../../../../behavior/ui-reduced-motion";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { signOutUi } from "../../../../behavior/ui-session-client";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 
 /** The address without its query string or fragment. */
 function pathnameOf(address: string): string {
@@ -35,6 +37,14 @@ export function OnboardingHost({ children }: { children: ReactNode }) {
 
   const organizations = onboardingApi.organization.getAll.useQuery({ isDemo: false });
   const graph = organizations.data;
+
+  // A refused graph is a state, not an empty one: `organization` and
+  // `activeProject` below are read off this query, so a refusal left the
+  // onboarding screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your onboarding",
+  });
 
   const hostOrganizations = useMemo<readonly OnboardingOrganization[] | undefined>(
     () =>
@@ -146,6 +156,9 @@ export function OnboardingHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <OnboardingHostProvider value={host}>{children}</OnboardingHostProvider>;
 }

@@ -12,7 +12,9 @@ import {
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { uiCopyTargets } from "../../../../model/ui-copy-targets";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { openMonitorOverlay } from "../../behavior/monitor-open-overlay";
 
 /** The grant a replication target is judged by. Monitors live under evaluations. */
@@ -23,6 +25,13 @@ export function MonitorHost({ children }: { children: ReactNode }) {
   const scope = session.activeScope();
 
   const organizations = monitorApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `project` below is read
+  // off this query, so a refusal left the online evaluations screen empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your online evaluations",
+  });
 
   const project = useMemo(() => {
     if (!scope.projectId) return { projectId: void 0, projectSlug: void 0 };
@@ -68,6 +77,9 @@ export function MonitorHost({ children }: { children: ReactNode }) {
     }),
     [project, session, copyTargets, timeZone, reading, route, navigation, feedback],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <MonitorHostProvider value={host}>{children}</MonitorHostProvider>;
 }

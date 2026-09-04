@@ -12,6 +12,8 @@ import {
 import { useMemo, type ReactNode } from "react";
 import { browserUiLogger, browserUiStorage } from "../../../../behavior/ui-browser-storage";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { resolvePromptDrawerAddress } from "../../behavior/prompt-drawer-address";
 import type { PromptTabCapabilities } from "../../behavior/prompt-tab-capabilities";
 import { promptCopyTargets } from "../../model/prompt-copy-targets";
@@ -31,6 +33,13 @@ export function PromptHost({ children }: { children: ReactNode }) {
   const scope = session.activeScope();
 
   const organizations = promptApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `project` below is read
+  // off this query, so a refusal left Prompt Studio empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your prompts",
+  });
 
   /**
    * The project the address is about, resolved from the one graph read rather
@@ -87,6 +96,9 @@ export function PromptHost({ children }: { children: ReactNode }) {
     }),
     [scope.organizationId, project, session, copyTargets, reading, route, navigation, feedback],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <PromptHostProvider value={host}>{children}</PromptHostProvider>;
 }

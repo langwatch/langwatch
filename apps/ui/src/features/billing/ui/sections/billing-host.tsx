@@ -15,6 +15,8 @@ import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { uiLeaveTo } from "../../../../behavior/ui-departure";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 
 function readDeployment(): { isSaaS: boolean; isSettled: boolean } {
   try {
@@ -34,6 +36,13 @@ export function BillingHost({ children }: { children: ReactNode }) {
   const scope = session.activeScope();
 
   const organizations = billingApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `organization` below is
+  // read off this query, so a refusal left the billing screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your billing",
+  });
 
   const organization: BillingHostOrganization | undefined = useMemo(() => {
     const found = (organizations.data ?? []).find(
@@ -69,6 +78,9 @@ export function BillingHost({ children }: { children: ReactNode }) {
       failed: (failure) => feedback.failed(failure),
     };
   }, [organization, activeTeamId, reading, navigation, feedback]);
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <BillingHostProvider value={host}>{children}</BillingHostProvider>;
 }

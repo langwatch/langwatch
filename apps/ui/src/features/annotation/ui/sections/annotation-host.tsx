@@ -12,6 +12,8 @@ import {
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { presentAnnotationSuccess } from "../../behavior/annotation-success-notice";
 
 export function AnnotationHost({ children }: { children: ReactNode }) {
@@ -20,6 +22,13 @@ export function AnnotationHost({ children }: { children: ReactNode }) {
   const { isLiteMember } = useUiOrganizationFacts();
 
   const organizations = annotationApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `placement` below is read
+  // off this query, so a refusal left the annotations screen empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your annotations",
+  });
 
   const actor = session.currentUser();
 
@@ -77,6 +86,9 @@ export function AnnotationHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <AnnotationHostProvider value={host}>{children}</AnnotationHostProvider>;
 }

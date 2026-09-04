@@ -16,6 +16,8 @@ import { writeUiClipboard } from "../../../../behavior/ui-clipboard";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { uiLeaveTo } from "../../../../behavior/ui-departure";
 import { authorizeUiMcpClient } from "../../../../behavior/ui-mcp-authorize";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { UiProjectSwitcher } from "../../../chrome";
 import { copyProjectApiKeyToClipboard } from "../../behavior/authorize-copy-to-clipboard";
 
@@ -44,6 +46,13 @@ export function AuthorizeHost({ children }: { children: ReactNode }) {
 
   const organizations = apiKeyApi.organization.getAll.useQuery({ isDemo: false });
   const graph = organizations.data as OrganizationGraphEntry[] | undefined;
+
+  // A refused graph is a state, not an empty one: `activeProject` below is
+  // read off this query, so a refusal left the hand-off screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load this project",
+  });
 
   const activeProject = useMemo(() => {
     if (!activeScope.projectId) return void 0;
@@ -102,6 +111,9 @@ export function AuthorizeHost({ children }: { children: ReactNode }) {
     }),
     [activeScope.projectId, activeProject, sessionStatus, address, reading, navigation, feedback],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <AuthorizeHostProvider value={host}>{children}</AuthorizeHostProvider>;
 }

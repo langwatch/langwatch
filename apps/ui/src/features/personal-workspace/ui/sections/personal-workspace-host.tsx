@@ -21,6 +21,8 @@ import {
   renameUiPasskey,
 } from "../../../../behavior/ui-passkeys";
 import { useRefreshUiSession } from "../../../../behavior/ui-session-refresh";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import {
   resolvePersonalWorkspaceOrganization,
   resolvePersonalWorkspaceProject,
@@ -54,6 +56,14 @@ export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
   const actor = session.currentUser();
 
   const organizations = personalWorkspaceApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `organization` and
+  // `project` below are read off this query, so a refusal left the
+  // personal-workspace screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your personal workspace",
+  });
 
   /** The graph, with each project stamped with its team id — the screens read a flat project and need it. */
   const organizationsWithTeamIds: readonly PersonalOrganization[] = useMemo(
@@ -140,6 +150,9 @@ export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <PersonalWorkspaceHostProvider value={host}>{children}</PersonalWorkspaceHostProvider>;
 }

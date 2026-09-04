@@ -14,6 +14,8 @@ import { useMemo, type ReactNode } from "react";
 import { DRAWER_OPEN_PARAM } from "../../../drawers";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { openGatewayDrawer } from "../../behavior/gateway-open-drawer";
 import {
   resolveGatewayOrganization,
@@ -50,6 +52,14 @@ export function GatewayHost({ children }: { children: ReactNode }) {
   const actor = session.currentUser();
 
   const organizations = gatewayApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: every scope answer below is
+  // read off this query, so a refusal left the gateway screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your AI gateway",
+  });
+
   const usage = gatewayApi.limits.getUsage.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
@@ -124,6 +134,9 @@ export function GatewayHost({ children }: { children: ReactNode }) {
       feedback,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <GatewayHostProvider value={host}>{children}</GatewayHostProvider>;
 }
