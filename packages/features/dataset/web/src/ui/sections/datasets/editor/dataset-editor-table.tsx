@@ -34,7 +34,7 @@ import { Pagination } from "@langwatch/design-system/pagination";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { api } from "@langwatch/workflow-web/studio-host/api";
@@ -593,12 +593,8 @@ export function DatasetEditorTable({
 
     downloadCsv({
       fields: exportColumns.map((col) => col.name),
-      rows: exportRecords.map((record) =>
-        exportColumns.map((col) => record[col.name] ?? ""),
-      ),
-      fileName: `${
-        datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"
-      }.csv`,
+      rows: exportRecords.map((record) => exportColumns.map((col) => record[col.name] ?? "")),
+      fileName: `${datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"}.csv`,
     });
   }, [columns, datasetId, datasetName, downloadDataset, project?.id, store]);
 

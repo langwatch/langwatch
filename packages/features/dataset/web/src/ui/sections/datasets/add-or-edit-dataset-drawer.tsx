@@ -22,7 +22,7 @@ import {
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { Drawer } from "@langwatch/workflow-web/components/ui/drawer";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-web";
 import {
   type DatasetColumns,

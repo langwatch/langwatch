@@ -21,7 +21,7 @@ import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
 import { useFilterParams } from "@langwatch/analytics-web/hooks/useFilterParams";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import {
   type Evaluators,
   evaluatorsSchema,

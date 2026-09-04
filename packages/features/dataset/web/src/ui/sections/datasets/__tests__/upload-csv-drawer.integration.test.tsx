@@ -51,7 +51,7 @@ vi.mock("@langwatch/dataset-web", async (importActual) => {
   };
 });
 
-vi.mock("@langwatch/workflow-web/studio-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "proj" },
   }),

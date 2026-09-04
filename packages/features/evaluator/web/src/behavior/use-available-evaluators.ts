@@ -8,7 +8,7 @@ import {
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 
 export const useAvailableEvaluators = ():
   | Record<EvaluatorTypes | `custom/${string}`, EvaluatorDefinition<EvaluatorTypes>>

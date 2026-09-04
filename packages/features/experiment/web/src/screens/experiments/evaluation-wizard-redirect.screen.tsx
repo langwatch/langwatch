@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { ExperimentType } from "../../model/prisma-types";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 

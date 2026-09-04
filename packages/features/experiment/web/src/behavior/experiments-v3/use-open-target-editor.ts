@@ -19,7 +19,7 @@ import {
 } from "@langwatch/prompt-web/surfaces/variables";
 import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { DRAWER_WIDTH } from "../../model/experiments-v3/constants";
 import type { FieldMapping, TargetConfig } from "../../model/experiments-v3/types";

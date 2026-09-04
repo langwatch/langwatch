@@ -19,7 +19,7 @@ import { EvaluationExecutionMode } from "@langwatch/workflow-web/model/prisma-ty
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 import { slugify } from "@langwatch/design-system/slugify";
 import { useAvailableEvaluators } from "../../../behavior/use-available-evaluators";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "@langwatch/workflow-web/utils/constants";
 import { DEFAULT_MAPPINGS, migrateLegacyMappings } from "@langwatch/evaluator-contract";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";

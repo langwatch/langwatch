@@ -12,7 +12,7 @@ import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
 import { modelProviderIcons, ProviderIconGlyph } from "./modelProviders/icons-map";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { isCodexModel, isModelAllowedForFeature } from "@langwatch/model-provider-contract";
 import {
   buildCustomModelDisplayNames,

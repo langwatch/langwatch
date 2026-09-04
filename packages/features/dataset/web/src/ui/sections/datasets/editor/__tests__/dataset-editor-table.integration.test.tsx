@@ -16,7 +16,7 @@ import { DatasetEditorTable, type InMemoryDataset } from "../dataset-editor-tabl
 
 // ── Mocks ────────────────────────────────────────────────────────────
 
-vi.mock("@langwatch/workflow-web/studio-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme-app" },
     organization: { id: "org-1", name: "Acme" },

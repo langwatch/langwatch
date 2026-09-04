@@ -19,7 +19,7 @@ import { GenerateApiSnippetDialog } from "@langwatch/workflow-web/components/Gen
 import { DataSourcePicker } from "@langwatch/workflow-web/components/run-via-api/DataSourcePicker";
 import { buildRunSnippet } from "@langwatch/workflow-web/components/run-via-api/runSnippets";
 import { useRunViaApiTabs } from "@langwatch/workflow-web/components/run-via-api/useRunViaApiTabs";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { WorkflowField } from "@langwatch/workflow-contract";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";

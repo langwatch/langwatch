@@ -4,7 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { readHandledError } from "@langwatch/workflow-web/studio-host/errors";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { captureException, toError } from "../../model/posthog-error-capture";
 import { isNotFound as isTrpcNotFound } from "@langwatch/trace-web/utils/trpcError";

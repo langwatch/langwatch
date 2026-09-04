@@ -21,7 +21,7 @@ const savedCodeEvaluator = {
   },
 };
 
-vi.mock("@langwatch/workflow-web/studio-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "p1", slug: "p1" },
   }),
@@ -48,9 +48,12 @@ vi.mock("@langwatch/workflow-web/studio-host/errors", () => ({
 
 // Stub the monaco editor and the variables section so the test stays focused on
 // the drawer's create-vs-edit behavior without pulling in heavy editors.
-vi.mock("@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport", () => ({
-  CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
-}));
+vi.mock(
+  "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport",
+  () => ({
+    CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
+  }),
+);
 vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
   VariablesSection: () => <div data-testid="variables-section" />,
 }));

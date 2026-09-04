@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { VersionHistoryListPopover } from "../version-history-list-popover";
 
-vi.mock("@langwatch/workflow-web/studio-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_1" } }),
 }));
 vi.mock("@langwatch/workflow-web/studio-host/toaster", () => ({
@@ -24,7 +24,11 @@ vi.mock("@langwatch/workflow-web/studio-host/errors", () => ({ showErrorToast: v
 
 const mockUseQuery = vi.fn();
 vi.mock("@langwatch/workflow-web/studio-host/api", () => ({
-  api: { prompts: { getAllVersionsForPrompt: { useQuery: (...args: unknown[]) => mockUseQuery(...args) } } },
+  api: {
+    prompts: {
+      getAllVersionsForPrompt: { useQuery: (...args: unknown[]) => mockUseQuery(...args) },
+    },
+  },
 }));
 
 type Author = { name: string | null; email?: string | null; image?: string | null } | null;
@@ -95,9 +99,9 @@ describe("VersionHistoryListPopover author display", () => {
 
       await waitFor(
         () =>
-          expect(
-            screen.getAllByText("No author recorded for this version").length,
-          ).toBeGreaterThan(0),
+          expect(screen.getAllByText("No author recorded for this version").length).toBeGreaterThan(
+            0,
+          ),
         { timeout: 3000 },
       );
     });

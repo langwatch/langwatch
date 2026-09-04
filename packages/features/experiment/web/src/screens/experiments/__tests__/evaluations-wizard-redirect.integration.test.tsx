@@ -23,7 +23,7 @@ vi.mock("@langwatch/workflow-web/studio-host/next-router", () => ({
   useRouter: () => ({ query: routerState.query, replace: replaceMock }),
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "p1", slug: "test-project" },
   }),

@@ -16,7 +16,7 @@ import {
   useDrawer,
   useDrawerParams,
 } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { CodeEditor } from "@langwatch/workflow-web/optimization_studio/components/code/workflow-code-editor.transport";
 import { rewriteCodeSignature } from "@langwatch/workflow-web";
 import {

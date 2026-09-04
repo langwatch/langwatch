@@ -31,7 +31,7 @@ import {
   useDrawer,
   useDrawerParams,
 } from "@langwatch/ui-host/use-drawer";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {

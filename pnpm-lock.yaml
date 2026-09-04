@@ -6409,6 +6409,9 @@ importers:
       '@langwatch/ui-drawer':
         specifier: workspace:*
         version: link:../../../ui-drawer
+      '@langwatch/ui-host':
+        specifier: workspace:*
+        version: link:../../../ui-host
       '@langwatch/workflow-web':
         specifier: workspace:*
         version: link:../../workflow/web

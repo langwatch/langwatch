@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
 import { describeError, showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import {
   type EvaluationV3Event,

@@ -37,7 +37,7 @@ import {
 } from "./saved-views-logic";
 import type { FilterParam } from "./use-filter-params";
 import { useFilterParams } from "./use-filter-params";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 
 // Re-export types and constants for consumers
 export {

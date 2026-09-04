@@ -7,7 +7,7 @@ import {
   VariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/experiments-v3/utils/mappingValidation";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useProjectSpanNames } from "@langwatch/trace-web/hooks/useProjectSpanNames";
 import { getThreadAvailableSources, getTraceAvailableSources } from "@langwatch/trace-contract";
 

@@ -19,7 +19,7 @@ import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 

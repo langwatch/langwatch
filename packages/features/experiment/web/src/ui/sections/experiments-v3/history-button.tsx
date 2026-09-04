@@ -13,7 +13,7 @@ import { BarChart2 } from "react-feather";
 import { Link } from "@langwatch/workflow-web/studio-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 
 type HistoryButtonProps = {

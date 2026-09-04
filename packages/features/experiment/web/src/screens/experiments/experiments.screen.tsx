@@ -37,7 +37,7 @@ import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-tex
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { isHandledByGlobalHandler } from "@langwatch/trace-web/utils/trpcError";

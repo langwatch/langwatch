@@ -5,7 +5,7 @@ import { usePeriodSelector } from "../elements/period-selector";
 import { filterOutEmptyFilters } from "./analytics/utils";
 import { availableFilters } from "../../model/filters/registry";
 import type { FilterField } from "../../model/filters/types";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 
 export type FilterParam =
   | string[]

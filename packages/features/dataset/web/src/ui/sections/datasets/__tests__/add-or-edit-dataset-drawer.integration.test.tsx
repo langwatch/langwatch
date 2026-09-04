@@ -16,7 +16,7 @@ vi.mock("@langwatch/ui-host/use-drawer", () => ({
   useDrawer: () => ({ closeDrawer }),
 }));
 
-vi.mock("@langwatch/workflow-web/studio-host/use-organization-team-project", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_1", slug: "acme" } }),
 }));
 

@@ -20,7 +20,7 @@ import {
   showErrorToast,
 } from "@langwatch/workflow-web/studio-host/errors";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { EmojiPickerModal } from "@langwatch/workflow-web/optimization_studio/components/properties/modals/EmojiPickerModal";
 import { getRandomWorkflowIcon } from "@langwatch/workflow-web";
 import { customEvaluatorTemplate } from "@langwatch/workflow-web";

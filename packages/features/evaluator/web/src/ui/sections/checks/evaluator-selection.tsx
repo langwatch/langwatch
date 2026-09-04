@@ -15,7 +15,7 @@ import { AlertTriangle, Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import NextLink from "@langwatch/workflow-web/utils/compat/next-link";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useFeatureFlag } from "@langwatch/workflow-web/hooks/useFeatureFlag";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {

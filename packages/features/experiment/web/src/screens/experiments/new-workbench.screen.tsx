@@ -8,7 +8,7 @@ import {
 } from "../../model/experiments-v3/types";
 import { extractPersistedState } from "../../model/experiments-v3/types/persistence";
 import { HandledErrorAlert } from "@langwatch/workflow-web/studio-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";

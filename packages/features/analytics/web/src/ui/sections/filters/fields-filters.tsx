@@ -25,7 +25,7 @@ import { ChevronDown, X } from "react-feather";
 import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { type FilterParam, useFilterParams } from "../use-filter-params";
 import { filterOutEmptyFilters } from "../analytics/utils";
 import type { AppRouter } from "@langwatch/workflow-web/studio-host/api";

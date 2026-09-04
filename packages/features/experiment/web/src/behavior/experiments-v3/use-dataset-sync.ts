@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import type { AutosaveState } from "@langwatch/dataset-web";
 import { useDatasetRecordSync } from "@langwatch/dataset-web/components/datasets/editor/useDatasetRecordSync";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { DatasetReference } from "../../model/experiments-v3/types";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store";
 

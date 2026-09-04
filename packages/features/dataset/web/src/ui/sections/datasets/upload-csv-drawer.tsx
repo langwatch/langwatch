@@ -23,7 +23,7 @@ import {
 import type { InMemoryDataset } from "./editor/dataset-editor-table";
 import { describeError, showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";

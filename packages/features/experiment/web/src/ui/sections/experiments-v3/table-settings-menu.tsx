@@ -15,7 +15,7 @@ import type { RowHeightMode } from "@langwatch/dataset-web";
 import { Popover } from "@langwatch/design-system/popover";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
 import { DEFAULT_CONCURRENCY } from "../../../model/experiments-v3/types";
 import { RunViaApiDialogContainer } from "./run-via-api-button";

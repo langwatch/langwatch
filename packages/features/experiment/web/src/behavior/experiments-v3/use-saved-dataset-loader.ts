@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import type {
   DatasetColumn,

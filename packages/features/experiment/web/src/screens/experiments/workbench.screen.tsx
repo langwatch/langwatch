@@ -34,7 +34,7 @@ import { useSavedDatasetLoader } from "../../behavior/experiments-v3/use-saved-d
 import { useTargetNames } from "../../behavior/experiments-v3/use-target-name";
 import { useWorkbenchUpdateListener } from "../../behavior/experiments-v3/use-workbench-update-listener";
 import { HandledErrorAlert } from "@langwatch/workflow-web/studio-host/errors";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useRouter } from "@langwatch/workflow-web/studio-host/next-router";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { assertCrispChatHidden } from "@langwatch/workflow-web/utils/crispBubblePolicy";

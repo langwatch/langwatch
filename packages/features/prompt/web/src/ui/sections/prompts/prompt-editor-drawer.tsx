@@ -24,7 +24,7 @@ import {
   useDrawerParams,
 } from "@langwatch/ui-host/use-drawer";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useRegisterDrawerFooter } from "@langwatch/workflow-web";
 import { PromptEditorFooter } from "./prompt-editor-footer";
 import { PromptEditorHeader } from "./prompt-editor-header";

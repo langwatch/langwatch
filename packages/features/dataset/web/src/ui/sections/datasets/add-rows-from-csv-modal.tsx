@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import { Dialog } from "@langwatch/workflow-web/components/ui/dialog";
 import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import {
   type DatasetColumns,
   type DatasetRecordEntry,
