@@ -72,6 +72,35 @@ else
   check "the percent sign reads as %25" no
 fi
 
+# A paragraph over the word limit fails, a list item over it fails, and a
+# table row or a paragraph split in two passes. The limit is set low so the
+# page stays short.
+LONG_PAGE="$WORK/docs/long.mdx"
+{
+  printf -- '---\ntitle: Long\n---\n\n'
+  printf 'one two three four five six seven eight nine ten eleven twelve\n\n'
+  printf -- '- one two three four five six seven eight nine ten eleven twelve\n- one two three\n\n'
+  printf '| one two three four five six seven eight nine ten eleven twelve |\n\n'
+  printf 'one two three four five six\n\none two three four five six\n'
+} > "$LONG_PAGE"
+rm -f "$WORK/docs/$PAGE_NAME"
+
+LONG_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+LONG_COUNT="$(printf '%s\n' "$LONG_OUTPUT" | grep -c 'words, the limit is 10' || true)"
+
+if [[ "$LONG_COUNT" -eq 2 ]]; then
+  check "the long paragraph and the long list item fail, the table row and the split paragraphs pass" yes
+else
+  check "the long paragraph and the long list item fail, the table row and the split paragraphs pass" no
+  echo "Output: $LONG_OUTPUT"
+fi
+
+if printf '%s\n' "$LONG_OUTPUT" | grep -q 'long.mdx,line=5::'; then
+  check "the annotation points at the first line of the long paragraph" yes
+else
+  check "the annotation points at the first line of the long paragraph" no
+fi
+
 if [[ $FAILURES -gt 0 ]]; then
   echo ""
   echo "Annotation: $ANNOTATION"
