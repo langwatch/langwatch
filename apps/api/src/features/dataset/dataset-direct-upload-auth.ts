@@ -29,50 +29,13 @@ import type {
 import type { ProjectService } from "@langwatch/project-contract";
 import type { Context } from "hono";
 
+import { isCrossSiteRequest } from "../../api-rest.cross-site";
+
 import type { ApiHandlerManagedCredentials } from "../../app/api-handler-managed-credential";
 import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session";
 
 const PERMISSION = "datasets:manage" as const;
 
-/**
- * CSRF defense-in-depth for the COOKIE-authed path only. The direct-upload POST
- * is a `multipart/form-data` "simple request" (no preflight) authenticated by the
- * NextAuth session cookie, so without this a malicious cross-origin page could
- * forge it with the victim's cookie. (The API-key path is not exposed: keys
- * aren't auto-attached by the browser.)
- *
- * `Sec-Fetch-Site` is the primary signal — set by every modern browser based on
- * the real request initiator and unaffected by reverse proxies; `cross-site` is
- * exactly the CSRF vector, while `same-origin`/`same-site`/`none` (direct nav)
- * are legitimate. For older browsers that omit it, fall back to comparing the
- * `Origin` host against the forwarded/Host header.
- */
-function isCrossSiteRequest(c: Context): boolean {
-  const secFetchSite = c.req.header("sec-fetch-site");
-  if (secFetchSite) {
-    return secFetchSite === "cross-site";
-  }
-  const origin = c.req.header("origin");
-  // Fail CLOSED: with neither `Sec-Fetch-Site` nor `Origin` there is no positive
-  // same-site signal, so treat it as cross-site. A real same-site upload from
-  // the UI always carries one of the two (modern browsers send `Sec-Fetch-Site`;
-  // older ones send `Origin` on a cross-origin POST), so this only rejects
-  // pathological/forged contexts — never a legitimate cookie-authed upload.
-  if (!origin) return true;
-  const host = c.req.header("x-forwarded-host") ?? c.req.header("host") ?? "";
-  try {
-    return new URL(origin).host !== host;
-  } catch {
-    return true; // malformed Origin → treat as cross-site
-  }
-}
-
-/**
- * Authorize a direct-upload request for `projectId` via session cookie OR API
- * key, requiring `datasets:manage`. Returns the resolved `projectId` + `teamId`
- * (the latter so the route can enforce resource limits in-handler) or a
- * discriminated error the route maps to a JSON response.
- */
 /**
  * Authorize a direct-upload request for `projectId` via browser session OR API
  * key, requiring `datasets:manage`. Returns the resolved `projectId` + `teamId`

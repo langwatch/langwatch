@@ -41,6 +41,7 @@ import { ApiApplication, MissingAgentService, MissingSecretService } from "../..
 import { ApiAuditPort } from "../../api-request.policy";
 import { ApiRestSecurity } from "../../api-rest.security";
 import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse";
+import { sameOriginSseInit } from "../../app-trpc/__tests__/support/sse-browser-request";
 import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
 import {
   ApiTrpcFeaturesComposition,
@@ -51,7 +52,13 @@ import {
   composeApiProductCollaborators,
   type ApiModelProviderEvidencePort,
 } from "../api-trpc-collaborators.product.composition";
-import { stub, stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+import {
+  stub,
+  stubApplicationSlices,
+  stubComposedFeatures,
+  stubInfrastructureEntitlements,
+  testHalves,
+} from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -410,8 +417,13 @@ function composeApplication() {
   if (!collaborators) throw new Error("the collaborator set was incomplete");
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-      composed: stubComposedFeatures(),
-    infrastructure: { ...stubInfrastructureEntitlements(), prisma: prisma.client, authz: testAuthz(), audit },
+    composed: stubComposedFeatures(),
+    infrastructure: {
+      ...stubInfrastructureEntitlements(),
+      prisma: prisma.client,
+      authz: testAuthz(),
+      audit,
+    },
     collaborators,
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
@@ -663,6 +675,7 @@ describe("given an API process composed with the product half of the record", ()
       );
       const response = await application.hono.request(
         `/api/sse/export.onExportProgress?input=${input}`,
+        sameOriginSseInit(),
       );
 
       expect(response.status).toBe(200);

@@ -13,10 +13,19 @@
  * no feature: nothing about it is a fact about traces, scenarios or prompts.
  * The one thing it does own is the response shape, which is bytes rather than
  * JSON, and the upstream status passthrough that a caller distinguishes a
- * broken link from a refused one by.
+ * broken link from a refused one by. That shape is NOT this module's own
+ * invention: it borrows the stored-object read hardening wholesale, because
+ * relayed bytes on the product's origin are the same hazard whether they came
+ * out of our bucket or off somebody else's host.
  */
 import { publicEndpoint } from "@langwatch/api";
-import { type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
+import {
+  safeMediaType,
+  sanitizeFilenameSegment,
+  STORED_OBJECT_RESPONSE_BASE_HEADERS,
+  type AppRestSecurity,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
 import { createSsrfUrlValidator, fetchValidatedDestination } from "@langwatch/egress";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -77,8 +86,18 @@ export function createImageProxyRestApp(options: {
           return c.json({ error: "URL does not point to an image" }, 400);
         }
 
+        // The SAME hardening every stored-object read carries, from the same
+        // place, because this door has the same problem: the bytes are somebody
+        // else's and they come back on the product's own origin. `image/` alone
+        // does not mean inert — `image/svg+xml` is a document that can carry
+        // script — so the CSP sandbox is what makes the type safe to honour.
         return new Response(await response.arrayBuffer(), {
-          headers: { "Content-Type": contentType, "Cache-Control": CACHE_CONTROL },
+          headers: {
+            "Content-Type": safeMediaType(mediaTypeOf(contentType)),
+            "Content-Disposition": `inline; filename="${proxiedFilename(url)}"`,
+            "Cache-Control": CACHE_CONTROL,
+            ...STORED_OBJECT_RESPONSE_BASE_HEADERS,
+          },
         });
       } catch {
         // One body for every failure, deliberately: a refused destination, a
@@ -90,4 +109,20 @@ export function createImageProxyRestApp(options: {
     });
 
   return secured.hono;
+}
+
+/** The bare media type, with the upstream's `; charset=…` parameters dropped. */
+function mediaTypeOf(contentType: string): string {
+  return (contentType.split(";")[0] ?? "").trim().toLowerCase();
+}
+
+/**
+ * A filename for the `Content-Disposition`, taken from the requested URL's
+ * last path segment and sanitised the way every other byte door sanitises one:
+ * the whole string is the caller's, so it reaches a header only as ASCII
+ * filename-safe characters.
+ */
+function proxiedFilename(requestedUrl: string): string {
+  const segments = requestedUrl.split("?")[0]?.split("/") ?? [];
+  return sanitizeFilenameSegment(segments[segments.length - 1] ?? "") || "image";
 }

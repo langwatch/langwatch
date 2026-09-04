@@ -25,6 +25,12 @@
  * protocol error here. {@link sseErrorFrame} is the only writer of the
  * protocol's error frame.
  *
+ * The lane serves SUBSCRIPTIONS and refuses everything else. A GET carries a
+ * `SameSite=Lax` session cookie across sites, and `fetchRequestHandler`'s own
+ * refusal of a mutation over GET does not apply here, so the two gates below —
+ * the same-origin check and the procedure-type check — are what stand between
+ * a page a signed-in person visits and every mutation on the router.
+ *
  * What this module deliberately does NOT own is the caller. Resolving a
  * browser session, building a request context and choosing which router the
  * path is addressed against are all the process's, and they arrive as
@@ -37,6 +43,12 @@ import { handlerManagedAuth } from "@langwatch/api";
 import type { AppRestSecurity, SecuredApp } from "@langwatch/api/rest";
 import { TRPCError } from "@trpc/server";
 import superjson from "superjson";
+import { isCrossSiteRequest } from "../api-rest.cross-site";
+import {
+  LiveStreamCrossSiteBlockedError,
+  LiveStreamNotFoundError,
+  LiveStreamUnsupportedProcedureError,
+} from "./app-trpc.sse.errors";
 
 /** How often the channel writes a comment so an idle proxy keeps it open. */
 export const SSE_KEEPALIVE_INTERVAL_MS = 25_000;
@@ -67,6 +79,18 @@ export interface SseSubscriptionPorts {
     request: Request;
     signal: AbortSignal | undefined;
   }): Promise<SseSubscriptionCaller>;
+
+  /**
+   * What KIND of procedure the composed router carries at a dotted path, read
+   * off its own procedure record rather than off the caller.
+   *
+   * The caller cannot answer this. `createCaller` exposes queries, mutations
+   * and subscriptions as identical callable leaves, so walking it would run a
+   * mutation on a plain GET carrying a `SameSite=Lax` session cookie — every
+   * mutation on the router, reachable from any page a signed-in person visits.
+   * The router's record is the only place the type is still stated.
+   */
+  procedureTypeAt(path: string): "query" | "mutation" | "subscription" | undefined;
 }
 
 /**
@@ -109,6 +133,10 @@ function handledCauseOf(err: unknown): HandledError | undefined {
  * A namespace on a tRPC caller is a PROXY, and `typeof` a proxy over a
  * function is `"function"`, not `"object"` — so narrowing the walk to objects
  * would resolve nothing on a real router and answer 404 for every live view.
+ *
+ * Which is also why this walk is NOT the gate: it cannot tell a subscription
+ * from a mutation. `SseSubscriptionPorts.procedureTypeAt` answers that, and
+ * has already refused by the time this runs.
  */
 function procedureAt(
   caller: SseSubscriptionCaller,
@@ -162,6 +190,9 @@ function logStreamFailure(
  * this route enforces no RBAC permission of its own; leaving it out would say
  * nothing at all, and the declaration sweep would walk straight past the one
  * route on the process that streams.
+ *
+ * What the route DOES enforce itself is the pair of gates in the handler: the
+ * request must be same-origin, and the path must name a subscription.
  */
 export function createSseSubscriptionApp(options: {
   security: AppRestSecurity;
@@ -185,9 +216,27 @@ export function createSseSubscriptionApp(options: {
       const raw = c.req.raw;
       const url = new URL(raw.url);
 
+      // Before anything is parsed or resolved: the channel is opened by this
+      // application's own pages with a cookie the browser attaches to a
+      // cross-site top-level GET as well.
+      if (isCrossSiteRequest(c)) {
+        throw new LiveStreamCrossSiteBlockedError();
+      }
+
       const path = subscriptionPathOf(url);
       if (!path) {
         return c.json({ message: "Missing trpc path" }, 400);
+      }
+
+      // Both refusals come BEFORE the caller exists: building one resolves the
+      // request's session and context, and a path this lane will not serve
+      // should cost neither.
+      const procedureType = ports.procedureTypeAt(path);
+      if (!procedureType) {
+        throw new LiveStreamNotFoundError();
+      }
+      if (procedureType !== "subscription") {
+        throw new LiveStreamUnsupportedProcedureError();
       }
 
       const inputParam = url.searchParams.get("input") ?? undefined;
@@ -196,7 +245,7 @@ export function createSseSubscriptionApp(options: {
       const caller = await ports.createCaller({ request: raw, signal: raw.signal });
       const procedure = procedureAt(caller, path);
       if (!procedure) {
-        return c.json({ message: "Procedure not found" }, 404);
+        throw new LiveStreamNotFoundError();
       }
 
       c.header("Content-Type", "text/event-stream; charset=utf-8");

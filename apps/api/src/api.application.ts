@@ -29,12 +29,13 @@ import {
 } from "@langwatch/api/trpc";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { trace } from "@opentelemetry/api";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import superjson from "superjson";
 import type { AppTrpcFeatureRecord } from "./app-trpc/app-trpc.features";
 import type { TopicApiFeature } from "./features/topic/topic-api.feature";
 import type { ApiRequestFailureCapturePort } from "./api-process.lifecycle";
 import type { SseSubscriptionPorts } from "./app-trpc/app-trpc.sse";
+import { apiClientAddress, apiSocketAddress } from "./app/api-client-address";
 import { appTrpcErrorFormatter } from "./app-trpc/app-trpc.error-formatter";
 import { createApiTrpcPolicy } from "./app-trpc/app-trpc.policy";
 import type {
@@ -44,6 +45,13 @@ import type {
 } from "./app-trpc/app-trpc.context";
 
 export type ApiActor = Readonly<{ id: string }>;
+
+/**
+ * The bucket a caller whose address this process cannot place lands in. Its
+ * own key rather than a constant shared with every resolved caller, so one
+ * unplaceable client cannot spend the whole deployment's signed-out budget.
+ */
+const UNRESOLVED_CLIENT_ADDRESS = "unresolved";
 export type ApiServices = Readonly<{ agents: AgentApp; secrets: SecretApp }>;
 
 /** The HTTP host authenticates a request then supplies these policy operations. */
@@ -123,6 +131,13 @@ export type ApiHttpOptions = Readonly<{
  */
 type ApiTrpcContext = Omit<ApiRequestContext, "can"> & {
   can(permission: AuthzPermission, target: Readonly<{ projectId: string }>): Promise<boolean>;
+  /**
+   * The caller's address, as the trusted-proxy resolver answers it, and the
+   * key every per-IP limit on the signed-out surfaces uses. Never absent:
+   * a caller this process cannot place gets the `unresolved` bucket rather
+   * than sharing one constant key with everybody, resolved or not.
+   */
+  clientIp(): string;
   permissionChecked: boolean;
   organizationRole?: string | null;
   /**
@@ -599,9 +614,16 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
     return Object.fromEntries(request.headers);
   }
 
-  private withServices(context: ApiRequestContext, request?: Request): ApiTrpcContext {
+  private withServices(
+    context: ApiRequestContext,
+    request?: Request,
+    transport?: Context,
+  ): ApiTrpcContext {
+    const socketAddress = transport ? apiSocketAddress(transport) : undefined;
+    const clientAddress = transport ? apiClientAddress(transport) : undefined;
     return {
       ...context,
+      clientIp: () => clientAddress ?? UNRESOLVED_CLIENT_ADDRESS,
       can: context.can ?? (async () => false),
       // Written by the declared check and read by the fail-closed backstop, so
       // it starts false on EVERY request: a flag carried over from a previous
@@ -629,7 +651,12 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
        * `undefined` remains for `createCaller`, which has no request at all —
        * the two surfaces that read it already answer for an absent one.
        */
-      req: request ? { headers: ApiApplication.headersOf(request) } : undefined,
+      req: request
+        ? {
+            headers: ApiApplication.headersOf(request),
+            ...(socketAddress ? { socket: { remoteAddress: socketAddress } } : {}),
+          }
+        : undefined,
       app: {
         ...this.services,
         ...(this.features?.application ?? unavailableFeatureApplication),
@@ -697,12 +724,13 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
      * options object deferred.
      */
     const router: AnyTRPCRouter = this.trpc;
-    const handler = async (request: Request): Promise<Response> =>
+    const handler = async (request: Request, transport?: Context): Promise<Response> =>
       fetchRequestHandler({
         endpoint,
         req: request,
         router,
-        createContext: async () => this.withServices(await http.createContext(request), request),
+        createContext: async () =>
+          this.withServices(await http.createContext(request), request, transport),
       });
     const hono = new Hono();
     hono.onError(async (error, context) => {
@@ -714,12 +742,19 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
       }
       return context.text("internal server error", 500);
     });
-    hono.get(`${endpoint}/*`, (context) => handler(context.req.raw));
-    hono.post(`${endpoint}/*`, (context) => handler(context.req.raw));
+    // The Hono context travels with the request because it is the only thing
+    // holding the socket peer, and the peer is what decides whether a
+    // forwarding header may be read at all.
+    hono.get(`${endpoint}/*`, (context) => handler(context.req.raw, context));
+    hono.post(`${endpoint}/*`, (context) => handler(context.req.raw, context));
     // The subscription lane runs the SAME router these two endpoints serve, so
     // a procedure is reachable live exactly when it is reachable at all — one
     // root, two transports, rather than a second surface that could drift.
     const subscriptions = http.subscriptions?.({
+      // The router's own record, which is the only place a procedure's TYPE
+      // survives: the caller below exposes all three kinds as identical
+      // callable leaves, so the lane cannot tell them apart from it.
+      procedureTypeAt: (path) => procedureTypeOf(router, path),
       createCaller: async ({ request, signal }) =>
         this.trpc.createCaller(
           // On the context AND in the caller's options: a subscription
@@ -737,4 +772,23 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
     }
     return hono;
   }
+}
+
+/**
+ * What kind of procedure a composed router serves at a dotted path.
+ *
+ * `_def.procedures` is tRPC's own flat record, keyed by exactly the dotted
+ * path the wire carries, and a procedure's `_def.type` is the last place the
+ * distinction between a query, a mutation and a subscription survives — the
+ * caller erases it. Read defensively: the record is untyped at this bound, and
+ * an unrecognised value must answer "no procedure" rather than pass a gate.
+ */
+function procedureTypeOf(
+  router: AnyTRPCRouter,
+  path: string,
+): "query" | "mutation" | "subscription" | undefined {
+  const procedures: Record<string, { _def?: { type?: unknown } } | undefined> =
+    router._def.procedures;
+  const type = procedures[path]?._def?.type;
+  return type === "query" || type === "mutation" || type === "subscription" ? type : undefined;
 }

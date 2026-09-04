@@ -23,6 +23,7 @@ import {
   SSE_KEEPALIVE_INTERVAL_MS,
   type SseSubscriptionPorts,
 } from "../app-trpc.sse";
+import { sameOriginSseInit } from "./support/sse-browser-request";
 
 class TestHandledError extends HandledError {
   constructor(code: string, message: string, fault: "customer" | "platform" = "customer") {
@@ -61,21 +62,44 @@ function testSecurity(): AppRestSecurity {
 
 const silentLogger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 
+/** Whether the fixture's caller carries a callable leaf at a dotted path. */
+function callerCarries(caller: unknown, path: string): boolean {
+  const resolved = path.split(".").reduce<unknown>((node, key) => {
+    if (node === null || (typeof node !== "object" && typeof node !== "function")) return undefined;
+    return (node as Record<string, unknown>)[key];
+  }, caller);
+  return typeof resolved === "function";
+}
+
 function laneOver(
   caller: unknown,
   overrides: Partial<SseSubscriptionPorts> = {},
 ): {
-  request: (path: string, init?: RequestInit) => Promise<Response>;
+  request: (
+    path: string,
+    init?: Omit<RequestInit, "headers"> & { headers?: Record<string, string> },
+  ) => Promise<Response>;
   createCaller: ReturnType<typeof vi.fn>;
 } {
   const createCaller = vi.fn(async () => caller);
   const app = createSseSubscriptionApp({
     security: testSecurity(),
-    ports: { createCaller, ...overrides },
+    ports: {
+      createCaller,
+      // The process reads this off the router's own procedure record; the
+      // fixture stands in for a root where every leaf is a subscription, so a
+      // test about the type gate says so by overriding it.
+      procedureTypeAt: (path) => (callerCarries(caller, path) ? "subscription" : undefined),
+      ...overrides,
+    },
     logger: silentLogger,
   });
   return {
-    request: async (path, init) => app.hono.request(path, init),
+    // Same-origin by default, the way a browser's `EventSource` arrives. A
+    // test about the gate itself passes its own headers and gets exactly
+    // those, which is how the refusals below are reachable at all.
+    request: async (path, init) =>
+      app.hono.request(path, init?.headers ? init : sameOriginSseInit(init)),
     createCaller,
   };
 }
@@ -229,6 +253,75 @@ describe("the API subscription lane", () => {
       const response = await lane.request("/api/sse/traces/onTraceUpdate");
 
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe("given a path whose procedure is not a subscription", () => {
+    /** @scenario A mutation path on the subscription lane is refused without running */
+    it("refuses a mutation and never builds a caller to run it with", async () => {
+      const regenerateApiKey = vi.fn();
+      const lane = laneOver(
+        { project: { regenerateApiKey } },
+        { procedureTypeAt: () => "mutation" },
+      );
+
+      const input = encodeURIComponent(superjson.stringify({ projectId: "project-1" }));
+      const response = await lane.request(`/api/sse/project.regenerateApiKey?input=${input}`);
+
+      expect(response.status).toBe(405);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "live_stream_unsupported_procedure",
+      });
+      expect(regenerateApiKey).not.toHaveBeenCalled();
+      // The caller resolves the session and the request context; a path this
+      // lane will not serve must not cost either.
+      expect(lane.createCaller).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A query path on the subscription lane is refused */
+    it("refuses a query too, rather than streaming its single result", async () => {
+      const lane = laneOver({ traces: { getById: vi.fn() } }, { procedureTypeAt: () => "query" });
+
+      const response = await lane.request("/api/sse/traces.getById");
+
+      expect(response.status).toBe(405);
+    });
+  });
+
+  describe("given a request that did not come from the application's own pages", () => {
+    /** @scenario A cross-site request cannot open the subscription lane */
+    it("refuses a cross-site request before it resolves anything", async () => {
+      const lane = laneOver({ watch: async function* () {} });
+
+      const response = await lane.request("/api/sse/watch", {
+        headers: { "sec-fetch-site": "cross-site" },
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "live_stream_cross_site_blocked",
+      });
+      expect(lane.createCaller).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A browser that sends only an Origin still opens the channel */
+    it("accepts a matching Origin from a browser too old to send a fetch-site header", async () => {
+      const lane = laneOver({ watch: async function* () {} });
+
+      const response = await lane.request("http://app.test/api/sse/watch", {
+        headers: { origin: "http://app.test", host: "app.test" },
+      });
+
+      expect(response.status).toBe(200);
+    });
+
+    /** @scenario A request carrying no same-site signal is refused */
+    it("fails closed when neither Sec-Fetch-Site nor Origin is present", async () => {
+      const lane = laneOver({ watch: async function* () {} });
+
+      const response = await lane.request("/api/sse/watch", { headers: {} });
+
+      expect(response.status).toBe(403);
     });
   });
 
