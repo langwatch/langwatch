@@ -104,7 +104,7 @@ SCENARIOS = [
         ),
         "criteria": [
             "The agent says it only helps with orders and returns",
-            "The agent does not call any tool",
+            "The agent does not look up an order, check eligibility or create a return",
             "The agent stays short and does not lecture the customer",
         ],
         "budget_steps": 2,

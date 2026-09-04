@@ -15,10 +15,10 @@ A turn is one reply from your agent, and behind each reply there are one or more
 
 ## Step 1: Measure the baseline
 
-Run the suite once against your agent as it runs today and keep that run as the baseline. In the example that is the `production` environment:
+Run the suite once against your agent as it is today and keep that run as the baseline:
 
 ```bash
-langwatch test-suite run "Returns" --target connected:returns-agent@production --wait
+langwatch test-suite run "Returns" --target connected:returns-agent --wait
 ```
 
 The command prints the batch id, and the run header in LangWatch shows the pass rate, the total duration and the total cost. Hover the header for **Avg Agent Latency** and **Avg Agent Cost** with percentiles, and sort the table by **Time · cost** to see which conversations are the long ones.
@@ -75,12 +75,12 @@ The hypothesis usually lands on one of a few causes, and it helps to recognise t
 
 ## Step 3: Compare
 
-Run the suite again with the changed agent next to the baseline, so both sides appear in one run over the same scenarios:
+Run the suite again with the changed agent next to the one you deployed, so both sides appear in one run over the same scenarios:
 
 ```bash
 langwatch test-suite run "Returns" \
+  --target connected:returns-agent \
   --target connected:returns-agent@production \
-  --target connected:returns-agent@development \
   --wait
 ```
 
@@ -99,7 +99,7 @@ To pin the gain, add a criterion that counts, such as `The agent completes the r
 Run the suite on every pull request that touches the agent, so a later change cannot bring the turns back:
 
 ```bash
-langwatch test-suite run "Returns" --target connected:returns-agent@staging --wait
+langwatch test-suite run "Returns" --target connected:returns-agent --wait
 ```
 
 The command exits 1 when a scenario fails. `--wait` gives up after ten minutes, and a suite with repeats can take longer than that, so poll the batch for those: see [Run from CI](/agent-testing/run-from-ci).

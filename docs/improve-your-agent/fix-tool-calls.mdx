@@ -134,12 +134,12 @@ See [Scenarios in code](/agent-testing/scenarios-in-code) for the adapter and th
 
 ## Step 3: Rerun and compare
 
-Run the suite against the changed agent next to the baseline:
+Run the suite against the changed agent next to the one you deployed:
 
 ```bash
 langwatch test-suite run "Returns" \
+  --target connected:returns-agent \
   --target connected:returns-agent@production \
-  --target connected:returns-agent@development \
   --wait
 ```
 

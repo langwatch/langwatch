@@ -54,8 +54,8 @@ In the run dialog, click **Compare agents**, keep the same agent on both rows an
 
 ```bash
 langwatch test-suite run "Returns" \
-  --target 'connected:returns-agent@development?model=gpt-5' \
-  --target 'connected:returns-agent@development?model=gpt-5-mini' \
+  --target 'connected:returns-agent?model=gpt-5' \
+  --target 'connected:returns-agent?model=gpt-5-mini' \
   --repeat 3 \
   --wait
 ```

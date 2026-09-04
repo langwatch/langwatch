@@ -11,7 +11,7 @@ The runnable example is in the SDK repository: [`sdks/python/examples/agent-opti
 
 ## What you need
 
-- Python 3.10 or later. In the example folder, `uv sync` installs everything. In your own project, `pip install "langwatch[dspy]" langwatch-scenario`, and import `scenario` before `dspy` in every module, because in the other order dspy 3.3 fails while loading numpy.
+- Python 3.10 or later. In the example folder, `uv sync` installs everything. In your own project, `pip install "langwatch[dspy]" "dspy[optuna]" langwatch-scenario` (MIPROv2 needs the `optuna` extra), and import `scenario` before `dspy` in every module, because in the other order dspy 3.3 fails while loading numpy.
 - `OPENAI_API_KEY` for the agent, the simulated user and the judge, and `LANGWATCH_API_KEY` so the optimization run and the simulations appear in LangWatch.
 - Five to ten scenarios. One optimization run executes each of them several times: the MIPROv2 run of the example below took 64 scenario runs, 42 minutes and $0.93, with `gpt-5-mini` as the agent, the simulated user and the judge, and `gpt-5` writing the instruction candidates.
 
@@ -150,7 +150,7 @@ optimized.save("optimized_agent.json")
 print(optimized.agent.react.signature.instructions)
 ```
 
-`max_metric_calls=48` is about eight passes over six scenarios. GEPA's `auto="light"` budget plans hundreds of metric calls, which is too many when every call is a full simulation.
+`max_metric_calls=48` bought four iterations on the example: the first full pass costs six calls, and each accepted candidate costs a minibatch of three for the parent, three for the candidate and a full pass of six. GEPA's `auto="light"` budget plans hundreds of metric calls, which is too many when every call is a full simulation.
   </Tab>
   <Tab title="MIPROv2">
 ```python
@@ -177,7 +177,7 @@ optimized = optimizer.compile(
 optimized.save("optimized_agent_mipro.json")
 ```
 
-Zero demos keeps the change to the instructions: MIPROv2 proposes instruction candidates and searches over their combinations. `minibatch=False` evaluates the whole suite on every trial, because the default minibatch is larger than six scenarios, and `langwatch.dspy.init` records every trial.
+Zero demos keeps the change to the instructions: MIPROv2 proposes instruction candidates and searches over their combinations, though it still runs about ten scenarios to bootstrap traces for the proposer. `minibatch=False` evaluates the whole suite on every trial, because the default minibatch is larger than six scenarios, and `langwatch.dspy.init` records every trial.
   </Tab>
 </Tabs>
 
@@ -192,8 +192,16 @@ uv run optimize_mipro.py
 
 ## Step 5: Read the result in LangWatch
 
-- **Experiments** shows the optimization run: one point per candidate that raised the best score, with the score and the instructions of that candidate. A MIPROv2 run appears through `langwatch.dspy.init`, and the GEPA example logs each candidate through a callback in `optimize_gepa.py`. See [DSPy visualization](/dspy-visualization/quickstart).
-- **Agent Testing** shows every simulation the optimizer ran, in the `dspy-optimization` set. The example groups the baseline pass and the final pass into their own batches, `<run id>-baseline` and `<run id>-best`, and prints both links, so you can open the conversations of the optimized agent next to the original ones.
+- **Experiments** shows the optimization run as a score chart, one point per trial, with the instructions of each predictor at that step. A MIPROv2 run appears through `langwatch.dspy.init`, and the GEPA example logs each candidate through a callback in `optimize_gepa.py`. See [DSPy visualization](/dspy-visualization/quickstart).
+- **Agent Testing** shows every simulation the optimizer ran, as runs of the `dspy-optimization` set. The example puts the baseline pass and the final pass in their own batches, named `<run id>-baseline` and `<run id>-best`, so they appear as two runs of six next to the larger runs from inside the optimizer, and the scripts print both names.
+
+<Frame caption="The MIPROv2 run in Experiments: one point per trial, the best trial marked, and the instructions of the selected step below the chart.">
+<img className="block" src="/images/improve-your-agent/dspy-experiment-run.png" alt="The Experiments page for returns-agent-scenarios: the MIPROv2 score chart with seven points and the Best marker on step 5, and the predictors table of the selected step below it" />
+</Frame>
+
+<Frame caption="The dspy-optimization set in Agent Testing: the baseline and best passes of both runs as runs of six, next to the runs from inside the optimizers.">
+<img className="block" src="/images/improve-your-agent/dspy-agent-testing-batches.png" alt="The Results tab of the dspy-optimization set, with eight runs in the sidebar and the six scenarios of the MIPROv2 best pass with their verdicts, time and cost" />
+</Frame>
 
 Compare the instructions before and after: both scripts print every instruction the optimizer changed, and the tool descriptions are part of them.
 
@@ -239,7 +247,7 @@ GEPA, from the judge's reasoning and the tool errors in the feedback, on its fir
 
 That is the same tool description fix as in [Fix tool calls](/improve-your-agent/fix-tool-calls), found by search. On both runs the damaged blender return went from failed to passed and from 5 steps to 4.
 
-The scenario where the customer asks for a recipe failed before and after on both runs: the agent answers the recipe instead of saying it only helps with orders, and no candidate instruction changed that. On the MIPROv2 run the angry customer passed before and failed after, and the 83% of the best trial did not repeat on the final pass, which is the non-determinism described in the Limits below.
+The scenario where the customer asks for a recipe failed on every pass, and the cause was in the example rather than in the agent: its criterion said the agent calls no tool, and the judge counts ReAct's internal `finish` step as a tool call. The criterion now names the tools it means. On the MIPROv2 run the angry customer passed before and failed after, and the 83% of the best trial did not repeat on the final pass, which is the non-determinism described in the Limits below.
 
 ## Limits
 

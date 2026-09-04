@@ -70,8 +70,9 @@ Lower `GEPA_MAX_METRIC_CALLS` or `num_trials` to shorten a run.
 - **Experiments**, under `returns-agent-scenarios`: the optimizer run, one step
   per candidate evaluation, with the score and the candidate instructions.
 - **Agent Testing**, set `dspy-optimization`: every scenario run. The two suite
-  evaluations arrive as the batches `<run_id>-baseline` and `<run_id>-best`, so
-  the same six scenarios can be read side by side before and after.
+  evaluations arrive as their own runs of six, the batches `<run_id>-baseline`
+  and `<run_id>-best`, so the same six scenarios can be read side by side before
+  and after.
 
 ## The same agent as a connected agent
 
@@ -106,11 +107,11 @@ Create a test suite named `Returns` with the six scenarios of `scenarios.py`,
 then run it against either side:
 
 ```bash
-langwatch test-suite run "Returns" --target connected:returns-agent@development --wait
+langwatch test-suite run "Returns" --target connected:returns-agent --wait
 
 langwatch test-suite run "Returns" \
+  --target connected:returns-agent \
   --target connected:returns-agent@production \
-  --target connected:returns-agent@development \
   --wait
 ```
 
