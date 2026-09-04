@@ -1807,7 +1807,7 @@ const PG_BASE_TABLE_DDL: Record<string, string> = {
     '"evaluation" text not null, "status" text not null, "score" double precision not null, ' +
     '"label" text, "passed" boolean not null, "cost" double precision not null, ' +
     '"datasetId" text not null, "datasetSlug" text not null, "details" text not null, ' +
-    '"data" jsonb not null, "createdAt" timestamptz not null)',
+    '"data" jsonb not null, "createdAt" timestamptz not null, "updatedAt" timestamptz not null)',
   LlmPromptConfig:
     '("id" text primary key, "projectId" text not null, "name" text not null, ' +
     '"handle" text, "createdAt" timestamptz not null, "deletedAt" timestamptz)',
@@ -1942,7 +1942,7 @@ export function postgresTenantSeedStatements({
           `('${tenantId}-run-${index + 1}', '${tenantId}', '${tenantId}-experiment', ` +
           `'exact_match', 'finished', ${score}, 'label-${index + 1}', ` +
           `${score >= 0.8}, ${index + 1}.25, 'dataset-${index + 1}', 'dataset-slug-${index + 1}', ` +
-          `'excluded-details-of-${tenantId}', '{"excluded":"rows"}'::jsonb, ${at})`,
+          `'excluded-details-of-${tenantId}', '{"excluded":"rows"}'::jsonb, ${at}, ${at})`,
       ),
     ),
     rows("LlmPromptConfig", [
