@@ -1,6 +1,9 @@
 /**
  * The LangWatchQL chart drawn on a page where nothing may be evaluated from a
- * string.
+ * string. Renders `LangWatchQLVegaLiteChart` directly — the shared component
+ * every chart surface (the dashboard widget) draws through — rather than a
+ * page-specific wrapper, since the CSP claim under test is about the Vega
+ * embed pipeline itself, not about any one surface's chrome around it.
  *
  * A Content-Security-Policy without `unsafe-eval` makes `eval` and the
  * `Function` constructor throw. The application's production policy still
@@ -21,33 +24,16 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("~/utils/compat/next-dynamic", () => {
-  function StubSpecEditor(props: {
-    value?: string;
-    onChange?: (value: string | undefined) => void;
-  }) {
-    return (
-      <textarea
-        data-testid="spec-editor-input"
-        aria-label="Chart specification"
-        value={props.value ?? ""}
-        onChange={(event) => props.onChange?.(event.target.value)}
-      />
-    );
-  }
-
-  return { __esModule: true, default: () => StubSpecEditor };
-});
-
 import embed from "vega-embed";
 
-import { LangWatchQLChartMode } from "../components/LangWatchQLChartMode";
+import { LangWatchQLVegaLiteChart } from "../components/LangWatchQLVegaLiteChart";
 import { lwqlVegaEmbedOptions } from "../hooks/useLangWatchQLVegaView";
 import { buildLangWatchQLVegaSpec } from "../visualization/buildLangWatchQLVegaSpec";
+import { LWQL_QUERY_RESULT_DATASET } from "../visualization/lwqlDatasetNames";
 import type { LangWatchQLDatasetColumn } from "../visualization/visualization.types";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
@@ -156,9 +142,10 @@ beforeEach(async () => {
 afterEach(() => cleanup());
 
 describe("the LangWatchQL chart on a page that forbids string evaluation", () => {
-  describe("given the workbench served under a policy without unsafe-eval", () => {
+  describe("given the chart rendered on a page served under a policy without unsafe-eval", () => {
     describe("when a valid specification renders as a chart", () => {
       /** @scenario "The chart renders under a CSP that forbids eval" */
+      /** @scenario "A categorical LangWatchQL result renders as a chart in a real browser" */
       it("draws through Vega's expression interpreter, while the same specification with the interpreter disabled is refused", async () => {
         // The control differs from the shipped path by exactly one option, and
         // this is the shipped value of it.
@@ -189,12 +176,11 @@ describe("the LangWatchQL chart on a page that forbids string evaluation", () =>
 
           render(
             <ChakraProvider value={defaultSystem}>
-              {/* Nothing here edits the specification, so the owner's half of
-                  that state is a starter this test never changes. */}
-              <LangWatchQLChartMode
-                result={RESULT}
-                editedSpecText={null}
-                onEditedSpecTextChange={() => undefined}
+              <LangWatchQLVegaLiteChart
+                spec={BAR_SPECIFICATION}
+                datasets={{ [LWQL_QUERY_RESULT_DATASET]: RESULT.rows }}
+                columnsByDataset={{ [LWQL_QUERY_RESULT_DATASET]: COLUMNS }}
+                ariaLabel="Evaluations by evaluator"
               />
             </ChakraProvider>,
           );

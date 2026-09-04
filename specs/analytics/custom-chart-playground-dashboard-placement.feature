@@ -7,9 +7,8 @@ Feature: Dashboard widgets placed on a dashboard
   card-level procedures never admitted the kind, so a widget with a
   `dashboardId` still never appeared on the grid. This feature opens that
   gate behind `release_custom_chart_playground`, the same flag that gates the
-  playground page and its REST/CLI surface, and gives the grid a read-only
-  renderer for the kind — no dashboard-side edit drawer yet, editing stays on
-  the playground page.
+  widget REST/CLI surface, gives the grid a renderer for the kind, and lets a
+  member edit the widget in place from the card's menu.
 
   Unlike the mutual exclusion between `chart`/`graph` WRITES and
   `dashboard-widget` WRITES (release_custom_chart_playground turns the
@@ -54,13 +53,19 @@ Feature: Dashboard widgets placed on a dashboard
     Then no add-alert control is offered, because sandboxed author code has no series to threshold
 
   @integration
-  Scenario: A dashboard widget card's Edit action opens the playground page
+  Scenario: Edit opens the widget editor in place
     Given a dashboard grid holding a dashboard widget
-    When the card's menu is opened
-    Then Edit is labelled "Open in playground" and navigates to the custom-chart-playground page, not the builder or workbench editor
+    When the card's menu is opened and Edit is chosen
+    Then the item is labelled "Edit" and the widget's edit drawer opens over the grid, without navigating to the builder or any other page
 
   @integration
   Scenario: A placed dashboard widget follows the dashboard's period control
     Given a dashboard grid holding a dashboard widget
     When the dashboard's period selector changes
     Then the widget's queries re-run against the new period, the same one control every other card on the grid reads
+
+  @integration
+  Scenario: Charts written with the earlier period placeholder names keep following the period
+    Given a saved chart whose statement still names {dashboard_context_period_start}, {dashboard_context_period_end} or {dashboard_context_granularity_seconds}
+    When the platform upgrades
+    Then the statement is rewritten once to the reserved period names, so the chart runs against the dashboard's period instead of refusing for missing parameters

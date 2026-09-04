@@ -99,7 +99,7 @@ describe("resolveLangWatchQLGranularity", () => {
   });
 
   describe("given the parameter declared as UInt32 with a surface step", () => {
-    /** @scenario "A statement declaring the granularity parameter runs at the step the workbench supplies" */
+    /** @scenario "A statement declaring the granularity parameter runs at the step the surface supplies" */
     it("follows granularity at the supplied step", () => {
       // An hour over a week: 168 buckets, comfortably inside the ceiling.
       const resolution = resolveLangWatchQLGranularity({

@@ -140,12 +140,7 @@ export function SandboxedChartFrame({
   }
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      overflow="hidden"
-    >
+    <Box overflow="hidden">
       <iframe
         key={generation}
         ref={iframeRef}

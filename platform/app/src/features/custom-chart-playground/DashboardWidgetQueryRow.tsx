@@ -13,11 +13,13 @@ import {
   HStack,
   IconButton,
   Input,
+  Spacer,
   Span,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, Play, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Play, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 import { formatNumber } from "~/utils/formatNumber";
 
@@ -37,6 +39,10 @@ function runSummary(run: QueryLastRun | undefined): string | null {
 }
 
 interface DashboardWidgetQueryRowProps {
+  /** This row's own Accordion.Item value — index-based, set by the panel. */
+  value: string;
+  /** Whether the panel currently has this row open — drives the chevron. */
+  isOpen: boolean;
   query: DashboardWidgetQuery;
   /** Empty when this name collides with a sibling's — the panel computes it. */
   nameError: string | null;
@@ -49,6 +55,8 @@ interface DashboardWidgetQueryRowProps {
 }
 
 export function DashboardWidgetQueryRow({
+  value,
+  isOpen,
   query,
   nameError,
   onChange,
@@ -60,36 +68,94 @@ export function DashboardWidgetQueryRow({
 }: DashboardWidgetQueryRowProps) {
   const summary = runSummary(lastRun);
 
+  // Click-to-edit, same pattern as EditableWidgetName — but hand-rolled
+  // rather than reused: that component is sized for a card title (a
+  // tooltip, a fading pencil icon), and an `<input>` can't nest inside
+  // `Accordion.ItemTrigger` (it renders a `<button>`), so the name lives as
+  // a SIBLING of the trigger rather than inside it. The trigger itself
+  // shrinks to just the chevron — the one thing that still toggles the row.
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [draftName, setDraftName] = useState(query.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, [isEditingName]);
+
+  const startEditingName = () => {
+    setDraftName(query.name);
+    setIsEditingName(true);
+  };
+
+  const commitName = () => {
+    if (draftName !== query.name) onChange({ ...query, name: draftName });
+    setIsEditingName(false);
+  };
+
   return (
     <Card.Root size="sm" width="full" marginBottom={3}>
-      <Accordion.Item value={query.name || "(unnamed)"} border="none">
+      <Accordion.Item value={value} border="none">
         <Card.Body gap={2}>
           <HStack>
-            <Accordion.ItemTrigger flex={1} minWidth={0}>
-              <Accordion.ItemIndicator>
-                <ChevronDown size={14} />
-              </Accordion.ItemIndicator>
-              <Span fontFamily="mono" fontSize="13px" truncate>
+            {/* Chakra's own indicator applies no rotation here (verified:
+                transform: none in both states) — pick the icon by hand so
+                closed reliably reads ">" and open reliably reads "v". */}
+            <Accordion.ItemTrigger
+              aria-label={isOpen ? "Collapse query" : "Expand query"}
+              width="auto"
+              flexShrink={0}
+              padding={1}
+            >
+              {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </Accordion.ItemTrigger>
+
+            {isEditingName ? (
+              <Input
+                ref={nameInputRef}
+                size="xs"
+                fontFamily="mono"
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onBlur={commitName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitName();
+                  if (e.key === "Escape") setIsEditingName(false);
+                }}
+                placeholder="query name — the LW.query(name, params) handle"
+                borderColor={nameError ? "red.400" : undefined}
+                width="auto"
+                minWidth="140px"
+              />
+            ) : (
+              <Span
+                fontFamily="mono"
+                fontSize="13px"
+                truncate
+                cursor="pointer"
+                onClick={startEditingName}
+              >
                 {query.name || "(unnamed query)"}
               </Span>
-              {summary && (
-                <Text
-                  fontSize="11px"
-                  color={lastRun?.error ? "red.500" : "fg.muted"}
-                  truncate
-                >
-                  {summary}
-                </Text>
-              )}
-            </Accordion.ItemTrigger>
+            )}
+
+            <Spacer />
+            {!isEditingName && summary && (
+              <Text
+                fontSize="11px"
+                color={lastRun?.error ? "red.500" : "fg.muted"}
+                truncate
+              >
+                {summary}
+              </Text>
+            )}
             <Button
               size="xs"
               variant="outline"
               loading={isRunning}
-              onClick={(e) => {
-                e.stopPropagation();
-                onRun();
-              }}
+              onClick={onRun}
             >
               <Play size={14} /> Run
             </Button>
@@ -98,32 +164,18 @@ export function DashboardWidgetQueryRow({
               size="xs"
               variant="ghost"
               disabled={!canRemove}
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove();
-              }}
+              onClick={onRemove}
             >
               <Trash2 size={14} />
             </IconButton>
           </HStack>
+          {nameError && (
+            <Text fontSize="11px" color="red.500">
+              {nameError}
+            </Text>
+          )}
           <Accordion.ItemContent>
             <VStack align="stretch" gap={2} paddingTop={2}>
-              <Box>
-                <Input
-                  size="xs"
-                  fontFamily="mono"
-                  value={query.name}
-                  onChange={(e) => onChange({ ...query, name: e.target.value })}
-                  placeholder="query name — the LW.query(name, params) handle"
-                  borderColor={nameError ? "red.400" : undefined}
-                />
-                {nameError && (
-                  <Text fontSize="11px" color="red.500" marginTop={1}>
-                    {nameError}
-                  </Text>
-                )}
-              </Box>
-
               <Box
                 height="140px"
                 borderWidth="1px"
@@ -146,9 +198,6 @@ export function DashboardWidgetQueryRow({
                 onChange={(parameters) => onChange({ ...query, parameters })}
               />
 
-              <Text fontSize="11px" color="fg.muted">
-                Last result
-              </Text>
               <DashboardWidgetQueryResultView run={lastRun} />
             </VStack>
           </Accordion.ItemContent>

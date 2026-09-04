@@ -126,7 +126,7 @@ describe("given the workbench query procedure and the granularity budget", () =>
   });
 
   describe("when a statement declaring the parameter is run at one-second steps over a week", () => {
-    /** @scenario "A window that would produce more buckets than the ceiling refuses on the workbench and REST" */
+    /** @scenario "A window that would produce more buckets than the ceiling refuses on caller-owned surfaces" */
     it("is refused with the named code and the bucket arithmetic in its meta", async () => {
       const refusal = await causeOf(() =>
         caller.query({

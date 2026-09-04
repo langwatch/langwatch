@@ -34,12 +34,16 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 
 import {
-  isClickHouseObjectUnavailableError,
+  isClickHouseObjectAccessDeniedError,
+  isClickHouseObjectMissingError,
   translateClickHouseQueryError,
 } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { toError } from "~/utils/posthogErrorCapture";
 
-import { LangWatchQLUnavailableError } from "./errors";
+import {
+  LangWatchQLProvisioningIncompleteError,
+  LangWatchQLUnavailableError,
+} from "./errors";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
@@ -258,12 +262,23 @@ export function createLangWatchQLExecutor(
       } catch (error) {
         // An unknown table/database or an access refusal cannot be the
         // caller's SQL: the validator only lets catalog-approved names reach
-        // this point. It is a deployment whose LangWatchQL objects or grants
-        // are missing — the same "not provisioned here" condition as a null
-        // executor, and it gets the same answer. The raw error rides in
-        // `reasons` for the operator's logs and never in the response.
-        if (isClickHouseObjectUnavailableError(error)) {
+        // this point. Both mean this deployment's LangWatchQL objects or
+        // grants are incomplete, but not the same way, and the customer-facing
+        // codes below say so differently. The raw error rides in `reasons` for
+        // the operator's logs and never in the response either way.
+        if (isClickHouseObjectMissingError(error)) {
+          // The object itself is not there — the same "not provisioned here"
+          // condition as a null executor (no restricted identity configured
+          // at all).
           throw new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+        }
+        if (isClickHouseObjectAccessDeniedError(error)) {
+          // The object exists; this identity's grants on it are incomplete —
+          // narrower than "not provisioned," and purely our own gap rather
+          // than something a customer's workspace administrator could act on.
+          throw new LangWatchQLProvisioningIncompleteError({
+            reasons: [toError(error)],
+          });
         }
         // Reuses the read path's translation, so the two resource ceilings a
         // caller can act on arrive as the platform's existing codes rather than

@@ -1,6 +1,7 @@
 /**
- * One persisted dashboard widget: a sortable card showing only its chart —
- * a sandboxed frame, a title, and a size/edit/delete menu. All editing (the
+ * One persisted dashboard widget: a grid card showing only its chart —
+ * a sandboxed frame, a title, and an edit/delete menu. Its header is the
+ * grid's drag handle; its size is dragged from the card's corner. All editing (the
  * React/TSX file, the declared queries) happens in `DashboardWidgetEditDrawer`,
  * which this card owns and opens from the menu's Edit item.
  *
@@ -16,18 +17,18 @@
  * every keystroke would be exactly as janky as it sounds.
  */
 
-import { Box, Button, Card, HStack, Text } from "@chakra-ui/react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { Box, Button, Card, HStack } from "@chakra-ui/react";
 import { Clock } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
+import { CHART_GRID_DRAG_HANDLE_CLASS } from "~/components/analytics/reports/ChartGrid";
 import { GraphCardMenu } from "~/components/analytics/reports/GraphCardMenu";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Menu } from "~/components/ui/menu";
+import { chartGridCardHeightPx } from "~/server/analytics/chartGrid";
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 
 import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer";
+import { EditableWidgetName } from "./EditableWidgetName";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
 import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
 import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
@@ -45,8 +46,13 @@ export interface DashboardWidget {
   dashboardId?: string | null;
 }
 
-/** The height a card's row span grants its frame — mirrors the report grid. */
-const rowSpanHeight = (rowSpan: number): number => (rowSpan === 2 ? 600 : 300);
+/**
+ * The height a card's row span grants its frame: the card less its header
+ * row and body padding — the same allowance the report grid's cards make.
+ */
+const CARD_CHROME_PX = 64;
+const rowSpanHeight = (rowSpan: number): number =>
+  Math.max(chartGridCardHeightPx(rowSpan) - CARD_CHROME_PX, 60);
 
 /** The drawer's own chart preview isn't grid-constrained — a fixed, generous height. */
 const DRAWER_PREVIEW_HEIGHT_PX = 320;
@@ -60,7 +66,10 @@ const noopLog = () => {
 };
 
 /** Cheap and correct at this scale: a widget's queries are a handful of small objects. */
-function queriesEqual(a: DashboardWidgetQuery[], b: DashboardWidgetQuery[]): boolean {
+function queriesEqual(
+  a: DashboardWidgetQuery[],
+  b: DashboardWidgetQuery[],
+): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
@@ -84,9 +93,13 @@ interface DashboardWidgetCardProps {
   projectId: string;
   projectSlug: string;
   onDelete: () => void;
-  onSizeChange: (size: SizeOption) => void;
   onSave: (
-    input: { id: string; code: string; queries: DashboardWidgetQuery[] },
+    input: {
+      id: string;
+      name?: string;
+      code: string;
+      queries: DashboardWidgetQuery[];
+    },
     options?: { onSuccess?: () => void },
   ) => void;
   isDeleting: boolean;
@@ -98,23 +111,15 @@ export function DashboardWidgetCard({
   projectId,
   projectSlug,
   onDelete,
-  onSizeChange,
   onSave,
   isDeleting,
   isSaving,
 }: DashboardWidgetCardProps) {
   const { colorMode } = useColorMode();
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: widget.id });
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<"code" | "queries">("code");
+  const [draftName, setDraftName] = useState(widget.name);
   const [draftCode, setDraftCode] = useState(widget.code);
   const [draftQueries, setDraftQueries] = useState(widget.queries);
 
@@ -129,9 +134,10 @@ export function DashboardWidgetCard({
   // Reseed the drafts whenever the persisted record changes underneath them:
   // a save from this card, or a refetch.
   useEffect(() => {
+    setDraftName(widget.name);
     setDraftCode(widget.code);
     setDraftQueries(widget.queries);
-  }, [widget.code, widget.queries]);
+  }, [widget.name, widget.code, widget.queries]);
 
   // The chart's own view of the draft, updated only after typing settles —
   // see the file header for why this can't just be draftCode/draftQueries.
@@ -150,13 +156,33 @@ export function DashboardWidgetCard({
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 
   const isDirty =
-    draftCode !== widget.code || !queriesEqual(draftQueries, widget.queries);
+    draftName !== widget.name ||
+    draftCode !== widget.code ||
+    !queriesEqual(draftQueries, widget.queries);
 
   const handleSave = () => {
     onSave(
-      { id: widget.id, code: draftCode, queries: draftQueries },
+      {
+        id: widget.id,
+        name: draftName,
+        code: draftCode,
+        queries: draftQueries,
+      },
       { onSuccess: () => setIsDrawerOpen(false) },
     );
+  };
+
+  // A standalone rename, straight from the card's own title — deliberately
+  // resaves the widget's CURRENT persisted code/queries, not whatever draft
+  // might be sitting in the (closed) drawer, so renaming here can never
+  // smuggle in an unrelated in-progress edit.
+  const handleRename = (newName: string) => {
+    onSave({
+      id: widget.id,
+      name: newName,
+      code: widget.code,
+      queries: widget.queries,
+    });
   };
 
   const openCodeTab = () => {
@@ -168,40 +194,48 @@ export function DashboardWidgetCard({
   // trigger, and clicking outside it, so none of the three can leave a
   // discarded edit sitting in the draft for the next open to reveal.
   const handleClose = () => {
+    setDraftName(widget.name);
     setDraftCode(widget.code);
     setDraftQueries(widget.queries);
     setIsDrawerOpen(false);
   };
 
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    gridColumn: `span ${widget.colSpan}`,
-    gridRow: `span ${widget.rowSpan}`,
-  };
-
   return (
-    <Box ref={setNodeRef} style={style} minWidth={0}>
-      <Card.Root height="full" minWidth={0}>
+    <Box height="full" minWidth={0}>
+      <Card.Root
+        height="full"
+        minWidth={0}
+        borderRadius="xl"
+        boxShadow="0 1px 2px rgba(16,16,32,0.04)"
+      >
         <Card.Body
           height="full"
           display="flex"
           flexDirection="column"
           minWidth={0}
           overflow="hidden"
+          paddingX={4}
+          paddingTop="10px"
+          paddingBottom={3}
           gap={2}
         >
-          <HStack minWidth={0} cursor="grab" {...attributes} {...listeners}>
-            <Text
-              fontSize="sm"
-              fontWeight="bold"
-              flex={1}
-              minWidth={0}
-              truncate
-            >
-              {widget.name}
-            </Text>
+          <HStack
+            className={CHART_GRID_DRAG_HANDLE_CLASS}
+            minWidth={0}
+            cursor="grab"
+            _active={{ cursor: "grabbing" }}
+            marginBottom={1}
+          >
+            <Box flex={1} minWidth={0}>
+              <EditableWidgetName
+                name={widget.name}
+                id={widget.id}
+                onRename={handleRename}
+                fontSize="sm"
+                fontWeight="bold"
+                truncate
+              />
+            </Box>
 
             <Menu.Root>
               <Menu.Trigger asChild>
@@ -228,12 +262,9 @@ export function DashboardWidgetCard({
               projectId={projectId}
               projectSlug={projectSlug}
               dashboardId={widget.dashboardId ?? undefined}
-              colSpan={widget.colSpan}
-              rowSpan={widget.rowSpan}
               isDashboardWidget
               showAddToDashboard
               onEdit={openCodeTab}
-              onSizeChange={onSizeChange}
               onDelete={onDelete}
               isDeleting={isDeleting}
             />
@@ -262,6 +293,9 @@ export function DashboardWidgetCard({
 
       <DashboardWidgetEditDrawer
         open={isDrawerOpen}
+        id={widget.id}
+        name={draftName}
+        onNameChange={setDraftName}
         code={draftCode}
         queries={draftQueries}
         onCodeChange={setDraftCode}

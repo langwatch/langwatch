@@ -19,10 +19,9 @@ function elapsedMsOf(run: QueryLastRun): number | undefined {
 }
 
 /**
- * Same "Partial result" convention as the workbench's own
- * `LangWatchQLResultPane.tsx` — truncation is the one diagnostic that says
- * the answer might be wrong by omission, so it gets a banner, not a suffix
- * folded into the row-count line.
+ * "Partial result" truncation is the one diagnostic that says the answer
+ * might be wrong by omission, so it gets a banner, not a suffix folded into
+ * the row-count line.
  */
 function TruncationBanner() {
   return (

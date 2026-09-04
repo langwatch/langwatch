@@ -661,7 +661,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       }
     };
 
-    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
+    /** @scenario "Every chart surface stays dark until the experimental feature switch is on" */
     it("refuses the query endpoint with the named refusal and touches no data", async () => {
       const response = await withFlagOff(async () =>
         post(openProject, { sql: "SELECT 1" }),
@@ -671,7 +671,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       expect(body.error.code).toBe("lwql_not_enabled");
     });
 
-    /** @scenario "The whole surface stays dark until the experimental feature switch is on" */
+    /** @scenario "Every chart surface stays dark until the experimental feature switch is on" */
     it("refuses the schema endpoint the same way", async () => {
       const response = await withFlagOff(async () =>
         app.request(schemaPath(openProject), {
@@ -718,7 +718,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       }
     };
 
-    /** @scenario "An organization-scoped rule can switch the workbench on" */
+    /** @scenario "An organization-scoped rule can switch the chart surfaces on" */
     it("turns the surface on for that organization's projects", async () => {
       const response = await withOrganizationRule(organization.id, async () =>
         app.request(schemaPath(openProject), {
@@ -728,7 +728,7 @@ describe("given the LangWatchQL analytics SQL REST endpoints", () => {
       expect(response.status).toBe(200);
     });
 
-    /** @scenario "An organization-scoped rule can switch the workbench on" */
+    /** @scenario "An organization-scoped rule can switch the chart surfaces on" */
     it("leaves the surface off for a project outside the rule's organization", async () => {
       const response = await withOrganizationRule(
         "org_someone_else",

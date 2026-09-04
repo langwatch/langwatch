@@ -1,24 +1,13 @@
 /**
- * The dashboard widget grid. Mirrors `components/analytics/reports`'
- * `ReportGrid`: a dnd-kit sortable grid over the same 2-column layout, reusing
- * `calculateGridPositions` to repack on drop. Cards are dashboard widgets
- * (sandboxed frames) rather than builder/workbench graphs.
+ * The dashboard widget grid: every widget in the project on the shared
+ * `ChartGrid`, the same grid the analytics dashboard lays its cards out on.
+ * Cards are dashboard widgets (sandboxed frames) rather than builder or
+ * workbench graphs.
  */
 
-import { Grid } from "@chakra-ui/react";
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
-
-import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
+import { ChartGrid } from "~/components/analytics/reports/ChartGrid";
+import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
-import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 
 import {
   type DashboardWidget,
@@ -30,12 +19,11 @@ interface DashboardWidgetGridProps {
   projectId: string;
   projectSlug: string;
   onWidgetDelete: (id: string) => void;
-  onWidgetSizeChange: (id: string, size: SizeOption) => void;
   onWidgetSave: (
     input: { id: string; code: string; queries: DashboardWidgetQuery[] },
     options?: { onSuccess?: () => void },
   ) => void;
-  onWidgetsReorder: (layouts: GridLayout[]) => void;
+  onWidgetsPlacementChange: (placements: ChartGridPlacement[]) => void;
   deletingWidgetId: string | null;
   savingWidgetId: string | null;
 }
@@ -45,61 +33,39 @@ export function DashboardWidgetGrid({
   projectId,
   projectSlug,
   onWidgetDelete,
-  onWidgetSizeChange,
   onWidgetSave,
-  onWidgetsReorder,
+  onWidgetsPlacementChange,
   deletingWidgetId,
   savingWidgetId,
 }: DashboardWidgetGridProps) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-  );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = widgets.findIndex((w) => w.id === active.id);
-    const newIndex = widgets.findIndex((w) => w.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const newOrder = [...widgets];
-    const [removed] = newOrder.splice(oldIndex, 1);
-    newOrder.splice(newIndex, 0, removed!);
-    onWidgetsReorder(calculateGridPositions(newOrder));
-  };
+  const widgetById = new Map(widgets.map((widget) => [widget.id, widget]));
+  const placements = widgets.map((widget) => ({
+    graphId: widget.id,
+    gridColumn: widget.gridColumn,
+    gridRow: widget.gridRow,
+    colSpan: widget.colSpan,
+    rowSpan: widget.rowSpan,
+  }));
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={widgets.map((w) => w.id)}
-        strategy={rectSortingStrategy}
-      >
-        <Grid
-          templateColumns="repeat(2, 1fr)"
-          autoRows="minmax(350px, auto)"
-          gap={5}
-          width="100%"
-        >
-          {widgets.map((widget) => (
-            <DashboardWidgetCard
-              key={widget.id}
-              widget={widget}
-              projectId={projectId}
-              projectSlug={projectSlug}
-              onDelete={() => onWidgetDelete(widget.id)}
-              onSizeChange={(size) => onWidgetSizeChange(widget.id, size)}
-              onSave={onWidgetSave}
-              isDeleting={deletingWidgetId === widget.id}
-              isSaving={savingWidgetId === widget.id}
-            />
-          ))}
-        </Grid>
-      </SortableContext>
-    </DndContext>
+    <ChartGrid
+      placements={placements}
+      onPlacementsCommit={onWidgetsPlacementChange}
+      renderCard={({ graphId }) => {
+        const widget = widgetById.get(graphId);
+        if (!widget) return null;
+        return (
+          <DashboardWidgetCard
+            widget={widget}
+            projectId={projectId}
+            projectSlug={projectSlug}
+            onDelete={() => onWidgetDelete(widget.id)}
+            onSave={onWidgetSave}
+            isDeleting={deletingWidgetId === widget.id}
+            isSaving={savingWidgetId === widget.id}
+          />
+        );
+      }}
+    />
   );
 }

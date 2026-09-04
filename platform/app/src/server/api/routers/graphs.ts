@@ -3,6 +3,12 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { allocateNextGridRow } from "~/server/analytics/allocateNextGridRow";
 import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+  chartGridPlacementSchema,
+  fitsChartGridWidth,
+} from "~/server/analytics/chartGrid";
+import {
   BUILDER_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
 } from "~/server/analytics/chartKinds";
@@ -24,6 +30,13 @@ interface AlertActionParams {
   seriesName?: string;
 }
 
+// A card's column and span pass their own bounds and still overflow the grid
+// together; refused here rather than clipped by the grid that reads it.
+const layoutSchema = chartGridPlacementSchema.refine(fitsChartGridWidth, {
+  message: "gridColumn + colSpan must not exceed the grid's columns",
+  path: ["colSpan"],
+});
+
 export const graphsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
@@ -33,10 +46,7 @@ export const graphsRouter = createTRPCRouter({
         graph: z.string(),
         filterParams: z.any().optional(),
         dashboardId: z.string().optional(),
-        gridColumn: z.number().min(0).max(1).optional(),
-        gridRow: z.number().min(0).optional(),
-        colSpan: z.number().min(1).max(2).optional(),
-        rowSpan: z.number().min(1).max(2).optional(),
+        ...chartGridPlacementSchema.partial().shape,
       }),
     )
     .permission("analytics:create")
@@ -78,8 +88,8 @@ export const graphsRouter = createTRPCRouter({
           dashboardId: input.dashboardId,
           gridColumn: input.gridColumn ?? 0,
           gridRow: gridRow ?? 0,
-          colSpan: input.colSpan ?? 1,
-          rowSpan: input.rowSpan ?? 1,
+          colSpan: input.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
+          rowSpan: input.rowSpan ?? CHART_GRID_DEFAULT_ROW_SPAN,
         },
       });
 
@@ -311,14 +321,9 @@ export const graphsRouter = createTRPCRouter({
 
   updateLayout: protectedProcedure
     .input(
-      z.object({
-        projectId: z.string(),
-        graphId: z.string(),
-        gridColumn: z.number().min(0).max(1),
-        gridRow: z.number().min(0),
-        colSpan: z.number().min(1).max(2),
-        rowSpan: z.number().min(1).max(2),
-      }),
+      z
+        .object({ projectId: z.string(), graphId: z.string() })
+        .and(layoutSchema),
     )
     .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
@@ -351,15 +356,7 @@ export const graphsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        layouts: z.array(
-          z.object({
-            graphId: z.string(),
-            gridColumn: z.number().min(0).max(1),
-            gridRow: z.number().min(0),
-            colSpan: z.number().min(1).max(2),
-            rowSpan: z.number().min(1).max(2),
-          }),
-        ),
+        layouts: z.array(z.object({ graphId: z.string() }).and(layoutSchema)),
       }),
     )
     .permission("analytics:update")

@@ -5,10 +5,9 @@
  *
  * No live re-fetch by id: unlike a placed workbench chart, a dashboard widget
  * widget has no separate source of truth to drift from. The `CustomGraph`
- * row IS the widget — the playground editor mutates this exact row's `graph`
- * column, so whatever the dashboard's own list query already returned is
- * already live. Editing goes through the playground page; there is no
- * dashboard-side edit drawer yet.
+ * row IS the widget: the card's Edit drawer (`DashboardWidgetInPlaceEditor`)
+ * mutates this exact row's `graph` column, so whatever the dashboard's own
+ * list query already returned is already live.
  *
  * The period comes from the dashboard's own period control
  * (`usePeriodSelector`), exactly the way `LangWatchQLDashboardWidget` reads

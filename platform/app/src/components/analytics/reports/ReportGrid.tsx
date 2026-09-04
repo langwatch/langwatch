@@ -1,23 +1,6 @@
-import { Box, Card, Grid, HStack, Text } from "@chakra-ui/react";
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  DragOverlay,
-  type DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
-import { BarChart2 } from "lucide-react";
-import { useState } from "react";
-import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
-import {
-  DraggableGraphCard,
-  type GraphData,
-  type SizeOption,
-} from "./DraggableGraphCard";
+import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
+import { ChartGrid } from "./ChartGrid";
+import { DraggableGraphCard, type GraphData } from "./DraggableGraphCard";
 
 interface ReportGridProps {
   graphs: GraphData[];
@@ -25,133 +8,64 @@ interface ReportGridProps {
   projectId: string;
   dashboardId?: string;
   onGraphDelete: (graphId: string) => void;
-  onGraphSizeChange: (graphId: string, size: SizeOption) => void;
   onGraphGranularityChange?: (input: {
     graphId: string;
     granularitySeconds: number;
   }) => void;
-  onGraphsReorder: (layouts: GridLayout[]) => void;
+  onGraphsPlacementChange: (placements: ChartGridPlacement[]) => void;
   deletingGraphId: string | null;
 }
 
+/**
+ * The analytics dashboard's grid of chart cards — every chart placed on the
+ * active dashboard, on the shared `ChartGrid`.
+ */
 export function ReportGrid({
   graphs,
   projectSlug,
   projectId,
   dashboardId,
   onGraphDelete,
-  onGraphSizeChange,
   onGraphGranularityChange,
-  onGraphsReorder,
+  onGraphsPlacementChange,
   deletingGraphId,
 }: ReportGridProps) {
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const activeDragGraph = graphs.find((g) => g.id === activeDragId);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-  );
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveDragId(event.active.id as string);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveDragId(null);
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = graphs.findIndex((g) => g.id === active.id);
-    const newIndex = graphs.findIndex((g) => g.id === over.id);
-
-    if (oldIndex !== -1 && newIndex !== -1) {
-      // Reorder the graphs array
-      const newOrder = [...graphs];
-      const [removed] = newOrder.splice(oldIndex, 1);
-      newOrder.splice(newIndex, 0, removed!);
-
-      // Recalculate grid positions for all graphs
-      const layouts = calculateGridPositions(newOrder);
-      onGraphsReorder(layouts);
-    }
-  };
+  const graphById = new Map(graphs.map((graph) => [graph.id, graph]));
+  const placements = graphs.map((graph) => ({
+    graphId: graph.id,
+    gridColumn: graph.gridColumn,
+    gridRow: graph.gridRow,
+    colSpan: graph.colSpan,
+    rowSpan: graph.rowSpan,
+  }));
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={graphs.map((g) => g.id)}
-        strategy={rectSortingStrategy}
-      >
-        <Grid
-          templateColumns="repeat(2, 1fr)"
-          autoRows="minmax(240px, auto)"
-          gap={4}
-          width="100%"
-        >
-          {graphs.map((graph) => (
-            <DraggableGraphCard
-              key={graph.id}
-              graph={graph}
-              projectSlug={projectSlug}
-              projectId={projectId}
-              dashboardId={dashboardId}
-              onDelete={() => onGraphDelete(graph.id)}
-              onSizeChange={(size) => onGraphSizeChange(graph.id, size)}
-              {...(onGraphGranularityChange
-                ? {
-                    onGranularityChange: (granularitySeconds: number) =>
-                      onGraphGranularityChange({
-                        graphId: graph.id,
-                        granularitySeconds,
-                      }),
-                  }
-                : {})}
-              isDeleting={deletingGraphId === graph.id}
-            />
-          ))}
-        </Grid>
-      </SortableContext>
-
-      <DragOverlay>
-        {activeDragGraph ? (
-          <Card.Root
-            boxShadow="xl"
-            opacity={0.9}
-            width={activeDragGraph.colSpan === 2 ? "600px" : "300px"}
-            height={activeDragGraph.rowSpan === 2 ? "400px" : "200px"}
-          >
-            <Card.Body>
-              <HStack align="center" marginBottom={4}>
-                <BarChart2 color="orange" />
-                <Text marginLeft={2} fontSize="md" fontWeight="bold">
-                  {activeDragGraph.name}
-                </Text>
-              </HStack>
-              <Box
-                flex={1}
-                background="gray.50"
-                borderRadius="md"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                color="fg.subtle"
-                height="calc(100% - 40px)"
-              >
-                Chart preview
-              </Box>
-            </Card.Body>
-          </Card.Root>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+    <ChartGrid
+      placements={placements}
+      onPlacementsCommit={onGraphsPlacementChange}
+      renderCard={({ graphId }) => {
+        const graph = graphById.get(graphId);
+        if (!graph) return null;
+        return (
+          <DraggableGraphCard
+            graph={graph}
+            projectSlug={projectSlug}
+            projectId={projectId}
+            dashboardId={dashboardId}
+            onDelete={() => onGraphDelete(graph.id)}
+            {...(onGraphGranularityChange
+              ? {
+                  onGranularityChange: (granularitySeconds: number) =>
+                    onGraphGranularityChange({
+                      graphId: graph.id,
+                      granularitySeconds,
+                    }),
+                }
+              : {})}
+            isDeleting={deletingGraphId === graph.id}
+          />
+        );
+      }}
+    />
   );
 }

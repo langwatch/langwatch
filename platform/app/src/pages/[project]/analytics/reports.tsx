@@ -8,21 +8,17 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
+import { useState } from "react";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
 import { toaster } from "~/components/ui/toaster";
 import { useWidgetGranularity } from "~/features/analytics-query/hooks/useWidgetGranularity";
+import { CreateDashboardWidgetDrawer } from "~/features/custom-chart-playground/CreateDashboardWidgetDrawer";
+import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  calculateGridPositions,
-  type GridLayout,
-  ReportGrid,
-  type SizeOption,
-  sizeOptions,
-} from "../../../components/analytics/reports";
-import { Link } from "../../../components/ui/link";
+import { ReportGrid } from "../../../components/analytics/reports";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
@@ -43,6 +39,8 @@ function ReportsContent() {
 
   const activeDashboardId = urlDashboardId ?? getOrCreateFirst.data?.id;
 
+  const [isAddChartOpen, setIsAddChartOpen] = useState(false);
+
   // Fetch all dashboards to get current dashboard name
   const dashboardsQuery = api.dashboards.getAll.useQuery(
     { projectId },
@@ -61,7 +59,6 @@ function ReportsContent() {
   );
 
   const deleteGraph = api.graphs.delete.useMutation();
-  const updateLayout = api.graphs.updateLayout.useMutation();
   const batchUpdateLayouts = api.graphs.batchUpdateLayouts.useMutation();
   const renameDashboard = api.dashboards.rename.useMutation();
 
@@ -103,69 +100,16 @@ function ReportsContent() {
     );
   };
 
-  const handleGraphSizeChange = (graphId: string, size: SizeOption) => {
-    const sizeConfig = sizeOptions.find((s) => s.value === size);
-    if (!sizeConfig) return;
-
-    const graph = graphsQuery.data?.find((g) => g.id === graphId);
-    if (!graph) return;
-
-    // Update this graph's size
-    updateLayout.mutate(
-      {
-        projectId,
-        graphId,
-        gridColumn: graph.gridColumn,
-        gridRow: graph.gridRow,
-        colSpan: sizeConfig.colSpan,
-        rowSpan: sizeConfig.rowSpan,
-      },
-      {
-        onSuccess: () => {
-          // Recalculate all positions after size change
-          const updatedGraphs = graphsQuery.data?.map((g) =>
-            g.id === graphId
-              ? {
-                  ...g,
-                  colSpan: sizeConfig.colSpan,
-                  rowSpan: sizeConfig.rowSpan,
-                }
-              : g,
-          );
-
-          if (updatedGraphs) {
-            const newLayouts = calculateGridPositions(updatedGraphs);
-            batchUpdateLayouts.mutate(
-              { projectId, layouts: newLayouts },
-              {
-                onSuccess: () => {
-                  void graphsQuery.refetch();
-                },
-              },
-            );
-          }
-        },
-        onError: () => {
-          toaster.create({
-            title: "Error updating graph size",
-            type: "error",
-            duration: 3000,
-          });
-        },
-      },
-    );
-  };
-
-  const handleGraphsReorder = (layouts: GridLayout[]) => {
+  const handleGraphsPlacementChange = (placements: ChartGridPlacement[]) => {
     batchUpdateLayouts.mutate(
-      { projectId, layouts },
+      { projectId, layouts: placements },
       {
         onSuccess: () => {
           void graphsQuery.refetch();
         },
         onError: () => {
           toaster.create({
-            title: "Error reordering graphs",
+            title: "Error saving the dashboard layout",
             type: "error",
             duration: 3000,
           });
@@ -203,11 +147,6 @@ function ReportsContent() {
   });
   const hasNoGraphs = graphs.length === 0 && !graphsQuery.isLoading;
 
-  // Build add chart URL with current dashboard
-  const addChartUrl = activeDashboardId
-    ? `/${project?.slug}/analytics/custom?dashboard=${activeDashboardId}`
-    : `/${project?.slug}/analytics/custom`;
-
   return (
     <GraphsLayout
       title={dashboardTitle}
@@ -217,14 +156,32 @@ function ReportsContent() {
       }}
       extraHeaderButtons={
         project ? (
-          <Link href={addChartUrl} asChild>
-            <Button colorPalette="orange" size="sm">
-              <Plus /> Add chart
-            </Button>
-          </Link>
+          <Button
+            colorPalette="orange"
+            size="sm"
+            onClick={() => setIsAddChartOpen(true)}
+          >
+            <Plus /> Add chart
+          </Button>
         ) : null
       }
     >
+      {/* The workbench builder's own save path is disabled while the
+          custom-chart-playground is enabled (see DashboardWidgetService /
+          saved_workbench_charts_disabled_for_playground) — a member landing
+          there would hit a Save button that always fails. This drawer is
+          the one "create a new chart" path that still works, and it lands
+          the new widget on this dashboard directly. */}
+      {project && (
+        <CreateDashboardWidgetDrawer
+          open={isAddChartOpen}
+          onClose={() => setIsAddChartOpen(false)}
+          projectId={projectId}
+          projectSlug={project.slug}
+          dashboardId={activeDashboardId ?? undefined}
+        />
+      )}
+
       {/* Empty state */}
       {hasNoGraphs && (
         <Alert.Root
@@ -258,9 +215,8 @@ function ReportsContent() {
               projectId={projectId}
               dashboardId={activeDashboardId ?? undefined}
               onGraphDelete={handleGraphDelete}
-              onGraphSizeChange={handleGraphSizeChange}
               onGraphGranularityChange={handleGraphGranularityChange}
-              onGraphsReorder={handleGraphsReorder}
+              onGraphsPlacementChange={handleGraphsPlacementChange}
               deletingGraphId={
                 deleteGraph.isPending
                   ? (deleteGraph.variables?.id ?? null)
