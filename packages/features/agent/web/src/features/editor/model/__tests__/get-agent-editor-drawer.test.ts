@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getAgentEditorDrawer } from "../get-agent-editor-drawer";
 
 describe("getAgentEditorDrawer", () => {
+  /** @scenario "Agents page routes each agent type to its matching editor drawer" */
   it("routes editable agent types and rejects legacy signature agents", () => {
     expect(getAgentEditorDrawer("code")).toBe("agentCodeEditor");
     expect(getAgentEditorDrawer("http")).toBe("agentHttpEditor");

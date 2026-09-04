@@ -154,6 +154,7 @@ describe("storeFromBytes", () => {
   });
 
   describe("when the content is new for the project", () => {
+    /** @scenario "Stored objects rows are tenant-tagged so a future project-purge can cascade" */
     it("PUTs bytes to storage, INSERTs a stored_objects row, returns the new id with isDuplicate false", async () => {
       const result = await service.storeFromBytes(STORE_PARAMS);
 
@@ -180,6 +181,7 @@ describe("storeFromBytes", () => {
   });
 
   describe("when identical content already exists for the project", () => {
+    /** @scenario "Duplicate content within a project reuses the existing stored_objects id" */
     it("returns the existing id with isDuplicate true and does not call storage put or repository insert", async () => {
       const existingId = "existing-uuid";
       vi.mocked(repo.findById).mockResolvedValue(makeRow({ id: existingId }));
@@ -317,6 +319,7 @@ describe("storeFromBytes", () => {
   });
 
   describe("when called twice with identical input", () => {
+    /** @scenario "Same content from the same project yields the same URI" */
     it("returns the same deterministic id", async () => {
       // First call: miss → store
       const first = await service.storeFromBytes(STORE_PARAMS);
@@ -440,6 +443,7 @@ describe("deleteOwnedBy", () => {
   });
 
   describe("when every byte-delete succeeds", () => {
+    /** @scenario "When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes" */
     it("deletes every row in one batch", async () => {
       const rows = [makeRow({ id: "obj-1" }), makeRow({ id: "obj-2" })];
       vi.mocked(repo.findAllByProject).mockResolvedValue(rows);

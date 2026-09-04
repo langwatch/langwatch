@@ -100,6 +100,9 @@ describe("Worker stored object storage composition", () => {
     await aws.close();
   });
 
+  /** @scenario "Storage registry dispatches by URI scheme" */
+  /** @scenario "Choosing S3 for writes does not unregister the Azure driver" */
+  /** @scenario "Legacy S3 surfaces keep working during an S3-to-Azure migration" */
   it("constructs Azure only for an Azure URI and routes S3 through the process AWS runtime", async () => {
     client.send.mockRejectedValueOnce({ $metadata: { httpStatusCode: 404 } });
     resolver.hosts.length = 0;
@@ -128,6 +131,7 @@ describe("Worker stored object storage composition", () => {
     await aws.close();
   });
 
+  /** @scenario "A resolvable Azure destination always comes with a usable Azure driver" */
   it("rejects an Azure write selection without its explicit driver factory", () => {
     expect(() =>
       WorkerStoredObjectStorageRuntimeFactory.create({

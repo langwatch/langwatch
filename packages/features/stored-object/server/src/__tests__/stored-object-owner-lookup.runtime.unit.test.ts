@@ -81,6 +81,7 @@ describe("StoredObjectOwnerLookupRuntime", () => {
     );
   });
 
+  /** @scenario "Cross-tenant owner lookup fans out to every ClickHouse instance" */
   it("finds a private ClickHouse owner after the shared instance misses", async () => {
     resolveInstances.mockResolvedValue([
       { target: "shared", client: makeMockClient([]) },
@@ -110,6 +111,7 @@ describe("StoredObjectOwnerLookupRuntime", () => {
     expect(privateClient.query).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario "Cross-tenant owner lookup isolates failures across instances" */
   it("returns a healthy match when another ClickHouse instance fails", async () => {
     resolveInstances.mockResolvedValue([
       { target: "org_byoc_down", client: makeFailingClient(new Error("connection refused")) },
@@ -126,6 +128,7 @@ describe("StoredObjectOwnerLookupRuntime", () => {
     expect(telemetry.attributes.get("result.degraded")).toBeUndefined();
   });
 
+  /** @scenario "Cross-tenant owner lookup signals transient unavailability when no hit and any instance failed" */
   it("throws a retryable degraded error when no healthy instance finds an owner", async () => {
     resolveInstances.mockResolvedValue([
       { target: "shared", client: makeMockClient([]) },
@@ -140,6 +143,7 @@ describe("StoredObjectOwnerLookupRuntime", () => {
     expect(telemetry.attributes.get("result.degraded")).toBe(true);
   });
 
+  /** @scenario "Cross-tenant owner lookup signals transient unavailability when no hit and any instance failed" */
   it("retains the unavailable-error type for transport 502 mapping", async () => {
     resolveInstances.mockResolvedValue([
       { target: "shared", client: makeMockClient([]) },

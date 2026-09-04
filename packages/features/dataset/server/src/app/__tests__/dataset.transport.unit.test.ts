@@ -23,6 +23,7 @@ import {
   type RestApiServicePorts,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { UploadValidationError } from "../../services/errors";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { DatasetApp } from "../dataset.app";
@@ -74,7 +75,7 @@ const boundaryErrorHandler: ErrorHandler = (error, c) => {
 };
 
 /** Every enforcement step the builder chose for the route under test. */
-function testSecurity(): { security: AppRestSecurity; chain: string[] } {
+function testSecurity({ refuse = false } = {}): { security: AppRestSecurity; chain: string[] } {
   const chain: string[] = [];
   const record =
     (label: string): MiddlewareHandler =>
@@ -84,6 +85,7 @@ function testSecurity(): { security: AppRestSecurity; chain: string[] } {
     };
   const authenticateProject: MiddlewareHandler = async (c, next) => {
     chain.push("authenticateProject");
+    if (refuse) return c.json({ error: "unauthorized" }, 401);
     c.set("project", {
       id: "project-1",
       name: "Project One",
@@ -117,8 +119,8 @@ function testSecurity(): { security: AppRestSecurity; chain: string[] } {
   return { security: createAppRestSecurity(ports), chain };
 }
 
-function buildApi(overrides: Record<string, unknown> = {}) {
-  const { security, chain } = testSecurity();
+function buildApi(overrides: Record<string, unknown> = {}, options: { refuse?: boolean } = {}) {
+  const { security, chain } = testSecurity(options);
   const stub = {
     listDatasets: vi.fn(async () => ({
       data: [{ ...dataset, recordCount: 2 }],
@@ -170,6 +172,16 @@ const send = (
     method,
     ...(body === undefined ? {} : { headers: jsonHeaders, body: JSON.stringify(body) }),
   });
+
+/** A multipart body carrying one file under the field the upload doors read. */
+const formWithFile = (filename: string, content: string) => {
+  const form = new FormData();
+  form.set("file", new File([content], filename, { type: "text/plain" }));
+  return form;
+};
+
+const upload = (hono: ReturnType<typeof buildApi>["hono"], path: string, body: FormData) =>
+  hono.request(path, { method: "POST", body });
 
 describe("createDatasetRestApp", () => {
   describe("given the mounted family", () => {
@@ -248,6 +260,9 @@ describe("createDatasetRestApp", () => {
   });
 
   describe("when the project's datasets are listed", () => {
+    /**
+     * @scenario "List datasets with page and limit parameters"
+     */
     it("passes the page window through and links each row into the app", async () => {
       const { hono, stub } = buildApi();
 
@@ -308,6 +323,9 @@ describe("createDatasetRestApp", () => {
       });
     });
 
+    /**
+     * @scenario "Create a dataset requires a name"
+     */
     it("refuses a body with no name", async () => {
       const { hono, stub } = buildApi();
 
@@ -319,6 +337,9 @@ describe("createDatasetRestApp", () => {
       expect(stub.upsertDataset).not.toHaveBeenCalled();
     });
 
+    /**
+     * @scenario "Create a dataset validates column types"
+     */
     it("refuses a column whose type is not one the dataset understands", async () => {
       const { hono, stub } = buildApi();
 
@@ -331,6 +352,9 @@ describe("createDatasetRestApp", () => {
       expect(stub.upsertDataset).not.toHaveBeenCalled();
     });
 
+    /**
+     * @scenario "Create a dataset auto-generates a unique slug from the name"
+     */
     it("answers 409 when the slug the name produces is already taken", async () => {
       const { hono } = buildApi({
         upsertDataset: vi.fn(async () => {
@@ -346,6 +370,9 @@ describe("createDatasetRestApp", () => {
   });
 
   describe("when one dataset is read whole", () => {
+    /**
+     * @scenario "Get a dataset by slug"
+     */
     it("asks for it under the family's own read ceiling", async () => {
       const { hono, stub } = buildApi();
 
@@ -364,6 +391,9 @@ describe("createDatasetRestApp", () => {
       });
     });
 
+    /**
+     * @scenario "Get dataset enforces 25MB response size limit"
+     */
     it("refuses rather than truncating when the read exceeds that ceiling", async () => {
       const { hono } = buildApi({
         getDatasetWithRecords: vi.fn(async () => ({
@@ -381,6 +411,9 @@ describe("createDatasetRestApp", () => {
       });
     });
 
+    /**
+     * @scenario "Get dataset returns 404 for non-existent slug"
+     */
     it("answers 404 for a slug that names no dataset", async () => {
       const { hono } = buildApi({
         getDatasetWithRecords: vi.fn(async () => {
@@ -429,6 +462,9 @@ describe("createDatasetRestApp", () => {
       });
     });
 
+    /**
+     * @scenario "Update a dataset fails when new slug conflicts"
+     */
     it("answers 409 when the new name collides with another dataset", async () => {
       const { hono } = buildApi({
         upsertDataset: vi.fn(async () => {
@@ -441,6 +477,9 @@ describe("createDatasetRestApp", () => {
       expect(response.status).toBe(409);
     });
 
+    /**
+     * @scenario "Update a non-existent dataset returns 404"
+     */
     it("answers 404 when the project has no such dataset", async () => {
       const { hono } = buildApi({
         upsertDataset: vi.fn(async () => {
@@ -468,6 +507,9 @@ describe("createDatasetRestApp", () => {
       });
     });
 
+    /**
+     * @scenario "Delete a non-existent dataset returns 404"
+     */
     it("answers 404 for a slug that names no dataset", async () => {
       const { hono } = buildApi({
         archiveDataset: vi.fn(async () => {
@@ -496,6 +538,9 @@ describe("createDatasetRestApp", () => {
       });
     });
 
+    /**
+     * @scenario "List records for non-existent dataset returns 404"
+     */
     it("answers 404 for a dataset that does not exist", async () => {
       const { hono } = buildApi({
         listRecords: vi.fn(async () => {
@@ -510,6 +555,10 @@ describe("createDatasetRestApp", () => {
   });
 
   describe("when one record is written by id", () => {
+    /**
+     * @scenario "Update a record entry"
+     * @scenario "Update a non-existent record creates it"
+     */
     it("answers 200 when it replaced one and 201 when it created one", async () => {
       const replaced = buildApi();
       const replacedResponse = await send(
@@ -539,6 +588,9 @@ describe("createDatasetRestApp", () => {
       });
     });
 
+    /**
+     * @scenario "Update a record for non-existent dataset returns 404"
+     */
     it("answers 404 when the dataset does not exist", async () => {
       const { hono } = buildApi({
         upsertRecord: vi.fn(async () => {
@@ -555,6 +607,9 @@ describe("createDatasetRestApp", () => {
   });
 
   describe("when records are appended in a batch", () => {
+    /**
+     * @scenario "Batch create records via POST /:slugOrId/records"
+     */
     it("answers 201 with the rows it created", async () => {
       const { hono, stub } = buildApi();
 
@@ -573,6 +628,9 @@ describe("createDatasetRestApp", () => {
       });
     });
 
+    /**
+     * @scenario "Batch create records requires entries in body"
+     */
     it("refuses a body with no entries", async () => {
       const { hono, stub } = buildApi();
 
@@ -582,6 +640,9 @@ describe("createDatasetRestApp", () => {
       expect(stub.batchCreateRecords).not.toHaveBeenCalled();
     });
 
+    /**
+     * @scenario "Batch create records enforces maximum batch size"
+     */
     it("names the batch ceiling in the reason rather than in the sentence", async () => {
       const { hono, stub } = buildApi();
 
@@ -600,6 +661,9 @@ describe("createDatasetRestApp", () => {
       expect(stub.batchCreateRecords).not.toHaveBeenCalled();
     });
 
+    /**
+     * @scenario "Batch create records validates column names against dataset schema"
+     */
     it("answers 400 when an entry names a column the dataset does not have", async () => {
       const { hono } = buildApi({
         batchCreateRecords: vi.fn(async () => {
@@ -637,6 +701,9 @@ describe("createDatasetRestApp", () => {
       expect(body.message).toContain("columnTypes");
     });
 
+    /**
+     * @scenario "Batch create records returns 404 for non-existent dataset"
+     */
     it("answers 404 when the dataset does not exist", async () => {
       const { hono } = buildApi({
         batchCreateRecords: vi.fn(async () => {
@@ -653,6 +720,9 @@ describe("createDatasetRestApp", () => {
   });
 
   describe("when records are deleted in a batch", () => {
+    /**
+     * @scenario "Delete records in batch"
+     */
     it("answers the count the application removed", async () => {
       const { hono, stub } = buildApi();
 
@@ -669,6 +739,9 @@ describe("createDatasetRestApp", () => {
       });
     });
 
+    /**
+     * @scenario "Delete records with no matching IDs returns 404"
+     */
     it("answers 404 when none of the named ids matched", async () => {
       const { hono } = buildApi({ deleteRecords: vi.fn(async () => ({ count: 0 })) });
 
@@ -681,6 +754,9 @@ describe("createDatasetRestApp", () => {
       expect(body.message).toContain("No matching records");
     });
 
+    /**
+     * @scenario "Delete records requires recordIds in body"
+     */
     it("refuses a body that names no ids", async () => {
       const { hono, stub } = buildApi();
 
@@ -688,6 +764,321 @@ describe("createDatasetRestApp", () => {
 
       expect(response.status).toBe(422);
       expect(stub.deleteRecords).not.toHaveBeenCalled();
+    });
+  });
+  describe("when the caller carries no usable credential", () => {
+    /**
+     * @scenario "Request without API key returns 401"
+     * @scenario "Request with invalid API key returns 401"
+     */
+    it("refuses every dataset route before the application is reached", async () => {
+      for (const [method, path] of [
+        ["GET", "/api/dataset"],
+        ["POST", "/api/dataset"],
+        ["GET", "/api/dataset/my-dataset"],
+        ["PATCH", "/api/dataset/my-dataset"],
+        ["DELETE", "/api/dataset/my-dataset"],
+        ["GET", "/api/dataset/my-dataset/records"],
+      ] as const) {
+        const { hono, stub } = buildApi({}, { refuse: true });
+
+        const response = await send(hono, method, path, method === "GET" ? undefined : {});
+
+        expect(response.status).toBe(401);
+        expect(stub.listDatasets).not.toHaveBeenCalled();
+        expect(stub.getDatasetWithRecords).not.toHaveBeenCalled();
+      }
+    });
+
+    /**
+     * @scenario "Upload without API key returns 401"
+     * @scenario "Upload to existing without API key returns 401"
+     */
+    it("refuses both upload doors the same way", async () => {
+      for (const path of ["/api/dataset/upload", "/api/dataset/some-dataset/upload"]) {
+        const { hono } = buildApi({}, { refuse: true });
+
+        const response = await hono.request(path, { method: "POST", body: new FormData() });
+
+        expect(response.status).toBe(401);
+      }
+    });
+  });
+
+  describe("when the project owns no dataset yet", () => {
+    /** @scenario "List datasets returns empty array for project with no datasets" */
+    it("answers an empty page rather than a refusal", async () => {
+      const { hono } = buildApi({
+        listDatasets: vi.fn(async () => ({
+          data: [],
+          pagination: { page: 1, limit: 50, total: 0, totalPages: 0 },
+        })),
+      });
+
+      const response = await hono.request("/api/dataset");
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        data: [],
+        pagination: { page: 1, limit: 50, total: 0, totalPages: 0 },
+      });
+    });
+  });
+
+  describe("when a dataset is named by its id rather than its slug", () => {
+    /**
+     * @scenario "Get a dataset by id"
+     * @scenario "Endpoints accept both slug and dataset ID"
+     */
+    it("hands the path segment to the application unchanged either way", async () => {
+      const bySlug = buildApi();
+      const slugResponse = await bySlug.hono.request("/api/dataset/my-data");
+      const byId = buildApi();
+      const idResponse = await byId.hono.request("/api/dataset/dataset_xyz");
+
+      expect(bySlug.stub.getDatasetWithRecords).toHaveBeenCalledWith({
+        slugOrId: "my-data",
+        projectId: "project-1",
+        limitMb: 25,
+      });
+      expect(byId.stub.getDatasetWithRecords).toHaveBeenCalledWith({
+        slugOrId: "dataset_xyz",
+        projectId: "project-1",
+        limitMb: 25,
+      });
+      await expect(slugResponse.json()).resolves.toEqual(await idResponse.json());
+    });
+
+    /** @scenario "Batch create records accepts dataset ID as well as slug" */
+    it("appends rows against the id the path named", async () => {
+      const { hono, stub } = buildApi();
+
+      const response = await send(hono, "POST", "/api/dataset/dataset_xyz/records", {
+        entries: [{ input: "test" }],
+      });
+
+      expect(response.status).toBe(201);
+      expect(stub.batchCreateRecords).toHaveBeenCalledWith({
+        slugOrId: "dataset_xyz",
+        projectId: "project-1",
+        entries: [{ input: "test" }],
+      });
+    });
+  });
+
+  describe("when a dataset's name and column set are both patched", () => {
+    /** @scenario "Update a dataset name and column types" */
+    it("carries both through and answers with what the application wrote", async () => {
+      const renamed = {
+        ...dataset,
+        name: "New Name",
+        slug: "new-name",
+        columnTypes: [{ name: "question", type: "string" }],
+      };
+      const { hono, stub } = buildApi({ upsertDataset: vi.fn(async () => renamed) });
+
+      const response = await send(hono, "PATCH", "/api/dataset/old-name", {
+        name: "New Name",
+        columnTypes: [{ name: "question", type: "string" }],
+      });
+
+      expect(response.status).toBe(200);
+      expect(stub.upsertDataset).toHaveBeenCalledWith({
+        projectId: "project-1",
+        slugOrId: "old-name",
+        name: "New Name",
+        columnTypes: [{ name: "question", type: "string" }],
+      });
+      await expect(response.json()).resolves.toMatchObject({
+        name: "New Name",
+        slug: "new-name",
+        columnTypes: [{ name: "question", type: "string" }],
+      });
+    });
+
+    /** @scenario "Update dataset does not enforce plan limits" */
+    it("runs no allowance step, so a project at its ceiling still edits what it has", async () => {
+      const { hono, chain } = buildApi();
+
+      const response = await send(hono, "PATCH", "/api/dataset/existing", { name: "Updated Name" });
+
+      expect(response.status).toBe(200);
+      expect(chain.filter((step) => step.startsWith("ceiling:"))).toEqual([]);
+    });
+  });
+
+  describe("when a dataset's records are paged without a window", () => {
+    /** @scenario "List records with default pagination" */
+    it("asks for the first page and echoes the application's count", async () => {
+      const { hono, stub } = buildApi({
+        listRecords: vi.fn(async () => ({
+          data: [{ id: "rec-1", entry: { input: "hello" } }],
+          pagination: { page: 1, limit: 50, total: 100, totalPages: 2 },
+        })),
+      });
+
+      const response = await hono.request("/api/dataset/my-dataset/records");
+
+      expect(response.status).toBe(200);
+      expect(stub.listRecords).toHaveBeenCalledWith({
+        slugOrId: "my-dataset",
+        projectId: "project-1",
+        page: 1,
+        limit: 50,
+      });
+      await expect(response.json()).resolves.toMatchObject({
+        pagination: { page: 1, limit: 50, total: 100 },
+      });
+    });
+  });
+
+  describe("when records are deleted from a dataset that does not exist", () => {
+    /** @scenario "Delete records for non-existent dataset returns 404" */
+    it("answers 404 rather than a count of nothing", async () => {
+      const { hono } = buildApi({
+        deleteRecords: vi.fn(async () => {
+          throw domainError("DatasetNotFoundError", "no such dataset");
+        }),
+      });
+
+      const response = await send(hono, "DELETE", "/api/dataset/ghost/records", {
+        recordIds: ["rec-1"],
+      });
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe("when a file is uploaded into an existing dataset", () => {
+    /** @scenario "Upload without a file field returns 422" */
+    it("refuses a multipart body carrying no file", async () => {
+      const { hono, stub } = buildApi({ uploadToExistingDataset: vi.fn() });
+
+      const response = await upload(hono, "/api/dataset/empty/upload", new FormData());
+
+      expect(response.status).toBe(422);
+      expect(stub.uploadToExistingDataset).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Upload to a non-existent dataset returns 404" */
+    it("answers 404 when the dataset the path names is gone", async () => {
+      const { hono } = buildApi({
+        uploadToExistingDataset: vi.fn(async () => {
+          throw domainError("DatasetNotFoundError", "no such dataset");
+        }),
+      });
+
+      const response = await upload(
+        hono,
+        "/api/dataset/does-not-exist/upload",
+        formWithFile("data.csv", "input\nhello\n"),
+      );
+
+      expect(response.status).toBe(404);
+    });
+
+    /**
+     * @scenario "Upload an empty file returns 422"
+     * @scenario "Upload with unsupported file format is rejected"
+     */
+    it("turns a refusal the caller can fix by sending a different file into a 422", async () => {
+      for (const kind of ["empty_file", "unsupported_format"] as const) {
+        const { hono } = buildApi({
+          uploadToExistingDataset: vi.fn(async () => {
+            throw new UploadValidationError("refused", kind);
+          }),
+        });
+
+        const response = await upload(
+          hono,
+          "/api/dataset/any/upload",
+          formWithFile("data.xlsx", "binary"),
+        );
+
+        expect(response.status).toBe(422);
+      }
+    });
+
+    /**
+     * @scenario "Upload exceeding row limit is rejected"
+     * @scenario "Upload exceeding file size limit is rejected"
+     * @scenario "Upload fails when file columns do not match dataset columns"
+     */
+    it("turns a refusal about the file's own shape or size into a 400", async () => {
+      for (const kind of ["row_limit_exceeded", "file_too_large", "column_mismatch"] as const) {
+        const { hono } = buildApi({
+          uploadToExistingDataset: vi.fn(async () => {
+            throw new UploadValidationError("refused", kind);
+          }),
+        });
+
+        const response = await upload(
+          hono,
+          "/api/dataset/big/upload",
+          formWithFile("data.csv", "input\nhello\n"),
+        );
+
+        expect(response.status).toBe(400);
+      }
+    });
+  });
+
+  describe("when a file is uploaded as a brand-new dataset", () => {
+    /** @scenario "Create + upload requires a name field" */
+    it("refuses a body that names nothing to call the dataset", async () => {
+      const { hono, stub } = buildApi({ createDatasetFromUpload: vi.fn() });
+
+      const response = await upload(
+        hono,
+        "/api/dataset/upload",
+        formWithFile("data.csv", "question\n2+2\n"),
+      );
+
+      expect(response.status).toBe(422);
+      expect(stub.createDatasetFromUpload).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Create + upload requires a file field" */
+    it("refuses a body carrying a name and no file", async () => {
+      const { hono, stub } = buildApi({ createDatasetFromUpload: vi.fn() });
+      const form = new FormData();
+      form.set("name", "No File");
+
+      const response = await upload(hono, "/api/dataset/upload", form);
+
+      expect(response.status).toBe(422);
+      expect(stub.createDatasetFromUpload).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Create + upload fails when slug conflicts with existing dataset" */
+    it("answers 409 when the name's slug is already taken", async () => {
+      const { hono } = buildApi({
+        createDatasetFromUpload: vi.fn(async () => {
+          throw domainError("DatasetConflictError", "slug taken");
+        }),
+      });
+      const form = formWithFile("data.csv", "question\n2+2\n");
+      form.set("name", "Duplicate");
+
+      const response = await upload(hono, "/api/dataset/upload", form);
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({ error: "Conflict" });
+    });
+
+    /** @scenario "Create + upload rejects file exceeding row limit" */
+    it("answers 400 when the file carries more rows than the family accepts", async () => {
+      const { hono } = buildApi({
+        createDatasetFromUpload: vi.fn(async () => {
+          throw new UploadValidationError("too many rows", "row_limit_exceeded");
+        }),
+      });
+      const form = formWithFile("data.csv", "question\n2+2\n");
+      form.set("name", "Too Big");
+
+      const response = await upload(hono, "/api/dataset/upload", form);
+
+      expect(response.status).toBe(400);
     });
   });
 });

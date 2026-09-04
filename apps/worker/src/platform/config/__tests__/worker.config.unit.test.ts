@@ -276,6 +276,7 @@ describe("resolveWorkerConfig", () => {
     });
   });
 
+  /** @scenario "S3 client honors S3_REGION env for real AWS deployments instead of the R2/MinIO 'auto' default" */
   it("resolves Worker-private Redis, queue, storage, and proxy settings once", () => {
     const source = {
       REDIS_URL: "redis://redis.example.test:6379",
@@ -439,6 +440,7 @@ describe("resolveWorkerConfig", () => {
     });
   });
 
+  /** @scenario "S3 client defaults region to 'auto' for R2 and MinIO compatibility" */
   it("preserves the legacy S3 region fallback for explicit credentials and custom endpoints", () => {
     expect(
       resolveWorkerConfig({

@@ -52,6 +52,7 @@ const SENTINEL_TITLE = "ZZ screen fallback ZZ";
 
 describe("given a failure a screen hands over", () => {
   describe("when it carries a code the registry knows", () => {
+    /** @scenario "A caller's generic headline loses to specific copy" */
     it("uses the registry copy rather than the action name", () => {
       const copy = resolveUiFailureCopy({
         error: trpcFailure("insufficient_permissions", {
@@ -108,6 +109,7 @@ describe("given a failure a screen hands over", () => {
   });
 
   describe("when the server sent remediation tips with it", () => {
+    /** @scenario "A tip that repeats our copy is dropped, one that adds to it is kept" */
     it("folds in the one tip the registry description did not already say", () => {
       const copy = resolveUiFailureCopy({
         error: trpcFailure("clickhouse_unavailable", {
@@ -119,6 +121,7 @@ describe("given a failure a screen hands over", () => {
       expect(copy.description).toContain("Check the LangWatch status page or contact support");
     });
 
+    /** @scenario "A tip that repeats our copy is dropped, one that adds to it is kept" */
     it("drops a tip that only repeats the description", () => {
       const copy = resolveUiFailureCopy({
         error: trpcFailure("rate_limited", {
@@ -131,7 +134,24 @@ describe("given a failure a screen hands over", () => {
     });
   });
 
+  describe("when the server sent remediation for a code this client cannot name", () => {
+    /** @scenario "Remediation reaches the customer when we have nothing better" */
+    it("shows the most actionable tip and keeps the docs link", () => {
+      const copy = resolveUiFailureCopy({
+        error: trpcFailure("dataset_import_stalled", {
+          tips: ["Rotate the key", "Then retry"],
+          docsUrl: "https://docs.langwatch.ai/platform/datasets",
+        }),
+        fallbackTitle: "Couldn't import the dataset",
+      });
+
+      expect(copy.description).toBe("Rotate the key");
+      expect(copy.docsUrl).toBe("https://docs.langwatch.ai/platform/datasets");
+    });
+  });
+
   describe("when it carries a code this client has never seen", () => {
+    /** @scenario "A caller's generic headline loses to specific copy" */
     it("says what the reader was doing, and offers the trace id", () => {
       const copy = resolveUiFailureCopy({
         error: {

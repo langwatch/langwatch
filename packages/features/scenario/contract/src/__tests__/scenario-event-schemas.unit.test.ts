@@ -46,6 +46,7 @@ describe("scenarioMessageSnapshotSchema — input_audio wire acceptance (#5149)"
     expect(result.success).toBe(true);
   });
 
+  /** @scenario "Voice MESSAGE_SNAPSHOT with input_audio is accepted (201) and the audio is externalized" */
   it("preserves the input_audio bytes through validation so the extractor can externalize them", () => {
     const event = makeSnapshotEvent([
       { type: "text", text: "Here is your audio reply" },
@@ -356,6 +357,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
       expect(scenarioEventSchema.safeParse(event).success).toBe(true);
     });
 
+    /** @scenario "A simulated user message with an image attachment shows the image in the run conversation" */
     it("preserves the image data URI through validation so the extractor can externalize it", () => {
       const event = makeSnapshotEvent([
         { type: "text", text: "What do you see in this image?" },
@@ -394,6 +396,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
       expect(scenarioEventSchema.safeParse(event).success).toBe(true);
     });
 
+    /** @scenario "A simulated user message with a document attachment stays available under its original filename" */
     it("preserves the file_data and filename through validation so the extractor can externalize them", () => {
       const event = makeSnapshotEvent([
         {

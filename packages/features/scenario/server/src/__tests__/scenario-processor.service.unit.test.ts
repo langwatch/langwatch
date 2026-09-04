@@ -214,6 +214,8 @@ describe("ScenarioProcessorService", () => {
   });
 
   describe("cancellation subscription", () => {
+    /** @scenario "Worker kills its own child process on cancel broadcast" */
+    /** @scenario "Worker ignores cancel broadcast for scenarios it does not own" */
     it("kills only the owned child and marks that run as cancelled", async () => {
       const fixture = processorFixture();
       const child = new ChildProcess();
@@ -241,6 +243,7 @@ describe("ScenarioProcessorService", () => {
     });
   });
 
+  /** @scenario "Worker skips execution if cancel was already requested" */
   it("writes a cancelled terminal result when the pool skips a job", async () => {
     const fixture = processorFixture();
     fixture.pool.markCancelled("cancelled");

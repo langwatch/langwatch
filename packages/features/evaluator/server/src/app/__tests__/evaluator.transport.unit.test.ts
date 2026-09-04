@@ -238,6 +238,7 @@ describe("createEvaluatorsRestApp", () => {
       });
     });
 
+    /** @scenario "DELETE /api/evaluators/:id archives an evaluator" */
     it("answers 404 when the project has no evaluator by that name", async () => {
       const { hono } = buildApi({ tryGetByIdOrSlugWithFields: vi.fn(async () => null) });
 
@@ -248,6 +249,7 @@ describe("createEvaluatorsRestApp", () => {
   });
 
   describe("when an evaluator is updated", () => {
+    /** @scenario "PUT /api/evaluators/:id updates an evaluator" */
     it("sends only the fields the caller named", async () => {
       const { hono, stub } = buildApi();
 
@@ -290,6 +292,7 @@ describe("createEvaluatorsRestApp", () => {
       });
     });
 
+    /** @scenario "PUT /api/evaluators/:id updates an evaluator" */
     it("refuses a body that changes the evaluator's type", async () => {
       const { hono, stub } = buildApi();
 
@@ -335,6 +338,7 @@ describe("createEvaluatorsRestApp", () => {
   });
 
   describe("when an evaluator is archived", () => {
+    /** @scenario "DELETE /api/evaluators/:id archives an evaluator" */
     it("archives it and answers success", async () => {
       const { hono, stub } = buildApi();
 

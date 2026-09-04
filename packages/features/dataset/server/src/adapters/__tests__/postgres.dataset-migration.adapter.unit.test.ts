@@ -1,8 +1,16 @@
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { PostgresDatasetMigrationAdapter } from "../postgres.dataset-migration.adapter";
-import type { DatasetStorage, PresignedUpload } from "../../ports/dataset-storage.port";
-import { DatasetStorageResolver } from "../../ports/dataset-storage.port";
+import { AzureDatasetStorageAdapter } from "../azure.dataset-storage.adapter";
+import type {
+  DatasetBlobDriver,
+  DatasetStorage,
+  PresignedUpload,
+} from "../../ports/dataset-storage.port";
+import {
+  DatasetAzureConfigResolver,
+  DatasetStorageResolver,
+} from "../../ports/dataset-storage.port";
 import {
   toJsonlChunks,
   type ChunkOffset,
@@ -64,6 +72,7 @@ function fixture(input: {
   current?: DatasetLayout | null;
   candidatePages?: string[][];
   recordPages?: Array<Array<{ id: string; entry: unknown }>>;
+  storage?: DatasetStorage;
 }) {
   const current =
     input.current === undefined ? { contentLayout: "postgres", useS3: false } : input.current;
@@ -107,7 +116,7 @@ function fixture(input: {
     $transaction: runTransaction,
   };
   const storage = new FixtureStorage();
-  const storageResolver = new FixtureStorageResolver(storage);
+  const storageResolver = new FixtureStorageResolver(input.storage ?? storage);
   // Prisma's delegates derive their return types from the arguments each call
   // was made with, so no hand-written stand-in can be declared to satisfy one.
   // The fake records what it was asked, which is what every claim below reads.
@@ -130,6 +139,48 @@ function fixture(input: {
     update,
   };
 }
+
+describe("given a deployment whose dataset destination is Azure Blob", () => {
+  describe("when the backfill migrates a postgres-layout dataset", () => {
+    /** @scenario "The dataset-content backfill task migrates a postgres-layout dataset onto azure" */
+    it("writes the chunk objects into the Azure container rather than a bucket", async () => {
+      const put = vi.fn(async () => undefined);
+      const driver: DatasetBlobDriver = {
+        put,
+        get: async () => Readable.from([]),
+        head: async () => 0,
+        // False, deliberately: `deleteChunksFrom` walks upward until the first
+        // gap, so a driver that always answers true never terminates.
+        exists: async () => false,
+        delete: async () => undefined,
+      };
+      const azure = AzureDatasetStorageAdapter.create(
+        new (class extends DatasetAzureConfigResolver {
+          async resolve() {
+            return { driver, accountName: "lwacct", container: "datasets" };
+          }
+        })(),
+      );
+      const subject = fixture({
+        recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
+        storage: azure,
+      });
+      subject.recordAggregate.mockResolvedValue(
+        fingerprintRow({ count: 1, maxUpdatedAt: new Date("2026-01-01T00:00:00.000Z") }),
+      );
+
+      await expect(
+        subject.migration.migrateDataset({ datasetId: "dataset_1", projectId: "project_1" }),
+      ).resolves.toBe("migrated");
+
+      expect(put).toHaveBeenCalledTimes(1);
+      const [uri, body, contentType] = put.mock.calls[0]! as unknown as [string, Buffer, string];
+      expect(uri).toMatch(/^azure-blob:\/\/lwacct\/datasets\//);
+      expect(body.toString("utf-8")).toContain('"record_1"');
+      expect(contentType).toBe("application/x-ndjson");
+    });
+  });
+});
 
 describe("PostgresDatasetMigrationAdapter", () => {
   it("streams ordered pages, preserves ids and atomically flips the dataset", async () => {

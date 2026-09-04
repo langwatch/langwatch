@@ -62,6 +62,7 @@ describe("formatError", () => {
       expect(body.retryable).toBe(false);
     });
 
+    /** @scenario "A handled error carries remediation for agent consumers" */
     it("keeps trusted handled remediation metadata lossless", () => {
       const err = new TestError("query_memory_exceeded", "Query used too much memory", {
         httpStatus: 422,

@@ -127,6 +127,7 @@ describe("given a request carrying no session", () => {
   });
 
   describe("when the key was minted for a different project", () => {
+    /** @scenario "Direct-upload rejects a foreign-project API key against an owned project" */
     it("refuses rather than writing into the project the body names", async () => {
       authenticate.mockResolvedValue({
         ok: true,

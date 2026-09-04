@@ -419,6 +419,15 @@ describe("<SuiteSidebar/>", () => {
       makeSuite({ id: "suite_3", name: "Quick Run", slug: "quick-run" }),
     ];
 
+    /** @scenario "Sidebar does not display a redundant SUITES label" */
+    it("does not render a SUITES section header above the suite list", () => {
+      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryAllByText(/^SUITES$/)).toHaveLength(0);
+    });
+
     /** @scenario "Sidebar still shows suite names and action buttons after label removal" */
     it("displays all suite names", () => {
       render(<SuiteSidebar {...defaultProps} suites={suites} />, {

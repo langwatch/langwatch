@@ -58,6 +58,7 @@ describe.skipIf(!process.env.REDIS_URL)("Redis Scenario cancellation", () => {
     await unsubscribe();
   });
 
+  /** @scenario "Batch cancel across multiple workers terminates all active runs" */
   it("broadcasts each run in a batch to every worker subscriber", async () => {
     const first: CancellationMessage[] = [];
     const second: CancellationMessage[] = [];

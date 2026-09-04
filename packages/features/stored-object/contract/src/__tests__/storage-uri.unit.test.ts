@@ -11,6 +11,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 describe("stored object storage URIs", () => {
+  /** @scenario "Minted URI is content-addressed under projectId and sha256" */
   it("keeps S3 object paths content-addressed by project and digest", () => {
     expect(
       mintS3StoredObjectUri({
@@ -21,6 +22,7 @@ describe("stored object storage URIs", () => {
     ).toBe("s3://my-bucket/proj-abc/deadbeef1234");
   });
 
+  /** @scenario "Minted URI is content-addressed under projectId and sha256" */
   it("normalizes local roots without changing the object path", () => {
     expect(
       mintFileStoredObjectUri({

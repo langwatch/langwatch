@@ -105,7 +105,7 @@ export {
  * evaluation payload written before the Postgres store still lives in. An
  * object written through one is not readable through the other.
  */
-export { ObjectNotFoundError } from "./errors";
+export { ObjectNotFoundError, UnsupportedStorageSchemeError } from "./errors";
 export {
   StoredObjectsClickHousePort,
   type StoredObjectsClickHouseClient,

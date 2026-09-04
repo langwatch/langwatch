@@ -150,6 +150,8 @@ describe("buildAwsClientConfig", () => {
   });
 
   describe("given an incomplete credential pair", () => {
+    /** @scenario "S3 client falls back to default chain when credentials are partial — prevents misleading 'empty string credentials' bug" */
+    /** @scenario "S3 client omits credentials so the SDK default provider chain handles IRSA and instance profiles" */
     it("omits credentials entirely rather than sending empty strings", () => {
       for (const credentials of [
         { accessKeyId: "", secretAccessKey: "" },
@@ -173,6 +175,7 @@ describe("buildAwsClientConfig", () => {
   });
 
   describe("given a complete credential pair", () => {
+    /** @scenario "S3 client uses explicit credentials when env keys are present" */
     it("passes a complete pair through, trimmed", () => {
       const config = buildAwsClientConfig({
         region: "eu-central-1",
@@ -188,6 +191,7 @@ describe("buildAwsClientConfig", () => {
       });
     });
 
+    /** @scenario "S3 client forwards sessionToken when set so SSO/STS credentials work" */
     it("carries a session token only when there is one", () => {
       expect(
         staticCredentialsOrUndefined({

@@ -159,6 +159,7 @@ describe("createExecuteRunHandler", () => {
 });
 
 describe("createCancelExecutionHandler", () => {
+  /** @scenario "Process manager broadcasts cancel to Redis on cancel_requested event" */
   it("broadcasts the cancellation with the run identity", async () => {
     const publishCancellation = vi.fn().mockResolvedValue(undefined);
     const run = createCancelExecutionHandler(

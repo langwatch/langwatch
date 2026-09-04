@@ -84,6 +84,18 @@ const unconfiguredAzure: WorkerStorageConfig["azure"] = {
   identity: { tenantId: undefined, clientId: undefined, federatedTokenFile: undefined },
 };
 
+const keylessAzure: WorkerStorageConfig["azure"] = {
+  ...unconfiguredAzure,
+  authMode: "workloadIdentity",
+  accountName: "acct",
+  container: "datasets",
+  identity: {
+    tenantId: "tenant-1",
+    clientId: "client-1",
+    federatedTokenFile: "/var/run/secrets/azure/tokens/azure-identity-token",
+  },
+};
+
 const configuredAzure: WorkerStorageConfig["azure"] = {
   ...unconfiguredAzure,
   authMode: "sharedKey",
@@ -106,6 +118,22 @@ describe("WorkerDatasetStorageResolver", () => {
 
       expect(result).toBeInstanceOf(AzureDatasetStorageAdapter);
       expect(result).not.toBeInstanceOf(LocalDatasetStorageAdapter);
+    });
+  });
+
+  describe("given a project routed to Azure in a token-based auth mode with no account key", () => {
+    /** @scenario "Dataset storage is selected without dereferencing an absent account key" */
+    it("selects the Azure dataset storage without reading an account key that is not there", async () => {
+      const storage = storageFor({
+        destination: { kind: "azure", accountName: "acct", container: "datasets" },
+        azure: keylessAzure,
+      });
+      const resolver = new WorkerDatasetStorageResolver(storage);
+
+      const result = await resolver.forProject("project-1");
+
+      expect(result).toBeInstanceOf(AzureDatasetStorageAdapter);
+      expect(keylessAzure.accountKey).toBeUndefined();
     });
   });
 

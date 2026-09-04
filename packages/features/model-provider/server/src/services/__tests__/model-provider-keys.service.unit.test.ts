@@ -216,6 +216,7 @@ describe("ModelProviderKeysService merge", () => {
   // so a write states it in full.
   describe("when a field is left out of the write", () => {
     /** @scenario A save that names one credential keeps the ones it leaves out */
+    /** @scenario "Credential fields are secret unless the registry declares them public" */
     it("keeps a stored secret", () => {
       const result = policy.merge({
         incoming: { AZURE_OPENAI_ENDPOINT: "https://acme2.openai.azure.com" },
@@ -307,6 +308,7 @@ describe("ModelProviderKeysService read masking", () => {
   };
 
   describe("when a stored credential set is read back", () => {
+    /** @scenario "Credential fields are secret unless the registry declares them public" */
     it("replaces every secret field with the placeholder", () => {
       const masked = Object.values(storedCredentials).map((keys) => policy.tryMask(keys));
 

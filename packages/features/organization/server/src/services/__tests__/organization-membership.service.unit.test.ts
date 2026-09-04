@@ -156,6 +156,58 @@ describe("OrganizationMembershipService", () => {
     });
   });
 
+  describe("changeMemberRole", () => {
+    /**
+     * The deployment answers `assertRoleChangeAllowed`, and its Enterprise
+     * half refuses a change that hands out a custom team role on a plan that
+     * does not carry custom roles. What this pins is the service's side of
+     * that contract: the team role updates reach the gate, and a refusal stops
+     * the write.
+     * @scenario "Non-enterprise org cannot assign custom roles via member role update"
+     */
+    it("refuses before writing when the plan gate rejects a custom team role", async () => {
+      vi.mocked(mockRepo.getClient!).mockReturnValue({
+        team: {
+          findFirst: vi.fn().mockResolvedValue(null),
+          findMany: vi.fn().mockResolvedValue([{ id: "team-1" }]),
+        },
+        project: { findFirst: vi.fn().mockResolvedValue(null) },
+        roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
+      } as unknown as PrismaClient);
+      vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
+        role: OrganizationUserRole.MEMBER,
+      } as never);
+      const teamRoleUpdates = [
+        {
+          teamId: "team-1",
+          userId: "user-456",
+          role: "custom:auditor",
+          customRoleId: "role-1",
+        },
+      ];
+      mockAssertRoleChangeAllowed.mockRejectedValue(
+        Object.assign(new Error("Custom roles require an Enterprise plan"), {
+          code: "FORBIDDEN",
+        }),
+      );
+
+      await expect(
+        service.changeMemberRole({
+          organizationId: "org-123",
+          userId: "user-456",
+          role: OrganizationUserRole.MEMBER,
+          teamRoleUpdates,
+          currentUserId: "admin-789",
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+      expect(mockAssertRoleChangeAllowed).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-123", teamRoleUpdates }),
+      );
+      expect(mockRepo.updateMemberRole).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when removing a member", () => {
     const membership = {
       userId: "user-456",

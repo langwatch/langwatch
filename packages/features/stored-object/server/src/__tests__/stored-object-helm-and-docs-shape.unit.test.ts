@@ -395,6 +395,41 @@ describe("storage_uri persisted on the stored_objects row is the authoritative b
   });
 });
 
+describe("Stored objects metadata table", () => {
+  describe("when the migration that creates it is inspected", () => {
+    /** @scenario "Stored objects metadata table exists with the documented shape" */
+    it("declares every documented column, the replacing engine, the order key, the partition key and both bloom-filter indexes", () => {
+      const migration = readRepoFile(
+        "packages/clickhouse-client/migrations/00023_create_stored_objects.sql",
+      );
+
+      for (const column of [
+        "id",
+        "project_id",
+        "purpose",
+        "owner_kind",
+        "owner_id",
+        "media_type",
+        "size_bytes",
+        "sha256",
+        "storage_uri",
+        "created_at",
+        "inserted_at",
+      ]) {
+        expect(migration).toMatch(new RegExp(`^\\s*${column}\\s+\\S`, "m"));
+      }
+
+      // The engine prefix is an envsub default, so the replicated variant can
+      // replace it on a clustered install; the version column is ours either way.
+      expect(migration).toMatch(/ENGINE = [^\n]*ReplacingMergeTree\(\}inserted_at\)/);
+      expect(migration).toMatch(/PARTITION BY toYYYYMM\(created_at\)/);
+      expect(migration).toMatch(/ORDER BY \(project_id, id\)/);
+      expect(migration).toMatch(/INDEX idx_sha256 sha256 TYPE bloom_filter/);
+      expect(migration).toMatch(/INDEX idx_purpose purpose TYPE bloom_filter/);
+    });
+  });
+});
+
 describe("Stored objects migration is idempotent at the SQL level", () => {
   describe("when the migration file is inspected", () => {
     /** @scenario "Stored objects migration is idempotent" */

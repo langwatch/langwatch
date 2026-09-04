@@ -863,9 +863,33 @@ describe("getTraceAvailableSources", () => {
 
     expect(threadsField).toBeUndefined();
   });
+
+  /** @scenario "Trace-level mapping UI includes both trace and thread available sources" */
+  it("offers a Trace group and a Thread group", () => {
+    const sources = getTraceAvailableSources([], []);
+
+    expect(sources.map((source) => source.id)).toEqual(["trace", "thread"]);
+    expect(sources.find((source) => source.id === "trace")!.fields.length).toBeGreaterThan(0);
+    expect(sources.find((source) => source.id === "thread")!.fields.length).toBeGreaterThan(0);
+  });
+
+  /** @scenario "Thread source fields include thread_id, traces, and formatted_traces" */
+  it("carries thread_id, traces and formatted_traces on the Thread group", () => {
+    const sources = getTraceAvailableSources([], []);
+    const thread = sources.find((source) => source.id === "thread")!;
+
+    for (const field of ["thread_id", "traces", "formatted_traces"]) {
+      expect(thread.fields.map((f) => f.name)).toContain(field);
+    }
+  });
 });
 
 describe("getThreadAvailableSources", () => {
+  /** @scenario "Thread-level mapping UI still shows only thread sources" */
+  it("offers the Thread group and no Trace group", () => {
+    expect(getThreadAvailableSources().map((source) => source.id)).toEqual(["thread"]);
+  });
+
   it("includes formatted_traces with label 'Full Thread (AI-Readable)'", () => {
     const sources = getThreadAvailableSources();
     const threadSource = sources[0]!;

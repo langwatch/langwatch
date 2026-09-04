@@ -150,10 +150,18 @@ describe("UserService", () => {
   });
 
   /** @scenario "Deactivating a user invalidates every session family" */
+  /** @scenario "user.deactivate sets deactivatedAt on the user" */
   it("marks a user deactivated", async () => {
     const { service, repository } = createService();
     await service.deactivate({ id: "user-1" });
     expect(repository.setDeactivatedAt).toHaveBeenCalledWith("user-1", new Date(42));
+  });
+
+  /** @scenario "user.reactivate clears deactivatedAt on the user" */
+  it("clears the deactivation stamp when a user is reactivated", async () => {
+    const { service, repository } = createService();
+    await service.reactivate({ id: "user-1" });
+    expect(repository.setDeactivatedAt).toHaveBeenCalledWith("user-1", null);
   });
 
   it("normalizes a changed email", async () => {

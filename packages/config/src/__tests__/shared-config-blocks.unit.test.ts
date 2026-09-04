@@ -21,7 +21,7 @@ import { postgresConfigDefinition } from "../postgres.config";
 import { groupQueueConfigDefinition } from "../queue.config";
 import { redisConfigDefinition } from "../redis.config";
 import { runtimeIdentityConfigDefinition } from "../runtime-identity.config";
-import { RuntimeConfig } from "../runtime-config";
+import { InvalidRuntimeConfigError, RuntimeConfig } from "../runtime-config";
 
 describe("shared configuration blocks", () => {
   it("resolves the shared Postgres connection from DATABASE_URL", () => {
@@ -69,6 +69,7 @@ describe("shared configuration blocks", () => {
     expect(value).toEqual({ url: "http://clickhouse.example.test:8123" });
   });
 
+  /** @scenario "The env schema declares the Azure backend variables as first-class keys" */
   it("resolves the shared object storage block's backend, S3 and Azure leaves", () => {
     const value = RuntimeConfig.create({
       name: "object-storage-block",
@@ -87,6 +88,17 @@ describe("shared configuration blocks", () => {
     expect(value.s3.bucket).toBe("langwatch-storage");
     expect(value.azure.accountName).toBe("langwatchstorage");
     expect(value.azure.identity.tenantId).toBe("tenant-1");
+  });
+
+  /** @scenario "An unrecognized STORED_OBJECTS_BACKEND value is rejected, not ignored" */
+  it("refuses a stored-objects backend outside the supported set rather than ignoring it", () => {
+    expect(() =>
+      RuntimeConfig.create({
+        name: "object-storage-block",
+        definition: objectStorageConfigDefinition,
+        source: { STORED_OBJECTS_BACKEND: "gcs" },
+      }),
+    ).toThrow(InvalidRuntimeConfigError);
   });
 
   it("resolves the shared mail gateway block across every transport", () => {

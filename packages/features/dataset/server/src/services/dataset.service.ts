@@ -44,7 +44,13 @@ import type {
   DatasetUploadPort,
   DatasetContentPort,
 } from "../ports/dataset.port";
-import { DatasetConflictError, DatasetNotFoundError, DatasetNotReadyError } from "./errors";
+import {
+  DatasetConflictError,
+  DatasetNotFoundError,
+  DatasetNotReadyError,
+  InvalidColumnError,
+} from "./errors";
+import { stripNullBytes } from "./sanitize";
 import type { DatasetStorageResolver } from "../ports/dataset-storage.port";
 import type { DatasetRepository, DatasetUpdateInput } from "../repositories/dataset.repository";
 import type { DatasetRecordRepository } from "../repositories/dataset-record.repository";
@@ -420,7 +426,7 @@ export class DatasetService extends DatasetServiceContract {
           id: parsed.recordId,
           datasetId: dataset.id,
           projectId: parsed.projectId,
-          entry: parsed.updatedRecord,
+          entry: sanitizedEntry(parsed.updatedRecord),
         }),
         created: false,
       };
@@ -430,7 +436,7 @@ export class DatasetService extends DatasetServiceContract {
     const [record] = await this.options.records.createMany({
       datasetId: dataset.id,
       projectId: parsed.projectId,
-      entries: [{ id: parsed.recordId, ...parsed.updatedRecord }],
+      entries: [{ id: parsed.recordId, ...sanitizedEntry(parsed.updatedRecord) }],
     });
     if (!record) throw new Error("Dataset record creation returned no record");
     return { record, created: true };
@@ -443,16 +449,17 @@ export class DatasetService extends DatasetServiceContract {
       projectId: parsed.projectId,
     });
     this.assertReady(dataset);
+    const columns = dataset.columnTypes.map((column) => column.name);
+    DatasetService.assertKnownColumns({ datasetName: dataset.name, columns, entries: parsed.entries });
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.batchCreateRecords({ dataset, input: parsed });
     }
-    const columns = dataset.columnTypes.map((column) => column.name);
     return this.options.records.createMany({
       datasetId: dataset.id,
       projectId: parsed.projectId,
       entries: parsed.entries.map((entry) => ({
         id: entry.id ?? this.generateId(),
-        ...Object.fromEntries(columns.map((column) => [column, entry[column] ?? null])),
+        ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
       })),
     });
   }
@@ -481,7 +488,7 @@ export class DatasetService extends DatasetServiceContract {
         id: parsed.recordId,
         datasetId: dataset.id,
         projectId: parsed.projectId,
-        entry: parsed.updatedRecord,
+        entry: sanitizedEntry(parsed.updatedRecord),
       });
     } catch (error) {
       if (DatasetService.isNotFound(error)) throw new DatasetRecordNotFoundError();
@@ -602,6 +609,35 @@ export class DatasetService extends DatasetServiceContract {
     return target;
   }
 
+  /**
+   * A key the dataset does not define is refused, not dropped. The fill below
+   * writes only defined columns, so an unknown key would vanish and the caller
+   * would read a 201 for data nothing stored. Validation runs before the
+   * storage split so both layouts refuse the same entry. `id` is the record's
+   * own identifier, part of the entry contract rather than a column.
+   */
+  private static assertKnownColumns({
+    datasetName,
+    columns,
+    entries,
+  }: {
+    datasetName: string;
+    columns: string[];
+    entries: ReadonlyArray<Record<string, unknown>>;
+  }): void {
+    const valid = new Set(columns);
+    for (const entry of entries) {
+      for (const key of Object.keys(entry)) {
+        if (key === "id" || valid.has(key)) continue;
+        throw new InvalidColumnError({
+          columnName: key,
+          datasetName,
+          validColumns: columns,
+        });
+      }
+    }
+  }
+
   private assertReady(dataset: Dataset): void {
     if (dataset.status !== "ready") {
       throw new DatasetNotReadyError({ status: dataset.status });
@@ -661,4 +697,13 @@ export class DatasetService extends DatasetServiceContract {
     }
     return { records: result, truncated: false };
   }
+}
+
+/**
+ * Postgres jsonb cannot hold U+0000, so a customer-supplied entry is scrubbed
+ * before it reaches the inline record table. The s3_jsonl paths scrub in the
+ * chunk writer instead.
+ */
+function sanitizedEntry(entry: Record<string, unknown>): Record<string, unknown> {
+  return stripNullBytes(entry) as Record<string, unknown>;
 }

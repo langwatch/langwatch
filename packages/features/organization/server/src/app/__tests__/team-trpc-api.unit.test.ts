@@ -249,6 +249,7 @@ describe("TeamTrpcApi", () => {
   });
 
   describe("when the team settings form is saved", () => {
+    /** @scenario "Non-enterprise org can update team members with built-in roles" */
     it("resolves the team's organization before it writes, and attributes the change to the caller", async () => {
       const updateTeamWithMembers = vi.fn(async () => {});
       const { caller, assertCustomRolesAllowed } = harness({
@@ -275,6 +276,7 @@ describe("TeamTrpcApi", () => {
       });
     });
 
+    /** @scenario "Non-enterprise org cannot assign custom roles via team update" */
     it("refuses a custom role the organization's plan does not include, before any write", async () => {
       const updateTeamWithMembers = vi.fn(async () => {});
       const { caller } = harness({
@@ -321,6 +323,29 @@ describe("TeamTrpcApi", () => {
         members: [{ userId: "u1", role: "ADMIN" }],
         actor: { type: "user", id: "test-user-id" },
       });
+    });
+
+    /** @scenario "Non-enterprise org cannot create teams with custom role members" */
+    it("refuses a member assigned a custom role the plan does not include", async () => {
+      const createTeamWithMembers = vi.fn(async () => team);
+      const { caller } = harness({
+        organizations: { createTeamWithMembers },
+        assertCustomRolesAllowed: async () => {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Custom roles require an Enterprise plan",
+          });
+        },
+      });
+
+      await expect(
+        caller.createTeamWithMembers({
+          organizationId: "org-1",
+          name: "Engineering",
+          members: [{ userId: "u1", role: "custom:auditor", customRoleId: "role-1" }],
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(createTeamWithMembers).not.toHaveBeenCalled();
     });
   });
 

@@ -452,6 +452,7 @@ describe("extractInlineMediaFromEvent", () => {
 
   describe("when an event has an AI-SDK file+audio part (typescript scenario SDK shape)", () => {
     /** @scenario "Raw realtime audio is wrapped into a playable container at store time" */
+    /** @scenario "Voice MESSAGE_SNAPSHOT with input_audio is accepted (201) and the audio is externalized" */
     it("calls storeFromBytes with the audio mediaType and rewrites the part to {type:'input_audio', input_audio:{url, mimeType}}", async () => {
       const base64Payload = makeBase64Payload("PCM16_AUDIO_BYTES");
       const mimeType = "audio/pcm16";
@@ -840,6 +841,7 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an AI-SDK image part with a base64 data URI (typescript scenario SDK shape)", () => {
+    /** @scenario "A simulated user message with an image attachment shows the image in the run conversation" */
     it("extracts the bytes and rewrites image to /api/files/<projectId>/<id>", async () => {
       const base64Payload = makeBase64Payload("WEBP_BYTES");
       const storedId = "stored-image-id";
@@ -905,6 +907,7 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an OpenAI file part with a data URI file_data (multimodal-files docs shape)", () => {
+    /** @scenario "A simulated user message with a document attachment stays available under its original filename" */
     it("extracts the bytes and rewrites the part to a binary reference preserving the filename", async () => {
       const base64Payload = makeBase64Payload("%PDF-1.4 fake pdf bytes");
       const storedId = "stored-openai-file-id";

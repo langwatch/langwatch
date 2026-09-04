@@ -466,10 +466,100 @@ describe("OrganizationTrpcApi", () => {
           organizationId: "org-1",
         });
       });
+
+      /**
+       * The refusal is raised before `createInvites` runs, so a batch that
+       * mixes one custom-role invitation in with built-in ones writes none of
+       * them.
+       * @scenario "Non-enterprise org cannot invite members with custom roles"
+       * @scenario "Batch invite rejects entirely when any invite has a custom role"
+       * @scenario "Non-enterprise org cannot create invite requests with custom roles"
+       */
+      it("refuses the whole batch when the plan does not include custom roles", async () => {
+        const ports = stubPorts({
+          assertCustomRolesAllowed: vi.fn(async () => {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Custom roles require an Enterprise plan",
+            });
+          }),
+        });
+        const { caller } = harness({ ports });
+
+        await expect(
+          caller.createInvites({
+            organizationId: "org-1",
+            invites: [
+              {
+                email: "builtin@example.com",
+                role: "MEMBER",
+                teams: [{ teamId: "team-1", role: "MEMBER" }],
+              },
+              {
+                email: "custom@example.com",
+                role: "MEMBER",
+                teams: [{ teamId: "team-1", role: "custom:role-1", customRoleId: "role-1" }],
+              },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+        expect(ports.createInvites).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given every invitation names a built-in team role", () => {
+      /** @scenario "Non-enterprise org can invite members with built-in roles" */
+      it("creates them without consulting the plan", async () => {
+        const ports = stubPorts();
+        const { caller } = harness({ ports });
+
+        await caller.createInvites({
+          organizationId: "org-1",
+          invites: [
+            {
+              email: "new@example.com",
+              role: "MEMBER",
+              teams: [{ teamId: "team-1", role: "MEMBER" }],
+            },
+          ],
+        });
+
+        expect(ports.assertCustomRolesAllowed).not.toHaveBeenCalled();
+        expect(ports.createInvites).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("when a team member's role is changed", () => {
+    describe("given the new role is a custom one", () => {
+      /** @scenario "Non-enterprise org cannot update team member role to custom role" */
+      it("refuses before the change is written", async () => {
+        const updateTeamMemberRole = vi.fn(async () => {});
+        const ports = stubPorts({
+          assertCustomRolesAllowed: vi.fn(async () => {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Custom roles require an Enterprise plan",
+            });
+          }),
+        });
+        const { caller } = harness({ organizations: { updateTeamMemberRole }, ports });
+
+        await expect(
+          caller.updateTeamMemberRole({
+            teamId: "team-1",
+            userId: "user-2",
+            role: "custom:role-1",
+            customRoleId: "role-1",
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+        expect(updateTeamMemberRole).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe("when reading the audit trail", () => {
+    /** @scenario "Non-enterprise org cannot access audit logs" */
     it("checks the Enterprise plan before the query runs", async () => {
       const getAuditLogs = vi.fn(async () => ({ auditLogs: [], totalCount: 0 }));
       const ports = stubPorts({
@@ -483,6 +573,18 @@ describe("OrganizationTrpcApi", () => {
         "audit logs are an Enterprise capability",
       );
       expect(getAuditLogs).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Enterprise org can access audit logs" */
+    it("answers with the trail once the plan allows it", async () => {
+      const getAuditLogs = vi.fn(async () => ({ auditLogs: [], totalCount: 0 }));
+      const { caller } = harness({ organizations: { getAuditLogs } });
+
+      await expect(caller.getAuditLogs({ organizationId: "org-1" })).resolves.toEqual({
+        auditLogs: [],
+        totalCount: 0,
+      });
+      expect(getAuditLogs).toHaveBeenCalled();
     });
   });
 });

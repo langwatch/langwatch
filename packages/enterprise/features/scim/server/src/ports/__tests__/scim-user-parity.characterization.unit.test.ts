@@ -347,6 +347,7 @@ describe("SCIM user parity", () => {
   describe("when proven offboarding is switched on", () => {
     // Every other case here runs the legacy path, so until now the flag's
     // enabled branch — the one a rollout turns on — had no cover at all.
+    /** @scenario "Deprovisioned user's org membership and role bindings are cleaned up" */
     it("removes access through the grants offboard rather than the legacy writer", async () => {
       const { writer, repo, service } = harness({
         membership: { userId: "user-1", organizationId: "org-1", role: "MEMBER" },
@@ -372,6 +373,31 @@ describe("SCIM user parity", () => {
 
       await service.deleteUser({ id: "user-1", organizationId: "org-1" });
 
+      expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
+    });
+
+    /** @scenario "Deactivating a user deprovisions them with the same proof" */
+    it("routes a push of active false through the same proof before deactivating", async () => {
+      const { writer, users, service } = harness({
+        membership: { user: user() },
+        currentUser: user({ deactivatedAt: null }),
+        provenOffboarding: true,
+      });
+
+      await service.replaceUser({
+        id: "user-1",
+        organizationId: "org-1",
+        request: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: "alice@acme.com",
+          name: { givenName: "Alice", familyName: "Smith" },
+          active: false,
+        },
+      });
+
+      expect(writer.offboard).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user-1", organizationId: "org-1" }),
+      );
       expect(users.deactivate).toHaveBeenCalledWith({ id: "user-1" });
     });
 

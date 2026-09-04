@@ -29,6 +29,7 @@ async function duplicatedHandledError(
 }
 
 describe("HandledError.serialize", () => {
+  /** @scenario "Remediation fields are additive and optional" */
   it("defaults fault to customer, retryable to false, and omits empty remediation fields", () => {
     const serialized = new TestError().serialize();
 

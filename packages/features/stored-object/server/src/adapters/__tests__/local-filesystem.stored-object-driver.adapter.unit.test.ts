@@ -52,6 +52,7 @@ afterEach(async () => {
 
 describe("when put is called with bytes and a file URI", () => {
   /** @scenario "Local filesystem driver writes under the configured root using atomic rename" */
+  /** @scenario "StorageDriver interface exposes get, put, delete, exists" */
   it("writes the bytes to the final path", async () => {
     const uri = mintFileStoredObjectUri({
       root: tmpDir,
@@ -154,6 +155,7 @@ describe("Local filesystem driver write is atomic under interruption", () => {
 // ---------------------------------------------------------------------------
 
 describe("when get is called and the file exists", () => {
+  /** @scenario "StorageDriver interface exposes get, put, delete, exists" */
   it("streams the bytes", async () => {
     const uri = mintFileStoredObjectUri({
       root: tmpDir,
@@ -186,6 +188,7 @@ describe("when get is called and the file does not exist", () => {
 // ---------------------------------------------------------------------------
 
 describe("when exists is called and the file is present", () => {
+  /** @scenario "StorageDriver interface exposes get, put, delete, exists" */
   it("returns true", async () => {
     const uri = mintFileStoredObjectUri({
       root: tmpDir,
@@ -215,6 +218,7 @@ describe("when exists is called and the file is missing", () => {
 // ---------------------------------------------------------------------------
 
 describe("when delete is called and the file exists", () => {
+  /** @scenario "StorageDriver interface exposes get, put, delete, exists" */
   it("removes it", async () => {
     const uri = mintFileStoredObjectUri({
       root: tmpDir,

@@ -20,7 +20,7 @@ import {
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { getStoredObjectStorageScheme } from "@langwatch/stored-object-contract";
-import { ObjectNotFoundError } from "../errors";
+import { ObjectNotFoundError, UnsupportedStorageSchemeError } from "../errors";
 import type {
   StoredObjectS3Target,
   StoredObjectS3TargetPort,
@@ -49,8 +49,13 @@ export type StoredObjectS3ClientPolicy = Readonly<{
  * @throws if the URI scheme is not "s3".
  */
 function parseS3Uri(uri: string): { bucket: string; key: string } {
-  // Throws if not "s3"
-  getStoredObjectStorageScheme(uri);
+  // Recognising the scheme is not accepting it: every scheme the platform
+  // knows passes the parse, and the slice below assumes "s3://" exactly — so
+  // an azure-blob address used to yield a bucket built from its own host.
+  const scheme = getStoredObjectStorageScheme(uri);
+  if (scheme !== "s3") {
+    throw new UnsupportedStorageSchemeError({ uri, scheme, expectedScheme: "s3" });
+  }
 
   // s3://bucket/key  → strip "s3://"
   const withoutScheme = uri.slice("s3://".length);
