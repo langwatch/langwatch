@@ -29,11 +29,32 @@ export class CliRunner {
     private readonly config: {
       cwd: string;
       timeout?: number;
+      /**
+       * Environment for the spawned CLI, laid over this process's own. A key
+       * whose value is `undefined` is removed, which is how a test spawns the
+       * CLI with no credential at all.
+       */
+      env?: Record<string, string | undefined>;
     },
   ) {
     const logFileName = "cli-test-run.log";
     this.logPath = path.join(config.cwd, logFileName);
     this.log("=== CLI Runner initialized ===");
+  }
+
+  /**
+   * This process's environment with the caller's overlay applied, an
+   * `undefined` value meaning the variable is absent from the child.
+   */
+  private spawnEnv(): NodeJS.ProcessEnv {
+    const overlay = this.config.env;
+    if (!overlay) return process.env;
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    for (const [name, value] of Object.entries(overlay)) {
+      if (value === undefined) delete env[name];
+      else env[name] = value;
+    }
+    return env;
   }
 
   /**
@@ -64,6 +85,7 @@ export class CliRunner {
         cwd: this.config.cwd,
         encoding: "utf8",
         stdio: "pipe",
+        env: this.spawnEnv(),
       });
 
       this.log(result);
@@ -105,6 +127,7 @@ export class CliRunner {
       const child = spawn("node", [CLI_PATH, ...command.split(" ")], {
         cwd: this.config.cwd,
         stdio: ["pipe", "pipe", "pipe"],
+        env: this.spawnEnv(),
       });
 
       let output = "";
