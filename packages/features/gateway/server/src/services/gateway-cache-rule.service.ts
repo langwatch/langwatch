@@ -12,9 +12,9 @@ import {
 import { GatewayCacheRuleRepository } from "../repositories/gateway-cache-rule.repository";
 
 /** Private cache-rule collaborator owned by the singular Gateway service. */
-export class GatewayCacheRulePersistence {
-  static create(repository: GatewayCacheRuleRepository): GatewayCacheRulePersistence {
-    return new GatewayCacheRulePersistence(repository);
+export class GatewayCacheRuleService {
+  static create(repository: GatewayCacheRuleRepository): GatewayCacheRuleService {
+    return new GatewayCacheRuleService(repository);
   }
 
   private constructor(private readonly repository: GatewayCacheRuleRepository) {}

@@ -11,19 +11,18 @@
  * Spend comes from the same rollup the budgets page reads, so a limit and
  * its "spent so far" agree wherever they are shown.
  */
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 
 import { type BudgetSpendTarget, GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
-import { budgetPeriodFloorMs } from "../adapters/gateway-period.adapter";
-import { resolveProviderLabels } from "../repositories/prisma/prisma.gateway-provider-label.repository";
-import { type ScopeInput } from "../ports/gateway-virtual-key.port";
 import {
+  budgetPeriodFloorMs,
   scopeTargetKey,
   type GatewayBudgetResolutionTarget,
   type GatewayResolvedBudget,
   type GatewayService,
 } from "@langwatch/gateway-contract";
+import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository";
+import { type ScopeInput } from "../ports/gateway-virtual-key.port";
 
 export type DraftVirtualKey = {
   organizationId: string;
@@ -66,102 +65,110 @@ export type ApplicableBudget = {
   managedByVirtualKeyId: string | null;
 };
 
-export async function resolveApplicableBudgetsForDraftKey(
-  prisma: PrismaClient,
-  projects: ProjectService,
-  draft: DraftVirtualKey,
-  budgetDecisions: GatewayService,
-  chRepo?: GatewayBudgetSpendPort,
-): Promise<ApplicableBudget[]> {
-  // Where this key's traces land, which is what decides whether team- and
-  // project-scoped budgets reach it at all.
-  //
-  // A key that exists has a stored destination, and the answer has to be the
-  // one the gateway will act on: the same pointer the materialiser follows,
-  // archived or not. Deciding it again here would show an empty list for a
-  // key whose destination the customer deleted, while its project and team
-  // budgets went on enforcing.
-  //
-  // A draft has no key row and no stored destination yet, so the honest
-  // answer is the decision the save is about to make. A draft the save would
-  // refuse previews as no destination, which is what an incomplete form is.
-  const traceProject = draft.virtualKeyId
-    ? draft.traceProjectId
-      ? await projects.tryGetTraceDestination(draft.traceProjectId)
-      : null
-    : await decidedTraceProject({ projects, draft });
-
-  return await resolveApplicableBudgetsForTarget(
-    prisma,
-    budgetDecisions,
-    {
-      organizationId: draft.organizationId,
-      virtualKeyId: draft.virtualKeyId,
-      teamId: traceProject?.teamId ?? null,
-      // Passed explicitly rather than read from the key: a draft has no key
-      // row yet, and the drawer has to preview the set the key will resolve
-      // once it is saved, not the smaller set it can look up today.
-      scopedTeamIds: draft.scopes
-        .filter((scope) => scope.scopeType === "TEAM")
-        .map((scope) => scope.scopeId),
-      projectId: traceProject?.id ?? null,
-      principalUserId: draft.principalUserId,
-    },
-    chRepo,
-  );
-}
-
 /**
- * Same decoration for a caller that already knows the exact resolution
- * target (team, project, key, principal) and does not need the draft's
- * trace-project inference. The budget-overview service reads this with
- * the user's personal workspace as the target.
+ * The budgets that already apply to a key, drafted or saved.
  */
-export async function resolveApplicableBudgetsForTarget(
-  prisma: PrismaClient,
-  budgetDecisions: GatewayService,
-  target: GatewayBudgetResolutionTarget,
-  chRepo?: GatewayBudgetSpendPort,
-): Promise<ApplicableBudget[]> {
-  const resolved = await budgetDecisions.resolveApplicableBudgets(target);
-  if (resolved.length === 0) {
-    return [];
+export class GatewayApplicableBudgetsService {
+  private constructor(
+    private readonly budgetDecisions: GatewayService,
+    private readonly providerLabels: GatewayProviderLabelRepository,
+  ) {}
+
+  static create(input: {
+    budgetDecisions: GatewayService;
+    providerLabels: GatewayProviderLabelRepository;
+  }): GatewayApplicableBudgetsService {
+    return new GatewayApplicableBudgetsService(input.budgetDecisions, input.providerLabels);
   }
 
-  // Independent lookups on an interactive path: run them together.
-  const [spentByBudgetId, targets, providerLabels] = await Promise.all([
-    loadSpend(budgetDecisions, target.organizationId, resolved, chRepo),
-    budgetDecisions.resolveScopeTargets(
-      resolved.map((r) => r.budget),
-      target.organizationId,
-    ),
-    resolveProviderLabels({
-      prisma,
-      budgets: resolved.map((r) => r.budget),
-    }),
-  ]);
+  async resolveApplicableBudgetsForDraftKey(
+    projects: ProjectService,
+    draft: DraftVirtualKey,
+    chRepo?: GatewayBudgetSpendPort,
+  ): Promise<ApplicableBudget[]> {
+    // Where this key's traces land, which is what decides whether team- and
+    // project-scoped budgets reach it at all.
+    //
+    // A key that exists has a stored destination, and the answer has to be the
+    // one the gateway will act on: the same pointer the materialiser follows,
+    // archived or not. Deciding it again here would show an empty list for a
+    // key whose destination the customer deleted, while its project and team
+    // budgets went on enforcing.
+    //
+    // A draft has no key row and no stored destination yet, so the honest
+    // answer is the decision the save is about to make. A draft the save would
+    // refuse previews as no destination, which is what an incomplete form is.
+    const traceProject = draft.virtualKeyId
+      ? draft.traceProjectId
+        ? await projects.tryGetTraceDestination(draft.traceProjectId)
+        : null
+      : await decidedTraceProject({ projects, draft });
 
-  // bucketScopeId stays internal: it is where spend accrues, not the
-  // budget's target, and a UI showing "<group>:<user>" would read as one.
-  return resolved.map(({ budget }) => ({
-    id: budget.id,
-    name: budget.name,
-    scopeType: budget.scopeType,
-    scopeId: budget.scopeId,
-    scopeLabel:
-      targets.get(scopeTargetKey(budget.scopeType, budget.scopeId))?.name ?? budget.scopeId,
-    window: budget.window,
-    limitUsd: budget.limitUsd.toFixed(6),
-    spentUsd: spentByBudgetId.get(budget.id) ?? "0",
-    onBreach: budget.onBreach,
-    timezone: budget.timezone,
-    providerKey: budget.providerKey,
-    providerLabel: budget.providerKey
-      ? (providerLabels.get(budget.providerKey) ?? budget.providerKey)
-      : null,
-    isPerMember: budget.scopeType === "GROUP",
-    managedByVirtualKeyId: budget.managedByVirtualKeyId,
-  }));
+    return await this.resolveApplicableBudgetsForTarget(
+      {
+        organizationId: draft.organizationId,
+        virtualKeyId: draft.virtualKeyId,
+        teamId: traceProject?.teamId ?? null,
+        // Passed explicitly rather than read from the key: a draft has no key
+        // row yet, and the drawer has to preview the set the key will resolve
+        // once it is saved, not the smaller set it can look up today.
+        scopedTeamIds: draft.scopes
+          .filter((scope) => scope.scopeType === "TEAM")
+          .map((scope) => scope.scopeId),
+        projectId: traceProject?.id ?? null,
+        principalUserId: draft.principalUserId,
+      },
+      chRepo,
+    );
+  }
+
+  /**
+   * Same decoration for a caller that already knows the exact resolution
+   * target (team, project, key, principal) and does not need the draft's
+   * trace-project inference. The budget-overview service reads this with
+   * the user's personal workspace as the target.
+   */
+  async resolveApplicableBudgetsForTarget(
+    target: GatewayBudgetResolutionTarget,
+    chRepo?: GatewayBudgetSpendPort,
+  ): Promise<ApplicableBudget[]> {
+    const resolved = await this.budgetDecisions.resolveApplicableBudgets(target);
+    if (resolved.length === 0) {
+      return [];
+    }
+
+    // Independent lookups on an interactive path: run them together.
+    const [spentByBudgetId, targets, providerLabels] = await Promise.all([
+      loadSpend(this.budgetDecisions, target.organizationId, resolved, chRepo),
+      this.budgetDecisions.resolveScopeTargets(
+        resolved.map((r) => r.budget),
+        target.organizationId,
+      ),
+      this.providerLabels.resolveProviderLabels(resolved.map((r) => r.budget)),
+    ]);
+
+    // bucketScopeId stays internal: it is where spend accrues, not the
+    // budget's target, and a UI showing "<group>:<user>" would read as one.
+    return resolved.map(({ budget }) => ({
+      id: budget.id,
+      name: budget.name,
+      scopeType: budget.scopeType,
+      scopeId: budget.scopeId,
+      scopeLabel:
+        targets.get(scopeTargetKey(budget.scopeType, budget.scopeId))?.name ?? budget.scopeId,
+      window: budget.window,
+      limitUsd: budget.limitUsd.toFixed(6),
+      spentUsd: spentByBudgetId.get(budget.id) ?? "0",
+      onBreach: budget.onBreach,
+      timezone: budget.timezone,
+      providerKey: budget.providerKey,
+      providerLabel: budget.providerKey
+        ? (providerLabels.get(budget.providerKey) ?? budget.providerKey)
+        : null,
+      isPerMember: budget.scopeType === "GROUP",
+      managedByVirtualKeyId: budget.managedByVirtualKeyId,
+    }));
+  }
 }
 
 /**

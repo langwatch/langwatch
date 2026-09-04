@@ -35,7 +35,7 @@ import {
   type GatewaySpendState,
   type SpendSettlementProcessDeps,
 } from "@langwatch/gateway-server";
-import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
+import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
 import { WEBHOOK_DELIVERY_PROCESS_NAME } from "@langwatch/enterprise-webhook-server";
 import { GATEWAY_DEBITS_PROCESS_NAME } from "@langwatch/enterprise-governance-server";
 import type { WebhookDispatchRateLimiterPort, WebhookEgressService } from "@langwatch/egress";
@@ -210,7 +210,7 @@ export function createWorkerGatewaySpend(
           options.database as unknown as PrismaClient,
           GatewayBudgetLedgerAdapter.create(options.resolveClickHouseClient as never),
           PostgresGatewayBudgetResolutionAdapter.create({ database: options.database }),
-          createGatewayChangeEventsPort(options.database),
+          PrismaGatewayChangeEventsRepository.create(options.database),
         ),
         new WorkerGovernanceSignalDelivery(options.governanceCommands),
       )

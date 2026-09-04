@@ -50,59 +50,12 @@ const WIRE_DIRECTION_TO_STORED: Record<GuardrailWireDirection, GatewayGuardrailD
   stream_chunk: "STREAM_CHUNK",
 };
 
-export function storedDirectionFor(direction: GuardrailWireDirection): GatewayGuardrailDirection {
-  return WIRE_DIRECTION_TO_STORED[direction];
-}
-
 const ALLOW: GuardrailCheckVerdict = {
   decision: "allow",
   reason: null,
   modified_content: null,
   policies_triggered: [],
 };
-
-/**
- * Turn the content the data plane sent into the input/output pair evaluators
- * expect. Request-direction content carries the prompt, response and
- * stream_chunk carry generated text.
- */
-export function evaluationDataFor({
-  direction,
-  content,
-}: {
-  direction: GuardrailWireDirection;
-  content: GuardrailCheckContent | undefined;
-}): { input: string; output: string } {
-  const asText = (value: unknown): string => {
-    if (value === undefined || value === null) {
-      return "";
-    }
-
-    if (typeof value === "string") {
-      return value;
-    }
-
-    return JSON.stringify(value);
-  };
-
-  if (direction === "request") {
-    // tools and mcps are part of what a request-direction guardrail is meant
-    // to inspect. Scoring only the messages would let a policy that exists to
-    // catch a dangerous tool call pass on an empty string.
-    const parts = [content?.messages, content?.tools, content?.mcps]
-      .filter((part) => part !== undefined && part !== null)
-      .map(asText)
-      .filter((part) => part !== "");
-
-    return { input: parts.join("\n"), output: "" };
-  }
-
-  if (direction === "response") {
-    return { input: "", output: asText(content?.output) };
-  }
-
-  return { input: "", output: asText(content?.chunk) };
-}
 
 /**
  * The evaluator call is the one boundary this service does not own. Injecting
@@ -133,6 +86,53 @@ export class GatewayGuardrailEvaluationService {
     return new GatewayGuardrailEvaluationService(prisma, monitors, runEvaluator);
   }
 
+  storedDirectionFor(direction: GuardrailWireDirection): GatewayGuardrailDirection {
+    return WIRE_DIRECTION_TO_STORED[direction];
+  }
+
+  /**
+   * Turn the content the data plane sent into the input/output pair evaluators
+   * expect. Request-direction content carries the prompt, response and
+   * stream_chunk carry generated text.
+   */
+  evaluationDataFor({
+    direction,
+    content,
+  }: {
+    direction: GuardrailWireDirection;
+    content: GuardrailCheckContent | undefined;
+  }): { input: string; output: string } {
+    const asText = (value: unknown): string => {
+      if (value === undefined || value === null) {
+        return "";
+      }
+
+      if (typeof value === "string") {
+        return value;
+      }
+
+      return JSON.stringify(value);
+    };
+
+    if (direction === "request") {
+      // tools and mcps are part of what a request-direction guardrail is meant
+      // to inspect. Scoring only the messages would let a policy that exists to
+      // catch a dangerous tool call pass on an empty string.
+      const parts = [content?.messages, content?.tools, content?.mcps]
+        .filter((part) => part !== undefined && part !== null)
+        .map(asText)
+        .filter((part) => part !== "");
+
+      return { input: parts.join("\n"), output: "" };
+    }
+
+    if (direction === "response") {
+      return { input: "", output: asText(content?.output) };
+    }
+
+    return { input: "", output: asText(content?.chunk) };
+  }
+
   async check({
     projectId,
     guardrailIds,
@@ -155,7 +155,7 @@ export class GatewayGuardrailEvaluationService {
         id: { in: guardrailIds },
         projectId,
         archivedAt: null,
-        direction: storedDirectionFor(direction),
+        direction: this.storedDirectionFor(direction),
       },
     });
     if (guardrails.length === 0) {
@@ -167,7 +167,7 @@ export class GatewayGuardrailEvaluationService {
       evaluatorIds: guardrails.map((guardrail) => guardrail.evaluatorId),
     });
 
-    const data = evaluationDataFor({ direction, content });
+    const data = this.evaluationDataFor({ direction, content });
 
     const verdicts = await Promise.all(
       guardrails.map(async (guardrail) => {

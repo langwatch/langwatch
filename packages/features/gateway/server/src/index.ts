@@ -16,18 +16,11 @@ export * from "./ports/gateway-virtual-key-spend.port";
 export * from "./adapters/fixed-gateway-settlement.adapter";
 export * from "./adapters/gateway-virtual-key-spend.adapter";
 export * from "./adapters/gateway-budget-ledger.adapter";
-export * from "./adapters/gateway-spend-events.adapter";
+export * from "./intents/gateway-spend.intent";
 export * from "./adapters/gateway-spend-events-clickhouse.adapter";
 export * from "./adapters/gateway-spend-cursor.adapter";
-export * from "./adapters/gateway-spend-fold.adapter";
-export { budgetPeriodFloorMs, currentPeriodStart } from "./adapters/gateway-period.adapter";
-export {
-  attributedUserBucketScopeId,
-  bucketScopeIdFor,
-  budgetAppliesToProvider,
-} from "./adapters/gateway-bucket-scope.adapter";
-export { spendTargetsForBudgets } from "./adapters/gateway-budget-spend-target.adapter";
-export * from "./adapters/gateway-audit-serializer.adapter";
+export { GatewaySpendStore } from "./stores/gateway-spend/gateway-spend.store";
+export { GatewaySpendFoldProjection } from "./projections/gateway-spend.projection";
 export * from "./adapters/gateway-budget-dto.adapter";
 export * from "./adapters/gateway-virtual-key-dto.adapter";
 export {
@@ -48,8 +41,6 @@ export {
   VirtualKeyExpiryInPastError,
   VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
-export * from "./adapters/gateway-period.adapter";
-export * from "./adapters/gateway-resource-metadata.adapter";
 export * from "./adapters/gateway-spend-filters.adapter";
 export * from "./adapters/gateway-spend-grouping.adapter";
 export * from "./processes/gateway-spend-commands.process";
@@ -57,19 +48,14 @@ export * from "./processes/gateway-spend-settlement.process";
 export * from "./intents/gateway-spend-settlement.intent";
 export * from "./ports/gateway-open-admissions.port";
 export * from "./adapters/clickhouse.gateway-open-admissions.adapter";
-export * from "./intents/gateway-spend.intent";
 export * from "./adapters/eventing.gateway-spend.adapter";
-export { createGatewaySpendProducerPipeline } from "./adapters/gateway-spend-producer.adapter";
+export { GatewaySpendProducerAdapter } from "./adapters/gateway-spend-producer.adapter";
 export {
   PostgresGatewayBudgetResolutionAdapter,
   type GatewayBudgetResolutionDatabase,
 } from "./adapters/postgres.gateway-budget-resolution.adapter";
 export type { GatewaySpendState } from "./projections/gateway-spend.projection";
-export * from "./adapters/gateway-spend-constants.adapter";
-export * from "./adapters/gateway-spend-events.adapter";
-export * from "./adapters/gateway-window.adapter";
 export * from "./adapters/gateway-wire-pagination.adapter";
-export * from "./adapters/gateway-routing-policy-select.adapter";
 export * from "./adapters/virtual-key-crypto.adapter";
 export type * from "./services/gateway.service";
 export type * from "./ports/gateway-budget-spend.port";
@@ -162,18 +148,6 @@ export {
   type CreatedVirtualKey,
 } from "./services/virtual-key.service";
 export {
-  assertActorCanManageAllScopes,
-  assertActorCanOperateOnAnyScope,
-  assertCanManageAllScopes,
-  assertCanOperateOnAnyScope,
-  assertGuardrailAttachmentsAllowed,
-  assertScopesBelongToOrg,
-  assertTraceProjectBelongsToOrg,
-  isVisibleToMembership,
-  loadMembershipSet,
-  requireExistingVk,
-  requireVisibleVk,
-  resolveVkProjectId,
   type ActorContext,
   type MembershipSet,
   type RBACContext,
@@ -181,21 +155,17 @@ export {
   type VirtualKeyActor,
   type VirtualKeyReader,
   type VirtualKeySessionActor,
+  VirtualKeyAuthorizationService,
 } from "./services/virtual-key-authorization.service";
 export { BudgetOverviewService } from "./services/gateway-budget-overview.service";
 export {
-  resolveApplicableBudgetsForDraftKey,
-  resolveApplicableBudgetsForTarget,
+  GatewayApplicableBudgetsService,
   type ApplicableBudget,
 } from "./services/gateway-applicable-budgets.service";
-export { loadDirectBudgetsForKeys } from "./services/virtual-key-direct-budget.service";
+export { VirtualKeyDirectBudgetService } from "./services/virtual-key-direct-budget.service";
+export { GatewayConfigMaterialiserService } from "./services/gateway-config-materialisation.service";
 export {
-  GatewayConfigMaterialiser,
-  buildCredentials,
-} from "./services/gateway-config-materialisation.service";
-export {
-  getElevenLabsApiCredential,
-  getElevenLabsWebhookSecret,
+  GatewayElevenLabsCredentialService,
   ELEVENLABS_DEFAULT_BASE_URL,
   ELEVENLABS_WEBHOOK_SECRET_KEY,
   type ElevenLabsApiCredential,
@@ -203,13 +173,7 @@ export {
   type ElevenLabsWebhookSecret,
 } from "./services/gateway-elevenlabs-credential.service";
 export {
-  closeAndConfirmRealtimeSession,
-  correlateRealtimeSession,
-  expireStaleRealtimeSessions,
-  matchRealtimeSession,
-  releaseRealtimeSession,
-  reportRealtimeSessionUsage,
-  reserveRealtimeSession,
+  GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,
   type GatewayRealtimeSessionCollaborators,
   type ReserveInput,
@@ -221,21 +185,18 @@ export {
   type GatewayJwtClaims,
   type GatewayJwtSubject,
 } from "./adapters/jwt.gateway-token.adapter";
-export { withTierFallthrough } from "./adapters/gateway-model-tier-fallthrough.adapter";
-export { declaredModelsForProvider } from "./adapters/gateway-provider-model-catalog.adapter";
-export { recordRealtimeSessionSpan } from "./adapters/gateway-realtime-session-span.adapter";
 export {
   elevenLabsConversationReportSchema,
-  GatewayRealtimeSessionReconciliationWorker,
+  GatewayRealtimeSessionReconciliationService,
   realtimeSessionReconciliationConfig,
-} from "./adapters/realtime-session-reconciliation.adapter";
+} from "./services/gateway-realtime-session-reconciliation.service";
 export type {
   ElevenLabsConversationReader,
   ElevenLabsConversationReport,
   ElevenLabsCredentialReader,
   RealtimeSessionPollerHandle,
   RealtimeSessionReconciliationRepository,
-} from "./adapters/realtime-session-reconciliation.adapter";
+} from "./services/gateway-realtime-session-reconciliation.service";
 export {
   GatewayGovernanceSignalsPort,
   type GatewayVirtualKeyLifecycleSignal,
@@ -245,15 +206,16 @@ export {
   GatewayScopePermissionsPort,
   type GatewayPermissionScope,
 } from "./ports/gateway-scope-permissions.port";
+export { GatewayConfigAssemblyPort } from "./ports/gateway-config-assembly.port";
+export { GatewayConfigAssemblyAdapter } from "./adapters/gateway-config-assembly.adapter";
+export { GatewayVirtualKeyCryptoPort } from "./ports/gateway-virtual-key-crypto.port";
 export { GatewaySpanIngestionPort } from "./ports/gateway-span-ingestion.port";
 export { GatewaySpendConfirmationPort } from "./ports/gateway-spend-confirmation.port";
 export { GatewaySpendRatingPort } from "./ports/gateway-spend-rating.port";
 export {
-  currentRegistryRateVersion,
   ModelCatalogGatewaySpendRatingAdapter,
   NANO_USD_PER_USD,
   NO_RATE_RULE_CODE,
-  rateSpendNanoUsd,
   UNPRICED_QUANTITIES_CODE,
 } from "./adapters/model-catalog.gateway-spend-rating.adapter";
 export {

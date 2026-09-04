@@ -6,13 +6,14 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { MODEL_TIERS } from "../gateway-model-tier-presets.adapter";
-import { withTierFallthrough } from "../gateway-model-tier-fallthrough.adapter";
+import { GatewayConfigAssemblyAdapter, MODEL_TIERS } from "../gateway-config-assembly.adapter";
+
+const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
 
 describe("given a routing policy that names a target for a tier", () => {
   /** @scenario "A tier the policy points somewhere reaches that model" */
   it("carries the tier through as an ordinary name mapping", () => {
-    const aliases = withTierFallthrough({
+    const aliases = assembly.withTierFallthrough({
       aliases: { complex: "anthropic/claude-opus-4-5" },
       defaultModel: null,
     });
@@ -24,7 +25,7 @@ describe("given a routing policy that names a target for a tier", () => {
 describe("given a routing policy with a default model", () => {
   /** @scenario "A tier the policy leaves blank falls through to the default model" */
   it("answers the tiers it named, and fills the rest from the default", () => {
-    const aliases = withTierFallthrough({
+    const aliases = assembly.withTierFallthrough({
       aliases: { complex: "anthropic/claude-opus-4-5" },
       defaultModel: "openai/gpt-5-mini",
     });
@@ -38,7 +39,7 @@ describe("given a routing policy with a default model", () => {
 
   /** @scenario "The default model answers the tier names and nothing else" */
   it("leaves an unrecognized model name out, so it is still refused", () => {
-    const aliases = withTierFallthrough({
+    const aliases = assembly.withTierFallthrough({
       aliases: {},
       defaultModel: "openai/gpt-5-mini",
     });
@@ -51,7 +52,7 @@ describe("given a routing policy with a default model", () => {
   });
 
   it("never overwrites a mapping the policy set itself", () => {
-    const aliases = withTierFallthrough({
+    const aliases = assembly.withTierFallthrough({
       aliases: { "gpt-4o": "openai/gpt-5-mini", fast: "openai/gpt-5-nano" },
       defaultModel: "openai/gpt-5-mini",
     });
@@ -64,7 +65,7 @@ describe("given a routing policy with a default model", () => {
 describe("given a routing policy with no default model", () => {
   /** @scenario "A policy with no default model leaves its unanswered tiers out" */
   it("carries only the tiers it named", () => {
-    const aliases = withTierFallthrough({
+    const aliases = assembly.withTierFallthrough({
       aliases: { fast: "openai/gpt-5-mini" },
       defaultModel: null,
     });
@@ -73,7 +74,7 @@ describe("given a routing policy with no default model", () => {
   });
 
   it("treats an empty default model the same as none at all", () => {
-    const aliases = withTierFallthrough({
+    const aliases = assembly.withTierFallthrough({
       aliases: { fast: "openai/gpt-5-mini" },
       defaultModel: "",
     });

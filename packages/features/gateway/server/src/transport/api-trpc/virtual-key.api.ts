@@ -38,6 +38,7 @@ import {
   virtualKeyApiKeyInputSchema,
   virtualKeyApiOrganizationInputSchema,
   virtualKeyApiUpdateInputSchema,
+  GatewayWindow,
 } from "@langwatch/gateway-contract";
 import {
   TRPCError,
@@ -46,7 +47,6 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import { GatewayWindow } from "../../adapters/gateway-window.adapter";
 import type { GatewayActor, GatewayApp, GatewayVirtualKeyBudgetInput } from "#app/gateway.app";
 
 /** The process supplies authentication; authorization arrives as the policies. */

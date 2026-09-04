@@ -1,4 +1,4 @@
-import type { GatewayRealtimeSessionReconciliationWorker } from "@langwatch/gateway-server";
+import type { GatewayRealtimeSessionReconciliationService } from "@langwatch/gateway-server";
 import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 
 /**
@@ -21,14 +21,14 @@ import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-
  */
 export class GatewayRealtimeSessionWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   static create(options: {
-    poller: GatewayRealtimeSessionReconciliationWorker;
+    poller: GatewayRealtimeSessionReconciliationService;
   }): GatewayRealtimeSessionWorkerFeatureInstaller {
     return new GatewayRealtimeSessionWorkerFeatureInstaller(options.poller);
   }
 
   readonly name = "gateway-realtime-session";
 
-  private constructor(private readonly poller: GatewayRealtimeSessionReconciliationWorker) {}
+  private constructor(private readonly poller: GatewayRealtimeSessionReconciliationService) {}
 
   install(): Promise<WorkerFeatureCloser | undefined> {
     const handle = this.poller.start();

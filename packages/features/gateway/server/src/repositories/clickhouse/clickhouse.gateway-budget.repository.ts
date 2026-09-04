@@ -42,28 +42,24 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type {
-  GatewayBudgetLedgerStatus,
-  GatewayBudgetResource,
-  GatewayBudgetScopeType,
-  GatewayBudgetWindow,
+import {
+  type GatewayBudgetLedgerStatus,
+  type GatewayBudgetResource,
+  type GatewayBudgetScopeType,
+  type GatewayBudgetWindow,
+  bucketPeriodFloorMs,
+  budgetPeriodFloorMs,
+  currentPeriodStart,
+  bucketScopeIdFor,
+  PROVIDER_BUCKET_SEPARATOR,
+  nanoUsdToDecimalString,
+  parseSummedNanoUsd,
 } from "@langwatch/gateway-contract";
 import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port";
 import {
   GatewayBudgetSpendPort,
   type GatewayBudgetSpendRecord,
 } from "../../ports/gateway-budget-spend.port";
-import {
-  bucketPeriodFloorMs,
-  budgetPeriodFloorMs,
-  currentPeriodStart,
-} from "../../adapters/gateway-period.adapter";
-import {
-  bucketScopeIdFor,
-  PROVIDER_BUCKET_SEPARATOR,
-} from "../../adapters/gateway-bucket-scope.adapter";
-import { spendTargetsForBudgets } from "../../adapters/gateway-budget-spend-target.adapter";
-import { nanoUsdToDecimalString, parseSummedNanoUsd } from "@langwatch/gateway-contract";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
@@ -288,6 +284,10 @@ type BucketQueryShape = {
 };
 
 export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
+  static create(resolveClient: GatewayClickHouseResolver): GatewayBudgetClickHouseRepository {
+    return new GatewayBudgetClickHouseRepository(resolveClient);
+  }
+
   constructor(private readonly resolveClient: GatewayClickHouseResolver) {
     super();
   }
@@ -1494,7 +1494,10 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     const first = input[0]!;
     return "budgetId" in first
       ? (input as BudgetSpendTarget[])
-      : spendTargetsForBudgets({ budgets: input as GatewayBudgetResource[], now });
+      : GatewayBudgetSpendPort.targetsForBudgets({
+          budgets: input as GatewayBudgetResource[],
+          now,
+        });
   }
 
   private static scopeToClickHouse(scope: GatewayBudgetScopeType): string {

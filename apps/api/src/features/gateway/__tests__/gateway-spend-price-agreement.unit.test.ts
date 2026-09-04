@@ -46,12 +46,12 @@ import {
   type ProcessEventEnvelope,
 } from "@langwatch/eventing";
 import {
-  createGatewaySpendFoldProjection,
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_EVENT_VERSION_LATEST,
-  rateSpendNanoUsd,
+  GatewaySpendFoldProjection,
+  ModelCatalogGatewaySpendRatingAdapter,
   type ConfirmSpendCommandData as GatewayConfirmSpendCommandData,
   type GatewaySpendConfirmedEvent,
   type GatewaySpendState,
@@ -75,6 +75,7 @@ import {
   type GatewaySpendProcessingEvent as WebhookGatewaySpendProcessingEvent,
 } from "@langwatch/enterprise-webhook-server";
 
+const spendRating = ModelCatalogGatewaySpendRatingAdapter.create();
 const TENANT = "proj_price";
 const REQUEST = "01K1PRICEULID";
 const MODEL = "openai/gpt-5";
@@ -144,9 +145,9 @@ function ledgerCostFor(costNanoUsd: number, rateVersion: string) {
     idempotencyKey: `${TENANT}:${REQUEST}:confirmed`,
   }) as unknown as GatewaySpendConfirmedEvent;
 
-  const state = createGatewaySpendFoldProjection(
-    {} as FoldProjectionStore<GatewaySpendState>,
-  ).handleGatewaySpendConfirmed(event, {} as GatewaySpendState);
+  const state = GatewaySpendFoldProjection.create({
+    store: {} as FoldProjectionStore<GatewaySpendState>,
+  }).handleGatewaySpendConfirmed(event, {} as GatewaySpendState);
   return { costNanoUsd: state.costNanoUsd, rateVersion: state.rateVersion };
 }
 
@@ -255,7 +256,7 @@ describe("one price per gateway request", () => {
   it("the ledger, the budget debit, and the webhook envelope agree across a catalog change", () => {
     // The ingest seam prices the outcome once, against the catalog of the
     // moment, and stamps the figure onto the event data below.
-    const priced = rateSpendNanoUsd({ model: MODEL, usage: USAGE });
+    const priced = spendRating.rateSpendNanoUsd({ model: MODEL, usage: USAGE });
     expect(priced.costNanoUsd).toBe(21_675);
 
     // A catalog deploy lands before the other consumers run. Rating now
@@ -263,7 +264,7 @@ describe("one price per gateway request", () => {
     // vacuous: a consumer that re-rated would disagree with the stamp.
     priceState.costNanoUsd = 216_750;
     priceState.rateVersion = "catalog@2026-08-01";
-    expect(rateSpendNanoUsd({ model: MODEL, usage: USAGE }).costNanoUsd).not.toBe(
+    expect(spendRating.rateSpendNanoUsd({ model: MODEL, usage: USAGE }).costNanoUsd).not.toBe(
       priced.costNanoUsd,
     );
 

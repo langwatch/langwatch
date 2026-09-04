@@ -38,6 +38,10 @@ const VK_ATTRIBUTE = "langwatch.virtual_key_id";
 const logger = createLogger("langwatch:gateway:virtual-key-spend-repository");
 
 export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort {
+  static create(resolveClient: GatewayClickHouseResolver): GatewayVirtualKeySpendRepository {
+    return new GatewayVirtualKeySpendRepository(resolveClient);
+  }
+
   constructor(private readonly resolveClient: GatewayClickHouseResolver) {
     super();
   }

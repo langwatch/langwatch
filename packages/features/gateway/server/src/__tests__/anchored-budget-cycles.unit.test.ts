@@ -9,7 +9,7 @@
  * reported periods, is in gateway-budget-period-floor.unit.test.ts.
  */
 import { describe, expect, it } from "vitest";
-import { CYCLIC_WINDOWS, GatewayWindow } from "../index";
+import { CYCLIC_WINDOWS, GatewayWindow } from "@langwatch/gateway-contract";
 
 const iso = (d: Date) => d.toISOString();
 

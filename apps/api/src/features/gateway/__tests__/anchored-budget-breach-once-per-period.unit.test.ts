@@ -16,7 +16,7 @@
  * governance-server — two feature packages that may not import each other.
  */
 import { describe, expect, it } from "vitest";
-import { GatewayWindow } from "@langwatch/gateway-server";
+import { GatewayWindow } from "@langwatch/gateway-contract";
 import {
   GovernanceEventDeliveryProcess,
   type GovernanceBudgetCrossingData,

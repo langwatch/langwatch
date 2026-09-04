@@ -30,8 +30,8 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { PrismaGatewayAdapter } from "../../../adapters/prisma.gateway.adapter";
 import { PrismaGatewayInternalStoreAdapter } from "../../../adapters/prisma.gateway-internal-store.adapter";
 import type { GatewayModelProviderCredentialsPort } from "../../../ports/gateway-model-provider-credentials.port";
-import { GatewayConfigMaterialiser } from "../../../services/gateway-config-materialisation.service";
-import { TestProjectService } from "../../../services/__tests__/support/test-project-service";
+import { GatewayConfigMaterialiserService } from "../../../services/gateway-config-materialisation.service";
+import { TestProjectService } from "../../../__tests__/support/test-project-service";
 import { VirtualKeyService } from "../../../services/virtual-key.service";
 import {
   buildGatewayCanonicalString,
@@ -41,6 +41,8 @@ import {
 } from "../gateway-internal.api";
 import { testRestSecurity } from "./support/rest-security.support";
 
+import { createVirtualKeyServiceForTest } from "../../../testing";
+import { GatewayConfigAssemblyAdapter } from "../../../adapters/gateway-config-assembly.adapter";
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);
@@ -118,9 +120,16 @@ function buildApp(): void {
     changes: {} as never,
     audit: {} as never,
   }).build();
-  const materialiser = new GatewayConfigMaterialiser(prisma, projects, null, gateway, credentials);
+  const materialiser = GatewayConfigMaterialiserService.create({
+    prisma,
+    projects: projects,
+    chRepo: null,
+    budgetDecisions: gateway,
+    credentials,
+    assembly: GatewayConfigAssemblyAdapter.create({ prisma }),
+  });
   const store = PrismaGatewayInternalStoreAdapter.create({ database: prisma });
-  virtualKeys = VirtualKeyService.createForTest(prisma, projects);
+  virtualKeys = createVirtualKeyServiceForTest(prisma, projects);
   const absent = () => {
     throw new Error("this route is not under test here");
   };

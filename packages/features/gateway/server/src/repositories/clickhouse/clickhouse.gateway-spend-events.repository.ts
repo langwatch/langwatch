@@ -19,25 +19,29 @@ import { createLogger } from "@langwatch/observability";
 import type { GatewayClickHouseResolver } from "../../ports/gateway-clickhouse.port";
 import type { GatewaySpendState } from "../../projections/gateway-spend.projection";
 import { EMPTY_SPEND_USAGE, type SpendUsage } from "../../processes/gateway-spend-commands.process";
-import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../adapters/gateway-spend-constants.adapter";
-import type { SpendFilters } from "../../adapters/gateway-spend-filters.adapter";
+import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../processes/gateway-spend-commands.process";
 import {
-  GatewaySpendFilters,
+  GatewaySpendFiltersAdapter,
   SPEND_STATUS_IN_FLIGHT,
   type SpendEventStatus,
 } from "../../adapters/gateway-spend-filters.adapter";
 import { nanoUsdToDecimalString, parseSummedNanoUsd } from "@langwatch/gateway-contract";
-import type { SpendBucket, SpendGroupByKey } from "../../adapters/gateway-spend-grouping.adapter";
-import { GatewaySpendGrouping } from "../../adapters/gateway-spend-grouping.adapter";
+import { GatewaySpendGroupingAdapter } from "../../adapters/gateway-spend-grouping.adapter";
 import {
-  decodeSpendEventsCursor,
-  decodeSpendSummariesCursor,
-  encodeSpendEventsCursor,
-  encodeSpendSummariesCursor,
+  GatewaySpendCursorAdapter,
   type GatewaySpendEventsCursor,
 } from "../../adapters/gateway-spend-cursor.adapter";
-import { GatewaySpendEventsPort } from "../../ports/gateway-spend-events.port";
+import {
+  GatewaySpendEventsPort,
+  type SpendBucket,
+  type SpendEventRow,
+  type SpendEventsPageCursor,
+  type SpendFilters,
+  type SpendGroupByKey,
+  type SpendSummaryRow,
+} from "../../ports/gateway-spend-events.port";
 
+const spendCursors = GatewaySpendCursorAdapter.create();
 const TABLE = "gateway_spend" as const;
 
 /**
@@ -50,53 +54,12 @@ const SUMMARIES_MAX_EXECUTION_SECONDS = 60;
 
 const logger = createLogger("langwatch:gateway:spend-repository");
 
-export type SpendEventRow = {
-  tenantId: string;
-  gatewayRequestId: string;
-  organizationId: string;
-  /** Not carried by the command pipeline; kept for response-shape
-   *  stability, always empty. */
-  teamId: string;
-  virtualKeyId: string;
-  principalUserId: string;
-  endUserId: string;
-  traceId: string;
-  model: string;
-  providerKey: string;
-  requestType: string;
-  tokensInput: number;
-  tokensOutput: number;
-  tokensCacheRead: number;
-  tokensCacheWrite: number;
-  tokensReasoning: number;
-  /** Integer nano-USD, the authoritative figure. */
-  costNanoUsd: number;
-  /** Decimal USD string derived from costNanoUsd, up to 9 fractional digits. */
-  costUsd: string;
-  rateVersion: string;
-  status: SpendEventStatus;
-  errorClass: string;
-  httpStatus: number;
-  needsReconciliation: boolean;
-  /** Why settlement fired, set only on settled rows. */
-  settleReason: string;
-  labels: string[];
-  metadata: string;
-  durationMs: number;
-  occurredAt: Date;
-};
-
 export const SPEND_ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, VirtualKeyId,
           PrincipalUserId, EndUserId, TraceId, Model, ProviderKey, RequestType,
           TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
           TokensReasoning, CostNanoUSD, RateVersion, Status, ErrorClass,
           HttpStatus, NeedsReconciliation, SettleReason, Labels, Metadata,
           DurationMS, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
-
-export interface SpendEventsPageCursor {
-  occurredAtMs: number;
-  gatewayRequestId: string;
-}
 
 /** One grouping dimension: the expression to group on and the alias it is
  *  selected as, so the walk can name it in ORDER BY and read it back. */
@@ -105,30 +68,14 @@ interface SummaryDimension {
   expression: string;
 }
 
-export interface SpendSummaryRow {
-  /**
-   * The first grouping dimension's value. It stays the first dimension so a
-   * consumer written against the single-dimension surface keeps reading what
-   * it always did. Two dimensions can share one flat key; `group` is the
-   * field that tells them apart.
-   */
-  key: string;
-  /** Every grouping dimension by name, e.g. `{ model: "gpt-5-mini" }`. */
-  group: Record<string, string>;
-  /** Start of the time bucket in the requested zone, null when unbucketed. */
-  bucketStart: string | null;
-  eventCount: number;
-  settledCount: number;
-  tokensInput: number;
-  tokensOutput: number;
-  tokensCacheRead: number;
-  tokensCacheWrite: number;
-  tokensReasoning: number;
-  costNanoUsd: number;
-  costUsd: string;
-}
+const spendFilters = GatewaySpendFiltersAdapter.create();
+const spendGrouping = GatewaySpendGroupingAdapter.create();
 
 export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
+  static create(resolveClient: GatewayClickHouseResolver): GatewaySpendEventsRepository {
+    return new GatewaySpendEventsRepository(resolveClient);
+  }
+
   constructor(private readonly resolveClient: GatewayClickHouseResolver) {
     super();
   }
@@ -295,7 +242,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       "OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})",
     ];
     const params: Record<string, unknown> = { tenantId, fromMs, toMs, limit };
-    const filterSql = GatewaySpendFilters.buildSpendFilterClauses({ filters });
+    const filterSql = spendFilters.buildSpendFilterClauses({ filters });
     conditions.push(...filterSql.clauses);
     Object.assign(params, filterSql.params);
     if (cursor) {
@@ -389,7 +336,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
   }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
     if (tenantIds.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
-    const decoded = cursor ? decodeSpendEventsCursor(cursor) : null;
+    const decoded = cursor ? spendCursors.decodeSpendEventsCursor(cursor) : null;
 
     const { clauses, params: filterParams } = GatewaySpendEventsRepository.spendEventsWalkFilter({
       decoded,
@@ -422,7 +369,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       rows,
       nextCursor:
         raw.length === limit && last
-          ? encodeSpendEventsCursor({
+          ? spendCursors.encodeSpendEventsCursor({
               eventTimestampMs: Number(last.EventTimestamp),
               gatewayRequestId: String(last.GatewayRequestId),
             })
@@ -478,7 +425,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     // an empty page would be read as "no such spend".
     if (
       filters.status !== undefined &&
-      GatewaySpendFilters.normalizeStatusFilter(filters.status) === SPEND_STATUS_IN_FLIGHT
+      spendFilters.normalizeStatusFilter(filters.status) === SPEND_STATUS_IN_FLIGHT
     ) {
       throw new Error(
         `readSpendSummaries cannot narrow to "${SPEND_STATUS_IN_FLIGHT}": rollups exclude in-flight rows, so the read would always be empty`,
@@ -493,7 +440,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
 
     const clauses: string[] = [];
     const walk = GatewaySpendEventsRepository.summariesWalkClause({
-      cursor: cursor ? decodeSpendSummariesCursor(cursor) : null,
+      cursor: cursor ? spendCursors.decodeSpendSummariesCursor(cursor) : null,
       dimensions,
     });
     if (walk) {
@@ -501,7 +448,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       Object.assign(params, walk.params);
     }
 
-    const filterSql = GatewaySpendFilters.buildSpendFilterClauses({ filters });
+    const filterSql = spendFilters.buildSpendFilterClauses({ filters });
     clauses.push(...filterSql.clauses.map((clause) => `AND ${clause}`));
     Object.assign(params, filterSql.params);
 
@@ -551,7 +498,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     const last = raw[raw.length - 1];
     const nextCursor =
       raw.length === limit && last
-        ? encodeSpendSummariesCursor(dimensions.map((d) => String(last[d.alias] ?? "")))
+        ? spendCursors.encodeSpendSummariesCursor(
+            dimensions.map((d) => String(last[d.alias] ?? "")),
+          )
         : null;
     const rows = raw.map((r) =>
       GatewaySpendEventsRepository.mapSummaryRow({ raw: r, groupBy, bucket }),
@@ -705,7 +654,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
       params.toMs = toMs;
     }
-    const filterSql = GatewaySpendFilters.buildSpendFilterClauses({ filters });
+    const filterSql = spendFilters.buildSpendFilterClauses({ filters });
     clauses.push(...filterSql.clauses.map((clause) => `AND ${clause}`));
     Object.assign(params, filterSql.params);
     return { clauses, params };
@@ -726,13 +675,13 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
     if (bucket !== "none") {
       dimensions.push({
         alias: "GroupBucket",
-        expression: GatewaySpendGrouping.bucketExpression({ bucket, timezoneParam: "timezone" }),
+        expression: spendGrouping.bucketExpression({ bucket, timezoneParam: "timezone" }),
       });
     }
     for (const [index, key] of groupBy.entries()) {
       dimensions.push({
         alias: `GroupKey${index}`,
-        expression: GatewaySpendGrouping.groupByColumn(key),
+        expression: spendGrouping.groupByColumn(key),
       });
     }
     return dimensions;

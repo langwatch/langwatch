@@ -1,11 +1,12 @@
-import type { SpendFilters } from "../adapters/gateway-spend-filters.adapter";
-import type { SpendBucket, SpendGroupByKey } from "../adapters/gateway-spend-grouping.adapter";
 import type {
+  GatewaySpendEventsPort,
+  SpendBucket,
   SpendEventRow,
   SpendEventsPageCursor,
+  SpendFilters,
+  SpendGroupByKey,
   SpendSummaryRow,
-} from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository";
-import type { GatewaySpendEventsPort } from "../ports/gateway-spend-events.port";
+} from "../ports/gateway-spend-events.port";
 
 export class GatewaySpendEventsService {
   private constructor(private readonly repository: GatewaySpendEventsPort) {}

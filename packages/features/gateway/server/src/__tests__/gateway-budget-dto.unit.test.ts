@@ -7,8 +7,9 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { decimalUsdToNanoUsd } from "@langwatch/gateway-contract";
-import { toBudgetDto, type GatewayBudgetWithSeats } from "../index";
+import { GatewayBudgetDtoAdapter, type GatewayBudgetWithSeats } from "../index";
 
+const budgetDtos = GatewayBudgetDtoAdapter.create();
 function budget(overrides: Partial<GatewayBudgetWithSeats> = {}): GatewayBudgetWithSeats {
   const now = new Date("2026-08-01T00:00:00.000Z");
   return {
@@ -61,7 +62,7 @@ describe("decimalUsdToNanoUsd", () => {
 describe("toBudgetDto", () => {
   /** @scenario Every enum a budget read returns is lowercase */
   it("publishes the wire casing and both money units", () => {
-    expect(toBudgetDto({ budget: budget() })).toMatchObject({
+    expect(budgetDtos.toBudgetDto({ budget: budget() })).toMatchObject({
       scope_type: "virtual_key",
       window: "month",
       on_breach: "block",
@@ -74,7 +75,7 @@ describe("toBudgetDto", () => {
 
   /** @scenario Spend that could not be totalled is null, never a stale figure */
   it("nulls both spend fields when spend is unavailable", () => {
-    const dto = toBudgetDto({ budget: budget(), spendAvailable: false });
+    const dto = budgetDtos.toBudgetDto({ budget: budget(), spendAvailable: false });
     expect(dto.spent_usd).toBeNull();
     expect(dto.spent_nano_usd).toBeNull();
     // The limit is a stored setting, not a measurement, so it still reads.
@@ -88,7 +89,7 @@ describe("toBudgetDto", () => {
     // six places cannot hold it. Taking the integer from the ledger is what
     // makes the published figure the one the spend events also publish;
     // deriving it from `spentUsd` would republish the rounding instead.
-    const dto = toBudgetDto({
+    const dto = budgetDtos.toBudgetDto({
       budget: budget({
         spentNanoUsd: 73_950,
         spentUsd: new Prisma.Decimal("0.000074"),
@@ -100,7 +101,7 @@ describe("toBudgetDto", () => {
 
   /** @scenario "A per-person template reports no total of its own" */
   it("nulls the spend fields on a per-person template", () => {
-    const dto = toBudgetDto({
+    const dto = budgetDtos.toBudgetDto({
       budget: budget({
         scopeType: "ATTRIBUTED_USER",
         spentNanoUsd: 73_950,
@@ -120,11 +121,13 @@ describe("toBudgetDto", () => {
 
   /** @scenario Per-person and per-member fields appear only on their scopes */
   it("carries the seat fields only when the scope has them", () => {
-    expect(toBudgetDto({ budget: budget() })).not.toHaveProperty("end_users_seen");
-    expect(toBudgetDto({ budget: budget(), memberCount: 4 })).toMatchObject({
+    expect(budgetDtos.toBudgetDto({ budget: budget() })).not.toHaveProperty("end_users_seen");
+    expect(budgetDtos.toBudgetDto({ budget: budget(), memberCount: 4 })).toMatchObject({
       member_count: 4,
     });
-    expect(toBudgetDto({ budget: budget({ endUsersSeen: 7, endUsersOver: 2 }) })).toMatchObject({
+    expect(
+      budgetDtos.toBudgetDto({ budget: budget({ endUsersSeen: 7, endUsersOver: 2 }) }),
+    ).toMatchObject({
       end_users_seen: 7,
       end_users_over: 2,
     });

@@ -9,8 +9,8 @@
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
-import { keysetAfter } from "../../adapters/gateway-wire-pagination.adapter";
-import { gatewayRoutingPolicySelect } from "../../adapters/gateway-routing-policy-select.adapter";
+import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter";
+import { gatewayRoutingPolicySelect } from "../../ports/gateway-virtual-key.port";
 import {
   GatewayVirtualKeysPort,
   type CreateGatewayVirtualKeyInput,
@@ -20,6 +20,7 @@ import {
 } from "../../ports/gateway-virtual-key.port";
 import type { GatewayPersistenceTransaction } from "../../ports/gateway-change-events.port";
 
+const wirePages = GatewayWirePaginationAdapter.create();
 /**
  * The routing-policy columns the materialiser reads off a virtual key.
  *
@@ -34,6 +35,10 @@ export type CreateVirtualKeyData = CreateGatewayVirtualKeyInput;
 export type SetVirtualKeyDisabledData = SetGatewayVirtualKeyDisabledInput;
 
 export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
+  static create(database: PrismaClient): PrismaGatewayVirtualKeyRepository {
+    return new PrismaGatewayVirtualKeyRepository(database);
+  }
+
   constructor(private readonly prisma: PrismaClient) {
     super();
   }
@@ -148,7 +153,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
         ...(args.externalId !== undefined ? { externalId: args.externalId } : {}),
         ...(args.cursor
           ? {
-              OR: keysetAfter([
+              OR: wirePages.keysetAfter([
                 {
                   name: "createdAt",
                   value: args.cursor.createdAt,
@@ -388,10 +393,6 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeysPort {
       data: { lastUsedAt: at },
     });
   }
-}
-
-export function createGatewayVirtualKeysPort(database: PrismaClient): GatewayVirtualKeysPort {
-  return new PrismaGatewayVirtualKeyRepository(database);
 }
 
 function jsonInput(value: unknown): Prisma.InputJsonValue {

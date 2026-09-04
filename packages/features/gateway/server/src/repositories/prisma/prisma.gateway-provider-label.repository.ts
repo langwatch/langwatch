@@ -1,22 +1,26 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { GatewayProviderLabelRepository } from "../gateway-provider-label.repository";
 
-/**
- * Display names for the ModelProvider rows referenced by provider-filtered
- * budgets, so a filter renders as "OpenAI only" instead of a row id.
- * Shared by the budgets list and the applicable-budgets resolver so the
- * same provider never renders under two different names.
- */
-export async function resolveProviderLabels(args: {
-  prisma: PrismaClient;
-  budgets: Array<{ providerKey: string | null }>;
-}): Promise<Map<string, string>> {
-  const ids = [
-    ...new Set(args.budgets.map((b) => b.providerKey).filter((k): k is string => Boolean(k))),
-  ];
-  if (ids.length === 0) return new Map();
-  const rows = await args.prisma.modelProvider.findMany({
-    where: { id: { in: ids } },
-    select: { id: true, name: true, provider: true },
-  });
-  return new Map(rows.map((r) => [r.id, r.name || r.provider]));
+export class PrismaGatewayProviderLabelRepository extends GatewayProviderLabelRepository {
+  private constructor(private readonly prisma: PrismaClient) {
+    super();
+  }
+
+  static create(prisma: PrismaClient): PrismaGatewayProviderLabelRepository {
+    return new PrismaGatewayProviderLabelRepository(prisma);
+  }
+
+  async resolveProviderLabels(
+    budgets: Array<{ providerKey: string | null }>,
+  ): Promise<Map<string, string>> {
+    const ids = [
+      ...new Set(budgets.map((b) => b.providerKey).filter((k): k is string => Boolean(k))),
+    ];
+    if (ids.length === 0) return new Map();
+    const rows = await this.prisma.modelProvider.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, provider: true },
+    });
+    return new Map(rows.map((r) => [r.id, r.name || r.provider]));
+  }
 }

@@ -81,7 +81,7 @@ export const realtimeSessionReconciliationConfig: RealtimeSessionReconciliationC
 };
 
 /** A process-owned worker contribution. Creating it does not start a timer. */
-export class GatewayRealtimeSessionReconciliationWorker {
+export class GatewayRealtimeSessionReconciliationService {
   private constructor(
     private readonly repository: RealtimeSessionReconciliationRepository,
     private readonly credentials: ElevenLabsCredentialReader,
@@ -98,8 +98,8 @@ export class GatewayRealtimeSessionReconciliationWorker {
     logger: RealtimeSessionReconciliationLogger;
     config: RealtimeSessionReconciliationConfig;
     clock: RealtimeSessionReconciliationClock;
-  }): GatewayRealtimeSessionReconciliationWorker {
-    return new GatewayRealtimeSessionReconciliationWorker(
+  }): GatewayRealtimeSessionReconciliationService {
+    return new GatewayRealtimeSessionReconciliationService(
       options.repository,
       options.credentials,
       options.conversations,

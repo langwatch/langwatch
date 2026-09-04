@@ -38,7 +38,7 @@ import { ForbiddenError } from "@langwatch/api/rest";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { eventMatches, WebhookEnvelopeService } from "@langwatch/enterprise-api/webhooks";
 import {
-  FixedGatewaySettlementPolicy,
+  FixedGatewaySettlementPolicyAdapter,
   GatewayEndUserCapsAdapter,
   GatewaySpendScopeAdapter,
   type GatewaySpendRestPorts,
@@ -124,7 +124,7 @@ export function composeApiGatewaySpendRest(
     // restated here.
     spendEventEnvelope: (row) => envelopes.fromSpendRow(row),
     endpointAcceptsEvent: ({ enabledEvents, eventType }) => eventMatches(enabledEvents, eventType),
-    settlementPolicy: FixedGatewaySettlementPolicy.create(options.settlementGraceMs),
+    settlementPolicy: FixedGatewaySettlementPolicyAdapter.create(options.settlementGraceMs),
     resolveSpendScope: (input) =>
       GatewaySpendScopeAdapter.create({ database: prisma }).resolveSpendScope(input),
     endUserCaps: ({ budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId }) =>

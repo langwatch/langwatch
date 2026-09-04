@@ -22,7 +22,7 @@ import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
   GATEWAY_SPEND_EVENT_VERSION_LATEST,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
-} from "../../adapters/gateway-spend-constants.adapter";
+} from "../../processes/gateway-spend-commands.process";
 import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository";
 import {
   createTestClickHouseClient,

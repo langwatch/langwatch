@@ -4,7 +4,7 @@ import type { SpendUsage } from "../processes/gateway-spend-commands.process";
 import {
   GATEWAY_SPEND_PIPELINE_NAME,
   GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
-} from "../adapters/gateway-spend-constants.adapter";
+} from "../processes/gateway-spend-commands.process";
 import {
   type GatewaySpendAdmittedEvent,
   type GatewaySpendConfirmedEvent,
@@ -14,7 +14,7 @@ import {
   gatewaySpendConfirmedEventSchema,
   gatewaySpendFailedEventSchema,
   gatewaySpendSettledEventSchema,
-} from "../adapters/gateway-spend-events.adapter";
+} from "../intents/gateway-spend.intent";
 
 const gatewaySpendEvents = [
   gatewaySpendAdmittedEventSchema,
@@ -190,6 +190,14 @@ export class GatewaySpendFoldProjection
     // replaying the aggregate's history from the log would derive nothing.
     refoldOnOutOfOrder: false,
   } as const;
+
+  static create({
+    store,
+  }: {
+    store: FoldProjectionStore<GatewaySpendState>;
+  }): GatewaySpendFoldProjection {
+    return new GatewaySpendFoldProjection({ store });
+  }
 
   constructor({ store }: { store: FoldProjectionStore<GatewaySpendState> }) {
     super({

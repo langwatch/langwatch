@@ -51,8 +51,14 @@ type AddTargetArgs = {
  * is the bug this shape makes visible.
  */
 export class PrismaGatewayBudgetScopeTargetRepository {
+  private constructor() {}
+
+  static create(): PrismaGatewayBudgetScopeTargetRepository {
+    return new PrismaGatewayBudgetScopeTargetRepository();
+  }
+
   /** ORGANIZATION and TEAM both resolve to (name, slug). */
-  private static async addNamedTargets({
+  private async addNamedTargets({
     out,
     prisma,
     kind,
@@ -77,7 +83,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
     }
   }
 
-  private static addProjectTargets({
+  private addProjectTargets({
     out,
     idSet,
     projectsById,
@@ -99,7 +105,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
     }
   }
 
-  private static async addVirtualKeyTargets({
+  private async addVirtualKeyTargets({
     out,
     prisma,
     idSet,
@@ -132,7 +138,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
     }
   }
 
-  private static async addPrincipalTargets({
+  private async addPrincipalTargets({
     out,
     prisma,
     idSet,
@@ -159,7 +165,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
     }
   }
 
-  private static async addGroupTargets({
+  private async addGroupTargets({
     out,
     prisma,
     idSet,
@@ -188,7 +194,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
     }
   }
 
-  private static async addAttributedUserTargets({
+  private async addAttributedUserTargets({
     out,
     prisma,
     idSet,
@@ -231,7 +237,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
    * lookups are pinned to `organizationId` so a stray scopeId can never
    * surface another tenant's name, key or member.
    */
-  static async resolveScopeTargetsBatch(
+  async resolveScopeTargetsBatch(
     prisma: GatewayBudgetScopeTargetDatabase,
     budgets: Array<{ scopeType: string; scopeId: string }>,
     organizationId: string | null,
@@ -257,24 +263,24 @@ export class PrismaGatewayBudgetScopeTargetRepository {
       virtualKeyProjectScopes.map((scope) => [scope.virtualKeyId, scope.projectId]),
     );
     await Promise.all([
-      PrismaGatewayBudgetScopeTargetRepository.addNamedTargets({
+      this.addNamedTargets({
         out,
         prisma,
         kind: "ORGANIZATION",
         idSet: ids.ORGANIZATION!,
       }),
-      PrismaGatewayBudgetScopeTargetRepository.addNamedTargets({
+      this.addNamedTargets({
         out,
         prisma,
         kind: "TEAM",
         idSet: ids.TEAM!,
       }),
-      PrismaGatewayBudgetScopeTargetRepository.addProjectTargets({
+      this.addProjectTargets({
         out,
         idSet: ids.PROJECT!,
         projectsById,
       }),
-      PrismaGatewayBudgetScopeTargetRepository.addVirtualKeyTargets({
+      this.addVirtualKeyTargets({
         out,
         prisma,
         idSet: ids.VIRTUAL_KEY!,
@@ -282,19 +288,19 @@ export class PrismaGatewayBudgetScopeTargetRepository {
         projectsById,
         projectScopeIdByVirtualKeyId,
       }),
-      PrismaGatewayBudgetScopeTargetRepository.addPrincipalTargets({
+      this.addPrincipalTargets({
         out,
         prisma,
         idSet: ids.PRINCIPAL!,
         organizationId,
       }),
-      PrismaGatewayBudgetScopeTargetRepository.addGroupTargets({
+      this.addGroupTargets({
         out,
         prisma,
         idSet: ids.GROUP!,
         organizationId,
       }),
-      PrismaGatewayBudgetScopeTargetRepository.addAttributedUserTargets({
+      this.addAttributedUserTargets({
         out,
         prisma,
         idSet: ids.ATTRIBUTED_USER!,
@@ -305,7 +311,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
     return out;
   }
 
-  static async listVirtualKeyProjectScopes(
+  async listVirtualKeyProjectScopes(
     prisma: GatewayBudgetScopeTargetDatabase,
     organizationId: string | null,
     virtualKeyIds: string[],

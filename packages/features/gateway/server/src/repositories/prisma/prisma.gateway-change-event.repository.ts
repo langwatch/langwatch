@@ -17,6 +17,10 @@ import {
 export type GatewayChangeEventDatabase = Pick<PrismaClient, "gatewayChangeEvent">;
 
 export class PrismaGatewayChangeEventsRepository extends GatewayChangeEventsPort {
+  static create(database: GatewayChangeEventDatabase): PrismaGatewayChangeEventsRepository {
+    return new PrismaGatewayChangeEventsRepository(database);
+  }
+
   constructor(private readonly prisma: GatewayChangeEventDatabase) {
     super();
   }
@@ -86,12 +90,6 @@ export class PrismaGatewayChangeEventsRepository extends GatewayChangeEventsPort
     });
     return last?.revision ?? 0n;
   }
-}
-
-export function createGatewayChangeEventsPort(
-  database: GatewayChangeEventDatabase,
-): GatewayChangeEventsPort {
-  return new PrismaGatewayChangeEventsRepository(database);
 }
 
 function jsonInput(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {

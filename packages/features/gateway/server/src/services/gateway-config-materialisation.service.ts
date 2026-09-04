@@ -15,20 +15,15 @@ import type {
   VirtualKey,
 } from "@langwatch/prisma-client/generated";
 
+import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port";
 import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port";
 import { resolveLangyMirrorTier, type LangyMirrorTier } from "@langwatch/langy-contract";
 import { modelProviders } from "@langwatch/model-provider-contract";
 import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
 import type { ProjectService } from "@langwatch/project-contract";
-import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "../adapters/gateway-period.adapter";
-import { computeConfigETag } from "../adapters/gateway-config-etag.adapter";
-import { withTierFallthrough } from "../adapters/gateway-model-tier-fallthrough.adapter";
-import { declaredModelsForProvider } from "../adapters/gateway-provider-model-catalog.adapter";
 import {
-  eligibleModelProvidersForVk,
-  scopeReachableModelProvidersForVk,
-} from "../adapters/gateway-scope-resolver.adapter";
-import {
+  budgetPeriodFloorMs,
+  effectiveBudgetPeriod,
   parseVirtualKeyConfig,
   type GatewayBudgetResource,
   type GatewayCacheRuleResource,
@@ -38,6 +33,7 @@ import {
   type GatewayResolvedBudget,
   type GatewayService,
 } from "@langwatch/gateway-contract";
+import { GatewayScopeResolutionService } from "./gateway-scope-resolution.service";
 import { type VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
 
 export type GuardrailWire = {
@@ -279,8 +275,8 @@ export type GatewayConfigPayload = {
   expires_at: number | null;
 };
 
-export class GatewayConfigMaterialiser {
-  constructor(
+export class GatewayConfigMaterialiserService {
+  private constructor(
     private readonly prisma: PrismaClient,
     private readonly projects: ProjectService,
     private readonly chRepo: GatewayBudgetSpendPort | null,
@@ -298,7 +294,35 @@ export class GatewayConfigMaterialiser {
      * another feature's server package.
      */
     private readonly credentials: GatewayModelProviderCredentialsPort,
+    /**
+     * The version token, the reserved tier vocabulary and the shipped model
+     * catalog: the three reads the bundle needs that are not this service's
+     * own logic.
+     */
+    private readonly assembly: GatewayConfigAssemblyPort,
   ) {}
+
+  static create(input: {
+    prisma: PrismaClient;
+    projects: ProjectService;
+    chRepo: GatewayBudgetSpendPort | null;
+    budgetDecisions: GatewayService;
+    credentials: GatewayModelProviderCredentialsPort;
+    assembly: GatewayConfigAssemblyPort;
+  }): GatewayConfigMaterialiserService {
+    return new GatewayConfigMaterialiserService(
+      input.prisma,
+      input.projects,
+      input.chRepo,
+      input.budgetDecisions,
+      input.credentials,
+      input.assembly,
+    );
+  }
+
+  private get scopeResolution(): GatewayScopeResolutionService {
+    return GatewayScopeResolutionService.create(this.prisma);
+  }
 
   /**
    * The providers this key dispatches to, plus the three wire fields that let
@@ -324,7 +348,7 @@ export class GatewayConfigMaterialiser {
     const providers = allowed
       ? eligibleProviders.filter((mp) => allowed.includes(mp.id))
       : eligibleProviders;
-    const scopeReachable = await scopeReachableModelProvidersForVk(this.prisma, vk);
+    const scopeReachable = await this.scopeResolution.scopeReachableModelProvidersForVk(vk);
     const { routingExcluded, accessExcluded } = providerExclusions({
       scopeReachable,
       eligibleProviders,
@@ -351,11 +375,11 @@ export class GatewayConfigMaterialiser {
    * change feed.
    */
   async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
-    return await computeConfigETag({ prisma: this.prisma, virtualKey: vk });
+    return await this.assembly.versionToken(vk);
   }
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
-    const eligibleProviders = await eligibleModelProvidersForVk(this.prisma, vk);
+    const eligibleProviders = await this.scopeResolution.eligibleModelProvidersForVk(vk);
     const traceProject = vk.traceProjectId
       ? await this.projects.tryGetTraceDestination(vk.traceProjectId)
       : null;
@@ -367,7 +391,7 @@ export class GatewayConfigMaterialiser {
       eligibleProviders,
       config.providersAllowed,
     );
-    const policySides = resolvePolicySideOfBundle(vk, config);
+    const policySides = resolvePolicySideOfBundle(vk, config, this.assembly);
     // The cache-rule bundle, the project's guardrail catalogue and the key's
     // surviving attachments come from the one Gateway service that owns those
     // tables, rather than from a second copy of each query living here.
@@ -398,7 +422,9 @@ export class GatewayConfigMaterialiser {
         vk.purpose === "LANGY" && traceProject?.id
           ? resolveLangyMirrorTier({ projectId: traceProject.id }, process.env)
           : "skip",
-      providers: providers.map((mp, index) => buildProviderSlot(mp, index, this.credentials)),
+      providers: providers.map((mp, index) =>
+        buildProviderSlot(mp, index, this.credentials, this.assembly),
+      ),
       fallback: {
         chain: providers.map((mp) => mp.id),
         // routing_mode NONE means the request never leaves the provider
@@ -571,6 +597,7 @@ function normalisePolicyRules(raw: unknown): BundlePolicyRules {
 function resolvePolicySideOfBundle(
   vk: VirtualKeyWithScopes,
   _config: ReturnType<typeof parseVirtualKeyConfig>,
+  assembly: GatewayConfigAssemblyPort,
 ): {
   modelAliases: Record<string, string>;
   policyRules: BundlePolicyRules;
@@ -591,7 +618,7 @@ function resolvePolicySideOfBundle(
       : {};
 
   return {
-    modelAliases: withTierFallthrough({
+    modelAliases: assembly.withTierFallthrough({
       aliases,
       defaultModel: rp.defaultModel,
     }),
@@ -599,132 +626,13 @@ function resolvePolicySideOfBundle(
   };
 }
 
-// Map ModelProvider.customKeys (env-var-style UPPER_SNAKE_CASE inherited
-// from the LiteLLM integration) to the Go gateway's per-provider
-// credential shape. See services/aigateway/internal/dispatch/account.go
-// #pcToBifrostKey for the consuming side.
-// Exported for tests: the per-provider credential shapes (which fields ride
-// with which provider, e.g. gemini's optional Agent Platform pair) are
-// contract, and this is the single place they are built.
-// One provider, two Google doors. A credential carrying a project and
-// location is an Agent Platform key: the Go gateway routes it to
-// aiplatform.googleapis.com at the path those two fields name, while a
-// bare key goes to the Gemini API. See
-// specs/model-providers/google-agent-platform.feature.
-function geminiCredentials(pick: (k: string) => string): Record<string, unknown> {
-  // Trimmed here as well as at the schema: rows stored before the schema
-  // trimmed could carry whitespace, and a whitespace-only "pair" must not
-  // pick the Agent Platform door.
-  const project = pick("GEMINI_PROJECT").trim();
-  const location = pick("GEMINI_LOCATION").trim();
-
-  return {
-    api_key: pick("GEMINI_API_KEY") || pick("GOOGLE_API_KEY"),
-    ...(project && location
-      ? {
-          project_id: project,
-          // `region`, not `location`: `buildProviderSlot` lifts a
-          // slot-level region by looking up exactly that key
-          // (`pickString(credentials, "region")`), the convention every
-          // other regional provider's credentials already follow. Naming
-          // it `location` here — Google's own term, kept as the
-          // customer-facing field name — would silently leave this
-          // credential without a slot-level region once something reads
-          // it.
-          region: location,
-        }
-      : {}),
-  };
-}
-
-export function buildCredentials(
-  mp: ModelProvider,
-  credentials: GatewayModelProviderCredentialsPort,
-): Record<string, unknown> {
-  const provider = mp.provider;
-  const customKeys = credentials.readCustomKeys(mp.customKeys);
-  const pick = (k: string): string =>
-    typeof customKeys[k] === "string" ? (customKeys[k] as string) : "";
-
-  switch (provider) {
-    case "azure": {
-      return {
-        api_key: pick("AZURE_OPENAI_API_KEY") || pick("api-key"),
-        endpoint: pick("AZURE_OPENAI_ENDPOINT") || pick("AZURE_API_GATEWAY_BASE_URL"),
-        api_version: pick("AZURE_OPENAI_API_VERSION") || pick("AZURE_API_GATEWAY_VERSION"),
-      };
-    }
-    case "bedrock": {
-      return {
-        access_key: pick("AWS_ACCESS_KEY_ID"),
-        secret_key: pick("AWS_SECRET_ACCESS_KEY"),
-        session_token: pick("AWS_SESSION_TOKEN"),
-        region: pick("AWS_REGION_NAME") || pick("AWS_REGION"),
-      };
-    }
-    case "vertex_ai":
-    case "vertex": {
-      return {
-        project_id: pick("VERTEXAI_PROJECT") || pick("GOOGLE_PROJECT_ID"),
-        project_number: pick("VERTEXAI_PROJECT_NUMBER"),
-        region: pick("VERTEXAI_LOCATION") || pick("GOOGLE_REGION"),
-        auth_credentials:
-          pick("GOOGLE_APPLICATION_CREDENTIALS") || pick("VERTEXAI_SERVICE_ACCOUNT_JSON"),
-      };
-    }
-    case "openai_codex": {
-      // OAuth session, not an API key: the gateway sends the access token as
-      // the bearer and the ChatGPT account id as a header, and calls back to
-      // the control plane (by row id) to refresh a 401'd token once. See
-      // services/aigateway codex dispatch + /api/gateway/internal codex
-      // refresh route.
-      return {
-        access_token: pick("CODEX_ACCESS_TOKEN"),
-        account_id: pick("CODEX_ACCOUNT_ID"),
-        provider_row_id: mp.id,
-      };
-    }
-    case "anthropic":
-      return { api_key: pick("ANTHROPIC_API_KEY") };
-    case "gemini":
-    case "google_gemini":
-      return geminiCredentials(pick);
-    // Fold-window compatibility: rows stored while Agent Platform was its
-    // own provider carry the retired field names. Same wire shape as a
-    // gemini credential naming the Agent Platform door; goes with the
-    // deprecated registry entry and is deleted after the migration runs.
-    case "google_agent_platform":
-      return {
-        api_key: pick("GOOGLE_AGENT_PLATFORM_API_KEY"),
-        project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT").trim(),
-        region: pick("GOOGLE_AGENT_PLATFORM_LOCATION").trim(),
-      };
-    case "openai":
-      return { api_key: pick("OPENAI_API_KEY") };
-    case "deepseek":
-      return { api_key: pick("DEEPSEEK_API_KEY") };
-    case "xai":
-      return { api_key: pick("XAI_API_KEY") };
-    case "cerebras":
-      return { api_key: pick("CEREBRAS_API_KEY") };
-    case "groq":
-      return { api_key: pick("GROQ_API_KEY") };
-    case "cloudflare":
-      return { api_key: pick("CLOUDFLARE_API_KEY") };
-    default: {
-      const apiKey = Object.entries(customKeys).find(([k]) => k.endsWith("_API_KEY"))?.[1];
-
-      return { api_key: typeof apiKey === "string" ? apiKey : "" };
-    }
-  }
-}
-
 function buildProviderSlot(
   mp: ModelProvider,
   index: number,
   credentialReader: GatewayModelProviderCredentialsPort,
+  assembly: GatewayConfigAssemblyPort,
 ): ProviderSlot {
-  const credentials = buildCredentials(mp, credentialReader);
+  const credentials = assembly.buildCredentials(mp, credentialReader);
   const customKeys = credentialReader.readCustomKeys(mp.customKeys);
   // Providers whose base-URL override the gateway consumes (see mapProvider
   // in bifrost.go): "custom" and "openai" route it to Bifrost's VLLM
@@ -766,7 +674,7 @@ function buildProviderSlot(
     ...(baseURL ? { base_url: baseURL } : {}),
     ...(region ? { region } : {}),
     ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
-    ...routingWire({ mp }),
+    ...routingWire({ mp, assembly }),
     config: buildProviderConfig(mp),
   };
 }
@@ -777,8 +685,14 @@ function buildProviderSlot(
  * empty when there is nothing to say, which is what the gateway reads as "this
  * provider said nothing" instead of "this provider serves nothing".
  */
-function routingWire({ mp }: { mp: ModelProvider }): Pick<ProviderSlot, "handle" | "models"> {
-  const models = declaredModelsForProvider(mp);
+function routingWire({
+  mp,
+  assembly,
+}: {
+  mp: ModelProvider;
+  assembly: GatewayConfigAssemblyPort;
+}): Pick<ProviderSlot, "handle" | "models"> {
+  const models = assembly.declaredModelsForProvider(mp);
 
   return {
     ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),

@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_SPEND_USAGE, type SpendUsage } from "../../processes/gateway-spend-commands.process";
 import {
+  ModelCatalogGatewaySpendRatingAdapter,
   NO_RATE_RULE_CODE,
-  rateSpendNanoUsd,
   UNPRICED_QUANTITIES_CODE,
 } from "../model-catalog.gateway-spend-rating.adapter";
 
+const spendRating = ModelCatalogGatewaySpendRatingAdapter.create();
 // The rating service is the only place that can see a request burn something
 // and be charged nothing, and its one way of saying so is this logger.
 const warned = vi.fn();
@@ -34,7 +35,7 @@ const usage = (overrides: Partial<SpendUsage>): SpendUsage => ({
 describe("rateSpendNanoUsd", () => {
   describe("given a character-priced speech call", () => {
     it("rates 4000 characters of openai/tts-1 at exactly $0.06", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
+      const { costNanoUsd } = spendRating.rateSpendNanoUsd({
         model: "openai/tts-1",
         usage: usage({ input_chars: 4000 }),
       });
@@ -42,7 +43,7 @@ describe("rateSpendNanoUsd", () => {
     });
 
     it("rates the same for the bare model id the gateway resolves to", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
+      const { costNanoUsd } = spendRating.rateSpendNanoUsd({
         model: "tts-1",
         usage: usage({ input_chars: 4000 }),
       });
@@ -52,7 +53,7 @@ describe("rateSpendNanoUsd", () => {
 
   describe("given a second-priced transcription call", () => {
     it("rates whisper by the audio duration it carried", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
+      const { costNanoUsd } = spendRating.rateSpendNanoUsd({
         model: "openai/whisper-1",
         usage: usage({ audio_ms: 60_000 }),
       });
@@ -60,7 +61,7 @@ describe("rateSpendNanoUsd", () => {
     });
 
     it("rates elevenlabs/convai at $0.08 for a minute of conversation", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
+      const { costNanoUsd } = spendRating.rateSpendNanoUsd({
         model: "convai",
         usage: usage({ audio_ms: 60_000 }),
       });
@@ -70,11 +71,11 @@ describe("rateSpendNanoUsd", () => {
 
   describe("given hour-long cache writes", () => {
     it("prices them above the short-lived rate", () => {
-      const short = rateSpendNanoUsd({
+      const short = spendRating.rateSpendNanoUsd({
         model: "anthropic/claude-sonnet-4.5",
         usage: usage({ cache_creation_input_tokens: 10_000 }),
       }).costNanoUsd;
-      const hourLong = rateSpendNanoUsd({
+      const hourLong = spendRating.rateSpendNanoUsd({
         model: "anthropic/claude-sonnet-4.5",
         usage: usage({
           cache_creation_input_tokens: 10_000,
@@ -87,7 +88,7 @@ describe("rateSpendNanoUsd", () => {
 
   describe("given a realtime call with an audio token split", () => {
     it("prices the audio portion at the audio rate", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
+      const { costNanoUsd } = spendRating.rateSpendNanoUsd({
         model: "openai/gpt-realtime",
         usage: usage({
           input_tokens: 200,
@@ -103,11 +104,11 @@ describe("rateSpendNanoUsd", () => {
     });
 
     it("charges the smaller model less for the same conversation", () => {
-      const full = rateSpendNanoUsd({
+      const full = spendRating.rateSpendNanoUsd({
         model: "openai/gpt-realtime",
         usage: usage({ input_audio_tokens: 800, output_audio_tokens: 250 }),
       }).costNanoUsd;
-      const mini = rateSpendNanoUsd({
+      const mini = spendRating.rateSpendNanoUsd({
         model: "openai/gpt-realtime-mini",
         usage: usage({ input_audio_tokens: 800, output_audio_tokens: 250 }),
       }).costNanoUsd;
@@ -118,7 +119,7 @@ describe("rateSpendNanoUsd", () => {
   describe("given an image generation with an image token split", () => {
     describe("when the request is rated", () => {
       it("prices gpt-image-2 by its text prompt and its output image tokens", () => {
-        const { costNanoUsd } = rateSpendNanoUsd({
+        const { costNanoUsd } = spendRating.rateSpendNanoUsd({
           model: "openai/gpt-image-2",
           usage: usage({
             input_tokens: 14,
@@ -135,7 +136,7 @@ describe("rateSpendNanoUsd", () => {
       });
 
       it("prices an edit for the image tokens it read as well", () => {
-        const { costNanoUsd } = rateSpendNanoUsd({
+        const { costNanoUsd } = spendRating.rateSpendNanoUsd({
           model: "openai/gpt-image-1",
           usage: usage({
             input_tokens: 20,
@@ -149,11 +150,11 @@ describe("rateSpendNanoUsd", () => {
       });
 
       it("charges the mini model less for the same image", () => {
-        const full = rateSpendNanoUsd({
+        const full = spendRating.rateSpendNanoUsd({
           model: "openai/gpt-image-1",
           usage: usage({ output_image_tokens: 1600 }),
         }).costNanoUsd;
-        const mini = rateSpendNanoUsd({
+        const mini = spendRating.rateSpendNanoUsd({
           model: "openai/gpt-image-1-mini",
           usage: usage({ output_image_tokens: 1600 }),
         }).costNanoUsd;
@@ -165,7 +166,7 @@ describe("rateSpendNanoUsd", () => {
   describe("given a model the catalog does not carry", () => {
     /** @scenario A model with no entry at all is reported */
     it("rates zero and leaves the miss visible", () => {
-      const { costNanoUsd, rateVersion } = rateSpendNanoUsd({
+      const { costNanoUsd, rateVersion } = spendRating.rateSpendNanoUsd({
         model: "nonexistent-vendor/nonexistent-model-xyz",
         usage: usage({ input_tokens: 1000 }),
       });
@@ -190,7 +191,7 @@ describe("rateSpendNanoUsd", () => {
       // A catalog entry whose every rate is zero is a free or bundled model,
       // not a gap. Warning on it would report a fault on every request.
       it("stays quiet, because charging nothing is the right answer", () => {
-        const { costNanoUsd } = rateSpendNanoUsd({
+        const { costNanoUsd } = spendRating.rateSpendNanoUsd({
           model: "gemini/lyria-3-pro-preview",
           usage: usage({ input_tokens: 1200, output_tokens: 300 }),
         });
@@ -208,7 +209,7 @@ describe("rateSpendNanoUsd", () => {
 
     /** @scenario A rule that prices none of the reported quantities is reported */
     it("warns when a matched rule prices none of the reported quantities", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
+      const { costNanoUsd } = spendRating.rateSpendNanoUsd({
         model: "openai/tts-1",
         usage: usage({ input_tokens: 65, output_tokens: 22 }),
       });
@@ -221,7 +222,7 @@ describe("rateSpendNanoUsd", () => {
 
     /** @scenario A rule that prices none of the reported quantities is reported */
     it("names the quantities the request did carry", () => {
-      rateSpendNanoUsd({
+      spendRating.rateSpendNanoUsd({
         model: "openai/tts-1",
         usage: usage({ input_tokens: 65, output_tokens: 22 }),
       });
@@ -233,7 +234,7 @@ describe("rateSpendNanoUsd", () => {
 
     /** @scenario A model with no entry at all is reported */
     it("warns once, not twice, when the model is unknown as well", () => {
-      rateSpendNanoUsd({
+      spendRating.rateSpendNanoUsd({
         model: "nonexistent-vendor/nonexistent-model-xyz",
         usage: usage({ input_tokens: 1000 }),
       });
@@ -245,7 +246,7 @@ describe("rateSpendNanoUsd", () => {
 
     /** @scenario The image count is display only and never a billable quantity */
     it("stays quiet when the request carried only an image count", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
+      const { costNanoUsd } = spendRating.rateSpendNanoUsd({
         model: "openai/gpt-image-2",
         usage: usage({ image_count: 1 }),
       });
@@ -255,7 +256,7 @@ describe("rateSpendNanoUsd", () => {
 
     /** @scenario A request that measured nothing is not a fault */
     it("stays quiet when the request measured nothing", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
+      const { costNanoUsd } = spendRating.rateSpendNanoUsd({
         model: "openai/tts-1",
         usage: usage({}),
       });
@@ -265,7 +266,7 @@ describe("rateSpendNanoUsd", () => {
 
     /** @scenario A request that measured nothing is not a fault */
     it("stays quiet when the rule priced the request", () => {
-      const { costNanoUsd } = rateSpendNanoUsd({
+      const { costNanoUsd } = spendRating.rateSpendNanoUsd({
         model: "openai/tts-1",
         usage: usage({ input_chars: 4000 }),
       });
@@ -275,7 +276,7 @@ describe("rateSpendNanoUsd", () => {
 
     /** @scenario A model with no entry at all is reported */
     it("still names an unknown model that measured nothing", () => {
-      rateSpendNanoUsd({
+      spendRating.rateSpendNanoUsd({
         model: "nonexistent-vendor/nonexistent-model-xyz",
         usage: usage({}),
       });

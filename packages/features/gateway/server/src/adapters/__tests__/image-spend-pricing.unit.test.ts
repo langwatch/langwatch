@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  estimateModelCost,
-  getStaticModelCostRates,
-} from "@langwatch/model-provider-contract";
+import { estimateModelCost, getStaticModelCostRates } from "@langwatch/model-provider-contract";
 import { EMPTY_SPEND_USAGE } from "../../processes/gateway-spend-commands.process";
 import {
+  ModelCatalogGatewaySpendRatingAdapter,
   NANO_USD_PER_USD,
-  rateSpendNanoUsd,
 } from "../model-catalog.gateway-spend-rating.adapter";
 
+const spendRating = ModelCatalogGatewaySpendRatingAdapter.create();
 // Catalog rates under test (model-catalog.overlay.json), per token, from
 // OpenAI's pricing page: gpt-image-1 $5 text in, $10 image in, $40 image out
 // per million.
@@ -24,7 +22,7 @@ describe("image spend pricing", () => {
     describe("when the request is rated", () => {
       /** @scenario the spend wire prices images from the catalog alone */
       it("prices both image buckets at the catalog rates", () => {
-        const { costNanoUsd } = rateSpendNanoUsd({
+        const { costNanoUsd } = spendRating.rateSpendNanoUsd({
           model: "openai/gpt-image-1",
           usage: {
             ...EMPTY_SPEND_USAGE,
@@ -36,9 +34,7 @@ describe("image spend pricing", () => {
         });
         expect(costNanoUsd).toBe(
           Math.round(
-            (20 * IMAGE1_TEXT_IN +
-              323 * IMAGE1_IMAGE_IN +
-              ONE_SQUARE_IMAGE * IMAGE1_IMAGE_OUT) *
+            (20 * IMAGE1_TEXT_IN + 323 * IMAGE1_IMAGE_IN + ONE_SQUARE_IMAGE * IMAGE1_IMAGE_OUT) *
               NANO_USD_PER_USD,
           ),
         );
@@ -57,7 +53,7 @@ describe("image spend pricing", () => {
           output_image_tokens: ONE_SQUARE_IMAGE,
           image_count: 1,
         };
-        const { costNanoUsd } = rateSpendNanoUsd({
+        const { costNanoUsd } = spendRating.rateSpendNanoUsd({
           model: "openai/gpt-image-2",
           usage,
         });

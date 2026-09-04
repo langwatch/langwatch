@@ -23,15 +23,21 @@ import type {
   VirtualKeyRoutingMode,
 } from "@langwatch/prisma-client/generated";
 import { GatewayAuditPort } from "../ports/gateway-audit.port";
-import { gatewayRoutingPolicySelect } from "../adapters/gateway-routing-policy-select.adapter";
+import { gatewayRoutingPolicySelect } from "../ports/gateway-virtual-key.port";
 import {
   serializeRowForAudit,
   type GatewayAuditJson,
-} from "../adapters/gateway-audit-serializer.adapter";
-import { GatewayWindow } from "../adapters/gateway-window.adapter";
+  GatewayWindow,
+  defaultVirtualKeyConfig,
+  type GuardrailAttachment,
+  type GuardrailDirection,
+  parseVirtualKeyConfig,
+  type VirtualKeyConfig,
+  virtualKeyConfigSchema,
+  identityPatchData,
+  type ResourceMetadata,
+} from "@langwatch/gateway-contract";
 import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port";
-import { createGatewayAuditPort } from "../repositories/prisma/prisma.gateway-audit.repository";
-import { createGatewayChangeEventsPort } from "../repositories/prisma/prisma.gateway-change-event.repository";
 import {
   GatewayTraceProjectAmbiguousError,
   GatewayTraceProjectRequiredError,
@@ -39,26 +45,13 @@ import {
   translateExternalIdConflict,
   VirtualKeyExpiryInPastError,
 } from "../index";
-import {
-  identityPatchData,
-  type ResourceMetadata,
-} from "../adapters/gateway-resource-metadata.adapter";
-import { scopeReachableModelProvidersForVk } from "../adapters/gateway-scope-resolver.adapter";
-import {
-  defaultVirtualKeyConfig,
-  type GuardrailAttachment,
-  type GuardrailDirection,
-  parseVirtualKeyConfig,
-  type VirtualKeyConfig,
-  virtualKeyConfigSchema,
-} from "@langwatch/gateway-contract";
-import { VirtualKeyCryptoAdapter } from "../adapters/virtual-key-crypto.adapter";
+import { GatewayScopeResolutionService } from "./gateway-scope-resolution.service";
+import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port";
 import {
   type ScopeInput,
   type GatewayVirtualKeysPort,
   type VirtualKeyWithScopes,
 } from "../ports/gateway-virtual-key.port";
-import { createGatewayVirtualKeysPort } from "../repositories/prisma/prisma.virtual-key.repository";
 import type { GatewayGovernanceSignalsPort } from "../ports/gateway-governance-signals.port";
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
@@ -229,7 +222,7 @@ export class VirtualKeyService {
     private readonly repository: GatewayVirtualKeysPort,
     private readonly changeEvents: GatewayChangeEventsPort,
     private readonly auditLog: GatewayAuditPort,
-    private readonly crypto: VirtualKeyCryptoAdapter,
+    private readonly crypto: GatewayVirtualKeyCryptoPort,
     /**
      * The Enterprise governance ledger, when the deployment composes one.
      * Absent means the five lifecycle emissions below are not recorded —
@@ -239,28 +232,23 @@ export class VirtualKeyService {
     private readonly governanceSignals?: GatewayGovernanceSignalsPort,
   ) {}
 
-  static create(
-    prisma: PrismaClient,
-    projects: ProjectService,
-    crypto: VirtualKeyCryptoAdapter,
-    governanceSignals?: GatewayGovernanceSignalsPort,
-  ): VirtualKeyService {
+  static create(input: {
+    prisma: PrismaClient;
+    projects: ProjectService;
+    repository: GatewayVirtualKeysPort;
+    changeEvents: GatewayChangeEventsPort;
+    auditLog: GatewayAuditPort;
+    crypto: GatewayVirtualKeyCryptoPort;
+    governanceSignals?: GatewayGovernanceSignalsPort;
+  }): VirtualKeyService {
     return new VirtualKeyService(
-      prisma,
-      projects,
-      createGatewayVirtualKeysPort(prisma),
-      createGatewayChangeEventsPort(prisma),
-      createGatewayAuditPort(prisma),
-      crypto,
-      governanceSignals,
-    );
-  }
-
-  static createForTest(prisma: PrismaClient, projects: ProjectService): VirtualKeyService {
-    return VirtualKeyService.create(
-      prisma,
-      projects,
-      VirtualKeyCryptoAdapter.create({ pepper: "test-virtual-key-pepper" }),
+      input.prisma,
+      input.projects,
+      input.repository,
+      input.changeEvents,
+      input.auditLog,
+      input.crypto,
+      input.governanceSignals,
     );
   }
 
@@ -354,8 +342,8 @@ export class VirtualKeyService {
       ...defaultVirtualKeyConfig(),
       ...input.config,
     });
-    const secret = VirtualKeyCryptoAdapter.mintSecret();
-    const { displayPrefix } = VirtualKeyCryptoAdapter.parseSecret(secret);
+    const secret = this.crypto.mintSecret();
+    const { displayPrefix } = this.crypto.parseSecret(secret);
     const hashedSecret = this.crypto.hashSecret(secret);
 
     if (input.routingPolicyId) {
@@ -632,8 +620,8 @@ export class VirtualKeyService {
     }
 
     const before = serialiseForAudit(existing);
-    const newSecret = VirtualKeyCryptoAdapter.mintSecret();
-    const { displayPrefix: newDisplayPrefix } = VirtualKeyCryptoAdapter.parseSecret(newSecret);
+    const newSecret = this.crypto.mintSecret();
+    const { displayPrefix: newDisplayPrefix } = this.crypto.parseSecret(newSecret);
     const newHashedSecret = this.crypto.hashSecret(newSecret);
     const previousSecretValidUntil = new Date(Date.now() + ROTATION_GRACE_MS);
 
@@ -1179,7 +1167,9 @@ export class VirtualKeyService {
       return;
     }
 
-    const reachable = await scopeReachableModelProvidersForVk(this.prisma, vk, tx);
+    const reachable = await GatewayScopeResolutionService.create(
+      this.prisma,
+    ).scopeReachableModelProvidersForVk(vk, tx);
     const reachableIds = new Set(reachable.map((mp) => mp.id));
     const unreachable = providersAllowed.filter((id) => !reachableIds.has(id));
     if (unreachable.length > 0) {

@@ -3,7 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { GatewayInternalStorePort } from "../ports/gateway-internal-store.port";
 import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
-import { gatewayRoutingPolicySelect } from "./gateway-routing-policy-select.adapter";
+import { gatewayRoutingPolicySelect } from "../ports/gateway-virtual-key.port";
 
 const logger = createLogger("langwatch:gateway:internal-store");
 

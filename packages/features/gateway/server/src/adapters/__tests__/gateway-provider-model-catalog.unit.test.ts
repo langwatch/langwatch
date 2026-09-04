@@ -10,12 +10,14 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { declaredModelsForProvider } from "../gateway-provider-model-catalog.adapter";
+import { GatewayConfigAssemblyAdapter } from "../gateway-config-assembly.adapter";
+
+const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
 
 describe("declaredModelsForProvider", () => {
   describe("when a custom provider declares models", () => {
     it("declares the customer's own model ids", () => {
-      const declared = declaredModelsForProvider({
+      const declared = assembly.declaredModelsForProvider({
         provider: "custom",
         customModels: [{ modelId: "stealth/ox-alpha", displayName: "Ox", mode: "chat" }],
         customEmbeddingsModels: null,
@@ -25,7 +27,7 @@ describe("declaredModelsForProvider", () => {
     });
 
     it("keeps a model id that contains a slash whole", () => {
-      const declared = declaredModelsForProvider({
+      const declared = assembly.declaredModelsForProvider({
         provider: "custom",
         customModels: ["meta-llama/Llama-3-70B"],
         customEmbeddingsModels: null,
@@ -35,7 +37,7 @@ describe("declaredModelsForProvider", () => {
     });
 
     it("declares chat and embeddings models together", () => {
-      const declared = declaredModelsForProvider({
+      const declared = assembly.declaredModelsForProvider({
         provider: "custom",
         customModels: ["chat-one"],
         customEmbeddingsModels: ["embed-one"],
@@ -47,7 +49,7 @@ describe("declaredModelsForProvider", () => {
 
   describe("when the provider is a hosted family", () => {
     it("declares the shipped catalog with the family prefix removed", () => {
-      const declared = declaredModelsForProvider({
+      const declared = assembly.declaredModelsForProvider({
         provider: "openai",
         customModels: null,
         customEmbeddingsModels: null,
@@ -58,7 +60,7 @@ describe("declaredModelsForProvider", () => {
     });
 
     it("declares the customer's own models alongside the shipped ones", () => {
-      const declared = declaredModelsForProvider({
+      const declared = assembly.declaredModelsForProvider({
         provider: "openai",
         customModels: ["ft:gpt-5-mini:acme:1"],
         customEmbeddingsModels: null,
@@ -70,18 +72,20 @@ describe("declaredModelsForProvider", () => {
 
     it("reads Anthropic and Gemini from the same catalog", () => {
       expect(
-        declaredModelsForProvider({
+        assembly.declaredModelsForProvider({
           provider: "anthropic",
           customModels: null,
           customEmbeddingsModels: null,
         }),
       ).toContain("claude-sonnet-5");
       expect(
-        declaredModelsForProvider({
-          provider: "gemini",
-          customModels: null,
-          customEmbeddingsModels: null,
-        })?.every((id) => !id.includes("/")),
+        assembly
+          .declaredModelsForProvider({
+            provider: "gemini",
+            customModels: null,
+            customEmbeddingsModels: null,
+          })
+          ?.every((id) => !id.includes("/")),
       ).toBe(true);
     });
   });
@@ -92,14 +96,14 @@ describe("declaredModelsForProvider", () => {
       // provider said nothing" and keeps it a candidate for a model no other
       // provider claims. An empty list would read as "serves no models".
       expect(
-        declaredModelsForProvider({
+        assembly.declaredModelsForProvider({
           provider: "bedrock",
           customModels: null,
           customEmbeddingsModels: null,
         }),
       ).toBeUndefined();
       expect(
-        declaredModelsForProvider({
+        assembly.declaredModelsForProvider({
           provider: "groq",
           customModels: [],
           customEmbeddingsModels: [],
@@ -112,7 +116,7 @@ describe("declaredModelsForProvider", () => {
     /** @scenario A malformed custom model entry is dropped loudly, not silently */
     it("drops it from the declared list and logs it at warn by name", () => {
       warned.mockClear();
-      const declared = declaredModelsForProvider({
+      const declared = assembly.declaredModelsForProvider({
         provider: "custom",
         customModels: [
           { modelId: "good-model", displayName: "Good", mode: "chat" },
@@ -130,7 +134,7 @@ describe("declaredModelsForProvider", () => {
 
   describe("when the same model is declared twice", () => {
     it("declares it once, sorted, so the payload does not move on its own", () => {
-      const declared = declaredModelsForProvider({
+      const declared = assembly.declaredModelsForProvider({
         provider: "custom",
         customModels: ["b-model", "a-model"],
         customEmbeddingsModels: ["a-model"],

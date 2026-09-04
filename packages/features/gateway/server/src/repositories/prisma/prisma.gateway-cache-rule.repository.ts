@@ -8,18 +8,19 @@ import {
   type GatewayCacheRuleMatchers,
   type GatewayCacheRuleResource,
   type UpdateGatewayCacheRuleInput,
+  serializeRowForAudit,
 } from "@langwatch/gateway-contract";
 import {
   Prisma,
   type GatewayCacheRule,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { serializeRowForAudit } from "../../adapters/gateway-audit-serializer.adapter";
-import { keysetAfter } from "../../adapters/gateway-wire-pagination.adapter";
+import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter";
 import type { GatewayAuditPort } from "../../ports/gateway-audit.port";
 import type { GatewayChangeEventsPort } from "../../ports/gateway-change-events.port";
 import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository";
 
+const wirePages = GatewayWirePaginationAdapter.create();
 /**
  * The client slice cache-rule persistence binds to, transaction included:
  * a rule write, its change event and its audit row land together or not at
@@ -64,7 +65,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
         archivedAt: null,
         ...(input.cursor
           ? {
-              OR: keysetAfter([
+              OR: wirePages.keysetAfter([
                 { name: "priority", value: input.cursor.priority, direction: "desc" },
                 { name: "createdAt", value: input.cursor.createdAt, direction: "asc" },
                 { name: "id", value: input.cursor.id, direction: "asc" },

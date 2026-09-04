@@ -35,13 +35,11 @@ import type {
 
 import {
   type ApplicableBudget,
-  resolveApplicableBudgetsForTarget,
+  GatewayApplicableBudgetsService,
 } from "./gateway-applicable-budgets.service";
 import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
-import { scopeTargetKey, type GatewayService } from "@langwatch/gateway-contract";
-import { spendTargetsForBudgets } from "../adapters/gateway-budget-spend-target.adapter";
-import { GatewayWindow } from "../adapters/gateway-window.adapter";
-import { resolveProviderLabels } from "../repositories/prisma/prisma.gateway-provider-label.repository";
+import { scopeTargetKey, type GatewayService, GatewayWindow } from "@langwatch/gateway-contract";
+import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository";
 
 /**
  * How binding a budget scope is to the person reading, most binding
@@ -151,8 +149,16 @@ export class BudgetOverviewService {
     private readonly personalVirtualKeys: PersonalVirtualKeyReader,
     private readonly personalUsage: PersonalUsageReader | undefined,
     private readonly budgetDecisions: GatewayService,
+    private readonly providerLabels: GatewayProviderLabelRepository,
     private readonly chRepo?: GatewayBudgetSpendPort,
   ) {}
+
+  private get applicableBudgets(): GatewayApplicableBudgetsService {
+    return GatewayApplicableBudgetsService.create({
+      budgetDecisions: this.budgetDecisions,
+      providerLabels: this.providerLabels,
+    });
+  }
 
   static create(options: {
     database: PrismaClient;
@@ -160,6 +166,7 @@ export class BudgetOverviewService {
     featureFlags: FeatureFlagService;
     personalVirtualKeys: PersonalVirtualKeyReader;
     budgetDecisions: GatewayService;
+    providerLabels: GatewayProviderLabelRepository;
     personalUsage?: PersonalUsageReader;
     budgetRepository?: GatewayBudgetSpendPort;
   }): BudgetOverviewService {
@@ -170,6 +177,7 @@ export class BudgetOverviewService {
       options.personalVirtualKeys,
       options.personalUsage,
       options.budgetDecisions,
+      options.providerLabels,
       options.budgetRepository,
     );
   }
@@ -224,9 +232,7 @@ export class BudgetOverviewService {
     // The model breakdown needs only the workspace, so it does not queue
     // behind budget resolution.
     const [applicable, topModels] = await Promise.all([
-      resolveApplicableBudgetsForTarget(
-        this.prisma,
-        this.budgetDecisions,
+      this.applicableBudgets.resolveApplicableBudgetsForTarget(
         {
           organizationId: input.organizationId,
           teamId: workspace?.team.id ?? null,
@@ -286,7 +292,7 @@ export class BudgetOverviewService {
 
     const [targets, providerLabels, spentUsd] = await Promise.all([
       this.budgetDecisions.resolveScopeTargets([budget], input.organizationId),
-      resolveProviderLabels({ prisma: this.prisma, budgets: [budget] }),
+      this.providerLabels.resolveProviderLabels([budget]),
       this.loadSpendForBudget(budget, input.organizationId),
     ]);
 
@@ -331,7 +337,7 @@ export class BudgetOverviewService {
     try {
       const spends = await this.chRepo.getSpendForTargetsAcrossTenants(
         tenantIds,
-        spendTargetsForBudgets({ budgets: [budget], now }),
+        GatewayBudgetSpendPort.targetsForBudgets({ budgets: [budget], now }),
         now,
       );
 
@@ -439,7 +445,7 @@ function absoluteScopeClass(scopeType: string): BudgetOverviewScopeClass | null 
  * /me page, the CLI epilogue, and the settings surfaces can never label
  * the same budget differently.
  */
-export function scopePhraseFor(scopeClass: BudgetOverviewScopeClass, scopeLabel: string): string {
+function scopePhraseFor(scopeClass: BudgetOverviewScopeClass, scopeLabel: string): string {
   switch (scopeClass) {
     case "organization":
       return "whole organization budget";

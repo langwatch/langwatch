@@ -36,12 +36,12 @@ import { GatewaySpendConfirmationPort } from "../../../ports/gateway-spend-confi
 import type { ConfirmSpendCommandData } from "../../../processes/gateway-spend-commands.process";
 import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../../services/gateway-elevenlabs-credential.service";
 import {
-  correlateRealtimeSession,
-  reserveRealtimeSession,
+  GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "../../../services/gateway-realtime-session.service";
 import { createElevenLabsWebhookRestApp } from "../elevenlabs-webhook.api";
 
+const realtimeSessions = GatewayRealtimeSessionService.create();
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);
@@ -145,7 +145,7 @@ async function openSession(label: string, conversationId: string) {
     },
   });
   const sessionId = `sess-${label}-${nanoid(6)}`;
-  await reserveRealtimeSession({
+  await realtimeSessions.reserveRealtimeSession({
     sessionId,
     projectId: PROJECT_ID,
     organizationId: ORG_ID,
@@ -155,7 +155,7 @@ async function openSession(label: string, conversationId: string) {
     model: "convai",
     collaborators: sessions,
   });
-  await correlateRealtimeSession({
+  await realtimeSessions.correlateRealtimeSession({
     sessionId,
     projectId: PROJECT_ID,
     vendorConversationId: conversationId,

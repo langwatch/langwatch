@@ -8,14 +8,13 @@ import {
   type GatewayResolvedBudget,
   type GovernanceResolvedBudgetCrossing,
 } from "@langwatch/enterprise-governance-server";
+import { type BudgetSpendTarget, type GatewayChangeEventsPort } from "@langwatch/gateway-server";
 import {
   budgetAppliesToProvider,
   budgetPeriodFloorMs,
   currentPeriodStart,
-  type BudgetSpendTarget,
-  type GatewayChangeEventsPort,
-} from "@langwatch/gateway-server";
-import type { GatewayService } from "@langwatch/gateway-contract";
+  type GatewayService,
+} from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
 import {

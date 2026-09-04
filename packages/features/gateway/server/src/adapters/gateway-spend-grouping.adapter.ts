@@ -19,18 +19,11 @@
 import { GatewaySettlementPolicyPort } from "../ports/gateway-settlement-policy.port";
 
 import { GatewaySpendGroupByUnstableError } from "@langwatch/gateway-contract";
-
-export const SPEND_GROUP_BY_KEYS = [
-  "virtual_key",
-  "end_user",
-  "project",
-  "model",
-  "provider",
-  "principal",
-  "request_type",
-] as const;
-
-export type SpendGroupByKey = (typeof SPEND_GROUP_BY_KEYS)[number];
+import {
+  SPEND_GROUP_BY_KEYS,
+  type SpendBucket,
+  type SpendGroupByKey,
+} from "../ports/gateway-spend-events.port";
 
 /**
  * The keys the fold rewrites after admission. Requested model and provider
@@ -52,9 +45,6 @@ const COLUMN_BY_KEY: Record<SpendGroupByKey, string> = {
   request_type: "RequestType",
 };
 
-export const SPEND_BUCKETS = ["none", "hour", "day"] as const;
-export type SpendBucket = (typeof SPEND_BUCKETS)[number];
-
 /**
  * How a spend rollup is grouped and bucketed.
  *
@@ -64,8 +54,14 @@ export type SpendBucket = (typeof SPEND_BUCKETS)[number];
  * others, so `isMovableGroupBy` and `windowHasSettled` decide together whether
  * the walk is safe, and `assertGroupingIsWalkable` refuses when it is not.
  */
-export class GatewaySpendGrouping {
-  static groupByColumn(key: SpendGroupByKey): string {
+export class GatewaySpendGroupingAdapter {
+  static create(): GatewaySpendGroupingAdapter {
+    return new GatewaySpendGroupingAdapter();
+  }
+
+  private constructor() {}
+
+  groupByColumn(key: SpendGroupByKey): string {
     return COLUMN_BY_KEY[key];
   }
 
@@ -86,7 +82,7 @@ export class GatewaySpendGrouping {
    * with a letter and no offset spelling does, so the first character settles
    * it.
    */
-  static isIanaTimeZone(zone: string): boolean {
+  isIanaTimeZone(zone: string): boolean {
     if (!/^[A-Za-z]/.test(zone)) return false;
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: zone });
@@ -103,7 +99,7 @@ export class GatewaySpendGrouping {
    * caller's local midnight, and re-bucketing UTC days client-side cannot
    * recover the requests that fell on the other side of it.
    */
-  static bucketExpression({
+  bucketExpression({
     bucket,
     timezoneParam,
   }: {
@@ -116,7 +112,7 @@ export class GatewaySpendGrouping {
   }
 
   /** True when a late outcome can still move a row between groups on this key. */
-  static isMovableGroupBy(key: SpendGroupByKey): boolean {
+  isMovableGroupBy(key: SpendGroupByKey): boolean {
     return MOVABLE_GROUP_BY_KEYS.includes(key);
   }
 
@@ -129,7 +125,7 @@ export class GatewaySpendGrouping {
    * here, so an operator who widens `LW_SPEND_SETTLEMENT_GRACE_MS` widens this
    * guard with it instead of leaving two numbers to disagree.
    */
-  static windowHasSettled({
+  windowHasSettled({
     toMs,
     nowMs,
     settlementPolicy,
@@ -152,7 +148,7 @@ export class GatewaySpendGrouping {
    * rewritten when the admission lands. A request can therefore change buckets,
    * and over a month boundary change partitions.
    */
-  static assertGroupingIsWalkable({
+  assertGroupingIsWalkable({
     keys,
     bucket,
     toMs,
@@ -168,8 +164,8 @@ export class GatewaySpendGrouping {
     settlementPolicy: GatewaySettlementPolicyPort;
   }): void {
     if (allowUnstable) return;
-    if (GatewaySpendGrouping.windowHasSettled({ toMs, nowMs, settlementPolicy })) return;
-    const movable: string[] = keys.filter((key) => GatewaySpendGrouping.isMovableGroupBy(key));
+    if (this.windowHasSettled({ toMs, nowMs, settlementPolicy })) return;
+    const movable: string[] = keys.filter((key) => this.isMovableGroupBy(key));
     if (bucket !== "none") movable.push(`bucket:${bucket}`);
     if (movable.length === 0) return;
     throw new GatewaySpendGroupByUnstableError({

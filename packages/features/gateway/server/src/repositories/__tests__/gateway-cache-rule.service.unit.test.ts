@@ -8,7 +8,7 @@ import {
 } from "@langwatch/gateway-contract";
 import { describe, expect, it } from "vitest";
 import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository";
-import { GatewayCacheRulePersistence } from "../../services/gateway-cache-rule.service";
+import { GatewayCacheRuleService } from "../../services/gateway-cache-rule.service";
 
 const existingRule: GatewayCacheRuleResource = {
   id: "rule_01",
@@ -109,10 +109,10 @@ class MemoryCacheRuleRepository extends GatewayCacheRuleRepository {
   }
 }
 
-describe("GatewayCacheRulePersistence", () => {
+describe("GatewayCacheRuleService", () => {
   it("validates and forwards the canonical cache-rule create payload", async () => {
     const repository = new MemoryCacheRuleRepository(null);
-    const service = GatewayCacheRulePersistence.create(repository);
+    const service = GatewayCacheRuleService.create(repository);
 
     await expect(
       service.create({
@@ -137,7 +137,7 @@ describe("GatewayCacheRulePersistence", () => {
 
   it("rejects an out-of-range cache TTL before persistence", () => {
     const repository = new MemoryCacheRuleRepository(null);
-    const service = GatewayCacheRulePersistence.create(repository);
+    const service = GatewayCacheRuleService.create(repository);
 
     expect(() =>
       service.create({
@@ -161,7 +161,7 @@ describe("GatewayCacheRulePersistence", () => {
      */
     it("refuses vk_tags that is not a list of strings", () => {
       const repository = new MemoryCacheRuleRepository(null);
-      const service = GatewayCacheRulePersistence.create(repository);
+      const service = GatewayCacheRuleService.create(repository);
 
       expect(() =>
         service.create({
@@ -178,7 +178,7 @@ describe("GatewayCacheRulePersistence", () => {
 
     it("refuses request_metadata that is not a flat key-value object", () => {
       const repository = new MemoryCacheRuleRepository(null);
-      const service = GatewayCacheRulePersistence.create(repository);
+      const service = GatewayCacheRuleService.create(repository);
 
       expect(() =>
         service.create({
@@ -195,7 +195,7 @@ describe("GatewayCacheRulePersistence", () => {
 
     it("refuses an action mode the gateway has no branch for", () => {
       const repository = new MemoryCacheRuleRepository(null);
-      const service = GatewayCacheRulePersistence.create(repository);
+      const service = GatewayCacheRuleService.create(repository);
 
       expect(() =>
         service.create({
@@ -213,7 +213,7 @@ describe("GatewayCacheRulePersistence", () => {
 
   it("does not update a missing or cross-organization rule", async () => {
     const repository = new MemoryCacheRuleRepository(existingRule);
-    const service = GatewayCacheRulePersistence.create(repository);
+    const service = GatewayCacheRuleService.create(repository);
 
     await expect(
       service.update({
@@ -229,7 +229,7 @@ describe("GatewayCacheRulePersistence", () => {
 
   it("forwards an update after checking the active organization-scoped rule", async () => {
     const repository = new MemoryCacheRuleRepository(existingRule);
-    const service = GatewayCacheRulePersistence.create(repository);
+    const service = GatewayCacheRuleService.create(repository);
 
     await expect(
       service.update({
@@ -250,7 +250,7 @@ describe("GatewayCacheRulePersistence", () => {
 
   it("archives rather than removing the organization-scoped rule from the repository contract", async () => {
     const repository = new MemoryCacheRuleRepository(existingRule);
-    const service = GatewayCacheRulePersistence.create(repository);
+    const service = GatewayCacheRuleService.create(repository);
 
     await expect(
       service.archive({ id: "rule_01", organizationId: "org_01", actorUserId: "usr_01" }),

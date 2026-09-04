@@ -61,6 +61,10 @@ export type GatewayAuditTargetKind = (typeof GATEWAY_AUDIT_TARGET_KINDS)[number]
 export type GatewayAuditDatabase = Pick<PrismaClient, "auditLog">;
 
 export class PrismaGatewayAuditRepository extends GatewayAuditPort {
+  static create(database: GatewayAuditDatabase): PrismaGatewayAuditRepository {
+    return new PrismaGatewayAuditRepository(database);
+  }
+
   constructor(private readonly prisma: GatewayAuditDatabase) {
     super();
   }
@@ -83,10 +87,6 @@ export class PrismaGatewayAuditRepository extends GatewayAuditPort {
       },
     });
   }
-}
-
-export function createGatewayAuditPort(database: GatewayAuditDatabase): GatewayAuditPort {
-  return new PrismaGatewayAuditRepository(database);
 }
 
 function jsonInput(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {

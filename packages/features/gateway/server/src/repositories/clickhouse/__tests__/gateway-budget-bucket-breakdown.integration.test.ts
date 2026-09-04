@@ -28,7 +28,7 @@ import {
   type BucketSpend,
   GatewayBudgetClickHouseRepository,
 } from "../clickhouse.gateway-budget.repository";
-import { PROVIDER_BUCKET_SEPARATOR } from "../../../adapters/gateway-bucket-scope.adapter";
+import { PROVIDER_BUCKET_SEPARATOR } from "@langwatch/gateway-contract";
 
 const chUrl = testClickHouseUrl();
 

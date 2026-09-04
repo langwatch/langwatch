@@ -4,7 +4,7 @@ import {
   runSpendSettlementSweep,
   type SpendSettlementProcessDeps,
 } from "../intents/gateway-spend-settlement.intent";
-import type { GatewaySpendProcessingEvent } from "../adapters/gateway-spend-events.adapter";
+import type { GatewaySpendProcessingEvent } from "../intents/gateway-spend.intent";
 
 export const SPEND_SETTLEMENT_PROCESS_NAME = "spendSettlement" as const;
 

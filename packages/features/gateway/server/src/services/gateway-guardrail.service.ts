@@ -11,23 +11,23 @@ import {
   type GatewayGuardrailResource,
   type GatewayGuardrailBundleEntry,
   type UpdateGatewayGuardrailInput,
+  serializeRowForAudit,
 } from "@langwatch/gateway-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { GatewayAuditPort } from "../ports/gateway-audit.port";
 import { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository";
-import { serializeRowForAudit } from "../adapters/gateway-audit-serializer.adapter";
 
 /** Private guardrail catalogue collaborator owned by the singular Gateway service. */
-export class GatewayGuardrailCatalogue {
+export class GatewayGuardrailService {
   static create(input: {
     repository: GatewayGuardrailRepository;
     evaluators: EvaluatorService;
     monitors: MonitorService;
     projects: ProjectService;
     audit: GatewayAuditPort;
-  }): GatewayGuardrailCatalogue {
-    return new GatewayGuardrailCatalogue(
+  }): GatewayGuardrailService {
+    return new GatewayGuardrailService(
       input.repository,
       input.evaluators,
       input.monitors,

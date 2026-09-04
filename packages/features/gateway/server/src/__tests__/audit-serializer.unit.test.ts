@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@langwatch/prisma-client/generated";
 
-import { serializeRowForAudit } from "../index";
+import { serializeRowForAudit } from "@langwatch/gateway-contract";
 
 /**
  * The serializer exists to solve one specific bug class: default

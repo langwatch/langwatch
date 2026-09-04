@@ -45,12 +45,13 @@
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import {
-  createGatewaySpendProducerPipeline,
   GatewaySpendConfirmationPort,
+  GatewaySpendProducerAdapter,
   type ConfirmSpendCommandData,
   type GatewaySpendCommandSender,
 } from "@langwatch/gateway-server";
 
+const spendProducer = GatewaySpendProducerAdapter.create();
 /** Reports the composition decision an absent queue would otherwise hide. */
 export abstract class ApiGatewaySpendPipelineAbsenceReport {
   /** No Eventing: `/spend-commands` refuses and the data plane keeps spooling. */
@@ -99,7 +100,9 @@ export function composeApiGatewaySpendPipeline(
     return undefined;
   }
 
-  const registered = eventing.register(createGatewaySpendProducerPipeline({ processName }));
+  const registered = eventing.register(
+    spendProducer.createGatewaySpendProducerPipeline({ processName }),
+  );
   const commands = registered.commands as Record<string, GatewaySpendCommandSender | undefined>;
 
   return {

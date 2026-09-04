@@ -44,95 +44,99 @@ export type ElevenLabsCredentialCollaborators = {
   credentials: GatewayModelProviderCredentialsPort;
 };
 
-/** The decrypted custom keys of an ElevenLabs row, or null for anything else. */
-async function elevenLabsKeys(
-  modelProviderId: string,
-  collaborators: ElevenLabsCredentialCollaborators,
-): Promise<{
-  keys: Record<string, unknown>;
-  organizationId: string;
-} | null> {
-  const provider = await collaborators.database.modelProvider.findUnique({
-    where: { id: modelProviderId },
-    select: { provider: true, organizationId: true, customKeys: true },
-  });
-  if (provider?.provider !== "elevenlabs") {
-    return null;
+export class GatewayElevenLabsCredentialService {
+  private constructor(private readonly collaborators: ElevenLabsCredentialCollaborators) {}
+
+  static create(
+    collaborators: ElevenLabsCredentialCollaborators,
+  ): GatewayElevenLabsCredentialService {
+    return new GatewayElevenLabsCredentialService(collaborators);
   }
 
-  return {
-    keys: collaborators.credentials.readCustomKeys(provider.customKeys),
-    organizationId: provider.organizationId,
-  };
-}
+  /** The decrypted custom keys of an ElevenLabs row, or null for anything else. */
+  private async elevenLabsKeys(modelProviderId: string): Promise<{
+    keys: Record<string, unknown>;
+    organizationId: string;
+  } | null> {
+    const collaborators = this.collaborators;
+    const provider = await collaborators.database.modelProvider.findUnique({
+      where: { id: modelProviderId },
+      select: { provider: true, organizationId: true, customKeys: true },
+    });
+    if (provider?.provider !== "elevenlabs") {
+      return null;
+    }
 
-/**
- * The workspace post-call webhook secret stored on one provider row.
- *
- * The organization comes back with it because the webhook has no other way to
- * know whose session a delivery may close: the tenant is the path parameter,
- * and the match has to be scoped to the organization that owns the secret the
- * delivery was signed with.
- */
-export async function getElevenLabsWebhookSecret({
-  modelProviderId,
-  collaborators,
-}: {
-  modelProviderId: string;
-  collaborators: ElevenLabsCredentialCollaborators;
-}): Promise<ElevenLabsWebhookSecret | null> {
-  const row = await elevenLabsKeys(modelProviderId, collaborators);
-  if (!row) {
-    return null;
+    return {
+      keys: collaborators.credentials.readCustomKeys(provider.customKeys),
+      organizationId: provider.organizationId,
+    };
   }
 
-  const secret = row.keys[ELEVENLABS_WEBHOOK_SECRET_KEY];
-  if (typeof secret !== "string" || secret.length === 0) {
-    return null;
+  /**
+   * The workspace post-call webhook secret stored on one provider row.
+   *
+   * The organization comes back with it because the webhook has no other way to
+   * know whose session a delivery may close: the tenant is the path parameter,
+   * and the match has to be scoped to the organization that owns the secret the
+   * delivery was signed with.
+   */
+  async getWebhookSecret({
+    modelProviderId,
+  }: {
+    modelProviderId: string;
+  }): Promise<ElevenLabsWebhookSecret | null> {
+    const row = await this.elevenLabsKeys(modelProviderId);
+    if (!row) {
+      return null;
+    }
+
+    const secret = row.keys[ELEVENLABS_WEBHOOK_SECRET_KEY];
+    if (typeof secret !== "string" || secret.length === 0) {
+      return null;
+    }
+
+    return { secret, organizationId: row.organizationId };
   }
 
-  return { secret, organizationId: row.organizationId };
-}
+  /**
+   * The API key and host to read a conversation back with.
+   *
+   * The host is validated here as well as on write. A row stored before the
+   * registry constrained the field would otherwise send the customer's API key
+   * to whatever host it names, and the SSRF policy only refuses private
+   * addresses. A bad host falls back to the vendor default rather than
+   * refusing, because the reconciler still has a real call to settle.
+   */
+  async getApiCredential({
+    modelProviderId,
+  }: {
+    modelProviderId: string;
+  }): Promise<ElevenLabsApiCredential | null> {
+    const row = await this.elevenLabsKeys(modelProviderId);
+    if (!row) {
+      return null;
+    }
 
-/**
- * The API key and host to read a conversation back with.
- *
- * The host is validated here as well as on write. A row stored before the
- * registry constrained the field would otherwise send the customer's API key
- * to whatever host it names, and the SSRF policy only refuses private
- * addresses. A bad host falls back to the vendor default rather than
- * refusing, because the reconciler still has a real call to settle.
- */
-export async function getElevenLabsApiCredential({
-  modelProviderId,
-  collaborators,
-}: {
-  modelProviderId: string;
-  collaborators: ElevenLabsCredentialCollaborators;
-}): Promise<ElevenLabsApiCredential | null> {
-  const row = await elevenLabsKeys(modelProviderId, collaborators);
-  if (!row) {
-    return null;
+    const apiKey = row.keys.ELEVENLABS_API_KEY;
+    if (typeof apiKey !== "string" || apiKey.length === 0) {
+      return null;
+    }
+
+    const configured = row.keys.ELEVENLABS_BASE_URL;
+    if (typeof configured !== "string" || configured.length === 0) {
+      return { apiKey, baseUrl: ELEVENLABS_DEFAULT_BASE_URL };
+    }
+
+    if (!isElevenLabsHost(configured)) {
+      logger.warn(
+        { modelProviderId },
+        "an ElevenLabs credential names a base URL outside elevenlabs.io; using the default host instead",
+      );
+
+      return { apiKey, baseUrl: ELEVENLABS_DEFAULT_BASE_URL };
+    }
+
+    return { apiKey, baseUrl: configured.replace(/\/$/, "") };
   }
-
-  const apiKey = row.keys.ELEVENLABS_API_KEY;
-  if (typeof apiKey !== "string" || apiKey.length === 0) {
-    return null;
-  }
-
-  const configured = row.keys.ELEVENLABS_BASE_URL;
-  if (typeof configured !== "string" || configured.length === 0) {
-    return { apiKey, baseUrl: ELEVENLABS_DEFAULT_BASE_URL };
-  }
-
-  if (!isElevenLabsHost(configured)) {
-    logger.warn(
-      { modelProviderId },
-      "an ElevenLabs credential names a base URL outside elevenlabs.io; using the default host instead",
-    );
-
-    return { apiKey, baseUrl: ELEVENLABS_DEFAULT_BASE_URL };
-  }
-
-  return { apiKey, baseUrl: configured.replace(/\/$/, "") };
 }

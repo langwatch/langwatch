@@ -16,8 +16,8 @@ import {
   PrismaGatewayGuardrailRepository,
   type GatewayGuardrailDatabase,
 } from "../repositories/prisma/prisma.gateway-guardrail.repository";
-import { GatewayCacheRulePersistence } from "../services/gateway-cache-rule.service";
-import { GatewayGuardrailCatalogue } from "../services/gateway-guardrail.service";
+import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service";
+import { GatewayGuardrailService } from "../services/gateway-guardrail.service";
 import { GatewayService } from "../services/gateway.service";
 
 /**
@@ -49,14 +49,14 @@ export class PrismaGatewayAdapter {
       options.database,
       options.budgetSpend,
     );
-    const cacheRules = GatewayCacheRulePersistence.create(
+    const cacheRules = GatewayCacheRuleService.create(
       PrismaGatewayCacheRuleRepository.create({
         database: options.database,
         changes: options.changes,
         audit: options.audit,
       }),
     );
-    const guardrails = GatewayGuardrailCatalogue.create({
+    const guardrails = GatewayGuardrailService.create({
       repository: PrismaGatewayGuardrailRepository.create(options.database),
       evaluators: options.evaluators,
       monitors: options.monitors,

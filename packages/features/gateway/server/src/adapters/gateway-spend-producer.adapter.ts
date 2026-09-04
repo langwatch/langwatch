@@ -84,18 +84,27 @@ class ProducerOnlyGatewaySpendEvents extends GatewaySpendEventsPort {
   }
 }
 
-/**
- * Builds the gateway-spend definition for a process that only sends commands
- * on it.
- *
- * `processName` names the refusal, so a stand-in reached by accident says which
- * process reached it rather than reporting an anonymous failure.
- */
-export function createGatewaySpendProducerPipeline(input: { processName: string }) {
-  return EventingGatewaySpendAdapter.create({
-    spendEvents: new ProducerOnlyGatewaySpendEvents(input.processName),
-    // No process managers and no settlement sweeper: all three are the
-    // worker's, and the sweeper's `connectSettlement` loop is the worker's
-    // too. A producer that mounted them would drain the shared queue.
-  }).buildProcessing();
+/** The gateway-spend pipeline for a process that only sends commands. */
+export class GatewaySpendProducerAdapter {
+  static create(): GatewaySpendProducerAdapter {
+    return new GatewaySpendProducerAdapter();
+  }
+
+  private constructor() {}
+
+  /**
+   * Builds the gateway-spend definition for a process that only sends commands
+   * on it.
+   *
+   * `processName` names the refusal, so a stand-in reached by accident says which
+   * process reached it rather than reporting an anonymous failure.
+   */
+  createGatewaySpendProducerPipeline(input: { processName: string }) {
+    return EventingGatewaySpendAdapter.create({
+      spendEvents: new ProducerOnlyGatewaySpendEvents(input.processName),
+      // No process managers and no settlement sweeper: all three are the
+      // worker's, and the sweeper's `connectSettlement` loop is the worker's
+      // too. A producer that mounted them would drain the shared queue.
+    }).buildProcessing();
+  }
 }

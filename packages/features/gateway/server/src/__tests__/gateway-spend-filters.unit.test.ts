@@ -5,12 +5,14 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
 import {
-  GatewaySpendFilters,
+  GatewaySpendFiltersAdapter,
   MAX_FILTER_VALUES,
   SPEND_STATUS_FILTERS,
   spendFilterQueryShape,
   spendFiltersSchema,
 } from "../index";
+
+const spendFilters = GatewaySpendFiltersAdapter.create();
 
 /** Which fields a parse rejected, so a refusal test can name the rule it
  *  meant rather than settling for "something threw". */
@@ -38,7 +40,7 @@ describe("given the shared spend filter vocabulary", () => {
 
   describe("when a metadata pair is written", () => {
     it("splits on the first colon so a value may contain one", () => {
-      expect(GatewaySpendFilters.parseMetadataFilters(["url:https://acme.test/x"])).toEqual([
+      expect(spendFilters.parseMetadataFilters(["url:https://acme.test/x"])).toEqual([
         { key: "url", values: ["https://acme.test/x"] },
       ]);
     });
@@ -47,9 +49,7 @@ describe("given the shared spend filter vocabulary", () => {
       // Two values for one key must OR. ANDing them would make
       // tier:gold + tier:silver match nothing, which reads to the caller as
       // "no such spend" rather than as an impossible question.
-      expect(
-        GatewaySpendFilters.parseMetadataFilters(["tier:gold", "tier:silver", "region:eu"]),
-      ).toEqual([
+      expect(spendFilters.parseMetadataFilters(["tier:gold", "tier:silver", "region:eu"])).toEqual([
         { key: "tier", values: ["gold", "silver"] },
         { key: "region", values: ["eu"] },
       ]);
@@ -75,9 +75,9 @@ describe("given the shared spend filter vocabulary", () => {
       // Slicing on an absent colon is silently wrong rather than empty:
       // indexOf answers -1, so `tier` would become key `tie` with value
       // `tier`, and the caller would read spend for a filter nobody wrote.
-      expect(() => GatewaySpendFilters.parseMetadataFilters(["tier"])).toThrow();
-      expect(() => GatewaySpendFilters.parseMetadataFilters([":gold"])).toThrow();
-      expect(() => GatewaySpendFilters.parseMetadataFilters(["tier:"])).toThrow();
+      expect(() => spendFilters.parseMetadataFilters(["tier"])).toThrow();
+      expect(() => spendFilters.parseMetadataFilters([":gold"])).toThrow();
+      expect(() => spendFilters.parseMetadataFilters(["tier:"])).toThrow();
     });
 
     /** @scenario "One filter may not name unbounded values" */
@@ -130,7 +130,7 @@ describe("given the shared spend filter vocabulary", () => {
 
   describe("when filters are rendered to SQL", () => {
     it("binds a placeholder only for the filters present", () => {
-      const { clauses, params } = GatewaySpendFilters.buildSpendFilterClauses({
+      const { clauses, params } = spendFilters.buildSpendFilterClauses({
         filters: { models: ["gpt-5-mini"] },
       });
       expect(clauses).toEqual(["Model IN {models:Array(String)}"]);
@@ -141,7 +141,7 @@ describe("given the shared spend filter vocabulary", () => {
       // The whole point: a team with no projects or an external id nobody
       // minted must answer nothing, not collapse into an absent predicate and
       // hand back the organization's entire spend.
-      const { clauses, params } = GatewaySpendFilters.buildSpendFilterClauses({
+      const { clauses, params } = spendFilters.buildSpendFilterClauses({
         filters: { virtualKeyIds: [] },
       });
       expect(clauses).toEqual(["VirtualKeyId IN {virtualKeyIds:Array(String)}"]);
@@ -149,14 +149,14 @@ describe("given the shared spend filter vocabulary", () => {
     });
 
     it("matches a label against any of the values named", () => {
-      const { clauses } = GatewaySpendFilters.buildSpendFilterClauses({
+      const { clauses } = spendFilters.buildSpendFilterClauses({
         filters: { labels: ["tier:gold"] },
       });
       expect(clauses).toEqual(["hasAny(Labels, {labels:Array(String)})"]);
     });
 
     it("gives each metadata pair its own numbered placeholders", () => {
-      const { clauses, params } = GatewaySpendFilters.buildSpendFilterClauses({
+      const { clauses, params } = spendFilters.buildSpendFilterClauses({
         filters: {
           metadata: [
             { key: "tier", values: ["gold"] },
@@ -177,7 +177,7 @@ describe("given the shared spend filter vocabulary", () => {
     });
 
     it("maps the legacy status vocabulary onto lifecycle statuses", () => {
-      const { params } = GatewaySpendFilters.buildSpendFilterClauses({
+      const { params } = spendFilters.buildSpendFilterClauses({
         filters: { status: "success" },
       });
       expect(params.status).toBe("confirmed");
@@ -190,30 +190,28 @@ describe("given the shared spend filter vocabulary", () => {
       // separately, a status added to the published list would pass the door
       // and then throw inside, turning a validated request into a 500.
       for (const status of SPEND_STATUS_FILTERS) {
-        expect(() => GatewaySpendFilters.normalizeStatusFilter(status), status).not.toThrow();
-        expect(GatewaySpendFilters.normalizeStatusFilter(status), status).toBeDefined();
+        expect(() => spendFilters.normalizeStatusFilter(status), status).not.toThrow();
+        expect(spendFilters.normalizeStatusFilter(status), status).toBeDefined();
       }
-      expect(() => GatewaySpendFilters.normalizeStatusFilter("pending")).toThrow();
+      expect(() => spendFilters.normalizeStatusFilter("pending")).toThrow();
       // An object lookup would answer this with a function off the prototype
       // and hand it back as if it were a status.
-      expect(() => GatewaySpendFilters.normalizeStatusFilter("constructor")).toThrow();
+      expect(() => spendFilters.normalizeStatusFilter("constructor")).toThrow();
     });
   });
 
   describe("when a key is named directly and by external id", () => {
     it("intersects rather than widening", () => {
-      expect(GatewaySpendFilters.intersectIds(["vk_1", "vk_2"], ["vk_2", "vk_3"])).toEqual([
-        "vk_2",
-      ]);
+      expect(spendFilters.intersectIds(["vk_1", "vk_2"], ["vk_2", "vk_3"])).toEqual(["vk_2"]);
     });
 
     it("treats an absent list as no opinion", () => {
-      expect(GatewaySpendFilters.intersectIds(undefined, ["vk_1"])).toEqual(["vk_1"]);
-      expect(GatewaySpendFilters.intersectIds(["vk_1"], undefined)).toEqual(["vk_1"]);
+      expect(spendFilters.intersectIds(undefined, ["vk_1"])).toEqual(["vk_1"]);
+      expect(spendFilters.intersectIds(["vk_1"], undefined)).toEqual(["vk_1"]);
     });
 
     it("answers nothing when the two name different keys", () => {
-      expect(GatewaySpendFilters.intersectIds(["vk_1"], ["vk_2"])).toEqual([]);
+      expect(spendFilters.intersectIds(["vk_1"], ["vk_2"])).toEqual([]);
     });
   });
 });

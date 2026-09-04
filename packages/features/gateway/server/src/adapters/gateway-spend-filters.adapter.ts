@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import type { SpendFilters, SpendMetadataFilter } from "../ports/gateway-spend-events.port";
 
 export type SpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
 
@@ -67,25 +68,6 @@ const LEGACY_STATUS_ALIASES = new Map<string, SpendEventStatus>([
   ["success", "confirmed"],
   ["error", "failed"],
 ]);
-
-/** A metadata predicate: the caller's own key, and the values that match. */
-export interface SpendMetadataFilter {
-  key: string;
-  /** Any of these matches. Repeating a key in the query widens it. */
-  values: string[];
-}
-
-export interface SpendFilters {
-  virtualKeyIds?: string[];
-  endUserIds?: string[];
-  principalUserIds?: string[];
-  models?: string[];
-  providerKeys?: string[];
-  requestTypes?: string[];
-  labels?: string[];
-  metadata?: SpendMetadataFilter[];
-  status?: string;
-}
 
 /**
  * How many values one filter may name. Each becomes an element of a bound
@@ -182,14 +164,20 @@ const IN_COLUMNS: ReadonlyArray<readonly [keyof SpendFilters, string]> = [
  * other with the same parameters. Parsing them in one place is what keeps that
  * promise true.
  */
-export class GatewaySpendFilters {
+export class GatewaySpendFiltersAdapter {
+  static create(): GatewaySpendFiltersAdapter {
+    return new GatewaySpendFiltersAdapter();
+  }
+
+  private constructor() {}
+
   /**
    * A filter the caller may repeat. Hono hands a query parameter back as a
    * string when it appears once and an array when it appears more than once,
    * so a schema that accepted only one of those shapes would reject the
    * commoner half of the traffic.
    */
-  static repeatable(inner: z.ZodType<string, string>): z.ZodType<string[], string | string[]> {
+  repeatable(inner: z.ZodType<string, string>): z.ZodType<string[], string | string[]> {
     return z
       .union([inner, z.array(inner).max(MAX_FILTER_VALUES)])
       .transform((value): string[] => (Array.isArray(value) ? value : [value]));
@@ -202,7 +190,7 @@ export class GatewaySpendFilters {
    * pass `spendStatusFilter` and then throw here, turning a validated request
    * into a 500.
    */
-  static normalizeStatusFilter(status: string): SpendEventStatus | undefined {
+  normalizeStatusFilter(status: string): SpendEventStatus | undefined {
     if (status === "") return undefined;
     const alias = LEGACY_STATUS_ALIASES.get(status);
     if (alias !== undefined) return alias;
@@ -225,7 +213,7 @@ export class GatewaySpendFilters {
    * match nothing at all, which reads as "no such spend" rather than as the
    * caller having asked an impossible question.
    */
-  static parseMetadataFilters(raw: string[]): SpendMetadataFilter[] {
+  parseMetadataFilters(raw: string[]): SpendMetadataFilter[] {
     const byKey = new Map<string, string[]>();
     for (const pair of raw) {
       const separator = pair.indexOf(":");
@@ -252,7 +240,7 @@ export class GatewaySpendFilters {
    * customer's own external id is one narrowing expressed twice, and naming two
    * different keys that way is a question with no answer, not a wider one.
    */
-  static intersectIds(a: string[] | undefined, b: string[] | undefined): string[] | undefined {
+  intersectIds(a: string[] | undefined, b: string[] | undefined): string[] | undefined {
     if (a === undefined) return b;
     if (b === undefined) return a;
     const inB = new Set(b);
@@ -264,7 +252,7 @@ export class GatewaySpendFilters {
    * Postgres-resolved filters (project, team, external id) are applied by the
    * caller before this runs.
    */
-  static spendFiltersFromQuery({
+  spendFiltersFromQuery({
     query,
     overrides,
   }: {
@@ -272,10 +260,7 @@ export class GatewaySpendFilters {
     overrides?: { virtualKeyIds?: string[] };
   }): SpendFilters {
     return {
-      virtualKeyIds: GatewaySpendFilters.intersectIds(
-        query.virtual_key_id,
-        overrides?.virtualKeyIds,
-      ),
+      virtualKeyIds: this.intersectIds(query.virtual_key_id, overrides?.virtualKeyIds),
       endUserIds: query.end_user_id,
       principalUserIds: query.principal_user_id,
       models: query.model,
@@ -283,9 +268,7 @@ export class GatewaySpendFilters {
       requestTypes: query.request_type,
       labels: query.label,
       metadata:
-        query.metadata === undefined
-          ? undefined
-          : GatewaySpendFilters.parseMetadataFilters(query.metadata),
+        query.metadata === undefined ? undefined : this.parseMetadataFilters(query.metadata),
       status: query.status,
     };
   }
@@ -302,7 +285,7 @@ export class GatewaySpendFilters {
    * absent predicate and hand back the organization's entire spend under a
    * narrowing the caller asked for.
    */
-  static buildSpendFilterClauses({ filters }: { filters: SpendFilters }): {
+  buildSpendFilterClauses({ filters }: { filters: SpendFilters }): {
     clauses: string[];
     params: Record<string, unknown>;
   } {
@@ -330,9 +313,7 @@ export class GatewaySpendFilters {
     });
 
     const status =
-      filters.status !== undefined
-        ? GatewaySpendFilters.normalizeStatusFilter(filters.status)
-        : undefined;
+      filters.status !== undefined ? this.normalizeStatusFilter(filters.status) : undefined;
     if (status !== undefined) {
       clauses.push("Status = {status:String}");
       params.status = status;
@@ -342,22 +323,24 @@ export class GatewaySpendFilters {
   }
 }
 
+const spendFilters = GatewaySpendFiltersAdapter.create();
+
 /**
  * The query-parameter shape both spend reads mount. Spread into each route's
  * schema rather than extended from it, because the two carry different
  * windows, cursors and page sizes around this common core.
  */
 export const spendFilterQueryShape = {
-  project_id: GatewaySpendFilters.repeatable(id).optional(),
-  team_id: GatewaySpendFilters.repeatable(id).optional(),
-  external_id: GatewaySpendFilters.repeatable(z.string().min(1).max(200)).optional(),
-  virtual_key_id: GatewaySpendFilters.repeatable(id).optional(),
-  end_user_id: GatewaySpendFilters.repeatable(longId).optional(),
-  principal_user_id: GatewaySpendFilters.repeatable(id).optional(),
-  model: GatewaySpendFilters.repeatable(z.string().min(1).max(200)).optional(),
-  provider_key: GatewaySpendFilters.repeatable(id).optional(),
-  request_type: GatewaySpendFilters.repeatable(z.string().min(1).max(50)).optional(),
-  label: GatewaySpendFilters.repeatable(z.string().min(1).max(200)).optional(),
-  metadata: GatewaySpendFilters.repeatable(metadataPair).optional(),
+  project_id: spendFilters.repeatable(id).optional(),
+  team_id: spendFilters.repeatable(id).optional(),
+  external_id: spendFilters.repeatable(z.string().min(1).max(200)).optional(),
+  virtual_key_id: spendFilters.repeatable(id).optional(),
+  end_user_id: spendFilters.repeatable(longId).optional(),
+  principal_user_id: spendFilters.repeatable(id).optional(),
+  model: spendFilters.repeatable(z.string().min(1).max(200)).optional(),
+  provider_key: spendFilters.repeatable(id).optional(),
+  request_type: spendFilters.repeatable(z.string().min(1).max(50)).optional(),
+  label: spendFilters.repeatable(z.string().min(1).max(200)).optional(),
+  metadata: spendFilters.repeatable(metadataPair).optional(),
   status: spendStatusFilter.optional(),
 } as const;

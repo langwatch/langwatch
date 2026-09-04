@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { attributedUserBucketScopeId } from "../gateway-bucket-scope.adapter";
+import { attributedUserBucketScopeId } from "@langwatch/gateway-contract";
 import { PrismaGatewayBudgetResolutionRepository } from "../../repositories/prisma/prisma.gateway-budget-resolution.repository";
 
 /**
@@ -29,16 +29,17 @@ const template = (over: Record<string, unknown> = {}) => ({
 describe("attributed-user template resolution", () => {
   /** @scenario A template resolves to the request's own bucket when the end user is known */
   it("buckets by anchor and end user, provider filter riding the suffix", async () => {
-    const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
-      client: prismaStub({
-        budgets: [template(), template({ id: "budget_tpl_openai", providerKey: "mp_openai" })],
-      }),
-      target: {
-        organizationId: "org_1",
-        virtualKeyId: "vk_anchor",
-        endUserId: "end_user_42",
-      },
-    });
+    const resolved =
+      await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
+        client: prismaStub({
+          budgets: [template(), template({ id: "budget_tpl_openai", providerKey: "mp_openai" })],
+        }),
+        target: {
+          organizationId: "org_1",
+          virtualKeyId: "vk_anchor",
+          endUserId: "end_user_42",
+        },
+      });
     const plain = resolved.find((r) => r.budget.id === "budget_tpl")!;
     expect(plain.bucketScopeId).toBe(attributedUserBucketScopeId("vk_anchor", "end_user_42"));
     expect(plain.bucketScopeId).toBe("vk_anchor:end_user_42");
@@ -50,13 +51,14 @@ describe("attributed-user template resolution", () => {
 
   /** @scenario A template resolves as itself when no end user is in context */
   it("resolves the bare template without an end user", async () => {
-    const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
-      client: prismaStub({ budgets: [template()] }),
-      target: {
-        organizationId: "org_1",
-        virtualKeyId: "vk_anchor",
-      },
-    });
+    const resolved =
+      await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
+        client: prismaStub({ budgets: [template()] }),
+        target: {
+          organizationId: "org_1",
+          virtualKeyId: "vk_anchor",
+        },
+      });
     expect(resolved).toHaveLength(1);
     expect(resolved[0]!.bucketScopeId).toBe("vk_anchor");
     expect(resolved[0]!.endUserId).toBeNull();

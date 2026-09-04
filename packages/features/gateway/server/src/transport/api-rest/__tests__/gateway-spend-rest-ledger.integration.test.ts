@@ -32,14 +32,11 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { MiddlewareHandler } from "hono";
 
-import { FixedGatewaySettlementPolicy } from "../../../adapters/fixed-gateway-settlement.adapter";
+import { FixedGatewaySettlementPolicyAdapter } from "../../../adapters/fixed-gateway-settlement.adapter";
 import { GatewayEndUserCapsAdapter } from "../../../adapters/gateway-end-user-caps.adapter";
 import { GatewaySpendScopeAdapter } from "../../../adapters/gateway-spend-scope.adapter";
 import { GatewayBudgetClickHouseRepository } from "../../../repositories/clickhouse/clickhouse.gateway-budget.repository";
-import {
-  GatewaySpendEventsRepository,
-  type SpendEventRow,
-} from "../../../repositories/clickhouse/clickhouse.gateway-spend-events.repository";
+import { GatewaySpendEventsRepository } from "../../../repositories/clickhouse/clickhouse.gateway-spend-events.repository";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -48,6 +45,7 @@ import { GatewaySpendEventsService } from "../../../services/gateway-spend-event
 import { createGatewaySpendRestApp, type GatewaySpendRestPorts } from "../gateway-spend.api";
 import { testRestSecurity } from "./support/rest-security.support";
 
+import type { SpendEventRow } from "../../../ports/gateway-spend-events.port";
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);
@@ -118,7 +116,7 @@ function buildApp(): void {
     webhookDelivery: undefined,
     spendEventEnvelope: testEnvelope,
     endpointAcceptsEvent: () => true,
-    settlementPolicy: FixedGatewaySettlementPolicy.create(15 * 60_000),
+    settlementPolicy: FixedGatewaySettlementPolicyAdapter.create(15 * 60_000),
     resolveSpendScope: (input) => {
       scope.clearCache();
       return scope.resolveSpendScope(input);

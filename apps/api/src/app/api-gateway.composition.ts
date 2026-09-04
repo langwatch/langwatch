@@ -36,45 +36,34 @@
 import type { ApiKeyPermissionScope, AuthzService } from "@langwatch/authz-contract";
 import {
   GatewayApp,
+  GatewayApplicableBudgetsService,
   GatewayBudgetLedgerAdapter,
   GatewayScopePermissionsPort,
   GatewaySpendEventsClickHouseAdapter,
   GatewaySpendEventsService,
   GatewayUsageService,
+  GatewayVirtualKeyDtoAdapter,
   GatewayVirtualKeySpendAdapter,
-  type GatewayService,
   PrismaGatewayAdapter,
+  VirtualKeyAuthorizationService,
   VirtualKeyCryptoAdapter,
+  VirtualKeyDirectBudgetService,
   VirtualKeyService,
-  assertActorCanManageAllScopes,
-  assertActorCanOperateOnAnyScope,
-  assertGuardrailAttachmentsAllowed,
-  assertScopesBelongToOrg,
-  assertTraceProjectBelongsToOrg,
-  isVisibleToMembership,
-  loadDirectBudgetsForKeys,
-  loadMembershipSet,
-  loadTraceDestinationFacts,
-  requireExistingVk,
-  requireVisibleVk,
-  resolveApplicableBudgetsForDraftKey,
-  resolveVkProjectId,
-  toVirtualKeyCamelDto,
-  toVirtualKeySnakeDto,
-  virtualKeyBudgetInputSchema,
   type GatewayBudgetSpendPort,
   type GatewayClickHouseClient,
   type GatewayClickHouseResolver,
   type GatewayGovernanceSignalsPort,
   type GatewayPermissionScope,
+  type GatewayService,
   type GatewayVirtualKeySpendPort,
   type MembershipSet,
   type VirtualKeyActor,
+  virtualKeyBudgetInputSchema,
 } from "@langwatch/gateway-server";
-import { createGatewayAuditPort } from "@langwatch/gateway-server/composition/gateway-audit";
-import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
-import { createGatewayVirtualKeysPort } from "@langwatch/gateway-server/composition/gateway-virtual-keys";
-import { resolveProviderLabels } from "@langwatch/gateway-server/composition/gateway-provider-labels";
+import { PrismaGatewayAuditRepository } from "@langwatch/gateway-server/composition/gateway-audit";
+import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
+import { PrismaGatewayVirtualKeyRepository } from "@langwatch/gateway-server/composition/gateway-virtual-keys";
+import { PrismaGatewayProviderLabelRepository } from "@langwatch/gateway-server/composition/gateway-provider-labels";
 import type { IdempotentRunner } from "@langwatch/api/rest";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -83,6 +72,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectIdentity, ProjectService } from "@langwatch/project-contract";
 import { TRPCError } from "@trpc/server";
 
+const virtualKeyAuthorization = VirtualKeyAuthorizationService.create();
+const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
 /** A capability this deployment did not compose, refused by name. */
 class ApiCapabilityUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
@@ -246,12 +237,15 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
     ? (tenantId) => clickhouse.resolve(tenantId)
     : undefined;
 
-  const virtualKeys = VirtualKeyService.create(
+  const virtualKeys = VirtualKeyService.create({
     prisma,
     projects,
-    VirtualKeyCryptoAdapter.create({ pepper: options.virtualKeyPepper }),
-    options.governanceSignals,
-  );
+    repository: PrismaGatewayVirtualKeyRepository.create(prisma),
+    changeEvents: PrismaGatewayChangeEventsRepository.create(prisma),
+    auditLog: PrismaGatewayAuditRepository.create(prisma),
+    crypto: VirtualKeyCryptoAdapter.create({ pepper: options.virtualKeyPepper }),
+    governanceSignals: options.governanceSignals,
+  });
 
   const budgetSpend = resolveClickHouse
     ? GatewayBudgetLedgerAdapter.create(resolveClickHouse)
@@ -274,8 +268,8 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
     // cache-rule and guardrail command is written to. Both are Prisma
     // repositories the feature package owns; the process only names the
     // connection they run on.
-    changes: createGatewayChangeEventsPort(prisma),
-    audit: createGatewayAuditPort(prisma),
+    changes: PrismaGatewayChangeEventsRepository.create(prisma),
+    audit: PrismaGatewayAuditRepository.create(prisma),
     budgetSpend,
   }).build();
 
@@ -284,7 +278,7 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
     // The usage rollup needs a label per key the ledger reported spend
     // against, which is a repository read; `virtualKeys` above is the
     // operations service the gateway application itself is built on.
-    virtualKeys: createGatewayVirtualKeysPort(prisma),
+    virtualKeys: PrismaGatewayVirtualKeyRepository.create(prisma),
     chRepo: budgetSpend,
     spendRepo: virtualKeySpend,
   });
@@ -332,7 +326,8 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
         throw new TRPCError({ code: "NOT_FOUND", message: "organization not found" });
       }
     },
-    resolveProviderLabels: (budgets) => resolveProviderLabels({ prisma, budgets: [...budgets] }),
+    resolveProviderLabels: (budgets) =>
+      PrismaGatewayProviderLabelRepository.create(prisma).resolveProviderLabels([...budgets]),
     listGroupTargets: async (organizationId) => {
       const groups = await prisma.group.findMany({
         where: { organizationId },
@@ -389,55 +384,74 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
           },
 
     listVisibleVirtualKeys: async ({ organizationId, userId }) => {
-      const membership = await loadMembershipSet(prisma, organizationId, userId);
+      const membership = await virtualKeyAuthorization.loadMembershipSet(
+        prisma,
+        organizationId,
+        userId,
+      );
       return (await virtualKeys.getAll(organizationId)).filter((virtualKey) =>
-        isVisibleToMembership(membership, virtualKey.scopes),
+        virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
       );
     },
     isVirtualKeyVisible: async ({ organizationId, userId, virtualKey }) =>
-      isVisibleToMembership(
-        await loadMembershipSet(prisma, organizationId, userId),
+      virtualKeyAuthorization.isVisibleToMembership(
+        await virtualKeyAuthorization.loadMembershipSet(prisma, organizationId, userId),
         virtualKey.scopes,
       ),
     requireVisibleVirtualKeyForUser: async ({ organizationId, id, userId }) =>
-      requireVisibleVk(virtualKeys, await loadMembershipSet(prisma, organizationId, userId), {
-        id,
-        organizationId,
-      }),
+      virtualKeyAuthorization.requireVisibleVk(
+        virtualKeys,
+        await virtualKeyAuthorization.loadMembershipSet(prisma, organizationId, userId),
+        {
+          id,
+          organizationId,
+        },
+      ),
     visibleToProjectCredential: ({ project, virtualKeys: page }) => {
       const membership = membershipForProjectCredential(project);
-      return page.filter((virtualKey) => isVisibleToMembership(membership, virtualKey.scopes));
+      return page.filter((virtualKey) =>
+        virtualKeyAuthorization.isVisibleToMembership(membership, virtualKey.scopes),
+      );
     },
     requireVisibleVirtualKeyForProjectCredential: ({ project, id, organizationId }) =>
-      requireVisibleVk(virtualKeys, membershipForProjectCredential(project), {
-        id,
-        organizationId,
-      }),
+      virtualKeyAuthorization.requireVisibleVk(
+        virtualKeys,
+        membershipForProjectCredential(project),
+        {
+          id,
+          organizationId,
+        },
+      ),
     requireExistingVirtualKey: ({ organizationId, id }) =>
-      requireExistingVk(virtualKeys, id, organizationId),
+      virtualKeyAuthorization.requireExistingVk(virtualKeys, id, organizationId),
 
     assertCanManageAllScopes: ({ actor, scopes }) =>
-      assertActorCanManageAllScopes({ prisma, permissions, actor: gatewayVirtualKeyActor(actor) }, [
-        ...scopes,
-      ]),
+      virtualKeyAuthorization.assertActorCanManageAllScopes(
+        { prisma, permissions, actor: gatewayVirtualKeyActor(actor) },
+        [...scopes],
+      ),
     assertCanOperateOnAnyScope: ({ actor, scopes, permission }) =>
-      assertActorCanOperateOnAnyScope(
+      virtualKeyAuthorization.assertActorCanOperateOnAnyScope(
         { prisma, permissions, actor: gatewayVirtualKeyActor(actor) },
         [...scopes],
         permission,
       ),
     assertScopesBelongToOrganization: ({ organizationId, scopes }) =>
-      assertScopesBelongToOrg(prisma, organizationId, [...scopes]),
+      virtualKeyAuthorization.assertScopesBelongToOrg(prisma, organizationId, [...scopes]),
     assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
-      assertTraceProjectBelongsToOrg(prisma, organizationId, traceProjectId),
+      virtualKeyAuthorization.assertTraceProjectBelongsToOrg(
+        prisma,
+        organizationId,
+        traceProjectId,
+      ),
     assertGuardrailAttachmentsAllowed: ({ actor, projectId, attachments }) =>
-      assertGuardrailAttachmentsAllowed(
+      virtualKeyAuthorization.assertGuardrailAttachmentsAllowed(
         { prisma, permissions, actor: gatewayVirtualKeyActor(actor) },
         projectId,
         attachments ? [...attachments] : undefined,
       ),
     resolveVirtualKeyProjectId: ({ organizationId, virtualKeyId, scopes, traceProjectId }) =>
-      resolveVkProjectId(prisma, organizationId, {
+      virtualKeyAuthorization.resolveVkProjectId(prisma, organizationId, {
         vkId: virtualKeyId,
         inputScopes: scopes ? [...scopes] : undefined,
         traceProjectId,
@@ -446,24 +460,30 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
     // One read of the destinations for a whole page, in both casings: a
     // listing must not cost a query per key to say where its traffic goes.
     toVirtualKeyCamelDtos: async ({ virtualKeys: page }) => {
-      const facts = await loadTraceDestinationFacts({ projects, virtualKeys: [...page] });
-      return page.map((virtualKey) => toVirtualKeyCamelDto({ virtualKey, facts }));
+      const facts = await virtualKeyDtos.loadTraceDestinationFacts({
+        projects,
+        virtualKeys: [...page],
+      });
+      return page.map((virtualKey) => virtualKeyDtos.toVirtualKeyCamelDto({ virtualKey, facts }));
     },
     toVirtualKeySnakeDtos: async ({ virtualKeys: page }) => {
-      const facts = await loadTraceDestinationFacts({ projects, virtualKeys: [...page] });
-      return page.map((virtualKey) => toVirtualKeySnakeDto({ virtualKey, facts }));
+      const facts = await virtualKeyDtos.loadTraceDestinationFacts({
+        projects,
+        virtualKeys: [...page],
+      });
+      return page.map((virtualKey) => virtualKeyDtos.toVirtualKeySnakeDto({ virtualKey, facts }));
     },
     resolveApplicableBudgets: ({ target }) =>
-      resolveApplicableBudgetsForDraftKey(
-        prisma,
+      GatewayApplicableBudgetsService.create({
+        budgetDecisions,
+        providerLabels: PrismaGatewayProviderLabelRepository.create(prisma),
+      }).resolveApplicableBudgetsForDraftKey(
         projects,
         { ...target, scopes: [...target.scopes] },
-        budgetDecisions,
         budgetSpend,
       ),
     loadDirectBudgetsForKeys: ({ organizationId, virtualKeyIds, now }) =>
-      loadDirectBudgetsForKeys({
-        prisma,
+      VirtualKeyDirectBudgetService.create(prisma).loadDirectBudgetsForKeys({
         organizationId,
         virtualKeyIds: [...virtualKeyIds],
         chRepo: budgetSpend,

@@ -51,15 +51,15 @@ import type { Context } from "hono";
 import { z } from "zod";
 
 import {
-  getElevenLabsWebhookSecret,
+  GatewayElevenLabsCredentialService,
   type ElevenLabsCredentialCollaborators,
 } from "../../services/gateway-elevenlabs-credential.service";
 import {
-  closeAndConfirmRealtimeSession,
-  matchRealtimeSession,
+  GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "../../services/gateway-realtime-session.service";
 
+const realtimeSessions = GatewayRealtimeSessionService.create();
 const logger = createLogger("langwatch:api:elevenlabs");
 
 const WEBHOOK_PUBLIC_REASON =
@@ -196,10 +196,9 @@ async function handleElevenLabsWebhook(
   // parameters. An empty id resolves no provider, so it answers 404 with the
   // rest of them.
   const modelProviderId = c.req.param("modelProviderId") ?? "";
-  const configured = await getElevenLabsWebhookSecret({
-    modelProviderId,
-    collaborators: ports.credentials,
-  });
+  const configured = await GatewayElevenLabsCredentialService.create(
+    ports.credentials,
+  ).getWebhookSecret({ modelProviderId });
   if (!configured) {
     // 404 rather than 401: an id with no webhook configured must look the
     // same as an id that does not exist, or the ids are enumerable.
@@ -286,7 +285,7 @@ async function applyPostCallReport(params: {
   }
 
   const startedAtSecs = data?.metadata?.start_time_unix_secs;
-  const session = await matchRealtimeSession({
+  const session = await realtimeSessions.matchRealtimeSession({
     vendor: "elevenlabs",
     organizationId: params.organizationId,
     modelProviderId: params.modelProviderId,
@@ -302,7 +301,7 @@ async function applyPostCallReport(params: {
   // wire is an integer, so it becomes milliseconds here, once. The guard
   // above already proved this rounds to 1 or more.
   const durationSecs = Math.round(reportedSecs);
-  await closeAndConfirmRealtimeSession({
+  await realtimeSessions.closeAndConfirmRealtimeSession({
     session,
     usage: { audio_ms: durationSecs * 1000 },
     // The whole metadata block, kept as the vendor's own record of the call.

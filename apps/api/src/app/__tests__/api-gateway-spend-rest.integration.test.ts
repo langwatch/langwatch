@@ -21,10 +21,10 @@ import { apiErrorSchema, requestTraceIds } from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import {
-  createGatewaySpendRestApp,
-  encodeSpendSummariesCursor,
+  GatewaySpendCursorAdapter,
   GatewaySpendEventsPort,
   GatewaySpendEventsService,
+  createGatewaySpendRestApp,
   type GatewaySpendEnvelope,
   type GatewaySpendWebhookEndpoint,
 } from "@langwatch/gateway-server";
@@ -37,6 +37,7 @@ import { canonicalErrorFor } from "../api-canonical-error";
 import { composeApiGatewaySpendRest } from "../api-gateway-spend-rest.composition";
 import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
 
+const spendCursors = GatewaySpendCursorAdapter.create();
 const ORGANIZATION_ID = "organization-1";
 const PROJECT_ID = "project-1";
 const ORGANIZATION_TOKEN = "org-key-token";
@@ -514,7 +515,7 @@ describe("given the gateway spend reconciliation REST surface", () => {
       // groups twice.
       const ledger = new TestSpendLedger();
       ledger.summaries = [{ key: "user-a", group: { end_user: "user-a" } }];
-      ledger.summariesCursor = encodeSpendSummariesCursor(["user-a"]);
+      ledger.summariesCursor = spendCursors.encodeSpendSummariesCursor(["user-a"]);
       const { request } = buildApp({ ledger });
 
       const first = await request(summariesPath({ group_by: "end_user", limit: 1, ...settled() }));

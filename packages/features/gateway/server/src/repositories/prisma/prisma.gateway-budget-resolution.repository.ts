@@ -32,7 +32,7 @@ import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
   groupBucketScopeId,
-} from "../../adapters/gateway-bucket-scope.adapter";
+} from "@langwatch/gateway-contract";
 
 export type BudgetResolutionTarget = {
   organizationId: string;
@@ -98,13 +98,19 @@ type PrismaLike = Pick<PrismaClient, "gatewayBudget" | "groupMembership" | "virt
  * budget must stop at the same one every time.
  */
 export class PrismaGatewayBudgetResolutionRepository {
+  private constructor() {}
+
+  static create(): PrismaGatewayBudgetResolutionRepository {
+    return new PrismaGatewayBudgetResolutionRepository();
+  }
+
   /**
    * Which budget scopes this request could match, as one OR list.
    *
    * A scope missing here is a budget that silently never fires, so each arm
    * says what it covers rather than leaving it to the reader.
    */
-  private static async scopePredicatesFor({
+  private async scopePredicatesFor({
     client,
     target,
   }: {
@@ -128,10 +134,10 @@ export class PrismaGatewayBudgetResolutionRepository {
     // Reading the key's scopes here rather than making every caller pass
     // them is what puts the fix on all four paths at once, the debit path
     // included, and that is the one that actually accrues spend.
-    const teamIds = PrismaGatewayBudgetResolutionRepository.presentIds([
+    const teamIds = this.presentIds([
       target.teamId,
       ...(target.scopedTeamIds ??
-        (await PrismaGatewayBudgetResolutionRepository.keyTeamScopeIds({
+        (await this.keyTeamScopeIds({
           client,
           virtualKeyId: target.virtualKeyId,
         }))),
@@ -146,10 +152,7 @@ export class PrismaGatewayBudgetResolutionRepository {
     // ATTRIBUTED_USER templates anchor on a virtual key or a project: the
     // template applies to every request on its anchor, whoever the end user
     // turns out to be.
-    const templateAnchors = PrismaGatewayBudgetResolutionRepository.presentIds([
-      target.virtualKeyId,
-      target.projectId,
-    ]);
+    const templateAnchors = this.presentIds([target.virtualKeyId, target.projectId]);
     if (templateAnchors.length > 0) {
       ors.push({
         scopeType: "ATTRIBUTED_USER",
@@ -163,7 +166,7 @@ export class PrismaGatewayBudgetResolutionRepository {
     if (!target.principalUserId) return ors;
 
     ors.push({ scopeType: "PRINCIPAL", scopeId: target.principalUserId });
-    const groupIds = await PrismaGatewayBudgetResolutionRepository.memberGroupIds({
+    const groupIds = await this.memberGroupIds({
       client,
       organizationId: target.organizationId,
       userId: target.principalUserId,
@@ -175,7 +178,7 @@ export class PrismaGatewayBudgetResolutionRepository {
   }
 
   /** The ids actually worth querying: present, non-empty, and each asked for once. */
-  private static presentIds(ids: (string | null | undefined)[] | null | undefined): string[] {
+  private presentIds(ids: (string | null | undefined)[] | null | undefined): string[] {
     if (!ids) return [];
     return Array.from(
       new Set(ids.filter((id): id is string => typeof id === "string" && id.length > 0)),
@@ -188,7 +191,7 @@ export class PrismaGatewayBudgetResolutionRepository {
    * `scopedTeamIds` instead so the drawer previews the same set the key will
    * resolve once it is saved.
    */
-  private static async keyTeamScopeIds({
+  private async keyTeamScopeIds({
     client,
     virtualKeyId,
   }: {
@@ -208,7 +211,7 @@ export class PrismaGatewayBudgetResolutionRepository {
    * org so a user in several orgs never drags another org's group
    * budget into this one's cascade.
    */
-  private static async memberGroupIds({
+  private async memberGroupIds({
     client,
     organizationId,
     userId,
@@ -224,7 +227,7 @@ export class PrismaGatewayBudgetResolutionRepository {
     return memberships.map((m) => m.groupId);
   }
 
-  private static byScopeThenId(a: ResolvedBudget, b: ResolvedBudget): number {
+  private byScopeThenId(a: ResolvedBudget, b: ResolvedBudget): number {
     if (a.budget.scopeType !== b.budget.scopeType) {
       return a.budget.scopeType < b.budget.scopeType ? -1 : 1;
     }
@@ -237,14 +240,14 @@ export class PrismaGatewayBudgetResolutionRepository {
    * bucket. Ordered by (scopeType, budget id) so callers, bundles, and
    * snapshots stay byte-stable across runs.
    */
-  static async resolveApplicableBudgets({
+  async resolveApplicableBudgets({
     client,
     target,
   }: {
     client: PrismaLike;
     target: BudgetResolutionTarget;
   }): Promise<ResolvedBudget[]> {
-    const ors = await PrismaGatewayBudgetResolutionRepository.scopePredicatesFor({
+    const ors = await this.scopePredicatesFor({
       client,
       target,
     });
@@ -290,6 +293,6 @@ export class PrismaGatewayBudgetResolutionRepository {
       };
     });
 
-    return resolved.sort((a, b) => PrismaGatewayBudgetResolutionRepository.byScopeThenId(a, b));
+    return resolved.sort((a, b) => this.byScopeThenId(a, b));
   }
 }

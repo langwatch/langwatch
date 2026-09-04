@@ -24,7 +24,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { computeConfigETag } from "../gateway-config-etag.adapter";
+import { GatewayConfigAssemblyAdapter } from "../gateway-config-assembly.adapter";
 import type { VirtualKeyWithScopes } from "../../ports/gateway-virtual-key.port";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -58,7 +58,7 @@ async function loadVk(): Promise<VirtualKeyWithScopes> {
 }
 
 async function etag() {
-  return await computeConfigETag({ prisma, virtualKey: await loadVk() });
+  return await GatewayConfigAssemblyAdapter.create({ prisma }).versionToken(await loadVk());
 }
 
 describe.skipIf(!databaseUrl)("provider credential rotation reaches the gateway", () => {

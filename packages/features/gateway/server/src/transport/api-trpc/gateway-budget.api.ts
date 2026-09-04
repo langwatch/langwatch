@@ -22,6 +22,7 @@ import {
   gatewayBudgetApiUpdateInputSchema,
   scopeTargetKey,
   type GatewayBudgetWithSeats,
+  effectiveBudgetPeriod,
 } from "@langwatch/gateway-contract";
 import {
   TRPCError,
@@ -29,7 +30,6 @@ import {
   type TRPCRootObject,
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
-import { effectiveBudgetPeriod } from "../../adapters/gateway-period.adapter";
 import { GatewayProviderLabelAdapter } from "../../adapters/gateway-provider-label.adapter";
 import type { GatewayApp } from "#app/gateway.app";
 

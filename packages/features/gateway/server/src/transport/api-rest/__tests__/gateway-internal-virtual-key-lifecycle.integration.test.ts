@@ -23,7 +23,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 
 import { GatewayJwtAdapter } from "../../../adapters/jwt.gateway-token.adapter";
-import { TestProjectService } from "../../../services/__tests__/support/test-project-service";
+import { TestProjectService } from "../../../__tests__/support/test-project-service";
 import { VirtualKeyService } from "../../../services/virtual-key.service";
 import {
   buildGatewayCanonicalString,
@@ -33,6 +33,7 @@ import {
 } from "../gateway-internal.api";
 import { testRestSecurity } from "./support/rest-security.support";
 
+import { createVirtualKeyServiceForTest } from "../../../testing";
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);
@@ -83,7 +84,7 @@ let app: ReturnType<typeof createGatewayInternalRestApp>;
 
 function buildApp(): void {
   const projects = new SuiteProjectService();
-  service = VirtualKeyService.createForTest(prisma, projects);
+  service = createVirtualKeyServiceForTest(prisma, projects);
   jwtAdapter = GatewayJwtAdapter.create({ secret: SECRET });
   const absent = () => {
     throw new Error("this route is not under test here");

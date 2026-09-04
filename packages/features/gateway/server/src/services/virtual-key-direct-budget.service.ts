@@ -14,9 +14,8 @@
  */
 import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLogger } from "@langwatch/observability";
-import { type GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
-import { spendTargetsForBudgets } from "../adapters/gateway-budget-spend-target.adapter";
-import { GatewayWindow } from "../adapters/gateway-window.adapter";
+import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port";
+import { GatewayWindow } from "@langwatch/gateway-contract";
 
 const logger = createLogger("langwatch:gateway:virtual-key-direct-budget");
 
@@ -29,75 +28,6 @@ export type VirtualKeyDirectBudget = {
   /** End of the period the spend is measured over, ISO-8601. */
   resetsAt: string;
 };
-
-/**
- * Resolve one direct budget per key, keyed by virtual key id. Keys with
- * no budget of their own are absent from the map.
- *
- * "Direct" is the key's own row: a VIRTUAL_KEY-scoped budget targeting
- * it, or the row its drawer's budget field manages. Budgets that reach
- * the key through its organization, team, project or account are not
- * the key's own cap and belong to the drawer's inherited list.
- */
-export async function loadDirectBudgetsForKeys(args: {
-  prisma: PrismaClient;
-  organizationId: string;
-  virtualKeyIds: string[];
-  chRepo: GatewayBudgetSpendPort | undefined;
-  /**
-   * The instant the periods are computed from. Injectable so a test that
-   * wrote a debit at a known time reads the same period back instead of
-   * racing the wall clock across a midnight boundary.
-   */
-  now?: Date;
-}): Promise<Map<string, VirtualKeyDirectBudget>> {
-  const { prisma, chRepo, now = new Date() } = args;
-  const out = new Map<string, VirtualKeyDirectBudget>();
-  if (args.virtualKeyIds.length === 0) {
-    return out;
-  }
-
-  const budgets = await prisma.gatewayBudget.findMany({
-    where: {
-      organizationId: args.organizationId,
-      archivedAt: null,
-      OR: [
-        { scopeType: "VIRTUAL_KEY", scopeId: { in: args.virtualKeyIds } },
-        { managedByVirtualKeyId: { in: args.virtualKeyIds } },
-      ],
-    },
-    orderBy: { createdAt: "asc" },
-  });
-
-  const chosen = chooseOnePerKey(budgets, new Set(args.virtualKeyIds));
-  if (chosen.size === 0) {
-    return out;
-  }
-
-  const spentByBudgetId = await loadPeriodSpend({
-    prisma,
-    organizationId: args.organizationId,
-    budgets: [...chosen.values()],
-    chRepo,
-    now,
-  });
-
-  for (const [virtualKeyId, budget] of chosen) {
-    out.set(virtualKeyId, {
-      budgetId: budget.id,
-      window: budget.window,
-      limitUsd: budget.limitUsd.toFixed(6),
-      periodSpentUsd: spentByBudgetId ? (spentByBudgetId.get(budget.id) ?? "0") : null,
-      // Recomputed from the window rather than read off the row: the
-      // stored instant is only rewritten when the window changes, so a
-      // budget that has been running for days carries a reset moment
-      // that has already passed.
-      resetsAt: GatewayWindow.nextResetAt(budget.window, now).toISOString(),
-    });
-  }
-
-  return out;
-}
 
 /**
  * One budget per key, from the rows that target them.
@@ -181,7 +111,7 @@ async function loadPeriodSpend(args: {
   try {
     const spends = await chRepo.getSpendForTargetsAcrossTenants(
       projects.map((p) => p.id),
-      spendTargetsForBudgets({ budgets, now }),
+      GatewayBudgetSpendPort.targetsForBudgets({ budgets, now }),
       now,
     );
 
@@ -199,5 +129,83 @@ async function loadPeriodSpend(args: {
     );
 
     return null;
+  }
+}
+
+/** The budget a key carries on itself, with its current-period spend. */
+export class VirtualKeyDirectBudgetService {
+  private constructor(private readonly prisma: PrismaClient) {}
+
+  static create(prisma: PrismaClient): VirtualKeyDirectBudgetService {
+    return new VirtualKeyDirectBudgetService(prisma);
+  }
+
+  /**
+   * Resolve one direct budget per key, keyed by virtual key id. Keys with
+   * no budget of their own are absent from the map.
+   *
+   * "Direct" is the key's own row: a VIRTUAL_KEY-scoped budget targeting
+   * it, or the row its drawer's budget field manages. Budgets that reach
+   * the key through its organization, team, project or account are not
+   * the key's own cap and belong to the drawer's inherited list.
+   */
+  async loadDirectBudgetsForKeys(args: {
+    organizationId: string;
+    virtualKeyIds: string[];
+    chRepo: GatewayBudgetSpendPort | undefined;
+    /**
+     * The instant the periods are computed from. Injectable so a test that
+     * wrote a debit at a known time reads the same period back instead of
+     * racing the wall clock across a midnight boundary.
+     */
+    now?: Date;
+  }): Promise<Map<string, VirtualKeyDirectBudget>> {
+    const { chRepo, now = new Date() } = args;
+    const prisma = this.prisma;
+    const out = new Map<string, VirtualKeyDirectBudget>();
+    if (args.virtualKeyIds.length === 0) {
+      return out;
+    }
+
+    const budgets = await prisma.gatewayBudget.findMany({
+      where: {
+        organizationId: args.organizationId,
+        archivedAt: null,
+        OR: [
+          { scopeType: "VIRTUAL_KEY", scopeId: { in: args.virtualKeyIds } },
+          { managedByVirtualKeyId: { in: args.virtualKeyIds } },
+        ],
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const chosen = chooseOnePerKey(budgets, new Set(args.virtualKeyIds));
+    if (chosen.size === 0) {
+      return out;
+    }
+
+    const spentByBudgetId = await loadPeriodSpend({
+      prisma,
+      organizationId: args.organizationId,
+      budgets: [...chosen.values()],
+      chRepo,
+      now,
+    });
+
+    for (const [virtualKeyId, budget] of chosen) {
+      out.set(virtualKeyId, {
+        budgetId: budget.id,
+        window: budget.window,
+        limitUsd: budget.limitUsd.toFixed(6),
+        periodSpentUsd: spentByBudgetId ? (spentByBudgetId.get(budget.id) ?? "0") : null,
+        // Recomputed from the window rather than read off the row: the
+        // stored instant is only rewritten when the window changes, so a
+        // budget that has been running for days carries a reset moment
+        // that has already passed.
+        resetsAt: GatewayWindow.nextResetAt(budget.window, now).toISOString(),
+      });
+    }
+
+    return out;
   }
 }

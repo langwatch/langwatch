@@ -17,23 +17,22 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { GatewaySpendCursorAdapter } from "../../adapters/gateway-spend-cursor.adapter";
 import {
-  decodeSpendEventsCursor,
-  decodeSpendSummariesCursor,
-} from "../../adapters/gateway-spend-cursor.adapter";
-import {
-  GatewaySpendFilters,
+  GatewaySpendFiltersAdapter,
   SPEND_SUMMARY_STATUS_DESCRIPTION,
   spendFilterQueryShape,
   spendSummaryStatusFilter,
 } from "../../adapters/gateway-spend-filters.adapter";
 import {
-  GatewaySpendGrouping,
+  GatewaySpendGroupingAdapter,
   MAX_GROUP_BY_KEYS,
+} from "../../adapters/gateway-spend-grouping.adapter";
+import {
   SPEND_BUCKETS,
   SPEND_GROUP_BY_KEYS,
   type SpendGroupByKey,
-} from "../../adapters/gateway-spend-grouping.adapter";
+} from "../../ports/gateway-spend-events.port";
 import type { GatewayBudgetSpendPort } from "../../ports/gateway-budget-spend.port";
 import type { GatewaySettlementPolicyPort } from "../../ports/gateway-settlement-policy.port";
 import type { GatewaySpendEventsService } from "../../services/gateway-spend-events.service";
@@ -48,6 +47,10 @@ import {
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
+
+const spendCursors = GatewaySpendCursorAdapter.create();
+const spendFilters = GatewaySpendFiltersAdapter.create();
+const spendGrouping = GatewaySpendGroupingAdapter.create();
 
 const logger = createLogger("langwatch:api:gateway-spend");
 
@@ -471,7 +474,7 @@ const spendSummariesQuerySchema = z
       .string()
       .min(1)
       .max(64)
-      .refine((zone) => GatewaySpendGrouping.isIanaTimeZone(zone), {
+      .refine((zone) => spendGrouping.isIanaTimeZone(zone), {
         message: "timezone must be an IANA zone name, e.g. Europe/Amsterdam",
       })
       .optional()
@@ -668,6 +671,7 @@ function handleGatewaySpendApiError(
  */
 export function createGatewaySpendRestApp(options: {
   security: AppRestSecurity;
+
   /**
    * Refuses every route unless the organization's plan includes the billing
    * events API. Which plans entitle it is read from the deployment's billing
@@ -724,7 +728,7 @@ export function createGatewaySpendRestApp(options: {
       // caller who changed `group_by` or `bucket` mid-walk, and a caller
       // holding a cursor minted before a rollup could group by two dimensions.
       if (query.cursor !== undefined) {
-        const parts = decodeSpendSummariesCursor(query.cursor);
+        const parts = spendCursors.decodeSpendSummariesCursor(query.cursor);
         const dimensionCount = query.group_by.length + (query.bucket === "none" ? 0 : 1);
         if (parts === null) {
           throw new BadRequestError("Invalid cursor.");
@@ -735,7 +739,7 @@ export function createGatewaySpendRestApp(options: {
           );
         }
       }
-      GatewaySpendGrouping.assertGroupingIsWalkable({
+      spendGrouping.assertGroupingIsWalkable({
         keys: query.group_by,
         bucket: query.bucket,
         toMs: query.to,
@@ -758,7 +762,7 @@ export function createGatewaySpendRestApp(options: {
         toMs: query.to,
         cursor: query.cursor ?? null,
         limit: query.limit,
-        filters: GatewaySpendFilters.spendFiltersFromQuery({
+        filters: spendFilters.spendFiltersFromQuery({
           query,
           overrides: { virtualKeyIds: scope.virtualKeyIds },
         }),
@@ -806,7 +810,7 @@ export function createGatewaySpendRestApp(options: {
       const query = c.req.valid("query");
       // A present-but-garbled cursor is a caller bug: refusing beats
       // silently restarting the walk, which would re-serve the whole range.
-      if (query.cursor !== undefined && !decodeSpendEventsCursor(query.cursor)) {
+      if (query.cursor !== undefined && !spendCursors.decodeSpendEventsCursor(query.cursor)) {
         throw new BadRequestError("Invalid cursor.");
       }
       const scope = await ports.resolveSpendScope({
@@ -821,7 +825,7 @@ export function createGatewaySpendRestApp(options: {
         toMs: query.to,
         cursor: query.cursor ?? null,
         limit: query.limit,
-        filters: GatewaySpendFilters.spendFiltersFromQuery({
+        filters: spendFilters.spendFiltersFromQuery({
           query,
           overrides: { virtualKeyIds: scope.virtualKeyIds },
         }),

@@ -13,11 +13,11 @@
 import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SpendEventRow } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository";
 import { GatewaySpendEventTrpcApi } from "../../transport/api-trpc/gateway-spend-event.api";
 import { GatewayApp, type GatewayAppDependencies } from "../gateway.app";
 import type { GatewaySpendEventsService } from "../../services/gateway-spend-events.service";
 
+import type { SpendEventRow } from "../../ports/gateway-spend-events.port";
 /** The slice of the application this surface reaches, and nothing else. */
 function gatewayAppStub(dependencies: Partial<GatewayAppDependencies>): GatewayApp {
   return GatewayApp.create(dependencies as GatewayAppDependencies);

@@ -35,7 +35,7 @@ import {
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import { apiErrorSchema, serializeResponseBody, withIdempotency } from "@langwatch/api/rest";
-import { currentPeriodStart, GatewayWindow } from "@langwatch/gateway-server";
+import { currentPeriodStart, GatewayWindow } from "@langwatch/gateway-contract";
 
 import {
   clickHouseUrl,

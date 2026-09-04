@@ -19,7 +19,11 @@
  * prompt tokens of which 4,736 came from the provider's cache.
  */
 import { describe, expect, it } from "vitest";
-import { EMPTY_SPEND_USAGE, NANO_USD_PER_USD, rateSpendNanoUsd } from "@langwatch/gateway-server";
+import {
+  EMPTY_SPEND_USAGE,
+  ModelCatalogGatewaySpendRatingAdapter,
+  NANO_USD_PER_USD,
+} from "@langwatch/gateway-server";
 import {
   ModelCatalogTraceModelCostAdapter,
   TraceCanonicalisationService,
@@ -32,6 +36,7 @@ import {
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { OtlpSpan, SpanReceivedEvent, TraceSummaryData } from "@langwatch/trace-contract";
 
+const spendRating = ModelCatalogGatewaySpendRatingAdapter.create();
 /**
  * The usage a provider reports, before either record is built. `promptTokens`
  * is the provider's own total and holds the cached tokens, which is the whole
@@ -178,7 +183,7 @@ function traceCostUsd(usage: ProviderUsage, inputTokens: number): number {
 
 /** The budget's and the ledger's number: the rated spend record. */
 function billedCostUsd(usage: ProviderUsage, inputTokens: number): number {
-  const { costNanoUsd } = rateSpendNanoUsd({
+  const { costNanoUsd } = spendRating.rateSpendNanoUsd({
     model: usage.model,
     usage: {
       ...EMPTY_SPEND_USAGE,

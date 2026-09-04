@@ -42,8 +42,8 @@ import { z } from "zod";
 import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
-} from "../../adapters/gateway-bucket-scope.adapter";
-import { bucketPeriodFloorMs } from "../../adapters/gateway-period.adapter";
+  bucketPeriodFloorMs,
+} from "@langwatch/gateway-contract";
 import {
   VirtualKeyCryptoAdapter,
   VirtualKeyCryptoError,
@@ -60,22 +60,20 @@ import {
   type SpendUsage,
   spendUsageSchema,
 } from "../../processes/gateway-spend-commands.process";
-import type { GatewayConfigMaterialiser } from "../../services/gateway-config-materialisation.service";
+import type { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service";
 import {
   GatewayGuardrailEvaluationService,
   GUARDRAIL_WIRE_DIRECTIONS,
   type EvaluatorRunner,
 } from "../../services/gateway-guardrail-evaluation.service";
 import {
-  correlateRealtimeSession,
-  releaseRealtimeSession,
-  reportRealtimeSessionUsage,
-  reserveRealtimeSession,
+  GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "../../services/gateway-realtime-session.service";
 import type { VirtualKeyService } from "../../services/virtual-key.service";
 import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
 
+const realtimeSessionService = GatewayRealtimeSessionService.create();
 const logger = createLogger("langwatch:gateway-internal");
 
 /**
@@ -113,7 +111,7 @@ export type GatewayInternalRestPorts = Readonly<{
   /** The durable revision feed the configuration long-poll walks. */
   changes: () => GatewayChangeEventsPort;
   /** Builds one key's warm-cache configuration bundle. */
-  config: () => GatewayConfigMaterialiser;
+  config: () => GatewayConfigMaterialiserService;
   /**
    * The budget ledger, or none.
    *
@@ -1511,7 +1509,7 @@ export function createGatewayInternalRestApp(options: {
     if (!realtimeSessions) {
       return c.json(realtimeSessionsUnavailable, 503);
     }
-    const result = await reserveRealtimeSession({
+    const result = await realtimeSessionService.reserveRealtimeSession({
       collaborators: realtimeSessions,
       sessionId: body.session_id,
       projectId: body.project_id,
@@ -1568,7 +1566,7 @@ export function createGatewayInternalRestApp(options: {
     }
     let applied = false;
     if (body.vendor_conversation_id) {
-      applied = await correlateRealtimeSession({
+      applied = await realtimeSessionService.correlateRealtimeSession({
         collaborators: realtimeSessions,
         sessionId,
         projectId: body.project_id,
@@ -1577,7 +1575,7 @@ export function createGatewayInternalRestApp(options: {
     }
     if (body.status) {
       applied =
-        (await releaseRealtimeSession({
+        (await realtimeSessionService.releaseRealtimeSession({
           collaborators: realtimeSessions,
           sessionId,
           projectId: body.project_id,
@@ -1628,7 +1626,7 @@ export function createGatewayInternalRestApp(options: {
     if (!realtimeSessions) {
       return c.json(realtimeSessionsUnavailable, 503);
     }
-    const outcome = await reportRealtimeSessionUsage({
+    const outcome = await realtimeSessionService.reportRealtimeSessionUsage({
       collaborators: realtimeSessions,
       sessionId,
       projectId: parsed.data.project_id,

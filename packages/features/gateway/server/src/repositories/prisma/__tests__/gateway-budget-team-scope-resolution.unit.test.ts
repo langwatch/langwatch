@@ -59,7 +59,7 @@ describe("team-scope budget resolution", () => {
         teamScopeIds: ["team_platform"],
       });
 
-      await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
+      await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
         client: client,
         target: {
           organizationId: "org_1",
@@ -78,7 +78,7 @@ describe("team-scope budget resolution", () => {
         teamScopeIds: ["team_platform"],
       });
 
-      await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
+      await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
         client: client,
         target: {
           organizationId: "org_1",
@@ -98,7 +98,7 @@ describe("team-scope budget resolution", () => {
         teamScopeIds: ["team_from_database"],
       });
 
-      await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
+      await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
         client: client,
         target: {
           organizationId: "org_1",
@@ -117,7 +117,7 @@ describe("team-scope budget resolution", () => {
     it("asks for no team at all rather than for an empty one", async () => {
       const { client, findMany } = prismaStub({ teamScopeIds: [] });
 
-      await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
+      await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
         client: client,
         target: {
           organizationId: "org_1",

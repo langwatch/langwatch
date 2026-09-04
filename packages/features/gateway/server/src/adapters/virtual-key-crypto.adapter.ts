@@ -23,6 +23,7 @@
  * ensures a database leak alone is not sufficient to recover plaintext.
  */
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port";
 
 const VK_PREFIX = "vk-lw-";
 
@@ -48,14 +49,25 @@ export type VirtualKeyCryptoConfig = {
   pepper?: string;
 };
 
-export class VirtualKeyCryptoAdapter {
+export class VirtualKeyCryptoAdapter extends GatewayVirtualKeyCryptoPort {
   static readonly displayPrefixLength = 13;
 
   static create(config: VirtualKeyCryptoConfig): VirtualKeyCryptoAdapter {
     return new VirtualKeyCryptoAdapter(config.pepper);
   }
 
-  private constructor(private readonly pepper: string | undefined) {}
+  private constructor(private readonly pepper: string | undefined) {
+    super();
+  }
+
+  /** The minting and parsing halves of the port, over this module's format. */
+  mintSecret(nowMs: number = Date.now()): string {
+    return VirtualKeyCryptoAdapter.mintSecret(nowMs);
+  }
+
+  parseSecret(secret: string): { ulid: string; displayPrefix: string } {
+    return VirtualKeyCryptoAdapter.parseSecret(secret);
+  }
 
   hashSecret(secret: string): string {
     const pepper = this.pepper;

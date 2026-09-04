@@ -18,15 +18,15 @@ import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_PIPELINE_NAME,
   GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
-} from "./gateway-spend-constants.adapter";
+} from "../processes/gateway-spend-commands.process";
 import {
   AdmitSpendCommand,
   ConfirmSpendCommand,
   FailSpendCommand,
   SettleSpendCommand,
 } from "../intents/gateway-spend.intent";
-import type { GatewaySpendProcessingEvent } from "./gateway-spend-events.adapter";
-import { createGatewaySpendFoldProjection } from "./gateway-spend-fold.adapter";
+import type { GatewaySpendProcessingEvent } from "../intents/gateway-spend.intent";
+import { GatewaySpendFoldProjection } from "../projections/gateway-spend.projection";
 
 /**
  * A process manager another feature owns, mounted on this pipeline under the
@@ -118,7 +118,7 @@ export class EventingGatewaySpendAdapter {
         events: defineEvents(GATEWAY_SPEND_PROCESSING_EVENT_TYPES),
       }),
     })
-      .withClickHouseFoldProjection(createGatewaySpendFoldProjection(this.foldStore()))
+      .withClickHouseFoldProjection(GatewaySpendFoldProjection.create({ store: this.foldStore() }))
       .withCommand("admitSpend", AdmitSpendCommand)
       .withCommand("confirmSpend", ConfirmSpendCommand)
       .withCommand("failSpend", FailSpendCommand)

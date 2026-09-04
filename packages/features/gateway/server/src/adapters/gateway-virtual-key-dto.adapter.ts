@@ -15,8 +15,7 @@
 import type { ProjectService } from "@langwatch/project-contract";
 
 import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
-import { metadataFromRow, type ResourceMetadata } from "./gateway-resource-metadata.adapter";
-import { toWireEnum } from "@langwatch/gateway-contract";
+import { metadataFromRow, type ResourceMetadata, toWireEnum } from "@langwatch/gateway-contract";
 
 /**
  * The one fact about a key's trace destination that is not on the key row.
@@ -30,29 +29,6 @@ import { toWireEnum } from "@langwatch/gateway-contract";
 export type TraceDestinationFacts = {
   archivedProjectIds: ReadonlySet<string>;
 };
-
-/**
- * Load the flag for a page of keys in one query, whatever the page's size.
- * Passed to the DTO explicitly rather than defaulted, because a caller that
- * forgets it would publish `trace_project_archived: false` for a deleted
- * project, which is the failure this field exists to prevent.
- */
-export async function loadTraceDestinationFacts({
-  projects,
-  virtualKeys,
-}: {
-  projects: ProjectService;
-  virtualKeys: { traceProjectId: string | null }[];
-}): Promise<TraceDestinationFacts> {
-  const destinationRows = await projects.listTraceDestinations(
-    virtualKeys.flatMap((vk) => (vk.traceProjectId ? [vk.traceProjectId] : [])),
-  );
-  const archivedProjectIds = new Set<string>();
-  for (const project of destinationRows) {
-    if (project.archivedAt) archivedProjectIds.add(project.id);
-  }
-  return { archivedProjectIds };
-}
 
 export type VirtualKeyScopeEntry = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -181,49 +157,81 @@ function baseVk(vk: VirtualKeyWithScopes, facts: TraceDestinationFacts): BaseVk 
   };
 }
 
-export function toVirtualKeyCamelDto({
-  virtualKey,
-  facts,
-}: {
-  virtualKey: VirtualKeyWithScopes;
-  facts: TraceDestinationFacts;
-}): VirtualKeyCamelDto {
-  return baseVk(virtualKey, facts);
-}
+/** Virtual-key rows to their two wire shapes. */
+export class GatewayVirtualKeyDtoAdapter {
+  static create(): GatewayVirtualKeyDtoAdapter {
+    return new GatewayVirtualKeyDtoAdapter();
+  }
 
-export function toVirtualKeySnakeDto({
-  virtualKey,
-  facts,
-}: {
-  virtualKey: VirtualKeyWithScopes;
-  facts: TraceDestinationFacts;
-}): VirtualKeySnakeDto {
-  const base = baseVk(virtualKey, facts);
-  return {
-    id: base.id,
-    organization_id: base.organizationId,
-    name: base.name,
-    description: base.description,
-    status: base.status,
-    purpose: base.purpose,
-    display_prefix: base.displayPrefix,
-    principal_user_id: base.principalUserId,
-    trace_project_id: base.traceProjectId,
-    trace_project_archived: base.traceProjectArchived,
-    external_id: base.externalId,
-    metadata: base.metadata,
-    scopes: base.scopes.map((s) => ({
-      scope_type: toWireEnum(s.scopeType),
-      scope_id: s.scopeId,
-    })),
-    routing_policy_id: base.routingPolicyId,
-    routing_mode: toWireEnum(base.routingMode),
-    config: base.config,
-    revision: base.revision,
-    created_at: base.createdAt,
-    updated_at: base.updatedAt,
-    last_used_at: base.lastUsedAt,
-    revoked_at: base.revokedAt,
-    expires_at: base.expiresAt,
-  };
+  private constructor() {}
+
+  /**
+   * Load the flag for a page of keys in one query, whatever the page's size.
+   * Passed to the DTO explicitly rather than defaulted, because a caller that
+   * forgets it would publish `trace_project_archived: false` for a deleted
+   * project, which is the failure this field exists to prevent.
+   */
+  async loadTraceDestinationFacts({
+    projects,
+    virtualKeys,
+  }: {
+    projects: ProjectService;
+    virtualKeys: { traceProjectId: string | null }[];
+  }): Promise<TraceDestinationFacts> {
+    const destinationRows = await projects.listTraceDestinations(
+      virtualKeys.flatMap((vk) => (vk.traceProjectId ? [vk.traceProjectId] : [])),
+    );
+    const archivedProjectIds = new Set<string>();
+    for (const project of destinationRows) {
+      if (project.archivedAt) archivedProjectIds.add(project.id);
+    }
+    return { archivedProjectIds };
+  }
+
+  toVirtualKeyCamelDto({
+    virtualKey,
+    facts,
+  }: {
+    virtualKey: VirtualKeyWithScopes;
+    facts: TraceDestinationFacts;
+  }): VirtualKeyCamelDto {
+    return baseVk(virtualKey, facts);
+  }
+
+  toVirtualKeySnakeDto({
+    virtualKey,
+    facts,
+  }: {
+    virtualKey: VirtualKeyWithScopes;
+    facts: TraceDestinationFacts;
+  }): VirtualKeySnakeDto {
+    const base = baseVk(virtualKey, facts);
+    return {
+      id: base.id,
+      organization_id: base.organizationId,
+      name: base.name,
+      description: base.description,
+      status: base.status,
+      purpose: base.purpose,
+      display_prefix: base.displayPrefix,
+      principal_user_id: base.principalUserId,
+      trace_project_id: base.traceProjectId,
+      trace_project_archived: base.traceProjectArchived,
+      external_id: base.externalId,
+      metadata: base.metadata,
+      scopes: base.scopes.map((s) => ({
+        scope_type: toWireEnum(s.scopeType),
+        scope_id: s.scopeId,
+      })),
+      routing_policy_id: base.routingPolicyId,
+      routing_mode: toWireEnum(base.routingMode),
+      config: base.config,
+      revision: base.revision,
+      created_at: base.createdAt,
+      updated_at: base.updatedAt,
+      last_used_at: base.lastUsedAt,
+      revoked_at: base.revokedAt,
+      expires_at: base.expiresAt,
+    };
+  }
 }

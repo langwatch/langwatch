@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  decodeSpendEventsCursor,
-  decodeSpendSummariesCursor,
-  encodeSpendEventsCursor,
-  encodeSpendSummariesCursor,
-} from "@langwatch/gateway-server";
+import { GatewaySpendCursorAdapter } from "@langwatch/gateway-server";
 
+const spendCursors = GatewaySpendCursorAdapter.create();
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   describe("given a page cursor", () => {
     describe("when it is encoded and read back", () => {
@@ -20,20 +16,22 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
           },
         ];
         for (const pair of pairs) {
-          const decoded = decodeSpendEventsCursor(encodeSpendEventsCursor(pair));
+          const decoded = spendCursors.decodeSpendEventsCursor(
+            spendCursors.encodeSpendEventsCursor(pair),
+          );
           expect(decoded).toEqual(pair);
         }
 
-        expect(decodeSpendEventsCursor("")).toBeNull();
-        expect(decodeSpendEventsCursor("%garbage%")).toBeNull();
+        expect(spendCursors.decodeSpendEventsCursor("")).toBeNull();
+        expect(spendCursors.decodeSpendEventsCursor("%garbage%")).toBeNull();
         expect(
-          decodeSpendEventsCursor(Buffer.from(":no-ts", "utf8").toString("base64url")),
+          spendCursors.decodeSpendEventsCursor(Buffer.from(":no-ts", "utf8").toString("base64url")),
         ).toBeNull();
         expect(
-          decodeSpendEventsCursor(Buffer.from("NaN:id", "utf8").toString("base64url")),
+          spendCursors.decodeSpendEventsCursor(Buffer.from("NaN:id", "utf8").toString("base64url")),
         ).toBeNull();
         expect(
-          decodeSpendEventsCursor(Buffer.from("123:", "utf8").toString("base64url")),
+          spendCursors.decodeSpendEventsCursor(Buffer.from("123:", "utf8").toString("base64url")),
         ).toBeNull();
       });
 
@@ -43,15 +41,17 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         // refused those callers' perfectly good cursors and restarted their walk
         // from page one, which double-counts.
         const legacy = Buffer.from("[beta]-model", "utf8").toString("base64url");
-        expect(decodeSpendSummariesCursor(legacy)).toEqual(["[beta]-model"]);
+        expect(spendCursors.decodeSpendSummariesCursor(legacy)).toEqual(["[beta]-model"]);
 
         // The multi-part form still round-trips, including keys holding the
         // separator any joined encoding would have needed.
         for (const parts of [["gpt-5-mini"], ["a,b", "c:d"], ["[x]", "]y["]]) {
-          expect(decodeSpendSummariesCursor(encodeSpendSummariesCursor(parts))).toEqual(parts);
+          expect(
+            spendCursors.decodeSpendSummariesCursor(spendCursors.encodeSpendSummariesCursor(parts)),
+          ).toEqual(parts);
         }
 
-        expect(decodeSpendSummariesCursor("")).toBeNull();
+        expect(spendCursors.decodeSpendSummariesCursor("")).toBeNull();
       });
     });
   });

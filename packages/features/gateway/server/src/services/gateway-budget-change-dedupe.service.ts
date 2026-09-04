@@ -60,7 +60,17 @@ class NullBudgetChangeEventDedupeService implements BudgetChangeEventDedupeServi
  * that distinction.
  */
 export class RedisBudgetChangeEventDedupeService implements BudgetChangeEventDedupeService {
-  constructor(private readonly redis: IORedis | Cluster) {}
+  /**
+   * A deployment with no Redis gets the always-emit stand-in, which is what
+   * this path did before the dedupe existed.
+   */
+  static create(redis: IORedis | Cluster | null): BudgetChangeEventDedupeService {
+    return redis
+      ? new RedisBudgetChangeEventDedupeService(redis)
+      : new NullBudgetChangeEventDedupeService();
+  }
+
+  private constructor(private readonly redis: IORedis | Cluster) {}
 
   async shouldEmit({ projectId }: { projectId: string }): Promise<boolean> {
     const key = `${BUDGET_CHANGE_EVENT_KEY_PREFIX}${projectId}`;
@@ -81,14 +91,4 @@ export class RedisBudgetChangeEventDedupeService implements BudgetChangeEventDed
       return true;
     }
   }
-}
-
-export function createBudgetChangeEventDedupeService(
-  redis: IORedis | Cluster | null,
-): BudgetChangeEventDedupeService {
-  if (!redis) {
-    return new NullBudgetChangeEventDedupeService();
-  }
-
-  return new RedisBudgetChangeEventDedupeService(redis);
 }

@@ -33,13 +33,6 @@ import type { SpendUsage } from "../processes/gateway-spend-commands.process";
 
 export const NANO_USD_PER_USD = 1_000_000_000;
 
-/** Rate identity stamped when the confirm event carried none: the model
- *  registry's own regeneration timestamp, date-granular. */
-export function currentRegistryRateVersion(): string {
-  const date = (llmModels.updatedAt ?? "").slice(0, 10);
-  return date ? `registry@${date}` : "registry@unversioned";
-}
-
 const logger = createLogger("langwatch:gateway-spend:rating");
 
 /** Quantities reported for display that no rate ever prices. A request that
@@ -133,42 +126,6 @@ function warnUnpriced({
   );
 }
 
-export function rateSpendNanoUsd({
-  model,
-  usage,
-  rateVersion,
-}: {
-  model: string;
-  usage: SpendUsage;
-  rateVersion?: string;
-}): { costNanoUsd: number; rateVersion: string } {
-  const rate = matchModelCost(model, getStaticModelCostRates());
-  const usd = rate
-    ? estimateCost({
-        rate,
-        inputTokens: usage.input_tokens,
-        outputTokens: usage.output_tokens,
-        cacheReadTokens: usage.cache_read_input_tokens,
-        cacheCreationTokens: usage.cache_creation_input_tokens,
-        cacheCreation1hTokens: usage.cache_creation_1h_tokens,
-        inputAudioTokens: usage.input_audio_tokens,
-        outputAudioTokens: usage.output_audio_tokens,
-        inputImageTokens: usage.input_image_tokens,
-        outputImageTokens: usage.output_image_tokens,
-        inputCharacters: usage.input_chars,
-        // The one conversion of the duration quantity: it is integer
-        // milliseconds everywhere else, and per-second rates apply here.
-        audioSeconds: usage.audio_ms / 1000,
-      })
-    : 0;
-  const costNanoUsd = Math.round((usd ?? 0) * NANO_USD_PER_USD);
-  const stamp = rateVersion && rateVersion.length > 0 ? rateVersion : currentRegistryRateVersion();
-  if (costNanoUsd === 0) {
-    warnUnpriced({ model, usage, rule: rate, rateVersion: stamp });
-  }
-  return { costNanoUsd, rateVersion: stamp };
-}
-
 /**
  * The vertical's ONE rating seam, over the static model-cost catalog.
  *
@@ -188,6 +145,50 @@ export class ModelCatalogGatewaySpendRatingAdapter extends GatewaySpendRatingPor
     costNanoUsd: number;
     rateVersion: string;
   } {
-    return rateSpendNanoUsd(input);
+    return this.rateSpendNanoUsd(input);
+  }
+
+  /** Rate identity stamped when the confirm event carried none: the model
+   *  registry's own regeneration timestamp, date-granular. */
+  currentRegistryRateVersion(): string {
+    const date = (llmModels.updatedAt ?? "").slice(0, 10);
+    return date ? `registry@${date}` : "registry@unversioned";
+  }
+
+  rateSpendNanoUsd({
+    model,
+    usage,
+    rateVersion,
+  }: {
+    model: string;
+    usage: SpendUsage;
+    rateVersion?: string;
+  }): { costNanoUsd: number; rateVersion: string } {
+    const rate = matchModelCost(model, getStaticModelCostRates());
+    const usd = rate
+      ? estimateCost({
+          rate,
+          inputTokens: usage.input_tokens,
+          outputTokens: usage.output_tokens,
+          cacheReadTokens: usage.cache_read_input_tokens,
+          cacheCreationTokens: usage.cache_creation_input_tokens,
+          cacheCreation1hTokens: usage.cache_creation_1h_tokens,
+          inputAudioTokens: usage.input_audio_tokens,
+          outputAudioTokens: usage.output_audio_tokens,
+          inputImageTokens: usage.input_image_tokens,
+          outputImageTokens: usage.output_image_tokens,
+          inputCharacters: usage.input_chars,
+          // The one conversion of the duration quantity: it is integer
+          // milliseconds everywhere else, and per-second rates apply here.
+          audioSeconds: usage.audio_ms / 1000,
+        })
+      : 0;
+    const costNanoUsd = Math.round((usd ?? 0) * NANO_USD_PER_USD);
+    const stamp =
+      rateVersion && rateVersion.length > 0 ? rateVersion : this.currentRegistryRateVersion();
+    if (costNanoUsd === 0) {
+      warnUnpriced({ model, usage, rule: rate, rateVersion: stamp });
+    }
+    return { costNanoUsd, rateVersion: stamp };
   }
 }

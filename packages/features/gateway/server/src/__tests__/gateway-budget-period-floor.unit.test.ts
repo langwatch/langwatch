@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { budgetPeriodFloorMs, currentPeriodStart, GatewayWindow } from "../index";
+import {
+  budgetPeriodFloorMs,
+  currentPeriodStart,
+  GatewayWindow,
+} from "@langwatch/gateway-contract";
 
 const NOW = new Date("2026-07-15T12:00:00.000Z");
 

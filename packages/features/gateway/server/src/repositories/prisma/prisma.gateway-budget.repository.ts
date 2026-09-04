@@ -16,23 +16,13 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { PrismaGatewayAuditRepository } from "./prisma.gateway-audit.repository";
-import { serializeRowForAudit } from "../../adapters/gateway-audit-serializer.adapter";
-import type {
-  BudgetBucketBoundary,
-  GatewayBudgetSpendPort,
-} from "../../ports/gateway-budget-spend.port";
-import { budgetPeriodFloorMs } from "../../adapters/gateway-period.adapter";
 import {
+  serializeRowForAudit,
+  budgetPeriodFloorMs,
   attributedUserBucketScopeId,
   bucketScopeIdFor,
   budgetAppliesToProvider,
-} from "../../adapters/gateway-bucket-scope.adapter";
-import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository";
-import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository";
-import type { GatewayBudgetScopeReach } from "../gateway-budget.repository";
-import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository";
-import { GatewayWindow } from "../../adapters/gateway-window.adapter";
-import {
+  GatewayWindow,
   GatewayBudgetCycleAnchorInvalidError,
   type GatewayBudgetPageInput,
   type GatewayBudgetResolutionTarget,
@@ -44,17 +34,23 @@ import {
   GatewayScopeOrgMismatchError,
   translateExternalIdConflict,
   VirtualKeyNotFoundError,
-} from "@langwatch/gateway-contract";
-import {
+  usdToNanoUsd,
   identityPatchData,
   type ResourceMetadata,
-} from "../../adapters/gateway-resource-metadata.adapter";
+} from "@langwatch/gateway-contract";
+import type {
+  BudgetBucketBoundary,
+  GatewayBudgetSpendPort,
+} from "../../ports/gateway-budget-spend.port";
+import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository";
+import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository";
+import type { GatewayBudgetScopeReach } from "../gateway-budget.repository";
+import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository";
 import {
   type BudgetScopeTargetInfo,
   PrismaGatewayBudgetScopeTargetRepository,
 } from "./prisma.gateway-budget-scope-target.repository";
-import { usdToNanoUsd } from "@langwatch/gateway-contract";
-import { keysetAfter } from "../../adapters/gateway-wire-pagination.adapter";
+import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter";
 import {
   GatewayBudgetRepository,
   type AttributedUserBudgetTemplate,
@@ -68,6 +64,7 @@ import {
 } from "../gateway-budget.repository";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 
+const wirePages = GatewayWirePaginationAdapter.create();
 const logger = createLogger("langwatch:gateway:budget-service");
 
 /**
@@ -323,10 +320,11 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   async resolveApplicableBudgets(
     input: GatewayBudgetResolutionTarget,
   ): Promise<GatewayResolvedBudget[]> {
-    const resolved = await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
-      client: this.prisma,
-      target: input,
-    });
+    const resolved =
+      await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
+        client: this.prisma,
+        target: input,
+      });
 
     return resolved.map((entry) => ({
       budget: toGatewayBudgetResource(entry.budget),
@@ -343,13 +341,14 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     projects: ProjectIdentity[],
     virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
   ): Promise<Map<string, GatewayBudgetScopeTarget>> {
-    const targets = await PrismaGatewayBudgetScopeTargetRepository.resolveScopeTargetsBatch(
-      this.prisma,
-      budgets,
-      organizationId,
-      projects,
-      virtualKeyProjectScopes,
-    );
+    const targets =
+      await PrismaGatewayBudgetScopeTargetRepository.create().resolveScopeTargetsBatch(
+        this.prisma,
+        budgets,
+        organizationId,
+        projects,
+        virtualKeyProjectScopes,
+      );
 
     return new Map(targets);
   }
@@ -358,7 +357,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     organizationId: string | null;
     virtualKeyIds: string[];
   }): Promise<GatewayVirtualKeyProjectScope[]> {
-    return PrismaGatewayBudgetScopeTargetRepository.listVirtualKeyProjectScopes(
+    return PrismaGatewayBudgetScopeTargetRepository.create().listVirtualKeyProjectScopes(
       this.prisma,
       input.organizationId,
       input.virtualKeyIds,
@@ -623,7 +622,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         ...(args.externalId !== undefined ? { externalId: args.externalId } : {}),
         ...(args.cursor
           ? {
-              OR: keysetAfter([
+              OR: wirePages.keysetAfter([
                 {
                   name: "createdAt",
                   value: args.cursor.createdAt,
@@ -1226,7 +1225,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     // Same resolver the bundle and the debits process use, so what
     // enforces here is exactly what the key was told applies to it.
     const resolved = (
-      await PrismaGatewayBudgetResolutionRepository.resolveApplicableBudgets({
+      await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
         client: this.prisma,
         target: {
           organizationId: input.organizationId,

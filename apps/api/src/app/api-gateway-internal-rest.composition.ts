@@ -44,7 +44,8 @@ import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import {
   createElevenLabsWebhookRestApp,
   createGatewayInternalRestApp,
-  GatewayConfigMaterialiser,
+  GatewayConfigAssemblyAdapter,
+  GatewayConfigMaterialiserService,
   GatewayJwtAdapter,
   GatewayModelProviderCredentialsPort,
   ModelCatalogGatewaySpendRatingAdapter,
@@ -55,7 +56,7 @@ import {
   type GatewaySpendConfirmationPort,
   type GatewaySpendRatingPort,
 } from "@langwatch/gateway-server";
-import { createGatewayChangeEventsPort } from "@langwatch/gateway-server/composition/gateway-change-events";
+import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { readCustomKeys } from "@langwatch/model-provider-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -172,17 +173,18 @@ export function composeApiGatewayInternalRest(
   if (!encryption || !jwtSecret) return undefined;
 
   const store = PrismaGatewayInternalStoreAdapter.create({ database: prisma });
-  const changes = createGatewayChangeEventsPort(prisma);
+  const changes = PrismaGatewayChangeEventsRepository.create(prisma);
   const jwt = GatewayJwtAdapter.create({ secret: jwtSecret });
-  const materialiser = new GatewayConfigMaterialiser(
+  const materialiser = GatewayConfigMaterialiserService.create({
     prisma,
     projects,
-    gateway.budgetSpend ?? null,
+    chRepo: gateway.budgetSpend ?? null,
     // The SAME decision store the console writes a budget through, so the
     // bundle the data plane enforces cannot disagree with what a customer set.
-    gateway.budgetDecisions,
-    ApiGatewayModelProviderCredentials.create(encryption),
-  );
+    budgetDecisions: gateway.budgetDecisions,
+    credentials: ApiGatewayModelProviderCredentials.create(encryption),
+    assembly: GatewayConfigAssemblyAdapter.create({ prisma }),
+  });
   const rating = ModelCatalogGatewaySpendRatingAdapter.create();
 
   const monitors = options.monitors;

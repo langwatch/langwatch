@@ -41,24 +41,22 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import type {
-  GatewayBudgetScope,
-  GatewayCacheRuleCursor,
-  GatewayCacheRuleResource,
-} from "@langwatch/gateway-contract";
-import { virtualKeyConfigSchema } from "@langwatch/gateway-contract";
-import { toBudgetDto } from "../../adapters/gateway-budget-dto.adapter";
 import {
+  type GatewayBudgetScope,
+  type GatewayCacheRuleCursor,
+  type GatewayCacheRuleResource,
+  virtualKeyConfigSchema,
+  GatewayWindow,
+  toStoredEnum,
+  toWireEnum,
+  USD_DISPLAY_STRING_FORMAT,
   EXTERNAL_ID_MAX_LENGTH,
   externalIdSchema,
   resourceMetadataSchema,
-} from "../../adapters/gateway-resource-metadata.adapter";
-import { GatewayWindow } from "../../adapters/gateway-window.adapter";
-import { toStoredEnum, toWireEnum } from "@langwatch/gateway-contract";
-import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-contract";
+} from "@langwatch/gateway-contract";
+import { GatewayBudgetDtoAdapter } from "../../adapters/gateway-budget-dto.adapter";
 import {
-  decodePageCursor,
-  nextPageCursor,
+  GatewayWirePaginationAdapter,
   PAGE_LIMIT_DEFAULT,
   PAGE_LIMIT_MAX,
 } from "../../adapters/gateway-wire-pagination.adapter";
@@ -66,6 +64,9 @@ import type { GatewayVirtualKeyScope } from "../../ports/gateway-virtual-key.por
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GatewayActor, GatewayApp, GatewayVirtualKeyBudgetInput } from "#app/gateway.app";
 
+const budgetDtos = GatewayBudgetDtoAdapter.create();
+
+const wirePages = GatewayWirePaginationAdapter.create();
 const logger = createLogger("langwatch:api:gateway-platform");
 
 // ── Wire enums ──────────────────────────────────────────────────────────
@@ -343,7 +344,7 @@ function createdAtIdCursor(
   encoded: string | undefined,
 ): { createdAt: Date; id: string } | null | undefined {
   if (encoded === undefined) return undefined;
-  const parts = decodePageCursor(encoded, 2);
+  const parts = wirePages.decodePageCursor(encoded, 2);
   if (!parts) return null;
   const createdAt = new Date(Number(parts[0]));
   return Number.isNaN(createdAt.getTime()) ? null : { createdAt, id: String(parts[1]) };
@@ -352,7 +353,7 @@ function createdAtIdCursor(
 /** The (priority, createdAt, id) sort key a cache-rule cursor names. */
 function cacheRuleCursor(encoded: string | undefined): GatewayCacheRuleCursor | null | undefined {
   if (encoded === undefined) return undefined;
-  const parts = decodePageCursor(encoded, 3);
+  const parts = wirePages.decodePageCursor(encoded, 3);
   if (!parts) return null;
   const priority = Number(parts[0]);
   const createdAt = new Date(Number(parts[1]));
@@ -777,7 +778,10 @@ export function createGatewayPlatformRestApp(options: {
         data: await app.toVirtualKeySnakeDtos({
           virtualKeys: app.visibleToProjectCredential({ project, virtualKeys: rows }),
         }),
-        next_cursor: nextPageCursor(rows, page.data.limit, (vk) => [vk.createdAt.getTime(), vk.id]),
+        next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (vk) => [
+          vk.createdAt.getTime(),
+          vk.id,
+        ]),
       });
     },
   );
@@ -1448,7 +1452,7 @@ export function createGatewayPlatformRestApp(options: {
       return c.json({
         spend_available: spendAvailable,
         data: rows.map((b) =>
-          toBudgetDto({
+          budgetDtos.toBudgetDto({
             budget: b,
             memberCount: memberCounts.get(b.scopeId),
             spendAvailable,
@@ -1456,7 +1460,10 @@ export function createGatewayPlatformRestApp(options: {
             reachable: scopeReach.get(b.id)?.reachable,
           }),
         ),
-        next_cursor: nextPageCursor(rows, page.data.limit, (b) => [b.createdAt.getTime(), b.id]),
+        next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (b) => [
+          b.createdAt.getTime(),
+          b.id,
+        ]),
       });
     },
   );
@@ -1508,7 +1515,7 @@ export function createGatewayPlatformRestApp(options: {
       const memberCounts = await app.groupMemberCounts([found.budget]);
       return c.json({
         spend_available: found.spendAvailable,
-        budget: toBudgetDto({
+        budget: budgetDtos.toBudgetDto({
           budget: found.budget,
           memberCount: memberCounts.get(found.budget.scopeId),
           spendAvailable: found.spendAvailable,
@@ -1593,7 +1600,7 @@ export function createGatewayPlatformRestApp(options: {
             return {
               status: 201,
               body: {
-                budget: toBudgetDto({
+                budget: budgetDtos.toBudgetDto({
                   budget: row,
                   memberCount: memberCounts.get(row.scopeId),
                   reachable: reach.reachable,
@@ -1656,7 +1663,7 @@ export function createGatewayPlatformRestApp(options: {
         });
         const memberCounts = await app.groupMemberCounts([row]);
         return c.json({
-          budget: toBudgetDto({
+          budget: budgetDtos.toBudgetDto({
             budget: row,
             memberCount: memberCounts.get(row.scopeId),
           }),
@@ -1703,7 +1710,7 @@ export function createGatewayPlatformRestApp(options: {
           organizationId,
           actorUserId,
         });
-        return c.json({ budget: toBudgetDto({ budget: row }) });
+        return c.json({ budget: budgetDtos.toBudgetDto({ budget: row }) });
       } catch (error) {
         return trpcErrorResponse(c, error);
       }
@@ -1779,7 +1786,7 @@ export function createGatewayPlatformRestApp(options: {
         });
         const memberCounts = await app.groupMemberCounts([row]);
         return c.json({
-          budget: toBudgetDto({
+          budget: budgetDtos.toBudgetDto({
             budget: row,
             memberCount: memberCounts.get(row.scopeId),
           }),
@@ -1887,7 +1894,7 @@ export function createGatewayPlatformRestApp(options: {
       });
       return c.json({
         data: rows.map(toCacheRuleDto),
-        next_cursor: nextPageCursor(rows, page.data.limit, (r) => [
+        next_cursor: wirePages.nextPageCursor(rows, page.data.limit, (r) => [
           r.priority,
           r.createdAt.getTime(),
           r.id,

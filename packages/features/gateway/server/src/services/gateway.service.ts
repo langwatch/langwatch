@@ -43,8 +43,8 @@ import {
 } from "../repositories/gateway-budget.repository";
 import { type GatewayBudgetScope } from "../repositories/gateway-budget.repository";
 import { GatewayBudgetScopeReachService } from "./gateway-budget-scope-reach.service";
-import { GatewayCacheRulePersistence } from "./gateway-cache-rule.service";
-import { GatewayGuardrailCatalogue } from "./gateway-guardrail.service";
+import { GatewayCacheRuleService } from "./gateway-cache-rule.service";
+import { GatewayGuardrailService } from "./gateway-guardrail.service";
 
 export type { GatewayBudgetScopeReachInput } from "@langwatch/gateway-contract";
 
@@ -55,8 +55,8 @@ export class GatewayService extends GatewayServiceContract {
   private constructor(
     private readonly repository: GatewayBudgetRepository,
     private readonly projects: ProjectService,
-    private readonly cacheRules: GatewayCacheRulePersistence,
-    private readonly guardrails: GatewayGuardrailCatalogue,
+    private readonly cacheRules: GatewayCacheRuleService,
+    private readonly guardrails: GatewayGuardrailService,
   ) {
     super();
   }
@@ -64,8 +64,8 @@ export class GatewayService extends GatewayServiceContract {
   static create(input: {
     repository: GatewayBudgetRepository;
     projects: ProjectService;
-    cacheRules: GatewayCacheRulePersistence;
-    guardrails: GatewayGuardrailCatalogue;
+    cacheRules: GatewayCacheRuleService;
+    guardrails: GatewayGuardrailService;
   }): GatewayService {
     return new GatewayService(input.repository, input.projects, input.cacheRules, input.guardrails);
   }

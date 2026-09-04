@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  GatewayRealtimeSessionReconciliationWorker,
+  GatewayRealtimeSessionReconciliationService,
   realtimeSessionReconciliationConfig,
   type ElevenLabsConversationReader,
   type RealtimeSessionReconciliationRepository,
-} from "../realtime-session-reconciliation.adapter";
+} from "../../services/gateway-realtime-session-reconciliation.service";
 
 const session = {
   id: "session-1",
@@ -36,7 +36,7 @@ function buildWorker(options?: {
       notFound: false,
     }),
   };
-  const worker = GatewayRealtimeSessionReconciliationWorker.create({
+  const worker = GatewayRealtimeSessionReconciliationService.create({
     repository,
     credentials: {
       getApiCredential: vi.fn().mockResolvedValue({
@@ -53,7 +53,7 @@ function buildWorker(options?: {
   return { worker, repository, conversations };
 }
 
-describe("GatewayRealtimeSessionReconciliationWorker", () => {
+describe("GatewayRealtimeSessionReconciliationService", () => {
   it("expires stale sessions, reads eligible sessions exactly, and confirms rounded duration", async () => {
     const { worker, repository, conversations } = buildWorker();
     const now = new Date("2026-08-25T12:00:00.000Z");
