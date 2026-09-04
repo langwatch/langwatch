@@ -11,6 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Switch } from "~/components/ui/switch";
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -83,6 +84,24 @@ export type EvaluatorMappingsConfig = {
   ) => void;
 };
 
+/**
+ * Whether a failing result of this evaluator fails what it is attached to.
+ *
+ * An evaluator that produces a pass or fail verdict can be required. A score
+ * only evaluator reports and never gates, so its switch stays off and
+ * disabled.
+ */
+export type EvaluatorGateConfig = {
+  required: boolean;
+  canRequire: boolean;
+};
+
+export const REQUIRED_TO_PASS_LABEL = "Required to pass";
+export const REQUIRED_TO_PASS_COPY =
+  "A failing required evaluator fails the scenario. An unrequired one reports its result beside the verdict.";
+export const SCORE_ONLY_COPY = "Scores report, they do not gate.";
+export const REMOVE_EVALUATOR_LABEL = "Remove evaluator";
+
 export type EvaluatorEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
@@ -101,6 +120,16 @@ export type EvaluatorEditorDrawerProps = {
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
+  /**
+   * The gate of the attachment this evaluator is opened for. Present only
+   * when the evaluator is attached to something that runs it after each
+   * scenario, which is where a required pass or fail means anything.
+   */
+  gate?: EvaluatorGateConfig;
+  /** Called when the required switch is flipped. Flows through setFlowCallbacks. */
+  onRequiredChange?: (required: boolean) => void;
+  /** Called when the attachment is taken off. Flows through setFlowCallbacks. */
+  onRemove?: () => void;
   initialLocalConfig?: LocalEvaluatorConfig;
   /**
    * Comparison drawer context. Non-serializable; flows through complexProps.
@@ -175,6 +204,12 @@ export type EvaluatorEditorController = {
   onLocalConfigChange:
     | ((config: LocalEvaluatorConfig | undefined) => void)
     | undefined;
+  /** The gate of the attachment, when the editor is open on one. */
+  gate: EvaluatorGateConfig | undefined;
+  /** Whether the attachment is required right now, as the switch shows it. */
+  required: boolean;
+  onRequiredChange: ((required: boolean) => void) | undefined;
+  onRemove: (() => void) | undefined;
   title: string;
   handleSave: () => void;
   handleClose: () => void;
@@ -251,6 +286,26 @@ export function useEvaluatorEditorController(
 
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
+
+  const gate =
+    props.gate ?? (complexProps.gate as EvaluatorGateConfig | undefined);
+  const onRequiredChange =
+    props.onRequiredChange ?? flowCallbacks?.onRequiredChange;
+  const onRemove = props.onRemove ?? flowCallbacks?.onRemove;
+  // The switch flips right away; the attachment behind it follows through
+  // the callback, the way a mapping does.
+  const [required, setRequired] = useState(gate?.required ?? false);
+  const gateRequired = gate?.required;
+  useEffect(() => {
+    setRequired(gateRequired ?? false);
+  }, [gateRequired]);
+  const handleRequiredChange = useCallback(
+    (next: boolean) => {
+      setRequired(next);
+      onRequiredChange?.(next);
+    },
+    [onRequiredChange],
+  );
 
   const onLocalConfigChange =
     props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
@@ -698,6 +753,10 @@ export function useEvaluatorEditorController(
     comparison,
     onComparisonChange: onComparisonChange ? handleComparisonChange : undefined,
     onLocalConfigChange,
+    gate,
+    required,
+    onRequiredChange: onRequiredChange ? handleRequiredChange : undefined,
+    onRemove,
     title,
     handleSave,
     handleClose,
@@ -705,6 +764,47 @@ export function useEvaluatorEditorController(
     handleApply,
     flushLocalConfig,
   };
+}
+
+/**
+ * Whether a failing result fails the scenario. Shown under the mappings when
+ * the editor is open on an attachment, so the gate is set where the inputs
+ * are, and a score only evaluator says why it cannot gate.
+ */
+function EvaluatorGateSection({
+  gate,
+  required,
+  onRequiredChange,
+}: {
+  gate: EvaluatorGateConfig;
+  required: boolean;
+  onRequiredChange: ((required: boolean) => void) | undefined;
+}) {
+  const checked = gate.canRequire && required;
+  return (
+    <HStack
+      align="flex-start"
+      gap={3}
+      paddingTop={4}
+      data-testid="evaluator-gate-section"
+    >
+      <VStack align="stretch" gap={0.5} flex={1} minWidth={0}>
+        <Text fontSize="sm" fontWeight="medium">
+          {REQUIRED_TO_PASS_LABEL}
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          {gate.canRequire ? REQUIRED_TO_PASS_COPY : SCORE_ONLY_COPY}
+        </Text>
+      </VStack>
+      <Switch
+        checked={checked}
+        disabled={!gate.canRequire || !onRequiredChange}
+        onCheckedChange={({ checked: next }) => onRequiredChange?.(next)}
+        aria-label={REQUIRED_TO_PASS_LABEL}
+        inputProps={{ "data-testid": "evaluator-required-switch" }}
+      />
+    </HStack>
+  );
 }
 
 // ============================================================================
@@ -734,6 +834,9 @@ export function EvaluatorEditorBody({
     expectsComparisonContext,
     comparison,
     onComparisonChange,
+    gate,
+    required,
+    onRequiredChange,
   } = controller;
 
   // Comparison: if the caller passed comparison context, ignore the generic
@@ -899,6 +1002,14 @@ export function EvaluatorEditorBody({
             />
           </Box>
         )}
+
+        {gate && (
+          <EvaluatorGateSection
+            gate={gate}
+            required={required}
+            onRequiredChange={onRequiredChange}
+          />
+        )}
       </VStack>
     </FormProvider>
   );
@@ -931,11 +1042,26 @@ export function EvaluatorEditorFooter({
     saveButtonText,
     onLocalConfigChange,
     onComparisonChange,
+    onRemove,
     handleSave,
     handleDiscard,
     handleApply,
     handleClose,
   } = controller;
+
+  // The way an attachment is taken off, when the editor is open on one. It
+  // stands on its own side of the footer, away from Save.
+  const removeButton = onRemove ? (
+    <Button
+      variant="ghost"
+      colorPalette="red"
+      size="sm"
+      onClick={onRemove}
+      data-testid="evaluator-remove-button"
+    >
+      {REMOVE_EVALUATOR_LABEL}
+    </Button>
+  ) : null;
 
   // Only a comparison editor mirrors its config into the store live (via
   // onComparisonChange), so only there does an unrunnable (sub-2-variant)
@@ -948,6 +1074,7 @@ export function EvaluatorEditorFooter({
   if (onLocalConfigChange) {
     return (
       <HStack width="full">
+        {removeButton}
         {hasUnsavedChanges && (
           <Button
             variant="outline"
@@ -989,7 +1116,9 @@ export function EvaluatorEditorFooter({
   }
 
   return (
-    <HStack gap={3}>
+    <HStack gap={3} width={removeButton ? "full" : undefined}>
+      {removeButton}
+      {removeButton && <Spacer />}
       <Button variant="outline" onClick={onCancel ?? handleClose}>
         Cancel
       </Button>
