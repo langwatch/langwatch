@@ -16,7 +16,16 @@ import {
 const REPO_ROOT = path.join(__dirname, "../../../../../../../");
 const SKILLS_ROOT = path.join(REPO_ROOT, "skills");
 
-/** The published set, read from the same sources the codegen reads. */
+/** A skill's own SKILL.mdx frontmatter says whether it's gated by a feature flag. */
+const isFlagGated = (src: string): boolean =>
+  /^feature-flag:\s*\S+/m.test(fs.readFileSync(src, "utf8"));
+
+/**
+ * The published set, read from the same sources the codegen reads. Skills
+ * gated by a `feature-flag:` frontmatter key are excluded, mirroring
+ * generate-skills-bundle.mjs — the CLI bundle ships inside the binary with
+ * no per-caller flag to resolve, so a gated skill isn't in it yet.
+ */
 const expectedPublishedSlugs = (): { slug: string; isRecipe: boolean }[] => {
   const featureSkillsSrc = fs.readFileSync(
     path.join(SKILLS_ROOT, "_lib/feature-skills.ts"),
@@ -35,7 +44,15 @@ const expectedPublishedSlugs = (): { slug: string; isRecipe: boolean }[] => {
       fs.existsSync(path.join(SKILLS_ROOT, "recipes", entry.name, "SKILL.mdx")),
     )
     .map((entry) => ({ slug: entry.name, isRecipe: true }));
-  return [...featureSkills, ...recipes];
+  return [
+    ...featureSkills.filter(
+      ({ slug }) => !isFlagGated(path.join(SKILLS_ROOT, slug, "SKILL.mdx")),
+    ),
+    ...recipes.filter(
+      ({ slug }) =>
+        !isFlagGated(path.join(SKILLS_ROOT, "recipes", slug, "SKILL.mdx")),
+    ),
+  ];
 };
 
 const skill = (slug: string): BundledSkill => {
