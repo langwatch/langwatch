@@ -64,7 +64,7 @@ class TestWhenTheStepPostFails:
     def test_resends_the_step_with_the_next_one(self, posts):
         posts.statuses.extend([502, 502, 502, 502, 502])
 
-        with pytest.raises(Exception):
+        with pytest.raises(httpx.HTTPStatusError):
             log_a_step("0")
 
         assert len(posts.bodies) == 5
@@ -78,7 +78,7 @@ class TestWhenTheStepPostFails:
     # @scenario "The steps a failed post left behind are sent when the run ends"
     def test_flushes_the_buffer_when_the_run_ends(self, posts):
         posts.statuses.extend([502, 502, 502, 502, 502])
-        with pytest.raises(Exception):
+        with pytest.raises(httpx.HTTPStatusError):
             log_a_step("0")
         callback = LangWatchGEPACallback(
             optimizer=tracked_optimizer(), student=Program(), valset=valset_of(1)
@@ -92,3 +92,36 @@ class TestWhenTheStepPostFails:
         callback.on_optimization_end({})  # type: ignore[arg-type]
 
         assert len(posts.bodies) == 6
+
+    # @scenario "The end-of-run flush keeps trying while the platform is down"
+    def test_keeps_trying_the_flush(self, posts):
+        posts.statuses.extend([502] * 5)
+        with pytest.raises(httpx.HTTPStatusError):
+            log_a_step("0")
+        callback = LangWatchGEPACallback(
+            optimizer=tracked_optimizer(), student=Program(), valset=valset_of(1)
+        )
+
+        posts.statuses.extend([502] * 19)
+        callback.on_optimization_end({})  # type: ignore[arg-type]
+
+        assert len(posts.bodies) == 5 + 20
+        assert [step["index"] for step in posts.bodies[-1]] == ["0"]
+        assert langwatch_dspy.steps_buffer == []
+
+    # @scenario "The end-of-run flush keeps trying while the platform is down"
+    def test_reports_the_steps_it_could_not_send(self, posts, capsys):
+        posts.statuses.extend([502] * 5)
+        with pytest.raises(httpx.HTTPStatusError):
+            log_a_step("0")
+        callback = LangWatchGEPACallback(
+            optimizer=tracked_optimizer(), student=Program(), valset=valset_of(1)
+        )
+        posts.bodies.clear()
+
+        posts.statuses.extend([502] * 20)
+        callback.on_optimization_end({})  # type: ignore[arg-type]
+
+        assert len(posts.bodies) == 20
+        assert [step.index for step in langwatch_dspy.steps_buffer] == ["0"]
+        assert "1 step(s) of run run could not be sent" in capsys.readouterr().out

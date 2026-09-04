@@ -82,3 +82,11 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
     Given a step still in the buffer after a failed post
     When GEPA reports on_optimization_end
     Then the buffered steps are posted and the buffer is empty
+
+  @unit
+  Scenario: The end-of-run flush keeps trying while the platform is down
+    Given a step still in the buffer when GEPA reports the end of the run
+    When the platform keeps answering 502
+    Then the flush retries for a few minutes before giving up
+    And a line says how many steps of the run could not be sent
+    And the steps stay in the buffer

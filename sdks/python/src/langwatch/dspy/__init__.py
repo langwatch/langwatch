@@ -809,9 +809,23 @@ class LangWatchGEPACallback:
         self.valset = valset
 
     def on_optimization_end(self, event: OptimizationEndEvent) -> None:
-        """Send the steps a failed post left behind, once the run is over."""
-        if langwatch_dspy.steps_buffer:
-            langwatch_dspy.send_steps()
+        """Send the steps a failed post left behind, once the run is over.
+
+        This is the last chance for those steps, so the flush keeps trying for
+        a few minutes before giving up and saying how many were lost.
+        """
+        if not langwatch_dspy.steps_buffer:
+            return
+        try:
+            self.flush_steps()
+        except Exception as e:
+            print(
+                f"[LangWatch] {len(langwatch_dspy.steps_buffer)} step(s) of run {langwatch_dspy.run_id} could not be sent: {e}"
+            )
+
+    @retry(tries=4, delay=15, backoff=2)
+    def flush_steps(self) -> None:
+        langwatch_dspy.send_steps()
 
     def on_valset_evaluated(self, event: ValsetEvaluatedEvent) -> None:
         langwatch_dspy.log_step(
