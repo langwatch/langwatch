@@ -6,17 +6,38 @@ import {
   organizationApiKeyResolutionSchema,
   resolvedApiKeyTokenSchema,
   type ApiKey,
+  type ApiKeyBinding,
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyToken,
   API_KEY_PREFIX,
   LANGY_SESSION_API_KEY_NAME,
 } from "@langwatch/api-key-contract";
+import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository";
 import type { ApiKeyDependencies } from "./api-key.service";
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
   return key;
+}
+
+/**
+ * Whether the key's own grants reach the project a caller named.
+ *
+ * An organization binding reaches every project in it, a team binding every
+ * project on that team, a project binding only its own. Without this the
+ * `X-Project-Id` header re-pointed a project-scoped key at any sibling project
+ * in the same organization.
+ */
+function bindingsReachProject(
+  bindings: readonly ApiKeyBinding[],
+  project: ProjectIdentity,
+): boolean {
+  return bindings.some((binding) => {
+    if (binding.scopeType === "ORGANIZATION") return binding.scopeId === project.organizationId;
+    if (binding.scopeType === "TEAM") return binding.scopeId === project.teamId;
+    return binding.scopeId === project.id;
+  });
 }
 
 export class ApiKeyTokenResolutionService {
@@ -160,6 +181,11 @@ export class ApiKeyTokenResolutionService {
 
     const project = await this.options.projects.tryGetIdentity(effectiveProjectId);
     if (!project || project.organizationId !== apiKey.organizationId) {
+      return null;
+    }
+    // Only a caller-NAMED project needs this: a self-scoped resolution derived
+    // the project from a binding already.
+    if (projectId && !bindingsReachProject(apiKey.roleBindings, project)) {
       return null;
     }
 

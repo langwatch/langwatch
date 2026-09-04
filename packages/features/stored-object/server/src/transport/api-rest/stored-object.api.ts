@@ -12,6 +12,7 @@
  * own database or Redis, which is why they are ports rather than imports.
  */
 import { Readable } from "node:stream";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
 import type { Context, Env, MiddlewareHandler } from "hono";
@@ -38,6 +39,13 @@ import type { StoredObjectApp } from "#app/stored-object.app";
 export type FilesDualAuthVariables = {
   apiKeyProjectId?: string;
   userId?: string;
+  /**
+   * The resolved key's ceiling. The key branch used to compare the caller's
+   * own `X-Project-Id` against the owner and pass, so a key scoped to one
+   * project read every project's bytes. Which permission to ask for is this
+   * family's decision, which is why it arrives as a call rather than a chain.
+   */
+  apiKeyCeiling?: (permission: AuthzPermission) => Promise<void>;
 };
 
 /**
@@ -58,6 +66,30 @@ const FILES_RATE_LIMIT_MAX = 120;
  * categories and a custom role can hold one without the other.
  */
 const FILE_VIEW_PERMISSIONS = ["traces:view", "scenarios:view"] as const;
+
+/**
+ * The key's ceiling, satisfied by ANY of the permissions a file read can need.
+ *
+ * The object's purpose is not known yet, so a key holding either category
+ * passes here and the purpose-specific gate runs once the row is read. The
+ * last refusal is what reaches the caller, carrying its own code.
+ */
+async function enforceAnyOf(
+  ceiling: (permission: AuthzPermission) => Promise<void>,
+  permissions: readonly AuthzPermission[],
+): Promise<void> {
+  let refusal: unknown;
+  for (const permission of permissions) {
+    try {
+      await ceiling(permission);
+      return;
+    } catch (err) {
+      if (!HandledError.isHandled(err)) throw err;
+      refusal = err;
+    }
+  }
+  throw refusal;
+}
 
 export function requiredPermissionForPurpose(
   purpose: string,
@@ -199,17 +231,20 @@ export function createFilesRestApp<
    * Checks that the caller (API key or session user) is allowed to read files
    * owned by `ownerProjectId` AT ALL. Runs BEFORE the row is read so a foreign
    * claim is always 403 regardless of row existence (no 403-vs-404 oracle);
-   * because the object's purpose is not known yet, a session user passes with
-   * ANY of the file-view permissions — the purpose-specific gate runs after
-   * the read (`authorizeFilePurpose`). Throws HTTPException(403)/(401) on
-   * failure; returns void on success.
+   * because the object's purpose is not known yet, a caller passes with ANY of
+   * the file-view permissions — the purpose-specific gate runs after the read
+   * (`authorizeFilePurpose`). An API key is pinned to the project it resolved
+   * to AND capped by its own ceiling. Throws HTTPException(403)/(401) or the
+   * key's own refusal on failure; returns void on success.
    */
   async function authorizeFileRead({
     apiKeyProjectId,
+    apiKeyCeiling,
     userId,
     ownerProjectId,
   }: {
     apiKeyProjectId: string | undefined;
+    apiKeyCeiling: FilesDualAuthVariables["apiKeyCeiling"];
     userId: string | undefined;
     ownerProjectId: string;
   }): Promise<void> {
@@ -217,6 +252,12 @@ export function createFilesRestApp<
       if (apiKeyProjectId !== ownerProjectId) {
         throw new HTTPException(403, { message: "forbidden" });
       }
+      if (!apiKeyCeiling) {
+        // The verifier sets this on every key it resolves; reaching here means
+        // a future edit broke that contract. Refuse rather than read.
+        throw new HTTPException(500, { message: "api key ceiling unresolved" });
+      }
+      await enforceAnyOf(apiKeyCeiling, FILE_VIEW_PERMISSIONS);
     } else if (userId) {
       for (const permission of FILE_VIEW_PERMISSIONS) {
         try {
@@ -240,9 +281,9 @@ export function createFilesRestApp<
   /**
    * Purpose-specific authorization, applied once the row (and so its purpose)
    * is known: `trace_content` objects require `traces:view`, everything else
-   * (the scenario purposes) requires `scenarios:view`. API-key callers are
-   * project-scoped full readers on this legacy-key surface and were already
-   * pinned to the owning project in `authorizeFileRead`.
+   * (the scenario purposes) requires `scenarios:view`. An API-key caller was
+   * already pinned to the owning project and capped by its own ceiling in
+   * `authorizeFileRead`.
    */
   async function authorizeFilePurpose({
     userId,
@@ -381,6 +422,7 @@ export function createFilesRestApp<
     // Step 3: project-membership gate.
     await authorizeFileRead({
       apiKeyProjectId,
+      apiKeyCeiling: c.get("apiKeyCeiling"),
       userId,
       ownerProjectId: authorizedProjectId,
     });

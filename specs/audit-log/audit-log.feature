@@ -305,6 +305,24 @@ Feature: Unified Audit Log
   # (`rbac.auditLog.test.ts`, `rbac-integration.test.ts`), but the
   # specific "no leakage" assertion is unbound today.
 
+  # A member of two organizations is routine here — every user has a personal
+  # organization — so "any project row written by a member of this org" was a
+  # cross-organization read. The organization's own projects are the fence.
+
+  @unit
+  Scenario: Project rows are fenced to the organization's own projects
+    Given a member of organization "acme" also belongs to organization "bravo"
+    When an "acme" administrator reads the audit trail
+    Then project-level rows are matched against the projects "acme" owns
+    And a row belonging to a "bravo" project is never matched
+
+  @unit
+  Scenario: A project filter naming another organization's project returns nothing
+    Given an "acme" administrator filters the audit trail by a project id
+    When that project belongs to organization "bravo"
+    Then no audit rows are returned at all
+    And the audit table is never read for that filter
+
   @integration @unimplemented
   Scenario: Audit log respects org/project boundaries
     Given alice is in organization "acme" only

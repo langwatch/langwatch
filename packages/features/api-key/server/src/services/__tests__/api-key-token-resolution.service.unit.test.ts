@@ -7,9 +7,9 @@
  *
  * Resolution is not authorization. It establishes who is calling and against
  * which project; whether that caller may do the thing is the ceiling check in
- * the auth middleware, which asks per permission at the project's scope. That
- * is why naming a project the key is not bound to still resolves — the
- * organization is the boundary enforced here, and the ceiling does the rest.
+ * the auth middleware, which asks per permission at the project's scope. It
+ * does fence WHICH project a key may speak for: an `X-Project-Id` naming a
+ * project no binding of the key reaches resolves to nothing.
  */
 
 import { describe, expect, it } from "vitest";
@@ -179,6 +179,49 @@ describe("ApiKeyTokenResolutionService", () => {
         await expect(
           service.tryResolveToken({ token: CURRENT_TOKEN, projectId: "project-1" }),
         ).resolves.toBeNull();
+      });
+    });
+
+    describe("given a key bound to one project that names a sibling project", () => {
+      /** @scenario "A scoped key cannot be re-pointed at a project its grants do not reach" */
+      it("refuses it, rather than re-pointing the key at a project it does not cover", async () => {
+        const { service } = serviceWith({
+          identity: project({ id: "project-2", teamId: "team-2" }),
+        });
+
+        await expect(
+          service.tryResolveToken({ token: CURRENT_TOKEN, projectId: "project-2" }),
+        ).resolves.toBeNull();
+      });
+    });
+
+    describe("given an organization-scoped key that names a project in it", () => {
+      /** @scenario "An organization or team key still selects a project it covers" */
+      it("resolves that project", async () => {
+        const { service } = serviceWith({
+          row: storedKey({
+            roleBindings: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
+          }),
+          identity: project({ id: "project-2", teamId: "team-2" }),
+        });
+
+        await expect(
+          service.tryResolveToken({ token: CURRENT_TOKEN, projectId: "project-2" }),
+        ).resolves.toMatchObject({ type: "apiKey", project: { id: "project-2" } });
+      });
+    });
+
+    describe("given a team-scoped key that names a project on that team", () => {
+      /** @scenario "An organization or team key still selects a project it covers" */
+      it("resolves that project", async () => {
+        const { service } = serviceWith({
+          row: storedKey({ roleBindings: [{ scopeType: "TEAM", scopeId: "team-1" }] }),
+          identity: project({ id: "project-2", teamId: "team-1" }),
+        });
+
+        await expect(
+          service.tryResolveToken({ token: CURRENT_TOKEN, projectId: "project-2" }),
+        ).resolves.toMatchObject({ type: "apiKey", project: { id: "project-2" } });
       });
     });
 

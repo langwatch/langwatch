@@ -160,6 +160,15 @@ Feature: Hono API endpoint authorization and tenant isolation
       When I call a mutating endpoint that requires a write permission
       Then the response status is 403
 
+    @unit
+    Scenario: A narrow API key cannot write model defaults with its owner's grants
+      Given a read-only project API key whose owner administers the organization
+      When it creates, updates or deletes a model-defaults config
+      Then the request is refused with the API-key permission-denied code
+      And the write never reaches the service
+      # The service gates each named scope against the key's OWNING USER, so
+      # without a ceiling on the route the key's scope capped nothing.
+
     @integration
     Scenario: An authorized key passes the permission gate
       Given a project API key whose role grants the required permission
@@ -212,6 +221,28 @@ Feature: Hono API endpoint authorization and tenant isolation
 
   # ============================================================================
   Rule: A credential for one tenant cannot reach another tenant's data
+
+    @unit
+    Scenario: A scoped key cannot be re-pointed at a project its grants do not reach
+      Given a project API key bound to project A only
+      When it names a sibling project B of the same organization in X-Project-Id
+      Then the credential resolves to nothing and the request is unauthenticated
+      # The organization was the only fence, and a project-scoped key that
+      # named a sibling passed it. The key's own bindings are the fence now.
+
+    @unit
+    Scenario: A scoped key reading another project's bytes is refused by its own ceiling
+      Given a project API key authenticated on the stored-object byte route
+      When it reads an object owned by the project it authenticated as
+      Then the key's ceiling is checked for the file-view permissions
+      And a key holding neither is refused with the permission-denied code
+      # The route compared the caller's own header against the owner and passed.
+
+    @unit
+    Scenario: An organization or team key still selects a project it covers
+      Given a project API key bound to an organization, or to a project's team
+      When it names a project inside that scope in X-Project-Id
+      Then the credential resolves to that project
 
     @integration
     Scenario: A key for one organization cannot resolve another organization's project

@@ -19,6 +19,7 @@ import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-objec
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { StoredObjectApp, StoredObjectFileRead } from "#app/stored-object.app";
 import {
   createFilesRestApp,
@@ -197,6 +198,48 @@ describe("given the /api/files family", () => {
     });
   });
 
+  describe("when the key names the owning project but its own scope does not reach it", () => {
+    /** @scenario "A scoped key reading another project's bytes is refused by its own ceiling" */
+    it("refuses on the key's ceiling with its own code, and reads nothing", async () => {
+      const read = vi.fn(async () => availableRead());
+      const api = mount({
+        read,
+        caller: { apiKeyProjectId: OWNER_PROJECT },
+        apiKeyCeiling: async () => {
+          throw new HandledError("api_key_permission_denied", "denied", { httpStatus: 403 });
+        },
+      });
+
+      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({ error: "api_key_permission_denied" });
+      expect(read).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the key holds only one of the two file-view categories", () => {
+    /** @scenario "A scoped key reading another project's bytes is refused by its own ceiling" */
+    it("passes on the category it holds rather than requiring both", async () => {
+      const asked: AuthzPermission[] = [];
+      const api = mount({
+        read: async () => availableRead(),
+        caller: { apiKeyProjectId: OWNER_PROJECT },
+        apiKeyCeiling: async (permission) => {
+          asked.push(permission);
+          if (permission === "traces:view") {
+            throw new HandledError("api_key_permission_denied", "denied", { httpStatus: 403 });
+          }
+        },
+      });
+
+      const response = await api.fetch(`/api/files/${OBJECT_ID}`);
+
+      expect(response.status).toBe(200);
+      expect(asked).toEqual(["traces:view", "scenarios:view"]);
+    });
+  });
+
   describe("when the caller presents a project API key and no session", () => {
     /** @scenario "GET /api/files/:id authenticates via API key header when no session cookie is present" */
     it("accepts the key scoped to the owning project and never consults a user permission", async () => {
@@ -225,6 +268,7 @@ function mount(options: {
   read?: () => Promise<StoredObjectFileRead | null>;
   owner?: () => Promise<{ projectId: string } | null>;
   caller?: { apiKeyProjectId?: string; userId?: string };
+  apiKeyCeiling?: (permission: AuthzPermission) => Promise<void>;
   requireProjectPermission?: FilesProjectPermissionCheck;
   rateLimit?: FilesRateLimiter;
 }) {
@@ -238,7 +282,10 @@ function mount(options: {
     security: passThroughSecurity(),
     app: () => app,
     dualAuth: async (c, next) => {
-      if (caller.apiKeyProjectId) c.set("apiKeyProjectId", caller.apiKeyProjectId);
+      if (caller.apiKeyProjectId) {
+        c.set("apiKeyProjectId", caller.apiKeyProjectId);
+        c.set("apiKeyCeiling", options.apiKeyCeiling ?? (async () => undefined));
+      }
       if (caller.userId) c.set("userId", caller.userId);
       await next();
     },
@@ -277,6 +324,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: () => noop,
     authenticateOrganization: () => noop,
     authorizeOrganizationPermission: () => noop,
+    authorizeRouteTeamPermission: () => noop,
     authorizeRouteProjectPermission: () => noop,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: () => noop,

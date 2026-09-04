@@ -1513,13 +1513,28 @@ export class PrismaOrganizationMembershipRepository implements OrganizationRepos
     });
     const orgUserIdsList = orgUserIds.map((ou) => ou.userId);
 
+    // Project-level rows are written with `organizationId = NULL`, so they can
+    // only be re-anchored through their project. Matching `projectId: { not:
+    // null }` anchored them to nothing and returned every organization a member
+    // also belongs to — payloads included. The organization's own projects are
+    // the fence.
+    const orgProjects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    const orgProjectIds = orgProjects.map((row) => row.id);
+
+    if (projectId && !orgProjectIds.includes(projectId)) {
+      return { auditLogs: [], totalCount: 0 };
+    }
+
     const orgIdConditions: Prisma.AuditLogWhereInput[] = [{ organizationId }];
 
-    if (orgUserIdsList.length > 0) {
+    if (orgUserIdsList.length > 0 && orgProjectIds.length > 0) {
       orgIdConditions.push({
         organizationId: null,
         userId: { in: orgUserIdsList },
-        projectId: { not: null },
+        projectId: { in: orgProjectIds },
       });
     }
 

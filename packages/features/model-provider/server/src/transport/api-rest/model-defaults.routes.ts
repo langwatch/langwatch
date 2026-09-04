@@ -6,7 +6,7 @@ import {
   ModelDefaultUserKeyRequiredError,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
-import { anyAuthenticated, requires } from "@langwatch/api";
+import { apiKeyPermission, requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
   baseResponses,
@@ -21,6 +21,14 @@ import {
 } from "./model-defaults.schemas";
 
 const logger = createLogger("langwatch:api:model-defaults");
+
+/**
+ * The service authorizes each named scope against the key's OWNING USER, so
+ * the key's own grants capped nothing: a read-only key minted for CI could
+ * repoint the organization's models. The ceiling is checked at the project the
+ * credential resolved to; a legacy project key keeps its full access.
+ */
+const MODEL_DEFAULTS_WRITE_PERMISSION = "project:manage" as const;
 
 /**
  * Uniform error mapping for the default-model write handlers: a typed
@@ -94,11 +102,11 @@ export function registerModelDefaultsRoutes(
     },
   );
 
-  // POST /api/model-defaults — create a new config. Authorization is
-  // data-dependent: the canonical service gates every target scope
-  // (the Hono analogue of tRPC's authorizeInResolver), so the route policy is
-  // "any authenticated caller" and the real check happens below.
-  secured.access(anyAuthenticated()).post(
+  // POST /api/model-defaults — create a new config. The canonical service
+  // gates every target scope against the KEY OWNER, so the route declares the
+  // API-key ceiling on top: without it a deliberately narrow key wrote the
+  // organization's defaults with its owner's grants.
+  secured.access(apiKeyPermission(MODEL_DEFAULTS_WRITE_PERMISSION)).post(
     "/",
     describeRoute({
       description:
@@ -141,9 +149,9 @@ export function registerModelDefaultsRoutes(
     },
   );
 
-  // PUT /api/model-defaults/:id — update an existing config. Same
-  // data-dependent authorization as POST plus an ownership backstop below.
-  secured.access(anyAuthenticated()).put(
+  // PUT /api/model-defaults/:id — update an existing config. Same ceiling and
+  // data-dependent authorization as POST, plus an ownership backstop below.
+  secured.access(apiKeyPermission(MODEL_DEFAULTS_WRITE_PERMISSION)).put(
     "/:id",
     describeRoute({
       description:
@@ -182,7 +190,7 @@ export function registerModelDefaultsRoutes(
   );
 
   // DELETE /api/model-defaults/:id — delete a config.
-  secured.access(anyAuthenticated()).delete(
+  secured.access(apiKeyPermission(MODEL_DEFAULTS_WRITE_PERMISSION)).delete(
     "/:id",
     describeRoute({
       description: "Delete a default-model config. Scope attachments cascade.",

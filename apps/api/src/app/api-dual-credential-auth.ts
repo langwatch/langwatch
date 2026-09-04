@@ -28,11 +28,12 @@
  * other door cannot decide differently about one caller.
  */
 import { getTokenType, type ApiKeyService } from "@langwatch/api-key-contract";
-import { arbitrateClaims } from "@langwatch/authz-contract";
+import { arbitrateClaims, type AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 
+import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
 import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session";
 import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
 
@@ -58,6 +59,13 @@ export class ContestedCredentialsError extends HandledError {
 export type ApiDualAuthVariables = {
   apiKeyProjectId?: string;
   userId?: string;
+  /**
+   * The resolved key's ceiling, bound to the credential this request carried.
+   * A byte door authorizes per object, so it decides which permission to ask
+   * for; without it the API-key branch enforced no ceiling at all and any key
+   * of the organization read any project's bytes through `X-Project-Id`.
+   */
+  apiKeyCeiling?: (permission: AuthzPermission) => Promise<void>;
 };
 
 /**
@@ -87,8 +95,10 @@ type ByteEndpointClaim = { kind: "api-key" } | { kind: "session"; userId: string
 export function createApiDualCredentialAuth(options: {
   apiKeys: ApiKeyService;
   session: ApiHandlerManagedSessionPort;
+  /** The SAME ceiling the framework chain enforces, for the API-key branch. */
+  credentials: Pick<ApiHandlerManagedCredentials, "enforceCeiling">;
 }): MiddlewareHandler<{ Variables: ApiDualAuthVariables }> {
-  const { apiKeys, session } = options;
+  const { apiKeys, session, credentials: ceiling } = options;
 
   return async (c, next) => {
     const credentials = extractApiKeyRequestCredentials(c.req.raw);
@@ -131,6 +141,7 @@ export function createApiDualCredentialAuth(options: {
     }
 
     c.set("apiKeyProjectId", resolved.project.id);
+    c.set("apiKeyCeiling", (permission) => ceiling.enforceCeiling({ resolved, permission }));
     return next();
   };
 }
