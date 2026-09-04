@@ -79,7 +79,7 @@ type Credentials struct {
 	// running worker.
 	Harness string `json:"harness,omitempty"`
 	// DisabledSkillIds are the skill ids the control plane has flag-gated off
-	// for this project/user, resolved once over the full skill catalogue by
+	// for this project/user, resolved once over the full skill catalog by
 	// langy-turn.service.ts. Folded into the worker signature (see
 	// SignatureOf) so a flag flip recycles the worker rather than reusing one
 	// still hiding (or still offering) the wrong set. Threaded to the
