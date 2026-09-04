@@ -147,10 +147,16 @@ export class SuiteApp {
    * test suite second, so an id that names both — which cannot happen today, and
    * would be a data fault if it ever did — resolves the same way at every
    * door. Refuses with {@link SuiteNotFoundError} when neither is there.
+   *
+   * The suite service answers a test-suite id too, as a run-plan-shaped row of
+   * kind "test_suite". That is not what a door asking this question means, so
+   * such an answer falls through to the test-suite lookup below and comes back
+   * as the row it really is.
    */
   async getByIdOrTestSuite(input: SuiteIdInput): Promise<SuiteOrTestSuite> {
     try {
-      return { kind: "suite", suite: await this.dependencies.suites.get(input) };
+      const suite = await this.dependencies.suites.get(input);
+      if (suite.kind !== "test_suite") return { kind: "suite", suite };
     } catch (error) {
       if (!(error instanceof SuiteNotFoundError)) throw error;
     }

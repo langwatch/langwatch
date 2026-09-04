@@ -167,18 +167,6 @@ export class RoleBindingPrincipalInvalidError extends HandledError {
   }
 }
 
-export class UserNotInOrganizationError extends HandledError {
-  declare readonly code: "user_not_in_organization";
-
-  constructor(userId: string) {
-    super("user_not_in_organization", "That user is not a member of this organization", {
-      httpStatus: 422,
-      meta: { userId },
-    });
-    this.name = "UserNotInOrganizationError";
-  }
-}
-
 export class GroupNotInOrganizationError extends HandledError {
   declare readonly code: "group_not_in_organization";
 

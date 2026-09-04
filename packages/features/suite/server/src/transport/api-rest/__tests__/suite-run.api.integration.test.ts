@@ -74,7 +74,12 @@ function testSecurity(): AppRestSecurity {
 }
 
 function buildApi(run: (...args: never[]) => unknown) {
-  const suites = { run } as unknown as SuiteApp;
+  // The door asks which kind the id names before it runs anything: a run plan
+  // runs the targets it stores, a test suite takes them from the body.
+  const suites = {
+    run,
+    getByIdOrTestSuite: async () => ({ kind: "suite", suite: { kind: "run_plan" } }),
+  } as unknown as SuiteApp;
   const app = createSuiteRestApp({
     security: testSecurity(),
     suites: () => suites,

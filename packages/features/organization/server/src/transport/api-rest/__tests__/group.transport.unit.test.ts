@@ -588,15 +588,9 @@ describe("createGroupRestApp", () => {
      *
      * Well-formed, but names somebody this organization does not have.
      *
-     * The status is 404, not the 422 the old REST suite asserted. Two classes
-     * carry this one code and they disagree: the organization contract's
-     * (`packages/features/organization/contract/src/team.errors.ts`) extends
-     * `NotFoundError`, which forces 404, and the role-bindings family's
-     * (`platform/app/src/server/role-bindings/errors.ts`) sets 422. The
-     * repository behind this route throws the contract's, so 404 is what a
-     * caller receives; the code, which is what the client renders copy from,
-     * is the same either way. Asserted as it behaves, with the disagreement
-     * named rather than hidden.
+     * One class carries this code now, and it answers 422 wherever it is
+     * raised: naming somebody the organization does not have is a malformed
+     * request, not a missing row.
      */
     it("reports somebody outside the organization as not a member", async () => {
       const { send } = buildApi({
@@ -612,7 +606,7 @@ describe("createGroupRestApp", () => {
         body: { userId: "outsider" },
       });
 
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(422);
       await expect(response.json()).resolves.toMatchObject({
         error: "user_not_in_organization",
       });

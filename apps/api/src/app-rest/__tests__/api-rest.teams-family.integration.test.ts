@@ -386,9 +386,7 @@ describe("given the organization's teams over REST", () => {
       await expect(errorCodeOf(response)).resolves.toBe("team_not_found");
     });
 
-    // NOT bound to "Adding somebody who is not in the organization names the
-    // code": that scenario asks for 422 and this branch answers 404, so a
-    // binding here would make the spec agree with the regression.
+    // @scenario "Adding somebody who is not in the organization names the code"
     it("names user_not_in_organization for somebody outside the organization", async () => {
       const { api } = mountTeams();
       const team = (await (
@@ -401,11 +399,8 @@ describe("given the organization's teams over REST", () => {
         asAdmin,
       );
 
-      // The code is right and the status is not: `UserNotInOrganizationError`
-      // in packages/features/organization/contract/src/team.errors.ts extends
-      // NotFoundError, where main's carried httpStatus 422.
+      expect(response.status).toBe(422);
       await expect(errorCodeOf(response)).resolves.toBe("user_not_in_organization");
-      expect(response.status).toBe(404);
     });
 
     // @scenario "Granting a role a member already holds names the code"

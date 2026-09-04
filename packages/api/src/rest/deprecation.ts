@@ -19,8 +19,11 @@ export function deprecatedAlias({
   successor: string;
 }): MiddlewareHandler {
   return async (c, next) => {
-    await next();
+    // Prepared before the handler runs, so a refusal the family THROWS carries
+    // them too: a header written after `next()` is never reached once the
+    // error is on its way to the boundary.
     c.header("Deprecation", "true");
     c.header("Link", `<${successor}>; rel="successor-version"`);
+    await next();
   };
 }

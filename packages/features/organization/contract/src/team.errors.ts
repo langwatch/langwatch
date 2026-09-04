@@ -58,11 +58,19 @@ export class TeamMemberAlreadyAddedError extends HandledError {
   }
 }
 
-export class UserNotInOrganizationError extends NotFoundError {
+/**
+ * The named user is not a member of the organization the write is scoped to.
+ *
+ * A malformed request rather than a missing row: the caller named somebody
+ * real and asked for something that cannot hold, and 422 is the one status
+ * this refusal publishes on every surface that raises it.
+ */
+export class UserNotInOrganizationError extends HandledError {
   declare readonly code: "user_not_in_organization";
 
   constructor(userId: string) {
-    super("user_not_in_organization", "Organization member", userId, {
+    super("user_not_in_organization", "That user is not a member of this organization", {
+      httpStatus: 422,
       meta: { userId },
     });
     this.name = "UserNotInOrganizationError";

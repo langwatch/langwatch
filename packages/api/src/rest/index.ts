@@ -147,6 +147,10 @@ export {
   managementActor,
 } from "./management-audit.js";
 
+// Marking a family as a deprecated alias: the headers every one of its
+// responses, refusals included, names its successor with.
+export { deprecatedAlias } from "./deprecation.js";
+
 // A family's own `onError`, layered over the spine's.
 export { createCanonicalFamilyErrorHandler } from "./canonical-family-error-handler.js";
 export { createFamilyErrorHandler } from "./family-error-handler.js";

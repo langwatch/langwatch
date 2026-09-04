@@ -11,7 +11,6 @@ import {
   RoleBindingNotFoundError,
   RoleBindingPrincipalInvalidError,
   ScopeNotInOrganizationError,
-  UserNotInOrganizationError,
   type AuthzApplyMemberBindingsInput,
   type AuthzBindingMutationSuccess,
   type AuthzBindingWrite,
@@ -23,6 +22,9 @@ import {
   type OrganizationRole,
   type RoleBindingScopeType,
 } from "@langwatch/authz-contract";
+// One class, one status: an organization's membership is the organization
+// feature's fact, and every surface answers this refusal 422.
+import { UserNotInOrganizationError } from "@langwatch/organization-contract";
 import type { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";
 import type {
   AuthzBindingRepository,

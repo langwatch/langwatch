@@ -10,13 +10,10 @@
  * families is what the suite is about, which is why both are mounted over one
  * application here.
  *
- * Six scenarios of the spec are NOT bound here, and deliberately: every route
- * that addresses ONE test suite refuses it. `readTestSuite` requires
- * `getByIdOrTestSuite` to answer `kind: "test_suite"`, and it never can — the
- * suite service's own `tryGet` falls back to the test-suite store and answers
- * `kind: "suite"` carrying a `test_suite` row, so read, rename, archive and run
- * all answer 404 suite_not_found. That is a production defect, reported rather
- * than pinned; a test asserting today's 404 would lock the bug in.
+ * Every route that addresses ONE test suite is exercised here, because that is
+ * where the family used to refuse itself: `readTestSuite` asks the application
+ * for `kind: "test_suite"`, and the application now answers the test-suite row
+ * rather than the run-plan-shaped one the suite service converts it into.
  *
  * @see specs/api-reference/test-suites-rest-api.feature
  */
@@ -56,6 +53,95 @@ describe("given a name for a new test suite", () => {
       scenarioIds: [],
       scenarioCount: 0,
       archivedAt: null,
+    });
+  });
+});
+
+describe("given a test suite holds two scenarios", () => {
+  // @scenario "Reading a test suite names the scenarios filed in it"
+  it("names both scenarios in the response", async () => {
+    const { api, world } = mountSuiteFamilies();
+    const { testSuite, cases } = world.addTestSuiteWithCases("Refunds", 2);
+
+    const response = await api.get(`${BASE}/${testSuite.id}`);
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { scenarios: { id: string; name: string }[] };
+    expect(body.scenarios.map((one) => one.id)).toEqual(cases.map((one) => one.id));
+    expect(body.scenarios.map((one) => one.name)).toEqual(cases.map((one) => one.name));
+  });
+
+  // @scenario "Archiving a test suite archives the scenarios filed in it"
+  it("archives the suite and the scenarios filed in it", async () => {
+    const { api, world } = mountSuiteFamilies();
+    const { testSuite, cases } = world.addTestSuiteWithCases("Refunds", 2);
+
+    const response = await api.delete(`${BASE}/${testSuite.id}`);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ id: testSuite.id, archived: true });
+    expect(world.testSuites.get(testSuite.id)?.archivedAt).not.toBeNull();
+    for (const one of cases) expect(world.scenarios.get(one.id)?.archivedAt).not.toBeNull();
+  });
+});
+
+describe("given the project holds a test suite named Refunds", () => {
+  // @scenario "Renaming a test suite keeps its slug"
+  it("carries the new name and the slug it was created with", async () => {
+    const { api, world } = mountSuiteFamilies();
+    const testSuite = world.addTestSuite({ name: "Refunds" });
+
+    const response = await api.patch(`${BASE}/${testSuite.id}`, { name: "Returns" });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      name: "Returns",
+      slug: testSuite.slug,
+    });
+  });
+});
+
+describe("given a test suite holds one scenario and the project holds one agent", () => {
+  // @scenario "Running a test suite names the plan after the suite and its targets"
+  it("creates a run plan named after the suite and the target", async () => {
+    const { api, world, commands } = mountSuiteFamilies();
+    const { testSuite } = world.addTestSuiteWithCases("Refunds", 1);
+    // A scope naming every test suite the project holds is the same rule as
+    // "all", and reads as such in the plan name, so the project holds a second.
+    world.addTestSuite({ name: "Onboarding" });
+    const agent = world.addAgent({ name: "dev-agent" });
+
+    const response = await api.post(`${BASE}/${testSuite.id}/run`, {
+      targets: [{ type: "http", referenceId: agent.id }],
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      scheduled: true,
+      planName: "Refunds dev-agent",
+      created: true,
+    });
+    expect(commands.queued).toHaveLength(1);
+  });
+
+  // @scenario "Running a test suite twice joins the run plan the first run resolved"
+  it("reports the plan as not created the second time", async () => {
+    const { api, world } = mountSuiteFamilies();
+    const { testSuite } = world.addTestSuiteWithCases("Refunds", 1);
+    const agent = world.addAgent({ name: "dev-agent" });
+    const run = () =>
+      api.post(`${BASE}/${testSuite.id}/run`, {
+        targets: [{ type: "http", referenceId: agent.id }],
+      });
+    const first = (await (await run()).json()) as { runPlanId: string; created: boolean };
+    expect(first.created).toBe(true);
+
+    const response = await run();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      created: false,
+      runPlanId: first.runPlanId,
     });
   });
 });

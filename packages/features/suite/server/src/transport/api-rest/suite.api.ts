@@ -4,10 +4,12 @@ import {
   type AppRestSecurity,
   badRequestSchema,
   baseResponses,
+  deprecatedAlias,
   type PlatformUrlBuilder,
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
   ScenarioTestSuiteNotFoundError,
@@ -30,6 +32,43 @@ import { z } from "zod";
 import { OrganizationNotFoundForProjectError, type SuiteApp } from "#app/suite.app";
 
 const logger = createLogger("langwatch:api:suites");
+
+/** The one sentence every operation of this family opens with. */
+const DEPRECATION_NOTE = "Deprecated: use /api/v1/run-plans and /api/v1/test-suites.";
+
+/**
+ * A refused run, at the status this family publishes one with.
+ *
+ * The successor families answer a refused run 422. This alias answered 400
+ * before they existed and keeps doing so, carrying the domain's own code and
+ * remediation either way, which is what a caller branches on.
+ */
+class SuiteAliasRunRefusedError extends HandledError {
+  constructor(refusal: SuiteExecutionError) {
+    super(refusal.code, refusal.message, {
+      httpStatus: 400,
+      fault: refusal.fault,
+      meta: refusal.meta,
+      tips: refusal.tips,
+    });
+    this.name = "SuiteAliasRunRefusedError";
+  }
+}
+
+/**
+ * The refusal for a body that names targets the addressed row does not take.
+ *
+ * A run plan holds its own configuration and a test suite holds no execution
+ * setting at all, so either way the request is malformed rather than the
+ * domain refusing something it understood.
+ */
+function storedTargetsRefusal(operation: "run" | "update"): ValidationError {
+  const message =
+    operation === "run"
+      ? "A run plan runs the targets it stores; send targets only when the id names a test suite"
+      : "A test suite gets its targets when a run is started, so it stores none";
+  return new ValidationError(message, { meta: { fieldErrors: { targets: [message] } } });
+}
 
 /**
  * What a run plan covers, in the words this family was published with.
@@ -209,6 +248,12 @@ const updateSuiteInputSchema = z.object({
 
 const runSuiteInputSchema = z.object({
   idempotencyKey: z.string().optional(),
+  targets: z
+    .array(suiteTargetSchema)
+    .optional()
+    .describe(
+      "The prompts, agents or workflows the run goes against. Read only when the id names a test suite, which stores no target of its own; a run plan already holds its own and refuses these.",
+    ),
   parameters: runParameterValuesSchema
     .optional()
     .describe(
@@ -296,12 +341,15 @@ export function createSuiteRestApp(options: {
 
   const secured = security.createProjectApp({ basePath: "/api/suites" });
 
+  // Every response of the family names its successor, refusals included.
+  secured.use(deprecatedAlias({ successor: "/api/v1/run-plans" }));
+
   // ── List Suites ────────────────────────────────────────────
   secured.access(requires("scenarios:view")).get(
     "/",
     describeRoute({
-      description:
-        "List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suites.",
+      deprecated: true,
+      description: `${DEPRECATION_NOTE} List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suites.`,
       responses: {
         ...baseResponses,
         200: {
@@ -341,7 +389,8 @@ export function createSuiteRestApp(options: {
   secured.access(requires("scenarios:view")).get(
     "/:id",
     describeRoute({
-      description: "Get a suite (run plan) by its ID",
+      deprecated: true,
+      description: `${DEPRECATION_NOTE} Get a suite (run plan) by its ID.`,
       responses: {
         ...baseResponses,
         200: {
@@ -400,7 +449,8 @@ export function createSuiteRestApp(options: {
   secured.access(requires("scenarios:create")).post(
     "/",
     describeRoute({
-      description: "Create a new suite (run plan)",
+      deprecated: true,
+      description: `${DEPRECATION_NOTE} Create a new suite (run plan).`,
       responses: {
         ...baseResponses,
         201: {
@@ -453,7 +503,8 @@ export function createSuiteRestApp(options: {
   secured.access(requires("scenarios:update")).patch(
     "/:id",
     describeRoute({
-      description: "Update a suite (run plan)",
+      deprecated: true,
+      description: `${DEPRECATION_NOTE} Update a suite (run plan).`,
       responses: {
         ...baseResponses,
         200: {
@@ -483,6 +534,10 @@ export function createSuiteRestApp(options: {
       // application's decision — the same one the tRPC surface makes.
       let updated;
       try {
+        if (body.targets !== undefined) {
+          const found = await suites().getByIdOrTestSuite({ id, projectId: project.id });
+          if (found.kind === "test_suite") throw storedTargetsRefusal("update");
+        }
         const { scope, ...fields } = body;
         updated = await suites().update({
           id,
@@ -516,7 +571,8 @@ export function createSuiteRestApp(options: {
   secured.access(requires("scenarios:create")).post(
     "/:id/duplicate",
     describeRoute({
-      description: "Duplicate a suite (run plan)",
+      deprecated: true,
+      description: `${DEPRECATION_NOTE} Duplicate a suite (run plan).`,
       responses: {
         ...baseResponses,
         201: {
@@ -573,8 +629,8 @@ export function createSuiteRestApp(options: {
   secured.access(requires("scenarios:create")).post(
     "/:id/run",
     describeRoute({
-      description:
-        "Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.",
+      deprecated: true,
+      description: `${DEPRECATION_NOTE} Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets are read from the body.`,
       responses: {
         ...baseResponses,
         200: {
@@ -600,25 +656,47 @@ export function createSuiteRestApp(options: {
       const body = c.req.valid("json");
       logger.info({ projectId: project.id, suiteId: id }, "Running suite");
 
+      const app = suites();
+      const actor = runActorFromRequest({
+        // A project key belongs to no person, so it records no actor. A
+        // user-bound key records the person it belongs to, through the
+        // surface the request declared.
+        userId: c.get("apiKeyUserId"),
+        surfaceHeader: c.req.header("X-LangWatch-Surface"),
+      });
+      const idempotencyKey =
+        body.idempotencyKey ?? `api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
       try {
-        const idempotencyKey =
-          body.idempotencyKey ?? `api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        // The project's organization is the application's to resolve; it
-        // refuses when there is none, exactly as this handler used to.
-        const result = await suites().run({
-          id,
-          projectId: project.id,
-          idempotencyKey,
-          parameters: body.parameters,
-          note: body.note,
-          // A project key belongs to no person, so it records no actor. A
-          // user-bound key records the person it belongs to, through the
-          // surface the request declared.
-          actor: runActorFromRequest({
-            userId: c.get("apiKeyUserId"),
-            surfaceHeader: c.req.header("X-LangWatch-Surface"),
-          }),
-        });
+        const found = await app.getByIdOrTestSuite({ id, projectId: project.id });
+        // A test suite stores no target, so the run takes them from the body
+        // and is filed under the run plan its scope resolves. A run plan
+        // stores its own, so a body naming any is a malformed request.
+        if (found.kind !== "test_suite" && body.targets !== undefined) {
+          throw storedTargetsRefusal("run");
+        }
+
+        const result =
+          found.kind === "test_suite"
+            ? await app.runPlan({
+                projectId: project.id,
+                config: {
+                  scope: { mode: "test_suites", testSuiteIds: [id] },
+                  targets: body.targets ?? [],
+                },
+                idempotencyKey,
+                ...(body.parameters !== undefined && { parameters: body.parameters }),
+                ...(body.note !== undefined && { note: body.note }),
+                ...(actor !== undefined && { actor }),
+              })
+            : await app.run({
+                id,
+                projectId: project.id,
+                idempotencyKey,
+                parameters: body.parameters,
+                note: body.note,
+                actor,
+              });
 
         return c.json({
           scheduled: true,
@@ -631,9 +709,9 @@ export function createSuiteRestApp(options: {
         if (error instanceof SuiteNotFoundError) {
           return c.json({ error: error.message }, 404);
         }
-        if (error instanceof SuiteExecutionError) {
-          return c.json({ error: error.message }, 400);
-        }
+        // The domain's own refusal, at the status this family publishes: the
+        // code, the fault and the remediation are the boundary's to render.
+        if (error instanceof SuiteExecutionError) throw new SuiteAliasRunRefusedError(error);
         throw error;
       }
     },
@@ -645,8 +723,8 @@ export function createSuiteRestApp(options: {
   secured.access(requires("scenarios:manage")).delete(
     "/:id",
     describeRoute({
-      description:
-        "Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in one transaction.",
+      deprecated: true,
+      description: `${DEPRECATION_NOTE} Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in one transaction.`,
       responses: {
         ...baseResponses,
         200: {
