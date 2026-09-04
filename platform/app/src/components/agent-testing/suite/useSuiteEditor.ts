@@ -105,7 +105,8 @@ function refusalsOf(draft: SuiteDraft): SuiteDraft | null {
         identifier,
         type: row.type,
       });
-      if (!parsed.success) error = parsed.error.issues[0]?.message;
+      const issues = parsed.success ? [] : parsed.error.issues;
+      if (issues[0]) error = issues[0].message;
       else if (seen.has(identifier))
         error = SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE;
       seen.add(identifier);
