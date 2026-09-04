@@ -33,9 +33,9 @@ export const createAnnotationCommand = async (
     });
     process.exit(1);
   }
-  // An annotation carries one rating, so asking for both is a mistake worth
-  // naming rather than resolving silently in favour of whichever is checked
-  // first.
+  // Unlike the two above, this is not a server rule: `CreateAnnotationBody`
+  // carries a single `isThumbsUp`, so the contradiction is inexpressible on
+  // the wire and the CLI is the only layer that can still see it.
   if (options.thumbsUp === true && options.thumbsDown === true) {
     reportCommandError({
       error: commandValidationError(
