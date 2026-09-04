@@ -8,8 +8,8 @@ import type { MountedRoute } from "../types.js";
 // onRouteMounted contract: one callback per mounted route, with the absolute
 // path exactly as the Hono route table reports it. The app builds its route
 // policy registry from these callbacks, so completeness (guards and withdrawn
-// mounts included) is the whole point. With the bare alias gone (ADR 002),
-// every reported endpoint mount names its version namespace.
+// mounts included) is the whole point. Every mount answers at its bare path
+// and at the `/api/v1` twin it reports as `canonicalPath` (ADR 002 s1).
 // ---------------------------------------------------------------------------
 
 const GUARD_PATH = "/api/test/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
@@ -17,12 +17,14 @@ const GUARD_WILDCARD_PATH = `${GUARD_PATH}/*`;
 
 type Summary = Pick<MountedRoute, "method" | "path" | "version" | "status" | "withdrawn"> & {
   isNamespaceGuard: boolean;
+  canonicalPath: string | null;
 };
 
 function summarize(route: MountedRoute): Summary {
   return {
     method: route.method,
     path: route.path,
+    canonicalPath: route.canonicalPath ?? null,
     version: route.version,
     status: route.status,
     withdrawn: route.withdrawn,
@@ -72,46 +74,37 @@ describe("onRouteMounted", () => {
     it("fires exactly once per mount: dated, latest, and both namespace guards", () => {
       const { mounted } = buildSingleVersionService();
 
+      const endpoint = (
+        method: "get" | "post",
+        path: string,
+        version: string,
+        status: "stable" | "latest",
+      ): Summary => ({
+        method,
+        path,
+        canonicalPath: path.replace("/api/", "/api/v1/"),
+        version,
+        status,
+        withdrawn: false,
+        isNamespaceGuard: false,
+      });
+
       const expected: Summary[] = [
         // dated version
-        {
-          method: "get",
-          path: "/api/test/2025-03-15/items",
-          version: "2025-03-15",
-          status: "stable",
-          withdrawn: false,
-          isNamespaceGuard: false,
-        },
-        {
-          method: "post",
-          path: "/api/test/2025-03-15/items.create",
-          version: "2025-03-15",
-          status: "stable",
-          withdrawn: false,
-          isNamespaceGuard: false,
-        },
+        endpoint("get", "/api/test/2025-03-15/items", "2025-03-15", "stable"),
+        endpoint("post", "/api/test/2025-03-15/items.create", "2025-03-15", "stable"),
         // latest
-        {
-          method: "get",
-          path: "/api/test/latest/items",
-          version: "latest",
-          status: "latest",
-          withdrawn: false,
-          isNamespaceGuard: false,
-        },
-        {
-          method: "post",
-          path: "/api/test/latest/items.create",
-          version: "latest",
-          status: "latest",
-          withdrawn: false,
-          isNamespaceGuard: false,
-        },
+        endpoint("get", "/api/test/latest/items", "latest", "latest"),
+        endpoint("post", "/api/test/latest/items.create", "latest", "latest"),
+        // the bare alias, which is the address the document names
+        endpoint("get", "/api/test/items", "latest", "latest"),
+        endpoint("post", "/api/test/items.create", "latest", "latest"),
         // version-namespace guards (the non-wildcard one is a real, enumerable
         // route and MUST be reported so hosts can register a policy for it)
         {
           method: "all",
           path: GUARD_PATH,
+          canonicalPath: GUARD_PATH.replace("/api/", "/api/v1/"),
           version: null,
           status: null,
           withdrawn: false,
@@ -120,6 +113,7 @@ describe("onRouteMounted", () => {
         {
           method: "all",
           path: GUARD_WILDCARD_PATH,
+          canonicalPath: GUARD_WILDCARD_PATH.replace("/api/", "/api/v1/"),
           version: null,
           status: null,
           withdrawn: false,
@@ -127,8 +121,8 @@ describe("onRouteMounted", () => {
         },
       ];
 
-      // No bare alias: 4 endpoint mounts + 2 guards.
-      expect(mounted).toHaveLength(6);
+      // 4 versioned mounts + 2 bare aliases + 2 guards, each reported once.
+      expect(mounted).toHaveLength(8);
       expect(mounted.map(summarize).sort(bySummary)).toEqual([...expected].sort(bySummary));
     });
 
@@ -185,8 +179,20 @@ describe("onRouteMounted", () => {
       // on: a mount Hono holds and the callback never reports lands in
       // production with no policy. `ALL /api/test/*` is the service's own
       // middleware layer rather than a route, so it is the single exclusion.
+      // The service's own middleware layers and every `/api/v1` twin are the
+      // exclusions: a twin is the same logical route, reported as the
+      // canonical path of the bare mount rather than as a second route.
+      const canonical = new Set(
+        mounted.flatMap((route) =>
+          route.canonicalPath ? [`${route.method.toUpperCase()} ${route.canonicalPath}`] : [],
+        ),
+      );
       const unreported = [...table].filter(
-        (entry) => entry !== "ALL /api/test/*" && !reported.has(entry),
+        (entry) =>
+          entry !== "ALL /api/test/*" &&
+          entry !== "ALL /api/v1/test/*" &&
+          !reported.has(entry) &&
+          !canonical.has(entry),
       );
       expect(unreported).toEqual([]);
     });
@@ -211,8 +217,8 @@ describe("onRouteMounted", () => {
         .withdrawRoute("get", "/old", "2025-06-01")
         .build();
 
-      // 1 dated 2025-01-01 + 1 dated 2025-06-01 + 1 latest + 2 guards.
-      expect(mounted).toHaveLength(5);
+      // 1 dated 2025-01-01 + 1 dated 2025-06-01 + 1 latest + 1 bare + 2 guards.
+      expect(mounted).toHaveLength(6);
 
       const withdrawn = mounted.filter((route) => route.withdrawn);
       expect(
@@ -228,6 +234,7 @@ describe("onRouteMounted", () => {
           status: "stable",
         },
         { path: "/api/test/latest/old", version: "latest", status: "latest" },
+        { path: "/api/test/old", version: "latest", status: "latest" },
       ]);
       for (const route of withdrawn) {
         expect(route.config?.meta).toEqual(meta);

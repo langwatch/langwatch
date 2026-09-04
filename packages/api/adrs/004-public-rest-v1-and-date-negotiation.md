@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-27
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-09-04 (`v1` is not public-REST-only)
 
 **Behavioural contract:**
 [../specs/public-rest.feature](../specs/public-rest.feature)
@@ -40,7 +40,14 @@ The URL has two independent version axes:
 /api/v1/{service}/{YYYY-MM-DD|latest}/{endpoint}
 ```
 
-`v1` is the static global API generation. The optional segment is the existing
+`v1` is the static global API generation. **Amended 2026-09-04:** it is not
+this surface's alone. Every REST family answers under `/api/v1`, whichever
+builder declares it, and `/api/v1/{thing}` is the canonical published prefix
+for the whole API ([002 section 1](./002-explicit-version-namespaces.md)). What
+stays specific to `createRestService` is the rest of this decision — the
+optional date segment, the header negotiation and the one-input contract.
+
+The optional segment is the existing
 date-version catalogue: dates inherit the latest registration on or before
 them, `latest` selects the newest registrations, and withdrawals remain dated.
 When the segment is absent, `X-API-Version` may carry a date or `latest`; with
@@ -62,7 +69,7 @@ errors; endpoints do not register error catalogues.
 - REST and RPC share one handler, schema, capability and error discipline.
 - A caller can pin a date visibly in its URL or operationally in a header.
 - Path fields cannot bypass the one input schema.
-- Existing routes remain byte-for-byte unchanged until migration work opts in.
+- Existing routes keep every address they had, and gain their `/api/v1` twin.
 
 ## Alternatives considered
 

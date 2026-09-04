@@ -109,7 +109,10 @@ export function createAuthRestApp(options: {
   ports: AuthRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api" });
+  // No `/api/v1` twin: Better Auth builds its own callback, cookie and
+  // redirect URLs from one configured base, so a second address for the
+  // sign-in door would be half-wired rather than equivalent.
+  const secured = security.createServiceApp({ basePath: "/api", v1Alias: false });
 
   const authPolicy = () =>
     publicEndpoint("BetterAuth session/OAuth handshake; framework manages its own session");

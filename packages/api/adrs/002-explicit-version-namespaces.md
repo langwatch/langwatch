@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-20
 
-**Status:** Proposed
+**Status:** Accepted, amended 2026-09-04 (section 1)
 
 **Behavioural contract:**
 [../specs/versioned-routing.feature](../specs/versioned-routing.feature)
@@ -34,21 +34,47 @@ compatibility `registerRoute`. The additive public REST surface has a static
 
 ## Decision
 
-### 1. The version namespace is part of the URL, always
+### 1. `/api/v1` is the canonical prefix; the bare alias and the version namespaces all answer
 
-Every API URL is:
+**Amended 2026-09-04.** The original ruling deleted the bare alias. That broke
+twenty-three operations the published, frozen OpenAPI document names at their
+bare paths, and every client generated from it. The amendment keeps the
+explicit namespaces and restores the alias, under one canonical prefix:
 
 ```text
-/api/{service}/{version}/{name}
+/api/v1/{service}/{name}              canonical — what documents, SDKs,
+                                      the CLI and MCP tools call
+/api/{service}/{name}                 the bare alias, serving `latest`
+/api/v1/{service}/{version}/{name}    the version namespaces, under both
+/api/{service}/{version}/{name}       prefixes
   version = YYYY-MM-DD | latest | preview
   name    = things.create            (RPC)
             things.watch             (SSE)
             some/rest/path           (registerRoute families)
 ```
 
-There is no bare alias. `/api/things/` and anything under it answers 404,
-produced by the same namespace guards that already reject unknown versions —
-a request without a version segment is an unknown namespace.
+Every REST family answers at `/api/v1/{thing}` as well as at `/api/{thing}`.
+The two are ONE logical route: the same handler, the same declared access
+policy, one entry in the route-policy registry, and one operation in the
+document — the mount reports the v1 form as its `canonicalPath` rather than
+reporting a second route, so an authorization audit and the document's drift
+guard count it once.
+
+A family whose path already names a generation of its own — `/api/v1/agents`,
+`/api/v1/run-plans`, `/api/v1/test-suites`, `/api/v1/secret`,
+`/api/otel/v1/*`, `/api/scim/v2/*` — is mounted once. Two generation segments
+in one URL would be two version axes, which is the thing this decision exists
+to prevent.
+
+Two surfaces are deliberately outside the canonical prefix: the Better Auth
+sign-in door (`/api/auth/*`), which builds its own callback, cookie and
+redirect URLs from one configured base, and the deployment's health probes
+(`/api/health`), which are operator configuration rather than product API.
+The tRPC (`/api/trpc`) and SSE (`/api/sse`) mounts are not REST families and
+carry their own contracts.
+
+The namespace guards stay exactly as they were, under both prefixes: an
+unknown version segment still answers 404 rather than falling through.
 
 ### 2. The document carries every dated version
 
@@ -59,10 +85,13 @@ it under its own honest name. `preview` is never documented: preview is where
 an endpoint may change without notice, and documenting it would promise
 stability it does not have.
 
-The declared OpenAPI `operationId` belongs to the `latest` mount. Each dated
-mount appends its version, for example `createThing_2026_08_07`, because an
-OpenAPI document requires operation ids to be globally unique even when one
-logical endpoint is inherited across several version namespaces.
+The declared OpenAPI `operationId` belongs to the address a client is told to
+call — the bare alias since the 2026-09-04 amendment, and `latest` where a
+family has no alias. Every other mount appends its namespace, for example
+`createThing_2026_08_07` and `createThing_latest`, because an OpenAPI document
+requires operation ids to be globally unique even when one logical endpoint is
+inherited across several version namespaces. The `/api/v1` twin adds no
+operation at all: it is the same route at its canonical address.
 
 The document growing with each version is bounded by withdrawal: a withdrawn
 endpoint leaves the document at the version it was withdrawn from.
@@ -83,16 +112,16 @@ and versioned mounts additionally carry `X-API-Version` with the namespace
 that answered. Both are set in a `finally`, so validation errors and 410
 withdrawals carry them too. `unversioned` disappears with the bare alias.
 
-### 5. The break is deliberate and enumerated
+### 5. Nothing that answered stops answering
 
-This breaks the four resource-REST management families (roles, role-bindings,
-scim-tokens, organization) and every spec and client that pins a bare path —
-the TypeScript SDK's management services and the CLI's request tests among
-them. They migrate to explicit namespaces when the rework lands; the
-route-coverage gate's "counted once at its bare alias path" scenario is
-amended to the dated mounts at the same time.
+**Amended 2026-09-04.** The original section enumerated a deliberate break of
+the four resource-REST management families (roles, role-bindings, scim-tokens,
+organization) and every client pinning a bare path. The amendment withdraws
+that break: those families answer at their bare paths again, and at
+`/api/v1/{thing}` besides. Documents, SDKs, the CLI and MCP tools move to the
+canonical `/api/v1` form; nothing has to move to keep working.
 
-Two casualties are worth naming rather than discovering. The version-gated
+One casualty is worth naming rather than discovering. The version-gated
 error envelope — the union format carrying the legacy `error` field for
 unversioned requests — loses its reason to exist with the alias: the clean
 format becomes the only format, and the MCP client's special case for the
@@ -103,9 +132,11 @@ lands, `v1` becomes a dated namespace like every other family.
 
 ## Alternatives considered
 
-Keeping the bare alias but undocumented was rejected: one operation with two
-addresses, where the undocumented one is the address every existing client
-uses. The alias would never die.
+Keeping the bare alias but undocumented was rejected, and the 2026-09-04
+amendment settles it the other way round: the alias stays, and the DOCUMENTED
+address is the canonical `/api/v1` one. One operation with two addresses is
+the deliberate shape, because the alias is what every existing client already
+calls.
 
 Documenting only `latest` was rejected: a pinned client cannot see its own
 contract, and `latest` changes meaning on every release, so SDK diffs would
@@ -126,5 +157,6 @@ permanent in client code, and a 302 trains clients to keep calling it.
   is removed; mounting stays eager.
 - Every dated mount is a real route the coverage gate counts; withdrawn
   endpoints remain accounted for without exclusion entries.
-- Clients that pinned nothing break loudly (404) rather than silently shifting
-  to a new latest — the failure mode this decision prefers everywhere.
+- A client that pins nothing gets `latest`, at the bare alias, as it always
+  did. The published document names the canonical `/api/v1` form, so a client
+  generated from it pins the generation without pinning a date.

@@ -46,6 +46,30 @@ function service() {
 }
 
 describe("modern REST", () => {
+  /** @scenario "One schema describes one request" */
+  it("types the chain to one withInput and one withOutput, with no bare params or query", () => {
+    // The assignments below only compile if each aliased type resolved to the
+    // literal the chain is supposed to produce; a wrong shape is a type error,
+    // not a runtime failure, so this is the test.
+    const wrongInputRejected: WrongInputIsRejected = false;
+    const wrongOutputRejected: WrongOutputIsRejected = false;
+    const responseOutputRejected: ResponseOutputIsRejected = false;
+    const missingInputCannotHandle: MissingRestInputCannotHandle = true;
+    const noBareRegistration: RestFacadeHasNoBareRegistration = false;
+    const noProviderRegistration: RestFacadeHasNoProviderRegistration = false;
+
+    expect([
+      wrongInputRejected,
+      wrongOutputRejected,
+      responseOutputRejected,
+      missingInputCannotHandle,
+      noBareRegistration,
+      noProviderRegistration,
+    ]).toEqual([false, false, false, true, false, false]);
+  });
+
+
+  /** @scenario "The global and date versions are independent" */
   it("defaults to /api/v1/{name} and permits a validated explicit base path", async () => {
     const endpoint = (path: string) =>
       createRestService({
@@ -78,7 +102,8 @@ describe("modern REST", () => {
 
     expect((await defaultApp.request("/api/v1/thing/items")).status).toBe(200);
     expect((await aliasApp.request("/api/thing/items")).status).toBe(200);
-    expect((await aliasApp.request("/api/v1/thing/items")).status).toBe(404);
+    // Every family answers at both addresses, whichever it declares.
+    expect((await aliasApp.request("/api/v1/thing/items")).status).toBe(200);
   });
 
   it("rejects unsafe REST base paths", () => {
@@ -182,6 +207,7 @@ describe("modern REST", () => {
     expect(parses).toBe(1);
   });
 
+  /** @scenario "The method selects the non-path input source" */
   it.each(["post", "put", "patch", "delete"] as const)(
     "uses one JSON body for %s",
     async (method) => {
@@ -209,6 +235,7 @@ describe("modern REST", () => {
     },
   );
 
+  /** @scenario "Output always crosses its schema boundary" */
   it("rejects invalid output and raw Response bypasses", async () => {
     const app = service()
       .get("/wrong", "2026-08-07", (endpoint) =>
@@ -260,6 +287,7 @@ describe("modern REST", () => {
     );
   });
 
+  /** @scenario "Every supported address is documented" */
   it("documents the static v1 path and negotiated version paths", async () => {
     const app = service()
       .get("/items/:id", "2026-08-07", (endpoint) =>
@@ -277,6 +305,10 @@ describe("modern REST", () => {
     expect(spec.paths["/api/v1/thing/latest/items/{id}"]?.get?.operationId).toBe("getThing_latest");
   });
 
+  /** @scenario "An omitted date version defaults to latest" */
+  /** @scenario "A header can pin the optional date version" */
+  /** @scenario "URL and header disagreement fails" */
+  /** @scenario "Invalid and unavailable header versions differ" */
   it("negotiates dated, inherited, latest and header versions without conflicts", async () => {
     const app = service()
       .get("/versioned/:id", "2026-01-15", (endpoint) =>
@@ -440,7 +472,8 @@ describe("modern REST", () => {
     expect(handlerCalls).toBe(1);
   });
 
-  it("keeps a versioned createService family off the public REST mount", async () => {
+  /** @scenario "Every family answers at its /api/v1 path and its bare path" */
+  it("serves a versioned createService family under both prefixes", async () => {
     const app = createService({
       name: "thing",
       basePath: "/api/thing",
@@ -460,6 +493,7 @@ describe("modern REST", () => {
     expect((await app.request("/api/thing/latest/things.get", { method: "POST" })).status).toBe(
       200,
     );
-    expect((await app.request("/api/v1/thing/things.get", { method: "POST" })).status).toBe(404);
+    expect((await app.request("/api/thing/things.get", { method: "POST" })).status).toBe(200);
+    expect((await app.request("/api/v1/thing/things.get", { method: "POST" })).status).toBe(200);
   });
 });

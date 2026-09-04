@@ -56,7 +56,8 @@ export function createAgentLegacyRestApp(options: {
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
   const { security, agents, agentPlatformUrl } = options;
 
-  const secured = security.createProjectApp({ basePath: "/api/agents" });
+  // No derived twin: `/api/v1/agents` is the family that supersedes this one.
+  const secured = security.createProjectApp({ basePath: "/api/agents", v1Alias: false });
 
   const boundary = createFamilyErrorHandler({
     loggerName: "langwatch:api:agents:errors",

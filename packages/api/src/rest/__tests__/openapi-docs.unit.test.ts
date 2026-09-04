@@ -110,17 +110,20 @@ describe("OpenAPI documentation", () => {
     expect(successSchema(june)).toEqual(successSchema(latest));
   });
 
-  it("never documents preview, and no documented path lacks a version namespace", async () => {
+  /** @scenario "One logical route reaches the document once" */
+  it("never documents preview, and never documents an /api/v1 twin", async () => {
     const spec = await generateSpecs(buildDocumentedApp(), SPEC_OPTIONS);
 
     const keys = Object.keys(spec.paths ?? {});
     expect(keys.length).toBeGreaterThan(0);
     for (const key of keys) {
       expect(key).not.toContain("/preview/");
-      expect(key).toMatch(/\/api\/things\/(latest|20\d{2}-\d{2}-\d{2})(\/|$)/);
+      expect(key).not.toContain("/api/v1/");
+      expect(key).toMatch(/^\/api\/things(\/|$)/);
     }
   });
 
+  /** @scenario "Documentation text reaches the published operation" */
   it("lands summary, description, tags, operationId, security and responses in the document", async () => {
     const spec = await generateSpecs(buildDocumentedApp(), SPEC_OPTIONS);
 
@@ -153,7 +156,11 @@ describe("OpenAPI documentation", () => {
     );
 
     expect(new Set(operationIds).size).toBe(operationIds.length);
-    expect(spec.paths["/api/things/latest/things.create"]?.post?.operationId).toBe("createThing");
+    // The declared id belongs to the bare path, the address the document names.
+    expect(spec.paths["/api/things/things.create"]?.post?.operationId).toBe("createThing");
+    expect(spec.paths["/api/things/latest/things.create"]?.post?.operationId).toBe(
+      "createThing_latest",
+    );
     expect(spec.paths["/api/things/2025-06-01/things.create"]?.post?.operationId).toBe(
       "createThing_2025_06_01",
     );
@@ -179,6 +186,7 @@ describe("OpenAPI documentation", () => {
     await expect(res.json()).resolves.toEqual({ ok: true });
   });
 
+  /** @scenario "Deprecation reaches the document and the wire" */
   it("marks a deprecated operation on every dated mount, with the notice in its description", async () => {
     const app = createService({ name: "w", basePath: "/api/w" })
       .registerRoute(

@@ -339,7 +339,8 @@ describe("explicit version namespaces", () => {
     expect(underPreview.headers.get("X-API-Version-Status")).toBe("preview");
   });
 
-  it("answers 404 from the namespace guard when no version segment is given", async () => {
+  /** @scenario "The bare path serves the latest registrations" */
+  it("serves the newest registrations at the bare path", async () => {
     const mounted: MountedRoute[] = [];
     const app = buildRoutedService((route) => mounted.push(route));
 
@@ -347,27 +348,84 @@ describe("explicit version namespaces", () => {
       method: "POST",
     });
 
-    expect(res.status).toBe(404);
-    // From the guard, not from a missing route: the catch-all guard is a real,
-    // reported route, and no endpoint mount ever answered for the bare path.
-    const guards = mounted.filter((route) => route.isNamespaceGuard);
-    expect(guards.length).toBeGreaterThan(0);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual(["august"]);
+    expect(res.headers.get("X-API-Version-Status")).toBe("latest");
     expect(
       mounted.some((route) => !route.isNamespaceGuard && route.path === "/api/things/things.list"),
-    ).toBe(false);
-    expect(res.headers.get("X-API-Version")).toBeNull();
+    ).toBe(true);
   });
 
+  /** @scenario "Every family answers at its /api/v1 path and its bare path" */
+  it("answers at the canonical /api/v1 path and reports it once", async () => {
+    const mounted: MountedRoute[] = [];
+    const app = buildRoutedService((route) => mounted.push(route));
+
+    const bare = await app.request("/api/things/things.list", { method: "POST" });
+    const canonical = await app.request("/api/v1/things/things.list", { method: "POST" });
+
+    expect(canonical.status).toBe(200);
+    await expect(canonical.json()).resolves.toEqual(await bare.json());
+
+    const reports = mounted.filter((route) => route.path === "/api/things/things.list");
+    expect(reports).toHaveLength(1);
+    expect(reports[0]?.canonicalPath).toBe("/api/v1/things/things.list");
+    expect(mounted.some((route) => route.path.startsWith("/api/v1/"))).toBe(false);
+  });
+
+  /** @scenario "A family already under /api/v1 is mounted once" */
+  it("does not alias a family that already names a generation", async () => {
+    const mounted: MountedRoute[] = [];
+    const app = createService({
+      name: "agents",
+      basePath: "/api/v1/agents",
+      logger: false,
+      tracer: false,
+      onRouteMounted: (route) => mounted.push(route),
+    })
+      .withoutPermission("framework test endpoint")
+      .registerRoute(
+        "post",
+        "/agents.list",
+        "2026-01-15",
+        async () => ["one"],
+        (b) => b.withOutput(z.array(z.string())),
+      )
+      .build();
+
+    expect((await app.request("/api/v1/agents/agents.list", { method: "POST" })).status).toBe(200);
+    expect(app.routes.some((route) => route.path.startsWith("/api/v1/v1/"))).toBe(false);
+    expect(mounted.every((route) => route.canonicalPath === undefined)).toBe(true);
+  });
+
+  /** @scenario "The dated and latest namespaces answer under both prefixes" */
+  it("keeps the dated and latest namespaces answering under both prefixes", async () => {
+    const app = buildRoutedService();
+
+    for (const prefix of ["/api/things", "/api/v1/things"]) {
+      const dated = await app.request(`${prefix}/2026-03-01/things.list`, { method: "POST" });
+      expect(dated.status).toBe(200);
+      await expect(dated.json()).resolves.toEqual(["january"]);
+
+      const latest = await app.request(`${prefix}/latest/things.list`, { method: "POST" });
+      expect(latest.status).toBe(200);
+      await expect(latest.json()).resolves.toEqual(["august"]);
+    }
+  });
+
+  /** @scenario "An unknown version namespace is rejected" */
   it("rejects an unknown version namespace with a 404", async () => {
     const app = buildRoutedService();
 
     for (const path of [
       // Not a real calendar date.
       "/api/things/2026-13-99/things.list",
+      "/api/v1/things/2026-13-99/things.list",
       // Not a date at all.
       "/api/things/v1/things.list",
       // A real date before the first registration.
       "/api/things/2020-01-01/things.list",
+      "/api/v1/things/2020-01-01/things.list",
     ]) {
       const res = await app.request(path, { method: "POST" });
       expect(res.status).toBe(404);

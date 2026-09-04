@@ -312,6 +312,12 @@ export interface MountedRoute {
   /** Absolute route path, including the service base path. */
   path: string;
   /**
+   * The canonical `/api/v1` path this same mount also answers at, or absent
+   * when the family already names a generation of its own. One logical route
+   * with two addresses: consumers register one policy, not two.
+   */
+  canonicalPath?: string;
+  /**
    * The mounted version namespace or static generation (`"2025-03-15"`,
    * `"latest"`, `"preview"`, or `"v1"`), or `null` for namespace guards.
    */
@@ -393,6 +399,12 @@ export interface ServiceConfig<TApp = unknown> {
    * the namespace guards. Lets the host register route policies without
    * re-deriving the route table.
    */
+  /**
+   * Set `false` to keep the family off `/api/v1`. Reserved for a family whose
+   * canonical path is already claimed by a different family — a legacy
+   * surface superseded by a v1 one, or an alias fan-out that mounts its own.
+   */
+  v1Alias?: boolean;
   onRouteMounted?: (route: MountedRoute) => void;
   /** @internal Enables the additive `/api/v1/{service}` REST surface. */
   publicRest?: {

@@ -88,6 +88,7 @@ describe("registerSse", () => {
     expect(watchMounts.map((r) => `${r.method} ${r.path}`).sort()).toEqual([
       "get /api/test/2025-03-15/things.watch",
       "get /api/test/latest/things.watch",
+      "get /api/test/things.watch",
     ]);
   });
 

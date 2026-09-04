@@ -21,6 +21,12 @@ export interface RegisteredRoute {
    * default that was wrong for every organization-scoped route.
    */
   readonly credentialClass: CredentialClass;
+  /**
+   * The `/api/v1` path this same route also answers at. One logical route with
+   * two addresses, so an authorization audit and the document's drift guard
+   * count it once and still recognise the canonical published URL.
+   */
+  readonly canonicalPath?: string;
 }
 
 const registry = new Map<string, RegisteredRoute>();

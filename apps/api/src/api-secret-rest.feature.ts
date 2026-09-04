@@ -41,6 +41,8 @@ export class ApiSecretRestFeature {
           application,
           basePath: "/api/secret",
           operationIdSuffix: "UnversionedAlias",
+          // This fan-out mounts its own /api/v1 pair above; no derived twin.
+          v1Alias: false,
           security,
         }),
       )
@@ -50,6 +52,7 @@ export class ApiSecretRestFeature {
           application,
           basePath: "/api/secrets",
           operationIdSuffix: "LegacyPluralAlias",
+          v1Alias: false,
           security,
         }),
       );
@@ -62,10 +65,12 @@ function buildSecretRestApi(options: {
   operationIdSuffix?: string;
   pathVersion?: "v1";
   security: ApiRestProjectPolicy;
+  v1Alias?: boolean;
 }): Hono {
   const rest = createRestService<SecretApp>({
     name: "secret",
     basePath: options.basePath,
+    ...(options.v1Alias === false ? { v1Alias: false } : {}),
     staticVersioning: {
       selector: restVersionSelector,
       ...(options.pathVersion ? { pathVersion: options.pathVersion } : {}),

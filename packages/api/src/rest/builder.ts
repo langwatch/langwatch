@@ -25,6 +25,7 @@ import {
 import { createErrorHandler } from "../errors.js";
 import { loggerMiddleware, tracerMiddleware } from "./middleware.js";
 import { mountResolvedRoutes } from "./route-mounting.js";
+import { canonicalV1Path } from "./v1-alias.js";
 import type { TypedSSEStream } from "./sse.js";
 import type {
   BaseApp,
@@ -300,15 +301,22 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
       throw new Error(`Service basePath must start with "/"; received "${basePath}"`);
     }
 
-    const app = new Hono().basePath(basePath);
+    // No Hono base path: the family's routes answer under both `/api/{name}`
+    // and `/api/v1/{name}`, and `basePath()` admits only one prefix.
+    const app = new Hono();
+    const v1BasePath = this._config.v1Alias === false ? null : canonicalV1Path(basePath);
+    const scopes = v1BasePath ? [`${basePath}/*`, `${v1BasePath}/*`] : [`${basePath}/*`];
+    const scoped = (middleware: MiddlewareHandler): void => {
+      for (const scope of scopes) app.use(scope, middleware);
+    };
     if (this._config.tracer !== false) {
-      app.use("*", tracerMiddleware({ name: this._config.name }));
+      scoped(tracerMiddleware({ name: this._config.name }));
     }
     if (this._config.logger !== false) {
-      app.use("*", loggerMiddleware({ name: this._config.name }));
+      scoped(loggerMiddleware({ name: this._config.name }));
     }
     for (const middleware of this._config.middleware ?? []) {
-      app.use("*", middleware);
+      scoped(middleware);
     }
 
     const onError = this._config.onError ?? createErrorHandler();

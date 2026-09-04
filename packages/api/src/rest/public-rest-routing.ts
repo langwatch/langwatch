@@ -6,6 +6,7 @@ import { ApiVersionUnavailableError, InvalidApiVersionError } from "../errors.js
 import { runMiddlewareStack } from "./middleware-stack.js";
 import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.js";
 import type { BaseApp, EndpointRegistration, HttpMethod, ServiceConfig } from "./types.js";
+import { canonicalV1Path, undescribedStack } from "./v1-alias.js";
 import { isDateVersion } from "./types.js";
 import { type ResolvedEndpoint, VERSION_LATEST } from "./versioning.js";
 
@@ -58,10 +59,11 @@ export function mountStaticVersionRoutes<TProject>({
           status,
           version,
         });
-    mountRoute({ app, method, path, stack });
+    const mounted = mountFamilyRoute({ app, basePath, method, path, serviceConfig, stack });
     serviceConfig.onRouteMounted?.({
       method,
-      path: mergePath(basePath, path),
+      path: mounted.path,
+      ...(mounted.canonicalPath ? { canonicalPath: mounted.canonicalPath } : {}),
       version,
       status,
       withdrawn: endpoint.withdrawn === true,
@@ -186,10 +188,18 @@ function mountOptionalEndpoint<TProject>({
     endpoint,
     serviceConfig,
   });
-  mountRoute({ app, method, path, stack: [...documentation, dispatch] });
+  const mounted = mountFamilyRoute({
+    app,
+    basePath,
+    method,
+    path,
+    serviceConfig,
+    stack: [...documentation, dispatch],
+  });
   serviceConfig.onRouteMounted?.({
     method,
-    path: mergePath(basePath, path),
+    path: mounted.path,
+    ...(mounted.canonicalPath ? { canonicalPath: mounted.canonicalPath } : {}),
     version: null,
     status: null,
     withdrawn: endpoint.withdrawn === true,
@@ -294,6 +304,37 @@ function endpointKey(endpoint: Pick<ResolvedEndpoint, "method" | "path">): strin
  * the method has to be dispatched rather than passed. Both mounters need that
  * and had a copy each; this is the one they share.
  */
+/**
+ * Mounts one resolved route at its bare `/api` path and, unless the family
+ * already names a generation of its own, at the canonical `/api/v1` twin.
+ *
+ * `path` is the family-relative path; both returned paths are absolute and
+ * byte-identical to what Hono's route table reports.
+ */
+export function mountFamilyRoute({
+  app,
+  basePath,
+  method,
+  path,
+  serviceConfig,
+  stack,
+}: {
+  app: Hono;
+  basePath: string;
+  method: HttpMethod;
+  path: string;
+  serviceConfig: ServiceConfig;
+  stack: MiddlewareHandler[];
+}): { path: string; canonicalPath: string | null } {
+  const absolute = mergePath(basePath, path);
+  mountRoute({ app, method, path: absolute, stack });
+  const canonicalPath = serviceConfig.v1Alias === false ? null : canonicalV1Path(absolute);
+  if (canonicalPath) {
+    mountRoute({ app, method, path: canonicalPath, stack: undescribedStack(stack) });
+  }
+  return { path: absolute, canonicalPath };
+}
+
 export function mountRoute({
   app,
   method,

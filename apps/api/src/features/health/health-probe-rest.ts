@@ -568,7 +568,9 @@ export function createHealthProbeRestApp(options: {
   ports: HealthProbeRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api/health" });
+  // No `/api/v1` twin: the probes are the deployment's own surface, not the
+  // published product API, and an orchestrator's probe URL is configuration.
+  const secured = security.createServiceApp({ basePath: "/api/health", v1Alias: false });
   const probe = publicEndpoint("subsystem health probe");
 
   secured.access(probe).get("/collector", (c) => collectorProbe(c, ports));

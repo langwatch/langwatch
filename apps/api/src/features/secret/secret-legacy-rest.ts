@@ -67,7 +67,9 @@ export function createSecretLegacyRestApp(options: {
 }): SecuredApp<{ Variables: AppRestProjectVariables }> {
   const { security, secrets } = options;
 
-  const legacy = security.createProjectApp({ basePath: "/api/secrets" });
+  // No derived twin: `/api/v1/secrets` is a different family with different
+  // payload and error semantics, mounted by ApiSecretRestFeature.
+  const legacy = security.createProjectApp({ basePath: "/api/secrets", v1Alias: false });
   legacy.use(legacyDeprecationWarning);
   legacy.use(restVersionSelectorMiddleware({ selector: legacyRestVersionSelector }));
   legacy.hono.onError((error, context) => {

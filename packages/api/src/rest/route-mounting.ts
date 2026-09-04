@@ -5,22 +5,27 @@ import { ApiVersionUnavailableError } from "../errors.js";
 import { runMiddlewareStack } from "./middleware-stack.js";
 import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./pipeline.js";
 import {
+  mountFamilyRoute,
   mountOptionalVersionRoutes,
-  mountRoute,
   mountStaticVersionRoutes,
 } from "./public-rest-routing.js";
-import type { BaseApp, HttpMethod, ServiceConfig, VersionStatus } from "./types.js";
+import type { BaseApp, ServiceConfig, VersionStatus } from "./types.js";
 import { isDateVersion } from "./types.js";
 import { type ResolvedEndpoint, VERSION_LATEST, VERSION_PREVIEW } from "./versioning.js";
+import { canonicalV1Path } from "./v1-alias.js";
 
 type ProviderMap<TProject> = Record<string, (base: BaseApp<TProject>, context: Context) => unknown>;
 type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
 
 /**
- * Mounts every resolved version namespace and the two namespace guards.
+ * Mounts every resolved version namespace, the bare alias, and the two
+ * namespace guards.
  *
- * `createService` has no bare alias (ADR 002). Public REST adds its separate,
- * optional date-version routes after the explicit mounts (ADR 004).
+ * Every mount answers at its bare `/api/{family}` path and at the canonical
+ * `/api/v1/{family}` twin (ADR 002 §1). The bare alias serves `latest` and
+ * owns the declared operation id; the `latest` namespace keeps its own,
+ * suffixed. Public REST adds its separate, optional date-version routes after
+ * the explicit mounts (ADR 004).
  */
 export function mountResolvedRoutes<TProject>({
   app,
@@ -49,17 +54,34 @@ export function mountResolvedRoutes<TProject>({
     return;
   }
 
+  // A compatibility family answers at its bare path as well as under every
+  // version namespace. Public REST already mounts a bare optional-version
+  // route of its own, so it is left alone.
+  const bareAlias = !serviceConfig.publicRest && versionMap.has(VERSION_LATEST);
+
   for (const [version, endpoints] of versionMap) {
     const status = resolveVersionStatus(version);
     mountVersion({
       app,
       basePath,
+      bareAlias,
       endpoints,
       onError,
       providers,
       serviceConfig,
       status,
       version,
+    });
+  }
+
+  if (bareAlias) {
+    mountBareAlias({
+      app,
+      basePath,
+      endpoints: versionMap.get(VERSION_LATEST)!,
+      onError,
+      providers,
+      serviceConfig,
     });
   }
 
@@ -94,10 +116,14 @@ export function mountResolvedRoutes<TProject>({
     const handlers: [MiddlewareHandler, ...MiddlewareHandler[]] = fallback
       ? [fallback, notFound]
       : [notFound];
-    app.all(guardPath, ...handlers);
+    const absolute = mergePath(basePath, guardPath);
+    const canonicalPath = serviceConfig.v1Alias === false ? null : canonicalV1Path(absolute);
+    app.all(absolute, ...handlers);
+    if (canonicalPath) app.all(canonicalPath, ...handlers);
     serviceConfig.onRouteMounted?.({
       method: "all",
-      path: mergePath(basePath, guardPath),
+      path: absolute,
+      ...(canonicalPath ? { canonicalPath } : {}),
       version: null,
       status: null,
       withdrawn: false,
@@ -110,6 +136,7 @@ export function mountResolvedRoutes<TProject>({
 function mountVersion<TProject>({
   app,
   basePath,
+  bareAlias,
   endpoints,
   onError,
   providers,
@@ -119,6 +146,7 @@ function mountVersion<TProject>({
 }: {
   app: Hono;
   basePath: string;
+  bareAlias: boolean;
   endpoints: ResolvedEndpoint[];
   onError: ErrorHandler;
   providers: ProviderMap<TProject>;
@@ -138,16 +166,72 @@ function mountVersion<TProject>({
           serviceConfig,
           status,
           version,
-          operationIdSuffix: serviceConfig.publicRest && status === "latest" ? "latest" : void 0,
+          // The declared id belongs to whichever mount a client is told to
+          // call: the bare alias where there is one, `latest` otherwise.
+          operationIdSuffix:
+            status === "latest" && (bareAlias || serviceConfig.publicRest) ? "latest" : void 0,
         });
-    mountRoute({ app, method, path, stack });
+    const mounted = mountFamilyRoute({ app, basePath, method, path, serviceConfig, stack });
     serviceConfig.onRouteMounted?.({
       method,
       // mergePath is what Hono itself applies a basePath with, so the
       // reported string is byte-identical to app.routes[i].path.
-      path: mergePath(basePath, path),
+      path: mounted.path,
+      ...(mounted.canonicalPath ? { canonicalPath: mounted.canonicalPath } : {}),
       version,
       status,
+      withdrawn: ep.withdrawn === true,
+      config: ep.config,
+    });
+  }
+}
+
+/**
+ * The bare alias: the `latest` catalogue served without a version segment.
+ *
+ * It is the address the published document names, so it carries the declared
+ * operation id and the same stack the `latest` namespace runs.
+ */
+function mountBareAlias<TProject>({
+  app,
+  basePath,
+  endpoints,
+  onError,
+  providers,
+  serviceConfig,
+}: {
+  app: Hono;
+  basePath: string;
+  endpoints: ResolvedEndpoint[];
+  onError: ErrorHandler;
+  providers: ProviderMap<TProject>;
+  serviceConfig: ServiceConfig;
+}): void {
+  for (const ep of endpoints) {
+    const path = ep.path || "/";
+    const method = ep.method === "sse" ? "get" : ep.method;
+    const stack = ep.withdrawn
+      ? buildWithdrawnMiddlewareStack({
+          ep,
+          serviceConfig,
+          status: "latest",
+          version: VERSION_LATEST,
+        })
+      : buildEndpointMiddlewareStack({
+          ep,
+          onError,
+          providers,
+          serviceConfig,
+          status: "latest",
+          version: VERSION_LATEST,
+        });
+    const mounted = mountFamilyRoute({ app, basePath, method, path, serviceConfig, stack });
+    serviceConfig.onRouteMounted?.({
+      method,
+      path: mounted.path,
+      ...(mounted.canonicalPath ? { canonicalPath: mounted.canonicalPath } : {}),
+      version: VERSION_LATEST,
+      status: "latest",
       withdrawn: ep.withdrawn === true,
       config: ep.config,
     });
@@ -240,7 +324,11 @@ function buildDateFallback<TProject>({
       return next();
     }
 
-    const rest = c.req.path.slice(basePath.length + requested.length + 1) || "/";
+    // The guard is mounted under both prefixes, so the base to strip comes
+    // from the route that matched rather than from the family's bare path.
+    const marker = c.req.routePath.indexOf("/:apiVersion");
+    const mountBase = marker >= 0 ? c.req.routePath.slice(0, marker) : basePath;
+    const rest = c.req.path.slice(mountBase.length + requested.length + 1) || "/";
     const method = c.req.method.toLowerCase();
     for (const candidate of table.get(effective)!) {
       if (candidate.method !== method) continue;
