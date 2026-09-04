@@ -17,7 +17,7 @@
  * row is read only through this schema, and a shape written by a
  * disagreeing build is refused by name instead of half-understood.
  *
- * Both the dashboard-widgets router and the client (`CustomChartPlayground.tsx`,
+ * Both the dashboard-widgets router and the client (`DashboardWidgetFrame.tsx`,
  * which parses `row.graph` with this same schema) import from here, so the
  * two sides cannot drift. Safe for the client to import: this module pulls in
  * nothing but `zod` and a constant, never Prisma or any server-only code.

@@ -10,11 +10,11 @@
  *  - `PATCH  /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}`
  *  - `DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}`
  *
- * They exist so Langy — and any CLI caller — can create, update and delete the
- * widgets the custom-chart-playground page renders, an action surface the page
- * itself has through the `dashboardWidgets` tRPC router but no API key could
- * reach. Placement is deliberately absent: a dashboard widget lives on the
- * playground page, not a dashboard, so there is nothing to place it onto.
+ * They exist so Langy — and any CLI caller — can create, update and delete
+ * dashboard widgets, an action surface the dashboard UI itself has through
+ * the `dashboardWidgets` tRPC router but no API key could reach. Placement
+ * on a dashboard is done via the widget's `dashboardId` field, set through
+ * the same tRPC router the UI uses.
  *
  * ## What is validated here
  *
@@ -146,8 +146,8 @@ const widgetNotFoundResponse: Record<404, RouteResponse> = {
 /**
  * The widget as the API publishes it.
  *
- * `platformUrl` names the custom-chart-playground page: unlike a saved chart,
- * a widget has a home surface to land an integrator on.
+ * `platformUrl` names the dashboards page: a widget is edited in place on
+ * its dashboard, so that's the home surface to land an integrator on.
  */
 function widgetResource({
   widget,
@@ -164,7 +164,7 @@ function widgetResource({
     updatedAt: widget.updatedAt.toISOString(),
     platformUrl: platformUrl({
       projectSlug: project.slug,
-      path: "/dev/custom-chart-playground",
+      path: "/analytics/reports",
     }),
     dashboardId: widget.dashboardId,
     gridColumn: widget.gridColumn,

@@ -885,7 +885,7 @@
     {
       "id": "dashboard-widgets",
       "name": "Dashboard Widgets",
-      "description": "Custom React widgets backed by LangWatchQL queries, authored on the custom-chart-playground page and pinned to dashboards",
+      "description": "Custom React widgets backed by LangWatchQL queries, authored and edited in place on dashboards",
       "surfaces": {
         "code": {
           "cli": [
@@ -910,7 +910,7 @@
           "docs": null
         },
         "platform": {
-          "ui": "/dev/custom-chart-playground",
+          "ui": "/analytics/reports",
           "mcp": null,
           "skill": null,
           "docs": null

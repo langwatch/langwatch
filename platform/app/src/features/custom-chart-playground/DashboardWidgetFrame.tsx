@@ -75,8 +75,7 @@ export function DashboardWidgetFrame({
 
   // A row this build never wrote — an old shape, a hand-edited one — fails
   // safeParse and degrades to an empty file with no queries rather than
-  // crashing the grid, the same fallback `CustomChartPlayground.tsx`'s
-  // `toWidget` uses on the editor page.
+  // crashing the grid.
   const parsed = dashboardWidgetDefinitionSchema.safeParse(graph);
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
