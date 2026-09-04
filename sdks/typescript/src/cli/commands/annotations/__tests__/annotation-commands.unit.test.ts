@@ -210,7 +210,7 @@ describe("createAnnotationCommand()", () => {
           .mocked(console.log)
           .mock.calls.map((call) => String(call[0]))
           .join("\n"),
-      ) as { ok: boolean; error: { kind: string; message: string } };
+      ) as { ok: boolean; error: { code: string; message: string } };
 
     beforeEach(() => {
       setOutputFormat("json");
@@ -228,7 +228,7 @@ describe("createAnnotationCommand()", () => {
       expect(mockCreate).not.toHaveBeenCalled();
       const document = stdoutDocument();
       expect(document.ok).toBe(false);
-      expect(document.error.kind).toBe("validation_error");
+      expect(document.error.code).toBe("validation_error");
       expect(document.error.message).toContain("--comment is required");
     });
 
@@ -240,7 +240,7 @@ describe("createAnnotationCommand()", () => {
       expect(mockCreate).not.toHaveBeenCalled();
       const document = stdoutDocument();
       expect(document.ok).toBe(false);
-      expect(document.error.kind).toBe("validation_error");
+      expect(document.error.code).toBe("validation_error");
       expect(document.error.message).toContain("--thumbs-up");
     });
   });

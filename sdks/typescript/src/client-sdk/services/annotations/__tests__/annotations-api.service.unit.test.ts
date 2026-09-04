@@ -95,7 +95,7 @@ describe("given an AnnotationsApiService against the server's envelope", () => {
     });
   });
 
-  describe("the create body's compile-time contract", () => {
+  describe("when a caller builds the create body", () => {
     it("requires comment and isThumbsUp, as the server enforces at runtime", () => {
       // The server 400s without them (routes/annotations.ts:336-355), so the
       // generated type must refuse the same bodies at compile time.
