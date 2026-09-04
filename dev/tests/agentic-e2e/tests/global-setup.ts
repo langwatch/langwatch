@@ -1,12 +1,10 @@
 /**
  * Global Setup for E2E Tests
  *
- * Boots what the suite needs and validates it is ready before any test runs.
- *
- * A stack that already answers at BASE_URL is used as it stands — that is CI,
- * which boots its own, and a developer who left `pnpm dev` running. Otherwise
- * the shared helper starts one on `E2E_STACK_PORT` and this file puts it back
- * down afterwards.
+ * Resolves the stack the suite runs against and validates it before any test.
+ * The helper decides which one: `LANGWATCH_E2E_BASE_URL` (CI), else this
+ * worktree's haven stack, else one already answering at BASE_URL, else it boots
+ * one on `E2E_STACK_PORT` and this file puts that back down afterwards.
  *
  * The journey's target agent starts here too: a run has to complete, so the
  * address the HTTP agent names must answer.
@@ -16,19 +14,10 @@ import { startStack, type RunningStack } from "@langwatch/e2e-stack";
 import { startEchoAgent, type EchoAgent } from "./journey/echo-agent";
 import { JOURNEY_MODEL_ID } from "./journey/journey.constants";
 
-const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
+let BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
 const STACK_PORT = Number(process.env.E2E_STACK_PORT ?? "5600");
 const MAX_RETRIES = 30;
 const RETRY_DELAY_MS = 2000;
-
-async function alreadyServing(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, { method: "GET", signal: AbortSignal.timeout(5000) });
-    return response.ok || response.status === 302;
-  } catch {
-    return false;
-  }
-}
 
 async function waitForApp(): Promise<void> {
   console.log(`\n🔍 Checking app availability at ${BASE_URL}...`);
@@ -108,16 +97,16 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   console.log("E2E Test Global Setup");
   console.log("=".repeat(60));
 
-  let stack: RunningStack | null = null;
-  if (await alreadyServing(BASE_URL)) {
-    console.log(`\n✅ Using the stack already serving at ${BASE_URL}`);
-  } else {
-    console.log(`\n🚀 No stack at ${BASE_URL}; starting one on port ${STACK_PORT}...`);
-    stack = await startStack({
-      port: STACK_PORT,
-      env: { LANGWATCH_DEFAULT_MODEL: JOURNEY_MODEL_ID },
-    });
-  }
+  const stack: RunningStack = await startStack({
+    port: STACK_PORT,
+    baseUrlHint: BASE_URL,
+    env: { LANGWATCH_DEFAULT_MODEL: JOURNEY_MODEL_ID },
+  });
+  console.log(`\n✅ Stack (${stack.source}): ${stack.baseUrl}`);
+
+  // Every worker reads this, and the journey builds its browser context on it.
+  BASE_URL = stack.baseUrl;
+  process.env.BASE_URL = stack.baseUrl;
 
   await waitForApp();
   await waitForApi();
@@ -132,6 +121,6 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 
   return async () => {
     await echo.stop();
-    await stack?.stop();
+    await stack.stop();
   };
 }

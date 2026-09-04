@@ -1,14 +1,15 @@
 /**
- * One local stack for an end-to-end suite.
+ * One local stack for an end-to-end suite, resolved in this order:
  *
- * `LANGWATCH_E2E_BASE_URL` names a stack that is already up — CI sets it — and
- * then nothing is started and nothing is stopped. Bare, the helper runs the
- * same `dev/scripts/dev-stack.sh` a developer runs, on the port slot the suite
- * asks for, and waits until all three Node applications answer.
+ *   1. `LANGWATCH_E2E_BASE_URL` — CI sets it, and then nothing is started.
+ *   2. This worktree's haven stack, when one is up.
+ *   3. A stack already answering at the caller's address.
+ *   4. Otherwise `dev/scripts/dev-stack.sh` on the port slot the suite asks for,
+ *      stopped again when the suite is done.
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 
 /**
  * The workspace root, found by walking up from the working directory to the
@@ -38,14 +39,18 @@ export type RunningStack = Readonly<{
   baseUrl: string;
   /** The api process, which the browser reaches through the ui lane's proxy. */
   apiUrl: string;
+  /** Where this address came from, for the line the suite prints. */
+  source: "environment" | "haven" | "already-serving" | "booted";
   /** True when this call started the processes and `stop` will end them. */
   started: boolean;
   stop: () => Promise<void>;
 }>;
 
 export type StartStackOptions = Readonly<{
-  /** The ui lane's port. The api lane takes `port + 1000`, the worker `port - 2561`. */
+  /** The ui lane's port when this call boots one. */
   port: number;
+  /** An address to use when something already answers there. */
+  baseUrlHint?: string;
   /** How long the three probes get before the boot is called a failure. */
   readyTimeoutMs?: number;
   /** Extra environment for the lanes, on top of what `dev-stack.sh` derives. */
@@ -56,6 +61,15 @@ export type StartStackOptions = Readonly<{
 
 const DEFAULT_READY_TIMEOUT_MS = 300_000;
 const PROBE_INTERVAL_MS = 2_000;
+
+async function answers(url: string, timeoutMs = 5_000): Promise<boolean> {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    return response.status < 400;
+  } catch {
+    return false;
+  }
+}
 
 async function probe(
   url: string,
@@ -77,6 +91,87 @@ async function probe(
   }
   throw new Error(`${label} never became ready at ${url} (last: ${last})`);
 }
+
+// --- haven ------------------------------------------------------------------
+
+type HavenService = Readonly<{ name?: string; url?: string; listening?: boolean }>;
+type HavenLane = Readonly<{ name?: string; listening?: boolean }>;
+type HavenStack = Readonly<{
+  slug?: string;
+  live?: boolean;
+  services?: readonly HavenService[];
+  lanes?: readonly HavenLane[];
+}>;
+
+/** This worktree's stack slug, the way haven derives it. */
+function worktreeSlug(): string {
+  const cached = resolve(REPO_ROOT, ".langwatch-slug");
+  if (existsSync(cached)) {
+    const named = readFileSync(cached, "utf8").trim();
+    if (named) return named;
+  }
+  return basename(REPO_ROOT)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/** The haven binary, on PATH or built in the tree. Absent means no haven. */
+function havenBinary(): string | null {
+  const candidates = [
+    "haven",
+    resolve(REPO_ROOT, "tools/thuishaven/haven"),
+    resolve(REPO_ROOT, "tools/thuishaven/cmd/haven/haven"),
+  ];
+  for (const candidate of candidates) {
+    try {
+      execFileSync(candidate, ["--version"], { stdio: "ignore", timeout: 20_000 });
+      return candidate;
+    } catch {
+      // Not this one; a missing haven is a normal state, not a failure.
+    }
+  }
+  return null;
+}
+
+/**
+ * The address of this worktree's haven stack, when one is up and serving. Any
+ * failure — no binary, no daemon, no stack, a stack that is registered but not
+ * live — answers null, because booting one is a perfectly good alternative.
+ */
+function havenBaseUrl(): string | null {
+  const binary = havenBinary();
+  if (!binary) return null;
+
+  let report: { stacks?: readonly HavenStack[] };
+  try {
+    const out = execFileSync(binary, ["status", "--json", "--agent"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      timeout: 60_000,
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    report = JSON.parse(out);
+  } catch {
+    return null;
+  }
+
+  const slug = worktreeSlug();
+  const stack = (report.stacks ?? []).find((candidate) => candidate.slug === slug);
+  if (!stack?.live) return null;
+
+  const app = (stack.services ?? []).find((service) => service.name === "app");
+  if (!app?.listening || !app.url) return null;
+
+  // A stack whose api lane is down serves pages and answers nothing, which is
+  // the one failure that looks like a healthy stack until a test asks for data.
+  const api = (stack.lanes ?? []).find((lane) => lane.name === "api");
+  if (api && !api.listening) return null;
+
+  return app.url.replace(/\/$/, "");
+}
+
+// --- booting ----------------------------------------------------------------
 
 function stopGroup(child: ChildProcess, ports: readonly number[]): Promise<void> {
   return new Promise((done) => {
@@ -106,26 +201,30 @@ function stopGroup(child: ChildProcess, ports: readonly number[]): Promise<void>
   });
 }
 
-/**
- * Boots the three Node applications on `port`, or returns the stack
- * `LANGWATCH_E2E_BASE_URL` names.
- */
+function borrowed(baseUrl: string, source: RunningStack["source"]): RunningStack {
+  return {
+    baseUrl,
+    apiUrl: `${baseUrl}/api`,
+    source,
+    started: false,
+    stop: async () => {},
+  };
+}
+
+/** Resolves a stack to run against, booting one only as the last resort. */
 export async function startStack(options: StartStackOptions): Promise<RunningStack> {
   const { port, readyTimeoutMs = DEFAULT_READY_TIMEOUT_MS } = options;
   const apiPort = port + 1000;
   const workerPort = port - 2561;
 
-  const external = process.env.LANGWATCH_E2E_BASE_URL;
-  if (external) {
-    const baseUrl = external.replace(/\/$/, "");
-    await probe(baseUrl, (status) => status < 400, 60_000, "ui lane");
-    return {
-      baseUrl,
-      apiUrl: `${baseUrl}/api`,
-      started: false,
-      stop: async () => {},
-    };
-  }
+  const named = process.env.LANGWATCH_E2E_BASE_URL;
+  if (named) return borrowed(named.replace(/\/$/, ""), "environment");
+
+  const haven = havenBaseUrl();
+  if (haven) return borrowed(haven, "haven");
+
+  const hint = options.baseUrlHint?.replace(/\/$/, "");
+  if (hint && (await answers(hint))) return borrowed(hint, "already-serving");
 
   const baseUrl = `http://localhost:${port}`;
   const child = spawn("bash", [resolve(REPO_ROOT, "dev/scripts/dev-stack.sh")], {
@@ -177,7 +276,7 @@ export async function startStack(options: StartStackOptions): Promise<RunningSta
     throw new Error("dev-stack.sh exited before every lane answered");
   }
 
-  return { baseUrl, apiUrl: `${baseUrl}/api`, started: true, stop };
+  return { baseUrl, apiUrl: `${baseUrl}/api`, source: "booted", started: true, stop };
 }
 
 export type SeededProject = Readonly<{

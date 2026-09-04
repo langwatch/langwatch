@@ -60,6 +60,8 @@ test.describe("browser product journey", () => {
     context = await browser.newContext({
       baseURL: BASE_URL,
       storageState: { cookies: [], origins: [] },
+      // A haven stack serves https under a local certificate authority.
+      ignoreHTTPSErrors: true,
     });
     page = await context.newPage();
   });

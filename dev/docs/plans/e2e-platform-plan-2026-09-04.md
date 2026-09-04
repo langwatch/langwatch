@@ -30,7 +30,11 @@ Decisions:
    `auth.json` gate are deleted once their two useful paths (create workflow,
    prompt create) are ported as journey steps. The root `test:e2e` tombstone
    becomes the real script.
-2. **Every suite can boot its own stack, and reuses one when told.** One
+2. **Every suite reuses a stack when there is one, and boots one otherwise.**
+   Resolution order: `LANGWATCH_E2E_BASE_URL`, then this worktree's haven stack
+   (discovered through `haven status --json --agent`, skipped silently when
+   haven is absent), then a stack already answering at `BASE_URL`, and only
+   then a boot of its own. One
    shared helper, `dev/tests/e2e-stack/` (a small TypeScript package, no
    vitest config of its own): `startStack({ port })` runs
    `dev/scripts/dev-stack.sh` with `PORT`, `LANGWATCH_ENDPOINT=http://localhost:PORT`,
@@ -67,13 +71,13 @@ Decisions:
    wherever a model is asked for. Without that variable the run leg and the
    monitor leg skip with the named reason `OPENAI_API_KEY not set`; every
    other leg still runs.
-7. **Known platform gaps fail by name.** The bare REST alias (decision 20,
-   `open-decisions-2026-09-03.md`) takes `/api/organization`, `/api/roles`,
-   `/api/role-bindings`, `/api/scim-tokens` off the wire; the trace transcript
-   route is unmounted; workflow evaluate always refuses. Tests that cover them
-   are written as they should pass and marked `test.fail` with a one-line
-   reason naming the decision, so they turn red the day the gap closes and
-   the marker has to go.
+7. **Known platform gaps fail by name.** The trace transcript route is
+   unmounted and workflow evaluate always refuses. Tests that cover them are
+   written as they should pass and marked `test.fail` with a one-line reason
+   naming the gap, so they turn red the day it closes and the marker has to
+   go. Decision 20 is resolved and carries no marker: every REST family now
+   answers at `/api/v1/{family}` as well as bare, so B, C and D address the
+   canonical `/api/v1` form and the management families are ordinary legs.
 8. **Specs first.** Each suite gets a feature file under `specs/e2e/` with
    `@e2e` scenarios, and every Playwright or vitest test carries
    `// @scenario "<title>"` verbatim. Error paths are scenarios too.
@@ -145,8 +149,8 @@ side (not through the request it just made):
    platform has no provider for the simulator and judge.
 6. **Experiments**: `experiments.init`, `evaluate`, results logged, then read
    through `experiments`.
-7. **Management families**: organization, roles, scim-tokens, marked
-   `test.fail` with the decision-20 reason (decision 7).
+7. **Management families**: organization, roles, scim-tokens, at their
+   canonical `/api/v1` addresses. No marker — decision 20 is resolved.
 
 ## Suite C — CLI (`sdks/typescript/__tests__/e2e/cli/`)
 
@@ -158,8 +162,8 @@ its own leg writing a temp `.env`). Legs: `whoami`; prompt `init/add/push/pull/s
 (existing, kept); `dataset` create and records; `evaluator` create/list;
 `scenario` create; `test-suite` create and run; `simulation-run` list;
 `agent` list/get; `trace search` and `trace get` for the SDK leg's trace;
-`trace transcript` marked `test.fail` (unmounted route); `organization`
-family marked `test.fail` (decision 20). Each command asserts exit code,
+`trace transcript` marked `test.fail` (unmounted route); the `organization`
+family as an ordinary leg. Each command asserts exit code,
 stdout shape (`--json` where the command has it) and the platform state it
 changed, read back through the SDK.
 
@@ -197,6 +201,6 @@ and commits by pathspec.
 
 ## Out of scope for these lanes
 
-Fixing product defects beyond an accessible name; decision 20; the Stripe
+Fixing product defects beyond an accessible name; the Stripe
 webhook; the trace transcript route; CI workflow rewiring beyond pointing
 `e2e-ci.yml` at the same commands (root does that after the suites are green).

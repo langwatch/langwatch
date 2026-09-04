@@ -11,6 +11,23 @@ import path from "path";
  *   pnpm test:ui
  */
 
+/**
+ * The workspace `.env`, resolved from the repository root the way every
+ * application resolves it. Node's loader leaves a variable that is already set
+ * alone, so the shell — and `LANGWATCH_E2E_BASE_URL` with it — still wins, and
+ * a worktree without the file is not an error.
+ */
+function loadWorkspaceEnv(): void {
+  if (typeof process.loadEnvFile !== "function") return;
+  try {
+    process.loadEnvFile(path.join(__dirname, "..", "..", "..", ".env"));
+  } catch {
+    // No workspace .env here; the shell is the whole environment.
+  }
+}
+
+loadWorkspaceEnv();
+
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5570";
 const AUTH_FILE = path.join(__dirname, ".auth", "user.json");
 const IS_CI = !!process.env.CI;

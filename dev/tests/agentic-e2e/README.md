@@ -17,11 +17,11 @@ Run it from the repository root:
 pnpm test:e2e
 ```
 
-That boots a stack on port 5600 through `dev/tests/e2e-stack` when nothing is
-already serving there, starts the loopback echo agent the journey's HTTP agent
-talks to, runs the suite, and puts both back down. A stack already answering at
-`BASE_URL` is used as it stands — which is what CI does, and what a developer
-with `pnpm dev` running gets.
+`dev/tests/e2e-stack` picks the stack: `LANGWATCH_E2E_BASE_URL` first (CI sets
+it), then this worktree's haven stack when one is up, then anything already
+answering at `BASE_URL`, and only then a boot of its own on port 5600. It also
+starts the loopback echo agent the journey's HTTP agent talks to, and puts back
+down whatever it started.
 
 The journey signs up its own account, so it runs as its own Playwright project
 (`--project=journey`) with no shared storage state, serially, one browser
