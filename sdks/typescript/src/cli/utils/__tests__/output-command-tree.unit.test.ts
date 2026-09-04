@@ -155,7 +155,6 @@ describe("the real command tree", () => {
       ["agent tunnel", "live tunnel session until Ctrl-C, no result document"],
       // Hidden compatibility name for `agent tunnel`, same wiring.
       ["agent dev", "live tunnel session until Ctrl-C, no result document"],
-      ["langy", "live shared-folder session until Ctrl-C, no result document"],
 
       // Launchers and passthroughs: they exec another tool and own its stdio.
       ...(
