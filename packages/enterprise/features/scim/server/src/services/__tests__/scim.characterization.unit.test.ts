@@ -301,6 +301,89 @@ describe("SCIM characterization: provisioning invariants", () => {
     expect(writer.attachBindings).toHaveBeenCalledOnce();
   });
 
+  describe("given a directory push carries a connection", () => {
+    describe("when a user is pushed", () => {
+      /** @scenario "The fact records which connection pushed it, and one directory actor" */
+      it("names the connection on the sync history and one system actor throughout", async () => {
+        const lifecycle: ScimSyncLifecyclePort = {
+          tokenIssued: vi.fn(async () => undefined),
+          userPushed: vi.fn(async () => undefined),
+          groupMapped: vi.fn(async () => undefined),
+          applyFailed: vi.fn(async () => undefined),
+          revoked: vi.fn(async () => undefined),
+        };
+        const writer = new GrantsFake();
+        const users = {
+          tryFindByEmail: vi.fn(async () => null),
+          tryFindById: vi.fn(async () => ({
+            id: "user_1",
+            email: "member@example.com",
+            name: "Member",
+            deactivatedAt: null,
+            createdAt: now,
+            updatedAt: now,
+            emailVerified: true,
+            image: null,
+            pendingSsoSetup: false,
+            lastLoginAt: null,
+          })),
+          create: vi.fn(async () => ({
+            id: "user_1",
+            email: "member@example.com",
+            name: "Member",
+            deactivatedAt: null,
+            createdAt: now,
+            updatedAt: now,
+            emailVerified: true,
+            image: null,
+            pendingSsoSetup: false,
+            lastLoginAt: null,
+          })),
+          updateProfile: vi.fn(),
+          deactivate: vi.fn(),
+          reactivate: vi.fn(),
+        } satisfies ScimUserProvisioning;
+        const scim = ScimService.create({
+          prisma: repository({ addMembership: vi.fn(async () => undefined) }),
+          writer,
+          auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
+          users,
+          governance: {
+            departmentResolveByNameOrCreate: vi.fn(async () => ({
+              id: "department_1",
+              organizationId: "org_1",
+              name: "Engineering",
+              createdAt: new Date(0),
+              updatedAt: new Date(0),
+            })),
+            departmentAssignUser: vi.fn(async () => undefined),
+          },
+          entitlements: new FixedEntitlementService(true),
+          lifecycle,
+          provenOffboarding: false,
+        });
+
+        await scim.createUser({
+          organizationId: "org_1",
+          connectionId: "connection_okta_primary",
+          request: {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            userName: "member@example.com",
+            externalId: "ext_1",
+          },
+        });
+
+        expect(lifecycle.userPushed).toHaveBeenCalledWith({
+          organizationId: "org_1",
+          connectionId: "connection_okta_primary",
+          userId: "user_1",
+          externalId: "ext_1",
+          op: "create",
+        });
+      });
+    });
+  });
+
   it("uses a typed protocol exception rather than an error-value union for missing users", async () => {
     await expect(
       service(repository()).getUser({ organizationId: "org_1", id: "missing" }),

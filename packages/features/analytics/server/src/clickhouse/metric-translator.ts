@@ -490,7 +490,6 @@ function translateMetadataMetric(
         requiredJoins,
         params: {},
       };
-
   }
 }
 
@@ -674,7 +673,6 @@ function translatePerformanceMetric(
         requiredJoins,
         params: {},
       };
-
   }
 }
 
@@ -743,7 +741,6 @@ function translateEvaluationMetric(
         requiredJoins,
         params,
       };
-
   }
 }
 
@@ -832,7 +829,6 @@ function translateEventMetric(
         `Metric events.event_details is not yet supported in ClickHouse ` +
           `(aggregation=${aggregation}, metricKey=${metricKey ?? "undefined"})`,
       );
-
   }
 }
 
@@ -901,7 +897,6 @@ function translateSentimentMetric(
         params,
       };
     }
-
   }
 }
 
@@ -934,7 +929,6 @@ function translateThreadsMetric(
           outerAggregation: `avg(thread_duration) AS ${alias}`,
         },
       };
-
   }
 }
 

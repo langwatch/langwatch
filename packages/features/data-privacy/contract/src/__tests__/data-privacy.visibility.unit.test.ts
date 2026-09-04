@@ -35,14 +35,23 @@ function viewer(partial: Partial<ViewerFacts>): ViewerFacts {
 
 describe("isContentVisible", () => {
   describe("given content restricted to admins", () => {
-    /** @scenario Content restricted to admins is hidden from a plain member */
+    /**
+     * @scenario Content restricted to admins is hidden from a plain member
+     * @scenario System instructions restricted to admins are hidden from a plain member
+     *
+     * The resolution is category-agnostic: whichever content category
+     * resolved to this restriction, the audience check is identical.
+     */
     it("hides it from a plain member", () => {
       expect(isContentVisible(eff("restrict", { admins: true }), viewer({ isAdmin: false }))).toBe(
         false,
       );
     });
 
-    /** @scenario Content restricted to admins is visible to an admin */
+    /**
+     * @scenario Content restricted to admins is visible to an admin
+     * @scenario System instructions restricted to admins are visible to an admin
+     */
     it("shows it to an admin", () => {
       expect(isContentVisible(eff("restrict", { admins: true }), viewer({ isAdmin: true }))).toBe(
         true,

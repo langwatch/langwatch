@@ -423,6 +423,7 @@ describe("SerializedHttpAgentAdapter", () => {
         }
       ).headers;
 
+    /** @scenario "Serialized HTTP adapter injects traceparent header" */
     it("captures the propagation once per call and sends its headers", async () => {
       injectTraceContext();
       const adapter = createMockHttpAgentAdapter({ config: defaultConfig });
@@ -432,6 +433,19 @@ describe("SerializedHttpAgentAdapter", () => {
       expect(mockInjectTraceContextHeaders).toHaveBeenCalledTimes(1);
       expect(sentHeaders().traceparent).toBe(TRACEPARENT);
       expect(sentHeaders().tracestate).toBe("vendor=1");
+    });
+
+    describe("when no active OTEL trace context exists", () => {
+      /** @scenario "Adapter proceeds without trace headers when OTEL context is unavailable" */
+      it("sends the request without a traceparent header and does not throw", async () => {
+        // beforeEach's default mock already returns traceId: undefined with
+        // headers unchanged, matching "no active context".
+        const adapter = createMockHttpAgentAdapter({ config: defaultConfig });
+
+        await expect(adapter.call(defaultInput)).resolves.toBeDefined();
+
+        expect(sentHeaders().traceparent).toBeUndefined();
+      });
     });
 
     describe("when the target configures its own traceparent header", () => {

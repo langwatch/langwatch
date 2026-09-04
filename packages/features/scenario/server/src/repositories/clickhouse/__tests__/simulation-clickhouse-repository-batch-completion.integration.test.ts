@@ -129,9 +129,7 @@ afterAll(async () => {
 async function seedBatch(statuses: string[]) {
   const scenarioSetId = `set-${nanoid()}`;
   const batchRunId = `batch-${nanoid()}`;
-  await insertRows(
-    statuses.map((status) => makeRunRow({ scenarioSetId, batchRunId, status })),
-  );
+  await insertRows(statuses.map((status) => makeRunRow({ scenarioSetId, batchRunId, status })));
   return { scenarioSetId, batchRunId };
 }
 

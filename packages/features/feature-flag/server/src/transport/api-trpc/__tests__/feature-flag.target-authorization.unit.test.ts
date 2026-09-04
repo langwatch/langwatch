@@ -119,6 +119,7 @@ describe("featureFlag target authorization", () => {
     });
   });
 
+  /** @scenario "A viewer cannot read tenant experiment policy" */
   it("does not expose tenant policy fields to a viewer", async () => {
     const { caller, featureFlags, hasPermission } = buildCaller();
     hasPermission.mockResolvedValueOnce(true).mockResolvedValue(false);

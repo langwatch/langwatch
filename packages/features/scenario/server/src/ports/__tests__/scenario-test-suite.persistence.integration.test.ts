@@ -188,6 +188,7 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     }
   });
 
+  /** @scenario "A new test suite is created empty and appears in the rail" */
   it("returns the complete test suite row and lists only active test suites of the project", async () => {
     const testSuites = service();
     const created = await testSuites.createTestSuite({ projectId, name: "Refunds" });
@@ -215,6 +216,58 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
       testSuites.tryGetTestSuite({ projectId, testSuiteId: created.id }),
     ).resolves.toEqual(created);
     await expect(testSuites.listTestSuites({ projectId })).resolves.toEqual([created]);
+  });
+
+  /** @scenario "A test suite created with a name another suite already uses keeps both names readable" */
+  it("keeps a colliding name readable under a distinct slug", async () => {
+    const testSuites = service();
+    const plan = await database().simulationSuite.create({
+      data: {
+        projectId,
+        name: "Refunds",
+        slug: "refunds",
+        kind: "run_plan",
+        scenarioIds: [],
+        targets: [],
+        repeatCount: 1,
+        labels: [],
+      },
+    });
+
+    const created = await testSuites.createTestSuite({ projectId, name: "Refunds" });
+
+    expect(created.name).toBe("Refunds");
+    expect(created.slug).not.toBe(plan.slug);
+    await expect(
+      database().simulationSuite.findFirst({ where: { id: plan.id, projectId } }),
+    ).resolves.toMatchObject({ name: "Refunds", slug: "refunds" });
+  });
+
+  /**
+   * Renaming touches only the test suite row's own `name` column: its
+   * membership and any run history a run plan resolved earlier live on
+   * separate rows this write never reaches.
+   */
+  /** @scenario "Renaming a test suite keeps its scenarios and its run history" */
+  it("renames a test suite without disturbing the scenarios filed in it", async () => {
+    const testSuites = service();
+    const testSuite = await testSuites.createTestSuite({ projectId, name: "Refunds" });
+    const scenarios = await Promise.all(
+      ["One", "Two", "Three"].map((name) => createScenario({ name, testSuiteId: testSuite.id })),
+    );
+
+    const renamed = await testSuites.renameTestSuite({
+      projectId,
+      testSuiteId: testSuite.id,
+      name: "Refunds and credits",
+    });
+
+    expect(renamed.name).toBe("Refunds and credits");
+    expect(renamed.id).toBe(testSuite.id);
+    expect(new Set(await testSuiteScenarioIds(testSuite.id))).toEqual(
+      new Set(scenarios.map((scenario) => scenario.id)),
+    );
+    expect(await invariantBreaks()).toEqual([]);
   });
 
   it("creates filed and unfiled cases while reconciling test suite membership", async () => {
@@ -315,6 +368,8 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     expect(await invariantBreaks()).toEqual([]);
   });
 
+  /** @scenario "A scenario cannot be filed into a run plan that is not a test suite" */
+  /** @scenario "A refused move leaves the scenario in the test suite it was in" */
   it("rejects archived, non-testSuite, and cross-project destinations without moving the case", async () => {
     const testSuites = service();
     const active = await testSuites.createTestSuite({ projectId, name: "Active" });
@@ -353,6 +408,8 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     expect(await invariantBreaks()).toEqual([]);
   });
 
+  /** @scenario "Archiving a test suite archives the scenarios in it" */
+  /** @scenario "Archiving a test suite that is already archived changes nothing" */
   it("archives a test suite and its active cases while preserving the final member snapshot", async () => {
     const testSuites = service();
     const testSuite = await testSuites.createTestSuite({ projectId, name: "Refunds" });

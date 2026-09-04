@@ -115,6 +115,7 @@ describe("frontend UI architecture boundaries", () => {
     expect(lint([])).toEqual([]);
   });
 
+  /** @scenario "A frontend feature is independent of a backend feature" */
   it("accepts declared owner screens and declared cross-feature surfaces", () => {
     const promptWeb = webPackage("prompt", {
       "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
@@ -158,6 +159,7 @@ describe("frontend UI architecture boundaries", () => {
     expect(lint([promptWeb])).toEqual([]);
   });
 
+  /** @scenario "A web package can be governed before its screen migration completes" */
   it("governs an opted-in web package before a frontend feature owns its screen", () => {
     const promptWeb = webPackage("prompt", {
       ".": "./src/index.ts",
@@ -218,6 +220,7 @@ describe("frontend UI architecture boundaries", () => {
     expect(policies([]).filter((policy) => policy === "ui-root-catch-all")).toEqual([]);
   });
 
+  /** @scenario "Application, platform and frontend feature directions remain distinct" */
   it("enforces global, screen, and frontend feature dependency direction", () => {
     writeCatalogue([{ id: "prompt-studio" }, { id: "trace-explorer" }]);
     write("apps/ui/src/behavior/api/client.ts", 'import "../../features/prompt-studio/route";');
@@ -362,6 +365,7 @@ describe("frontend UI architecture boundaries", () => {
     expect(policies([])).toContain("ui-dependency-direction");
   });
 
+  /** @scenario "Browser dependency edges remain statically visible" */
   it("requires analyzable module specifiers while recognizing static template imports", () => {
     const promptWeb = webPackage("prompt", {
       "./surfaces/prompt-reference": "./src/surfaces/prompt-reference/index.ts",
@@ -391,6 +395,9 @@ describe("frontend UI architecture boundaries", () => {
     ).toHaveLength(2);
   });
 
+  /** @scenario "A frontend feature imports only its declared contributions" */
+  /** @scenario "Owner-only screens cannot be imported by another frontend feature" */
+  /** @scenario "Exact public UI exports are the only package doors" */
   it("rejects undeclared, root, deep, and incorrectly owned feature-web imports", () => {
     const promptWeb = webPackage("prompt", {
       ".": "./src/index.ts",
@@ -447,6 +454,7 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
+  /** @scenario "A surface cannot pull in its feature's complete implementation" */
   it("keeps a shareable surface out of hidden screens, state, transport, and other surfaces", () => {
     const promptWeb = webPackage("prompt", {
       "./surfaces/prompt-reference": "./src/surfaces/prompt-reference/index.ts",
@@ -476,6 +484,7 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
+  /** @scenario "An owner-only screen remains browser-safe" */
   it("keeps owner-only screens browser-safe while allowing private presentation code", () => {
     const promptWeb = webPackage("prompt", {
       "./screens/prompt-studio": "./src/screens/prompt-studio/index.ts",
@@ -699,6 +708,7 @@ describe("frontend UI architecture boundaries", () => {
     expect(policies([promptWeb]).filter((policy) => policy === "ui-screen-closure")).toEqual([]);
   });
 
+  /** @scenario "Browser source remains independent of backend implementations" */
   it("keeps browser UI out of server, Prisma, AppRouter, environment, and legacy application imports", () => {
     writeCatalogue([{ id: "prompt-studio" }]);
     write(
@@ -840,6 +850,7 @@ describe("frontend UI architecture boundaries", () => {
     expect(lint([agentWeb])).toEqual([]);
   });
 
+  /** @scenario "Governed web packages keep private code in two scoped hierarchies" */
   it("rejects flat root files, generic components, upward layers, and deep feature imports", () => {
     const agentWeb = webPackage("agent", {
       "./screens/agent-management": "./src/screens/agent-management/index.ts",
@@ -878,6 +889,7 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
+  /** @scenario "Private web features compose only through declared narrow entries" */
   it("requires declared acyclic feature dependencies through a feature entry point", () => {
     const agentWeb = webPackage("agent", {
       "./screens/agent-management": "./src/screens/agent-management/index.ts",
@@ -917,6 +929,7 @@ describe("frontend UI architecture boundaries", () => {
     );
   });
 
+  /** @scenario "Public screen and surface boundaries do not leak inward" */
   it("keeps screens and surfaces from leaking into each other's private composition", () => {
     const agentWeb = webPackage("agent", {
       "./screens/agent-management": "./src/screens/agent-management/index.ts",

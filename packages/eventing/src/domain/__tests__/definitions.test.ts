@@ -33,6 +33,7 @@ describe("event catalogue", () => {
     expect(() => createEventCatalogue([first, second])).not.toThrow();
   });
 
+  /** @scenario "Conflicting event definitions are rejected" */
   it("rejects an event type owned by multiple aggregates", () => {
     const traces = defineAggregate({
       type: "trace",

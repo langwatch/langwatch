@@ -18,11 +18,13 @@ const dsl = EvaluatorCodeService.buildDsl({
 });
 
 describe("code evaluator DSL", () => {
+  /** @scenario Code evaluator executes through the engine code component */
   it("uses the injected workflow id and entry-code-end shape", () => {
     expect(dsl.workflow_id).toBe("code_evaluator_test");
     expect(dsl.nodes.map((node) => node.type)).toEqual(["entry", "code", "end"]);
   });
 
+  /** @scenario Code evaluator returns only the fields it computes */
   it("carries the code and declares no required code outputs", () => {
     const code = dsl.nodes.find((node) => node.type === "code");
     expect(code?.data.outputs).toEqual([]);

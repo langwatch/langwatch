@@ -208,6 +208,7 @@ describe("the Roles screen", () => {
     });
 
     /** @scenario A refused write is reported to the reader, not swallowed */
+    /** @scenario "A refusal reaches the reader as the error the server sent" */
     it("hands a refusal to the host with the raw error", () => {
       const { host } = renderWithAuthzHost(<RolesScreen />);
       const refusal = new Error("validation_error");

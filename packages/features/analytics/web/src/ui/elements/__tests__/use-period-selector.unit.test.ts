@@ -32,8 +32,7 @@ describe("usePeriodSelector()", () => {
         const { result } = renderHook(() => usePeriodSelector(30));
 
         const { startDate, endDate } = result.current.period;
-        const diffDays =
-          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+        const diffDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
 
         expect(diffDays).toBeGreaterThanOrEqual(28);
         expect(diffDays).toBeLessThanOrEqual(30);

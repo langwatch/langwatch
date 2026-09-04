@@ -51,6 +51,7 @@ const CONTEXT = {
 
 describe("traceMetricsSync subscriber", () => {
   describe("when a run finishes carrying trace ids", () => {
+    /** @scenario "Simulation-side subscriber dispatches pull-based computation on RunFinished" */
     it("dispatches one computeRunMetrics per trace", async () => {
       const deps = makeDeps();
       const subscriber = createTraceMetricsSyncSubscriber(deps);
@@ -76,6 +77,7 @@ describe("traceMetricsSync subscriber", () => {
   });
 
   describe("when a run finishes without trace ids", () => {
+    /** @scenario "Run with no trace IDs leaves metrics empty" */
     it("dispatches nothing for an empty traceIds array", async () => {
       const deps = makeDeps();
       const subscriber = createTraceMetricsSyncSubscriber(deps);

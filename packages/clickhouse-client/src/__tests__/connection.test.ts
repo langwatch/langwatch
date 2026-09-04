@@ -37,6 +37,7 @@ const configuration = () =>
   });
 
 describe("explicit ClickHouse connection lifecycle", () => {
+  /** @scenario Private clients are cached per organization */
   it("constructs an endpoint once and resolves tenants through the injected directory", async () => {
     const factory = new RecordingClientFactory();
     const organizationForTenant = vi.fn(async (tenantId: string) =>
@@ -64,6 +65,7 @@ describe("explicit ClickHouse connection lifecycle", () => {
     ]);
   });
 
+  /** @scenario getAllClickHouseInstances returns shared and all private instances */
   it("builds each physical endpoint once for migrations and checks", () => {
     const factory = new RecordingClientFactory();
     const connection = ClickHouseConnectionService.create({

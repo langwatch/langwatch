@@ -25,8 +25,10 @@ describe("webhook contract", () => {
     expect(createWebhookEndpointCommandSchema.parse(input)).toEqual(input);
   });
 
+  /** @scenario Endpoint secrets never appear in read values */
   it("does not expose secret fields in endpoint views", () => {
     expect("secret" in webhookEndpointViewSchema.shape).toBe(false);
     expect("secretEncrypted" in webhookEndpointViewSchema.shape).toBe(false);
+    expect("sqs" in webhookEndpointViewSchema.shape).toBe(true);
   });
 });

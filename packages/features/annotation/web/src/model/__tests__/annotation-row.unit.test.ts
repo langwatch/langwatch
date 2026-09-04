@@ -88,6 +88,7 @@ describe("annotation row score presentation", () => {
     expect(line).toBe("score-retired: mild");
   });
 
+  /** @scenario A score a reviewer left blank is not a score they gave */
   it("joins multi-value answers and ignores blank values", () => {
     const annotation = score({
       "score-1": { value: ["mild", "vague"] },

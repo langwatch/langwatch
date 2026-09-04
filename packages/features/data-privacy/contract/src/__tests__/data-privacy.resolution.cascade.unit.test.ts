@@ -68,6 +68,26 @@ describe("resolveDataPrivacy", () => {
 
       expect(resolved.categories.input.disposition).toBe("capture");
     });
+
+    /**
+     * @scenario Removing a project rule falls back to the next tier
+     *
+     * The row is simply absent here, standing in for the project rule having
+     * been deleted: the resolver has no notion of a removed rule, only of
+     * which rows exist for the chain, so an absent project row is exactly
+     * what a delete produces on the next resolve.
+     */
+    it("falls back to the organization rule once the project rule is gone", () => {
+      const rows = [
+        rule("ORGANIZATION", "acme", {
+          categories: { input: { disposition: "drop" } },
+        }),
+      ];
+
+      const resolved = resolveDataPrivacy({ rows, facts: teamProject });
+
+      expect(resolved.categories.input.disposition).toBe("drop");
+    });
   });
 
   describe("given an organization rule and a team rule", () => {

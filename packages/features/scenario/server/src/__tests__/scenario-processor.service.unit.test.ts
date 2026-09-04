@@ -127,6 +127,7 @@ function deferred<T>(): {
 
 describe("ScenarioProcessorService", () => {
   describe("failed runs", () => {
+    /** @scenario Include job metadata in failure events */
     it("finishes with the complete run and target context", async () => {
       const fixture = processorFixture();
 
@@ -432,6 +433,7 @@ describe("Scenario child process protocol", () => {
     expect(parseChildProcessResult('{"level":30,"msg":"only logs"}')).toBeNull();
   });
 
+  /** @scenario Pass labels to SDK for tracing */
   it("escapes labels in the resource attribute", () => {
     expect(buildOtelResourceAttributes(["support,tier=one"])).toBe(
       "langwatch.origin.source=platform,scenario.labels=support\\,tier\\=one",

@@ -30,6 +30,7 @@ const edge = {
 };
 
 describe("boundary edge baseline (R8)", () => {
+  /** @scenario "Legacy edge reconciliation stays out of the hot path" */
   it("stays quiet for a listed edge that has not expired", () => {
     const root = mkdtempSync(join(tmpdir(), "boundary-edge-fresh-"));
     writeBaselineFile(root, {

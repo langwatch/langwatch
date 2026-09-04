@@ -53,6 +53,7 @@ describe("the instance sign-in method policy", () => {
     });
 
     /** @scenario "The provider env becomes the default method set" */
+    /** @scenario "A licensed self-hosted deployment reports federation as licensed" */
     it("makes the configured provider the offered method, exactly as before", async () => {
       const policy = await resolveSignInMethodPolicy(inputs);
 

@@ -9,11 +9,14 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
-import { type AgentService, relayPayloadCaps } from "@langwatch/agent-contract";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { type Agent, type AgentService, PROTOCOL_VERSION, relayPayloadCaps } from "@langwatch/agent-contract";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import { resultCapViolation } from "../../../adapters/connected-agent-envelope.adapter";
-import { createConnectedAgentRuntime } from "../../../services/connected-agent-runtime.service";
+import {
+  createConnectedAgentRuntime,
+  type ConnectedAgentRuntime,
+} from "../../../services/connected-agent-runtime.service";
 import { createMemoryStateStore } from "../../../adapters/connected-agent-state.adapter";
 import type { AgentRepository } from "../../../repositories/agent.repository";
 import type { ConnectCredentialPort } from "../../../ports/connect-credential.port";
@@ -142,6 +145,255 @@ describe("ConnectGateway without Redis", () => {
         socket.once("error", () => resolve(-1));
       });
       expect(status).toBe(404);
+    });
+  });
+});
+
+/** A fake `AgentService` that upserts nothing, just echoes what it was given. */
+function registeringAgentService(): AgentService {
+  return {
+    registerConnected: async (input) =>
+      ({
+        id: input.id,
+        name: input.name,
+        environment: input.identity.environment,
+        type: "connected",
+      }) as unknown as Agent,
+  } as unknown as AgentService;
+}
+
+const noopAgentRepository = { touchLastSeenAt: async () => undefined } as unknown as AgentRepository;
+
+const resolvingCredentials = {
+  resolve: async () => ({ project: { id: "proj_1", slug: "proj-one" }, userId: null }),
+} as unknown as ConnectCredentialPort;
+
+function registerFrame(overrides: { name?: string; instanceId?: string } = {}) {
+  return {
+    protocol: PROTOCOL_VERSION,
+    type: "register" as const,
+    sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+    instance: {
+      id: overrides.instanceId ?? "inst_1",
+      hostname: "laptop",
+      username: "dev",
+      pid: 1,
+      startedAt: new Date().toISOString(),
+      inFlightCallIds: [],
+    },
+    agents: [{ name: overrides.name ?? "support-agent", environment: "production", parameters: {} }],
+  };
+}
+
+/** One pod with a real socket server, a real gateway, and a registering process. */
+async function startPod({
+  pingIntervalMs = 10_000,
+  pongWaitMs = 200,
+}: { pingIntervalMs?: number; pongWaitMs?: number } = {}) {
+  const runtime = createConnectedAgentRuntime({
+    podId: `pod_${Math.random().toString(36).slice(2)}`,
+    store: createMemoryStateStore(),
+  });
+  const server = createServer((_request, response) => {
+    response.statusCode = 404;
+    response.end();
+  });
+  const gateway = new ConnectGateway({
+    runtime,
+    agents: registeringAgentService(),
+    agentRepository: noopAgentRepository,
+    credentials: resolvingCredentials,
+    agentPlatformUrl: () => "https://example.test/agents",
+    replicaCount: 1,
+    pingIntervalMs,
+    pongWaitMs,
+  });
+  gateway.mount(createUpgradeRouter(server));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const url = `ws://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  return { runtime, gateway, server, url };
+}
+
+async function stopPod(pod: Awaited<ReturnType<typeof startPod>>) {
+  await pod.gateway.close();
+  await new Promise<void>((resolve) => pod.server.close(() => resolve()));
+}
+
+function connectAndRegister(
+  url: string,
+  frame: ReturnType<typeof registerFrame>,
+): { socket: WebSocket; registered: Promise<Record<string, unknown>> } {
+  const socket = new WebSocket(`${url}${CONNECT_PATH}`, {
+    headers: { Authorization: "Bearer sk-lw-anything" },
+  });
+  const registered = new Promise<Record<string, unknown>>((resolve, reject) => {
+    socket.once("open", () => socket.send(JSON.stringify(frame)));
+    socket.once("message", (raw) => resolve(JSON.parse(raw.toString())));
+    socket.once("error", reject);
+  });
+  return { socket, registered };
+}
+
+describe("ConnectGateway socket lifecycle", () => {
+  let pod: Awaited<ReturnType<typeof startPod>>;
+
+  afterEach(async () => {
+    if (pod) await stopPod(pod);
+  });
+
+  describe("when the instance does not answer a ping inside the pong wait", () => {
+    /** @scenario "A missed pong retires the instance" */
+    it("closes the socket and the instance is no longer live", async () => {
+      pod = await startPod({ pingIntervalMs: 30, pongWaitMs: 30 });
+      const { socket, registered } = connectAndRegister(pod.url, registerFrame());
+      // A ws client answers pings automatically unless told not to.
+      socket.pong = () => undefined as never;
+      await registered;
+
+      await new Promise<void>((resolve) => socket.once("close", () => resolve()));
+      // The client sees its own close before the server finishes its onClose.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(pod.gateway.sessionCount).toBe(0);
+    });
+  });
+
+  describe("when the pong lands inside the wait of its own ping, after the next ping already went out", () => {
+    /** @scenario "A pong that lands inside its own wait keeps the socket" */
+    it("keeps the socket open and the instance live", async () => {
+      pod = await startPod({ pingIntervalMs: 40, pongWaitMs: 150 });
+      const { socket, registered } = connectAndRegister(pod.url, registerFrame());
+      await registered;
+
+      // Two pings will have gone out before this one pong answers; the pong
+      // still lands inside the wait of the ping that is currently open.
+      await new Promise((resolve) => setTimeout(resolve, 250));
+
+      expect(pod.gateway.sessionCount).toBe(1);
+      expect(socket.readyState).toBe(WebSocket.OPEN);
+      socket.close();
+    });
+  });
+
+  describe("when the socket closes while its registration is still running", () => {
+    /** @scenario "A socket that goes away during registration retires its instance" */
+    it("holds no connection for it once the registration finishes", async () => {
+      let releaseRegister: (() => void) | undefined;
+      const gate = new Promise<void>((resolve) => {
+        releaseRegister = resolve;
+      });
+      const slowAgents: AgentService = {
+        registerConnected: async (input) => {
+          await gate;
+          return {
+            id: input.id,
+            name: input.name,
+            environment: input.identity.environment,
+            type: "connected",
+          } as unknown as Agent;
+        },
+      } as unknown as AgentService;
+
+      const runtime = createConnectedAgentRuntime({
+        podId: "pod_slow",
+        store: createMemoryStateStore(),
+      });
+      const server = createServer((_request, response) => {
+        response.statusCode = 404;
+        response.end();
+      });
+      const gateway = new ConnectGateway({
+        runtime,
+        agents: slowAgents,
+        agentRepository: noopAgentRepository,
+        credentials: resolvingCredentials,
+        agentPlatformUrl: () => "https://example.test/agents",
+        replicaCount: 1,
+      });
+      gateway.mount(createUpgradeRouter(server));
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const url = `ws://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+      const socket = new WebSocket(`${url}${CONNECT_PATH}`, {
+        headers: { Authorization: "Bearer sk-lw-anything" },
+      });
+      await new Promise<void>((resolve) => socket.once("open", () => resolve()));
+      socket.send(JSON.stringify(registerFrame()));
+      // The socket goes away before registerConnected ever answers.
+      socket.terminate();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      releaseRegister?.();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(gateway.sessionCount).toBe(0);
+      await gateway.close();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    });
+  });
+
+});
+
+describe("AgentSessionCore.readCallForSession", () => {
+  describe("given an instance that registered agent A only, and a call routed at it for agent B", () => {
+    /** @scenario "An instance never receives a call for an agent it did not register" */
+    it("is not handed the call, and the call is marked undelivered for a retry elsewhere", async () => {
+      const store = createMemoryStateStore();
+      const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store });
+      const core = new (
+        await import("../../../services/connected-agent-session.service")
+      ).AgentSessionCore({
+        runtime,
+        agents: registeringAgentService(),
+        agentRepository: noopAgentRepository,
+        credentials: resolvingCredentials,
+        agentPlatformUrl: () => "https://example.test/agents",
+        replicaCount: 1,
+      });
+      const session = {
+        instanceId: "inst_1",
+        projectId: "proj_1",
+        projectSlug: "proj-one",
+        agentIds: new Set(["agent_a"]),
+        meta: {
+          instanceId: "inst_1",
+          projectId: "proj_1",
+          hostname: "laptop",
+          username: "dev",
+          pid: 1,
+          sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+          label: null,
+          podId: "pod_solo",
+          connectedAt: Date.now(),
+          maxConcurrency: 1,
+        },
+      };
+      const stored = {
+        projectId: "proj_1",
+        instanceId: "inst_1",
+        replyTo: "pod_solo",
+        envelope: {
+          callId: "call_1",
+          agentId: "agent_b",
+          threadId: "thread_1",
+          messages: [{ role: "user", content: "hi" }],
+          newMessages: [{ role: "user", content: "hi" }],
+          params: {},
+          session: null,
+          traceparent: null,
+          deadlineAt: Date.now() + 60_000,
+          run: {},
+        },
+      };
+      await store.set("agent_call:v1:proj_1:call_1", JSON.stringify(stored), 60);
+
+      const call = await core.readCallForSession(session, "call_1");
+
+      expect(call).toBeNull();
+      const result = await store.get("agent_result:v1:proj_1:call_1");
+      expect(result && JSON.parse(result)).toMatchObject({
+        instanceId: "inst_1",
+        undelivered: true,
+      });
     });
   });
 });

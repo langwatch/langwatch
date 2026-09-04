@@ -60,6 +60,7 @@ describe("runNoteSchema", () => {
   });
 
   describe("when the note is one character over the length limit", () => {
+    /** @scenario "A note over two hundred characters is rejected with validation_error" */
     it("rejects it", () => {
       const note = "a".repeat(MAX_RUN_NOTE_LENGTH + 1);
 

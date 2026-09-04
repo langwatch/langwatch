@@ -58,9 +58,7 @@ describe("useOnboardingFlow", () => {
       act(() => {
         rendered.result.current.navigation.nextScreen();
       });
-      expect(rendered.result.current.currentScreenIndex).toBe(
-        OnboardingScreenIndex.INTENT,
-      );
+      expect(rendered.result.current.currentScreenIndex).toBe(OnboardingScreenIndex.INTENT);
     });
   });
 
@@ -74,9 +72,7 @@ describe("useOnboardingFlow", () => {
       act(() => {
         rendered.result.current.navigation.nextScreen();
       });
-      expect(rendered.result.current.currentScreenIndex).toBe(
-        OnboardingScreenIndex.INTENT,
-      );
+      expect(rendered.result.current.currentScreenIndex).toBe(OnboardingScreenIndex.INTENT);
       return rendered;
     }
 

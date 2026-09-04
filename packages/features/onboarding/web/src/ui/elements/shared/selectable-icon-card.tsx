@@ -21,8 +21,17 @@ interface SelectableIconCardProps {
 }
 
 export function SelectableIconCard(props: SelectableIconCardProps): React.ReactElement {
-  const { label, size = "md", icon, iconNode, iconSize, selected, onClick, ariaLabel, badge } =
-    props;
+  const {
+    label,
+    size = "md",
+    icon,
+    iconNode,
+    iconSize,
+    selected,
+    onClick,
+    ariaLabel,
+    badge,
+  } = props;
 
   const actualIcon = icon?.type === "with-label" ? icon.icon : icon;
   const iconLabel = icon?.type === "with-label" ? icon.label : undefined;
@@ -129,7 +138,13 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
           }}
         >
           {iconNode ? (
-            <Box w={resolvedSize} h={resolvedSize} display="flex" alignItems="center" justifyContent="center">
+            <Box
+              w={resolvedSize}
+              h={resolvedSize}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
               {iconNode}
             </Box>
           ) : icon ? (

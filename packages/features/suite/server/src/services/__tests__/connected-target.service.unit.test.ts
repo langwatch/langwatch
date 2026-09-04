@@ -33,6 +33,8 @@ type ConnectedAgentFixture = {
   name: string;
   environment: string;
   ownerUserId: string | null;
+  type?: "connected" | "http";
+  lastSeenAt?: Date;
 };
 
 function baseSuite(overrides: Partial<Suite> = {}): Suite {
@@ -68,10 +70,10 @@ function connectedAgentService(agents: ConnectedAgentFixture[]): AgentService {
         .map((agent) => ({
           id: agent.id,
           name: agent.name,
-          type: "connected" as const,
+          type: agent.type ?? ("connected" as const),
           archivedAt: null,
           ownerUserId: agent.ownerUserId,
-          lastSeenAt: new Date(),
+          lastSeenAt: agent.lastSeenAt ?? new Date(),
         })),
     ),
     getConnectedByNameAndEnvironment: vi.fn(
@@ -316,6 +318,53 @@ describe("addressing a connected agent by name and environment", () => {
 
       expect(failure).toBeInstanceOf(InvalidTargetReferencesError);
       expect(execute).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a connected target unseen for thirty one days", () => {
+  describe("when the suite run is triggered", () => {
+    /** @scenario "A connected agent unseen for thirty days is refused as a run target" */
+    it("skips it the way it skips an archived target", async () => {
+      const unseenAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+      const agents = connectedAgentService([
+        { id: "agent_1", name: "agent_1", environment: "production", ownerUserId: null, type: "http" },
+        {
+          id: "agent_unseen",
+          name: "agent_unseen",
+          environment: "production",
+          ownerUserId: null,
+          lastSeenAt: unseenAt,
+        },
+      ]);
+      const { service, execute } = buildService(agents);
+
+      const config: RunPlanConfigInput = {
+        scope: { mode: "scenarios" },
+        scenarioIds: ["scenario_1"],
+        targets: [
+          { type: "http", referenceId: "agent_1" },
+          { type: "connected", referenceId: "agent_unseen" },
+        ],
+      };
+      const result = await service.runPlan({
+        projectId,
+        organizationId: "org_1",
+        name: "Support run",
+        config,
+        idempotencyKey: "idem_1",
+        actor: teammate,
+      });
+
+      expect(result.jobCount).toBe(1);
+      expect(execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          activeTargets: [{ type: "http", referenceId: "agent_1" }],
+          skippedArchived: expect.objectContaining({
+            targets: ["agent_unseen"],
+          }),
+        }),
+      );
     });
   });
 });

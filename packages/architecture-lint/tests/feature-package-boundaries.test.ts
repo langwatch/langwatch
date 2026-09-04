@@ -216,6 +216,7 @@ describe("feature package boundary lint", () => {
     expect(policies()).toContain("feature-layout");
   });
 
+  /** @scenario "Retired schema runtimes cannot re-enter feature packages" */
   it("rejects the retired Zod runtime in a feature contract", () => {
     featurePackage({
       feature: "agent",
@@ -391,6 +392,7 @@ describe("feature package boundary lint", () => {
     expect(policies()).toContain("public-exports");
   });
 
+  /** @scenario "A root barrel cannot disguise private persistence" */
   it("rejects private persistence exported through a server root barrel", () => {
     featurePackage({
       feature: "agent",
@@ -647,6 +649,7 @@ describe("feature package boundary lint", () => {
 
 describe("strict feature source layout", () => {
   /** @scenario A strict feature declares its layout version */
+  /** @scenario "Test fixtures have a named non-production home" */
   it("accepts canonical version-0 contract and server source", () => {
     featurePackage({ feature: "agent", role: "contract", layoutVersion: 0 });
     write(
@@ -799,6 +802,7 @@ describe("strict feature source layout", () => {
 
   /** @scenario Central subjects make broad feature ownership explicit */
   /** @scenario "Every production subject has exactly one owner" */
+  /** @scenario "A broad feature cannot silently acquire a new subject" */
   it("rejects contract and server modules that claim another feature subject", () => {
     featurePackage({ feature: "anomaly-rule", role: "contract" });
     featurePackage({

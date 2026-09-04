@@ -81,6 +81,7 @@ describe("Scenario child environment isolation", () => {
   });
 
   /** @scenario "A child receives only its project's telemetry" */
+  /** @scenario "Child process environment variables are preserved" */
   it("keeps tenant telemetry and resource attributes separate between children", () => {
     const first = buildChildEnvironment({
       config,
@@ -103,5 +104,29 @@ describe("Scenario child environment isolation", () => {
     expect(second.LANGWATCH_ENDPOINT).toBe("https://project-b.test");
     expect(second.OTEL_RESOURCE_ATTRIBUTES).toContain("scenario.labels=tenant-b");
     expect(second.OTEL_RESOURCE_ATTRIBUTES).not.toContain("tenant-a");
+  });
+
+  describe("given the scenario processor builds the child environment", () => {
+    /** @scenario "Repeat simulations do not repeat the same startup work" */
+    it("names a compile cache directory, preserving a caller-provided one", () => {
+      const withoutOverride = buildChildEnvironment({
+        config,
+        jobData: job("project-a", "run-a"),
+        labels: [],
+        telemetry: { endpoint: "https://project-a.test", apiKey: "key-a" },
+      });
+      expect(withoutOverride.NODE_COMPILE_CACHE).toContain("langwatch-scenario-compile-cache");
+
+      const withOverride = buildChildEnvironment({
+        config: {
+          ...config,
+          parentEnvironment: { ...config.parentEnvironment, nodeCompileCache: "/caller/cache" },
+        },
+        jobData: job("project-a", "run-a"),
+        labels: [],
+        telemetry: { endpoint: "https://project-a.test", apiKey: "key-a" },
+      });
+      expect(withOverride.NODE_COMPILE_CACHE).toBe("/caller/cache");
+    });
   });
 });

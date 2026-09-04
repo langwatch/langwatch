@@ -152,6 +152,22 @@ describe("redacting a correction for its reader", () => {
       expect(redacted.trace).toBeUndefined();
     });
 
+    /** @scenario "A viewer who may not read captured content is handed only the structural edits" */
+    it("hands over the structural edits and none of the corrected content", () => {
+      const redacted = redactPatchForViewer({
+        patch: contentAndStructurePatch,
+        protections: {
+          ...openProtections,
+          canSeeCapturedInput: false,
+          canSeeCapturedOutput: false,
+        },
+      });
+
+      expect(redacted.trace).toBeUndefined();
+      expect(redacted.spans).toEqual([{ spanId: "span-1", name: "renamed" }]);
+      expect(redacted.deletedSpanIds).toEqual(["span-2"]);
+    });
+
     it("keeps the category the viewer may still read", () => {
       const redacted = redactPatchForViewer({
         patch: patchOf({
@@ -403,6 +419,7 @@ describe("saving over a correction that was read redacted", () => {
 
   describe("given a reviewer who was never shown part of it", () => {
     /** @scenario "A saved correction keeps the edits the saver was never shown" */
+    /** @scenario "A reviewer who cannot read a field cannot remove its correction" */
     it("keeps their edits and puts back everything that was withheld", () => {
       const readable = redactPatchForViewer({
         patch: storedPatch,

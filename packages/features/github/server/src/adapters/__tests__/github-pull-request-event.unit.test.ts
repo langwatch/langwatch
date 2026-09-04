@@ -80,6 +80,7 @@ describe("GitHub pull-request webhook parsing", () => {
     expect(parsed?.pullRequest.updatedAt).toBe("2026-08-01T13:00:00+02:00");
   });
 
+  /** @scenario "An announcement for a pull request opened from a fork is dropped" */
   it("rejects forked or deleted head repositories", () => {
     const pullRequest = delivery().pull_request as Record<string, unknown>;
     const forked = {

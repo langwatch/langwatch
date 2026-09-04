@@ -504,4 +504,60 @@ describe("simulation run fold — event ordering invariants", () => {
       expect(state.FinishedAt, `${name}: FinishedAt must be set`).not.toBeNull();
     });
   });
+
+  describe("when a late child reports finished after the run already finished", () => {
+    /** @scenario "A late child cannot overwrite the terminal state of a finished run" */
+    it("keeps the terminal state it was finished with", async () => {
+      const state = await processFold(
+        [createStartedEvent(1000), createErrorFinishedEvent(5200), createFinishedEvent(9000)],
+        store,
+        projection,
+      );
+
+      expect(state.Status, "Status must remain the first finish's ERROR").toBe("ERROR");
+      expect(state.Verdict, "Verdict must remain the first finish's failure").toBe("failure");
+    });
+  });
+
+  describe("when a finished event names a non-terminal status", () => {
+    /** @scenario "A finished run can never be left in a non-terminal state" */
+    it("is recorded with a terminal status", async () => {
+      const nonTerminalFinished: SimulationRunFinishedEvent = {
+        ...createFinishedEvent(5200),
+        data: {
+          scenarioRunId: "run-1",
+          results: {
+            verdict: "failure",
+            reasoning: "still running per the client",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
+          status: "QUEUED",
+        },
+      };
+
+      const state = await processFold(
+        [createStartedEvent(1000), nonTerminalFinished],
+        store,
+        projection,
+      );
+
+      expect(state.Status, "Status must be terminal").toBe("FAILURE");
+      expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
+    });
+  });
+
+  describe("when a queued event announces the run again after it finished", () => {
+    /** @scenario "A run re-entering the queue cannot revive a finished run" */
+    it("keeps its terminal state", async () => {
+      const state = await processFold(
+        [createStartedEvent(1000), createFinishedEvent(5200), createQueuedEvent(9000)],
+        store,
+        projection,
+      );
+
+      expect(state.Status, "Status must remain SUCCESS").toBe("SUCCESS");
+      expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
+    });
+  });
 });

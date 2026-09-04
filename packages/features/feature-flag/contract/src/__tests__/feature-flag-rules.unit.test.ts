@@ -27,6 +27,7 @@ describe("evaluateRules", () => {
   });
 
   describe("when a project-scoped rule overrides a broader earlier rule", () => {
+    /** @scenario "The first matching rule wins" */
     it("returns the first matching rule's value (order wins)", () => {
       const rules: FeatureFlagRules = [
         { match: { projectId: "proj_x" }, enabled: false },
@@ -72,6 +73,7 @@ describe("evaluateRules", () => {
   });
 
   describe("when a rule carries an unknown match key (forward-compat)", () => {
+    /** @scenario "A rule condition the reader does not understand matches nobody" */
     it("fails closed so a newer writer's condition doesn't silently match everyone", () => {
       // A future writer ships { match: { percentageRollout: 10 }, enabled: true }.
       // An older reader doesn't know about percentageRollout — without
@@ -108,6 +110,7 @@ describe("parseRules", () => {
   });
 
   describe("when given a malformed payload", () => {
+    /** @scenario "A malformed stored rules payload is ignored" */
     it("returns an empty list so a bad row never 500s a flag check", () => {
       expect(parseRules({ not: "an array" })).toEqual([]);
       expect(parseRules([{ match: "wrong" }])).toEqual([]);

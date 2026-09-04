@@ -72,6 +72,7 @@ describe("httpProxy.execute", () => {
   describe("given an agent that has been saved and carries an agentId", () => {
     describe("when the user executes a test request", () => {
       /** @scenario "Successful request creates a trace" */
+      /** @scenario "Trace includes project ID" */
       it("records the trace against the project the test ran in", async () => {
         const { caller, recorded } = harness();
 

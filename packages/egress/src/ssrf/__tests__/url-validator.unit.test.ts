@@ -104,14 +104,11 @@ describe("the SSRF address policy", () => {
       "168.63.129.16",
       "metadata",
       "metadata.google.internal",
-    ])(
-      "still refuses the metadata endpoint %s",
-      async (host) => {
-        await expect(permissive(`http://${host}/latest/meta-data/`)).rejects.toThrow(
-          /cloud metadata endpoints is not allowed/i,
-        );
-      },
-    );
+    ])("still refuses the metadata endpoint %s", async (host) => {
+      await expect(permissive(`http://${host}/latest/meta-data/`)).rejects.toThrow(
+        /cloud metadata endpoints is not allowed/i,
+      );
+    });
 
     /**
      * The brackets come off before the host is judged, so the classifier sees
@@ -139,9 +136,9 @@ describe("the SSRF address policy", () => {
       async (address) => {
         resolvesTo({ a: [address] });
 
-        await expect(
-          permissive("http://imds.attacker.example/latest/meta-data/"),
-        ).rejects.toThrow(/resolves to a cloud metadata endpoint/i);
+        await expect(permissive("http://imds.attacker.example/latest/meta-data/")).rejects.toThrow(
+          /resolves to a cloud metadata endpoint/i,
+        );
       },
     );
 

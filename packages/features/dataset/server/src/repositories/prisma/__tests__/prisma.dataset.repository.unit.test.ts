@@ -49,16 +49,36 @@ describe("PrismaDatasetRepository", () => {
           take: 5,
           include: { _count: { select: { datasetRecords: true } } },
         });
-        expect(listed.map(({ id, name, slug, columnTypes, recordCount }) => ({
-          id,
-          name,
-          slug,
-          columnTypes,
-          recordCount,
-        }))).toEqual([
-          { id: "a", name: "Dataset a", slug: "dataset-a", columnTypes: [{ name: "input", type: "string" }], recordCount: 2 },
-          { id: "b", name: "Dataset b", slug: "dataset-b", columnTypes: [{ name: "input", type: "string" }], recordCount: 0 },
-          { id: "c", name: "Dataset c", slug: "dataset-c", columnTypes: [{ name: "input", type: "string" }], recordCount: 7 },
+        expect(
+          listed.map(({ id, name, slug, columnTypes, recordCount }) => ({
+            id,
+            name,
+            slug,
+            columnTypes,
+            recordCount,
+          })),
+        ).toEqual([
+          {
+            id: "a",
+            name: "Dataset a",
+            slug: "dataset-a",
+            columnTypes: [{ name: "input", type: "string" }],
+            recordCount: 2,
+          },
+          {
+            id: "b",
+            name: "Dataset b",
+            slug: "dataset-b",
+            columnTypes: [{ name: "input", type: "string" }],
+            recordCount: 0,
+          },
+          {
+            id: "c",
+            name: "Dataset c",
+            slug: "dataset-c",
+            columnTypes: [{ name: "input", type: "string" }],
+            recordCount: 7,
+          },
         ]);
       });
     });

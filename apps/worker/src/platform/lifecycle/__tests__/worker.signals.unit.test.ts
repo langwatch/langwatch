@@ -28,6 +28,7 @@ class Signals implements WorkerSignalSource {
 }
 
 describe("WorkerSignalHandlers", () => {
+  /** @scenario A second signal during shutdown does not start a second teardown */
   it("coalesces repeated signals, drains once, and removes listeners", async () => {
     const source = new Signals();
     const close = vi.fn(async () => undefined);
@@ -94,6 +95,7 @@ describe("WorkerSignalHandlers", () => {
     );
   });
 
+  /** @scenario A shutdown that overruns its deadline exits on its own terms */
   it("enforces an executable-owned shutdown deadline while a drain is still pending", async () => {
     vi.useFakeTimers();
     try {

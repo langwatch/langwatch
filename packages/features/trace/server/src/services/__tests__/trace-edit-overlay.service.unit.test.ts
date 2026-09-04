@@ -206,6 +206,7 @@ describe("TraceEditOverlayService", () => {
   });
 
   describe("given a stored patch this build cannot interpret", () => {
+    /** @scenario "A stored correction that can no longer be understood reads as none" */
     it("reads as no correction", async () => {
       const { service } = buildService({ version: 99 });
 
@@ -630,6 +631,7 @@ describe("TraceEditOverlayService", () => {
   });
 
   describe("when saving a correction that changes nothing", () => {
+    /** @scenario "A correction that changes nothing is rejected" */
     it("rejects it and never writes", async () => {
       const { service, upsert } = buildService(null);
 
@@ -646,6 +648,7 @@ describe("TraceEditOverlayService", () => {
   });
 
   describe("when saving a correction that is not shaped like a trace", () => {
+    /** @scenario "A correction that is not shaped like a trace is rejected" */
     it("rejects it and never writes", async () => {
       const { service, upsert } = buildService(null);
 
@@ -662,6 +665,144 @@ describe("TraceEditOverlayService", () => {
         }),
       ).rejects.toMatchObject({ code: "validation_error" });
       expect(upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a trace nobody has corrected", () => {
+    /** @scenario "A trace with no correction reads as uncorrected" */
+    it("returns no correction", async () => {
+      const { service } = buildService(null);
+
+      expect(
+        await service.getByTraceId({ projectId: "project-1", traceId: "trace-1" }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when a reviewer saves a correction", () => {
+    /** @scenario "Saving a correction stores it with its author" */
+    it("stores the correction with its author", async () => {
+      const { service, upsert } = buildService(null);
+
+      const saved = await service.upsert({
+        projectId: "project-1",
+        traceId: "trace-1",
+        patch: { version: 1, spans: [{ spanId: "span-1", name: "cleaned up" }], deletedSpanIds: [] },
+        userId: "user-1",
+      });
+
+      expect(saved.patch.spans[0]?.name).toBe("cleaned up");
+      expect(upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: "project-1", traceId: "trace-1", userId: "user-1" }),
+      );
+    });
+
+    /** @scenario "Saving again replaces the correction and records the last editor" */
+    it("replaces the patch and records the last editor", async () => {
+      const rows: unknown[] = [];
+      const upsert = vi.fn(async ({ patch, userId }: { patch: TraceEditOverlayPatch; userId: string | null }) => {
+        const created = rows.length === 0 ? userId : "user-1";
+        rows.push(patch);
+        return {
+          id: "traceedit_1",
+          projectId: "project-1",
+          traceId: "trace-1",
+          patch,
+          createdById: created,
+          updatedById: userId,
+          createdAt: new Date("2026-08-04T00:00:00.000Z"),
+          updatedAt: new Date("2026-08-04T00:00:01.000Z"),
+          createdBy: { id: created, name: "First Reviewer", image: null },
+          updatedBy: { id: userId, name: "Second Reviewer", image: null },
+        } as TraceEditOverlayRow;
+      });
+      const repository = {
+        tryFindByProjectAndTrace: vi.fn(async () => null),
+        upsert,
+        delete: vi.fn(),
+      } as unknown as TraceEditOverlayRepository;
+      const service = new TraceEditOverlayService(repository);
+
+      await service.upsert({
+        projectId: "project-1",
+        traceId: "trace-1",
+        patch: { version: 1, spans: [{ spanId: "span-1", name: "cleaned up" }], deletedSpanIds: [] },
+        userId: "user-1",
+      });
+      const replaced = await service.upsert({
+        projectId: "project-1",
+        traceId: "trace-1",
+        patch: { version: 1, spans: [], deletedSpanIds: ["span-noise"] },
+        userId: "user-2",
+      });
+
+      expect(replaced.patch.spans).toEqual([]);
+      expect(replaced.patch.deletedSpanIds).toEqual(["span-noise"]);
+      expect(replaced.createdBy?.id).toBe("user-1");
+      expect(replaced.updatedBy?.id).toBe("user-2");
+    });
+
+    /** @scenario "Saving a correction that changes trace metadata stores it" */
+    it("stores corrected trace metadata alongside the span edits", async () => {
+      const { service, upsert } = buildService(null);
+
+      const saved = await service.upsert({
+        projectId: "project-1",
+        traceId: "trace-1",
+        patch: {
+          version: 1,
+          trace: { metadata: { environment: "production", reviewer: null } },
+          spans: [{ spanId: "span-1", name: "cleaned up" }],
+          deletedSpanIds: [],
+        },
+        userId: "user-1",
+      });
+
+      expect(saved.patch).toMatchObject({
+        trace: { metadata: { environment: "production", reviewer: null } },
+        spans: [{ spanId: "span-1", name: "cleaned up" }],
+      });
+      expect(upsert).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("when a reviewer removes a correction", () => {
+    /** @scenario "Removing a correction is idempotent and restores the original" */
+    it("returns the trace to uncorrected and tolerates a second removal", async () => {
+      const { service, deleteRow } = buildService(null);
+
+      await service.delete({ projectId: "project-1", traceId: "trace-1" });
+      await service.delete({ projectId: "project-1", traceId: "trace-1" });
+
+      expect(deleteRow).toHaveBeenCalledTimes(2);
+      expect(
+        await service.getByTraceId({ projectId: "project-1", traceId: "trace-1" }),
+      ).toBeNull();
+    });
+  });
+
+  describe("given a page of traces, some corrected and some not", () => {
+    /** @scenario "A page of traces fetches its corrections in one read" */
+    it("returns a map keyed by trace id with only the corrected traces present", async () => {
+      const findAllByProjectAndTraces = vi.fn(async () => [row({ version: 1, spans: [{ spanId: "span-1", name: "renamed" }], deletedSpanIds: [] })]);
+      const repository = {
+        findAllByProjectAndTraces,
+        tryFindByProjectAndTrace: vi.fn(async () => null),
+      } as unknown as TraceEditOverlayRepository;
+      const service = new TraceEditOverlayService(repository);
+
+      const patches = await service.getPatchesByTraceIds({
+        projectId: "project-1",
+        traceIds: ["trace-1", "trace-2"],
+      });
+
+      expect(findAllByProjectAndTraces).toHaveBeenCalledWith({
+        projectId: "project-1",
+        traceIds: ["trace-1", "trace-2"],
+      });
+      expect(patches.size).toBe(1);
+      expect(patches.get("trace-1")?.spans[0]?.name).toBe("renamed");
+      expect(patches.has("trace-2")).toBe(false);
     });
   });
 });

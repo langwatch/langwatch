@@ -114,6 +114,68 @@ describe("OtlpSpanContentDropService.stripSpanContent", () => {
         expect(result.droppedCategories).toEqual(["input"]);
       });
 
+      /** @scenario Metadata always survives a drop */
+      it("keeps token, cost, model and latency metadata when every category is dropped", () => {
+        const target = span([
+          { key: "gen_ai.input.messages", value: { stringValue: "hello" } },
+          { key: "gen_ai.output.messages", value: { stringValue: "hi there" } },
+          { key: "gen_ai.system_instructions", value: { stringValue: "be nice" } },
+          { key: "gen_ai.tool.call.arguments", value: { stringValue: "{}" } },
+          { key: "gen_ai.usage.input_tokens", value: { stringValue: "12" } },
+          { key: "gen_ai.usage.output_tokens", value: { stringValue: "8" } },
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } },
+        ]);
+
+        pureDrop().stripSpanContent({
+          span: target,
+          policy: policy({ input: "drop", output: "drop", system: "drop", tools: "drop" }),
+        });
+
+        expect(keys(target)).not.toContain("gen_ai.input.messages");
+        expect(keys(target)).not.toContain("gen_ai.output.messages");
+        expect(keys(target)).not.toContain("gen_ai.system_instructions");
+        expect(keys(target)).not.toContain("gen_ai.tool.call.arguments");
+        expect(keys(target)).toContain("gen_ai.usage.input_tokens");
+        expect(keys(target)).toContain("gen_ai.usage.output_tokens");
+        expect(keys(target)).toContain("gen_ai.request.model");
+      });
+
+      /** @scenario Each content category is dropped independently */
+      it("drops only the requested category, leaving the others untouched", () => {
+        const target = span([
+          { key: "gen_ai.input.messages", value: { stringValue: "hello" } },
+          { key: "gen_ai.output.messages", value: { stringValue: "hi" } },
+          { key: "gen_ai.tool.call.arguments", value: { stringValue: "{}" } },
+          { key: "gen_ai.tool.call.result", value: { stringValue: "ok" } },
+        ]);
+
+        pureDrop().stripSpanContent({
+          span: target,
+          policy: policy({ tools: "drop" }),
+        });
+
+        expect(keys(target)).toContain("gen_ai.input.messages");
+        expect(keys(target)).toContain("gen_ai.output.messages");
+        expect(keys(target)).not.toContain("gen_ai.tool.call.arguments");
+        expect(keys(target)).not.toContain("gen_ai.tool.call.result");
+      });
+
+      /** @scenario A coding-agent's full request body is never stored when input is dropped */
+      it("removes the raw request body carried under gen_ai.prompt but keeps the completion", () => {
+        const target = span([
+          { key: "gen_ai.prompt", value: { stringValue: "FULL RAW REQUEST BODY" } },
+          { key: "gen_ai.completion", value: { stringValue: "the answer" } },
+        ]);
+
+        pureDrop().stripSpanContent({
+          span: target,
+          policy: policy({ input: "drop" }),
+        });
+
+        expect(keys(target)).not.toContain("gen_ai.prompt");
+        expect(keys(target)).toContain("gen_ai.completion");
+      });
+
       /** @scenario "The drop marker names the dropped categories in catalog order" */
       it("stamps the marker with the categories comma-joined", () => {
         const target = span([{ key: "gen_ai.prompt", value: { stringValue: "secret" } }]);
@@ -148,6 +210,7 @@ describe("OtlpSpanContentDropService.stripSpanContent", () => {
     describe("when the conversation still carries that role", () => {
       /**
        * @scenario "A dropped system category strips system turns from the conversation"
+       * @scenario Dropping system instructions strips the system turn from the conversation
        *
        * Canonicalisation runs AFTER the drop and re-derives
        * `gen_ai.system_instructions` from the conversation, so removing only
@@ -177,7 +240,10 @@ describe("OtlpSpanContentDropService.stripSpanContent", () => {
         expect(result.droppedCount).toBe(1);
       });
 
-      /** @scenario "A dropped tools category strips tool turns and assistant tool_calls" */
+      /**
+       * @scenario "A dropped tools category strips tool turns and assistant tool_calls"
+       * @scenario Dropping tool calls strips tool messages and assistant tool_calls
+       */
       it("removes tool and function turns and the tool_calls key", () => {
         const target = span([
           {
@@ -228,7 +294,10 @@ describe("OtlpSpanContentDropService.stripSpanContent", () => {
 
   describe("given a policy with custom attribute rules", () => {
     describe("when a matching attribute is stripped", () => {
-      /** @scenario "Custom attribute rules drop by wildcard and name the keys" */
+      /**
+       * @scenario "Custom attribute rules drop by wildcard and name the keys"
+       * @scenario A wildcard attribute rule drops every matching key
+       */
       it("removes matching keys and lists their names in the second marker", () => {
         const target = span([
           { key: "my.secret.token", value: { stringValue: "shhh" } },
@@ -246,6 +315,22 @@ describe("OtlpSpanContentDropService.stripSpanContent", () => {
           "my.secret.token,my.secret.id",
         );
         expect(result.droppedAttributeKeys).toEqual(["my.secret.token", "my.secret.id"]);
+      });
+
+      /** @scenario Extra blacklisted attribute keys are dropped */
+      it("removes an exact custom key without touching captured categories", () => {
+        const target = span([
+          { key: "http.request.body", value: { stringValue: "secret payload" } },
+          { key: "gen_ai.input.messages", value: { stringValue: "hello" } },
+        ]);
+
+        pureDrop().stripSpanContent({
+          span: target,
+          policy: policy({}, [{ pattern: "http.request.body", disposition: "drop" }]),
+        });
+
+        expect(keys(target)).not.toContain("http.request.body");
+        expect(keys(target)).toContain("gen_ai.input.messages");
       });
 
       /**

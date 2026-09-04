@@ -136,6 +136,7 @@ describe("withRateLimit", () => {
       .build();
   }
 
+  /** @scenario "Rate limiting runs after auth and before validation" */
   it("runs after auth and before validation: an over-limit caller gets 429, not 422", async () => {
     const app = buildLimitedService();
     rateLimiter.denyAll(30);
@@ -166,6 +167,7 @@ describe("withRateLimit", () => {
     expect(res.headers.get("Retry-After")).toBeNull();
   });
 
+  /** @scenario "The rate-limit key names service, endpoint, version and principal" */
   it("keys on service, endpoint, version namespace and principal", async () => {
     const auth: MiddlewareHandler = async (c, next) => {
       c.set("user", { id: "user-1" });
@@ -278,6 +280,7 @@ describe("withCache", () => {
     return app;
   }
 
+  /** @scenario "A cache hit serves the validated bytes without the handler" */
   it("serves a cache hit without running the handler or the output schema", async () => {
     const handler = vi.fn(async (_c: unknown, input: { id: string }) => ({
       id: input.id,
@@ -311,6 +314,7 @@ describe("withCache", () => {
     expect(entry.ttlSeconds).toBe(60);
   });
 
+  /** @scenario "The cache key is the complete call" */
   it("treats the cache key as the complete call", async () => {
     const handler = vi.fn(async (_c: unknown, input: { id: string }) => ({
       id: input.id,
@@ -404,6 +408,7 @@ describe("withCache", () => {
     expect(cache.store.size).toBe(2);
   });
 
+  /** @scenario "Tag invalidation drops a family's entries" */
   it("drops a family's entries when its tag is invalidated", async () => {
     const handler = vi.fn(async (_c: unknown, input: { id: string }) => ({
       id: input.id,
@@ -421,6 +426,7 @@ describe("withCache", () => {
   });
 
   /** @scenario "Answering requires an output schema" */
+  /** @scenario "An endpoint without output is never cached" */
   it("refuses the registration when no output is declared: unvalidated bytes may not be cached", () => {
     const service = createService({
       name: "things",
@@ -448,6 +454,7 @@ describe("withCache", () => {
     ).toThrow(/must declare an output schema/);
   });
 
+  /** @scenario "A cache failure degrades to a handler call" */
   it("degrades a cache failure to a handler call and logs it", async () => {
     const handler = vi.fn(async (_c: unknown, input: { id: string }) => ({
       id: input.id,
@@ -506,6 +513,7 @@ describe("withDeprecated", () => {
       .build();
   }
 
+  /** @scenario "Deprecation headers ride errors too" */
   it("warns on every live response, including errors", async () => {
     const app = buildDeprecatedService();
 
@@ -537,6 +545,10 @@ describe("withDeprecated", () => {
 // ---------------------------------------------------------------------------
 
 describe("capability defaults", () => {
+  /** @scenario "A service-level capability is the default for every endpoint" */
+  /** @scenario "An endpoint re-declaration wins over the service default" */
+  /** @scenario "Cache and rate limit can be opted out per endpoint" */
+  /** @scenario "A service-level default applies until re-declared or opted out" */
   it("applies a service-level default until re-declared or opted out", async () => {
     const rateLimiter = new InMemoryRateLimiter();
     const cache = new InMemoryCache();

@@ -309,6 +309,7 @@ describe("SCIM user parity", () => {
     });
   });
 
+  /** @scenario "With the flag off the previous write path answers exactly as before" */
   it("deactivates and removes a member on delete, sweeping visible grants", async () => {
     const repo = repository({
       tryFindMembership: vi.fn(async () => ({

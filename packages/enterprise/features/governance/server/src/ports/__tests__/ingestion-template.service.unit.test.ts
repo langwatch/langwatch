@@ -69,16 +69,16 @@ class MemoryIngestionTemplateRepository extends IngestionTemplateRepository {
     return this.mutationResult;
   }
 
-  async syncPlatformCatalog(input: {
-    templates: readonly PlatformIngestionTemplateSeed[];
-    retiredSlugs: readonly string[];
-  }): Promise<PlatformIngestionTemplateSyncResult> {
-    return {
+  readonly syncPlatformCatalog = vi.fn(
+    async (input: {
+      templates: readonly PlatformIngestionTemplateSeed[];
+      retiredSlugs: readonly string[];
+    }): Promise<PlatformIngestionTemplateSyncResult> => ({
       created: input.templates.length,
       updated: 0,
       archived: input.retiredSlugs.length,
-    };
-  }
+    }),
+  );
 }
 
 describe("IngestionTemplateService", () => {
@@ -168,6 +168,19 @@ describe("IngestionTemplateService", () => {
     });
     expect(repository.createWithAudit).toHaveBeenCalledWith(
       expect.objectContaining({ surface: "mcp" }),
+    );
+  });
+
+  /** @scenario "An existing platform claude-cowork template is archived by the seeder" */
+  it("syncs the platform catalog with claude_cowork among the retired slugs and no new seeds", async () => {
+    const repository = new MemoryIngestionTemplateRepository();
+    await IngestionTemplateService.create({ repository }).syncPlatformCatalog();
+
+    expect(repository.syncPlatformCatalog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        templates: [],
+        retiredSlugs: expect.arrayContaining(["claude_cowork"]),
+      }),
     );
   });
 });

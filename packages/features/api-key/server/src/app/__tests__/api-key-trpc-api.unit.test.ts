@@ -160,6 +160,7 @@ describe("ApiKeyTrpcApi", () => {
   describe("when the caller is not a member of the organization", () => {
     /** The membership proof is the authorization here — no permission gates
      *  these procedures — so it must run before anything is read. */
+    /** @scenario A non-member cannot name a key in an organization they are outside */
     it("refuses to name a key, without looking one up", async () => {
       const tryGetNameByIdInOrg = vi.fn();
       const { caller } = harness({
@@ -249,6 +250,25 @@ describe("ApiKeyTrpcApi", () => {
         id: "ak_1",
         organizationId: ORG_ID,
       });
+    });
+
+    /** @scenario A revoked key still resolves to its name */
+    it("still resolves the name for a revoked key, flagged as revoked", async () => {
+      const { caller } = harness({
+        apiKeys: {
+          tryGetNameByIdInOrg: async () => ({
+            name: "Retired ingestion key",
+            revoked: true,
+          }),
+        },
+      });
+
+      const result = await caller.nameById({
+        organizationId: ORG_ID,
+        apiKeyId: "ak_1",
+      });
+
+      expect(result).toEqual({ name: "Retired ingestion key", revoked: true });
     });
 
     /** An unknown id and one belonging to another organization must be

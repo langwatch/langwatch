@@ -82,6 +82,7 @@ const input = {
 };
 
 describe("ImpersonationService", () => {
+  /** @scenario "A healthy target receives a bounded session window" */
   it("audits before installing a one-hour impersonation window", async () => {
     const repository = new InMemoryImpersonationRepository(target());
     const { audit, service } = serviceFor(repository);
@@ -100,6 +101,7 @@ describe("ImpersonationService", () => {
     expect(repository.window?.expires.toISOString()).toBe("2026-01-01T01:00:00.000Z");
   });
 
+  /** @scenario "An admin cannot impersonate another admin" */
   it("rejects missing, deactivated, and platform-admin targets", async () => {
     await expect(
       serviceFor(new InMemoryImpersonationRepository(null)).service.start(input),

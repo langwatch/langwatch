@@ -7,10 +7,29 @@
  * target that made the pairing (#6590).
  */
 
+import { FieldMappingSchema } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 import { suiteTargetSchema } from "../suite";
 
 describe("suiteTargetSchema", () => {
+  describe("given a suite target carrying a source mapping and a literal mapping", () => {
+    /** @scenario "A mapping accepted by the suite target schema is accepted by the child" */
+    it("is also accepted by the child's field mapping schema", () => {
+      const parsed = suiteTargetSchema.parse({
+        type: "prompt",
+        referenceId: "prompt_123",
+        scenarioMappings: {
+          question: { type: "source", sourceId: "scenario", path: ["input"] },
+          tier: { type: "value", value: "gold" },
+        },
+      });
+
+      for (const mapping of Object.values(parsed.scenarioMappings ?? {})) {
+        expect(FieldMappingSchema.safeParse(mapping).success).toBe(true);
+      }
+    });
+  });
+
   describe("given a prompt target carrying scenario mappings", () => {
     /** @scenario "A run plan keeps the bindings configured for its prompt" */
     it("preserves the scenarioMappings through validation", () => {

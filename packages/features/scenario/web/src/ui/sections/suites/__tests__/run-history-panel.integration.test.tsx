@@ -231,9 +231,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         expect(groupBySelect).toBeInTheDocument();
         expect(groupBySelect).toHaveValue("none");
 
-        const optionValues = Array.from(
-          groupBySelect.querySelectorAll("option"),
-        ).map((o) => o.value);
+        const optionValues = Array.from(groupBySelect.querySelectorAll("option")).map(
+          (o) => o.value,
+        );
         expect(optionValues).toEqual(["none", "scenario", "target"]);
       });
     });
@@ -290,16 +290,11 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
 
         render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
-        await userEvent.selectOptions(
-          screen.getByLabelText("Group by"),
-          "scenario",
-        );
+        await userEvent.selectOptions(screen.getByLabelText("Group by"), "scenario");
 
         const groupHeaders = screen.getAllByTestId("group-row-header");
         expect(groupHeaders.length).toBe(1);
-        expect(
-          within(groupHeaders[0]!).getByText("Shared Scenario"),
-        ).toBeInTheDocument();
+        expect(within(groupHeaders[0]!).getByText("Shared Scenario")).toBeInTheDocument();
       });
     });
   });

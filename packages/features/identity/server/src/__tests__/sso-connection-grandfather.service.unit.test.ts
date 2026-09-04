@@ -115,6 +115,43 @@ beforeEach(() => {
 });
 
 describe("the sso connection grandfather migration", () => {
+  describe("given an organization carrying legacy ssoDomain and a provider string", () => {
+    describe("when the migration runs for it", () => {
+      /** @scenario "A legacy SSO organization is grandfathered without noticing" */
+      it("backfills a VERIFIED, ACTIVE connection from history that routes sign-ins exactly as before", async () => {
+        const legacyRouting = new StubRouting({
+          "acme.com": routable({ connectionId: `org:${ORG}` }),
+        });
+        const connectionRouting = new StubRouting({
+          "acme.com": routable({ connectionId: "ssoc_gf_org_acme" }),
+        });
+
+        const outcome = await grandfatherOf({ legacyRouting, connectionRouting }).migrateOrganization({
+          organizationId: ORG,
+        });
+        expect(outcome.status).toBe("finalized");
+
+        // The backfilled connection is live from the append alone — nobody
+        // ran a separate activation step.
+        const state = await connections.findConnection({
+          connectionId: "ssoc_gf_org_acme",
+        });
+        expect(state).toMatchObject({ state: "ACTIVE" });
+        expect(state?.verifiedDomains).toContain("acme.com");
+
+        // And it routes the domain exactly as the legacy string did — the
+        // "without noticing" half.
+        const routedByConnection = await connectionRouting.tryFindConnectionForDomain({
+          domain: "acme.com",
+        });
+        const routedByLegacy = await legacyRouting.tryFindConnectionForDomain({
+          domain: "acme.com",
+        });
+        expect(routedByConnection?.method.id).toBe(routedByLegacy?.method.id);
+      });
+    });
+  });
+
   describe("given an organization whose legacy strings still decide sign-in", () => {
     /** @scenario "A grandfathered organization finalizes on routing agreement" */
     it("compares both lookups for every domain and finalizes on agreement", async () => {

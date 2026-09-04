@@ -72,4 +72,24 @@ describe("ingestionCredentials", () => {
       expect(credentials.decrypt(null)).toEqual({});
     });
   });
+
+  describe("given an admin saves an OpenAI Admin source carrying an admin API key", () => {
+    /** @scenario "The Admin API key is never stored in plain text" */
+    it("stores the key encrypted, unreadable from the serialised config", () => {
+      const token = "sk-admin-abcdef123456";
+      const out = credentials.tryEncryptParserConfig({
+        adapter: "openai_admin",
+        report: "cost",
+        credentials: { token },
+      })!;
+
+      // Credentials become an opaque tagged string, not the plaintext
+      // object — the real AES port's own tests cover that the ciphertext
+      // itself hides the token; this module owns only the envelope.
+      expect(typeof out.credentials).toBe("string");
+      expect(out.credentials as string).toMatch(/^enc:v1:/);
+      expect(out.credentials).not.toEqual({ token });
+      expect(credentials.decrypt(out.credentials)).toEqual({ token });
+    });
+  });
 });

@@ -67,6 +67,7 @@ describe("WorkflowNlpExecutionService with a migrated legacy version", () => {
     expect("default_llm" in migrated).toBe(false);
   });
 
+  /** @scenario Published workflows saved before the change still run with their old model */
   it("dispatches the node-owned LLM configuration supplied by the migration boundary", async () => {
     const dispatchNlp = vi.fn().mockResolvedValue({
       ok: true,

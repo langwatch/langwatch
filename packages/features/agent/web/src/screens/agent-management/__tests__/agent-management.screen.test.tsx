@@ -300,6 +300,7 @@ describe("given the agents page", () => {
   });
 
   describe("when the address already asks for a new agent", () => {
+    /** @scenario "Selecting type navigates to appropriate editor" */
     it("offers the types, and a choice opens the application's editor for it", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { host } = await mountScreen({ new: "agent" });

@@ -100,11 +100,13 @@ describe("SsoGateService", () => {
       evaluationTimeoutMs,
     });
 
+  /** @scenario "SaaS is unaffected by license gating" */
   it("allows SaaS without asking the licensing service", async () => {
     expect(await create({ ...baseConfiguration(), isSaas: true }).platformAllowed()).toBe(true);
     expect(licensing.inspectPlatformAccess).not.toHaveBeenCalled();
   });
 
+  /** @scenario "An expired but genuine license still keeps SSO working" */
   it("allows any signature-valid organization license even when expired", async () => {
     licensing.inspectPlatformAccess.mockResolvedValue(validAccess({ expired: true }));
 
@@ -118,6 +120,7 @@ describe("SsoGateService", () => {
     );
   });
 
+  /** @scenario "A tampered license does not enable SSO" */
   it("rejects a tampered license and explains the failed signature", async () => {
     licensing.inspectPlatformAccess.mockResolvedValue({
       allowed: false,
@@ -138,6 +141,7 @@ describe("SsoGateService", () => {
     );
   });
 
+  /** @scenario "An SSO-only deployment recovers by setting the instance license key" */
   it("passes the instance license to the shared licensing service", async () => {
     licensing.inspectPlatformAccess.mockResolvedValue(
       validAccess({ source: "instance", organizationId: undefined }),
@@ -154,6 +158,7 @@ describe("SsoGateService", () => {
     });
   });
 
+  /** @scenario "Self-hosted with a genuine org license keeps SSO working with zero action" */
   it("shares one successful process decision across concurrent requests", async () => {
     let settle: (access: PlatformLicenseAccess) => void = () => {};
     licensing.inspectPlatformAccess.mockReturnValue(
@@ -172,6 +177,7 @@ describe("SsoGateService", () => {
     expect(licensing.inspectPlatformAccess).toHaveBeenCalledOnce();
   });
 
+  /** @scenario "A licensing-store outage refuses SSO and heals itself" */
   it("evicts a failed licensing decision so the next request self-heals", async () => {
     licensing.inspectPlatformAccess
       .mockRejectedValueOnce(new Error("offline"))
@@ -183,6 +189,7 @@ describe("SsoGateService", () => {
     expect(licensing.inspectPlatformAccess).toHaveBeenCalledTimes(2);
   });
 
+  /** @scenario "A licensing store that never answers stops being waited on" */
   it("times out a stuck licensing service and retries later", async () => {
     vi.useFakeTimers();
     try {
@@ -200,6 +207,7 @@ describe("SsoGateService", () => {
     }
   });
 
+  /** @scenario "A provider id this build cannot mount falls back to email" */
   it("falls back to email when a licensed provider cannot mount", async () => {
     licensing.inspectPlatformAccess.mockResolvedValue(
       validAccess({ source: "instance", organizationId: undefined }),

@@ -80,6 +80,7 @@ describe("CachedFeatureFlagRowAdapter", () => {
     await expect(harness.store.tryGetRow("flag")).resolves.toBeNull();
   });
 
+  /** @scenario "An operator write is visible to the next resolution" */
   it("invalidates both cache tiers before the next read", async () => {
     const harness = createHarness();
     await writeRow(harness.repository, "flag", false);

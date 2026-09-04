@@ -93,13 +93,37 @@ describe("given a filter being written to the address", () => {
 describe("given rows scoped across an organization", () => {
   const hierarchy = scopeHierarchyOf(available);
 
+  describe("when the filter is the organization", () => {
+    const filter = resolveScopeFilter(
+      { kind: "specific", scopeType: "ORGANIZATION", scopeId: "org_1" },
+      {},
+    );
+
+    /** @scenario "Picking the organization keeps every row in that org's tree" */
+    it("keeps every team and project the page loaded, since they all belong to it", () => {
+      expect(
+        isScopeInFilter({ scopeType: "ORGANIZATION", scopeId: "org_1" }, filter, hierarchy),
+      ).toBe(true);
+      expect(isScopeInFilter({ scopeType: "TEAM", scopeId: "team_1" }, filter, hierarchy)).toBe(
+        true,
+      );
+      expect(
+        isScopeInFilter({ scopeType: "PROJECT", scopeId: "project_1" }, filter, hierarchy),
+      ).toBe(true);
+    });
+  });
+
   describe("when the filter is a team", () => {
     const filter = resolveScopeFilter({ kind: "team-current" }, { currentTeamId: "team_1" });
 
+    /** @scenario "Picking a team keeps org rows, the team itself, and its projects" */
     it("keeps the organization above it and the projects below it", () => {
       expect(
         isScopeInFilter({ scopeType: "ORGANIZATION", scopeId: "org_1" }, filter, hierarchy),
       ).toBe(true);
+      expect(isScopeInFilter({ scopeType: "TEAM", scopeId: "team_1" }, filter, hierarchy)).toBe(
+        true,
+      );
       expect(
         isScopeInFilter({ scopeType: "PROJECT", scopeId: "project_1" }, filter, hierarchy),
       ).toBe(true);
@@ -112,6 +136,35 @@ describe("given rows scoped across an organization", () => {
       expect(
         isScopeInFilter({ scopeType: "PROJECT", scopeId: "project_9" }, filter, hierarchy),
       ).toBe(false);
+    });
+  });
+
+  describe("when the filter is a project", () => {
+    const filter = resolveScopeFilter(
+      { kind: "specific", scopeType: "PROJECT", scopeId: "project_1" },
+      {},
+    );
+
+    /** @scenario "Picking a project keeps org rows, the project's parent team, and the project itself" */
+    it("keeps the organization, the project's parent team, and the project itself", () => {
+      expect(
+        isScopeInFilter({ scopeType: "ORGANIZATION", scopeId: "org_1" }, filter, hierarchy),
+      ).toBe(true);
+      expect(isScopeInFilter({ scopeType: "TEAM", scopeId: "team_1" }, filter, hierarchy)).toBe(
+        true,
+      );
+      expect(
+        isScopeInFilter({ scopeType: "PROJECT", scopeId: "project_1" }, filter, hierarchy),
+      ).toBe(true);
+    });
+
+    it("drops a sibling project and a sibling team", () => {
+      expect(
+        isScopeInFilter({ scopeType: "PROJECT", scopeId: "project_9" }, filter, hierarchy),
+      ).toBe(false);
+      expect(isScopeInFilter({ scopeType: "TEAM", scopeId: "team_2" }, filter, hierarchy)).toBe(
+        false,
+      );
     });
   });
 

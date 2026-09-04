@@ -667,4 +667,72 @@ describe("ClaudeCodeCanonicaliser.apply cache lifetime", () => {
       expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBeUndefined();
     });
   });
+
+  describe("given a call whose llm_request.context states who made it", () => {
+    /** @scenario "A main-thread call's cache writes price as hour-long entries" */
+    it("stamps the hour-long count for an interaction-context call", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "claude-opus-5",
+          cache_creation_tokens: 17854,
+          "llm_request.context": "interaction",
+        },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeCanonicaliser().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBe(17854);
+    });
+
+    /** @scenario "A sub-agent call's cache writes price as five-minute entries" */
+    it("asserts no hour-long count for a tool-context call", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "claude-opus-5",
+          cache_creation_tokens: 17854,
+          "llm_request.context": "tool",
+        },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeCanonicaliser().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBeUndefined();
+    });
+  });
+
+  describe("given a call with no stated context", () => {
+    /** @scenario "A call with no stated context prices its writes conservatively" */
+    it("asserts no hour-long count", () => {
+      const ctx = createExtractorContext(
+        { model: "claude-opus-5", cache_creation_tokens: 17854 },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeCanonicaliser().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBeUndefined();
+    });
+  });
+
+  describe("given a span that already carries an hour-long cache count", () => {
+    /** @scenario "A provider-stated split is never overwritten" */
+    it("keeps the provider's own count", () => {
+      const ctx = createExtractorContext(
+        {
+          model: "claude-opus-5",
+          cache_creation_tokens: 17854,
+          "llm_request.context": "interaction",
+          "gen_ai.usage.cache_creation_1h.input_tokens": 4000,
+        },
+        { name: "claude_code.llm_request" },
+      );
+
+      new ClaudeCodeCanonicaliser().apply(ctx);
+
+      expect(ctx.out["gen_ai.usage.cache_creation_1h.input_tokens"]).toBeUndefined();
+      expect(ctx.bag.attrs.get("gen_ai.usage.cache_creation_1h.input_tokens")).toBe(4000);
+    });
+  });
 });

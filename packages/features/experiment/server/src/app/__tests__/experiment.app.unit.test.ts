@@ -292,6 +292,7 @@ describe("ExperimentApp", () => {
   });
 
   describe("when an experiment is archived", () => {
+    /** @scenario Archiving cascades to the associated workflow and hard-deletes the monitor */
     it("archives the workflow it wrote versions into and drops its monitor", async () => {
       const { app, experiments, workflows, monitors } = harness({
         experiments: { tryGetById: vi.fn(async () => workflowBacked) },
@@ -314,6 +315,7 @@ describe("ExperimentApp", () => {
       });
     });
 
+    /** @scenario Archiving without a workflow or monitor still succeeds */
     it("leaves the workflow alone when the experiment was backed by none", async () => {
       const { app, workflows, monitors } = harness();
 
@@ -362,6 +364,15 @@ describe("ExperimentApp", () => {
       await expect(
         app.tryGetWorkflow({ id: "workflow-1", projectId: "project-1" }),
       ).rejects.toThrow("the workflow store is unreachable");
+    });
+  });
+
+  describe("when checking the archive path's source", () => {
+    /** @scenario The delete-experiment code path does NOT contact ClickHouse */
+    it("does not import getClickHouseClientForTenant", async () => {
+      const fs = await import("node:fs/promises");
+      const src = await fs.readFile(new URL("../experiment.app.ts", import.meta.url), "utf8");
+      expect(src).not.toMatch(/getClickHouseClientForTenant/);
     });
   });
 });

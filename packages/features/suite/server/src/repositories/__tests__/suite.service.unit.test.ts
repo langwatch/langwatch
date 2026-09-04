@@ -22,6 +22,7 @@ import {
   type Scenario,
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { SuiteExecutionPort } from "../../ports/suite-execution.port";
 import { SuiteRepository } from "../suite.repository";
 import { MemorySuiteRunRepository } from "../memory/memory.suite-run.repository";
@@ -171,8 +172,44 @@ describe("SuiteService", () => {
     ).rejects.toBeInstanceOf(SuiteNameTakenError);
   });
 
+  describe("given a suite that exists", () => {
+    /** @scenario "Archived suite is hidden from the active list" */
+    /** @scenario "Archived suite does not appear in sidebar search results" */
+    it("removes the suite from the active list once archived", async () => {
+      const archive = vi.fn().mockResolvedValue(suite({ archivedAt: new Date() }));
+      const service = SuiteService.create(
+        serviceOptions(
+          repository({
+            tryFindById: vi.fn().mockResolvedValue(suite({ id: "suite_to_archive" })),
+            archive,
+            list: vi.fn().mockResolvedValue([]),
+          }),
+        ),
+      );
+
+      const archived = await service.archive({ id: "suite_to_archive", projectId: "project_1" });
+
+      expect(archived.archivedAt).not.toBeNull();
+      await expect(service.list({ projectId: "project_1" })).resolves.toEqual([]);
+    });
+  });
+
+  describe("given a suite id that does not exist", () => {
+    /** @scenario "Archiving a non-existent suite returns not found" */
+    it("refuses to archive it with a not-found error", async () => {
+      const service = SuiteService.create(
+        serviceOptions(repository({ tryFindById: vi.fn().mockResolvedValue(null) })),
+      );
+
+      await expect(
+        service.archive({ id: "nonexistent-id", projectId: "project_1" }),
+      ).rejects.toBeInstanceOf(SuiteNotFoundError);
+    });
+  });
+
   /** @scenario "Resolve a run through owning feature services" */
   /** @scenario "Suite run succeeds when all scenarios exist" */
+  /** @scenario "Suite run succeeds when prompt config exists in project" */
   it("resolves references before handing a run to the execution port", async () => {
     const execute = vi.fn().mockResolvedValue({
       batchRunId: "batch_1",
@@ -279,6 +316,7 @@ describe("SuiteService", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Running a test suite with no target is refused with suite_targets_required" */
   it("refuses a test suite run without targets before resolving membership", async () => {
     const scenarios = mockScenarioService({
       getTestSuiteRunDefinition: vi.fn(),
@@ -350,6 +388,9 @@ describe("SuiteService", () => {
     { scope: { mode: "labels", labels: ["smoke"] }, membership: ["scenario_1"] },
   ];
 
+  /** @scenario "A plan scoped to all scenarios runs every active scenario" */
+  /** @scenario "A plan scoped to test suites runs the scenarios filed in them" */
+  /** @scenario "A plan scoped to labels runs the scenarios carrying them" */
   it.each(dynamicScopes)(
     "resolves $scope.mode scope membership at run time",
     async ({ scope, membership }) => {
@@ -405,6 +446,7 @@ describe("SuiteService", () => {
     },
   );
 
+  /** @scenario "A dynamic scope that covers nothing is refused" */
   it("refuses a dynamic scope that resolves to no scenarios", async () => {
     const execution = new CapturingExecutionPort();
     const service = SuiteService.create({
@@ -445,6 +487,7 @@ describe("SuiteService", () => {
   /** @scenario "Suite run reports skipped archived scenarios" */
   /** @scenario "Suite run reports skipped archived targets" */
   /** @scenario "Job count reflects only active scenarios and targets" */
+  /** @scenario "Suite run succeeds when prompt config is org-scoped" */
   it("batches target checks, filters archived references, and preserves the run idempotency key", async () => {
     const execution = new CapturingExecutionPort();
     const agents = mockAgentService({
@@ -531,8 +574,54 @@ describe("SuiteService", () => {
     );
   });
 
+  /** @scenario "A connected agent unseen for thirty days is refused as a run target" */
+  it("skips a connected agent target unseen for thirty one days the way an archived one is skipped", async () => {
+    const execution = new CapturingExecutionPort();
+    const thirtyOneDaysAgo = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    const agents = mockAgentService({
+      getReferenceStates: vi.fn().mockResolvedValue([
+        {
+          id: "agent_stale",
+          type: "connected",
+          archivedAt: null,
+          lastSeenAt: thirtyOneDaysAgo,
+        },
+      ]),
+      getNamesByIds: vi.fn(),
+    });
+    const service = SuiteService.create({
+      repository: repository({
+        tryFindById: vi.fn().mockResolvedValue(
+          suite({
+            targets: [{ type: "connected", referenceId: "agent_stale" }],
+          }),
+        ),
+      }),
+      scenarios: mockScenarioService({
+        getReferenceStates: vi.fn().mockResolvedValue([{ id: "scenario_1", archivedAt: null }]),
+        getRunConfigs: vi.fn(),
+        getNamesByIds: vi.fn(),
+      }),
+      agents,
+      prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
+      execution,
+      runRepository: MemorySuiteRunRepository.create(),
+    });
+
+    await expect(
+      service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "request_stale",
+      }),
+    ).rejects.toBeInstanceOf(AllTargetsArchivedError);
+    expect(execution.execute).not.toHaveBeenCalled();
+  });
+
   /** @scenario "Suite run fails when a scenario does not exist" */
   /** @scenario "Suite run fails when HTTP target agent does not exist" */
+  /** @scenario "Deleted scenarios still cause validation errors" */
   it("rejects missing scenario and target references before execution", async () => {
     const execution = new CapturingExecutionPort();
     const scenarios = mockScenarioService({
@@ -591,6 +680,46 @@ describe("SuiteService", () => {
       }),
     ).rejects.toBeInstanceOf(InvalidTargetReferencesError);
     expect(targetExecution.execute).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Run validation rejects prompt from unrelated project without org scope" */
+  /** @scenario "Suite run fails when prompt config is soft-deleted" */
+  /** @scenario "Suite run fails when prompt config belongs to another organization" */
+  it("rejects a prompt target the project's own prompt lookup does not resolve", async () => {
+    const execution = new CapturingExecutionPort();
+    const service = SuiteService.create({
+      repository: repository({
+        tryFindById: vi.fn().mockResolvedValue(
+          suite({
+            targets: [{ type: "prompt", referenceId: "prompt_from_other_project" }],
+          }),
+        ),
+      }),
+      scenarios: mockScenarioService({
+        getReferenceStates: vi.fn().mockResolvedValue([{ id: "scenario_1", archivedAt: null }]),
+        getRunConfigs: vi.fn(),
+        getNamesByIds: vi.fn(),
+      }),
+      agents: mockAgentService({ getReferenceStates: vi.fn(), getNamesByIds: vi.fn() }),
+      // The project-scoped lookup finds nothing: the prompt lives in another
+      // project and was never marked org-scoped, so no OR-query widens it in.
+      prompts: mockPromptService({
+        getExistingIds: vi.fn().mockResolvedValue([]),
+        getNamesByIds: vi.fn(),
+      }),
+      execution,
+      runRepository: MemorySuiteRunRepository.create(),
+    });
+
+    await expect(
+      service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "request_3",
+      }),
+    ).rejects.toBeInstanceOf(InvalidTargetReferencesError);
+    expect(execution.execute).not.toHaveBeenCalled();
   });
 
   /** @scenario "Suite run fails when all targets are archived" */
@@ -807,6 +936,7 @@ describe("SuiteService", () => {
     });
   });
 
+  /** @scenario "A test suite refuses a scope" */
   it("keeps test suite membership managed by ScenarioService and maps test suite errors", async () => {
     const testSuite = suite({ id: "test_suite_1", kind: "test_suite", scenarioIds: [] });
     const updateTestSuite = vi.fn().mockResolvedValue(testSuite);
@@ -1003,5 +1133,337 @@ describe("SuiteService", () => {
         archivedSlug: "critical-path--archived-uite_1",
       }),
     );
+  });
+
+  describe("given a plan whose scope changes over time", () => {
+    /** @scenario "A plan keeps the scope it was given" */
+    it("reads back with the scope it was last given", async () => {
+      const existing = suite({ scope: { mode: "labels", labels: ["checkout"] } });
+      const updated = suite({ scope: { mode: "all" } });
+      const repo = repository({
+        tryFindById: vi.fn().mockResolvedValue(existing),
+        update: vi.fn().mockResolvedValue(updated),
+      });
+      const service = SuiteService.create(serviceOptions(repo));
+
+      const result = await service.update({
+        id: existing.id,
+        projectId: existing.projectId,
+        scope: { mode: "all" },
+      });
+
+      expect(result.scope).toEqual({ mode: "all" });
+      expect(repo.update).toHaveBeenCalledWith(
+        expect.objectContaining({ scope: { mode: "all" } }),
+      );
+    });
+  });
+
+  describe("given a plan scoped to a hand-picked list of scenarios", () => {
+    /** @scenario "A plan scoped to a hand-picked list runs exactly that list" */
+    it("runs exactly the held scenarios and never resolves membership dynamically", async () => {
+      const execution = new CapturingExecutionPort();
+      const resolveDynamicRunMembership = vi.fn();
+      const service = SuiteService.create({
+        repository: repository({
+          tryFindById: vi.fn().mockResolvedValue(
+            suite({
+              scope: { mode: "scenarios" },
+              scenarioIds: ["scenario_1", "scenario_2"],
+              targets: [{ type: "prompt", referenceId: "prompt_1" }],
+            }),
+          ),
+          resolveDynamicRunMembership,
+        }),
+        scenarios: mockScenarioService({
+          getReferenceStates: vi
+            .fn()
+            .mockResolvedValue([
+              { id: "scenario_1", archivedAt: null },
+              { id: "scenario_2", archivedAt: null },
+            ]),
+          getRunConfigs: vi.fn().mockResolvedValue([
+            { id: "scenario_1", name: "s1", situation: "", criteria: [], parameters: null },
+            { id: "scenario_2", name: "s2", situation: "", criteria: [], parameters: null },
+          ]),
+        }),
+        agents: {} as AgentService,
+        prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
+        execution,
+        runRepository: MemorySuiteRunRepository.create(),
+      });
+
+      await service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "hand-picked",
+      });
+
+      expect(resolveDynamicRunMembership).not.toHaveBeenCalled();
+      expect(execution.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ activeScenarioIds: ["scenario_1", "scenario_2"] }),
+      );
+    });
+  });
+
+  describe("given a dynamic scope whose membership changes between runs", () => {
+    /** @scenario "A scenario added later runs on the next run" */
+    it("picks up a scenario filed into scope after the plan's first run", async () => {
+      const resolveDynamicRunMembership = vi
+        .fn()
+        .mockResolvedValueOnce(["scenario_1"])
+        .mockResolvedValueOnce(["scenario_1", "scenario_2"]);
+      const scenarios = mockScenarioService({
+        getReferenceStates: vi.fn(async ({ ids }: { ids: string[] }) =>
+          ids.map((id) => ({ id, archivedAt: null })),
+        ),
+        getRunConfigs: vi.fn(async ({ ids }: { ids: string[] }) =>
+          ids.map((id) => ({ id, name: id, situation: "", criteria: [], parameters: null })),
+        ),
+      });
+      const buildService = () => {
+        const execution = new CapturingExecutionPort();
+        const service = SuiteService.create({
+          repository: repository({
+            tryFindById: vi.fn().mockResolvedValue(
+              suite({
+                scope: { mode: "test_suites", testSuiteIds: ["test_suite_1"] },
+                scenarioIds: [],
+                targets: [{ type: "prompt", referenceId: "prompt_1" }],
+              }),
+            ),
+            resolveDynamicRunMembership,
+          }),
+          scenarios,
+          agents: {} as AgentService,
+          prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
+          execution,
+          runRepository: MemorySuiteRunRepository.create(),
+        });
+        return { service, execution };
+      };
+
+      const first = buildService();
+      await first.service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "run-1",
+      });
+      expect(first.execution.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ activeScenarioIds: ["scenario_1"] }),
+      );
+
+      const second = buildService();
+      await second.service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "run-2",
+      });
+      expect(second.execution.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ activeScenarioIds: ["scenario_1", "scenario_2"] }),
+      );
+    });
+
+    /** @scenario "A scenario that loses the label drops out of the plan" */
+    it("drops a scenario from the run once it no longer carries the scoped label", async () => {
+      const resolveDynamicRunMembership = vi
+        .fn()
+        .mockResolvedValueOnce(["scenario_1", "scenario_2"])
+        .mockResolvedValueOnce(["scenario_1"]);
+      const scenarios = mockScenarioService({
+        getReferenceStates: vi.fn(async ({ ids }: { ids: string[] }) =>
+          ids.map((id) => ({ id, archivedAt: null })),
+        ),
+        getRunConfigs: vi.fn(async ({ ids }: { ids: string[] }) =>
+          ids.map((id) => ({ id, name: id, situation: "", criteria: [], parameters: null })),
+        ),
+      });
+      const buildService = () => {
+        const execution = new CapturingExecutionPort();
+        const service = SuiteService.create({
+          repository: repository({
+            tryFindById: vi.fn().mockResolvedValue(
+              suite({
+                scope: { mode: "labels", labels: ["checkout"] },
+                scenarioIds: [],
+                targets: [{ type: "prompt", referenceId: "prompt_1" }],
+              }),
+            ),
+            resolveDynamicRunMembership,
+          }),
+          scenarios,
+          agents: {} as AgentService,
+          prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
+          execution,
+          runRepository: MemorySuiteRunRepository.create(),
+        });
+        return { service, execution };
+      };
+
+      const first = buildService();
+      await first.service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "run-1",
+      });
+      expect(first.execution.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ activeScenarioIds: ["scenario_1", "scenario_2"] }),
+      );
+
+      const second = buildService();
+      await second.service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "run-2",
+      });
+      expect(second.execution.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ activeScenarioIds: ["scenario_1"] }),
+      );
+    });
+
+    /** @scenario "Archived scenarios are left out of a dynamic scope" */
+    it("excludes an archived scenario the dynamic scope still names", async () => {
+      const execution = new CapturingExecutionPort();
+      const service = SuiteService.create({
+        repository: repository({
+          tryFindById: vi.fn().mockResolvedValue(
+            suite({
+              scope: { mode: "all" },
+              scenarioIds: [],
+              targets: [{ type: "prompt", referenceId: "prompt_1" }],
+            }),
+          ),
+          resolveDynamicRunMembership: vi
+            .fn()
+            .mockResolvedValue(["scenario_active", "scenario_archived"]),
+        }),
+        scenarios: mockScenarioService({
+          getReferenceStates: vi.fn().mockResolvedValue([
+            { id: "scenario_active", archivedAt: null },
+            { id: "scenario_archived", archivedAt: new Date() },
+          ]),
+          getRunConfigs: vi
+            .fn()
+            .mockResolvedValue([
+              { id: "scenario_active", name: "a", situation: "", criteria: [], parameters: null },
+            ]),
+        }),
+        agents: {} as AgentService,
+        prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
+        execution,
+        runRepository: MemorySuiteRunRepository.create(),
+      });
+
+      await service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "archived-in-scope",
+      });
+
+      expect(execution.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          activeScenarioIds: ["scenario_active"],
+          skippedArchived: expect.objectContaining({ scenarios: ["scenario_archived"] }),
+        }),
+      );
+    });
+  });
+
+  describe("run() through the test suite path", () => {
+    /**
+     * A test suite is run by resolving it to its run plan (`runPlan`,
+     * covered by suite-run-plan.unit.test.ts and the plan-identity
+     * integration lane) — never by calling `run()` directly with an
+     * execution override. `SuiteRunInput` is `.strict()` with no `targets`
+     * or `repeatCount` field at all, so a caller that tries to send them
+     * alongside a plan id is refused before any business logic runs: the
+     * schema itself carries the "stored configuration only" rule.
+     */
+    /** @scenario "A run plan run through the test suite path refuses stored execution settings" */
+    it("refuses a request carrying execution settings it has no field for", async () => {
+      const service = SuiteService.create(serviceOptions(repository()));
+
+      await expect(
+        service.run({
+          id: "suite_original",
+          projectId: "project_1",
+          organizationId: "org_1",
+          idempotencyKey: "request_1",
+          targets: [{ type: "http", referenceId: "agent_9" }],
+          repeatCount: 2,
+        } as unknown as Parameters<typeof service.run>[0]),
+      ).rejects.toBeInstanceOf(z.ZodError);
+    });
+  });
+
+  describe("given a run plan scoped over several test suites", () => {
+    /** @scenario "A run plan can span the scenarios of several test suites" */
+    it("schedules the scenarios of every named test suite and touches no test suite row", async () => {
+      const execution = new CapturingExecutionPort();
+      const resolveDynamicRunMembership = vi
+        .fn()
+        .mockResolvedValue(["scenario_refunds_1", "scenario_refunds_2", "scenario_checkout_1", "scenario_checkout_2"]);
+      const repo = repository({
+        tryFindById: vi.fn().mockResolvedValue(
+          suite({
+            kind: "run_plan",
+            scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds", "test_suite_checkout"] },
+            scenarioIds: [],
+            targets: [{ type: "prompt", referenceId: "prompt_1" }],
+          }),
+        ),
+        resolveDynamicRunMembership,
+      });
+      const scenarios = mockScenarioService({
+        getReferenceStates: vi
+          .fn()
+          .mockResolvedValue(
+            ["scenario_refunds_1", "scenario_refunds_2", "scenario_checkout_1", "scenario_checkout_2"].map(
+              (id) => ({ id, archivedAt: null }),
+            ),
+          ),
+        getRunConfigs: vi.fn().mockResolvedValue(
+          ["scenario_refunds_1", "scenario_refunds_2", "scenario_checkout_1", "scenario_checkout_2"].map(
+            (id) => ({ id, name: id, situation: "", criteria: [], parameters: null }),
+          ),
+        ),
+      });
+      const service = SuiteService.create({
+        ...serviceOptions(repo, { scenarios, execution }),
+        prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
+      });
+
+      await service.run({
+        id: "suite_original",
+        projectId: "project_1",
+        organizationId: "org_1",
+        idempotencyKey: "spans-suites",
+      });
+
+      expect(resolveDynamicRunMembership).toHaveBeenCalledWith({
+        id: "suite_original",
+        projectId: "project_1",
+      });
+      expect(execution.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          activeScenarioIds: [
+            "scenario_refunds_1",
+            "scenario_refunds_2",
+            "scenario_checkout_1",
+            "scenario_checkout_2",
+          ],
+        }),
+      );
+      // Neither test suite is a row this call ever writes to: the plan
+      // reads their membership and nothing else.
+      expect(repo.update).not.toHaveBeenCalled();
+      expect(repo.archive).not.toHaveBeenCalled();
+    });
   });
 });

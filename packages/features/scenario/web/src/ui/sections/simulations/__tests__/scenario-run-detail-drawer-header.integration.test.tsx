@@ -227,7 +227,7 @@ describe("the run detail drawer", () => {
 
   afterEach(cleanup);
 
-  describe("given a failed run of \"Echo user request\" against target-A", () => {
+  describe('given a failed run of "Echo user request" against target-A', () => {
     beforeEach(() => {
       setRunState(
         makeRunState({

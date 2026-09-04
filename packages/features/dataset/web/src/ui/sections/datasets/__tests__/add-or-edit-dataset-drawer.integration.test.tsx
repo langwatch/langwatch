@@ -91,4 +91,26 @@ describe("given the dataset editor opened from a bare drawer address", () => {
       expect(closeDrawer).toHaveBeenCalled();
     });
   });
+
+  describe("when the drawer proposes the columns for a new dataset", () => {
+    /** @scenario "A new dataset ends with an annotations column" */
+    it("names the last column annotations and holds a string in it", () => {
+      mount(<AddOrEditDatasetDrawer open />);
+
+      const names = screen
+        .getAllByPlaceholderText("Column name")
+        .map((input) => (input as HTMLInputElement).value);
+
+      expect(names.at(-1)).toBe("annotations");
+      expect(names).toEqual([
+        "trace_id",
+        "timestamp",
+        "input",
+        "output",
+        "contexts",
+        "total_cost",
+        "annotations",
+      ]);
+    });
+  });
 });

@@ -65,7 +65,10 @@ function policyWith(fakes: Fakes = {}) {
       defineRole: async (input: Record<string, unknown>) => {
         calls.push({ method: "defineRole", ...input });
       },
-      attachBindings: async () => fakes.attached ?? { attached: [], duplicates: [] },
+      attachBindings: async (input: Record<string, unknown>) => {
+        calls.push({ method: "attachBindings", ...input });
+        return fakes.attached ?? { attached: [], duplicates: [] };
+      },
       revokeBindingsWhere: async (input: Record<string, unknown>) => {
         calls.push({ method: "revokeBindingsWhere", ...input });
       },
@@ -507,6 +510,29 @@ describe("ApiKeyGrantPolicyService", () => {
         await service.writeBindings({ ...input, replace: false });
 
         expect(calls.some((call) => call.method === "revokeBindingsWhere")).toBe(false);
+      });
+    });
+
+    describe("given permissions for a restricted-mode key", () => {
+      /**
+       * A restricted key's role is defined in the ledger before the binding
+       * naming it is attached — otherwise a request made the instant the key
+       * is returned could resolve the binding's custom role before it exists.
+       */
+      /** @scenario "A new restricted key is usable the moment it is returned" */
+      it("finishes the role definition before attaching the binding", async () => {
+        const { service, calls } = policyWith({});
+
+        await service.writeBindings({
+          ...input,
+          bindings: [scope({ role: "CUSTOM" })],
+          permissions: ["traces:view"],
+        });
+
+        const methodOrder = calls.map((call) => call.method);
+        expect(methodOrder.indexOf("defineRole")).toBeLessThan(
+          methodOrder.indexOf("attachBindings"),
+        );
       });
     });
 

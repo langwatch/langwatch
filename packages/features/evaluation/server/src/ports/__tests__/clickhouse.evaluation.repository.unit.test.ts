@@ -270,6 +270,7 @@ describe("ClickHouseEvaluationRepository", () => {
     expect(query.mock.calls[1]?.[0].query).not.toContain("Inputs");
   });
 
+  /** @scenario A single evaluation's inputs can be fetched without scanning the trace */
   it("reads one evaluation's inputs by its sort key and degrades unavailable reads", async () => {
     const { client, repository } = harness([[{ Inputs: '{"input":"hello","output":"world"}' }]]);
 

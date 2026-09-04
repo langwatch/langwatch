@@ -14,6 +14,7 @@ const tester = new RuleTester({
 });
 
 /** @scenario "LangWatch house rules keep executable fixtures" */
+/** @scenario "Retired package surfaces cannot remain in application code" */
 tester.run("package-boundaries", plugin.rules["package-boundaries"], {
   valid: [
     {
@@ -152,6 +153,7 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
 });
 
 /** @scenario "LangWatch house rules keep executable fixtures" */
+/** @scenario "Feature packages receive validated environment configuration" */
 tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
   valid: [
     {
@@ -349,6 +351,8 @@ tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
   ],
 });
 
+/** @scenario "Feature services are classes" */
+/** @scenario "Feature classes may use private pure helpers" */
 tester.run("service-classes", plugin.rules["service-classes"], {
   valid: [
     {
@@ -483,6 +487,8 @@ tester.run("api-context-services", plugin.rules["api-context-services"], {
   ],
 });
 
+/** @scenario "Services do not reach through another domain's repository" */
+/** @scenario "Service dependencies are explicit domain capabilities" */
 tester.run("service-dependencies", plugin.rules["service-dependencies"], {
   valid: [
     {

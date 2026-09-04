@@ -11,6 +11,7 @@ import { buildTraceTestContext, sanitizeHeadersForTrace } from "../agent-test-tr
 describe("sanitizeHeadersForTrace()", () => {
   describe("when Authorization header contains a bearer token", () => {
     /** @scenario "Bearer token is redacted in trace" */
+    /** @scenario "Authorization headers are redacted in captured request headers" */
     it("redacts the token value", () => {
       const headers: Record<string, string> = {
         Authorization: "Bearer super-secret-token-123",
@@ -40,6 +41,7 @@ describe("sanitizeHeadersForTrace()", () => {
 
   describe("when a custom auth header is present", () => {
     /** @scenario "API key is redacted in trace" */
+    /** @scenario "Custom auth headers are redacted in captured request headers" */
     it("redacts the custom header value", () => {
       const headers: Record<string, string> = {
         "X-API-Key": "secret-key-456",
@@ -150,6 +152,7 @@ describe("buildTraceTestContext()", () => {
       expect(context.has_auth).toBe(true);
     });
 
+    /** @scenario "Bearer token credentials are redacted from trace" */
     it("does not include the token value", () => {
       const context = buildTraceTestContext({
         url: "https://api.example.com/test",
@@ -176,6 +179,7 @@ describe("buildTraceTestContext()", () => {
       expect(context.has_auth).toBe(true);
     });
 
+    /** @scenario "API key credentials are redacted from trace" */
     it("does not include the api key value", () => {
       const context = buildTraceTestContext({
         url: "https://api.example.com/test",
@@ -202,6 +206,7 @@ describe("buildTraceTestContext()", () => {
       expect(context.has_auth).toBe(true);
     });
 
+    /** @scenario "Basic auth credentials are redacted from trace" */
     it("does not include username or password", () => {
       const context = buildTraceTestContext({
         url: "https://api.example.com/test",

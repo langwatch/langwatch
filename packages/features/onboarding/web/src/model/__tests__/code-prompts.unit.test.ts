@@ -80,10 +80,7 @@ describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
     { name: "PROMPT_LEVEL_UP", text: PROMPT_LEVEL_UP },
   ];
 
-  describe.each(prompts)("given $name pasted into Gemini CLI", ({
-    name,
-    text,
-  }) => {
+  describe.each(prompts)("given $name pasted into Gemini CLI", ({ name, text }) => {
     describe("when Gemini's atCommandProcessor scans the prompt", () => {
       /** @scenario 'Pasting the tracing setup prompt does not crash Gemini CLI' */
       /** @scenario 'Pasting the "level up" prompt does not crash Gemini CLI' */

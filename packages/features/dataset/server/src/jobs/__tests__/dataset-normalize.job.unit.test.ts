@@ -54,6 +54,7 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("createDatasetNormalizeHandler()", () => {
   describe("when a processing JSONL dataset normalizes successfully", () => {
+    /** @scenario "Both CSV and JSONL files are accepted" */
     it("writes chunks and flips the dataset to ready with counters and columnTypes", async () => {
       const { storage, writeChunks, deleteStaged } = makeStorage({
         streamStaged: vi
@@ -86,6 +87,7 @@ describe("createDatasetNormalizeHandler()", () => {
   });
 
   describe("when a CSV dataset normalizes successfully", () => {
+    /** @scenario "Both CSV and JSONL files are accepted" */
     it("derives headers from the CSV fields and writes the rows", async () => {
       const { storage, writeChunks } = makeStorage({
         streamStaged: vi.fn().mockResolvedValue(Readable.from(["a,b\n1,x\n2,y\n"])),
@@ -159,6 +161,7 @@ describe("createDatasetNormalizeHandler()", () => {
   });
 
   describe("when a ready dataset reports its row count and size", () => {
+    /** @scenario "A ready dataset reports its true row count and size" */
     it("records the true rowCount and a positive sizeBytes once ready", async () => {
       const rows = Array.from({ length: 50 }, (_, i) => `{"a":"${i}"}`).join("\n");
       const { storage } = makeStorage({

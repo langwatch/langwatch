@@ -84,6 +84,7 @@ describe("findExperimentDefinitionViolations", () => {
   });
 
   describe("given a SYSTEM flag marked as an experiment", () => {
+    /** @scenario "A backend kill switch cannot be offered as a personal choice" */
     it("reports it, because a kill switch is not a personal choice", () => {
       expect(check({ ...good, scope: "SYSTEM" })).toEqual([
         "release_ui_agent_testing_v2_enabled: an experiment must be a PRODUCT flag, not SYSTEM",
@@ -92,6 +93,7 @@ describe("findExperimentDefinitionViolations", () => {
   });
 
   describe("given an experiment the browser cannot see", () => {
+    /** @scenario "An experiment the browser cannot see is refused" */
     it("reports it", () => {
       expect(check({ ...good, key: "release_not_in_the_browser_list" })).toEqual([
         "release_not_in_the_browser_list: an experiment must be listed in FRONTEND_FEATURE_FLAGS",
@@ -100,6 +102,7 @@ describe("findExperimentDefinitionViolations", () => {
   });
 
   describe("given an experiment with no customer-facing copy", () => {
+    /** @scenario "An experiment with no customer-facing copy is refused" */
     it("reports it", () => {
       expect(check({ ...good, experiment: { ...EXPERIMENT, title: "   ", summary: "" } })).toEqual([
         "release_ui_agent_testing_v2_enabled: an experiment needs a title and a summary",
@@ -108,6 +111,7 @@ describe("findExperimentDefinitionViolations", () => {
   });
 
   describe("given catalogue versions that do not strictly increase", () => {
+    /** @scenario "Catalogue versions must strictly increase" */
     it("reports the one that does not advance the watermark", () => {
       const violations = findExperimentDefinitionViolations({
         definitions: [good, { ...good, key: "release_ui_ai_gateway_menu_enabled" }],

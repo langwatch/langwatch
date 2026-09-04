@@ -28,6 +28,7 @@ describe("error remediation registry", () => {
   });
 
   describe("when no model is configured for a feature", () => {
+    /** @scenario The missing-model refusal names the settings page that fixes it */
     it("names the Default Models page, the organization scope, and the documentation", () => {
       const { tips = [], docsUrl } = remediation("model_not_configured");
 

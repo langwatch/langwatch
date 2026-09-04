@@ -130,10 +130,9 @@ describe("<ExternalSetDetailPanel/>", () => {
           error: null,
         });
 
-        render(
-          <ExternalSetDetailPanel scenarioSetId="ext-set-1" period={period} />,
-          { wrapper: Wrapper },
-        );
+        render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={period} />, {
+          wrapper: Wrapper,
+        });
 
         fireEvent.click(screen.getByLabelText(/View details for/));
 

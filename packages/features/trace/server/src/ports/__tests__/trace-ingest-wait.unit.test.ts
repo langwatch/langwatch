@@ -68,6 +68,8 @@ describe("TraceService ingest wait", () => {
     vi.useRealTimers();
   });
 
+  /** @scenario "The wait budget grows with the project's measured ingest lag" */
+  /** @scenario "The wait budget rounds up, never down" */
   it("uses a quarter more than p95 plus five seconds and rounds up", async () => {
     const repository = new IngestLagRepository();
     repository.sample = { p95LagMs: 6_000.1, sampleCount: 20 };
@@ -77,6 +79,7 @@ describe("TraceService ingest wait", () => {
     ).resolves.toBe(12_501);
   });
 
+  /** @scenario "The wait budget stays within its floor and ceiling" */
   it.each([
     [{ p95LagMs: 0, sampleCount: 20 }, 10_000],
     [{ p95LagMs: 100_000, sampleCount: 20 }, 30_000],
@@ -89,6 +92,7 @@ describe("TraceService ingest wait", () => {
     ).resolves.toBe(expected);
   });
 
+  /** @scenario "A project with few recent traces gets the default wait budget" */
   it("uses the default until the repository has enough samples", async () => {
     const repository = new IngestLagRepository();
     repository.sample = { p95LagMs: 1_000, sampleCount: 19 };
@@ -98,6 +102,7 @@ describe("TraceService ingest wait", () => {
     ).resolves.toBe(30_000);
   });
 
+  /** @scenario "A failed ingest lag measurement never fails the run" */
   it("does not cache a fallback after a repository failure", async () => {
     const repository = new IngestLagRepository();
     const service = createService(repository);
@@ -115,6 +120,7 @@ describe("TraceService ingest wait", () => {
     expect(repository.calls).toEqual(["project_1", "project_1"]);
   });
 
+  /** @scenario "A measured wait budget is reused for an hour" */
   it("caches a measured value per project for one hour", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));

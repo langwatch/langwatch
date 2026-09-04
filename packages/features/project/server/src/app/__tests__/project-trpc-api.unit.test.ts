@@ -271,6 +271,7 @@ describe("ProjectTrpcApi", () => {
   });
 
   describe("when the project write key is rotated", () => {
+    /** @scenario "Rotation is recorded for audit" */
     it("returns the new key and records the rotation", async () => {
       const { caller, recordApiKeyRegenerated } = harness({
         apiKeys: { regenerateLegacyProjectKey: async () => "sk-lw-new" },

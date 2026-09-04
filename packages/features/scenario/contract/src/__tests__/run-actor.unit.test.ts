@@ -35,6 +35,7 @@ describe("the actor of a REST run", () => {
 
   describe("when the key belongs to no person", () => {
     /** @scenario "A user-bound key records the person it belongs to, through the surface it declared" */
+    /** @scenario "A REST run with a key that belongs to no person records no actor" */
     it("names no actor, whatever surface the request declares", () => {
       expect(runActorFromRequest({ userId: null, surfaceHeader: "cli" })).toBeUndefined();
       expect(runActorFromRequest({ userId: undefined, surfaceHeader: undefined })).toBeUndefined();

@@ -13,6 +13,7 @@
  * leave the counters claiming rows that are not there.
  */
 import { describe, expect, it } from "vitest";
+import type { DatasetColumns } from "@langwatch/dataset-contract";
 import type { DatasetStorage } from "../../ports/dataset-storage.port";
 import type { DatasetContentRepository } from "../../repositories/prisma/dataset-content.repository";
 import { DatasetChunkService, type DatasetMutationRecord } from "../dataset-chunk.service";
@@ -132,6 +133,32 @@ describe("DatasetChunkService", () => {
       expect(result.appended).toBe(3);
       expect(stored[0]).toHaveLength(3);
     });
+
+    /** @scenario "Appending rows adds new data and preserves existing rows" */
+    it("adds the new rows without disturbing the existing chunk", async () => {
+      const dataset = readyDataset(oneChunk);
+      const { chunks } = fakeRepository(dataset);
+      const { storage, chunks: stored } = fakeStorage([
+        [
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ],
+      ]);
+
+      const result = await chunks.append({
+        dataset,
+        projectId,
+        entries: [{ a: 3 }, { a: 4 }, { a: 5 }],
+        storage,
+      });
+
+      expect(result.appended).toBe(3);
+      expect(stored[0]).toEqual([
+        { id: "r1", entry: { a: 1 } },
+        { id: "r2", entry: { a: 2 } },
+      ]);
+      expect(stored[1]).toHaveLength(3);
+    });
   });
 
   describe("when the dataset is still preparing", () => {
@@ -197,6 +224,40 @@ describe("DatasetChunkService", () => {
     });
   });
 
+  describe("when editing one row and deleting another", () => {
+    /** @scenario "Editing or deleting a row updates only that row" */
+    it("saves both changes and leaves the other rows unaffected", async () => {
+      const dataset = readyDataset({
+        chunkCount: 1,
+        rowCount: 3,
+        sizeBytes: 30n,
+        chunkOffsets: [{ index: 0, start: 0, rowCount: 3, byteSize: 30 }],
+      });
+      const { chunks } = fakeRepository(dataset);
+      const { storage, chunks: stored } = fakeStorage([
+        [
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+          { id: "r3", entry: { a: 3 } },
+        ],
+      ]);
+
+      await chunks.editRecord({ dataset, projectId, recordId: "r2", entry: { a: 99 }, storage });
+      const deleted = await chunks.deleteRecords({
+        dataset,
+        projectId,
+        recordIds: ["r3"],
+        storage,
+      });
+
+      expect(deleted.deleted).toBe(1);
+      expect(stored[0]).toEqual([
+        { id: "r1", entry: { a: 1 } },
+        { id: "r2", entry: { a: 99 } },
+      ]);
+    });
+  });
+
   describe("when recomputing the counters", () => {
     it("derives them from the chunks and commits inside the lock", async () => {
       const dataset = readyDataset({ chunkCount: 2, rowCount: 99, sizeBytes: 999n });
@@ -214,6 +275,64 @@ describe("DatasetChunkService", () => {
       expect(counts.rowCount).toBe(3);
       expect(locks).toEqual(["dataset-1"]);
       expect(updates.every((update) => update.transactional)).toBe(true);
+    });
+  });
+
+  describe("when changing a column's type", () => {
+    const scoreAsText: DatasetColumns = [{ name: "score", type: "string" }];
+    const scoreAsNumber: DatasetColumns = [{ name: "score", type: "number" }];
+
+    /** @scenario "Changing a column's type re-converts the stored values" */
+    it("converts the stored values to the new type and leaves other rows unchanged", async () => {
+      const dataset = readyDataset({ ...oneChunk, columnTypes: scoreAsText });
+      const { chunks } = fakeRepository(dataset);
+      const { storage, chunks: stored } = fakeStorage([
+        [
+          { id: "r1", entry: { score: "10" } },
+          { id: "r2", entry: { score: "20" } },
+        ],
+      ]);
+
+      const result = await chunks.migrateColumns({
+        dataset,
+        projectId,
+        oldColumnTypes: scoreAsText,
+        newColumnTypes: scoreAsNumber,
+        name: "Scores",
+        slug: "scores",
+        storage,
+      });
+
+      expect(result.columnTypes).toEqual(scoreAsNumber);
+      expect(stored[0]).toEqual([
+        { id: "r1", entry: { score: 10 } },
+        { id: "r2", entry: { score: 20 } },
+      ]);
+    });
+
+    /** @scenario "Retyping a text column to an image URL keeps the value" */
+    it("keeps a data URL untouched when retyping the column to image", async () => {
+      const dataUrl = "data:image/png;base64,aGVsbG8=";
+      const asText: DatasetColumns = [{ name: "photo", type: "string" }];
+      const asImage: DatasetColumns = [{ name: "photo", type: "image" }];
+      const dataset = readyDataset({ ...oneChunk, columnTypes: asText });
+      const { chunks } = fakeRepository(dataset);
+      const { storage, chunks: stored } = fakeStorage([
+        [{ id: "r1", entry: { photo: dataUrl } }],
+      ]);
+
+      const result = await chunks.migrateColumns({
+        dataset,
+        projectId,
+        oldColumnTypes: asText,
+        newColumnTypes: asImage,
+        name: "Photos",
+        slug: "photos",
+        storage,
+      });
+
+      expect(result.columnTypes).toEqual(asImage);
+      expect(stored[0]).toEqual([{ id: "r1", entry: { photo: dataUrl } }]);
     });
   });
 });

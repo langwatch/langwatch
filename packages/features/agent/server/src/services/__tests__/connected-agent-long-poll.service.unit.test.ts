@@ -5,7 +5,15 @@
  *
  * @see specs/agents/connected-agents.feature
  */
-import { PROTOCOL_VERSION, type AgentService } from "@langwatch/agent-contract";
+import {
+  AgentOfflineError,
+  AgentRegisterRefusedError,
+  AgentSessionUnknownError,
+  PRESENCE_TTL_SECONDS,
+  PROTOCOL_VERSION,
+  type Agent,
+  type AgentService,
+} from "@langwatch/agent-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   callKey,
@@ -194,6 +202,369 @@ describe("LongPollTransport with a memory store", () => {
         type: "refused",
         code: "replica_count_unsupported",
       });
+      await transport.close();
+    });
+  });
+});
+
+/** A fake `AgentService` that upserts nothing, just echoes what it was given. */
+function registeringAgentService(): AgentService {
+  return {
+    registerConnected: async (input) =>
+      ({
+        id: input.id,
+        name: input.name,
+        environment: input.identity.environment,
+        type: "connected",
+      }) as unknown as Agent,
+  } as unknown as AgentService;
+}
+
+function registerFrameBody(overrides: { name?: string; instanceId?: string } = {}) {
+  return {
+    type: "register" as const,
+    protocol: PROTOCOL_VERSION,
+    sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+    instance: {
+      id: overrides.instanceId ?? instanceId,
+      hostname: "laptop",
+      username: "dev",
+      pid: 1,
+      startedAt: new Date().toISOString(),
+      inFlightCallIds: [],
+    },
+    agents: [{ name: overrides.name ?? "support-agent", environment: "production", parameters: {} }],
+  };
+}
+
+describe("LongPollTransport registration and polling, against a memory store", () => {
+  describe("when an SDK process whose network blocks WebSockets registers", () => {
+    /** @scenario "A register over HTTP creates the rows and answers with an instance token" */
+    it("creates an agent row for each agent of the frame and answers with an instance token", async () => {
+      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
+      const agents = registeringAgentService();
+      const registerSpy = vi.spyOn(agents, "registerConnected");
+      const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store: createMemoryStateStore() });
+      const registeringTransport = new LongPollTransport({
+        runtime,
+        agents,
+        agentRepository: fakeAgentRepository,
+        credentials: fakeCredentials,
+        agentPlatformUrl: fakeAgentPlatformUrl,
+        replicaCount: 1,
+      });
+
+      const answer = await registeringTransport.register({
+        credentials,
+        body: registerFrameBody(),
+      });
+
+      expect(answer.status).toBe(200);
+      expect(answer.body.frame.type).toBe("registered");
+      expect(answer.body.instanceToken).toMatch(/^ait_/);
+      expect(registerSpy).toHaveBeenCalledTimes(1);
+      await registeringTransport.close();
+    });
+  });
+
+  describe("when the credentials are refused the same way the socket refuses them", () => {
+    /** @scenario "The HTTP transport refuses the same credentials as the socket" */
+    it("answers a refused frame naming the reason", async () => {
+      const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store: createMemoryStateStore() });
+      const permissionDenied = new LongPollTransport({
+        runtime,
+        agents: fakeAgents,
+        agentRepository: fakeAgentRepository,
+        credentials: {
+          resolve: async () => {
+            throw new AgentRegisterRefusedError({
+              reason: "permission_denied",
+              message: "The API key needs the scenarios:manage permission to connect an agent.",
+            });
+          },
+        },
+        agentPlatformUrl: fakeAgentPlatformUrl,
+        replicaCount: 1,
+      });
+      const viewOnly = await permissionDenied.register({
+        credentials,
+        body: registerFrameBody(),
+      });
+      expect(viewOnly.body.frame).toMatchObject({ type: "refused", code: "permission_denied" });
+      await permissionDenied.close();
+
+      const ingestion = new LongPollTransport({
+        runtime,
+        agents: fakeAgents,
+        agentRepository: fakeAgentRepository,
+        credentials: {
+          resolve: async () => {
+            throw new AgentRegisterRefusedError({
+              reason: "key_type_not_allowed",
+              message: "An ingestion key or a Langy session key cannot connect an agent.",
+            });
+          },
+        },
+        agentPlatformUrl: fakeAgentPlatformUrl,
+        replicaCount: 1,
+      });
+      const ingestAnswer = await ingestion.register({ credentials, body: registerFrameBody() });
+      expect(ingestAnswer.body.frame).toMatchObject({
+        type: "refused",
+        code: "key_type_not_allowed",
+      });
+      await ingestion.close();
+      await runtime.store.close?.();
+    });
+  });
+
+  describe("when a registered instance polls", () => {
+    /** @scenario "A poll refreshes presence" */
+    it("is live for its agent, and a read after the TTL with no poll finds it offline", async () => {
+      let now = Date.now();
+      const store = createMemoryStateStore({ now: () => now });
+      const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store, resultPollMs: 20 });
+      const agents = registeringAgentService();
+      const transport = new LongPollTransport({
+        runtime,
+        agents,
+        agentRepository: fakeAgentRepository,
+        credentials: fakeCredentials,
+        agentPlatformUrl: fakeAgentPlatformUrl,
+        replicaCount: 1,
+        pollWaitMs: 20,
+        now: () => now,
+      });
+      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
+
+      const registered = await transport.register({ credentials, body: registerFrameBody() });
+      const registeredAgentId = (
+        registered.body.frame as { agents: { id: string }[] }
+      ).agents[0]?.id;
+      const token = registered.body.instanceToken as string;
+
+      await transport.poll({ credentials, token, inFlightCallIds: [] });
+
+      const liveAfterPoll = await runtime.registry.listLive({
+        projectId,
+        agentId: registeredAgentId as string,
+        now,
+      });
+      expect(liveAfterPoll).toHaveLength(1);
+
+      now += (PRESENCE_TTL_SECONDS + 1) * 1000;
+      const liveAfterTtlWithNoPoll = await runtime.registry.listLive({
+        projectId,
+        agentId: registeredAgentId as string,
+        now,
+      });
+      expect(liveAfterTtlWithNoPoll).toEqual([]);
+
+      await transport.close();
+    });
+  });
+
+  describe("when a poll is made with an instance token the platform does not know", () => {
+    /** @scenario "A poll with an unknown instance token asks the process to register again" */
+    it("answers agent_session_unknown", async () => {
+      const { transport } = build({ pollWaitMs: 50 });
+      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
+
+      const failure = await transport
+        .poll({ credentials, token: "ait_unknown", inFlightCallIds: [] })
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(AgentSessionUnknownError);
+      await transport.close();
+    });
+  });
+
+  describe("when an instance registered over HTTP stops polling", () => {
+    /** @scenario "A process that stops polling goes offline after the presence TTL" */
+    it("fails a call dispatched to its agent with agent_offline", async () => {
+      const store = createMemoryStateStore();
+      const runtime = createConnectedAgentRuntime({
+        podId: "pod_solo",
+        store,
+        firstTurnGraceMs: 10,
+        firstTurnPollMs: 5,
+      });
+      const agents = registeringAgentService();
+      const transport = new LongPollTransport({
+        runtime,
+        agents,
+        agentRepository: fakeAgentRepository,
+        credentials: fakeCredentials,
+        agentPlatformUrl: fakeAgentPlatformUrl,
+        replicaCount: 1,
+        pollWaitMs: 10,
+      });
+      vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
+
+      const registered = await transport.register({ credentials, body: registerFrameBody() });
+      const registeredAgentId = (
+        registered.body.frame as { agents: { id: string }[] }
+      ).agents[0]?.id as string;
+
+      // No poll came in: force the instance's last-seen score past the
+      // presence TTL, the way a stalled process reads once no watch's clock
+      // extends it.
+      const { instanceSetKey } = await import("../../adapters/connected-agent-state.adapter");
+      await store.zadd({
+        key: instanceSetKey(projectId, registeredAgentId),
+        score: Date.now() - (PRESENCE_TTL_SECONDS + 5) * 1000,
+        member: instanceId,
+        ttlSeconds: 1,
+      });
+
+      const failure = await runtime.dispatcher
+        .dispatch({
+          projectId,
+          agent: {
+            id: registeredAgentId,
+            name: "support-agent",
+            environment: "production",
+            timeoutMs: 300,
+            isSticky: false,
+          },
+          call: {
+            threadId: "thread_1",
+            messages: [{ role: "user", content: "hi" }],
+            newMessages: [{ role: "user", content: "hi" }],
+            params: {},
+            session: undefined,
+            traceparent: null,
+            run: {},
+          },
+        })
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(AgentOfflineError);
+      await transport.close();
+    });
+  });
+});
+
+/** One instance registered over HTTP, with a real dispatcher call in flight. */
+async function registerAndDispatch(signal?: AbortSignal) {
+  const store = createMemoryStateStore();
+  const runtime = createConnectedAgentRuntime({ podId: "pod_solo", store, resultPollMs: 15 });
+  const agents = registeringAgentService();
+  const transport = new LongPollTransport({
+    runtime,
+    agents,
+    agentRepository: fakeAgentRepository,
+    credentials: fakeCredentials,
+    agentPlatformUrl: fakeAgentPlatformUrl,
+    replicaCount: 1,
+    pollWaitMs: 200,
+  });
+  vi.spyOn(AgentSessionCore.prototype, "authenticate").mockResolvedValue(resolved);
+  const registered = await transport.register({ credentials, body: registerFrameBody() });
+  const registeredAgentId = (
+    registered.body.frame as { agents: { id: string }[] }
+  ).agents[0]?.id as string;
+  const token = registered.body.instanceToken as string;
+
+  const dispatched = runtime.dispatcher.dispatch({
+    projectId,
+    agent: {
+      id: registeredAgentId,
+      name: "support-agent",
+      environment: "production",
+      timeoutMs: 5_000,
+      isSticky: false,
+    },
+    call: {
+      threadId: "thread_1",
+      messages: [{ role: "user", content: "hi" }],
+      newMessages: [{ role: "user", content: "hi" }],
+      params: {},
+      session: undefined,
+      traceparent: null,
+      run: {},
+    },
+    signal,
+  });
+
+  const poll = await transport.poll({ credentials, token, inFlightCallIds: [] });
+  const callId = (poll.frames[0] as { callId: string }).callId;
+
+  return { transport, dispatched, callId, token };
+}
+
+describe("LongPollTransport dispatch through a real call", () => {
+  describe("when an instance that received a call by poll answers it", () => {
+    /** @scenario "A result posted over HTTP answers the dispatcher" */
+    it("returns the output of the result to the dispatcher", async () => {
+      const { transport, dispatched, callId, token } = await registerAndDispatch();
+
+      await transport.frames({
+        credentials,
+        token,
+        frames: [
+          { type: "ack", protocol: PROTOCOL_VERSION, callId },
+          { type: "result", protocol: PROTOCOL_VERSION, callId, output: "the answer" },
+        ],
+      });
+
+      const outcome = await dispatched;
+      expect(outcome.output).toBe("the answer");
+      await transport.close();
+    });
+  });
+
+  describe("when an instance that received a call by poll and acknowledged it has its relay request aborted", () => {
+    /** @scenario "A cancel reaches a polling instance" */
+    it("answers the next poll with a cancel frame for that call", async () => {
+      const controller = new AbortController();
+      const { transport, dispatched, callId, token } = await registerAndDispatch(
+        controller.signal,
+      );
+
+      await transport.frames({
+        credentials,
+        token,
+        frames: [{ type: "ack", protocol: PROTOCOL_VERSION, callId }],
+      });
+
+      controller.abort();
+      await dispatched.catch(() => undefined);
+
+      const nextPoll = await transport.poll({
+        credentials,
+        token,
+        inFlightCallIds: [callId],
+      });
+
+      expect(
+        nextPoll.frames.some((frame) => frame.type === "cancel" && frame.callId === callId),
+      ).toBe(true);
+      await transport.close();
+    });
+  });
+
+  describe("when an instance registered over HTTP posts a deregister frame", () => {
+    /** @scenario "A deregister posted over HTTP retires the instance at once" */
+    it("is no longer live, and a poll with its instance token answers agent_session_unknown", async () => {
+      const { transport, dispatched, callId, token } = await registerAndDispatch();
+
+      await transport.frames({
+        credentials,
+        token,
+        frames: [
+          { type: "ack", protocol: PROTOCOL_VERSION, callId },
+          { type: "deregister", protocol: PROTOCOL_VERSION },
+        ],
+      });
+
+      const failure = await transport
+        .poll({ credentials, token, inFlightCallIds: [] })
+        .catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(AgentSessionUnknownError);
+
+      const dispatchFailure = await dispatched.catch((error: unknown) => error);
+      expect(dispatchFailure).toBeTruthy();
       await transport.close();
     });
   });

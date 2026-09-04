@@ -161,6 +161,7 @@ describe("StudioWorkflowEventEnricherService", () => {
     });
   });
 
+  /** @scenario Running a workflow with a modelless LLM node is rejected as a fixable problem */
   it("rejects a node-owned LLM config without a model and names the node", async () => {
     await expect(
       createEnricher().enrich({ event: event([llmNode(undefined)]), projectId }),

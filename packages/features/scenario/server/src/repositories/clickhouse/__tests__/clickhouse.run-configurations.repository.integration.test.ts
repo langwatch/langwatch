@@ -18,10 +18,7 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { RunParameterValues, ScenarioService } from "@langwatch/scenario-contract";
 import { getSuiteSetId, type SuiteTarget } from "@langwatch/suite-contract";
-import {
-  SuiteExecutionService,
-  type QueueSimulationRunCommandData,
-} from "@langwatch/suite-server";
+import { SuiteExecutionService, type QueueSimulationRunCommandData } from "@langwatch/suite-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { QueueRunCommand } from "../../../adapters/simulation-processing-commands.adapter";
@@ -29,10 +26,7 @@ import {
   SimulationRunStateFoldProjection,
   type SimulationRunStateData,
 } from "../../../projections/simulation-run-state.projection";
-import type {
-  ScenarioPlanRecord,
-  ScenarioRepository,
-} from "../../scenario.repository";
+import type { ScenarioPlanRecord, ScenarioRepository } from "../../scenario.repository";
 import { RunConfigurationsService } from "../../../services/run-configurations.service";
 import { RunConfigurationsClickHouseRepository } from "../clickhouse.run-configurations.repository";
 import { SimulationRunStateRepositoryClickHouse } from "../clickhouse.simulation-run-state.repository";

@@ -183,6 +183,7 @@ afterEach(async () => {
 
 describe("CallDispatcher", () => {
   describe("when the instance answers", () => {
+    /** @scenario "A call reaches an instance connected to another app replica" */
     it("returns the output, the session and the instance", async () => {
       await connectInstance({
         instanceId: "inst_1",
@@ -366,6 +367,32 @@ describe("CallDispatcher", () => {
           call: call(),
         }),
       ).rejects.toMatchObject({ code: "agent_call_timeout" });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(instance.cancelled).toEqual(instance.received);
+    });
+  });
+
+  describe("when the relay request is aborted", () => {
+    /** @scenario "Aborting the relay request cancels the call on the instance" */
+    it("sends the instance a cancel frame for that call", async () => {
+      const instance = await connectInstance({
+        instanceId: "inst_working",
+        behavior: async (_, reply) => {
+          await reply.ack();
+        },
+      });
+      const controller = new AbortController();
+
+      const dispatched = runtime.dispatcher.dispatch({
+        projectId,
+        agent: agent({ timeoutMs: 5_000 }),
+        call: call(),
+        signal: controller.signal,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      controller.abort();
+
+      await expect(dispatched).rejects.toThrow();
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(instance.cancelled).toEqual(instance.received);
     });

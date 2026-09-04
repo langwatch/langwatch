@@ -67,6 +67,7 @@ function harness(
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("LegacyApiKeyGrantService", () => {
+  /** @scenario "The mint never holds up the request that triggered it" */
   it("writes the pre-cutover service key fact without blocking authentication", async () => {
     const { service, attachBindings } = harness();
 
@@ -94,6 +95,7 @@ describe("LegacyApiKeyGrantService", () => {
     });
   });
 
+  /** @scenario "A key that is busy authenticating mints once, not once per request" */
   it("deduplicates hot requests but retries after the bounded note expires", async () => {
     let now = 1_000;
     const { service, attachBindings } = harness({ now: () => now });
@@ -109,6 +111,7 @@ describe("LegacyApiKeyGrantService", () => {
     expect(attachBindings).toHaveBeenCalledTimes(2);
   });
 
+  /** @scenario "A key born during a parked genesis import still mints once the organization migrates" */
   it("retries after the organization reaches finalized cutover", async () => {
     const { service, tryGetEngineCutoverAt, attachBindings } = harness({
       cutoverAt: null,
@@ -124,6 +127,8 @@ describe("LegacyApiKeyGrantService", () => {
     expect(attachBindings).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario "A key that already states its access mints nothing" */
+  /** @scenario "A key owned by a user mints nothing it did not already have" */
   it.each([
     ["created at cutover", apiKey({ createdAt: CUTOVER_AT })],
     ["already bound", apiKey({ roleBindings: [{ id: "binding-1" }] as ApiKey["roleBindings"] })],
@@ -136,6 +141,7 @@ describe("LegacyApiKeyGrantService", () => {
     expect(attachBindings).not.toHaveBeenCalled();
   });
 
+  /** @scenario "A mint that fails leaves the credential working" */
   it("swallows a failed write, reports it, and lets the next request retry", async () => {
     const attachBindings = vi
       .fn()

@@ -137,6 +137,7 @@ describe("shrinking legacy feature fragment inventory", () => {
     ]);
   });
 
+  /** @scenario "Legacy feature fragments only shrink" */
   it("rejects a new matching fragment and a stale inventory entry", () => {
     write(
       "platform/app/src/server/datasets/dataset.service.ts",

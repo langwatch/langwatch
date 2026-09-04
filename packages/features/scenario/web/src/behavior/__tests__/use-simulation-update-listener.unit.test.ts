@@ -130,4 +130,56 @@ describe("useSimulationUpdateListener()", () => {
       });
     });
   });
+
+  describe("given a tab registered with a machine key", () => {
+    const navigatePayload = (tabKey: string) => ({
+      event: "scenario_tab_navigate",
+      tabKey,
+      url: "https://app.langwatch.ai/acme/simulations/checkout/batch-9",
+    });
+
+    describe("when a navigate payload names this machine", () => {
+      /** @scenario "The registered tab navigates to the handed-off run" */
+      it("follows a run handed to this machine", () => {
+        const onTabNavigate = vi.fn();
+
+        renderHook(() =>
+          useSimulationUpdateListener({
+            projectId: "proj_1",
+            tabKey: "machine-abc",
+            tabId: "tab-1",
+            onTabNavigate,
+          }),
+        );
+
+        act(() => {
+          simulateSSEEvent(navigatePayload("machine-abc"));
+        });
+
+        expect(onTabNavigate).toHaveBeenCalledWith(navigatePayload("machine-abc"));
+      });
+    });
+
+    describe("when a navigate payload names a different machine", () => {
+      /** @scenario "A navigate payload for another machine is ignored" */
+      it("ignores a run handed to a different machine", () => {
+        const onTabNavigate = vi.fn();
+
+        renderHook(() =>
+          useSimulationUpdateListener({
+            projectId: "proj_1",
+            tabKey: "machine-abc",
+            tabId: "tab-1",
+            onTabNavigate,
+          }),
+        );
+
+        act(() => {
+          simulateSSEEvent(navigatePayload("machine-xyz"));
+        });
+
+        expect(onTabNavigate).not.toHaveBeenCalled();
+      });
+    });
+  });
 });

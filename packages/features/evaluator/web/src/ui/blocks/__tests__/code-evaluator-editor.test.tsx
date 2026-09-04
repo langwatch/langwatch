@@ -13,6 +13,7 @@ const inputs: CodeEvaluatorField[] = [{ identifier: "output", type: "str" }];
 afterEach(cleanup);
 
 describe("code evaluator editor", () => {
+  /** @scenario Code evaluator outputs are the fixed evaluator contract */
   it("presents the fixed evaluator result contract", () => {
     const renderCodeEditor = vi.fn(() => <div data-testid="code-editor" />);
 

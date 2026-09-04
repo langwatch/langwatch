@@ -115,6 +115,7 @@ function aggregateRow(overrides: Record<string, string> = {}) {
 }
 
 describe("SimulationClickHouseRepository", () => {
+  /** @scenario "The run drawer opens a test run by its id" */
   it("looks up a run by tenant and run id, returning only the latest matching row", async () => {
     const { fixture, repository } = makeRepository([
       [runRow({ ScenarioRunId: "run-1", Status: "SUCCESS", UpdatedAt: "9000" })],
@@ -294,6 +295,7 @@ describe("SimulationClickHouseRepository", () => {
     });
   });
 
+  /** @scenario "Archiving the default set matches both default and empty set ids" */
   it("caps set run IDs and treats the default storage aliases as one set", async () => {
     const rows = Array.from({ length: RUN_ID_CAP }, (_, index) => ({
       ScenarioRunId: `run-${index}`,
@@ -369,5 +371,19 @@ describe("SimulationClickHouseRepository", () => {
     expect(sweep?.query).toContain("t.StartedAt >=");
     expect(sweep?.query).toContain("AND t.ArchivedAt IS NULL");
     expect(sweep?.query).toContain("max(UpdatedAt)");
+  });
+
+  /** @scenario "A test run does not make the results page look stale" */
+  it("excludes the agent test set from the cheap change check", async () => {
+    const { fixture, repository } = makeRepository([[{ LastUpdatedAt: "5000" }]]);
+
+    await expect(
+      repository.getRunDataForAllSuites({
+        projectId: "project-1",
+        sinceTimestamp: 5000,
+      }),
+    ).resolves.toEqual({ changed: false, lastUpdatedAt: 5000 });
+
+    expect(fixture.calls[0]?.query).toContain("endsWith(ScenarioSetId, '__agent-test')");
   });
 });

@@ -67,12 +67,17 @@ function harness({
   const chunkLines: WrittenRecord[] = [];
   let failing = storageFails;
 
+  const updated: Record<string, unknown>[] = [];
   const datasets = {
     tryFindOne: async ({ id }: { id: string }) => (row && row.id === id ? row : null),
     tryFindBySlug: async ({ slug }: { slug: string }) => (row && row.slug === slug ? row : null),
     create: async (input: Record<string, unknown>) => {
       created.push(input);
       return datasetRow({ ...(input as Partial<DatasetRow>) });
+    },
+    update: async (input: Record<string, unknown>) => {
+      updated.push(input);
+      return datasetRow();
     },
   } as unknown as DatasetContentRepository;
 
@@ -99,6 +104,7 @@ function harness({
   return {
     adapter: DatasetUploadAdapter.create({ datasets, records, storageResolver }),
     created,
+    updated,
     inlineRecords,
     chunkLines,
     restoreStorage: () => {
@@ -119,7 +125,10 @@ const upload = (
     fileSize: Buffer.byteLength(content, "utf8"),
   });
 
-const create = (adapter: DatasetUploadAdapter, input: { name: string; filename: string; content: string }) =>
+const create = (
+  adapter: DatasetUploadAdapter,
+  input: { name: string; filename: string; content: string },
+) =>
   adapter.createDatasetFromUpload({
     projectId: PROJECT_ID,
     name: input.name,
@@ -162,7 +171,8 @@ describe("DatasetUploadAdapter", () => {
         const result = await upload(adapter, {
           slugOrId: "logs",
           filename: "logs.jsonl",
-          content: '{"message": "started", "level": "info"}\n{"message": "crashed", "level": "error"}\n',
+          content:
+            '{"message": "started", "level": "info"}\n{"message": "crashed", "level": "error"}\n',
         });
 
         expect(result.recordsCreated).toBe(2);
@@ -324,6 +334,7 @@ describe("DatasetUploadAdapter", () => {
       /**
        * @scenario "Create a new dataset from an uploaded CSV file"
        * @scenario "Create + upload infers column types as string by default"
+       * @scenario "A new dataset is created directly in object storage"
        */
       it("makes the dataset the name slugifies to, with every header a string column", async () => {
         const { adapter, created } = harness();
@@ -352,7 +363,8 @@ describe("DatasetUploadAdapter", () => {
         const result = await create(adapter, {
           name: "Logs",
           filename: "logs.jsonl",
-          content: '{"message": "started", "level": "info"}\n{"message": "crashed", "level": "error"}\n',
+          content:
+            '{"message": "started", "level": "info"}\n{"message": "crashed", "level": "error"}\n',
         });
 
         expect(result).toMatchObject({ name: "Logs", recordsCreated: 2 });
@@ -439,6 +451,33 @@ describe("DatasetUploadAdapter", () => {
         await expect(
           create(adapter, { name: "Sheet", filename: "book.xlsx", content: "anything" }),
         ).rejects.toThrow(/Unsupported file format/);
+      });
+    });
+  });
+
+  describe("given a dataset whose preparation was interrupted", () => {
+    describe("when the preparation is retried", () => {
+      /** @scenario "An interrupted preparation loses nothing and can be retried" */
+      it("flips the dataset back to processing without losing the staged upload", async () => {
+        const { adapter, updated } = harness({
+          row: datasetRow({
+            status: "failed",
+            stagingKey: "staging/project-1/u1",
+            uploadFilename: "big.csv",
+          }),
+        });
+
+        const result = await adapter.retryNormalize({
+          datasetId: "dataset_abc123",
+          projectId: PROJECT_ID,
+        });
+
+        expect(result).toEqual({ datasetId: "dataset_abc123", status: "processing" });
+        expect(updated).toEqual([
+          expect.objectContaining({
+            data: { status: "processing", statusError: null },
+          }),
+        ]);
       });
     });
   });

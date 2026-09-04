@@ -20,6 +20,7 @@ describe("LlmSignatureNodeDraggable", () => {
     captured.component = null;
   });
 
+  /** @scenario Dragging a new signature node seeds it with the resolved default */
   it("seeds a dragged signature node with the app-resolved model", () => {
     render(<LlmSignatureNodeDraggable model="anthropic/claude-haiku-4-5-20251001" />);
 

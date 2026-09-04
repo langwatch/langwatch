@@ -14,6 +14,7 @@ describe("readAnonymousId", () => {
   });
 
   describe("given no id has been stored", () => {
+    /** @scenario "An anonymous browser id is random and carries nothing about the machine" */
     it("mints a v4 UUID", () => {
       expect(readAnonymousId()).toMatch(UUID_V4);
     });
@@ -33,6 +34,7 @@ describe("readAnonymousId", () => {
   });
 
   describe("given storage was cleared", () => {
+    /** @scenario "Clearing site data rotates the anonymous id" */
     it("rotates to a different id", () => {
       const first = readAnonymousId();
       localStorage.clear();
@@ -42,6 +44,7 @@ describe("readAnonymousId", () => {
   });
 
   describe("given a stored value that is not a v4 UUID", () => {
+    /** @scenario "A stored anonymous id that is not a v4 identifier is replaced" */
     it("replaces it rather than trusting it", () => {
       localStorage.setItem(STORAGE_KEY, "../../etc/passwd");
 
@@ -53,6 +56,7 @@ describe("readAnonymousId", () => {
   });
 
   describe("given localStorage throws", () => {
+    /** @scenario "Storage failure still yields a usable anonymous id" */
     it("still returns an id, stable for the page", () => {
       vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
         throw new Error("site data blocked");

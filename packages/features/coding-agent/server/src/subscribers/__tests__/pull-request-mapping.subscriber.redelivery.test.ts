@@ -102,6 +102,7 @@ describe("pullRequestMapping subscriber", () => {
   });
 
   describe("given a session carrying a github.com repository and a branch", () => {
+    /** @scenario "A folded session carrying repo and branch maps its branch's pull requests" */
     it("requests the mapping for that branch", async () => {
       const github = TestGithubService.create();
       const requestBranchMapping = vi.spyOn(github, "requestBranchMapping");

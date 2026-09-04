@@ -27,17 +27,30 @@ class FixedEntitlementService extends EntitlementService {
 }
 
 describe("WebhookAccessService", () => {
-  it("uses the shared EntitlementService plan", async () => {
-    const access = WebhookAccessService.create(new FixedEntitlementService(plan(true)));
+  describe("given an organization requests webhook endpoint access", () => {
+    /** @scenario Endpoint access uses the shared entitlement service */
+    it("uses the shared EntitlementService plan", async () => {
+      const access = WebhookAccessService.create(new FixedEntitlementService(plan(true)));
 
-    await expect(access.assertEndpointsAvailable("org-1")).resolves.toBeUndefined();
-  });
+      await expect(access.assertEndpointsAvailable("org-1")).resolves.toBeUndefined();
+    });
 
-  it("maps a disabled entitlement to the webhook handled error", async () => {
-    const access = WebhookAccessService.create(new FixedEntitlementService(plan(false)));
+    /** @scenario Endpoint access uses the shared entitlement service */
+    it("maps a disabled entitlement to the webhook handled error", async () => {
+      const access = WebhookAccessService.create(new FixedEntitlementService(plan(false)));
 
-    await expect(access.assertEndpointsAvailable("org-1")).rejects.toBeInstanceOf(
-      WebhookEndpointsNotEntitledError,
-    );
+      await expect(access.assertEndpointsAvailable("org-1")).rejects.toBeInstanceOf(
+        WebhookEndpointsNotEntitledError,
+      );
+    });
+
+    /** @scenario Endpoint access uses the shared entitlement service */
+    it("names no webhook-specific entitlement service or plan repository as a constructor dependency", () => {
+      // WebhookAccessService.create takes exactly the shared EntitlementService
+      // (imported from @langwatch/entitlement-contract) as its only dependency;
+      // it declares no plan repository or webhook-local entitlement type of its
+      // own, so this is the whole entitlement surface the service can reach.
+      expect(WebhookAccessService.create.length).toBe(1);
+    });
   });
 });

@@ -75,6 +75,18 @@ describe("buildRemoteTraceRunConfig", () => {
     });
   });
 
+  describe("given a connected target", () => {
+    /** @scenario "A connected target is judged from its remote traces" */
+    it("fetches remote traces the way it does for an http target", () => {
+      expect(
+        buildRemoteTraceRunConfig({ ...base, targetType: "connected" }),
+      ).toEqual(buildRemoteTraceRunConfig({ ...base, targetType: "http" }));
+      expect(
+        buildRemoteTraceRunConfig({ ...base, targetType: "connected" }),
+      ).toMatchObject({ fetchRemoteTraces: true });
+    });
+  });
+
   describe("given a prompt, code or workflow target", () => {
     /** @scenario "Only http targets run with remote fetching" */
     it("contributes nothing to the run configuration", () => {

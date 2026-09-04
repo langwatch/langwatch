@@ -21,6 +21,7 @@ describe("ApiHttpListener", () => {
     await expect(fetch(`http://127.0.0.1:${address.port}/ready`)).rejects.toThrow();
   });
 
+  /** @scenario A request in flight when the listener closes is allowed to finish */
   it("drains an in-flight request before closing the process intake", async () => {
     let release: (() => void) | undefined;
     let markEntered: (() => void) | undefined;
@@ -56,6 +57,7 @@ describe("ApiHttpListener", () => {
     await closing;
   });
 
+  /** @scenario A connection outliving the grace is destroyed inside the phase */
   it("reaps a request that outlives the bounded drain grace", async () => {
     let markEntered: (() => void) | undefined;
     const entered = new Promise<void>((resolve) => {

@@ -46,6 +46,7 @@ describe("webhook event registry", () => {
     }
   });
 
+  /** @scenario Registered selectors validate and match */
   it("selector validation knows exact types, family wildcards, and star", () => {
     expect(isValidEventSelector("gateway.request.completed")).toBe(true);
     expect(isValidEventSelector("gateway.*")).toBe(true);

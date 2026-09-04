@@ -48,6 +48,8 @@ const query = {
 };
 
 describe("Coding Agent pull-request usage", () => {
+  /** @scenario "A project without the cost permission returns tokens with no cost" */
+  /** @scenario "The organization-wide read carries the cost split and the per-model totals" */
   it("leaves post-merge sessions out and preserves nullable price and billed splits", async () => {
     const github = new TestGithubService();
     github.pullRequests = [
@@ -230,6 +232,7 @@ describe("Coding Agent pull-request usage", () => {
     expect(result.totals.totalTokens).toBe(5);
   });
 
+  /** @scenario "Cross-project totals include only projects the caller can view" */
   it("returns the mapped identity with empty, nullable totals when the caller cannot view a project", async () => {
     const github = new TestGithubService();
     github.pullRequests = [
@@ -305,6 +308,7 @@ describe("Coding Agent pull-request usage", () => {
     ]);
   });
 
+  /** @scenario "An unmapped pull request returns the named failure" */
   it("raises the GitHub contract error when no mapped pull request exists", async () => {
     const service = serviceWith({
       sessions: new TestSessions(),

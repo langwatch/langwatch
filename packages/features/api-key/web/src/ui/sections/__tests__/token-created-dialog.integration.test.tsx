@@ -20,7 +20,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyHostProvider } from "../../../model/api-key-host";
 import { FakeApiKeyHost } from "../../../testing";
@@ -335,6 +335,59 @@ describe("given a token has just been minted", () => {
 
       selectAssistant("Windsurf");
       expect(within(assistantSection()).queryByText("Run in your terminal")).toBeNull();
+    });
+  });
+
+  describe("when the copy button is used", () => {
+    /** @scenario Copy button is present on every command box */
+    it("gives every rendered command box its own copy button", async () => {
+      renderDialog();
+
+      const envBox = await boxLabelled(".env");
+      expect(within(envBox).getByRole("button", { name: /copy/i })).toBeInTheDocument();
+
+      fireEvent.click(within(useInCodeSection()).getByRole("button", { name: "Bearer" }));
+      const bearerBox = await boxLabelled("HTTP headers");
+      expect(within(bearerBox).getByRole("button", { name: /copy/i })).toBeInTheDocument();
+
+      selectAssistant("Codex");
+      const terminalBox = await boxLabelled("Terminal");
+      expect(within(terminalBox).getByRole("button", { name: /copy/i })).toBeInTheDocument();
+    });
+
+    /** @scenario Copy button flashes a success state on click */
+    it("flashes a success state and returns to default after 2 seconds", async () => {
+      renderDialog();
+      const box = await boxLabelled(".env");
+      const copyButton = within(box).getByRole("button", { name: /copy/i });
+
+      vi.useFakeTimers();
+      try {
+        fireEvent.click(copyButton);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(copyButton.querySelector("svg.lucide-check")).not.toBeNull();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(2000);
+        });
+        expect(copyButton.querySelector("svg.lucide-check")).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    /** @scenario Copy success is announced to assistive tech */
+    it("hands the host a success notice for the copy", async () => {
+      const host = renderDialog();
+      const box = await boxLabelled(".env");
+      fireEvent.click(within(box).getByRole("button", { name: /copy/i }));
+
+      await vi.waitFor(() => expect(host.copies).toHaveLength(1));
+      expect(host.copies[0]!.succeeded).toEqual(
+        expect.objectContaining({ title: "Copied", description: expect.stringContaining(".env") }),
+      );
     });
   });
 });

@@ -27,26 +27,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // The menu's own reads go through a per-package tRPC client whose provider the
 // shell mounts; only the flag read is under test, so they answer nothing.
 vi.mock("@langwatch/platform-api-client", async () => {
-  const actual =
-    await vi.importActual<typeof import("@langwatch/platform-api-client")>(
-      "@langwatch/platform-api-client",
-    );
+  const actual = await vi.importActual<typeof import("@langwatch/platform-api-client")>(
+    "@langwatch/platform-api-client",
+  );
   return {
     ...actual,
     createFeatureApi: () =>
       new Proxy(
         {},
         {
-          get: () =>
-            new Proxy({}, { get: () => ({ useQuery: () => ({ data: void 0 }) }) }),
+          get: () => new Proxy({}, { get: () => ({ useQuery: () => ({ data: void 0 }) }) }),
         },
       ),
   };
 });
-import {
-  UI_FEATURE_FLAG_PROCEDURE,
-  useUiFeatureFlags,
-} from "../../../behavior/ui-session-queries";
+import { UI_FEATURE_FLAG_PROCEDURE, useUiFeatureFlags } from "../../../behavior/ui-session-queries";
 import type { UiFeatureApiTransport } from "../../../behavior/ui-feature-transport";
 import { readNavigationFeatureFlag } from "../behavior/navigation-feature-flag";
 
@@ -54,15 +49,17 @@ const AGENT_TESTING_FLAG = "release_ui_agent_testing_v2_enabled";
 const ORGANIZATION_ID = "organization-1";
 
 /** Off by default, with one rule that names the organization reading the menu. */
-const RULES: FeatureFlagRules = [
-  { match: { organizationId: ORGANIZATION_ID }, enabled: true },
-];
+const RULES: FeatureFlagRules = [{ match: { organizationId: ORGANIZATION_ID }, enabled: true }];
 
 /** The real matcher, over whatever scope the read actually stated. */
 const transport = {
   query: async (procedure: string, input: unknown) => {
     if (procedure !== UI_FEATURE_FLAG_PROCEDURE) return { enabled: false };
-    const asked = input as { flag: string; projectId: string | null; organizationId: string | null };
+    const asked = input as {
+      flag: string;
+      projectId: string | null;
+      organizationId: string | null;
+    };
     if (asked.flag !== AGENT_TESTING_FLAG) return { enabled: false };
     const hit = evaluateRules(RULES, {
       ...(asked.projectId ? { projectId: asked.projectId } : {}),
@@ -122,9 +119,9 @@ describe("the main menu under an organization-scoped rule on the release flag", 
         );
 
         await waitFor(() => {
-          expect(
-            screen.queryByRole("link", { name: "Agent Testing" })?.getAttribute("href"),
-          ).toBe("/demo/agent-testing");
+          expect(screen.queryByRole("link", { name: "Agent Testing" })?.getAttribute("href")).toBe(
+            "/demo/agent-testing",
+          );
         });
         expect(screen.queryByRole("button", { name: /Simulations$/ })).toBeNull();
       });

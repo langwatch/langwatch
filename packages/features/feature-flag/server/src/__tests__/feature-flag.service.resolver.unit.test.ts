@@ -35,6 +35,7 @@ describe("FeatureFlagService", () => {
 
   describe("given a flag registered with envOverridable false", () => {
     describe("when its uppercase environment variable is set", () => {
+      /** @scenario "A flag can opt out of environment overrides entirely" */
       it("ignores the variable and resolves from the store", async () => {
         const { service } = buildService({
           [NON_ENV_OVERRIDABLE_FLAG.toUpperCase()]: "1",
@@ -50,6 +51,7 @@ describe("FeatureFlagService", () => {
 
   describe("given a SYSTEM-scoped flag", () => {
     describe("when nothing overrides it", () => {
+      /** @scenario "An unconfigured deployment resolves a flag to its registry default" */
       it("resolves to the registry default", async () => {
         const { service } = buildService();
 
@@ -60,6 +62,7 @@ describe("FeatureFlagService", () => {
     });
 
     describe("when the store has a value", () => {
+      /** @scenario "An operator row overrides the registry default" */
       it("uses the store value", async () => {
         const { service } = buildService();
         await writeEnabled(service, SYSTEM_FLAG, true);
@@ -71,6 +74,7 @@ describe("FeatureFlagService", () => {
     });
 
     describe("when the derived environment override is set", () => {
+      /** @scenario "An environment override beats the operator row" */
       it("beats the store value", async () => {
         const { service } = buildService({
           OPS_ES_CAUSALITY_LOOP_GUARD_DISABLED: "1",
@@ -84,6 +88,7 @@ describe("FeatureFlagService", () => {
     });
 
     describe("when the legacy environment alias is set", () => {
+      /** @scenario "A legacy environment alias keeps working after a flag is registered" */
       it("honours LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD for back-compat", async () => {
         const { service } = buildService({
           LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: "1",
@@ -130,6 +135,7 @@ describe("FeatureFlagService", () => {
     });
 
     describe("when the store row carries an organization-scoped rule", () => {
+      /** @scenario "An organization-scoped rule enables a flag for that organization" */
       it("uses the rule for the matching organization", async () => {
         const { service } = buildService();
         await service.setRules({
@@ -147,6 +153,7 @@ describe("FeatureFlagService", () => {
         expect(enabled).toBe(true);
       });
 
+      /** @scenario "A rule leaves the registry default intact for targets it does not name" */
       it("keeps the registry default for a non-matching organization", async () => {
         // A rules-only write seeds the new row's row-level value from the
         // registry, so an operator targeting an allowlist does not flip
@@ -190,6 +197,7 @@ describe("FeatureFlagService", () => {
   });
 
   describe("given the force-enable list names a flag", () => {
+    /** @scenario "The force-enable list turns a flag on for local development" */
     it("returns true even though the store disables it", async () => {
       const { service } = buildService({
         FEATURE_FLAG_FORCE_ENABLE: ` other_flag , ${SYSTEM_FLAG} `,
@@ -199,6 +207,20 @@ describe("FeatureFlagService", () => {
       const enabled = await service.isEnabled(SYSTEM_FLAG, SYSTEM_TARGET);
 
       expect(enabled).toBe(true);
+    });
+  });
+
+  describe("given a key the registry does not define", () => {
+    /** @scenario "A key the registry does not define is refused" */
+    it("refuses to set it enabled or set its rules", async () => {
+      const { service } = buildService();
+
+      await expect(
+        service.setEnabled({ key: "not_a_real_flag", enabled: true, lastEditedBy: "operator-1" }),
+      ).rejects.toThrow();
+      await expect(
+        service.setRules({ key: "not_a_real_flag", rules: [], lastEditedBy: "operator-1" }),
+      ).rejects.toThrow();
     });
   });
 });

@@ -45,6 +45,7 @@ describe("FeatureFlagService", () => {
       await expect(service.isEnabled(SYSTEM_FLAG, SYSTEM_TARGET)).resolves.toBe(true);
     });
 
+    /** @scenario "A per-flag environment override beats the force-enable list" */
     it("loses to a per-flag environment override", async () => {
       const { service } = buildService({
         FEATURE_FLAG_FORCE_ENABLE: SYSTEM_FLAG,
@@ -68,6 +69,7 @@ describe("FeatureFlagService", () => {
       await expect(service.isEnabled(SYSTEM_FLAG, SYSTEM_TARGET)).resolves.toBe(false);
     });
 
+    /** @scenario "Environment overrides are fixed when the process boots" */
     it("is fixed for the lifetime of the composed service", async () => {
       const source: Record<string, unknown> = {};
       const { service } = buildService(source);

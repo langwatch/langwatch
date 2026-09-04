@@ -4,7 +4,16 @@ import {
   isPlatformTierPermission,
   permissionGrantTiers,
   resolveDeclaredScope,
+  type DeclarationError,
+  type ValidatePermissionForInput,
 } from "../declaration";
+
+/** Type-level assertion helper, mirroring packages/api/type-tests. */
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
+    ? true
+    : false;
+type Assert<Value extends true> = Value;
 
 describe("permissionGrantTiers", () => {
   describe("given a project-grantable permission", () => {
@@ -31,6 +40,7 @@ describe("permissionGrantTiers", () => {
 
 describe("declaredScopeId", () => {
   describe("when the input carries ids at several allowed tiers", () => {
+    /** @scenario "The most specific tier the permission allows decides the check scope" */
     it("resolves the most specific tier the permission allows", () => {
       expect(
         declaredScopeId({
@@ -53,6 +63,7 @@ describe("declaredScopeId", () => {
   });
 
   describe("when a via field is declared", () => {
+    /** @scenario "A scope derivation is written at the call site, never inferred" */
     it("resolves the named field at its own tier", () => {
       expect(
         declaredScopeId({
@@ -237,6 +248,65 @@ describe("resolveDeclaredScope", () => {
           input: { projectId: "" },
         }),
       ).toEqual({ resolved: false, unresolved: { reason: "absent" } });
+    });
+  });
+});
+
+/**
+ * The compile-time half: `ValidatePermissionForInput<P, I>` resolves to P
+ * when the input carries a usable scope id, and to a `DeclarationError`
+ * otherwise. These pin the declaration surface every framework (tRPC
+ * builder, HTTP route policy) is typed against.
+ */
+describe("ValidatePermissionForInput", () => {
+  describe("given a project-scoped permission and a matching input", () => {
+    /** @scenario "A declared permission reads its scope from the validated input" */
+    it("resolves to the permission itself", () => {
+      type Result = ValidatePermissionForInput<"traces:view", { projectId: string }>;
+      type _Compiles = Assert<Equal<Result, "traces:view">>;
+      expect(true satisfies _Compiles).toBe(true);
+    });
+  });
+
+  describe("given an input naming no scope id the permission can use", () => {
+    /** @scenario "Declaring a permission with no usable scope id in the input fails to compile" */
+    it("resolves to a declaration error", () => {
+      type Result = ValidatePermissionForInput<"traces:view", { name: string }>;
+      type _Refuses = Assert<Equal<Result extends DeclarationError<string> ? true : false, true>>;
+      expect(true satisfies _Refuses).toBe(true);
+    });
+  });
+
+  describe("given an input carrying only an id from a tier the permission cannot be granted at", () => {
+    /** @scenario "An input id from a tier the permission cannot be granted at fails to compile" */
+    it("resolves to a declaration error", () => {
+      type Result = ValidatePermissionForInput<"governance:view", { projectId: string }>;
+      type _Refuses = Assert<Equal<Result extends DeclarationError<string> ? true : false, true>>;
+      expect(true satisfies _Refuses).toBe(true);
+    });
+  });
+
+  describe("given a platform-tier permission", () => {
+    /** @scenario "A platform-tier permission is refused by the scoped declaration surface" */
+    it("resolves to a declaration error regardless of the input", () => {
+      type Result = ValidatePermissionForInput<"ops:view", { organizationId: string }>;
+      type _Refuses = Assert<Equal<Result extends DeclarationError<string> ? true : false, true>>;
+      expect(true satisfies _Refuses).toBe(true);
+    });
+  });
+
+  describe("given a union input", () => {
+    /** @scenario "An input modelled as a union is checked per member" */
+    it("validates each member independently", () => {
+      type Result = ValidatePermissionForInput<
+        "project:update",
+        { projectId: string } | { organizationId: string }
+      >;
+      // Both members carry a usable id for project:update (project and
+      // organization are both grantable tiers), so the union validates
+      // member-by-member rather than being refused as a whole.
+      type _Compiles = Assert<Equal<Result, "project:update">>;
+      expect(true satisfies _Compiles).toBe(true);
     });
   });
 });

@@ -3,6 +3,7 @@ import { ResourceScope } from "../src";
 
 describe("ResourceScope", () => {
   /** @scenario Combined shutdown drains work before closing shared clients */
+  /** @scenario The queue drain completes before any connection is closed */
   it("closes resources once in reverse ownership order", async () => {
     const calls: string[] = [];
     const scope = new ResourceScope();
@@ -38,6 +39,7 @@ describe("ResourceScope", () => {
     expect(closeResource).toHaveBeenCalledOnce();
   });
 
+  /** @scenario A failing drain still releases the connections */
   it("collects close failures without skipping older resources", async () => {
     const closeDatabase = vi.fn();
     const scope = new ResourceScope();

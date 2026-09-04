@@ -183,6 +183,7 @@ describe("Authz binding management writes", () => {
     expect(writes.attachBindings).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Every write goes through the group queue" */
   it("emits one ledger attach and maps duplicate storage signals", async () => {
     const { writes, writer } = setup();
 

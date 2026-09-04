@@ -59,6 +59,7 @@ describe("the webhook delivery process manager's outbox", () => {
   });
 
   describe("its retry schedule", () => {
+    /** @scenario Delivery retry follows the stable ladder */
     it("is the webhook ladder, not whatever the runtime would have used", () => {
       const retryDelayMs = recordedOutboxConfig()?.retryDelayMs;
 

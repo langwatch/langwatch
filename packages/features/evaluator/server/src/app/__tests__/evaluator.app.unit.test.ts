@@ -203,6 +203,7 @@ describe("EvaluatorApp", () => {
      * project that has configured none, so the absence is a state rather than
      * a failure — unlike the default model's.
      */
+    /** @scenario A type whose settings carry no embeddings_model asks for no embeddings model */
     it("creates the evaluator with a null embeddings model", async () => {
       const { app, evaluators } = harness({
         modelProviders: {
@@ -231,6 +232,35 @@ describe("EvaluatorApp", () => {
       });
     });
 
+    /** @scenario A type with neither field asks for no model at all */
+    it("creates a type with neither model field, tolerating the missing embeddings default", async () => {
+      const { app, evaluators } = harness({
+        modelProviders: {
+          resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
+            if (featureKey === "analytics.topic_clustering_embeddings") {
+              throw new ModelNotConfiguredError(
+                featureKey,
+                "EMBEDDINGS",
+                "Topic clustering embeddings",
+                "project-1",
+              );
+            }
+            return { model: "anthropic/claude-sonnet-4-5" };
+          }),
+        },
+      });
+
+      await app.createWithResolvedDefaults({
+        projectId: "project-1",
+        name: "Exact match",
+        config: { evaluatorType: "langevals/exact_match" },
+      });
+
+      expect(firstCall(evaluators.createWithDefaults)).toMatchObject({
+        resolved: { defaultModel: "anthropic/claude-sonnet-4-5", embeddingsModel: null },
+      });
+    });
+
     /**
      * @scenario A type that does need embeddings still refuses when none is configured
      *
@@ -241,6 +271,7 @@ describe("EvaluatorApp", () => {
      * evaluator that can only fail at RUN time against a provider it has no
      * key for.
      */
+    /** @scenario A type whose settings carry embeddings_model asks for both */
     it("refuses for a type whose settings do carry an embeddings model", async () => {
       const { app, evaluators } = harness({
         modelProviders: {
@@ -275,6 +306,7 @@ describe("EvaluatorApp", () => {
      * backwards would make every custom evaluator uncreatable in a project
      * with no embeddings key, for a field it does not have.
      */
+    /** @scenario An unknown or custom evaluator asks for no model at all */
     it("creates a type the catalogue does not describe, rather than demanding embeddings for it", async () => {
       const { app, evaluators } = harness({
         modelProviders: {

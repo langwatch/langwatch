@@ -765,6 +765,48 @@ describe("authz engine decideWithCeiling()", () => {
       ).toBe(true);
     });
   });
+
+  describe("given an owner whose access predates the RoleBinding migration", () => {
+    /**
+     * The population this fallback exists for is DEFINED by holding zero
+     * RoleBindings, so an owner with none relies entirely on their legacy
+     * team row to pass the ceiling — a key minted for them must still work.
+     */
+    const ownerGrants = makeGrants({
+      bindings: [],
+      legacyTeamMemberships: [
+        { teamId: TEAM, role: "ADMIN", customRoleId: null, isPersonal: false },
+      ],
+    });
+
+    /** @scenario "A key minted from legacy membership works at request time" */
+    it("permits the request the legacy role covers", () => {
+      const decision = engine.decideWithCeiling({
+        keyGrants,
+        ownerGrants,
+        permission: "traces:view",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(true);
+    });
+
+    it("still denies what the legacy role does not cover", () => {
+      const viewerOwnerGrants = makeGrants({
+        bindings: [],
+        legacyTeamMemberships: [
+          { teamId: TEAM, role: "VIEWER", customRoleId: null, isPersonal: false },
+        ],
+      });
+      const decision = engine.decideWithCeiling({
+        keyGrants,
+        ownerGrants: viewerOwnerGrants,
+        permission: "datasets:manage",
+        scope: projectScope,
+      });
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("owner-ceiling");
+    });
+  });
 });
 
 describe("authz engine explain()", () => {

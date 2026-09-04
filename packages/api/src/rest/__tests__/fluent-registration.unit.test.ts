@@ -27,6 +27,7 @@ async function jsonBody(res: Response): Promise<unknown> {
 
 describe("a registered endpoint", () => {
   /** @scenario "A handler is given input only when input was declared" */
+  /** @scenario "An endpoint is one registration call" */
   it("serves POST /api/{service}/{version}{path} with context and validated input", async () => {
     const seen: unknown[] = [];
     const app = buildTestService()
@@ -87,6 +88,7 @@ describe("a registered endpoint", () => {
 
 describe("an endpoint that declares no input", () => {
   /** @scenario "A handler is given input only when input was declared" */
+  /** @scenario "An endpoint that declares no input installs no input validation" */
   it("installs no input validation: bodyless and empty-object POSTs both succeed", async () => {
     // Declared with no input parameter, which is all the type allows here; the
     // spy still records everything the framework actually passed.
@@ -174,6 +176,7 @@ describe("withStatus", () => {
 // ---------------------------------------------------------------------------
 
 describe("withMeta", () => {
+  /** @scenario "withMeta is not documentation" */
   it("travels on the mount report and never reaches the document", async () => {
     const meta = { policy: "things:read" };
     const mounted: MountedRoute[] = [];
@@ -206,6 +209,7 @@ describe("withMeta", () => {
 // ---------------------------------------------------------------------------
 
 describe("registerRoute", () => {
+  /** @scenario "REST endpoints register with an explicit method and path" */
   it("serves the declared method on the path under the versioned namespace", async () => {
     const app = buildTestService()
       .registerRoute(
@@ -240,6 +244,7 @@ describe("registerRoute", () => {
     expect(wrongMethod.status).toBe(404);
   });
 
+  /** @scenario "Every route uses one validated handler boundary" */
   it("merges validated path, query and body fields into one handler input", async () => {
     const app = buildTestService()
       .registerRoute(
@@ -301,6 +306,7 @@ describe("registerRoute", () => {
     expect(body).not.toContain("body-id");
   });
 
+  /** @scenario "GET input comes from its URL" */
   it("refuses a JSON body schema on GET", () => {
     const service = buildTestService();
 
@@ -316,6 +322,7 @@ describe("registerRoute", () => {
     ).toThrow(/GET .* cannot declare a JSON body/);
   });
 
+  /** @scenario "GET input comes from its URL" */
   it("refuses a path parameter without a matching schema", () => {
     const service = buildTestService();
 
@@ -517,6 +524,7 @@ describe("provide", () => {
     expect(authorize).toHaveBeenCalledWith(expect.anything(), "traces:view");
   });
 
+  /** @scenario "A project-scoped endpoint chooses an authorized target" */
   it("rejects a body projectId different from the authenticated project", async () => {
     const app = createService({
       name: "test",
@@ -917,6 +925,7 @@ describe("resource limits", () => {
 // ---------------------------------------------------------------------------
 
 describe("capability ports", () => {
+  /** @scenario "A declared capability without its port fails the build" */
   it("fails the build naming the endpoint and the missing rate limiter port", () => {
     const service = buildTestService().registerRoute(
       "post",
@@ -951,6 +960,7 @@ describe("capability ports", () => {
 // ---------------------------------------------------------------------------
 
 describe("group", () => {
+  /** @scenario "A group applies its chain to everything registered through it" */
   it("applies its chain to everything registered through it", async () => {
     const mounted: MountedRoute[] = [];
     const limiterKeys: string[] = [];
@@ -1011,6 +1021,8 @@ describe("group", () => {
     expect(limiterKeys).toEqual(["test:post:/things.get:2026-08-07:anonymous"]);
   });
 
+  /** @scenario "Middleware stacks service first, endpoint second" */
+  /** @scenario "Precedence runs service, group, endpoint" */
   it("runs middleware service first, group second, endpoint last", async () => {
     const order: string[] = [];
     const mw =
@@ -1038,6 +1050,7 @@ describe("group", () => {
     expect(order).toEqual(["service", "group", "endpoint", "handler"]);
   });
 
+  /** @scenario "An endpoint re-declaration wins over the service default" */
   it("lets the endpoint's re-declaration win over group and service defaults", async () => {
     const mounted: MountedRoute[] = [];
     const service = createService({
@@ -1077,6 +1090,7 @@ describe("group", () => {
     expect(metaOf("/other.ping")).toEqual({ level: "service" });
   });
 
+  /** @scenario "A group carries no version" */
   it("carries no version: every registration names its own", async () => {
     const mounted: MountedRoute[] = [];
     const service = createService({
@@ -1127,6 +1141,7 @@ describe("group", () => {
     expect(mounted.some((r) => r.path === "/api/test/2025-03-15/:id")).toBe(true);
   });
 
+  /** @scenario "Withdrawal is explicit and dated" */
   it("withdraws through the group under the prefixed name", async () => {
     const service = buildTestService();
     const things = service.group("things");

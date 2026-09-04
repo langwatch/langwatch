@@ -68,11 +68,9 @@ async function openMenu(props: {
 
 /** The menu item by its label, or null when the menu does not carry one. */
 function item(menu: HTMLElement, label: string): HTMLElement | null {
-  return (
-    Array.from(menu.querySelectorAll('[role="menuitem"]')).find((element) =>
-      element.textContent?.trim().startsWith(label),
-    ) ?? null
-  ) as HTMLElement | null;
+  return (Array.from(menu.querySelectorAll('[role="menuitem"]')).find((element) =>
+    element.textContent?.trim().startsWith(label),
+  ) ?? null) as HTMLElement | null;
 }
 
 /** Whether the item is offered to the caller at all. */

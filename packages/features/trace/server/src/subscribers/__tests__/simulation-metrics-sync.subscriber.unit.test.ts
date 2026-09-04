@@ -97,6 +97,7 @@ describe("simulationMetricsSync subscriber (trace-side metrics publisher)", () =
   // see subscriberWiring.unit.test.ts.
 
   describe("when trace has scenario.run_id attribute", () => {
+    /** @scenario "Trace-side subscriber publishes metrics via ECST after trace stabilises" */
     it("dispatches computeRunMetrics in pull mode (role costs derived downstream)", async () => {
       const deps = createDeps();
       const subscriber = createSimulationMetricsSyncHandler(deps);
@@ -125,6 +126,7 @@ describe("simulationMetricsSync subscriber (trace-side metrics publisher)", () =
   });
 
   describe("when trace has no scenario.run_id attribute", () => {
+    /** @scenario "Trace-side subscriber ignores non-scenario traces" */
     it("skips without dispatching", async () => {
       const deps = createDeps();
       const subscriber = createSimulationMetricsSyncHandler(deps);

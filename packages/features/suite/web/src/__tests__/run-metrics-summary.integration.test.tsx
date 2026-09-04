@@ -166,4 +166,53 @@ describe("<RunMetricsSummary/>", () => {
       expect(screen.queryByText("Pass")).not.toBeInTheDocument();
     });
   });
+
+  describe("given a run group with pass rate, latency and cost data", () => {
+    /** @scenario "Accordion header shows pass rate circle with latency and cost" */
+    it("displays a pass rate circle, a clock with latency and a cost label", () => {
+      render(
+        <RunMetricsSummary
+          summary={makeSummary({
+            passRate: 75,
+            passedCount: 6,
+            failedCount: 2,
+            completedCount: 8,
+            totalCount: 8,
+            averageAgentLatencyMs: 3200,
+            totalDurationMs: 3200,
+            totalCost: 0.024,
+          })}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("75%")).toBeInTheDocument();
+      expect(screen.getByText("3.2s")).toBeInTheDocument();
+      expect(screen.getByText("$0.0240")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a run group predating the metrics migration", () => {
+    /** @scenario "Accordion header shows only pass rate when no cost/latency data" */
+    it("shows the pass rate but no latency or cost labels", () => {
+      render(
+        <RunMetricsSummary
+          summary={makeSummary({
+            passRate: 75,
+            passedCount: 6,
+            failedCount: 2,
+            completedCount: 8,
+            totalCount: 8,
+            averageAgentLatencyMs: null,
+            totalDurationMs: null,
+            totalCost: null,
+          })}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("75%")).toBeInTheDocument();
+      expect(screen.queryByText("$", { exact: false })).not.toBeInTheDocument();
+    });
+  });
 });

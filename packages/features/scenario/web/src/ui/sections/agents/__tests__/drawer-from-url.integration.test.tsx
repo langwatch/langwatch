@@ -141,6 +141,7 @@ describe("Agent editor drawer *FromUrl wrappers", () => {
   describe("given the registry mounts AgentHttpEditorDrawerFromUrl with no open prop", () => {
     describe("when the URL names agentHttpEditor", () => {
       /** @scenario "Clicking HTTP Agent in the type selector opens the HTTP editor drawer" */
+      /** @scenario "HTTP agent editor renders Scenario Mappings section" */
       it("mounts the HTTP editor with its form visible", async () => {
         drawerState.open = "agentHttpEditor";
 
@@ -149,6 +150,7 @@ describe("Agent editor drawer *FromUrl wrappers", () => {
         await waitFor(() => {
           expect(screen.getByText("New HTTP Agent")).toBeInTheDocument();
         });
+        expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
       });
     });
 

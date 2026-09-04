@@ -174,6 +174,129 @@ describe("SuiteExecutionService", () => {
     expect(commands.queueSimulationRun).toHaveBeenCalledTimes(1);
   });
 
+  describe("given a run plan configured with both simulation models", () => {
+    /** @scenario "A run records the simulation models its plan was configured with" */
+    it("records the simulator and judge models it was configured with", async () => {
+      const commands = new Commands();
+      const service = SuiteExecutionService.create({
+        commands,
+        ids: new Ids(),
+        scenarios: scenarios(),
+      });
+
+      await service.execute(
+        input({ simulatorModel: "openai/gpt-5-mini", judgeModel: "openai/gpt-5" }),
+      );
+
+      expect(commands.queueSimulationRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            langwatch: expect.objectContaining({
+              simulatorModel: "openai/gpt-5-mini",
+              judgeModel: "openai/gpt-5",
+            }),
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("given a run plan that names neither model", () => {
+    /** @scenario "A run plan that names no model records no model" */
+    it("records neither model", async () => {
+      const commands = new Commands();
+      const service = SuiteExecutionService.create({
+        commands,
+        ids: new Ids(),
+        scenarios: scenarios(),
+      });
+
+      await service.execute(input());
+
+      const call = commands.queueSimulationRun.mock.calls[0]?.[0] as {
+        metadata: { langwatch: Record<string, unknown> };
+      };
+      expect(call.metadata.langwatch).not.toHaveProperty("simulatorModel");
+      expect(call.metadata.langwatch).not.toHaveProperty("judgeModel");
+    });
+  });
+
+  describe("given a run plan that names only the judge model", () => {
+    /** @scenario "A plan that names only one of the two models records only that one" */
+    it("records only the judge model", async () => {
+      const commands = new Commands();
+      const service = SuiteExecutionService.create({
+        commands,
+        ids: new Ids(),
+        scenarios: scenarios(),
+      });
+
+      await service.execute(input({ judgeModel: "openai/gpt-5" }));
+
+      const call = commands.queueSimulationRun.mock.calls[0]?.[0] as {
+        metadata: { langwatch: Record<string, unknown> };
+      };
+      expect(call.metadata.langwatch.judgeModel).toBe("openai/gpt-5");
+      expect(call.metadata.langwatch).not.toHaveProperty("simulatorModel");
+    });
+  });
+
+  describe("given a run started by no person", () => {
+    /** @scenario "A run started by no person records no actor" */
+    it("records no actor", async () => {
+      const commands = new Commands();
+      const service = SuiteExecutionService.create({
+        commands,
+        ids: new Ids(),
+        scenarios: scenarios(),
+      });
+
+      await service.execute(input());
+
+      const call = commands.queueSimulationRun.mock.calls[0]?.[0] as {
+        metadata: { langwatch: Record<string, unknown> };
+      };
+      expect(call.metadata.langwatch).not.toHaveProperty("actorId");
+      expect(call.metadata.langwatch).not.toHaveProperty("actorLabel");
+    });
+  });
+
+  describe("given a run plan with three scenarios and two targets", () => {
+    /** @scenario "Every run of a batch carries the note stamped at queue time" */
+    it("stamps the same note on every one of the six queued runs", async () => {
+      const commands = new Commands();
+      const service = SuiteExecutionService.create({
+        commands,
+        ids: new Ids(),
+        scenarios: scenarios(
+          vi.fn().mockResolvedValue([
+            { scenarioId: "scenario_1", parameters: {}, secretParameters: {} },
+            { scenarioId: "scenario_2", parameters: {}, secretParameters: {} },
+            { scenarioId: "scenario_3", parameters: {}, secretParameters: {} },
+          ]),
+        ),
+      });
+
+      await service.execute(
+        input({
+          activeScenarioIds: ["scenario_1", "scenario_2", "scenario_3"],
+          activeTargets: [
+            { type: "http", referenceId: "agent_1" },
+            { type: "http", referenceId: "agent_2" },
+          ],
+          note: "switched judge to the stricter criterion",
+        }),
+      );
+
+      expect(commands.queueSimulationRun).toHaveBeenCalledTimes(6);
+      for (const call of commands.queueSimulationRun.mock.calls) {
+        expect((call[0] as { metadata: { note?: string } }).metadata.note).toBe(
+          "switched judge to the stricter criterion",
+        );
+      }
+    });
+  });
+
   describe("given a target that carries overrides of its own", () => {
     /** @scenario "Each target receives its own parameters merged over the run parameters" */
     it("merges them over the run's values, the target winning", async () => {

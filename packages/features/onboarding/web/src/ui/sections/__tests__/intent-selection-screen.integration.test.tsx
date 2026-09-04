@@ -94,9 +94,7 @@ describe("IntentSelectionScreen", () => {
         renderScreen();
         expect(screen.getByText("Monitor & evaluate my LLM app")).toBeInTheDocument();
         expect(
-          screen.getByText(
-            "Trace, evaluate, and improve the LLM apps and agents you're building",
-          ),
+          screen.getByText("Trace, evaluate, and improve the LLM apps and agents you're building"),
         ).toBeInTheDocument();
       });
     });

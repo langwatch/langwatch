@@ -165,13 +165,13 @@ describe("Azure byte paths without an account key", () => {
   describe("given the backend is azure in workload-identity mode", () => {
     /** @scenario "A token-mode write path resolves without consulting a shared key" */
     it("resolves an azure write destination while no account key is configured", async () => {
-      await expect(policyFor(KEYLESS_CONFIG, INJECTED_IDENTITY).resolve(PROJECT_ID)).resolves.toEqual(
-        {
-          kind: "azure",
-          accountName: "lwacct",
-          container: "stored-objects",
-        },
-      );
+      await expect(
+        policyFor(KEYLESS_CONFIG, INJECTED_IDENTITY).resolve(PROJECT_ID),
+      ).resolves.toEqual({
+        kind: "azure",
+        accountName: "lwacct",
+        container: "stored-objects",
+      });
       expect(KEYLESS_CONFIG.accountKey).toBeUndefined();
     });
 

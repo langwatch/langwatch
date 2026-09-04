@@ -172,6 +172,7 @@ describe("given a rule-only write for a flag whose registry default is off", () 
 
 describe("given the database read fails", () => {
   describe("when the ingestion edge resolves the flag", () => {
+    /** @scenario "A database failure resolves the flag to its registry default" */
     it("falls back to the registry default rather than propagating the error", async () => {
       findUnique.mockRejectedValueOnce(new Error("connection terminated"));
       const service = buildService();

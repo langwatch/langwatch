@@ -25,6 +25,7 @@ describe("suiteTargetSchema", () => {
 
   describe("when only type and referenceId are provided", () => {
     /** @scenario Existing suites without fieldMappings parse successfully */
+    /** @scenario Suite target schema ignores unknown fields for backwards compatibility */
     it("validates successfully without fieldMappings", () => {
       const result = suiteTargetSchema.safeParse({
         type: "prompt",

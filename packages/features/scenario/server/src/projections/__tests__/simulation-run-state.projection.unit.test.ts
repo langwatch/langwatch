@@ -11,6 +11,7 @@ import type {
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
   SimulationRunFinishedEvent,
+  SimulationRunMetricsComputedEvent,
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
   SimulationTextMessageEndEvent,
@@ -118,6 +119,31 @@ function createRunFinishedEvent(
     version: SIMULATION_EVENT_VERSIONS.FINISHED,
     data: {
       scenarioRunId: "scenario-run-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createMetricsComputedEvent(
+  overrides: Partial<SimulationRunMetricsComputedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunMetricsComputedEvent> = {},
+): SimulationRunMetricsComputedEvent {
+  return {
+    id: "event-metrics-1",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 2000,
+    occurredAt: 2000,
+    type: SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED,
+    version: SIMULATION_EVENT_VERSIONS.METRICS_COMPUTED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      traceId: "trace-1",
+      totalCost: 0.003,
+      roleCosts: { Agent: 0.003 },
+      roleLatencies: { Agent: 1200 },
       ...overrides,
     },
     ...eventOverrides,
@@ -1210,6 +1236,116 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
         expect(state.Status).toBe("IN_PROGRESS");
         expect(state.FinishedAt).toBeNull();
       });
+    });
+  });
+});
+
+describe("simulationRunStateFoldProjection metrics_computed handling", () => {
+  describe("given a run with no metrics yet", () => {
+    /** @scenario "Simulation fold stores per-trace metrics and recomputes aggregates" */
+    it("stores a per-trace entry and recomputes aggregates as more traces arrive", () => {
+      const afterFirst = foldEvents([
+        createMetricsComputedEvent({
+          traceId: "trace-1",
+          totalCost: 0.003,
+          roleCosts: { Agent: 0.003 },
+        }),
+      ]);
+
+      expect(afterFirst.TraceMetrics["trace-1"]).toBeDefined();
+      expect(afterFirst.TotalCost).toBe(0.003);
+      expect(afterFirst.RoleCosts["Agent"]).toEqual([0.003]);
+
+      const afterSecond = foldEvents([
+        createMetricsComputedEvent({
+          traceId: "trace-1",
+          totalCost: 0.003,
+          roleCosts: { Agent: 0.003 },
+        }),
+        createMetricsComputedEvent({
+          traceId: "trace-2",
+          totalCost: 0.002,
+          roleCosts: { Judge: 0.002 },
+        }),
+      ]);
+
+      expect(afterSecond.TotalCost).toBe(0.005);
+      expect(afterSecond.RoleCosts["Agent"]).toEqual([0.003]);
+      expect(afterSecond.RoleCosts["Judge"]).toEqual([0.002]);
+    });
+  });
+
+  describe("given a run whose trace already has metrics stored", () => {
+    /** @scenario "Reprocessing a trace replaces its entry (idempotent)" */
+    it("replaces the trace's entry instead of accumulating a second contribution", () => {
+      const state = foldEvents([
+        createMetricsComputedEvent({ traceId: "trace-1", totalCost: 0.003 }),
+        createMetricsComputedEvent({ traceId: "trace-1", totalCost: 0.004 }),
+      ]);
+
+      expect(state.TraceMetrics["trace-1"]?.totalCost).toBe(0.004);
+      expect(state.TotalCost).toBe(0.004);
+    });
+  });
+
+  describe("given metrics arriving in either order relative to which trace finishes first", () => {
+    /** @scenario "Metrics computed regardless of arrival order — trace first" */
+    it("accepts a metrics_computed event that arrives before the run finishes", () => {
+      const state = foldEvents([
+        createMetricsComputedEvent({ traceId: "trace-abc", totalCost: 0.003 }, { occurredAt: 1000 }),
+        createRunFinishedEvent({}, { occurredAt: 2000 }),
+      ]);
+
+      expect(state.TraceMetrics["trace-abc"]?.totalCost).toBe(0.003);
+      expect(state.TotalCost).toBe(0.003);
+      expect(state.FinishedAt).toBe(2000);
+    });
+
+    /** @scenario "Metrics computed regardless of arrival order — simulation first" */
+    it("accepts a metrics_computed event that arrives after the run finishes", () => {
+      const state = foldEvents([
+        createRunFinishedEvent({}, { occurredAt: 1000 }),
+        createMetricsComputedEvent({ traceId: "trace-abc", totalCost: 0.003 }, { occurredAt: 2000 }),
+      ]);
+
+      expect(state.TraceMetrics["trace-abc"]?.totalCost).toBe(0.003);
+      expect(state.TotalCost).toBe(0.003);
+      expect(state.FinishedAt).toBe(1000);
+    });
+  });
+
+  describe("given a run with two trace ids arriving one at a time", () => {
+    /** @scenario "Metrics aggregate across multiple trace IDs as they arrive" */
+    it("computes partial metrics from the first trace, then complete metrics once the second arrives", () => {
+      const partial = foldEvents([
+        createMetricsComputedEvent({
+          traceId: "trace-1",
+          totalCost: 0.003,
+          roleCosts: { Agent: 0.003 },
+          roleLatencies: { Agent: 1200 },
+        }),
+      ]);
+
+      expect(partial.TotalCost).toBe(0.003);
+      expect(Object.keys(partial.TraceMetrics)).toEqual(["trace-1"]);
+
+      const complete = foldEvents([
+        createMetricsComputedEvent({
+          traceId: "trace-1",
+          totalCost: 0.003,
+          roleCosts: { Agent: 0.003 },
+          roleLatencies: { Agent: 1200 },
+        }),
+        createMetricsComputedEvent({
+          traceId: "trace-2",
+          totalCost: 0.002,
+          roleCosts: { Agent: 0.002 },
+          roleLatencies: { Agent: 800 },
+        }),
+      ]);
+
+      expect(Object.keys(complete.TraceMetrics).sort()).toEqual(["trace-1", "trace-2"]);
+      expect(complete.TotalCost).toBe(0.005);
     });
   });
 });

@@ -51,6 +51,7 @@ function buildService(overrides: {
   repository?: Partial<SuiteRepository>;
   scenarios?: Partial<ScenarioService>;
   agents?: Partial<AgentService>;
+  execution?: SuiteExecutionPort;
 }) {
   // Spied so a refusal test can assert the plan row was never touched: a
   // refused run must resolve entirely from the config it was sent, never
@@ -84,15 +85,17 @@ function buildService(overrides: {
     ...overrides.scenarios,
   } as ScenarioService;
 
-  const execution: SuiteExecutionPort = {
-    execute: async (input) => ({
-      batchRunId: "batch-1",
-      setId: `suiteset_${input.suiteId}`,
-      jobCount: input.activeScenarioIds.length * input.activeTargets.length,
-      skippedArchived: input.skippedArchived,
-      items: [],
-    }),
-  } as SuiteExecutionPort;
+  const execution: SuiteExecutionPort =
+    overrides.execution ??
+    ({
+      execute: async (input) => ({
+        batchRunId: "batch-1",
+        setId: `suiteset_${input.suiteId}`,
+        jobCount: input.activeScenarioIds.length * input.activeTargets.length,
+        skippedArchived: input.skippedArchived,
+        items: [],
+      }),
+    } as SuiteExecutionPort);
 
   const agents: AgentService = {
     getReferenceStates: async ({ ids }: { ids: string[] }) =>
@@ -236,6 +239,48 @@ describe("SuiteService.runPlan", () => {
 
         expect(result.planName).toBe("All test cases agent-1");
       });
+    });
+  });
+
+  describe("when the config carries a repeat count", () => {
+    /** @scenario "A test suite run honours the repeat count sent with the run" */
+    it("stores it on the plan and passes it to execution", async () => {
+      const executeSpy = vi.fn(async (input: { repeatCount: number; suiteId: string }) => ({
+        batchRunId: "batch-1",
+        setId: `suiteset_${input.suiteId}`,
+        jobCount: 1,
+        skippedArchived: { scenarios: [], targets: [] },
+        items: [],
+      }));
+      const { service, findOrCreatePlanByName } = buildService({
+        repository: {
+          findOrCreatePlanByName: async ({ id, projectId: pid, name, scope, targets, config: cfg }) => ({
+            suite: baseSuite({
+              id,
+              projectId: pid,
+              name,
+              scope,
+              targets,
+              repeatCount: cfg.repeatCount ?? 1,
+            }),
+            created: true,
+          }),
+        },
+        execution: { execute: executeSpy } as unknown as SuiteExecutionPort,
+      });
+
+      await service.runPlan({
+        projectId,
+        organizationId: "org-1",
+        name: "Refunds prod-agent",
+        config: { ...config, repeatCount: 3 },
+        idempotencyKey: "idem-1",
+      });
+
+      expect(findOrCreatePlanByName).toHaveBeenCalledWith(
+        expect.objectContaining({ config: expect.objectContaining({ repeatCount: 3 }) }),
+      );
+      expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({ repeatCount: 3 }));
     });
   });
 });

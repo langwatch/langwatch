@@ -18,6 +18,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { ScenarioTargetRow } from "../scenario-target-row";
 import { makeScenarioRunData } from "./test-helpers";
+import { cssRulesForElement } from "./emotion-test-css";
 
 const prefetchMock = vi.hoisted(() => vi.fn());
 
@@ -295,6 +296,94 @@ describe("<ScenarioTargetRow/>", () => {
       await user.hover(screen.getByLabelText("View details for Prod Agent: Angry refund request"));
 
       expect(prefetchMock).toHaveBeenCalledWith("run_hover");
+    });
+  });
+
+  describe("given a scenario run with status SUCCESS", () => {
+    /** @scenario "List row shows colored status circle instead of icon" */
+    it("shows a green circle on the left, not a checkmark icon", () => {
+      const { container } = render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const circle = container.querySelector('div[style*="border-radius"]') ?? container.firstChild;
+      expect(container.querySelector("svg")).not.toBeInTheDocument();
+      expect(circle).toBeTruthy();
+    });
+
+    /** @scenario "List row shows status label with latency and cost" */
+    it("shows 'Passed' in green semibold text with latency and cost", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            results: null,
+            durationInMs: 1200,
+            totalCost: 0.003,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const label = screen.getByText("Passed");
+      const css = cssRulesForElement(label);
+      expect(css).toContain("font-weight:var(--chakra-font-weights-semibold)");
+      expect(css).toContain("color:var(--chakra-colors-green-500)");
+      expect(screen.getByText("1.2s")).toBeInTheDocument();
+      expect(screen.getByText("$0.0030")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run with status FAILED", () => {
+    /** @scenario "Failed list row shows red styling" */
+    it("shows a red circle and 'Failed' in red semibold text with latency", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.FAILED,
+            results: null,
+            durationInMs: 5400,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const label = screen.getByText("Failed");
+      const css = cssRulesForElement(label);
+      expect(css).toContain("font-weight:var(--chakra-font-weights-semibold)");
+      expect(css).toContain("color:var(--chakra-colors-red-500)");
+      expect(screen.getByText("5.4s")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run with no duration or cost", () => {
+    /** @scenario "List row without metrics shows only status label" */
+    it("shows only the status label, not a cost", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            results: null,
+            durationInMs: 0,
+            totalCost: null,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("Passed")).toBeInTheDocument();
+      expect(screen.queryByText("$", { exact: false })).not.toBeInTheDocument();
     });
   });
 });

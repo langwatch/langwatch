@@ -23,7 +23,6 @@ const otherTenantId = `${tenantId}-other`;
 const now = Date.now();
 const windowStart = now - 7 * 24 * 60 * 60 * 1000;
 
-
 function makeRow({
   scenarioId = `scen-${nanoid(6)}`,
   scenarioRunId = `run-${nanoid(10)}`,
@@ -90,8 +89,7 @@ function makeRow({
     Status: status,
     Name: name,
     Description: null,
-    Metadata:
-      Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
+    Metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null,
     "Messages.Id": [],
     "Messages.Role": [],
     "Messages.Content": [],
@@ -221,9 +219,7 @@ integration("findAtoms", () => {
     /** @scenario "A run pushed from code reads as started from code" */
     it("reads the target as unknown and the trigger as code", async () => {
       const setId = `set-${nanoid(6)}`;
-      await insertRows([
-        makeRow({ batchRunId: `batch-${nanoid(6)}`, scenarioSetId: setId }),
-      ]);
+      await insertRows([makeRow({ batchRunId: `batch-${nanoid(6)}`, scenarioSetId: setId })]);
 
       const { atoms } = await repo.findAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
@@ -261,9 +257,7 @@ integration("findAtoms", () => {
       });
 
       expect(atoms).toHaveLength(4);
-      expect(new Set(atoms.map((atom) => atom.BatchRunId))).toEqual(
-        new Set([batchRunId]),
-      );
+      expect(new Set(atoms.map((atom) => atom.BatchRunId))).toEqual(new Set([batchRunId]));
       expect(new Set(atoms.map((atom) => atom.TargetKey))).toEqual(
         new Set(["agent_dev", "agent_prod"]),
       );
@@ -613,9 +607,7 @@ integration("the cost of an atom", () => {
         }),
       ]);
 
-      const totals = await repo.aggregateTotals(
-        baseFilter({ scenarioSetIds: [setId] }),
-      );
+      const totals = await repo.aggregateTotals(baseFilter({ scenarioSetIds: [setId] }));
 
       expect(Number(totals?.CostTotal)).toBeCloseTo(0.5, 6);
       expect(Number(totals?.CostUnknown)).toBe(1);
@@ -717,9 +709,7 @@ integration("filters", () => {
       });
 
       expect(atoms).toHaveLength(2);
-      expect(atoms.every((atom) => atom.ScenarioName === "List agents")).toBe(
-        true,
-      );
+      expect(atoms.every((atom) => atom.ScenarioName === "List agents")).toBe(true);
     });
   });
 
@@ -941,9 +931,7 @@ integration("the target of a run whose target carries parameters", () => {
       const byKey = new Map(atoms.map((atom) => [atom.TargetKey, atom]));
       expect(variantKey).not.toBe("prod-agent");
       expect(byKey.get("prod-agent")?.TargetParameters).toBe("");
-      expect(JSON.parse(byKey.get(variantKey)?.TargetParameters ?? "")).toEqual(
-        overrides,
-      );
+      expect(JSON.parse(byKey.get(variantKey)?.TargetParameters ?? "")).toEqual(overrides);
     });
 
     /** @scenario "The overview groups a parameter variant apart from its agent" */
@@ -977,9 +965,7 @@ integration("the target of a run whose target carries parameters", () => {
       const byKey = new Map(groups.map((group) => [group.GroupKey, group]));
       expect(byKey.get("prod-agent")?.TargetParameters).toBe("");
       expect(Number(byKey.get("prod-agent")?.Passed)).toBe(1);
-      expect(JSON.parse(byKey.get(variantKey)?.TargetParameters ?? "")).toEqual(
-        overrides,
-      );
+      expect(JSON.parse(byKey.get(variantKey)?.TargetParameters ?? "")).toEqual(overrides);
       expect(Number(byKey.get(variantKey)?.Passed)).toBe(0);
     });
 
@@ -1068,14 +1054,9 @@ integration("findRunTargets", () => {
         }),
       ]);
 
-      const rows = await repo.findRunTargets(
-        baseFilter({ scenarioSetIds: [setId] }),
-      );
+      const rows = await repo.findRunTargets(baseFilter({ scenarioSetIds: [setId] }));
 
-      expect(rows.map((row) => row.TargetKey)).toEqual([
-        variantKey,
-        "code:acmesupportagent",
-      ]);
+      expect(rows.map((row) => row.TargetKey)).toEqual([variantKey, "code:acmesupportagent"]);
       expect(rows[0]).toMatchObject({
         Name: "",
         ReferenceId: "prod-agent",
@@ -1116,9 +1097,7 @@ integration("findRunTargets", () => {
         }),
       ]);
 
-      const rows = await repo.findRunTargets(
-        baseFilter({ scenarioSetIds: [setId] }),
-      );
+      const rows = await repo.findRunTargets(baseFilter({ scenarioSetIds: [setId] }));
 
       expect(rows).toEqual([
         {
@@ -1168,9 +1147,7 @@ integration("findCodeScenarios", () => {
         }),
       ]);
 
-      const rows = await repo.findCodeScenarios(
-        baseFilter({ scenarioSetIds: [setId] }),
-      );
+      const rows = await repo.findCodeScenarios(baseFilter({ scenarioSetIds: [setId] }));
 
       expect(rows).toEqual([
         { ScenarioKey: `${setId}-list-agents`, Name: "List agents" },
@@ -1185,9 +1162,7 @@ integration("findRunOrdinals", () => {
     /** @scenario "The number of a run counts the runs of its plan, oldest first" */
     it("numbers them from one, oldest first", async () => {
       const setId = `set-${nanoid(6)}`;
-      const batches = ["oldest", "middle", "newest"].map(
-        (label) => `batch-${label}-${nanoid(6)}`,
-      );
+      const batches = ["oldest", "middle", "newest"].map((label) => `batch-${label}-${nanoid(6)}`);
       await insertRows(
         batches.flatMap((batchRunId, index) =>
           Array.from({ length: 2 }, () =>
@@ -1200,13 +1175,9 @@ integration("findRunOrdinals", () => {
         ),
       );
 
-      const ordinals = await repo.findRunOrdinals(
-        baseFilter({ scenarioSetIds: [setId] }),
-      );
+      const ordinals = await repo.findRunOrdinals(baseFilter({ scenarioSetIds: [setId] }));
 
-      const byBatch = new Map(
-        ordinals.map((row) => [row.BatchRunId, Number(row.Ordinal)]),
-      );
+      const byBatch = new Map(ordinals.map((row) => [row.BatchRunId, Number(row.Ordinal)]));
       expect(byBatch.get(batches[0]!)).toBe(1);
       expect(byBatch.get(batches[1]!)).toBe(2);
       expect(byBatch.get(batches[2]!)).toBe(3);
@@ -1343,9 +1314,7 @@ integration("aggregateGroups", () => {
         makeRow({ batchRunId, scenarioSetId: setId, status: "FAILED" }),
       ]);
 
-      const all = await repo.aggregateTotals(
-        baseFilter({ scenarioSetIds: [setId] }),
-      );
+      const all = await repo.aggregateTotals(baseFilter({ scenarioSetIds: [setId] }));
       const failedOnly = await repo.aggregateTotals(
         baseFilter({ scenarioSetIds: [setId], outcome: "failed" }),
       );
@@ -1398,9 +1367,7 @@ integration("aggregateTrend", () => {
     /** @scenario "A group carries one trend point per run" */
     it("returns one point per run", async () => {
       const setId = `set-${nanoid(6)}`;
-      const batchRunIds = ["a", "b", "c"].map(
-        (suffix) => `batch-${suffix}-${nanoid(4)}`,
-      );
+      const batchRunIds = ["a", "b", "c"].map((suffix) => `batch-${suffix}-${nanoid(4)}`);
 
       await insertRows(
         batchRunIds.map((batchRunId, index) =>

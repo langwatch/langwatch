@@ -436,6 +436,7 @@ describe("buildContentPrivacy", () => {
     expect(privacy.tools).toEqual({ state: "restricted", visibleTo: "Admins" });
   });
 
+  /** @scenario A viewer inside the audience is told the content is restricted to them */
   it("marks restricted-but-visible content so an in-audience viewer is told", () => {
     const privacy = buildContentPrivacy(
       { contentCategories: cats({ input: restrictedVisible("Admins") }) },
@@ -455,6 +456,25 @@ describe("buildContentPrivacy", () => {
       new Set(["system"]),
     );
     expect(privacy.system.state).toBe("dropped");
+  });
+
+  /**
+   * @scenario Restriction is retroactive
+   *
+   * The status comes from the resolved policy passed in, not from anything
+   * stamped on the row at ingestion — so the exact same stored trace reads
+   * differently the moment the policy that resolves it changes, with no
+   * re-ingestion involved.
+   */
+  it("changes an already-stored trace's visibility the moment the policy changes", () => {
+    const beforeTheRule = buildContentPrivacy({ contentCategories: cats() }, new Set());
+    expect(beforeTheRule.input).toEqual({ state: "visible", visibleTo: null });
+
+    const afterTheRule = buildContentPrivacy(
+      { contentCategories: cats({ input: restricted("Admins") }) },
+      new Set(),
+    );
+    expect(afterTheRule.input).toEqual({ state: "restricted", visibleTo: "Admins" });
   });
 });
 

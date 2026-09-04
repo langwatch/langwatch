@@ -42,6 +42,12 @@ describe("buildAgentTestTrace()", () => {
   describe("given a test request that the endpoint answered", () => {
     describe("when the trace for it is built", () => {
       /** @scenario "Successful request creates a trace" */
+      /** @scenario "Trace includes agent_test type" */
+      /** @scenario "Trace includes agent ID" */
+      /** @scenario "Trace includes user ID" */
+      /** @scenario "Trace captures response status code" */
+      /** @scenario "Trace captures response duration" */
+      /** @scenario "Trace captures response body" */
       it("names the agent and the user, and carries the status, duration and body", () => {
         const trace = traceFor({
           success: true,
@@ -74,6 +80,7 @@ describe("buildAgentTestTrace()", () => {
   describe("given an endpoint that answered 404", () => {
     describe("when the trace for it is built", () => {
       /** @scenario "Failed request creates a trace" */
+      /** @scenario "Trace captures HTTP error responses" */
       it("carries the error details and raises the span's error flag", () => {
         const trace = traceFor({
           success: false,
@@ -99,6 +106,7 @@ describe("buildAgentTestTrace()", () => {
   describe("given an endpoint that could not be reached at all", () => {
     describe("when the trace for it is built", () => {
       /** @scenario "Unreachable endpoint creates a trace" */
+      /** @scenario "Trace captures connection failures" */
       it("records the connection error rather than a status", () => {
         const trace = traceFor({
           success: false,
@@ -128,6 +136,7 @@ describe("buildAgentTestTrace()", () => {
   describe("given a test request configured with an output path", () => {
     describe("when the trace for it is built", () => {
       /** @scenario "JSONPath extraction is captured in trace" */
+      /** @scenario "Trace captures extracted output" */
       it("carries the extracted value beside the path it came from", () => {
         const trace = traceFor(
           {

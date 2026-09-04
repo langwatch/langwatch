@@ -51,6 +51,7 @@ const pair = (overrides?: Partial<AccountSecretPair>): AccountSecretPair => ({
 describe("carrying account secrets onto credential rows", () => {
   describe("given a user whose backfill has just finalized", () => {
     describe("when the carry runs", () => {
+      /** @scenario "Finalizing an existing user carries their secrets across once" */
       it("creates the credential row with the Account row's own timestamps", async () => {
         const { service, insertCredentialIfMissing } = harness([
           pair({ accountCreatedAtMs: T0 - 5_000, accountUpdatedAtMs: T0 }),
@@ -72,6 +73,7 @@ describe("carrying account secrets onto credential rows", () => {
         expect(outcome).toEqual({ carried: 1, healed: 0 });
       });
 
+      /** @scenario "Finalizing an existing user carries their secrets across once" */
       it("inserts nothing the second time it runs", async () => {
         const { service, insertCredentialIfMissing, overwriteCredential } = harness([pair()]);
         insertCredentialIfMissing.mockResolvedValue(false);

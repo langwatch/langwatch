@@ -113,9 +113,9 @@ describe("analytics timeseries metric validation", () => {
 
       /** @scenario "An unknown metric is refused as a validation error naming its series" */
       it("refuses a pipeline series on the same enumeration", () => {
-        expect(
-          handledCodeOf(() => translateMetric("not_a_real_metric", "sum", 0)),
-        ).toBe("validation_error");
+        expect(handledCodeOf(() => translateMetric("not_a_real_metric", "sum", 0))).toBe(
+          "validation_error",
+        );
       });
     });
   });
@@ -135,8 +135,9 @@ describe("analytics timeseries metric validation", () => {
       it("emits no SQL carrying the injected text", () => {
         let sql: string | undefined;
         try {
-          sql = buildTimeseriesQuery(timeseriesInput([{ metric: INJECTION, aggregation: "sum" }]))
-            .sql;
+          sql = buildTimeseriesQuery(
+            timeseriesInput([{ metric: INJECTION, aggregation: "sum" }]),
+          ).sql;
         } catch {
           sql = undefined;
         }

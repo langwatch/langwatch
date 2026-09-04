@@ -43,6 +43,7 @@ describe("resolveSettingsBackTarget", () => {
       ).toEqual({ label: "Back to LLM Ops", href: "/acme-app/traces?span=abc" });
     });
 
+    /** @scenario The back entry drops a page from another organization */
     it("drops it after an organization switch, so it never returns somewhere else", () => {
       captureSettingsReturnPath({ organizationId: "org_1", pathname: "/acme-app/traces" });
 

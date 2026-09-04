@@ -79,6 +79,7 @@ describe("GitHub branch maintenance", () => {
   });
 
   /** @scenario "Branch bookkeeping is dropped past the activity horizon" */
+  /** @scenario "Bookkeeping for a branch outside the activity window is removed" */
   it("prunes bookkeeping at the same one-week activity horizon", async () => {
     const repository = new MaintenanceRepository();
     repository.deleted = { branchChecks: 7 };

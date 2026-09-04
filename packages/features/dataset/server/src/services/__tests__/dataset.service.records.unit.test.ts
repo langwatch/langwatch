@@ -37,9 +37,8 @@ const dataset = {
 function service(overrides: { columnTypes?: { name: string; type: string }[] } = {}) {
   const row = { ...dataset, columnTypes: overrides.columnTypes ?? dataset.columnTypes };
   const update = vi.fn(async (input: Record<string, unknown>) => ({ ...row, ...input }));
-  const createMany = vi.fn(
-    async ({ entries }: { entries: Record<string, unknown>[] }) =>
-      entries.map((entry) => ({ id: String(entry.id), entry })),
+  const createMany = vi.fn(async ({ entries }: { entries: Record<string, unknown>[] }) =>
+    entries.map((entry) => ({ id: String(entry.id), entry })),
   );
   const updateRecord = vi.fn(async (input: { id: string; entry: Record<string, unknown> }) => ({
     id: input.id,
@@ -80,7 +79,11 @@ describe("DatasetService", () => {
         });
 
         expect(update).toHaveBeenCalledWith(
-          expect.objectContaining({ id: "dataset-1", name: "Renamed Dataset", slug: "renamed-dataset" }),
+          expect.objectContaining({
+            id: "dataset-1",
+            name: "Renamed Dataset",
+            slug: "renamed-dataset",
+          }),
         );
       });
     });

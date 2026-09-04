@@ -68,6 +68,7 @@ function harness({ experiment = EXPERIMENT }: { experiment?: FeatureFlagExperime
 
 describe("given an experiment that is available", () => {
   describe("when nobody has chosen anything", () => {
+    /** @scenario "An available experiment is off until the person joins it" */
     it("is off, because an experiment is opt-in", async () => {
       const { service, makeAvailable } = harness();
       await makeAvailable();
@@ -79,6 +80,7 @@ describe("given an experiment that is available", () => {
   });
 
   describe("when the person opts themselves in", () => {
+    /** @scenario "A person joins an experiment for themselves" */
     it("turns on for them", async () => {
       const { service, makeAvailable } = harness();
       await makeAvailable();
@@ -113,6 +115,7 @@ describe("given an experiment that is available", () => {
   });
 
   describe("when the person opts back out", () => {
+    /** @scenario "Leaving an experiment removes the enrolment rather than recording a refusal" */
     it("removes the enrolment rather than storing a refusal", async () => {
       const { service, experiments, makeAvailable } = harness();
       await makeAvailable();
@@ -157,6 +160,7 @@ describe("given an experiment that is available", () => {
   });
 
   describe("when an owner disables it for the organization", () => {
+    /** @scenario "An owner disabling an experiment overrides a person's own choice" */
     it("overrides the person's own opt-in", async () => {
       const { service, makeAvailable } = harness();
       await makeAvailable();
@@ -178,6 +182,7 @@ describe("given an experiment that is available", () => {
       expect(entry?.userEnrolled).toBe(true);
     });
 
+    /** @scenario "A disabled experiment stays visible so an owner can reverse it" */
     it("stays listed, so the owner can switch it back on", async () => {
       const { service, makeAvailable } = harness();
       await makeAvailable();
@@ -193,6 +198,7 @@ describe("given an experiment that is available", () => {
   });
 
   describe("when the organization disables it and the project enables it", () => {
+    /** @scenario "A project policy overrides an organization policy" */
     it("follows the project", async () => {
       const { service, makeAvailable } = harness();
       await makeAvailable();
@@ -216,6 +222,7 @@ describe("given an experiment that is available", () => {
   });
 
   describe("when a policy is returned to inherit", () => {
+    /** @scenario "Returning a policy to inherit hands the decision back to the person" */
     it("hands the decision back to the person", async () => {
       const { service, makeAvailable } = harness();
       await makeAvailable();
@@ -240,12 +247,14 @@ describe("given an experiment that is available", () => {
 });
 
 describe("given an experiment the operator has not made available", () => {
+  /** @scenario "An unreleased experiment is never announced" */
   it("is not listed at all, so metadata never announces it", async () => {
     const { service } = harness();
 
     await expect(service.resolveExperimentCatalogue(PROJECT_TARGET)).resolves.toEqual([]);
   });
 
+  /** @scenario "Joining an experiment that is not available is refused" */
   it("refuses an attempt to join it", async () => {
     const { service } = harness();
 
@@ -258,6 +267,7 @@ describe("given an experiment the operator has not made available", () => {
     ).rejects.toBeInstanceOf(FeatureFlagExperimentUnavailableError);
   });
 
+  /** @scenario "An operator switch-off outranks every tenant and personal choice" */
   it("stays off even where an owner enabled it", async () => {
     const { service } = harness();
     await service.setExperimentTenantPolicy({
@@ -274,6 +284,7 @@ describe("given an experiment the operator has not made available", () => {
 });
 
 describe("given a key that is not an experiment", () => {
+  /** @scenario "A key that is not an experiment cannot be joined or governed" */
   it("refuses an enrolment", async () => {
     const { service } = harness();
 
@@ -301,6 +312,7 @@ describe("given a key that is not an experiment", () => {
 });
 
 describe("given a signed-out visitor", () => {
+  /** @scenario "A signed-out browser is shown no experiment that is not public" */
   it("is shown no experiment that did not opt into pre-authentication", async () => {
     const { service, makeAvailable } = harness();
     await makeAvailable();
@@ -308,6 +320,7 @@ describe("given a signed-out visitor", () => {
     await expect(service.resolveExperimentCatalogue(ANONYMOUS)).resolves.toEqual([]);
   });
 
+  /** @scenario "A signed-out browser cannot read an ordinary browser flag" */
   it("cannot read an ordinary browser flag from the public surface", async () => {
     const { service, makeAvailable } = harness();
     await makeAvailable();
@@ -316,6 +329,7 @@ describe("given a signed-out visitor", () => {
   });
 
   describe("when the experiment opted into pre-authentication", () => {
+    /** @scenario "A public experiment is decided for a signed-out browser by availability alone" */
     it("is decided by availability alone", async () => {
       const { service, makeAvailable } = harness({
         experiment: { ...EXPERIMENT, publicAnonymous: true },

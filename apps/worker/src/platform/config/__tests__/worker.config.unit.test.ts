@@ -264,6 +264,9 @@ describe("resolveWorkerConfig", () => {
     });
   });
 
+  /** @scenario Raising the drain budget widens every clock above it */
+  /** @scenario The drain budget defaults to 25s in production and 5s in dev */
+  /** @scenario A malformed drain override is reported and falls back, never fatal */
   it("preserves the Worker shutdown budget defaults and positive override", () => {
     expect(
       resolveWorkerConfig({ NODE_ENV: "production", ENVIRONMENT: "production" }).shutdown,
@@ -274,6 +277,43 @@ describe("resolveWorkerConfig", () => {
     expect(resolveWorkerConfig({ SHUTDOWN_DRAIN_TIMEOUT_MS: "invalid" }).shutdown).toEqual({
       processDeadlineMs: 25_000,
     });
+  });
+
+  /** @scenario "Every shutdown clock nests inside the one outside it" */
+  it("keeps the process deadline strictly wider than the drain budget it wraps", () => {
+    for (const drainMs of [1_000, 5_000, 25_000, 60_000]) {
+      const { processDeadlineMs } = resolveWorkerConfig({
+        SHUTDOWN_DRAIN_TIMEOUT_MS: String(drainMs),
+      }).shutdown;
+
+      expect(processDeadlineMs).toBeGreaterThan(drainMs);
+    }
+  });
+
+  /**
+   * @scenario "The required grace period matches what the chart guard enforces"
+   * @scenario "The chart is sized for the same production drain the code uses"
+   *
+   * Mirrors charts/langwatch/tests/workers-shutdown.sh, which asserts the pod's
+   * terminationGracePeriodSeconds against these same two numbers by rendering
+   * the chart rather than reading its template. Both suites assert one pair so
+   * that retuning either side alone cannot admit a release the kubelet kills
+   * mid-drain.
+   */
+  it("agrees with the chart guard's drain and required margin", () => {
+    const DRAIN_SECONDS = 25;
+    const REQUIRED_MARGIN_SECONDS = 30;
+    const KUBELET_SLACK_SECONDS = 10;
+
+    const { processDeadlineMs } = resolveWorkerConfig({
+      NODE_ENV: "production",
+      ENVIRONMENT: "production",
+    }).shutdown;
+
+    expect(processDeadlineMs / 1_000).toBe(DRAIN_SECONDS + (REQUIRED_MARGIN_SECONDS - KUBELET_SLACK_SECONDS));
+    expect(processDeadlineMs / 1_000 + KUBELET_SLACK_SECONDS).toBe(
+      DRAIN_SECONDS + REQUIRED_MARGIN_SECONDS,
+    );
   });
 
   /** @scenario "S3 client honors S3_REGION env for real AWS deployments instead of the R2/MinIO 'auto' default" */
@@ -420,6 +460,21 @@ describe("resolveWorkerConfig", () => {
       resolveWorkerConfig({ BLOCK_LOCAL_HTTP_CALLS: "yes" }).infrastructure.modelProvider
         .blockLocalHttpCalls,
     ).toBe(false);
+  });
+
+  /** @scenario "TS validator ignores IS_SAAS for SSRF blocking" */
+  it("leaves the egress fence unset when IS_SAAS is true and the toggle is unset", () => {
+    expect(
+      resolveWorkerConfig({ IS_SAAS: "true" }).infrastructure.modelProvider.blockLocalHttpCalls,
+    ).toBe(false);
+  });
+
+  /** @scenario "TS validator with explicit BLOCK_LOCAL_HTTP_CALLS overrides any IS_SAAS state" */
+  it("honors an explicit BLOCK_LOCAL_HTTP_CALLS regardless of IS_SAAS", () => {
+    expect(
+      resolveWorkerConfig({ IS_SAAS: "false", BLOCK_LOCAL_HTTP_CALLS: "true" }).infrastructure
+        .modelProvider.blockLocalHttpCalls,
+    ).toBe(true);
   });
 
   it("preserves empty S3 credentials as the default AWS credential chain", () => {

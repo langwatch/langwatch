@@ -16,6 +16,7 @@ function Wrapper({ children }: { children: ReactNode }) {
 describe("WorkflowResultsPanel", () => {
   afterEach(cleanup);
 
+  /** @scenario The results panel has no Optimizations tab */
   it("shows only the evaluations tab", () => {
     render(
       <WorkflowResultsPanel isCollapsed={false} onCollapse={vi.fn()}>

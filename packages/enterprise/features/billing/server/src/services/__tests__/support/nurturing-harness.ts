@@ -57,7 +57,10 @@ export function registerNurturingSink({ failing = false, hanging = false } = {})
     fetchFn,
     errorReporter,
     sent,
-    sentTo: (path: string) => sent().filter((call) => call.path === path).map((call) => call.body),
+    sentTo: (path: string) =>
+      sent()
+        .filter((call) => call.path === path)
+        .map((call) => call.body),
   };
 }
 

@@ -54,9 +54,9 @@ describe("Quick Search and the Agent Testing release flag", () => {
     describe("when a term reaches Quick Search", () => {
       /** @scenario "Quick Search offers Agent Testing while the flag is on" */
       it("offers Agent Testing and hides the Simulations entries it replaces", () => {
-        expect(
-          navigationIdsFor({ query: "agent testing", agentTestingEnabled: true }),
-        ).toContain("nav-agent-testing");
+        expect(navigationIdsFor({ query: "agent testing", agentTestingEnabled: true })).toContain(
+          "nav-agent-testing",
+        );
 
         const simulationIds = navigationIdsFor({
           query: "simulation",
@@ -72,9 +72,9 @@ describe("Quick Search and the Agent Testing release flag", () => {
     describe("when a term reaches Quick Search", () => {
       /** @scenario "Quick Search keeps the Simulations entries while the flag is off" */
       it("offers Simulations and hides Agent Testing", () => {
-        expect(
-          navigationIdsFor({ query: "simulations", agentTestingEnabled: false }),
-        ).toContain("nav-simulations");
+        expect(navigationIdsFor({ query: "simulations", agentTestingEnabled: false })).toContain(
+          "nav-simulations",
+        );
         expect(
           navigationIdsFor({ query: "agent testing", agentTestingEnabled: false }),
         ).not.toContain("nav-agent-testing");

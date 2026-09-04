@@ -24,6 +24,8 @@ function renderDrawer(onSelect = vi.fn()) {
 }
 
 describe("AgentTypeSelectorDrawer", () => {
+  /** @scenario "Agent types available" */
+  /** @scenario "AgentTypeSelectorDrawer shows two options" */
   it("renders the available agent types", () => {
     renderDrawer();
 

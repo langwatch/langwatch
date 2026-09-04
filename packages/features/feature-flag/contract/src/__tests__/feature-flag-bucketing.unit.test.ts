@@ -59,6 +59,7 @@ describe("bucketForSubject", () => {
 
 describe("isWithinRolloutPercentage", () => {
   describe("given the boundary percentages", () => {
+    /** @scenario "Zero admits nobody and one hundred admits everybody" */
     it("admits nobody at 0", () => {
       const admitted = subjects(1_000).filter((subject) =>
         isWithinRolloutPercentage({ flagKey: FLAG, subject, percentage: 0 }),
@@ -80,6 +81,7 @@ describe("isWithinRolloutPercentage", () => {
     // A system target is not a person, so a percentage rule has nobody to
     // bucket. It is refused at every percentage, 100 included, rather than
     // being admitted as bucket zero or as "everyone".
+    /** @scenario "A backend caller never satisfies a percentage rule" */
     it.each([1, 50, 99, 100])("refuses it at %i percent", (percentage) => {
       expect(isWithinRolloutPercentage({ flagKey: FLAG, subject: undefined, percentage })).toBe(
         false,
@@ -88,6 +90,7 @@ describe("isWithinRolloutPercentage", () => {
   });
 
   describe("when the percentage is raised", () => {
+    /** @scenario "A person's bucket does not move as the rollout widens" */
     it("never drops a subject that was already admitted", () => {
       const population = subjects(2_000);
       let previous = new Set<string>();
@@ -111,6 +114,7 @@ describe("isWithinRolloutPercentage", () => {
   });
 
   describe("when two flags share a percentage", () => {
+    /** @scenario "Two flags at the same percentage do not pick the same people" */
     it("does not select the same audience", () => {
       const population = subjects(2_000);
       const forFlag = new Set(
@@ -128,6 +132,7 @@ describe("isWithinRolloutPercentage", () => {
   });
 
   describe("given a whole population", () => {
+    /** @scenario "A rollout admits roughly the share it names" */
     it("admits roughly the requested share", () => {
       const population = subjects(5_000);
       const admitted = population.filter((subject) =>

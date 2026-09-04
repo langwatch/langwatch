@@ -87,6 +87,7 @@ function makeTraceSummary(overrides: Partial<TraceSummaryData> = {}): TraceSumma
 
 describe("ComputeRunMetricsCommand", () => {
   describe("when trace summary exists but has no metrics yet", () => {
+    /** @scenario "Pull-mode command schedules deferred retry for missing traces" */
     it("schedules a deferred retry instead of silently returning", async () => {
       const deps = makeDeps({
         traceSummaryStore: {
@@ -134,6 +135,7 @@ describe("ComputeRunMetricsCommand", () => {
   });
 
   describe("when trace summary exists with metrics", () => {
+    /** @scenario "Pull-mode command reads trace summary and emits event" */
     it("emits a metrics_computed event with totalCost from the summary and role costs derived from spans", async () => {
       const deps = makeDeps({
         traceSummaryStore: {
@@ -189,6 +191,32 @@ describe("ComputeRunMetricsCommand", () => {
         totalCost: 0,
         roleCosts: {},
         roleLatencies: { Agent: 4000 },
+      });
+    });
+  });
+
+  describe("when the trace summary has no role attributes at all (pre-role-attribution run)", () => {
+    /** @scenario "Old runs without role attributes still get total cost from trace" */
+    it("still emits totalCost from the trace summary with empty role maps", async () => {
+      const deps = makeDeps({
+        traceSummaryStore: {
+          get: vi.fn().mockResolvedValue(makeTraceSummary({ totalCost: 0.01 })),
+          store: vi.fn(),
+        },
+        deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
+          scenarioRoleCosts: {},
+          scenarioRoleLatencies: {},
+        }),
+      });
+
+      const handler = new ComputeRunMetricsCommand(deps);
+      const events = await handler.handle(makeCommand());
+
+      expect(events).toHaveLength(1);
+      expect(events[0]!.data).toMatchObject({
+        totalCost: 0.01,
+        roleCosts: {},
+        roleLatencies: {},
       });
     });
   });

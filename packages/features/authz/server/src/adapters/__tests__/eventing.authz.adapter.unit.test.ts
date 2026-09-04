@@ -99,6 +99,8 @@ describe("EventingAuthzAdapter", () => {
     expect([...pipeline.eventSubscribers.keys()]).toEqual(["auditTrail"]);
   });
 
+  /** @scenario "A grant's aggregate is the grant" */
+  /** @scenario "A role's aggregate is the role" */
   it.each([
     ["attach grant", new AttachGrantCommand(), { ...IDENTITY, grant: GRANT }, "grant_1"],
     [
@@ -164,6 +166,22 @@ describe("EventingAuthzAdapter", () => {
       });
     },
   );
+
+  /** @scenario "Two grants under one action never collide" */
+  it("gives two grants distinct idempotency keys even under one action", async () => {
+    const [first] = await emit(new AttachGrantCommand() as unknown as EventEmitter, {
+      ...IDENTITY,
+      commandId: "cmd_1:grant_1",
+      grant: GRANT,
+    });
+    const [second] = await emit(new AttachGrantCommand() as unknown as EventEmitter, {
+      ...IDENTITY,
+      commandId: "cmd_1:grant_2",
+      grant: { ...GRANT, grantId: "grant_2" },
+    });
+
+    expect(first?.idempotencyKey).not.toBe(second?.idempotencyKey);
+  });
 
   it("uses the portable command schema, including the tenant identity invariant", () => {
     const valid = AttachGrantCommand.schema.validate({

@@ -133,6 +133,7 @@ describe("<ScenarioRunExportDialog/> and its trigger", () => {
      * against the real one in RunHistoryEmptyState. This covers the other half:
      * the bar honours the flag instead of rendering an enabled button anyway.
      */
+    /** @scenario "Export is unavailable when no runs match" */
     it("renders the button disabled", () => {
       render(<ExportSurface runCount={0} />, { wrapper: Wrapper });
 

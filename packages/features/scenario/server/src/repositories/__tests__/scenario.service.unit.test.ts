@@ -1,31 +1,18 @@
 import {
-  ScenarioTestSuiteNotFoundError,
   ScenarioNotFoundError,
   type Scenario,
-  type ScenarioCreateInput,
   type ScenarioTestSuite,
-  type ScenarioTestSuiteCreateInput,
   type ScenarioTestSuiteIdInput,
-  type ScenarioTestSuiteRenameInput,
-  type ScenarioTestSuiteRunDefinition,
-  type ScenarioTestSuiteUpdateInput,
-  type ScenarioReferenceState,
-  type ScenarioRunConfig,
-  type ScenarioUpdateInput,
   type ScenarioActor,
-  type ScenarioVersionDetail,
-  type ScenarioVersionInput,
-  type ScenarioVersionListInput,
-  type ScenarioVersionRestoreInput,
-  type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
 import { SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
-import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository";
+import { ScenarioRepository } from "../scenario.repository";
 import { ScenarioService } from "../../services/scenario.service";
 import { ScenarioClockPort } from "../../ports/scenario-clock.port";
 import { ScenarioTestSuiteIdPort, ScenarioIdPort } from "../../ports/scenario-id.port";
 import { ScenarioSecretCipherPort } from "../../ports/scenario-secret-cipher.port";
+import { MemoryScenarioRepository } from "./fixtures/memory-scenario.repository";
 
 const simulations = Object.create(SimulationService.prototype) as SimulationService;
 
@@ -80,281 +67,6 @@ function serviceOptions(
     clock,
     secretCipher: new TestScenarioSecretCipher(),
   };
-}
-
-class MemoryScenarioRepository extends ScenarioRepository {
-  readonly rows = new Map<string, Scenario>();
-  readonly testSuites = new Map<string, ScenarioTestSuite>();
-
-  async create(
-    input: ScenarioCreateInput & { id: string; actor: ScenarioActor },
-  ): Promise<Scenario> {
-    const { actor: _, ...scenarioInput } = input;
-    const row: Scenario = {
-      ...scenarioInput,
-      parameters: scenarioInput.parameters ?? null,
-      simulatorModel: scenarioInput.simulatorModel ?? null,
-      judgeModel: scenarioInput.judgeModel ?? null,
-      maxTurns: scenarioInput.maxTurns ?? null,
-      minTurns: scenarioInput.minTurns ?? null,
-      testSuiteId: scenarioInput.testSuiteId ?? null,
-      version: 1,
-      lastUpdatedById: scenarioInput.lastUpdatedById ?? null,
-      archivedAt: null,
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    };
-    this.rows.set(row.id, row);
-    return row;
-  }
-
-  tryFindById(input: { id: string; projectId: string }): Promise<Scenario | null> {
-    const row = this.rows.get(input.id);
-    return Promise.resolve(
-      row?.projectId === input.projectId && row.archivedAt === null ? row : null,
-    );
-  }
-
-  async findById(input: { id: string; projectId: string }): Promise<Scenario> {
-    const row = this.rows.get(input.id);
-    if (row?.projectId !== input.projectId || row.archivedAt !== null) {
-      throw new ScenarioNotFoundError(input.id);
-    }
-
-    return row;
-  }
-
-  async findByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Scenario> {
-    const row = this.rows.get(input.id);
-    if (row?.projectId !== input.projectId) {
-      throw new ScenarioNotFoundError(input.id);
-    }
-
-    return row;
-  }
-
-  tryFindByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Scenario | null> {
-    const row = this.rows.get(input.id);
-    return Promise.resolve(row?.projectId === input.projectId ? row : null);
-  }
-
-  findAll(input: { projectId: string }): Promise<Scenario[]> {
-    return Promise.resolve(
-      [...this.rows.values()].filter(
-        (row) => row.projectId === input.projectId && row.archivedAt === null,
-      ),
-    );
-  }
-
-  async count(input: { projectId: string }): Promise<number> {
-    return (await this.findAll(input)).length;
-  }
-
-  async update(input: ScenarioUpdateInput & { actor: ScenarioActor }): Promise<Scenario> {
-    const existing = await this.tryFindByIdIncludingArchived(input);
-    if (!existing) throw new ScenarioNotFoundError(input.id);
-    const {
-      actor: _,
-      changeDescription: __,
-      expectedVersion: ___,
-      id: ____,
-      projectId: _____,
-      ...data
-    } = input;
-    const row = { ...existing, ...data, updatedAt: new Date(1) };
-    this.rows.set(row.id, row);
-    return row;
-  }
-
-  findVersions(
-    _input: ScenarioVersionListInput & { take: number },
-  ): Promise<ScenarioVersionSummary[]> {
-    throw new Error("Version history is not exercised by this repository double");
-  }
-
-  findVersion(_input: ScenarioVersionInput): Promise<ScenarioVersionDetail> {
-    throw new Error("Version history is not exercised by this repository double");
-  }
-
-  restoreVersion(_input: ScenarioVersionRestoreInput): Promise<Scenario> {
-    throw new Error("Version history is not exercised by this repository double");
-  }
-
-  async tryArchive(input: {
-    id: string;
-    projectId: string;
-    archivedAt: Date;
-  }): Promise<Scenario | null> {
-    const existing = await this.tryFindByIdIncludingArchived(input);
-    if (!existing) return null;
-    const row = { ...existing, archivedAt: existing.archivedAt ?? input.archivedAt };
-    this.rows.set(row.id, row);
-    return row;
-  }
-
-  async archiveMany(input: {
-    ids: string[];
-    projectId: string;
-    archivedAt: Date;
-  }): Promise<{ archived: string[]; missing: string[] }> {
-    const archived: string[] = [];
-    const missing: string[] = [];
-    for (const id of input.ids) {
-      const row = await this.tryArchive({
-        id,
-        projectId: input.projectId,
-        archivedAt: input.archivedAt,
-      });
-      if (row) archived.push(id);
-      else missing.push(id);
-    }
-    return { archived, missing };
-  }
-
-  async findRunConfigs(input: { ids: string[]; projectId: string }): Promise<ScenarioRunConfig[]> {
-    return [...this.rows.values()]
-      .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
-      .map(({ id, name, version, situation, criteria, parameters }) => ({
-        id,
-        name,
-        version,
-        situation,
-        criteria,
-        parameters,
-      }));
-  }
-
-  async findReferenceStates(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<ScenarioReferenceState[]> {
-    return [...this.rows.values()]
-      .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
-      .map(({ id, archivedAt }) => ({ id, archivedAt }));
-  }
-
-  async findNamesByIds(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<{ id: string; name: string }[]> {
-    return [...this.rows.values()]
-      .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
-      .map(({ id, name }) => ({ id, name }));
-  }
-
-  async findModelChoices(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<{ id: string; simulatorModel: string | null; judgeModel: string | null }[]> {
-    return [...this.rows.values()]
-      .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
-      .map(({ id, simulatorModel, judgeModel }) => ({ id, simulatorModel, judgeModel }));
-  }
-
-  async findIdsByLabelsOrTestSuites(input: {
-    projectId: string;
-    labels?: string[];
-    testSuiteIds?: string[];
-  }): Promise<string[]> {
-    const labels = input.labels ?? [];
-    const testSuiteIds = input.testSuiteIds ?? [];
-    return [...this.rows.values()]
-      .filter(
-        (row) =>
-          row.projectId === input.projectId &&
-          (row.labels.some((label) => labels.includes(label)) ||
-            (row.testSuiteId !== null && testSuiteIds.includes(row.testSuiteId))),
-      )
-      .map((row) => row.id);
-  }
-
-  async findTitlesByIds(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<{ id: string; name: string; labels: string[] }[]> {
-    return [...this.rows.values()]
-      .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
-      .map(({ id, name, labels }) => ({ id, name, labels }));
-  }
-
-  async findPlans(): Promise<ScenarioPlanRecord[]> {
-    return [];
-  }
-
-  async createTestSuite(
-    input: ScenarioTestSuiteCreateInput & { id: string },
-  ): Promise<ScenarioTestSuite> {
-    const testSuite: ScenarioTestSuite = {
-      id: input.id,
-      projectId: input.projectId,
-      name: input.name,
-      slug: input.name.toLowerCase(),
-      description: null,
-      scenarioIds: [],
-      targets: [],
-      repeatCount: 1,
-      labels: [],
-      simulatorModel: null,
-      judgeModel: null,
-      kind: "test_suite",
-      scope: null,
-      archivedAt: null,
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-    };
-    this.testSuites.set(testSuite.id, testSuite);
-    return testSuite;
-  }
-
-  findTestSuites(input: { projectId: string }): Promise<ScenarioTestSuite[]> {
-    return Promise.resolve(
-      [...this.testSuites.values()].filter(
-        (testSuite) => testSuite.projectId === input.projectId && testSuite.archivedAt === null,
-      ),
-    );
-  }
-
-  tryFindTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
-    const testSuite = this.testSuites.get(input.testSuiteId);
-    return Promise.resolve(
-      testSuite?.projectId === input.projectId && testSuite.archivedAt === null ? testSuite : null,
-    );
-  }
-
-  async renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite> {
-    return this.updateTestSuite(input);
-  }
-
-  async updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
-    const testSuite = await this.tryFindTestSuite(input);
-    if (!testSuite) throw new ScenarioTestSuiteNotFoundError();
-
-    const { testSuiteId: _, projectId: __, ...changes } = input;
-    const updated = { ...testSuite, ...changes, updatedAt: new Date(1) };
-    this.testSuites.set(updated.id, updated);
-    return updated;
-  }
-
-  async getTestSuiteRunDefinition(
-    input: ScenarioTestSuiteIdInput,
-  ): Promise<ScenarioTestSuiteRunDefinition> {
-    const testSuite = await this.tryFindTestSuite(input);
-    if (!testSuite) throw new ScenarioTestSuiteNotFoundError();
-
-    return { testSuite, scenarioIds: testSuite.scenarioIds };
-  }
-
-  async archiveTestSuite(
-    input: ScenarioTestSuiteIdInput & { archivedAt: Date },
-  ): Promise<ScenarioTestSuite> {
-    const testSuite = this.testSuites.get(input.testSuiteId);
-    if (!testSuite || testSuite.projectId !== input.projectId)
-      throw new ScenarioTestSuiteNotFoundError();
-
-    const archived = { ...testSuite, archivedAt: testSuite.archivedAt ?? input.archivedAt };
-    this.testSuites.set(archived.id, archived);
-    return archived;
-  }
 }
 
 describe("ScenarioService", () => {
@@ -535,6 +247,52 @@ describe("ScenarioService", () => {
     ]);
   });
 
+  describe("given a deployment with no stored-secret encryption key", () => {
+    class RefusingScenarioSecretCipher extends ScenarioSecretCipherPort {
+      encrypt(): string {
+        throw Object.assign(
+          new Error(
+            "This deployment cannot store or read scenario secrets, because it has no encryption key configured.",
+          ),
+          { code: "service_unavailable" },
+        );
+      }
+
+      decrypt(): string {
+        throw Object.assign(new Error("no encryption key configured"), {
+          code: "service_unavailable",
+        });
+      }
+    }
+
+    /** @scenario "Writing a scenario secret refuses by name" */
+    it("refuses saving a stored secret, naming the missing encryption key", async () => {
+      const service = ScenarioService.create({
+        ...serviceOptions(new MemoryScenarioRepository(), "scenario_1"),
+        secretCipher: new RefusingScenarioSecretCipher(),
+      });
+
+      await expect(
+        service.resolveRunParametersForScenarios({
+          scenarios: [
+            {
+              id: "scenario_1",
+              name: "Refund flow",
+              version: 1,
+              situation: "A customer asks for help",
+              criteria: [],
+              parameters: [{ name: "api_token", secret: true }],
+            },
+          ],
+          values: { api_token: "token-live" },
+        }),
+      ).rejects.toMatchObject({
+        code: "service_unavailable",
+        message: expect.stringContaining("encryption key"),
+      });
+    });
+  });
+
   it("rejects an unknown suite parameter before returning schedulable values", async () => {
     const service = ScenarioService.create(
       serviceOptions(new MemoryScenarioRepository(), "scenario_1"),
@@ -603,5 +361,59 @@ describe("ScenarioService", () => {
       ],
     });
     await expect(firstService.list({ projectId: "project-a" })).resolves.toEqual([]);
+  });
+
+  describe("createTestSuite()", () => {
+    describe("when the name is only spaces", () => {
+      /** @scenario "A test suite created with a blank name is rejected with validation_error" */
+      it("rejects the input before it reaches the repository", async () => {
+        const repository = new MemoryScenarioRepository();
+        const service = ScenarioService.create(serviceOptions(repository, "test_suite_1"));
+
+        expect(() => service.createTestSuite({ projectId: "project-a", name: "   " })).toThrow();
+        expect(await service.listTestSuites({ projectId: "project-a" })).toEqual([]);
+      });
+    });
+  });
+
+  describe("moveToTestSuite()", () => {
+    describe("given a scenario already filed in one test suite", () => {
+      /** @scenario "A scenario belongs to exactly one test suite" */
+      it("holds only the destination test suite id, replacing the one it left", async () => {
+        const repository = new MemoryScenarioRepository();
+        // Each test suite is created through its own service instance so its
+        // fixed id generator (see `serviceOptions`) mints a distinct id; the
+        // repository underneath is shared, so every instance reads and
+        // writes the same rows.
+        const refunds = await ScenarioService.create(
+          serviceOptions(repository, "test_suite_refunds"),
+        ).createTestSuite({ projectId: "project-a", name: "Refunds" });
+        const checkout = await ScenarioService.create(
+          serviceOptions(repository, "test_suite_checkout"),
+        ).createTestSuite({ projectId: "project-a", name: "Checkout" });
+        const service = ScenarioService.create(serviceOptions(repository, "scenario_1"));
+        const scenario = await service.create({
+          projectId: "project-a",
+          name: "Refund flow",
+          situation: "A customer asks for a refund",
+          criteria: [],
+          labels: [],
+          testSuiteId: refunds.id,
+        });
+        expect(scenario.testSuiteId).toBe(refunds.id);
+
+        const moved = await service.moveToTestSuite({
+          projectId: "project-a",
+          scenarioId: scenario.id,
+          testSuiteId: checkout.id,
+        });
+
+        // One column holds the membership, so a scenario can never answer to
+        // two test suites at once: naming a new one replaces the old one,
+        // never adds to it.
+        expect(moved.testSuiteId).toBe(checkout.id);
+        expect(moved.testSuiteId).not.toBe(refunds.id);
+      });
+    });
   });
 });

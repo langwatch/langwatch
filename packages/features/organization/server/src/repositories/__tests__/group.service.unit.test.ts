@@ -349,4 +349,48 @@ describe("OrganizationService groups", () => {
       expect(groupRepository.addMember).not.toHaveBeenCalled();
     });
   });
+
+  describe("when an edit both revokes a group binding and removes a member", () => {
+    /** @scenario "Revoking an orphaned group binding runs before the membership edit commits" */
+    it("revokes the group's bindings before applying the membership edit", async () => {
+      const { service, groupRepository, authz, grants } = buildService();
+      (authz.listGroupBindings as ReturnType<typeof vi.fn>).mockResolvedValue([
+        {
+          id: "binding_1",
+          groupId: "group_1",
+          role: "MEMBER",
+          customRoleId: null,
+          customRole: null,
+          scopeType: "TEAM",
+          scopeId: "team_1",
+        },
+      ]);
+      const order: string[] = [];
+      (grants.revokeBindings as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        order.push("revoke");
+      });
+      (groupRepository.applyEdits as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+        order.push("applyEdits");
+      });
+
+      await service.applyGroupEdits({
+        organizationId: "org_1",
+        groupId: "group_1",
+        rename: null,
+        bindingIdsToDelete: ["binding_1"],
+        bindingsToCreate: [],
+        memberUserIdsToAdd: [],
+        memberUserIdsToRemove: ["user_removed"],
+        actor: { type: "user", id: "actor_1" },
+      });
+
+      expect(grants.revokeBindings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_1",
+          bindingIds: ["binding_1"],
+        }),
+      );
+      expect(order).toEqual(["revoke", "applyEdits"]);
+    });
+  });
 });

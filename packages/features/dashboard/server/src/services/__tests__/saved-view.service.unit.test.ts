@@ -77,6 +77,17 @@ describe("SavedViewService.getAll", () => {
 
       expect(calls.some((call) => call.method === "createMany")).toBe(true);
     });
+
+    /** @scenario First-visit projects auto-seed and show All Traces plus 4 seed views */
+    it("seeds exactly the 5 origin views, in order", async () => {
+      const { service, calls } = serviceWith({ count: 0, existing: [] });
+
+      await service.getAll({ projectId: "project-1" });
+
+      const created = calls.find((call) => call.method === "createMany");
+      const names = (created?.views as Array<{ name: string }> | undefined)?.map((v) => v.name);
+      expect(names).toEqual(["Application", "Evaluations", "Simulations", "Playground", "Gateway"]);
+    });
   });
 
   describe("given a project that already has views", () => {

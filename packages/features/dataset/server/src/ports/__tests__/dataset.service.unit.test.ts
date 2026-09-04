@@ -179,6 +179,41 @@ describe("DatasetService", () => {
     ).rejects.toThrow("Dataset is not ready");
   });
 
+  /** @scenario "Dataset access is isolated to its own project" */
+  it("refuses to read or write a dataset from another project", async () => {
+    const repository = new MemoryDatasetRepository();
+    repository.dataset = makeDataset({ projectId: "project_1" });
+    const service = DatasetService.create({
+      repository,
+      records: new MemoryRecordRepository(),
+    });
+
+    await expect(
+      service.listRecords({ slugOrId: "dataset_1", projectId: "project_2" }),
+    ).rejects.toThrow();
+    await expect(
+      service.createRecords({
+        slugOrId: "dataset_1",
+        projectId: "project_2",
+        entries: [{ question: "hello" }],
+      }),
+    ).rejects.toThrow();
+  });
+
+  /** @scenario "A dataset still being prepared is not used as data" */
+  it("refuses to list records from a dataset that is still processing", async () => {
+    const repository = new MemoryDatasetRepository();
+    repository.dataset = makeDataset({ status: "processing" });
+    const service = DatasetService.create({
+      repository,
+      records: new MemoryRecordRepository(),
+    });
+
+    await expect(
+      service.listRecords({ slugOrId: "dataset_1", projectId: "project_1" }),
+    ).rejects.toThrow("Dataset is not ready");
+  });
+
   it("routes object-backed reads and mutations through the content port", async () => {
     const repository = new MemoryDatasetRepository();
     repository.dataset = makeDataset({

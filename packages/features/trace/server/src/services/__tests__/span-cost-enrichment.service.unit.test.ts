@@ -415,6 +415,39 @@ describe("OtlpSpanCostEnrichmentService", () => {
     });
   });
 
+  describe("given an organization-level custom cost", () => {
+    describe("when a span for a project under that organization is enriched", () => {
+      /** @scenario An organization-level custom cost prices spans at ingestion */
+      it("prices the span from the org-scoped rule the catalog port returned", async () => {
+        const { port } = catalog([
+          cost({
+            model: "bedrock/eu.anthropic.claude-sonnet-4-6",
+            regex: "^bedrock\\/eu\\.anthropic\\.claude-sonnet-4-6$",
+            scopeType: "ORGANIZATION",
+            scopeId: "org-1",
+            projectId: null,
+            inputCostPerToken: 0.000003,
+            outputCostPerToken: 0.000015,
+          }),
+        ]);
+        const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
+        const target = span([
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "bedrock/eu.anthropic.claude-sonnet-4-6" },
+          },
+        ]);
+
+        await service.enrichSpan({ span: target, tenantId: "project-1" });
+
+        expect(rates(target)).toEqual({
+          "langwatch.model.inputCostPerToken": 0.000003,
+          "langwatch.model.outputCostPerToken": 0.000015,
+        });
+      });
+    });
+  });
+
   describe("given a project with no matching rule", () => {
     describe("when enrichment runs", () => {
       /** @scenario "An unmatched model is left unpriced" */

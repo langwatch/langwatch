@@ -266,6 +266,10 @@ describe("PostgresDatasetMigrationAdapter", () => {
     expect(subject.update).not.toHaveBeenCalled();
   });
 
+  /**
+   * @scenario "The storage migration is safe to run more than once"
+   * @scenario "A legacy single-blob dataset is left readable, not emptied"
+   */
   it("skips migrated and legacy single-blob datasets before storage access", async () => {
     for (const current of [
       { contentLayout: "s3_jsonl", useS3: false },

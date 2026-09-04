@@ -450,7 +450,11 @@ export class DatasetService extends DatasetServiceContract {
     });
     this.assertReady(dataset);
     const columns = dataset.columnTypes.map((column) => column.name);
-    DatasetService.assertKnownColumns({ datasetName: dataset.name, columns, entries: parsed.entries });
+    DatasetService.assertKnownColumns({
+      datasetName: dataset.name,
+      columns,
+      entries: parsed.entries,
+    });
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.batchCreateRecords({ dataset, input: parsed });
     }

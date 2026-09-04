@@ -49,6 +49,19 @@ function row(overrides: Partial<WebhookSpendEventRow> = {}): WebhookSpendEventRo
 }
 
 describe("WebhookEnvelopeService.fromSpendRow", () => {
+  describe("given a spend record carrying a provider key", () => {
+    /** @scenario The envelope renames the provider column to the contract field */
+    it("maps providerKey to model_provider_id and the request id to the envelope id", () => {
+      const envelope = WebhookEnvelopeService.fromSpendRow(row());
+      expect(envelope.id).toBe("01K1REQUESTULID:completed");
+      expect(envelope.type).toBe("gateway.request.completed");
+      expect(envelope.data.gateway_request_id).toBe("01K1REQUESTULID");
+      expect(envelope.data.model_provider_id).toBe("provider_row_id_1");
+      expect(envelope.data).not.toHaveProperty("provider_key");
+      expect(envelope.data).not.toHaveProperty("ProviderKey");
+    });
+  });
+
   describe("given a settled row", () => {
     /** @scenario A settled request is its own event type with unknown cost */
     it("maps to gateway.request.settled with null cost and usage", () => {

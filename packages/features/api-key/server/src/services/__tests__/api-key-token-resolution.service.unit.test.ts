@@ -377,5 +377,46 @@ describe("ApiKeyTokenResolutionService", () => {
         );
       });
     });
+
+    /**
+     * A stateful fake, rather than the fixed-answer one above: rotation must
+     * be observed to actually swap which token resolves, not merely that a
+     * new string came back.
+     */
+    describe("given a rotation against a repository that actually swaps the stored token", () => {
+      /** @scenario "Rotation invalidates the previous base key" */
+      it("makes the old token resolve to nothing and the new one resolve to the project", async () => {
+        const projectId = "project-1";
+        let storedToken: string | null = LEGACY_TOKEN;
+
+        const service = ApiKeyTokenResolutionService.create({
+          repository: {
+            tryFindLegacyProjectId: async ({ token }: { token: string }) =>
+              token === storedToken ? projectId : null,
+            rotateLegacyProjectKey: async (input: { projectId: string; token: string }) => {
+              if (input.projectId !== projectId) return null;
+              storedToken = input.token;
+              return true;
+            },
+          },
+          tokens: { generateLegacyProjectKey: () => "sk-lw-rotated-project-key" },
+          projects: { tryGetIdentity: async () => project() },
+        } as never);
+
+        await expect(service.tryResolveToken({ token: LEGACY_TOKEN })).resolves.toMatchObject({
+          type: "legacyProjectKey",
+          project: { id: projectId },
+        });
+
+        const newToken = await service.regenerateLegacyProjectKey({ projectId });
+        expect(newToken).toBe("sk-lw-rotated-project-key");
+
+        await expect(service.tryResolveToken({ token: LEGACY_TOKEN })).resolves.toBeNull();
+        await expect(service.tryResolveToken({ token: newToken })).resolves.toMatchObject({
+          type: "legacyProjectKey",
+          project: { id: projectId },
+        });
+      });
+    });
   });
 });

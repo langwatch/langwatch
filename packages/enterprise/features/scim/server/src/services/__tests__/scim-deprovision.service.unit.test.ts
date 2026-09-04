@@ -19,7 +19,10 @@ const CONNECTION_ID = "connection_okta";
 const USER_ID = "user_sam";
 
 describe("ScimDeprovisionService", () => {
-  /** @scenario "The proof runs on every path a directory can remove somebody by" */
+  /**
+   * @scenario "The proof runs on every path a directory can remove somebody by"
+   * @scenario "Deprovisioning leaves no effective permission anywhere"
+   */
   it("uses authz's transactional proof for directory removals", async () => {
     const grants = new GrantsFake();
     const lifecycle = new LifecycleFake();
@@ -32,10 +35,39 @@ describe("ScimDeprovisionService", () => {
       op: "delete_user",
     });
 
+    // `offboard` is the transactional proof: it removes bindings, group
+    // memberships and the organization membership itself in the same
+    // commit a later permission check reads.
     expect(grants.offboard).toHaveBeenCalledWith({
       actor: { type: "system", name: "scim" },
       userId: USER_ID,
       organizationId: ORGANIZATION_ID,
+    });
+  });
+
+  describe("given a person with access through a group and a direct role binding", () => {
+    describe("when the directory pushes them as inactive", () => {
+      /** @scenario "Marking somebody inactive is a deprovision, not a flag" */
+      it("removes access through the same proof a deletion carries", async () => {
+        const grants = new GrantsFake();
+        const lifecycle = new LifecycleFake();
+        const service = ScimDeprovisionService.create({ grants, lifecycle });
+
+        await service.removeAccess({
+          userId: USER_ID,
+          organizationId: ORGANIZATION_ID,
+          connectionId: CONNECTION_ID,
+          op: "deactivate_user",
+        });
+
+        // Same call, same proof, whichever op named it — no grant of
+        // theirs is left standing behind a deactivated flag.
+        expect(grants.offboard).toHaveBeenCalledWith({
+          actor: { type: "system", name: "scim" },
+          userId: USER_ID,
+          organizationId: ORGANIZATION_ID,
+        });
+      });
     });
   });
 

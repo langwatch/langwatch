@@ -20,6 +20,7 @@ const tableOf = (routes: Record<string, string>) => ({
 describe("parseRoutingTable", () => {
   describe("given well-formed entries", () => {
     describe("when the table is parsed", () => {
+      /** @scenario Parse private ClickHouse URL from env var */
       it("keys the route by the organisation id, ignoring the human label", () => {
         const table = parseRoutingTable({
           CLICKHOUSE_URL__acme__org_1: "http://acme:8123",
@@ -36,6 +37,29 @@ describe("parseRoutingTable", () => {
         });
 
         expect(table.routes.get("org_1")).toBe("http://acme:8123");
+      });
+
+      /** @scenario Multiple private ClickHouse env vars are parsed */
+      it("parses every well-formed entry into its own route", () => {
+        const table = parseRoutingTable({
+          CLICKHOUSE_URL__acme__org_1: "http://acme:8123",
+          CLICKHOUSE_URL__globex__org_2: "http://globex:8123",
+        });
+
+        expect(table.routes.get("org_1")).toBe("http://acme:8123");
+        expect(table.routes.get("org_2")).toBe("http://globex:8123");
+        expect(table.routes.size).toBe(2);
+      });
+    });
+  });
+
+  describe("given no private ClickHouse env vars", () => {
+    describe("when the table is parsed", () => {
+      /** @scenario No private ClickHouse env vars results in empty map */
+      it("returns an empty routing table", () => {
+        const table = parseRoutingTable({ UNRELATED: "x" });
+
+        expect(table.routes.size).toBe(0);
       });
     });
   });
@@ -127,6 +151,8 @@ describe("createTenantRouter", () => {
 
   describe("given a tenant in an organisation with no private instance", () => {
     describe("when it is routed", () => {
+      /** @scenario Org without private ClickHouse gets the shared client */
+      /** @scenario "Project in a standard org routes to the shared instance" */
       it("routes to the shared instance", async () => {
         const router = createTenantRouter({
           table: tableOf({}),
@@ -142,6 +168,8 @@ describe("createTenantRouter", () => {
 
   describe("given a tenant in an organisation with a private instance", () => {
     describe("when it is routed", () => {
+      /** @scenario Org with private ClickHouse gets a dedicated client */
+      /** @scenario "Project in a private-CH org routes to the private instance" */
       it("routes to that instance", async () => {
         const router = createTenantRouter({
           table: tableOf({ org_1: "http://acme:8123" }),
@@ -157,8 +185,43 @@ describe("createTenantRouter", () => {
     });
   });
 
+  describe("given an organisation reading its own tenant identity", () => {
+    describe("when it is routed", () => {
+      /** @scenario "An organization is a tenant in its own right" */
+      it("routes on itself, with no project in between", async () => {
+        const router = createTenantRouter({
+          table: tableOf({ org_1: "http://acme:8123" }),
+          directory: directoryOf({ org_1: "org_1" }),
+        });
+
+        await expect(router.route("org_1")).resolves.toEqual({
+          kind: "private",
+          organizationId: "org_1",
+          url: "http://acme:8123",
+        });
+      });
+    });
+  });
+
+  describe("given a user reading their own tenant identity", () => {
+    describe("when it is routed", () => {
+      /** @scenario "A user is a tenant in its own right" */
+      it("routes through the organisation the directory answers for that user", async () => {
+        const router = createTenantRouter({
+          table: tableOf({}),
+          directory: directoryOf({ user_1: "org_1" }),
+        });
+
+        await expect(router.route("user_1")).resolves.toEqual({
+          kind: "shared",
+        });
+      });
+    });
+  });
+
   describe("given a tenant the directory does not know", () => {
     describe("when it is routed", () => {
+      /** @scenario "A tenant that names no project, organization or user is refused" */
       it("fails closed rather than falling back to shared", async () => {
         // Falling back would run the statement against the shared instance,
         // which succeeds and returns plausible rows belonging to someone else.
@@ -172,6 +235,7 @@ describe("createTenantRouter", () => {
     });
 
     describe("when the tenant id is empty", () => {
+      /** @scenario "A tenant that names no project, organization or user is refused" */
       it("fails closed without asking the directory", async () => {
         const directory = { organizationForTenant: vi.fn() };
         const router = createTenantRouter({ table: tableOf({}), directory });

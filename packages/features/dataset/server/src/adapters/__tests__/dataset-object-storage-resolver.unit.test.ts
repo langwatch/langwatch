@@ -56,7 +56,9 @@ describe("DatasetObjectStorageResolver", () => {
     it("selects the S3 adapter", async () => {
       const { resolver } = resolverFor({ kind: "s3" });
 
-      await expect(resolver.forProject("project-1")).resolves.toBeInstanceOf(S3DatasetStorageAdapter);
+      await expect(resolver.forProject("project-1")).resolves.toBeInstanceOf(
+        S3DatasetStorageAdapter,
+      );
     });
   });
 
