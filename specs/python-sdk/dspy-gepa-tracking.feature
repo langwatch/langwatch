@@ -40,7 +40,7 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
   Scenario: compile installs the GEPA callback and keeps the ones the caller passed
     Given a tracked GEPA created with gepa_kwargs={"callbacks": [my_callback]}
     When compile runs
-    Then gepa.optimize receives my_callback followed by the LangWatch callback
+    Then the callbacks GEPA runs are my_callback followed by the LangWatch callback
     And after compile the optimizer's gepa_kwargs are the ones the caller passed
 
   @unit
@@ -61,7 +61,7 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
   @unit
   Scenario: The seed program's step takes its examples from the metric buffer
     Given GEPA evaluates the seed program on the validation set without reporting outputs
-    When on_valset_evaluated fires for iteration 0
+    When GEPA reports that evaluation
     Then the step's examples are the ones the tracked metric buffered during that evaluation
 
   @unit
