@@ -51,7 +51,7 @@ export interface IssuedIngestionKey {
  * cloud machines, and the forks of a golden image that share their parent's
  * key rather than minting their own.
  */
-export const PERSONAL_INGEST_KEYS_PER_TOOL_CAP = 10;
+export const PERSONAL_INGEST_KEYS_PER_TOOL_CAP = 32;
 
 const logger = createLogger("langwatch:governance:ingestion-key");
 
