@@ -29,41 +29,17 @@ The command prints the batch id, and the run header in LangWatch shows the pass 
 
 ## Step 2: Get a hypothesis for improving the agent
 
-Ask Langy, or your coding agent, to read the run and come back with the cause and a change:
-
-<Tabs>
-  <Tab title="Langy">
-```text
-Reduce the number of turns of returns-agent on the Returns suite without failing any scenario.
-Read the last run, start from the longest conversations, tell me what causes the extra turns
-and the extra model calls, and open a pull request with one change for me to evaluate.
-```
-
-Langy reads the run and the traces with the `langwatch` CLI, explains the cause and opens a pull request with the change to the prompt, the tool description or the code. The suite runs in your CI on that pull request, and the result comes back on the pull request card in the chat.
-  </Tab>
-  <Tab title="Your coding agent">
-```text
-Use the langwatch CLI to read the last run of the "Returns" test suite:
-`langwatch simulation-run list -f json` lists the runs with their batch id, and
-`langwatch simulation-run get <run id> -f json --full` returns one conversation with its
-messages, the judge's verdict per criterion, the reasoning, and the cost.
-Start from the conversations with the most replies and the most tool calls, work out the main
-cause of the extra turns, tell me the hypothesis with the evidence, and make one change in the
-prompt, the tool descriptions or the code for me to evaluate. Change nothing else.
-```
-
-With the `agent-improve` skill installed, `/agent-improve` does the same with ranked hypotheses that it explains before it changes anything:
-
-```bash
-npx skills add langwatch/skills/agent-improve
-npx skills add langwatch/skills/scenarios
-```
+Paste this into Langy or into your coding agent:
 
 ```text
-/agent-improve The returns-agent takes eight to ten turns on the Returns suite. Find the cause in the last run and reduce the turns without failing a scenario.
+Reduce the number of turns my agent takes without failing any scenario.
+Use the langwatch CLI to read the last run of the test suite I ran last; ask me which one if it is
+not clear from our conversation. Start from the longest conversations, tell me what causes the
+extra turns and the extra model calls, and make one change in the prompt, the tool descriptions
+or the code for me to evaluate. Change nothing else.
 ```
-  </Tab>
-</Tabs>
+
+Langy answers with a pull request, and the suite runs in your CI on it; your coding agent answers with the change in your working tree. Both come with the cause and the conversations it was found in, so you review the reasoning and the diff together.
 
 The hypothesis usually lands on one of a few causes, and it helps to recognise them when you read the proposal:
 
@@ -84,7 +60,7 @@ langwatch test-suite run "Returns" \
   --wait
 ```
 
-The run detail shows one column per target with its pass rate, total duration and cost, and four charts above them: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. Keep the change when the pass rate holds or rises and the model calls per conversation went down. When a criterion fails on the changed side, the judge's reasoning says which turn the agent skipped, and that goes back to your agent as the next prompt.
+The run detail shows one column per target with its pass rate, total duration and cost, and four charts above them: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. Keep the change when the pass rate holds or rises and the model calls per conversation went down. When a criterion fails on the changed side, read the judge's reasoning for the turn your agent skipped, and hand that back as the next prompt.
 
 Be careful with the cost and the latency charts on a single pass: over six scenarios run once, both move more between two runs of the same agent than a removed retry moves them, so read those two from a run with `--repeat 3`.
 
@@ -92,7 +68,7 @@ Be careful with the cost and the latency charts on a single pass: over six scena
 <img className="block" src="/images/improve-your-agent/comparison-run-detail.png" alt="A comparison run of the returns agent in production against development: the four charts, one column per target with its pass rate, duration and cost, and one row per scenario" />
 </Frame>
 
-To pin the gain, add a criterion that counts, such as `The agent completes the return within four replies`. The judge counts the replies in the conversation and fails the scenario when your agent takes more.
+To lock the gain in, add a criterion that counts the replies, such as `The agent completes the return within four replies`. The judge counts the replies in the conversation and fails the scenario when your agent takes more.
 
 ## Step 4: Keep it in CI
 
@@ -106,7 +82,7 @@ The command exits 1 when a scenario fails. `--wait` gives up after ten minutes, 
 
 ## Common failures
 
-- **The pass rate dropped.** Revert the change and hand the judge's reasoning of the failed criterion to your agent: it points at the turn where the agent stopped doing something it did before, such as confirming the refund method before it created the return.
+- **The pass rate dropped.** Revert the change and hand the judge's reasoning of the failed criterion to Langy or your coding agent: the reasoning quotes the turn where your agent stopped doing something it did before, such as confirming the refund method before it created the return.
 - **The turns did not move.** The cause is in a tool rather than in the prompt: the agent keeps retrying because the tool still rejects the input, so fix the tool contract first.
 - **A criterion about the agent's behaviour is inconclusive, with `no agent spans arrived` in the reasoning.** The judge waits thirty seconds for the trace after the conversation ends, and under load the trace arrives later than that, so the judge read an empty one. Rerun the scenario. If the trace shows `[REDACTED]` for the tool names and contents instead, the data privacy policy of the project hides them from the judge as well: see [Linking your traces](/agent-testing/linking-your-traces).
 - **The latency dropped and the cost did not.** Your agent takes fewer turns but with longer prompts. Read the token count on the trace and shorten the context: see [Reduce cost and latency](/improve-your-agent/reduce-cost-and-latency).

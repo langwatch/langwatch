@@ -74,7 +74,7 @@ The run detail has one column per target: the column with the declared default m
 <img className="block" src="/images/improve-your-agent/model-comparison-run-detail.png" alt="A comparison run of the same agent on gpt-5 and on gpt-5-mini, with the four charts and one column per model" />
 </Frame>
 
-Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, the failed criterion in that conversation says what the smaller model skipped, and the decision is either to route that kind of request to the larger model in your code or to keep the larger model for everything; ask Langy or your coding agent for the change, and rerun.
+Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, read the failed criterion in that conversation for what the smaller model skipped, then decide whether to route that kind of request to the larger model in your code or to keep the larger model for everything. Ask Langy or your coding agent for the change, and rerun.
 
 For example, on the six-scenario Returns suite of the example with three repeats, gpt-5-mini answered a conversation in 28 seconds against 54 seconds for gpt-5 and cost $0.036 against $0.046, but it failed the scenario where the customer gives a wrong order number twice out of three times, because it never asked the question that leads to the right order.
 
@@ -83,31 +83,21 @@ For example, on the six-scenario Returns suite of the example with three repeats
 After the model, in order of effect:
 
 - **Turns.** Every avoided turn removes a whole prompt from the bill. See [Reduce turns](/improve-your-agent/reduce-turns).
-- **Context size.** The system prompt, the tool list and the history are paid for on every turn. The input tokens of the first and the last call of a conversation, on the trace, show how much of the bill is context; ask your agent to shorten the prompt or trim the history, and compare.
+- **Context size.** The system prompt, the tool list and the history are paid for on every turn. The input tokens of the first and the last call of a conversation, on the trace, show how much of the bill is context; ask Langy or your coding agent to shorten the prompt or trim the history, and compare.
 - **Prompt caching.** Providers charge cached input tokens at a fraction of the price, and you get the cache by keeping the static part of the prompt first and identical across calls.
 - **Provider.** The `provider-cost-comparison` skill prices the traffic in your traces on other providers and tells you whether one of them would be cheaper.
 
 Every lever goes through the same gate: a comparison run of the suite before you keep it.
 
-## Let Langy or your coding agent run it
+## Run the whole loop from one prompt
 
-The whole loop above is one request. Ask [Langy](/langy/chat):
-
-```text
-Run the Returns suite on returns-agent with model=gpt-5 and model=gpt-5-mini, three repeats each,
-and tell me whether gpt-5-mini holds the pass rate. If it fails a scenario, tell me which one and why,
-and propose the change that keeps the cheaper model where it works.
-```
-
-Or your coding agent, with the skills installed:
-
-```bash
-npx skills add langwatch/skills/agent-improve
-npx skills add langwatch/skills/provider-cost-comparison
-```
+The four steps above are one request. Paste this into Langy or into your coding agent:
 
 ```text
-/agent-improve Cut the cost per conversation of returns-agent. Start with a model comparison on the Returns suite, then the context size. Keep the pass rate.
+Use the langwatch CLI to run the test suite I ran last against my agent once per value of its model
+run parameter, with three repeats; ask me which suite if it is not clear from our conversation.
+Tell me whether the cheapest model holds the pass rate. If it fails a scenario, tell me which one
+and why, and propose the change that keeps the cheaper model where it works.
 ```
 
 ## Common failures
