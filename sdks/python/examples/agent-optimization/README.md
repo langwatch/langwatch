@@ -54,10 +54,16 @@ The optimized program is written to `optimized_agent.json` and
 
 ## Cost and time
 
-A GEPA run at the default budget is about 50 scenario runs. Each one is a full
-conversation with three models involved, so expect 20 to 30 minutes and a few
-dollars on `gpt-5-mini` plus the `gpt-5` reflection calls. Lower
-`GEPA_MAX_METRIC_CALLS` to shorten it.
+Each scenario run is a full conversation with three models involved. Measured
+on one run of each script, with the agent, the simulated user and the judge on
+`gpt-5-mini`:
+
+| Script | Scenario runs | Wall clock | Cost |
+|---|---|---|---|
+| `optimize_mipro.py` | 64 (6 baseline, 10 bootstrap, 42 over seven trials, 6 final) | 42 minutes | $0.93, of which $0.41 for 18 `gpt-5` proposer calls |
+| `optimize_gepa.py` | 63 (6 baseline, 51 in the optimizer with `max_metric_calls=48`, 6 final) | 31 minutes | $0.64, of which $0.18 for 4 `gpt-5` reflection calls |
+
+Lower `GEPA_MAX_METRIC_CALLS` or `num_trials` to shorten a run.
 
 ## Where to look in LangWatch
 

@@ -5,7 +5,9 @@ keywords: langwatch, tool calls, tool optimization, tool description, function c
 description: Catch a tool your agent calls wrong or retries, get the tool contract fixed so the model gets it right the first time, and assert on the tool calls in your scenarios.
 ---
 
-A tool call goes wrong in two ways: your agent calls the wrong tool, or it calls the right tool with arguments the tool rejects. The second is the common one, and it is silent, because the agent retries with new wording until the call succeeds and the conversation still ends well; the only signs of the problem are the failed calls in the trace and the extra model calls they cost. Finding those calls and fixing the contract is work for Langy or your coding agent; your part is the suite, the criteria that catch the retries, and the review of the change.
+A tool call goes wrong in two ways: your agent calls the wrong tool, or it calls the right tool with arguments the tool rejects. The second is the common one, and it is silent, because the agent retries with new wording until the call succeeds and the conversation still ends well; the only signs of the problem are the failed calls in the trace and the extra model calls they cost.
+
+Finding those calls and fixing the contract is work for Langy or your coding agent; your part is the suite, the criteria that catch the retries, and the review of the change.
 
 ## How a bad tool call shows up
 

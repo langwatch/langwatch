@@ -2,10 +2,12 @@
 title: Reduce the Turns of an Agent
 sidebarTitle: Reduce turns
 keywords: langwatch, reduce turns, agent turns, tool retries, agent latency, scenarios, test suite, compare agents
-description: Find out why your agent is taking ten turns for a task that looks like it could be done in three, change the cause, and prove with the test suite that the quality stayed the same or improved.
+description: Find out why your agent is taking ten turns for a basic task, change the cause, and prove with the test suite that the quality improved.
 ---
 
-A turn is one reply from your agent, and behind each reply there are one or more model calls, since every tool call is a model call too. So when a tool rejects a call and your agent retries it, you pay for another model call even though the reply count stays at one, and this guide counts both. The digging is not yours to do: you wire the suite up, run the commands below, and Langy or your coding agent reads the run, tells you the cause and proposes the change for you to review.
+A turn is one reply from your agent, and behind each reply there are one or more model calls, since every tool call is a model call too. So when a tool rejects a call and your agent retries it, you pay for another model call even though the reply count stays at one, and this guide counts both.
+
+The digging is not yours to do: you wire the suite up, run the commands below, and Langy or your coding agent reads the run, tells you the cause and proposes the change for you to review.
 
 ## What you need
 
@@ -85,7 +87,9 @@ langwatch test-suite run "Returns" \
   --wait
 ```
 
-The run detail shows one column per target with its pass rate, total duration and cost, and four charts above them: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. Keep the change when the pass rate holds or rises and the model calls per conversation went down. Be careful with the cost and the latency charts on a single pass: over six scenarios run once, both move more between two runs of the same agent than a removed retry moves them, so read those two from a run with `--repeat 3`. When a criterion fails on the changed side, the judge's reasoning says which turn the agent skipped, and that goes back to your agent as the next prompt.
+The run detail shows one column per target with its pass rate, total duration and cost, and four charts above them: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. Keep the change when the pass rate holds or rises and the model calls per conversation went down. When a criterion fails on the changed side, the judge's reasoning says which turn the agent skipped, and that goes back to your agent as the next prompt.
+
+Be careful with the cost and the latency charts on a single pass: over six scenarios run once, both move more between two runs of the same agent than a removed retry moves them, so read those two from a run with `--repeat 3`.
 
 <Frame caption="A comparison run: one column per target, and the charts above the table.">
 <img className="block" src="/images/improve-your-agent/comparison-run-detail.png" alt="A comparison run of the returns agent in production against development: the four charts, one column per target with its pass rate, duration and cost, and one row per scenario" />

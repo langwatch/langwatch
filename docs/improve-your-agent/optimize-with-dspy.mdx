@@ -197,20 +197,21 @@ uv run optimize_mipro.py
 
 Compare the instructions before and after: both scripts print every instruction the optimizer changed, and the tool descriptions are part of them.
 
-## What one MIPROv2 run of the example showed
+## What the example runs showed
 
-The run used `num_candidates=4` and `num_trials=6` on the six scenarios, with the agent, the simulated user and the judge on `gpt-5-mini` and `gpt-5` as the proposer.
+One run of each script on the six scenarios, with the agent, the simulated user and the judge on `gpt-5-mini` and `gpt-5` as the proposer or the reflection model:
 
-| | |
-|---|---|
-| Scenario runs | 64: the baseline pass, 10 to bootstrap traces for the proposer, 42 over seven trials, the final pass |
-| Wall clock | 42 minutes |
-| Cost | $0.93, of which $0.41 for the 18 proposer calls |
-| Best trial score | 83% on trial 5, from 65% for the default program on trial 1 |
-| Pass rate before and after, re-evaluated | 4 of 6 both times |
-| Steps over the suite before and after | 24, then 18 |
+| | MIPROv2 | GEPA |
+|---|---|---|
+| Settings | `num_candidates=4`, `num_trials=6`, zero demos | `max_metric_calls=48`, `reflection_minibatch_size=3` |
+| Scenario runs | 64: the baseline pass, 10 to bootstrap traces for the proposer, 42 over seven trials, the final pass | 63: the baseline pass, 51 inside the optimizer, the final pass |
+| Wall clock | 42 minutes | 31 minutes |
+| Cost | $0.93, of which $0.41 for 18 proposer calls | $0.64, of which $0.18 for 4 reflection calls |
+| Best score inside the optimizer | 83% on trial 5, from 65% for the default program | 100% on iteration 1, from 67% for the default program |
+| Pass rate before and after, re-evaluated | 4 of 6, then 4 of 6 | 4 of 6, then 5 of 6 |
+| Steps over the suite before and after | 24, then 18 | 21, then 20 |
 
-The optimizer never saw the tool code; it only saw the rejected calls in the traces, and from those it wrote this into the `react` instructions:
+Neither optimizer saw the tool code. Both saw the rejected calls in the traces, and both wrote the accepted values into the `react` instructions. MIPROv2, from the proposer's candidates:
 
 ```text
 - Normalize the customer's freeform reason to one of the allowed codes before checking eligibility:
@@ -221,7 +222,24 @@ The optimizer never saw the tool code; it only saw the rejected calls in the tra
 - Call check_return_eligibility(order_id, reason) at most once per order.
 ```
 
-That is the same tool description fix as in [Fix tool calls](/improve-your-agent/fix-tool-calls), found by search instead of by reading the trace yourself. The damaged blender return went from 5 steps to 4 and from failed to passed. Two scenarios did not follow: the one where the customer asks for a recipe failed before and after, because the agent answers the recipe instead of saying it only helps with orders and no candidate instruction changed that, and the angry customer passed before and failed after. The best trial's 83% also did not repeat on the final pass, which is the non-determinism described in the Limits below.
+GEPA, from the judge's reasoning and the tool errors in the feedback, on its first iteration:
+
+```text
+2) check_return_eligibility
+   - args: {"order_id": "string", "reason": "string"}
+   - reason MUST be one of exactly:
+     - "defective"
+     - "incorrect_item"
+     - "not_as_expected"
+     - "remorse"
+   - Map customer wording to these values BEFORE calling:
+     - "damaged", "broken", "doesn't work" -> "defective"
+     - "wrong item", "received the wrong product" -> "incorrect_item"
+```
+
+That is the same tool description fix as in [Fix tool calls](/improve-your-agent/fix-tool-calls), found by search instead of by reading the trace yourself. On both runs the damaged blender return went from failed to passed and from 5 steps to 4.
+
+The scenario where the customer asks for a recipe failed before and after on both runs: the agent answers the recipe instead of saying it only helps with orders, and no candidate instruction changed that. On the MIPROv2 run the angry customer passed before and failed after, and the 83% of the best trial did not repeat on the final pass, which is the non-determinism described in the Limits below.
 
 ## Limits
 

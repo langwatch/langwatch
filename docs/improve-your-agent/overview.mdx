@@ -7,9 +7,11 @@ description: Make your agent faster, cheaper and shorter without making it worse
 
 ## What the improvement loop is
 
-The agent improvement loop is how you change an agent and prove that the change did not make it worse. It matters because an agent has no single right answer you can compare against: the same return request can end well after three turns or after ten, with one tool call or with four, so a change that makes the conversation shorter can also quietly drop the step where the agent confirmed the refund method, and a spot check would not show you that.
+The agent improvement loop is how you change your agent and prove that the change did not make it worse. Change one small thing in the harness, the prompt, a tool description or the model, and something that worked before can break five turns down the line. So you need a loop to keep improving the agent, in cost, in latency or in what it can handle, without dropping the quality.
 
-So the loop starts with a definition of quality that you can run. That definition is a test suite of [scenarios](/agent-testing/scenarios): simulated conversations with the criteria the agent has to meet, all of which pass on the agent you trust today. The judge in each scenario reads the whole conversation together with the agent's traces, passes or fails every criterion you wrote, and explains the verdict, which is what makes a suite a better gate than a golden answer. Everything else you care about, turns, tokens, cost and latency, is a metric you push down while that suite keeps passing, and the same run that gives you the verdicts also gives you those numbers, so you see in one place whether the change paid off and whether it cost you anything.
+The loop starts with a definition of quality that you can run. That definition is a test suite of [scenarios](/agent-testing/scenarios): simulated conversations with the criteria the agent has to meet, all of which pass on the agent you trust today. The judge in each scenario reads the whole conversation together with the agent's traces, passes or fails every criterion you wrote, and explains the verdict, which is what makes a suite a better gate than a golden answer.
+
+Everything else you care about, turns, tokens, cost and latency, is a metric you push down while that suite keeps passing. The same run that gives you the verdicts also gives you those numbers, so you see in one place whether the change paid off and whether it cost you anything.
 
 ## The loop
 
@@ -35,7 +37,7 @@ Use the guided engine when the change is in code, in a tool or in the harness, s
 
 <CardGroup cols={2}>
   <Card title="Reduce turns" icon="arrow-down-short-wide" href="/improve-your-agent/reduce-turns">
-    Find out why your agent takes ten turns for a task that could be done in three, get the cause changed, and prove the suite still passes.
+    Find out why your agent takes ten turns for a basic task, get the cause changed, and prove the suite still passes.
   </Card>
   <Card title="Fix tool calls" icon="wrench" href="/improve-your-agent/fix-tool-calls">
     Catch a tool your agent retries, get the tool contract fixed, and assert on the tool calls in the criteria.

@@ -53,7 +53,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ### Improve your agent
 
 - [Improve Your Agent](https://langwatch.ai/docs/improve-your-agent/overview.md): Make your agent faster, cheaper and shorter without making it worse, with a scenario test suite as the quality gate and one hypothesis at a time.
-- [Reduce the Turns of an Agent](https://langwatch.ai/docs/improve-your-agent/reduce-turns.md): Find out why your agent is taking ten turns for a task that looks like it could be done in three, change the cause, and prove with the test suite that the quality stayed the same or improved.
+- [Reduce the Turns of an Agent](https://langwatch.ai/docs/improve-your-agent/reduce-turns.md): Find out why your agent is taking ten turns for a basic task, change the cause, and prove with the test suite that the quality improved.
 - [Fix and Optimize Tool Calls](https://langwatch.ai/docs/improve-your-agent/fix-tool-calls.md): Catch a tool your agent calls wrong or retries, get the tool contract fixed so the model gets it right the first time, and assert on the tool calls in your scenarios.
 - [Reduce Cost and Latency](https://langwatch.ai/docs/improve-your-agent/reduce-cost-and-latency.md): Run the same test suite on two models side by side, read the pass rate, the cost and the reply latency of each, and keep the cheaper model only where the pass rate holds.
 - [Optimize with DSPy Using Scenarios as the Metric](https://langwatch.ai/docs/improve-your-agent/optimize-with-dspy.md): A DSPy optimizer rewrites your agent's instructions and tool descriptions and scores every candidate by running your scenario suite, with the judge's reasoning as its feedback.
